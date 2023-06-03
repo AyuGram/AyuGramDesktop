@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=Telegram
-Comment=New era of messaging
-TryExec=Telegram
-Exec=Telegram -- %u
-Icon=org.telegram.desktop
+Name=AyuGram Desktop
+Comment=Unofficial desktop version of Telegram messaging app
+TryExec=telegram-desktop
+Exec=telegram-desktop -- %u
+Icon=telegram
 Terminal=false
-StartupWMClass=TelegramDesktop
+StartupWMClass=AyuGram
 Type=Application
 Categories=Chat;Network;InstantMessaging;Qt;
 MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;

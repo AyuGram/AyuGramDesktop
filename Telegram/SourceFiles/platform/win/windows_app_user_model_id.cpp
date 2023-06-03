@@ -213,7 +213,7 @@ void CleanupShortcut() {
 		return;
 	}
 
-	QString path = systemShortcutPath() + u"Telegram.lnk"_q;
+	QString path = systemShortcutPath() + u"AyuGram.lnk"_q;
 	std::wstring p = QDir::toNativeSeparators(path).toStdWString();
 
 	DWORD attributes = GetFileAttributes(p.c_str());
@@ -358,16 +358,19 @@ bool ValidateShortcut() {
 	}
 
 	if (cAlphaVersion()) {
-		path += u"TelegramAlpha.lnk"_q;
+		path += u"AyuGramAlpha.lnk"_q;
 		if (validateShortcutAt(path)) {
 			return true;
 		}
 	} else {
-		if (checkInstalled(path)) {
+		const auto installed = u"AyuGram Desktop/AyuGram.lnk"_q;
+		const auto old = u"AyuGram for Windows/AyuGram.lnk"_q;
+		if (validateShortcutAt(path + installed)
+			|| validateShortcutAt(path + old)) {
 			return true;
 		}
 
-		path += u"Telegram.lnk"_q;
+		path += u"AyuGram.lnk"_q;
 		if (validateShortcutAt(path)) {
 			return true;
 		}

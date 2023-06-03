@@ -1,47 +1,43 @@
-# [Telegram Desktop][telegram_desktop] – Official Messenger
+# AyuGram
 
-This is the complete source code and the build instructions for the official [Telegram][telegram] messenger desktop client, based on the [Telegram API][telegram_api] and the [MTProto][telegram_proto] secure protocol.
+![AyuGram Logo](.github/AyuGram.png)
 
-[![Version](https://badge.fury.io/gh/telegramdesktop%2Ftdesktop.svg)](https://github.com/telegramdesktop/tdesktop/releases)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Windows./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/MacOS./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Linux./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
+## Features
 
-[![Preview of Telegram Desktop][preview_image]][preview_image_url]
+- Disable read packets sending
+- Disable online packets sending
+- Disable typing & upload packets sending
+- Auto offline
+- Messages history (+ deleted ones)
+- Using scheduled messages to keep offline
 
-The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
+Technically, we have the **Ghost mode** starter pack.
 
-## Supported systems
+Also, we have a cool **purple icon**.
 
-The latest version is available for
+## Downloads? / FAQ?
 
-* [Windows 7 and above (64 bit)](https://telegram.org/dl/desktop/win64) ([portable](https://telegram.org/dl/desktop/win64_portable))
-* [Windows 7 and above (32 bit)](https://telegram.org/dl/desktop/win) ([portable](https://telegram.org/dl/desktop/win_portable))
-* [macOS 10.13 and above](https://telegram.org/dl/desktop/mac)
-* [Linux static build for 64 bit](https://telegram.org/dl/desktop/linux)
-* [Snap](https://snapcraft.io/telegram-desktop)
-* [Flatpak](https://flathub.org/apps/details/org.telegram.desktop)
+Follow our [Telegram channel](https://t.me/ayugram1338). FAQ can be found here.
 
-## Old system versions
-
+<<<<<<< HEAD
 Version **4.9.9** was the last that supports older systems
 
 * [macOS 10.12](https://updates.tdesktop.com/tmac/tsetup.4.9.9.dmg)
 * [Linux with glibc < 2.28 static build](https://updates.tdesktop.com/tlinux/tsetup.4.9.9.tar.xz)
 
 Version **2.4.4** was the last that supports older systems
+=======
+## May I get banned?
 
-* [OS X 10.10 and 10.11](https://updates.tdesktop.com/tosx/tsetup-osx.2.4.4.dmg)
-* [Linux static build for 32 bit](https://updates.tdesktop.com/tlinux32/tsetup32.2.4.4.tar.xz)
+Well, *you* **can't**, because you're just an ordinary user.
 
-Version **1.8.15** was the last that supports older systems
+## How to build
 
-* [Windows XP and Vista](https://updates.tdesktop.com/tsetup/tsetup.1.8.15.exe) ([portable](https://updates.tdesktop.com/tsetup/tportable.1.8.15.zip))
-* [OS X 10.8 and 10.9](https://updates.tdesktop.com/tmac/tsetup.1.8.15.dmg)
-* [OS X 10.6 and 10.7](https://updates.tdesktop.com/tmac32/tsetup32.1.8.15.dmg)
+Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md).
 
-## Third-party
+### Remarks
 
+<<<<<<< HEAD
 * Qt 6 ([LGPL](http://doc.qt.io/qt-6/lgpl.html)) and Qt 5.15 ([LGPL](http://doc.qt.io/qt-5/lgpl.html)) slightly patched
 * OpenSSL 3.2.1 ([Apache License 2.0](https://www.openssl.org/source/apache-license-2.0.txt))
 * WebRTC ([New BSD License](https://github.com/desktop-app/tg_owt/blob/master/LICENSE))
@@ -84,3 +80,9 @@ Version **1.8.15** was the last that supports older systems
 [linux]: docs/building-linux.md
 [preview_image]: https://github.com/telegramdesktop/tdesktop/blob/dev/docs/assets/preview.png "Preview of Telegram Desktop"
 [preview_image_url]: https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/docs/assets/preview.png
+=======
+Make sure you have these components installed with VS Build Tools:
+- C++ MFC latest (x86 & x64)
+- C++ ATL latest (x86 & x64)
+- latest Windows 11 SDK
+>>>>>>> eaba9781a5 (upload: import Ayu initial)

@@ -71,6 +71,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_notifications_manager.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
 
+#include "ayu/ayu_settings.h"
+
 namespace {
 
 constexpr auto kNotificationTextLimit = 255;
@@ -3231,6 +3233,11 @@ void HistoryItem::setForwardsCount(int count) {
 }
 
 void HistoryItem::setPostAuthor(const QString &postAuthor) {
+    const auto settings = &AyuSettings::getInstance();
+    if (settings->keepDeletedMessages && !(_flags & MessageFlag::HasPostAuthor)) {
+        _flags |= MessageFlag::HasPostAuthor;
+    }
+
 	auto msgsigned = Get<HistoryMessageSigned>();
 	if (msgsigned && msgsigned->viaBusinessBot) {
 		return;
@@ -3251,6 +3258,11 @@ void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	msgsigned->author = postAuthor;
 	msgsigned->isAnonymousRank = !isDiscussionPost()
 		&& this->author()->isMegagroup();
+
+    if (settings->keepDeletedMessages) {
+        history()->owner().requestItemViewRefresh(this);
+    }
+
 	history()->owner().requestItemResize(this);
 }
 

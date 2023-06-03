@@ -96,6 +96,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+#include "ayu/ayu_settings.h"
+#include "ayu/database/ayu_database.h"
+#include "ayu/context_menu/message_history_box.h"
+
 namespace HistoryView {
 namespace {
 
@@ -1379,7 +1383,26 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		}
 	}
 
-	AddCopyLinkAction(result, link);
+    if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty())) {
+        result->addAction(QString("History"), [=] {
+            auto box = Box<AyuUi::MessageHistoryBox>(item);
+            Ui::show(std::move(box));
+        }, &st::menuIconInfo);
+    }
+
+    const auto settings = &AyuSettings::getInstance();
+    const auto history = item->history();
+    result->addAction(QString("Hide"), [=]() {
+        const auto initKeepDeleted = settings->keepDeletedMessages;
+
+        settings->set_keepDeletedMessages(false);
+        history->destroyMessage(item);
+        settings->set_keepDeletedMessages(initKeepDeleted);
+    }, &st::menuIconClear);
+
+	if (!view || !list->hasCopyRestriction(view->data())) {
+		AddCopyLinkAction(result, link);
+	}
 	AddMessageActions(result, request, list);
 
 	const auto wasAmount = result->actions().size();

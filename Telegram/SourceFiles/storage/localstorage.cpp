@@ -32,6 +32,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QDirIterator>
 
+#include "ayu/ayu_settings.h"
+
 #ifndef Q_OS_WIN
 #include <unistd.h>
 #endif // Q_OS_WIN
@@ -440,6 +442,8 @@ void writeSettings() {
 	}
 
 	if (!QDir().exists(_basePath)) QDir().mkpath(_basePath);
+
+    AyuSettings::save();
 
 	// We dropped old test authorizations when migrated to multi auth.
 	//const auto name = cTestMode() ? u"settings_test"_q : u"settings"_q;

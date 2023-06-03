@@ -65,6 +65,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QMimeData>
 
+#include "ayu/ayu_settings.h"
+#include "base/unixtime.h"
+
 namespace {
 
 constexpr auto kMaxMessageLength = 4096;
@@ -1892,6 +1895,14 @@ bool SendFilesBox::validateLength(const QString &text) const {
 void SendFilesBox::send(
 		Api::SendOptions options,
 		bool ctrlShiftEnter) {
+    // AyuGram useScheduledMessages
+    const auto settings = &AyuSettings::getInstance();
+    if (settings->useScheduledMessages && !options.scheduled) {
+        DEBUG_LOG(("[AyuGram] Scheduling files"));
+        auto current = base::unixtime::now();
+        options.scheduled = current + 60; // well, files can be really big...
+    }
+
 	if ((_sendType == Api::SendType::Scheduled
 		|| _sendType == Api::SendType::ScheduledToUser)
 		&& !options.scheduled) {

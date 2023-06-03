@@ -74,6 +74,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_common_adapters.h"
 #include "styles/style_dialogs.h"
 
+#include "ayu/ayu_settings.h"
+
 namespace {
 
 constexpr auto kNewBlockEachMessage = 50;
@@ -579,6 +581,49 @@ not_null<HistoryItem*> History::insertItem(
 
 void History::destroyMessage(not_null<HistoryItem*> item) {
 	Expects(item->isHistoryEntry() || !item->mainView());
+
+    // AyuGram keepDeletedMessages
+    const auto settings = &AyuSettings::getInstance();
+    if (settings->keepDeletedMessages && item->isRegular() && !item->isGroupMigrate()) {
+        if (!item->isService()) {
+            item->setPostAuthor(settings->deletedMark);
+        } else {
+            const auto msg = TextWithEntities{
+                    "Message deleted",
+                    {
+                            EntityInText(
+                                    EntityType::Italic,
+                                    0,
+                                    15,
+                                    "Message deleted"
+                            )
+                    }
+            };
+
+            auto flags = MessageFlag::HasFromId
+                         | MessageFlag::HasReplyInfo
+                         | MessageFlag::HasPostAuthor;
+
+            if (item->isPost()) {
+                flags |= MessageFlag::Post;
+            }
+
+            addNewLocalMessage(
+                    session().data().nextLocalMessageId(),
+                    flags,
+                    UserId(),
+                    item->id,
+                    base::unixtime::now(),
+                    item->author()->id,
+                    "AyuGram"_q,
+                    msg,
+                    MTP_messageMediaEmpty(),
+                    HistoryMessageMarkupData(),
+                    uint64(0));
+        }
+
+        return;
+    }
 
 	const auto peerId = peer->id;
 	if (item->isHistoryEntry()) {

@@ -33,6 +33,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_credits.h"
 #include "styles/style_dialogs.h"
 
+#include "ayu/ayu_settings.h"
+
 namespace HistoryView {
 
 struct BottomInfo::Effect {
@@ -408,11 +410,12 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto edited = (_data.flags & Data::Flag::Edited)
-		? (tr::lng_edited(tr::now) + ' ')
-		: (_data.flags & Data::Flag::EstimateDate)
-		? (tr::lng_approximate(tr::now) + ' ')
-		: QString();
+    const auto ayuSettings = &AyuSettings::getInstance();
+    auto editedMarkValue = ayuSettings->editedMark;
+
+    const auto edited = (_data.flags & Data::Flag::Edited)
+                        ? (editedMarkValue + ' ')
+                        : QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? u", "_q : QString();
 	const auto date = edited + QLocale().toString(

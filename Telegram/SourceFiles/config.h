@@ -21,9 +21,9 @@ enum {
 
 	AutoSearchTimeout = 900, // 0.9 secs
 
-	PreloadHeightsCount = 3, // when 3 screens to scroll left make a preload request
+	PreloadHeightsCount = 4, // when 4 screens to scroll left make a preload request
 
-	SearchPeopleLimit = 5,
+	SearchPeopleLimit = 20,
 
 	MaxMessageSize = 4096,
 

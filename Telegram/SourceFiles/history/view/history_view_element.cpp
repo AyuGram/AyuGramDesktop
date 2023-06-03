@@ -2113,7 +2113,7 @@ Element *Element::previousInBlocks() const {
 
 Element *Element::previousDisplayedInBlocks() const {
 	auto result = previousInBlocks();
-	while (result && (result->data()->isEmpty() || result->isHidden())) {
+	while (result && (result->data()->isEmpty() || result->isHidden() || result->data()->isLocal())) {
 		result = result->previousInBlocks();
 	}
 	return result;
@@ -2134,7 +2134,7 @@ Element *Element::nextInBlocks() const {
 
 Element *Element::nextDisplayedInBlocks() const {
 	auto result = nextInBlocks();
-	while (result && (result->data()->isEmpty() || result->isHidden())) {
+	while (result && (result->data()->isEmpty() || result->isHidden() || result->data()->isLocal())) {
 		result = result->nextInBlocks();
 	}
 	return result;

@@ -109,6 +109,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
 
+#include "ayu/context_menu/context_menu.h"
+
 namespace {
 
 constexpr auto kScrollDateHideTimeout = 1000;
@@ -2484,6 +2486,14 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}
 			}
 		}
+        // ayu context menu options
+        auto ayuSubMenu = AyuUi::AyuPopupMenu(this);
+        ayuSubMenu.addHistoryAction(item);
+        ayuSubMenu.addHideMessageAction(item);
+        ayuSubMenu.addReadUntilAction(item);
+
+        _menu->addAction(QString("Ayu"), std::move(ayuSubMenu._ayuSubMenu), &st::menuIconSettings, &st::menuIconSettings);
+
 	};
 	const auto addPhotoActions = [&](not_null<PhotoData*> photo, HistoryItem *item) {
 		const auto media = photo->activeMediaView();

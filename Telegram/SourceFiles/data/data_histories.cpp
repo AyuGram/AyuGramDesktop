@@ -31,6 +31,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "apiwrap.h"
 
+#include "ayu/ayu_settings.h"
+#include "ayu/ayu_state.h"
+
 namespace Data {
 namespace {
 
@@ -267,6 +270,15 @@ void Histories::readInboxTill(
 
 	Core::App().notifications().clearIncomingFromHistory(history);
 
+    // AyuGram sendReadPackets
+    const auto settings = &AyuSettings::getInstance();
+    auto allow = settings->sendReadPackets;
+    auto reallyAllow = AyuState::getAllowSendPacket(); // will return true if `allow`
+    if (!reallyAllow) {
+        DEBUG_LOG(("[AyuGram] Don't read messages"));
+        return;
+    }
+
 	const auto needsRequest = history->readInboxTillNeedsRequest(tillId);
 	if (!needsRequest && !force) {
 		DEBUG_LOG(("Reading: readInboxTill finish 1."));
@@ -288,8 +300,8 @@ void Histories::readInboxTill(
 			sendPendingReadInbox(history);
 		}
 		return;
-	} else if (!needsRequest
-		&& (!maybeState || !maybeState->willReadTill)) {
+    } else if (!needsRequest && (allow != reallyAllow && !force)
+               && (!maybeState || !maybeState->willReadTill)) {
 		return;
 	}
 	const auto stillUnread = history->countStillUnreadLocal(tillId);

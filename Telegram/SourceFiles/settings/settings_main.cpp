@@ -83,6 +83,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtGui/QWindow>
 
+#include "ayu/settings/settings_ayu.h"
+
 namespace Settings {
 namespace {
 
@@ -700,7 +702,11 @@ void SetupSections(
 	addSection(
 		tr::lng_settings_section_devices(),
 		Calls::Id(),
-		{ &st::menuIconUnmute });
+		{ &st::settingsIconCalls, kIconGreen });
+    addSection(
+        rpl::single(QString("AyuGram Settings")),
+        Ayu::Id(),
+        { &st::settingsPremiumIconStar, kIconPurple });
 
 	SetupPowerSavingButton(&controller->window(), container);
 	SetupLanguageButton(&controller->window(), container);

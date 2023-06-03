@@ -1004,7 +1004,7 @@ void Notification::updateNotifyDisplay() {
 				: TextWithEntities{ name };
 		};
 		auto title = options.hideNameAndPhoto
-			? TextWithEntities{ u"Telegram Desktop"_q }
+			? TextWithEntities{ u"AyuGram Desktop"_q }
 			: reminder
 			? tr::lng_notification_reminder(tr::now, Ui::Text::WithEntities)
 			: topicWithChat();

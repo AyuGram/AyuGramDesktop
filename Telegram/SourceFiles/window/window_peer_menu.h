@@ -268,4 +268,6 @@ void ForwardToSelf(
 	std::shared_ptr<Main::SessionShow> show,
 	const Data::ForwardDraft &draft);
 
+void MarkAsReadChatListHack(not_null<Dialogs::MainList*> list);
+
 } // namespace Window

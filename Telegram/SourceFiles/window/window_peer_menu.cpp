@@ -1721,6 +1721,9 @@ void PeerMenuExportChat(
 		Core::App().exportManager().start(peer);
 	});
 }
+void MarkAsReadChatListHack(not_null<Dialogs::MainList*> list) {
+    MarkAsReadChatList(list);
+}
 
 void PeerMenuDeleteContact(
 		not_null<Window::SessionController*> controller,

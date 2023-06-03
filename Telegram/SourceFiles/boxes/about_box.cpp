@@ -46,11 +46,11 @@ rpl::producer<TextWithEntities> Text2() {
 		lt_gpl_link,
 		rpl::single(Ui::Text::Link(
 			"GNU GPL",
-			"https://github.com/telegramdesktop/tdesktop/blob/master/LICENSE")),
+			"https://github.com/AyuGram/AyuGramDesktop/blob/master/LICENSE")),
 		lt_github_link,
 		rpl::single(Ui::Text::Link(
 			"GitHub",
-			"https://github.com/telegramdesktop/tdesktop")),
+			"https://github.com/AyuGram/AyuGramDesktop")),
 		Ui::Text::WithEntities);
 }
 
@@ -64,7 +64,7 @@ rpl::producer<TextWithEntities> Text3() {
 } // namespace
 
 void AboutBox(not_null<Ui::GenericBox*> box) {
-	box->setTitle(rpl::single(u"Telegram Desktop"_q));
+	setTitle(rpl::single(u"AyuGram Desktop"_q));
 
 	auto layout = box->verticalLayout();
 
@@ -313,4 +313,3 @@ void ArchiveHintBox(
 		box->addButton(std::move(button));
 	}
 }
-

@@ -79,6 +79,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+#include "ayu/ayu_settings.h"
+#include "ayu/boxes/confirmation_box.h"
+
 namespace Window {
 namespace {
 
@@ -704,6 +707,26 @@ void MainMenu::setupMenu() {
 		)->setClickedCallback([=] {
 			controller->showPeerHistory(controller->session().user());
 		});
+        addAction(
+                rpl::single(QString("LRead Messages")),
+                { &st::settingsIconForward, kIconPurple }
+        )->setClickedCallback([=] {
+            auto settings = &AyuSettings::getInstance();
+            auto prev = settings->sendReadPackets;
+            settings->set_sendReadPackets(false);
+
+            auto chats = controller->session().data().chatsList();
+            MarkAsReadChatListHack(chats);
+
+            settings->set_sendReadPackets(prev);
+        });
+        addAction(
+                rpl::single(QString("SRead Messages")),
+                { &st::settingsIconForward, kIconPurple }
+        )->setClickedCallback([=] {
+            auto box = Box<AyuUi::ConfirmationBox>(controller);
+            Ui::show(std::move(box));
+        });
 	} else {
 		addAction(
 			tr::lng_profile_add_contact(),
