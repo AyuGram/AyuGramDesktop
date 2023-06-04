@@ -22,7 +22,8 @@ for string in tree.find_all('string'):
 with open('./ayu-scripts/desktop-specific.json') as f:
     data = json.load(f)
 
-    strings.update(data)
+    for k, v in data.items():
+        strings[f'ayu_{k}'] = v
 
 req = requests.get(
     'https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/langs/lang.strings'
