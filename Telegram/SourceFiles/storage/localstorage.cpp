@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDirIterator>
 
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_lang.h"
 
 #ifndef Q_OS_WIN
 #include <unistd.h>
@@ -1132,6 +1133,14 @@ void readLangPack() {
 	if (langpack.stream.status() == QDataStream::Ok) {
 		Lang::GetInstance().fillFromSerialized(data, langpack.version);
 	}
+    QString langPackBaseId = Lang::GetInstance().baseId();
+    QString langPackId = Lang::GetInstance().id();
+    if (langPackId.isEmpty()) {
+        LOG(("Lang ID not found! Re-use old language pack..."));
+        return;
+    }
+    CustomLangPack::initInstance();
+    CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
 }
 
 void writeLangPack() {

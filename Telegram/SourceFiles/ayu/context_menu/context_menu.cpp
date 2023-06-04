@@ -1,5 +1,6 @@
 #include "context_menu.h"
 #include "history/history_inner_widget.h"
+#include "lang_auto.h"
 #include "ui/widgets/popup_menu.h"
 #include "base/unixtime.h"
 #include "styles/style_chat.h"
@@ -36,7 +37,7 @@ namespace AyuUi {
 
     void AyuPopupMenu::addReadUntilAction(HistoryItem *item) const {
         const auto history = item->history();
-        _ayuSubMenu->addAction(QString("Read until"), [=]() {
+        _ayuSubMenu->addAction(tr::ayu_ReadUntilMenuText(tr::now), [=]() {
             AyuState::setAllowSendReadPacket(true);
             history->session().data().histories().readInboxOnNewMessage(item);
         }, &st::menuIconShowInChat);

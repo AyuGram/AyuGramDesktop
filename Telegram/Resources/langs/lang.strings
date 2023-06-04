@@ -7040,3 +7040,37 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mac_hold_to_quit" = "Hold {text} to Quit";
 
 // Keys finished
+
+
+// AyuGram keys generated
+
+"ayu_AyuPreferences" = "AyuGram Preferences";
+"ayu_GhostEssentialsHeader" = "Ghost essentials";
+"ayu_SendReadPackets" = "Send read status";
+"ayu_SendOnlinePackets" = "Send online status";
+"ayu_SendUploadProgress" = "Send typing & upload status";
+"ayu_SendOfflinePacketAfterOnline" = "Immediate offline after online";
+"ayu_MarkReadAfterSend" = "Send read status after reply";
+"ayu_UseScheduledMessages" = "Schedule messages";
+"ayu_SpyEssentialsHeader" = "Spy essentials";
+"ayu_KeepDeletedMessages" = "Keep deleted messages";
+"ayu_KeepMessagesHistory" = "Keep edits history";
+"ayu_QoLTogglesHeader" = "QoL toggles";
+"ayu_RealForwardTime" = "Show real forward time";
+"ayu_ShowFromChannel" = "Show «channel» label";
+"ayu_KeepAliveService" = "Keep Alive Service";
+"ayu_EnableAds" = "Enable ads";
+"ayu_CustomizationHeader" = "Customization";
+"ayu_DeletedMarkText" = "Deleted mark";
+"ayu_ShowGhostToggleInDrawer" = "Show ghost mode toggle";
+"ayu_CleanDatabase" = "Clean database";
+"ayu_CleanDatabaseNotification" = "AyuGram database cleaned";
+"ayu_EnableGhostMode" = "Enable Ghost";
+"ayu_DisableGhostMode" = "Disable Ghost";
+"ayu_GhostModeEnabled" = "Ghost mode turned on";
+"ayu_GhostModeDisabled" = "Ghost mode turned off";
+"ayu_EditsHistoryTitle" = "Edits history";
+"ayu_EditsHistoryMenuText" = "History";
+"ayu_ReadUntilMenuText" = "Read until";
+"ayu_LikelyOfflineStatus" = "offline ?";
+"ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs";

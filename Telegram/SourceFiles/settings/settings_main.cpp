@@ -704,7 +704,7 @@ void SetupSections(
 		Calls::Id(),
 		{ &st::settingsIconCalls, kIconGreen });
     addSection(
-        rpl::single(QString("AyuGram Settings")),
+        tr::ayu_AyuPreferences(),
         Ayu::Id(),
         { &st::settingsPremiumIconStar, kIconPurple });
 

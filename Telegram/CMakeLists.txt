@@ -104,6 +104,8 @@ PRIVATE
     ayu/ayu_state.h
     ayu/ayu_settings.cpp
     ayu/ayu_settings.h
+    ayu/ayu_lang.cpp
+    ayu/ayu_lang.h
     ayu/boxes/confirmation_box.cpp
     ayu/boxes/confirmation_box.h
     ayu/boxes/edit_deleted_mark.cpp

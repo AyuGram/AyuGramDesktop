@@ -3,6 +3,7 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/settings/settings_ayu.h"
 
+#include "lang_auto.h"
 #include "mainwindow.h"
 #include "settings/settings_common.h"
 #include "ui/wrap/vertical_layout.h"
@@ -24,7 +25,7 @@
 namespace Settings {
 
     rpl::producer<QString> Ayu::title() {
-        return rpl::single(QString("AyuGram Settings"));
+        return tr::ayu_AyuPreferences();
     }
 
     Ayu::Ayu(
@@ -38,11 +39,12 @@ namespace Settings {
                                    not_null<Window::SessionController *> controller) {
         auto settings = &AyuSettings::getInstance();
 
-        AddSubsectionTitle(container, rpl::single(QString("General")));
+        AddSkip(container);
+        AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
 
         AddButton(
                 container,
-                rpl::single(QString("Send read packets")),
+                tr::ayu_SendReadPackets(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->sendReadPackets)
@@ -56,7 +58,7 @@ namespace Settings {
 
         AddButton(
                 container,
-                rpl::single(QString("Send online packets")),
+                tr::ayu_SendOnlinePackets(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->sendOnlinePackets)
@@ -70,21 +72,7 @@ namespace Settings {
 
         AddButton(
                 container,
-                rpl::single(QString("Send offline packet after online")),
-                st::settingsButtonNoIcon
-        )->toggleOn(
-                rpl::single(settings->sendOfflinePacketAfterOnline)
-        )->toggledValue(
-        ) | rpl::filter([=](bool enabled) {
-            return (enabled != settings->sendOfflinePacketAfterOnline);
-        }) | rpl::start_with_next([=](bool enabled) {
-            settings->set_sendOfflinePacketAfterOnline(enabled);
-            Local::writeSettings();
-        }, container->lifetime());
-
-        AddButton(
-                container,
-                rpl::single(QString("Send typing & upload progress")),
+                tr::ayu_SendUploadProgress(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->sendUploadProgress)
@@ -98,7 +86,21 @@ namespace Settings {
 
         AddButton(
                 container,
-                rpl::single(QString("Use scheduled messages to keep offline")),
+                tr::ayu_SendOfflinePacketAfterOnline(),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->sendOfflinePacketAfterOnline)
+        )->toggledValue(
+        ) | rpl::filter([=](bool enabled) {
+            return (enabled != settings->sendOfflinePacketAfterOnline);
+        }) | rpl::start_with_next([=](bool enabled) {
+            settings->set_sendOfflinePacketAfterOnline(enabled);
+            Local::writeSettings();
+        }, container->lifetime());
+
+        AddButton(
+                container,
+                tr::ayu_UseScheduledMessages(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->useScheduledMessages)
@@ -110,9 +112,14 @@ namespace Settings {
             Local::writeSettings();
         }, container->lifetime());
 
+        AddDivider(container);
+        AddSkip(container);
+
+        AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
+
         AddButton(
                 container,
-                rpl::single(QString("Keep deleted messages")),
+                tr::ayu_KeepDeletedMessages(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->keepDeletedMessages)
@@ -126,7 +133,7 @@ namespace Settings {
 
         AddButton(
                 container,
-                rpl::single(QString("Keep messages' history")),
+                tr::ayu_KeepMessagesHistory(),
                 st::settingsButtonNoIcon
         )->toggleOn(
                 rpl::single(settings->keepMessagesHistory)
@@ -138,11 +145,16 @@ namespace Settings {
             Local::writeSettings();
         }, container->lifetime());
 
+        AddDivider(container);
+        AddSkip(container);
+
+        AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
+
         auto currentDeletedMark = lifetime().make_state<rpl::variable<QString>>();
 
         auto btn = AddButtonWithLabel(
                 container,
-                rpl::single(QString("Deleted Mark")),
+                tr::ayu_DeletedMarkText(),
                 currentDeletedMark->changes(),
                 st::settingsButtonNoIcon
         );
@@ -160,7 +172,7 @@ namespace Settings {
 
         auto btn2 = AddButtonWithLabel(
                 container,
-                rpl::single(QString("Edited Mark")),
+                rpl::single(QString("Edited mark")),
                 currentEditedMark->changes(),
                 st::settingsButtonNoIcon
         );
@@ -174,7 +186,7 @@ namespace Settings {
         });
         *currentEditedMark = settings->editedMark;
 
-        AddDividerText(container, rpl::single(QString("AyuGram developed and maintained by Radolyn Labs")));
+        AddDividerText(container, tr::ayu_SettingsWatermark());
     }
 
     void Ayu::setupContent(not_null<Window::SessionController *> controller) {
