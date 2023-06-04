@@ -31,7 +31,6 @@ EditEditedMarkBox::EditEditedMarkBox(QWidget *) :
 }
 
 
-
 void EditEditedMarkBox::prepare() {
     const auto defaultEditedMark = tr::lng_edited(tr::now);
     auto newHeight = st::contactPadding.top() + _text->height();
@@ -78,8 +77,8 @@ void EditEditedMarkBox::resizeEvent(QResizeEvent *e) {
 
 void EditEditedMarkBox::save() {
     const auto settings = &AyuSettings::getInstance();
-    settings->editedMark = _text->getLastText();
-    Local::writeSettings();
+    settings->set_editedMark(_text->getLastText());
+    AyuSettings::save();
 
     closeBox();
 }

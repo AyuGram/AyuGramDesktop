@@ -56,7 +56,7 @@ namespace AyuDatabase {
                         c(&EditedMessage::userId) == userId and
                         c(&EditedMessage::dialogId) == dialogId and
                         c(&EditedMessage::messageId) == messageId)
-                        );
+        );
     }
 
     std::vector<EditedMessage> getEditedMessages(HistoryItem *item) {

@@ -35,8 +35,7 @@ namespace Settings {
         setupContent(controller);
     }
 
-    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
-                                   not_null<Window::SessionController *> controller) {
+    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container) {
         auto settings = &AyuSettings::getInstance();
 
         AddSkip(container);
@@ -150,41 +149,27 @@ namespace Settings {
 
         AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
 
-        auto currentDeletedMark = lifetime().make_state<rpl::variable<QString>>();
-
         auto btn = AddButtonWithLabel(
                 container,
                 tr::ayu_DeletedMarkText(),
-                currentDeletedMark->changes(),
+                AyuSettings::get_deletedMarkReactive().value(),
                 st::settingsButtonNoIcon
         );
         btn->addClickHandler([=]() {
             auto box = Box<EditDeletedMarkBox>();
-            box->boxClosing() | rpl::start_with_next([=]() {
-                *currentDeletedMark = settings->deletedMark;
-            }, container->lifetime());
-
             Ui::show(std::move(box));
         });
-        *currentDeletedMark = settings->deletedMark;
-
-        auto currentEditedMark = lifetime().make_state<rpl::variable<QString>>();
 
         auto btn2 = AddButtonWithLabel(
                 container,
                 rpl::single(QString("Edited mark")),
-                currentEditedMark->changes(),
+                AyuSettings::get_editedMarkReactive().value(),
                 st::settingsButtonNoIcon
         );
         btn2->addClickHandler([=]() {
             auto box = Box<EditEditedMarkBox>();
-            box->boxClosing() | rpl::start_with_next([=]() {
-                *currentEditedMark = settings->editedMark;
-            }, container->lifetime());
-
             Ui::show(std::move(box));
         });
-        *currentEditedMark = settings->editedMark;
 
         AddDividerText(container, tr::ayu_SettingsWatermark());
     }
@@ -192,7 +177,7 @@ namespace Settings {
     void Ayu::setupContent(not_null<Window::SessionController *> controller) {
         const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
-        SetupAyuGramSettings(content, controller);
+        SetupAyuGramSettings(content);
 
         Ui::ResizeFitChild(this, content);
     }

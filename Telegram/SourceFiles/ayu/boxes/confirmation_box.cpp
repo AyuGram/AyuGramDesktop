@@ -9,7 +9,7 @@
 
 namespace AyuUi {
     ConfirmationBox::ConfirmationBox(
-            QWidget*,
+            QWidget *,
             not_null<Window::SessionController *> controller) : _controller(controller) {
         //
     }

@@ -6,12 +6,16 @@
 namespace AyuUi {
     class MessageHistoryBox : public Ui::BoxContent {
     public:
-        MessageHistoryBox(QWidget*, HistoryItem *item);
+        MessageHistoryBox(QWidget *, HistoryItem *item);
+
     protected:
         void prepare() override;
+
         void resizeEvent(QResizeEvent *e) override;
+
     private:
         void setupControls();
+
         void addEditedMessagesToLayout(HistoryItem *item);
 
         object_ptr<Ui::VerticalLayout> _content;

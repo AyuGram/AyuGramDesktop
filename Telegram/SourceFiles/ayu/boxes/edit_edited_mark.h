@@ -6,16 +6,18 @@
 
 class EditEditedMarkBox : public Ui::BoxContent {
 public:
-    EditEditedMarkBox(QWidget*);
+    EditEditedMarkBox(QWidget *);
 
 protected:
     void setInnerFocus() override;
+
     void prepare() override;
 
     void resizeEvent(QResizeEvent *e) override;
 
 private:
     void submit();
+
     void save();
 
     object_ptr<Ui::InputField> _text;

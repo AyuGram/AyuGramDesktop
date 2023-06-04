@@ -40,7 +40,7 @@ namespace AyuUi {
     }
 
     void MessageHistoryBox::prepare() {
-        setTitle(rpl::single(QString("Message history")));
+        setTitle(tr::ayu_EditsHistoryTitle());
 
 //        setDimensionsToContent(st::boxWideWidth, _content);
         setDimensions(st::boxWideWidth, 900);
@@ -53,7 +53,7 @@ namespace AyuUi {
             return;
         }
 
-        for (const auto& message : messages) {
+        for (const auto &message: messages) {
             AddSkip(_content);
             AddDividerText(_content, rpl::single(QString::fromStdString(message.text)));
             AddSkip(_content);

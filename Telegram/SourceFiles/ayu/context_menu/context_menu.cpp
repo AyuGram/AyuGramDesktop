@@ -16,7 +16,7 @@ namespace AyuUi {
 
     void AyuPopupMenu::addHistoryAction(HistoryItem *item) {
         if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty())) {
-            _ayuSubMenu->addAction(QString("History"), [=] {
+            _ayuSubMenu->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=] {
                 auto box = Box<MessageHistoryBox>(item);
                 Ui::show(std::move(box));
             }, &st::menuIconInfo);

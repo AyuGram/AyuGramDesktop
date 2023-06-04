@@ -1,8 +1,10 @@
 #pragma once
 
+#include "rpl/producer.h"
+
 #define QS_HAS_JSON
 
-#include <lang_auto.h>
+#include "lang_auto.h"
 #include "qserializer.h"
 
 namespace AyuSettings {
@@ -11,8 +13,6 @@ namespace AyuSettings {
 
     public:
         AyuGramSettings() {
-            migrationVersion = 0;
-
             sendReadPackets = true;
             sendOnlinePackets = true;
             sendOfflinePacketAfterOnline = false;
@@ -22,12 +22,9 @@ namespace AyuSettings {
             keepMessagesHistory = false;
             deletedMark = "🧹";
             editedMark = tr::lng_edited(tr::now);
-            ghostMode = true;
         }
 
         QS_SERIALIZABLE
-
-    QS_FIELD(int, migrationVersion)
 
     QS_FIELD(bool, sendReadPackets)
 
@@ -47,52 +44,16 @@ namespace AyuSettings {
 
     QS_FIELD(QString, editedMark)
 
-    QS_FIELD(bool, ghostMode)
-
     public:
-        void set_migrationVersion(int val) {
-            migrationVersion = val;
-        }
-
-        void set_sendReadPackets(bool val) {
-            sendReadPackets = val;
-        }
-
-        void set_sendOnlinePackets(bool val) {
-            sendOnlinePackets = val;
-        }
-
-        void set_sendOfflinePacketAfterOnline(bool val) {
-            sendOfflinePacketAfterOnline = val;
-        }
-
-        void set_sendUploadProgress(bool val) {
-            sendUploadProgress = val;
-        }
-
-        void set_useScheduledMessages(bool val) {
-            useScheduledMessages = val;
-        }
-
-        void set_keepDeletedMessages(bool val) {
-            keepDeletedMessages = val;
-        }
-
-        void set_keepMessagesHistory(bool val) {
-            keepMessagesHistory = val;
-        }
-
-        void set_deletedMark(QString val) {
-            deletedMark = val;
-        }
-
-        void set_editedMark(QString val) {
-            editedMark = val;
-        }
-
-        void set_ghostMode(bool val) {
-            ghostMode = val;
-        }
+        void set_sendReadPackets(bool val);
+        void set_sendOnlinePackets(bool val);
+        void set_sendOfflinePacketAfterOnline(bool val);
+        void set_sendUploadProgress(bool val);
+        void set_useScheduledMessages(bool val);
+        void set_keepDeletedMessages(bool val);
+        void set_keepMessagesHistory(bool val);
+        void set_deletedMark(QString val);
+        void set_editedMark(QString val);
     };
 
     AyuGramSettings &getInstance();
@@ -100,4 +61,17 @@ namespace AyuSettings {
     void load();
 
     void save();
+
+    rpl::variable<bool> get_sendReadPacketsReactive();
+    rpl::variable<bool> get_sendOnlinePacketsReactive();
+    rpl::variable<bool> get_sendOfflinePacketAfterOnlineReactive();
+    rpl::variable<bool> get_sendUploadProgressReactive();
+    rpl::variable<bool> get_useScheduledMessagesReactive();
+    rpl::variable<bool> get_keepDeletedMessagesReactive();
+    rpl::variable<bool> get_keepMessagesHistoryReactive();
+    rpl::variable<QString> get_deletedMarkReactive();
+    rpl::variable<QString> get_editedMarkReactive();
+
+    // computed fields
+    rpl::variable<bool> get_ghostModeEnabled();
 }

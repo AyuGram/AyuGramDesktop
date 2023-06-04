@@ -18,25 +18,34 @@ CustomLangPack *CustomLangPack::currentInstance() {
     return instance;
 }
 
-void CustomLangPack::fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId) {
+void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId) {
     LOG(("Current Language pack ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
-    const auto proxy = Core::App().settings().proxy().isEnabled() ? Core::App().settings().proxy().selected() : MTP::ProxyData();
+    auto finalLangPackId = langPackId;
+    if (finalLangPackId == qsl("pt-br")) { // meh
+        finalLangPackId = qsl("pt");
+    }
+
+    const auto proxy = Core::App().settings().proxy().isEnabled() ? Core::App().settings().proxy().selected()
+                                                                  : MTP::ProxyData();
     if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
         QNetworkProxy LocaleProxy = MTP::ToNetworkProxy(MTP::ToDirectIpProxy(proxy));
         networkManager.setProxy(LocaleProxy);
     }
 
     QUrl url;
-    if (!langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(langPackId));
+    if (!finalLangPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
+        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(
+                finalLangPackId));
     } else {
-        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(needFallback ? langPackBaseId : langPackId));
+        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(
+                needFallback ? langPackBaseId : finalLangPackId));
     }
     _chkReply = networkManager.get(QNetworkRequest(url));
     connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));
     connect(_chkReply, SIGNAL(finished()), this, SLOT(fetchFinished()));
-    LOG(("Fetching %1 lang pack...").arg(needFallback ? (langPackBaseId.isEmpty() ? langPackId : langPackBaseId) : langPackId));
+    LOG(("Fetching %1 lang pack...").arg(
+            needFallback ? (langPackBaseId.isEmpty() ? finalLangPackId : langPackBaseId) : finalLangPackId));
 }
 
 void CustomLangPack::fetchFinished() {
@@ -51,8 +60,7 @@ void CustomLangPack::fetchFinished() {
         needFallback = true;
         _chkReply->disconnect();
         fetchCustomLangPack("", langPackBaseId);
-    }
-    else {
+    } else {
         QByteArray result = _chkReply->readAll().trimmed();
         QJsonParseError error{};
         QJsonDocument str = QJsonDocument::fromJson(result, &error);
@@ -92,7 +100,7 @@ void CustomLangPack::loadDefaultLangFile() {
     if (file.open(QIODevice::ReadOnly)) {
         QJsonDocument str = QJsonDocument::fromJson(file.readAll());
         QJsonObject json = str.object();
-        for (const QString& key : json.keys()) {
+        for (const QString &key: json.keys()) {
             Lang::GetInstance().applyValue(key.toUtf8(), json.value(key).toString().toUtf8());
         }
         Lang::GetInstance().updatePluralRules();
@@ -102,9 +110,9 @@ void CustomLangPack::loadDefaultLangFile() {
 
 void CustomLangPack::parseLangFile(QJsonDocument str) {
     QJsonObject json = str.object();
-    for (const QString& brokenKey : json.keys()) {
+    for (const QString &brokenKey: json.keys()) {
         auto key = qsl("ayu_") + brokenKey;
-        auto val = json.value(brokenKey).toString().toUtf8();
+        auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&")).toUtf8();
 
         Lang::GetInstance().resetValue(key.toUtf8());
         Lang::GetInstance().applyValue(key.toUtf8(), val);

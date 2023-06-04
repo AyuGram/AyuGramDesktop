@@ -75,8 +75,8 @@ void EditDeletedMarkBox::resizeEvent(QResizeEvent *e) {
 
 void EditDeletedMarkBox::save() {
     const auto settings = &AyuSettings::getInstance();
-    settings->deletedMark = _text->getLastText();
-    Local::writeSettings();
+    settings->set_deletedMark(_text->getLastText());
+    AyuSettings::save();
 
     closeBox();
 }

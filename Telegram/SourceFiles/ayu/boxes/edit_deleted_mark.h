@@ -6,16 +6,18 @@
 
 class EditDeletedMarkBox : public Ui::BoxContent {
 public:
-    EditDeletedMarkBox(QWidget*);
+    EditDeletedMarkBox(QWidget *);
 
 protected:
     void setInnerFocus() override;
+
     void prepare() override;
 
     void resizeEvent(QResizeEvent *e) override;
 
 private:
     void submit();
+
     void save();
 
     object_ptr<Ui::InputField> _text;

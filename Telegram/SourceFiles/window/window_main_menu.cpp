@@ -788,28 +788,21 @@ void MainMenu::setupMenu() {
 			toggle);
 	}, _nightThemeToggle->lifetime());
 
+    const auto settings = &AyuSettings::getInstance();
     _ghostModeToggle = addAction(
             rpl::single(QString("Ghost Mode")),
             { &st::menuIconFake, kIconPurple }
-    )->toggleOn(rpl::single((&AyuSettings::getInstance())->ghostMode));
+    )->toggleOn(AyuSettings::get_ghostModeEnabled().value());
 
     _ghostModeToggle->toggledChanges(
-    ) | rpl::filter([=](bool ghostMode) {
-        const auto settings = &AyuSettings::getInstance();
-        return (ghostMode != settings->ghostMode);
-    }) | rpl::start_with_next([=](bool ghostMode) {
-        const auto settings = &AyuSettings::getInstance();
-        settings->set_ghostMode(ghostMode);
-
+    ) | rpl::start_with_next([=](bool ghostMode) {
         settings->set_sendReadPackets(!ghostMode);
         settings->set_sendOnlinePackets(!ghostMode);
-        settings->set_sendOfflinePacketAfterOnline(ghostMode);
         settings->set_sendUploadProgress(!ghostMode);
-        settings->set_keepDeletedMessages(ghostMode);
-        settings->set_keepMessagesHistory(ghostMode);
+
+        settings->set_sendOfflinePacketAfterOnline(ghostMode);
 
         AyuSettings::save();
-
     }, _ghostModeToggle->lifetime());
 
 	Core::App().settings().systemDarkModeValue(

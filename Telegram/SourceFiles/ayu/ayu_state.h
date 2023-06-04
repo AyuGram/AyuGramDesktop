@@ -12,7 +12,7 @@ namespace AyuState {
 
         AyuStateVariable allowSendReadPacket;
 
-        bool processVariable(AyuStateVariable& variable) {
+        bool processVariable(AyuStateVariable &variable) {
             if (variable.resetAfter == -1) {
                 return variable.val;
             }

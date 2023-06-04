@@ -9,7 +9,7 @@ namespace AyuDatabase {
             long userId,
             long dialogId,
             long messageId,
-            const QString& text,
+            const QString &text,
             bool isDocument,
             QString path,
             long date);
