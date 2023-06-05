@@ -1,3 +1,4 @@
+#include <ui/boxes/single_choice_box.h>
 #include "ayu/boxes/edit_edited_mark.h"
 #include "ayu/boxes/edit_deleted_mark.h"
 #include "ayu/ayu_settings.h"
@@ -35,10 +36,9 @@ namespace Settings {
         setupContent(controller);
     }
 
-    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container) {
+    void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container) {
         auto settings = &AyuSettings::getInstance();
 
-        AddSkip(container);
         AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
 
         AddButton(
@@ -52,7 +52,7 @@ namespace Settings {
             return (enabled != settings->sendReadPackets);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_sendReadPackets(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
 
         AddButton(
@@ -66,7 +66,7 @@ namespace Settings {
             return (enabled != settings->sendOnlinePackets);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_sendOnlinePackets(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
 
         AddButton(
@@ -80,7 +80,7 @@ namespace Settings {
             return (enabled != settings->sendUploadProgress);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_sendUploadProgress(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
 
         AddButton(
@@ -94,7 +94,7 @@ namespace Settings {
             return (enabled != settings->sendOfflinePacketAfterOnline);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_sendOfflinePacketAfterOnline(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
 
         AddButton(
@@ -108,11 +108,12 @@ namespace Settings {
             return (enabled != settings->useScheduledMessages);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_useScheduledMessages(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
+    }
 
-        AddDivider(container);
-        AddSkip(container);
+    void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container) {
+        auto settings = &AyuSettings::getInstance();
 
         AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
 
@@ -127,7 +128,7 @@ namespace Settings {
             return (enabled != settings->keepDeletedMessages);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_keepDeletedMessages(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
 
         AddButton(
@@ -141,18 +142,17 @@ namespace Settings {
             return (enabled != settings->keepMessagesHistory);
         }) | rpl::start_with_next([=](bool enabled) {
             settings->set_keepMessagesHistory(enabled);
-            Local::writeSettings();
+            AyuSettings::save();
         }, container->lifetime());
+    }
 
-        AddDivider(container);
-        AddSkip(container);
-
+    void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
         AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
 
         auto btn = AddButtonWithLabel(
                 container,
                 tr::ayu_DeletedMarkText(),
-                AyuSettings::get_deletedMarkReactive().value(),
+                AyuSettings::get_deletedMarkReactive(),
                 st::settingsButtonNoIcon
         );
         btn->addClickHandler([=]() {
@@ -163,7 +163,7 @@ namespace Settings {
         auto btn2 = AddButtonWithLabel(
                 container,
                 rpl::single(QString("Edited mark")),
-                AyuSettings::get_editedMarkReactive().value(),
+                AyuSettings::get_editedMarkReactive(),
                 st::settingsButtonNoIcon
         );
         btn2->addClickHandler([=]() {
@@ -171,13 +171,64 @@ namespace Settings {
             Ui::show(std::move(box));
         });
 
+        SetupShowPeerId(container, controller);
+    }
+
+    void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+        auto settings = &AyuSettings::getInstance();
+
+        const auto options = std::vector{
+                QString(tr::ayu_SettingsShowID_Hide(tr::now)),
+                QString("Telegram API"),
+                QString("Bot API")
+        };
+
+        auto currentVal = AyuSettings::get_showPeerId() | rpl::map([=] (int val) {
+            return options[val];
+        });
+
+        const auto button = AddButtonWithLabel(
+                container,
+                tr::ayu_SettingsShowID(),
+                currentVal,
+                st::settingsButtonNoIcon);
+        button->addClickHandler([=] {
+            controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+                const auto save = [=](int index) {
+                    settings->set_showPeerId(index);
+                    AyuSettings::save();
+                };
+                SingleChoiceBox(box, {
+                        .title = tr::ayu_SettingsShowID(),
+                        .options = options,
+                        .initialSelection = settings->showPeerId,
+                        .callback = save,
+                });
+            }));
+        });
+    }
+
+    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+        AddSkip(container);
+        SetupGhostEssentials(container);
+
+        AddDivider(container);
+
+        AddSkip(container);
+        SetupSpyEssentials(container);
+
+        AddDivider(container);
+
+        AddSkip(container);
+        SetupCustomization(container, controller);
+
         AddDividerText(container, tr::ayu_SettingsWatermark());
     }
 
     void Ayu::setupContent(not_null<Window::SessionController *> controller) {
         const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
-        SetupAyuGramSettings(content);
+        SetupAyuGramSettings(content, controller);
 
         Ui::ResizeFitChild(this, content);
     }

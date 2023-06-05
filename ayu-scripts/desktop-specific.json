@@ -1,3 +1,8 @@
 {
-  "SettingsWatermark": "AyuGram developed and maintained by Radolyn Labs"
+  "SettingsWatermark": "AyuGram developed and maintained by Radolyn Labs",
+  "SettingsShowID": "Show peer ID",
+  "SettingsShowID_Hide": "Hide",
+  "ContextCopyID": "Copy ID",
+  "IDCopiedToast": "ID copied to clipboard.",
+  "DrawerGhostModeToggle": "Ghost Mode"
 }

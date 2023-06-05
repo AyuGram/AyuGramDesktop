@@ -45,6 +45,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "tde2e/tde2e_api.h"
 #include "tde2e/tde2e_integration.h"
 #include "ui/boxes/confirm_box.h"
+#include "lang_auto.h"
+#include "window/themes/window_theme.h"
+#include "window/window_peer_menu.h"
+#include "window/window_session_controller.h"
+#include "window/window_controller.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/controls/userpic_button.h"
@@ -790,9 +795,9 @@ void MainMenu::setupMenu() {
 
     const auto settings = &AyuSettings::getInstance();
     _ghostModeToggle = addAction(
-            rpl::single(QString("Ghost Mode")),
+            tr::ayu_DrawerGhostModeToggle(),
             { &st::menuIconFake, kIconPurple }
-    )->toggleOn(AyuSettings::get_ghostModeEnabled().value());
+    )->toggleOn(AyuSettings::get_ghostModeEnabled());
 
     _ghostModeToggle->toggledChanges(
     ) | rpl::start_with_next([=](bool ghostMode) {

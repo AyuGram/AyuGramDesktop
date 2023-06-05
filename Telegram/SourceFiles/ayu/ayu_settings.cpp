@@ -1,5 +1,7 @@
 #include "ayu_settings.h"
 #include "rpl/lifetime.h"
+#include "rpl/producer.h"
+#include "rpl/variable.h"
 
 namespace AyuSettings {
     const QString filename = "tdata/ayu_settings.json";
@@ -14,6 +16,8 @@ namespace AyuSettings {
     rpl::variable<bool> keepMessagesHistoryReactive;
     rpl::variable<QString> deletedMarkReactive;
     rpl::variable<QString> editedMarkReactive;
+    rpl::variable<int> showPeerIdReactive;
+
     rpl::variable<bool> ghostModeEnabled;
 
     rpl::lifetime lifetime = rpl::lifetime();
@@ -47,6 +51,8 @@ namespace AyuSettings {
         keepMessagesHistoryReactive = settings->keepMessagesHistory;
         deletedMarkReactive = settings->deletedMark;
         editedMarkReactive = settings->editedMark;
+        showPeerIdReactive = settings->showPeerId;
+
         ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
     }
 
@@ -127,43 +133,52 @@ namespace AyuSettings {
         editedMarkReactive = editedMark;
     }
 
-    rpl::variable<bool> get_sendReadPacketsReactive() {
-        return sendReadPacketsReactive;
+    void AyuGramSettings::set_showPeerId(int val) {
+        showPeerId = val;
+        showPeerIdReactive = val;
     }
 
-    rpl::variable<bool> get_sendOnlinePacketsReactive() {
-        return sendOnlinePacketsReactive;
+    rpl::producer<bool> get_sendReadPacketsReactive() {
+        return sendReadPacketsReactive.value();
     }
 
-    rpl::variable<bool> get_sendOfflinePacketAfterOnlineReactive() {
-        return sendOfflinePacketAfterOnlineReactive;
+    rpl::producer<bool> get_sendOnlinePacketsReactive() {
+        return sendOnlinePacketsReactive.value();
     }
 
-    rpl::variable<bool> get_sendUploadProgressReactive() {
-        return sendUploadProgressReactive;
+    rpl::producer<bool> get_sendOfflinePacketAfterOnlineReactive() {
+        return sendOfflinePacketAfterOnlineReactive.value();
     }
 
-    rpl::variable<bool> get_useScheduledMessagesReactive() {
-        return useScheduledMessagesReactive;
+    rpl::producer<bool> get_sendUploadProgressReactive() {
+        return sendUploadProgressReactive.value();
     }
 
-    rpl::variable<bool> get_keepDeletedMessagesReactive() {
-        return keepDeletedMessagesReactive;
+    rpl::producer<bool> get_useScheduledMessagesReactive() {
+        return useScheduledMessagesReactive.value();
     }
 
-    rpl::variable<bool> get_keepMessagesHistoryReactive() {
-        return keepMessagesHistoryReactive;
+    rpl::producer<bool> get_keepDeletedMessagesReactive() {
+        return keepDeletedMessagesReactive.value();
     }
 
-    rpl::variable<QString> get_deletedMarkReactive() {
-        return deletedMarkReactive;
+    rpl::producer<bool> get_keepMessagesHistoryReactive() {
+        return keepMessagesHistoryReactive.value();
     }
 
-    rpl::variable<QString> get_editedMarkReactive() {
-        return editedMarkReactive;
+    rpl::producer<QString> get_deletedMarkReactive() {
+        return deletedMarkReactive.value();
     }
 
-    rpl::variable<bool> get_ghostModeEnabled() {
-        return ghostModeEnabled;
+    rpl::producer<QString> get_editedMarkReactive() {
+        return editedMarkReactive.value();
+    }
+
+    rpl::producer<int> get_showPeerId() {
+        return showPeerIdReactive.value();
+    }
+
+    rpl::producer<bool> get_ghostModeEnabled() {
+        return ghostModeEnabled.value();
     }
 }

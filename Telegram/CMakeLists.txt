@@ -124,6 +124,8 @@ PRIVATE
     ayu/database/entities.h
     ayu/database/ayu_database.cpp
     ayu/database/ayu_database.h
+    ayu/utils/ayu_profile_values.cpp
+    ayu/utils/ayu_profile_values.h
 
     api/api_attached_stickers.cpp
     api/api_attached_stickers.h

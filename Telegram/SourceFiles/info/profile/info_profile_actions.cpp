@@ -15,6 +15,36 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
+#include "ayu/ayu_settings.h"
+#include "data/data_peer_values.h"
+#include "data/data_session.h"
+#include "data/data_folder.h"
+#include "data/data_forum_topic.h"
+#include "data/data_channel.h"
+#include "data/data_changes.h"
+#include "data/data_user.h"
+#include "data/notify/data_notify_settings.h"
+#include "ui/text/text_entity.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/wrap/padding_wrap.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/widgets/shadow.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/box_content_divider.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/boxes/report_box.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/layers/generic_box.h"
+#include "ui/toast/toast.h"
+#include "ui/text/text_utilities.h" // Ui::Text::ToUpper
+#include "ui/text/text_variant.h"
+#include "history/history_location_manager.h" // LocationClickHandler.
+#include "history/view/history_view_context_menu.h" // HistoryView::ShowReportPeerBox
+#include "boxes/abstract_box.h"
+#include "boxes/peer_list_box.h"
+#include "boxes/peer_list_controllers.h"
+#include "boxes/add_contact_box.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/peers/edit_participants_box.h"
@@ -102,6 +132,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
+
+#include "ayu/utils/ayu_profile_values.h"
 
 namespace Info {
 namespace Profile {
@@ -1209,6 +1241,8 @@ bool SetClickContext(
 }
 
 object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
+    auto settings = &AyuSettings::getInstance();
+
 	auto result = object_ptr<Ui::VerticalLayout>(_wrap);
 	auto tracker = Ui::MultiSlideTracker();
 
@@ -1520,6 +1554,29 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			).text->setLinksTrusted();
 		}
 
+        if (settings->showPeerId != 0) {
+            auto idDrawableText = IDValue(
+                    user
+            ) | rpl::map([](TextWithEntities &&text) {
+                return Ui::Text::Code(text.text);
+            });
+            auto idInfo = addInfoOneLine(
+                    rpl::single(QString("ID")),
+                    std::move(idDrawableText),
+                    tr::ayu_ContextCopyID(tr::now)
+            );
+
+            idInfo.text->setClickHandlerFilter([=](auto &&...) {
+                const auto idText = IDString(user);
+                if (!idText.isEmpty()) {
+                    QGuiApplication::clipboard()->setText(idText);
+                    const auto msg = tr::ayu_IDCopiedToast(tr::now);
+                    controller->showToast(msg);
+                }
+                return false;
+            });
+        }
+
 		AddMainButton(
 			result,
 			tr::lng_info_add_as_contact(),
@@ -1596,6 +1653,29 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		if (!_topic) {
 			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
+
+        if (settings->showPeerId != 0) {
+            auto idDrawableText = IDValue(
+                    _peer
+            ) | rpl::map([](TextWithEntities &&text) {
+                return Ui::Text::Code(text.text);
+            });
+            auto idInfo = addInfoOneLine(
+                    rpl::single(QString("ID")),
+                    std::move(idDrawableText),
+                    tr::ayu_ContextCopyID(tr::now)
+            );
+
+            idInfo.text->setClickHandlerFilter([=, peer = _peer](auto &&...) {
+                const auto idText = IDString(peer);
+                if (!idText.isEmpty()) {
+                    QGuiApplication::clipboard()->setText(idText);
+                    const auto msg = tr::ayu_IDCopiedToast(tr::now);
+                    controller->showToast(msg);
+                }
+                return false;
+            });
+        }
 	}
 	if (!_peer->isSelf()) {
 		// No notifications toggle for Self => no separator.

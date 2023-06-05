@@ -22,6 +22,13 @@ namespace AyuSettings {
             keepMessagesHistory = false;
             deletedMark = "🧹";
             editedMark = tr::lng_edited(tr::now);
+
+            /*
+             * showPeerId = 0 means no ID shown
+             * showPeerId = 1 means ID shown as for Telegram API devs
+             * showPeerId = 2 means ID shown as for Bot API devs (-100)
+             */
+            showPeerId = 2;
         }
 
         QS_SERIALIZABLE
@@ -44,6 +51,8 @@ namespace AyuSettings {
 
     QS_FIELD(QString, editedMark)
 
+    QS_FIELD(int, showPeerId)
+
     public:
         void set_sendReadPackets(bool val);
         void set_sendOnlinePackets(bool val);
@@ -54,6 +63,7 @@ namespace AyuSettings {
         void set_keepMessagesHistory(bool val);
         void set_deletedMark(QString val);
         void set_editedMark(QString val);
+        void set_showPeerId(int val);
     };
 
     AyuGramSettings &getInstance();
@@ -62,16 +72,17 @@ namespace AyuSettings {
 
     void save();
 
-    rpl::variable<bool> get_sendReadPacketsReactive();
-    rpl::variable<bool> get_sendOnlinePacketsReactive();
-    rpl::variable<bool> get_sendOfflinePacketAfterOnlineReactive();
-    rpl::variable<bool> get_sendUploadProgressReactive();
-    rpl::variable<bool> get_useScheduledMessagesReactive();
-    rpl::variable<bool> get_keepDeletedMessagesReactive();
-    rpl::variable<bool> get_keepMessagesHistoryReactive();
-    rpl::variable<QString> get_deletedMarkReactive();
-    rpl::variable<QString> get_editedMarkReactive();
+    rpl::producer<bool> get_sendReadPacketsReactive();
+    rpl::producer<bool> get_sendOnlinePacketsReactive();
+    rpl::producer<bool> get_sendOfflinePacketAfterOnlineReactive();
+    rpl::producer<bool> get_sendUploadProgressReactive();
+    rpl::producer<bool> get_useScheduledMessagesReactive();
+    rpl::producer<bool> get_keepDeletedMessagesReactive();
+    rpl::producer<bool> get_keepMessagesHistoryReactive();
+    rpl::producer<QString> get_deletedMarkReactive();
+    rpl::producer<QString> get_editedMarkReactive();
+    rpl::producer<int> get_showPeerId();
 
     // computed fields
-    rpl::variable<bool> get_ghostModeEnabled();
+    rpl::producer<bool> get_ghostModeEnabled();
 }
