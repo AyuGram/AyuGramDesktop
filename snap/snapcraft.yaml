@@ -11,7 +11,7 @@ apps:
   telegram-desktop:
     command: usr/bin/telegram-desktop
     common-id: org.telegram.desktop
-    desktop: usr/share/applications/org.telegram.desktop.desktop
+    desktop: usr/share/applications/org.ayugram.desktop.desktop
     autostart: telegram-desktop_telegram-desktop.desktop
     extensions: [gnome]
     plugs:
@@ -36,7 +36,7 @@ parts:
     plugin: cmake
     source: .
     source-type: git
-    parse-info: [usr/share/metainfo/org.telegram.desktop.metainfo.xml]
+    parse-info: [usr/share/metainfo/org.ayugram.desktop.metainfo.xml]
     build-environment:
       - LDFLAGS: ${LDFLAGS:+$LDFLAGS} -Wl,--push-state,--no-as-needed,-ldav1d,-lhwy,--pop-state -s
     build-packages:

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component type="desktop">
-    <id>org.telegram.desktop</id>
+    <id>org.ayugram.desktop</id>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
-    <name>Telegram</name>
-    <summary>New era of messaging</summary>
+    <name>AyuGram Desktop</name>
+    <summary>Unofficial desktop version of Telegram messaging app</summary>
     <description>
         <p>Pure instant messaging — simple, fast, secure, and synced across all your devices. One of the world's top 10 most downloaded apps with over 500 million active users.</p>
         <p>FAST: Telegram is the fastest messaging app on the market, connecting people via a unique, distributed network of data centers around the globe.</p>
@@ -104,11 +104,15 @@
         <content_attribute id="money-gambling">none</content_attribute>
         <content_attribute id="money-advertising">moderate</content_attribute>
     </content_rating>
-    <launchable type="desktop-id">org.telegram.desktop.desktop</launchable>
+    <launchable type="desktop-id">org.ayugram.desktop.desktop</launchable>
     <provides>
+<<<<<<< HEAD:lib/xdg/org.telegram.desktop.metainfo.xml
         <binary>Telegram</binary>
         <dbus type="session">org.telegram.desktop</dbus>
         <mediatype>x-scheme-handler/tg</mediatype>
         <mediatype>x-scheme-handler/tonsite</mediatype>
+=======
+        <binary>ayugram-desktop</binary>
+>>>>>>> a53c40e03b (feat: linux improvements):lib/xdg/org.ayugram.desktop.metainfo.xml
     </provides>
 </component>

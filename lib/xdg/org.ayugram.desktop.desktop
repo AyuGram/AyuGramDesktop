@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=AyuGram Desktop
 Comment=Unofficial desktop version of Telegram messaging app
-TryExec=telegram-desktop
-Exec=telegram-desktop -- %u
+TryExec=ayugram-desktop
+Exec=DESKTOPINTEGRATION=1 ayugram-desktop -- %u
 Icon=telegram
 Terminal=false
 StartupWMClass=AyuGram
@@ -17,6 +17,6 @@ X-GNOME-UsesNotifications=true
 X-GNOME-SingleWindow=true
 
 [Desktop Action quit]
-Exec=Telegram -quit
+Exec=ayugram-desktop -quit
 Name=Quit Telegram
 Icon=application-exit
