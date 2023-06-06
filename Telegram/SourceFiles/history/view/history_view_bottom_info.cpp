@@ -410,14 +410,13 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-    const auto ayuSettings = &AyuSettings::getInstance();
-    auto editedMarkValue = ayuSettings->editedMark;
+    const auto settings = &AyuSettings::getInstance();
 
     const auto edited = (_data.flags & Data::Flag::Edited)
-                        ? (editedMarkValue + ' ')
+                        ? (settings->editedMark + ' ')
                         : QString();
 	const auto author = _data.author;
-	const auto prefix = !author.isEmpty() ? u", "_q : QString();
+	const auto prefix = !author.isEmpty() ? (author == settings->deletedMark ? u" "_q : u", "_q) : QString();
 	const auto date = edited + QLocale().toString(
 		_data.date.time(),
 		QLocale::ShortFormat);

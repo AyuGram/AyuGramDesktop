@@ -99,6 +99,20 @@ namespace Settings {
 
         AddButton(
                 container,
+                tr::ayu_MarkReadAfterSend(),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->markReadAfterSend)
+        )->toggledValue(
+        ) | rpl::filter([=](bool enabled) {
+            return (enabled != settings->markReadAfterSend);
+        }) | rpl::start_with_next([=](bool enabled) {
+            settings->set_markReadAfterSend(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
+
+        AddButton(
+                container,
                 tr::ayu_UseScheduledMessages(),
                 st::settingsButtonNoIcon
         )->toggleOn(
@@ -147,6 +161,8 @@ namespace Settings {
     }
 
     void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+        auto settings = &AyuSettings::getInstance();
+
         AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
 
         auto btn = AddButtonWithLabel(
@@ -162,7 +178,7 @@ namespace Settings {
 
         auto btn2 = AddButtonWithLabel(
                 container,
-                rpl::single(QString("Edited mark")),
+                tr::ayu_EditedMarkText(),
                 AyuSettings::get_editedMarkReactive(),
                 st::settingsButtonNoIcon
         );
@@ -170,6 +186,20 @@ namespace Settings {
             auto box = Box<EditEditedMarkBox>();
             Ui::show(std::move(box));
         });
+
+        AddButton(
+                container,
+                tr::ayu_ShowGhostToggleInDrawer(),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->showGhostToggleInDrawer)
+        )->toggledValue(
+        ) | rpl::filter([=](bool enabled) {
+            return (enabled != settings->showGhostToggleInDrawer);
+        }) | rpl::start_with_next([=](bool enabled) {
+            settings->set_showGhostToggleInDrawer(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
 
         SetupShowPeerId(container, controller);
     }

@@ -794,21 +794,23 @@ void MainMenu::setupMenu() {
 	}, _nightThemeToggle->lifetime());
 
     const auto settings = &AyuSettings::getInstance();
-    _ghostModeToggle = addAction(
-            tr::ayu_DrawerGhostModeToggle(),
-            { &st::menuIconFake, kIconPurple }
-    )->toggleOn(AyuSettings::get_ghostModeEnabled());
+    if (settings->showGhostToggleInDrawer) {
+        _ghostModeToggle = addAction(
+                tr::ayu_DrawerGhostModeToggle(),
+                {&st::menuIconFake, kIconPurple}
+        )->toggleOn(AyuSettings::get_ghostModeEnabled());
 
-    _ghostModeToggle->toggledChanges(
-    ) | rpl::start_with_next([=](bool ghostMode) {
-        settings->set_sendReadPackets(!ghostMode);
-        settings->set_sendOnlinePackets(!ghostMode);
-        settings->set_sendUploadProgress(!ghostMode);
+        _ghostModeToggle->toggledChanges(
+        ) | rpl::start_with_next([=](bool ghostMode) {
+            settings->set_sendReadPackets(!ghostMode);
+            settings->set_sendOnlinePackets(!ghostMode);
+            settings->set_sendUploadProgress(!ghostMode);
 
-        settings->set_sendOfflinePacketAfterOnline(ghostMode);
+            settings->set_sendOfflinePacketAfterOnline(ghostMode);
 
-        AyuSettings::save();
-    }, _ghostModeToggle->lifetime());
+            AyuSettings::save();
+        }, _ghostModeToggle->lifetime());
+    }
 
 	Core::App().settings().systemDarkModeValue(
 	) | rpl::start_with_next([=](std::optional<bool> darkMode) {

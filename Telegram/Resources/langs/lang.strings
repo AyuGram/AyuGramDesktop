@@ -7062,6 +7062,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_EnableAds" = "Enable ads";
 "ayu_CustomizationHeader" = "Customization";
 "ayu_DeletedMarkText" = "Deleted mark";
+"ayu_EditedMarkText" = "Edited mark";
 "ayu_ShowGhostToggleInDrawer" = "Show ghost mode toggle";
 "ayu_CleanDatabase" = "Clean database";
 "ayu_CleanDatabaseNotification" = "AyuGram database cleaned";
@@ -7072,6 +7073,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_EditsHistoryTitle" = "Edits history";
 "ayu_EditsHistoryMenuText" = "History";
 "ayu_ReadUntilMenuText" = "Read until";
+"ayu_ForwardsRestrictedInfoDeleted" = "Forwarding of deleted message is not supported.";
 "ayu_LikelyOfflineStatus" = "offline ?";
 "ayu_GhostModeShortcut" = "Enter with Ghost";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs";

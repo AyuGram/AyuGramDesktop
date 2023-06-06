@@ -187,6 +187,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_state.h"
 
 namespace {
 
@@ -4674,6 +4675,11 @@ void HistoryWidget::send(Api::SendOptions options) {
         DEBUG_LOG(("[AyuGram] Scheduling message"));
         auto current = base::unixtime::now();
         options.scheduled = current + 12;
+    }
+
+    if (!settings->sendReadPackets && settings->markReadAfterSend) {
+        AyuState::setAllowSendReadPacket(true);
+        _history->session().data().histories().readInboxOnNewMessage(_history->lastMessage());
     }
 
 	if (!_history) {

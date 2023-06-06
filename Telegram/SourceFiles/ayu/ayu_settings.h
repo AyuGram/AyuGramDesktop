@@ -13,15 +13,24 @@ namespace AyuSettings {
 
     public:
         AyuGramSettings() {
+            // ~ Ghost essentials
             sendReadPackets = true;
             sendOnlinePackets = true;
-            sendOfflinePacketAfterOnline = false;
             sendUploadProgress = true;
+
+            sendOfflinePacketAfterOnline = false;
+            markReadAfterSend = false;
+
             useScheduledMessages = false;
-            keepDeletedMessages = false;
-            keepMessagesHistory = false;
+
+            // ~ Message edits & deletion history
+            keepDeletedMessages = true;
+            keepMessagesHistory = true;
+
+            // ~ Customization
             deletedMark = "🧹";
             editedMark = tr::lng_edited(tr::now);
+            showGhostToggleInDrawer = true;
 
             /*
              * showPeerId = 0 means no ID shown
@@ -37,9 +46,11 @@ namespace AyuSettings {
 
     QS_FIELD(bool, sendOnlinePackets)
 
+    QS_FIELD(bool, sendUploadProgress)
+
     QS_FIELD(bool, sendOfflinePacketAfterOnline)
 
-    QS_FIELD(bool, sendUploadProgress)
+    QS_FIELD(bool, markReadAfterSend)
 
     QS_FIELD(bool, useScheduledMessages)
 
@@ -51,18 +62,26 @@ namespace AyuSettings {
 
     QS_FIELD(QString, editedMark)
 
+    QS_FIELD(bool, showGhostToggleInDrawer)
+
     QS_FIELD(int, showPeerId)
 
     public:
         void set_sendReadPackets(bool val);
         void set_sendOnlinePackets(bool val);
-        void set_sendOfflinePacketAfterOnline(bool val);
         void set_sendUploadProgress(bool val);
+
+        void set_sendOfflinePacketAfterOnline(bool val);
+        void set_markReadAfterSend(bool val);
+
         void set_useScheduledMessages(bool val);
+
         void set_keepDeletedMessages(bool val);
         void set_keepMessagesHistory(bool val);
+
         void set_deletedMark(QString val);
         void set_editedMark(QString val);
+        void set_showGhostToggleInDrawer(bool val);
         void set_showPeerId(int val);
     };
 
@@ -81,6 +100,7 @@ namespace AyuSettings {
     rpl::producer<bool> get_keepMessagesHistoryReactive();
     rpl::producer<QString> get_deletedMarkReactive();
     rpl::producer<QString> get_editedMarkReactive();
+    rpl::producer<QString> get_showGhostToggleInDrawer();
     rpl::producer<int> get_showPeerId();
 
     // computed fields
