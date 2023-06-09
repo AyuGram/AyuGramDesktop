@@ -33,6 +33,7 @@ namespace AyuSettings {
             // ~ Customization
             deletedMark = "🧹";
             editedMark = tr::lng_edited(tr::now);
+            recentStickersCount = 20;
             showGhostToggleInDrawer = true;
 
             /*
@@ -69,6 +70,8 @@ namespace AyuSettings {
 
     QS_FIELD(QString, editedMark)
 
+    QS_FIELD(int, recentStickersCount)
+
     QS_FIELD(bool, showGhostToggleInDrawer)
 
     QS_FIELD(int, showPeerId)
@@ -92,6 +95,7 @@ namespace AyuSettings {
 
         void set_deletedMark(QString val);
         void set_editedMark(QString val);
+        void set_recentStickersCount(int val);
         void set_showGhostToggleInDrawer(bool val);
         void set_showPeerId(int val);
         void set_showMessageSeconds(bool val);

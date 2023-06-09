@@ -11,7 +11,6 @@
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "boxes/connection_box.h"
-#include "ui/boxes/confirm_box.h"
 #include "platform/platform_specific.h"
 #include "window/window_session_controller.h"
 #include "lang/lang_instance.h"
@@ -22,6 +21,7 @@
 #include "styles/style_settings.h"
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
+#include "ui/widgets/continuous_sliders.h"
 
 namespace Settings {
 
@@ -207,6 +207,8 @@ namespace Settings {
             Ui::show(std::move(box));
         });
 
+        SetupRecentStickersLimitSlider(container);
+
         SetupShowPeerId(container, controller);
 
         AddButton(
@@ -272,6 +274,46 @@ namespace Settings {
                 });
             }));
         });
+    }
+
+    void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container) {
+        auto settings = &AyuSettings::getInstance();
+
+        container->add(
+                CreateButton(
+                        container,
+                        tr::ayu_SettingsRecentStickersCount(),
+                        st::settingsButtonNoIcon)
+        );
+
+        auto recentStickersLimitSlider = MakeSliderWithLabel(
+                container,
+                st::settingsScale,
+                st::settingsScaleLabel,
+                st::normalFont->spacew * 2,
+                st::settingsScaleLabel.style.font->width("300%"));
+        container->add(
+                std::move(recentStickersLimitSlider.widget),
+                st::settingsScalePadding);
+        const auto slider = recentStickersLimitSlider.slider;
+        const auto label = recentStickersLimitSlider.label;
+
+        const auto updateLabel = [=](int amount) {
+            label->setText(QString::number(amount));
+        };
+        updateLabel(settings->recentStickersCount);
+
+        slider->setPseudoDiscrete(
+                40 + 1, // thx tg
+                [=](int amount) { return amount; },
+                settings->recentStickersCount,
+                [=](int amount) { updateLabel(amount); },
+                [=](int amount) {
+                    updateLabel(amount);
+
+                    settings->set_recentStickersCount(amount);
+                    AyuSettings::save();
+                });
     }
 
     void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {

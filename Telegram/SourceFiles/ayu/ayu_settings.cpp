@@ -128,6 +128,10 @@ namespace AyuSettings {
         editedMarkReactive = editedMark;
     }
 
+    void AyuGramSettings::set_recentStickersCount(int val) {
+        recentStickersCount = val;
+    }
+
     void AyuGramSettings::set_showGhostToggleInDrawer(bool val) {
         showGhostToggleInDrawer = val;
     }

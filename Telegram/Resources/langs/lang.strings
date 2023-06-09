@@ -7079,6 +7079,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_GhostModeShortcut" = "Enter with Ghost";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";
 "ayu_SettingsCustomizationHint" = "After making changes to the \"Customization\" section, you must restart the application.";
+"ayu_SettingsRecentStickersCount" = "Recent stickers count";
 "ayu_SettingsShowID" = "Show peer ID";
 "ayu_SettingsShowID_Hide" = "Hide";
 "ayu_SettingsShowMessageSeconds" = "Show message seconds";
