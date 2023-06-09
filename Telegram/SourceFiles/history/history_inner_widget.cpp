@@ -110,6 +110,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 #include "ayu/context_menu/context_menu.h"
+#include "styles/style_ayu_icons.h"
 
 namespace {
 
@@ -2492,8 +2493,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
         ayuSubMenu.addHideMessageAction(item);
         ayuSubMenu.addReadUntilAction(item);
 
-        _menu->addAction(QString("Ayu"), std::move(ayuSubMenu._ayuSubMenu), &st::menuIconSettings, &st::menuIconSettings);
-
+        _menu->addAction(QString("Ayu"), std::move(ayuSubMenu._ayuSubMenu), &st::ayuMenuIcon, &st::ayuMenuIcon);
 	};
 	const auto addPhotoActions = [&](not_null<PhotoData*> photo, HistoryItem *item) {
 		const auto media = photo->activeMediaView();

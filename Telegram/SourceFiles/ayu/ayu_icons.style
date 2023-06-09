@@ -1,3 +1,5 @@
 using "ui/colors.palette";
+using "ui/widgets/widgets.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", settingsIconFg }};
+ayuMenuIcon: icon {{ "ayu/ayu_menu", menuIconColor }};
