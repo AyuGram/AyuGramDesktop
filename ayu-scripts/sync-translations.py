@@ -38,7 +38,8 @@ data += '''
 '''
 
 for k, v in strings.items():
-    data += f'"{k}" = "{v}";\n'
+    escaped = v.replace('"', '\\"')
+    data += f'"{k}" = "{escaped}";\n'
 
 with open(os.path.realpath('./Telegram/Resources/langs/lang.strings'), 'w', encoding='utf-8') as f:
     f.write(data)

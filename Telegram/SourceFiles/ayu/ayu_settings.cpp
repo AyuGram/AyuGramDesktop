@@ -9,21 +9,10 @@ namespace AyuSettings {
 
     rpl::variable<bool> sendReadPacketsReactive;
     rpl::variable<bool> sendOnlinePacketsReactive;
-    rpl::variable<bool> sendUploadProgressReactive;
-
-    rpl::variable<bool> sendOfflinePacketAfterOnlineReactive;
-    rpl::variable<bool> markReadAfterSendReactive;
-
-    rpl::variable<bool> useScheduledMessagesReactive;
-
-    rpl::variable<bool> keepDeletedMessagesReactive;
-    rpl::variable<bool> keepMessagesHistoryReactive;
 
     rpl::variable<QString> deletedMarkReactive;
     rpl::variable<QString> editedMarkReactive;
-    rpl::variable<bool> showGhostToggleInDrawerReactive;
     rpl::variable<int> showPeerIdReactive;
-    rpl::variable<bool> showMessageSecondsReactive;
 
     rpl::variable<bool> ghostModeEnabled;
 
@@ -51,21 +40,10 @@ namespace AyuSettings {
     void postinitialize() {
         sendReadPacketsReactive = settings->sendReadPackets;
         sendOnlinePacketsReactive = settings->sendOnlinePackets;
-        sendUploadProgressReactive = settings->sendUploadProgress;
-
-        sendOfflinePacketAfterOnlineReactive = settings->sendOfflinePacketAfterOnline;
-        markReadAfterSendReactive = settings->markReadAfterSend;
-
-        useScheduledMessagesReactive = settings->useScheduledMessages;
-
-        keepDeletedMessagesReactive = settings->keepDeletedMessages;
-        keepMessagesHistoryReactive = settings->keepMessagesHistory;
 
         deletedMarkReactive = settings->deletedMark;
         editedMarkReactive = settings->editedMark;
-        showGhostToggleInDrawerReactive = settings->showGhostToggleInDrawer;
         showPeerIdReactive = settings->showPeerId;
-        showMessageSecondsReactive = settings->showMessageSeconds;
 
         ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
     }
@@ -114,32 +92,30 @@ namespace AyuSettings {
 
     void AyuGramSettings::set_sendUploadProgress(bool val) {
         sendUploadProgress = val;
-        sendUploadProgressReactive = val;
     }
 
     void AyuGramSettings::set_sendOfflinePacketAfterOnline(bool val) {
         sendOfflinePacketAfterOnline = val;
-        sendOfflinePacketAfterOnlineReactive = val;
     }
 
     void AyuGramSettings::set_markReadAfterSend(bool val) {
         markReadAfterSend = val;
-        markReadAfterSendReactive = val;
     }
 
     void AyuGramSettings::set_useScheduledMessages(bool val) {
         useScheduledMessages = val;
-        useScheduledMessagesReactive = val;
     }
 
     void AyuGramSettings::set_keepDeletedMessages(bool val) {
         keepDeletedMessages = val;
-        keepDeletedMessagesReactive = val;
     }
 
     void AyuGramSettings::set_keepMessagesHistory(bool val) {
         keepMessagesHistory = val;
-        keepMessagesHistoryReactive = val;
+    }
+
+    void AyuGramSettings::set_enableAds(bool val) {
+        enableAds = val;
     }
 
     void AyuGramSettings::set_deletedMark(QString val) {
@@ -154,7 +130,6 @@ namespace AyuSettings {
 
     void AyuGramSettings::set_showGhostToggleInDrawer(bool val) {
         showGhostToggleInDrawer = val;
-        showGhostToggleInDrawerReactive = val;
     }
 
     void AyuGramSettings::set_showPeerId(int val) {
@@ -164,39 +139,6 @@ namespace AyuSettings {
 
     void AyuGramSettings::set_showMessageSeconds(bool val) {
         showMessageSeconds = val;
-        showMessageSecondsReactive = val;
-    }
-
-    rpl::producer<bool> get_sendReadPacketsReactive() {
-        return sendReadPacketsReactive.value();
-    }
-
-    rpl::producer<bool> get_sendOnlinePacketsReactive() {
-        return sendOnlinePacketsReactive.value();
-    }
-
-    rpl::producer<bool> get_sendUploadProgressReactive() {
-        return sendUploadProgressReactive.value();
-    }
-
-    rpl::producer<bool> get_sendOfflinePacketAfterOnlineReactive() {
-        return sendOfflinePacketAfterOnlineReactive.value();
-    }
-
-    rpl::producer<bool> get_markReadAfterSend() {
-        return markReadAfterSendReactive.value();
-    }
-
-    rpl::producer<bool> get_useScheduledMessagesReactive() {
-        return useScheduledMessagesReactive.value();
-    }
-
-    rpl::producer<bool> get_keepDeletedMessagesReactive() {
-        return keepDeletedMessagesReactive.value();
-    }
-
-    rpl::producer<bool> get_keepMessagesHistoryReactive() {
-        return keepMessagesHistoryReactive.value();
     }
 
     rpl::producer<QString> get_deletedMarkReactive() {
@@ -207,16 +149,8 @@ namespace AyuSettings {
         return editedMarkReactive.value();
     }
 
-    rpl::producer<bool> get_showGhostToggleInDrawerReactive() {
-        return showGhostToggleInDrawerReactive.value();
-    }
-
     rpl::producer<int> get_showPeerId() {
         return showPeerIdReactive.value();
-    }
-
-    rpl::producer<bool> get_showMessageSeconds() {
-        return showMessageSecondsReactive.value();
     }
 
     rpl::producer<bool> get_ghostModeEnabled() {

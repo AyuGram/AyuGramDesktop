@@ -27,6 +27,9 @@ namespace AyuSettings {
             keepDeletedMessages = true;
             keepMessagesHistory = true;
 
+            // ~ QoL toggles
+            enableAds = false;
+
             // ~ Customization
             deletedMark = "🧹";
             editedMark = tr::lng_edited(tr::now);
@@ -60,6 +63,8 @@ namespace AyuSettings {
 
     QS_FIELD(bool, keepMessagesHistory)
 
+    QS_FIELD(bool, enableAds)
+
     QS_FIELD(QString, deletedMark)
 
     QS_FIELD(QString, editedMark)
@@ -83,6 +88,8 @@ namespace AyuSettings {
         void set_keepDeletedMessages(bool val);
         void set_keepMessagesHistory(bool val);
 
+        void set_enableAds(bool val);
+
         void set_deletedMark(QString val);
         void set_editedMark(QString val);
         void set_showGhostToggleInDrawer(bool val);
@@ -96,18 +103,9 @@ namespace AyuSettings {
 
     void save();
 
-    rpl::producer<bool> get_sendReadPacketsReactive();
-    rpl::producer<bool> get_sendOnlinePacketsReactive();
-    rpl::producer<bool> get_sendOfflinePacketAfterOnlineReactive();
-    rpl::producer<bool> get_sendUploadProgressReactive();
-    rpl::producer<bool> get_useScheduledMessagesReactive();
-    rpl::producer<bool> get_keepDeletedMessagesReactive();
-    rpl::producer<bool> get_keepMessagesHistoryReactive();
     rpl::producer<QString> get_deletedMarkReactive();
     rpl::producer<QString> get_editedMarkReactive();
-    rpl::producer<QString> get_showGhostToggleInDrawer();
     rpl::producer<int> get_showPeerId();
-    rpl::producer<bool> get_showMessageSeconds();
 
     // computed fields
     rpl::producer<bool> get_ghostModeEnabled();

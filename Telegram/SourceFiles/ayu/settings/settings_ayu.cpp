@@ -160,6 +160,26 @@ namespace Settings {
         }, container->lifetime());
     }
 
+    void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container) {
+        auto settings = &AyuSettings::getInstance();
+
+        AddSubsectionTitle(container, tr::ayu_QoLTogglesHeader());
+
+        AddButton(
+                container,
+                tr::ayu_EnableAds(),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->enableAds)
+        )->toggledValue(
+        ) | rpl::filter([=](bool enabled) {
+            return (enabled != settings->enableAds);
+        }) | rpl::start_with_next([=](bool enabled) {
+            settings->set_enableAds(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
+    }
+
     void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
         auto settings = &AyuSettings::getInstance();
 
@@ -187,6 +207,8 @@ namespace Settings {
             Ui::show(std::move(box));
         });
 
+        SetupShowPeerId(container, controller);
+
         AddButton(
                 container,
                 tr::ayu_ShowGhostToggleInDrawer(),
@@ -201,7 +223,21 @@ namespace Settings {
             AyuSettings::save();
         }, container->lifetime());
 
-        SetupShowPeerId(container, controller);
+        AddButton(
+                container,
+                tr::ayu_SettingsShowMessageSeconds(),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->showMessageSeconds)
+        )->toggledValue(
+        ) | rpl::filter([=](bool enabled) {
+            return (enabled != settings->showMessageSeconds);
+        }) | rpl::start_with_next([=](bool enabled) {
+            settings->set_showMessageSeconds(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
+
+        AddDividerText(container, tr::ayu_SettingsCustomizationHint());
     }
 
     void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
@@ -246,6 +282,11 @@ namespace Settings {
 
         AddSkip(container);
         SetupSpyEssentials(container);
+
+        AddDivider(container);
+
+        AddSkip(container);
+        SetupQoLToggles(container);
 
         AddDivider(container);
 
