@@ -23,6 +23,7 @@ namespace AyuSettings {
     rpl::variable<QString> editedMarkReactive;
     rpl::variable<bool> showGhostToggleInDrawerReactive;
     rpl::variable<int> showPeerIdReactive;
+    rpl::variable<bool> showMessageSecondsReactive;
 
     rpl::variable<bool> ghostModeEnabled;
 
@@ -64,6 +65,7 @@ namespace AyuSettings {
         editedMarkReactive = settings->editedMark;
         showGhostToggleInDrawerReactive = settings->showGhostToggleInDrawer;
         showPeerIdReactive = settings->showPeerId;
+        showMessageSecondsReactive = settings->showMessageSeconds;
 
         ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
     }
@@ -160,6 +162,11 @@ namespace AyuSettings {
         showPeerIdReactive = val;
     }
 
+    void AyuGramSettings::set_showMessageSeconds(bool val) {
+        showMessageSeconds = val;
+        showMessageSecondsReactive = val;
+    }
+
     rpl::producer<bool> get_sendReadPacketsReactive() {
         return sendReadPacketsReactive.value();
     }
@@ -206,6 +213,10 @@ namespace AyuSettings {
 
     rpl::producer<int> get_showPeerId() {
         return showPeerIdReactive.value();
+    }
+
+    rpl::producer<bool> get_showMessageSeconds() {
+        return showMessageSecondsReactive.value();
     }
 
     rpl::producer<bool> get_ghostModeEnabled() {

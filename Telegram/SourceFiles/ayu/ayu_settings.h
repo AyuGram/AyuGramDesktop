@@ -38,6 +38,8 @@ namespace AyuSettings {
              * showPeerId = 2 means ID shown as for Bot API devs (-100)
              */
             showPeerId = 2;
+
+            showMessageSeconds = false;
         }
 
         QS_SERIALIZABLE
@@ -66,6 +68,8 @@ namespace AyuSettings {
 
     QS_FIELD(int, showPeerId)
 
+    QS_FIELD(bool, showMessageSeconds)
+
     public:
         void set_sendReadPackets(bool val);
         void set_sendOnlinePackets(bool val);
@@ -83,6 +87,7 @@ namespace AyuSettings {
         void set_editedMark(QString val);
         void set_showGhostToggleInDrawer(bool val);
         void set_showPeerId(int val);
+        void set_showMessageSeconds(bool val);
     };
 
     AyuGramSettings &getInstance();
@@ -102,6 +107,7 @@ namespace AyuSettings {
     rpl::producer<QString> get_editedMarkReactive();
     rpl::producer<QString> get_showGhostToggleInDrawer();
     rpl::producer<int> get_showPeerId();
+    rpl::producer<bool> get_showMessageSeconds();
 
     // computed fields
     rpl::producer<bool> get_ghostModeEnabled();

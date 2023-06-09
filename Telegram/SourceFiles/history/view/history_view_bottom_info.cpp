@@ -419,7 +419,7 @@ void BottomInfo::layoutDateText() {
 	const auto prefix = !author.isEmpty() ? (author == settings->deletedMark ? u" "_q : u", "_q) : QString();
 	const auto date = edited + QLocale().toString(
 		_data.date.time(),
-		QLocale::ShortFormat);
+		settings->showMessageSeconds ? QLocale::LongFormat : QLocale::ShortFormat);
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 	const auto authorWidth = st::msgDateFont->width(author);
