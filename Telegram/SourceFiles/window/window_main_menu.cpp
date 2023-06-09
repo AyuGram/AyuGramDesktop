@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ayu/ayu_settings.h"
 #include "ayu/boxes/confirmation_box.h"
+#include "styles/style_ayu_icons.h"
 
 namespace Window {
 namespace {
@@ -797,7 +798,7 @@ void MainMenu::setupMenu() {
     if (settings->showGhostToggleInDrawer) {
         _ghostModeToggle = addAction(
                 tr::ayu_DrawerGhostModeToggle(),
-                {&st::menuIconFake, kIconPurple}
+                {&st::ayuGhostIcon, kIconPurple}
         )->toggleOn(AyuSettings::get_ghostModeEnabled());
 
         _ghostModeToggle->toggledChanges(

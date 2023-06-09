@@ -1,0 +1,3 @@
+using "ui/colors.palette";
+
+ayuGhostIcon: icon {{ "ayu/ghost", settingsIconFg }};
