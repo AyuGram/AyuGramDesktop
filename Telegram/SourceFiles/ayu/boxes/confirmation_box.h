@@ -8,10 +8,12 @@ namespace AyuUi {
 
     protected:
         void prepare() override;
+        void resizeEvent(QResizeEvent *e) override;
 
     private:
         void ReadAllPeers();
 
         not_null<Window::SessionController *> _controller;
+        object_ptr<Ui::FlatLabel> _text = { nullptr };
     };
 }

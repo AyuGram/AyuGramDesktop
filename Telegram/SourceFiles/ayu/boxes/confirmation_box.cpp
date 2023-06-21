@@ -6,6 +6,7 @@
 #include "window/window_peer_menu.h"
 #include "styles/style_layers.h"
 #include "lang_auto.h"
+#include "ui/text/text_utilities.h"
 
 namespace AyuUi {
     ConfirmationBox::ConfirmationBox(
@@ -15,14 +16,30 @@ namespace AyuUi {
     }
 
     void ConfirmationBox::prepare() {
-        setTitle(rpl::single(QString("Confirmation for SRead")));
-        setDimensions(st::boxWideWidth, st::boxPadding.top());
+//        setTitle(rpl::single(QString("Confirmation for SRead")));
+        auto details = TextWithEntities();
+        details.text = QString("Do you want to read all messages?");
 
-        addButton(rpl::single(QString("OK")), [=, this] {
+        _text.create(this, rpl::single(std::move(details)), st::boxLabel);
+
+        auto fullHeight = st::boxPadding.top()
+                          + _text->height()
+                          + st::boxPadding.bottom();
+
+        setDimensions(st::boxWidth, fullHeight);
+
+        addButton(rpl::single(QString("Read")), [=, this] {
             ReadAllPeers();
             closeBox();
         });
         addButton(tr::lng_cancel(), [=, this] { closeBox(); });
+    }
+
+    void ConfirmationBox::resizeEvent(QResizeEvent *e) {
+        BoxContent::resizeEvent(e);
+
+        const auto &padding = st::boxPadding;
+        _text->moveToLeft(padding.left(), padding.top());
     }
 
     void ConfirmationBox::ReadAllPeers() {

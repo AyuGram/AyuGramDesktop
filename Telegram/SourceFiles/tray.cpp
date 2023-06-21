@@ -74,7 +74,7 @@ void Tray::rebuildMenu() {
 			_activeForTrayIconAction = Core::App().isActiveForTrayMenu();
 			return _activeForTrayIconAction
 				? tr::lng_minimize_to_tray(tr::now)
-				: tr::lng_open_from_tray(tr::now);
+				: tr::ayu_OpenFromTray(tr::now);
 		});
 
 		_tray.addAction(
@@ -95,7 +95,7 @@ void Tray::rebuildMenu() {
 			[=] { toggleSoundNotifications(); });
 	}
 
-	_tray.addAction(tr::lng_quit_from_tray(), [] { Core::Quit(); });
+	_tray.addAction(tr::ayu_QuitFromTray(), [] { Core::Quit(); });
 
 	updateMenuText();
 }

@@ -19,7 +19,7 @@ namespace AyuSettings {
             sendUploadProgress = true;
 
             sendOfflinePacketAfterOnline = false;
-            markReadAfterSend = false;
+            markReadAfterSend = true;
 
             useScheduledMessages = false;
 
