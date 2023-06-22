@@ -9,7 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "core/application.h"
 #include "core/core_settings.h"
-#include "platform/platform_notifications_manager.h"
+#include "lang_auto.h"
 #include "platform/platform_specific.h"
 #include "lang/lang_keys.h"
 
@@ -75,7 +75,7 @@ void Tray::rebuildMenu() {
 			_activeForTrayIconAction = Core::App().isActiveForTrayMenu();
 			return _activeForTrayIconAction
 				? tr::lng_minimize_to_tray(tr::now)
-				: tr::ayu_OpenFromTray(tr::now);
+				: tr::lng_open_from_tray(tr::now).replace("Telegram", "AyuGram");
 		});
 
 		_tray.addAction(
@@ -119,7 +119,11 @@ void Tray::rebuildMenu() {
         AyuSettings::save();
     });
 
-	_tray.addAction(tr::ayu_QuitFromTray(), [] { Core::Quit(); });
+    auto quitText = _textUpdates.events(
+    ) | rpl::map([=] {
+        return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
+    });
+	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
 
 	updateMenuText();
 }
