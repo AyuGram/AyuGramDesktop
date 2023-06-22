@@ -35,10 +35,10 @@ void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QStrin
 
     QUrl url;
     if (!finalLangPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(
+        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/Languages/main/values/langs/%1/Shared.json").arg(
                 finalLangPackId));
     } else {
-        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/localization/translations/desktop/%1.json").arg(
+        url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/Languages/main/values/langs/%1/Shared.json").arg(
                 needFallback ? langPackBaseId : finalLangPackId));
     }
     _chkReply = networkManager.get(QNetworkRequest(url));
