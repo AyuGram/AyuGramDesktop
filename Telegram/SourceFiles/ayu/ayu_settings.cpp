@@ -145,6 +145,14 @@ namespace AyuSettings {
         showMessageSeconds = val;
     }
 
+    void AyuGramSettings::set_stickerConfirmation(bool val) {
+        stickerConfirmation = val;
+    }
+
+    void AyuGramSettings::set_GIFConfirmation(bool val) {
+        GIFConfirmation = val;
+    }
+
     rpl::producer<QString> get_deletedMarkReactive() {
         return deletedMarkReactive.value();
     }

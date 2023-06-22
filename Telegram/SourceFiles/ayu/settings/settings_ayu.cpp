@@ -242,6 +242,8 @@ namespace Settings {
         AddDividerText(container, tr::ayu_SettingsCustomizationHint());
     }
 
+
+
     void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
         auto settings = &AyuSettings::getInstance();
 
@@ -316,6 +318,26 @@ namespace Settings {
                 });
     }
 
+    void Ayu::SetupBetaFunctions(not_null<Ui::VerticalLayout *> container) {
+        auto settings = &AyuSettings::getInstance();
+
+        AddSubsectionTitle(container, rpl::single(QString("Beta functions")));
+
+        AddButton(
+                container,
+                rpl::single(QString("Send sticker confirmation")),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->stickerConfirmation)
+        )->toggledValue(
+        ) | rpl::filter([=] (bool enabled) {
+            return (enabled != settings->stickerConfirmation);
+        }) | rpl::start_with_next([=] (bool enabled) {
+            settings->set_stickerConfirmation(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
+    }
+
     void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
         AddSkip(container);
         SetupGhostEssentials(container);
@@ -334,6 +356,9 @@ namespace Settings {
 
         AddSkip(container);
         SetupCustomization(container, controller);
+
+        AddSkip(container);
+        SetupBetaFunctions(container);
 
         AddDividerText(container, tr::ayu_SettingsWatermark());
     }

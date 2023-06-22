@@ -36,6 +36,10 @@ namespace AyuSettings {
             recentStickersCount = 20;
             showGhostToggleInDrawer = true;
 
+            // ~ Beta functionality
+            stickerConfirmation = false;
+            GIFConfirmation = false;
+
             /*
              * showPeerId = 0 means no ID shown
              * showPeerId = 1 means ID shown as for Telegram API devs
@@ -78,6 +82,10 @@ namespace AyuSettings {
 
     QS_FIELD(bool, showMessageSeconds)
 
+    QS_FIELD(bool, stickerConfirmation)
+
+    QS_FIELD(bool, GIFConfirmation)
+
     public:
         void set_sendReadPackets(bool val);
         void set_sendOnlinePackets(bool val);
@@ -99,6 +107,9 @@ namespace AyuSettings {
         void set_showGhostToggleInDrawer(bool val);
         void set_showPeerId(int val);
         void set_showMessageSeconds(bool val);
+
+        void set_stickerConfirmation(bool val);
+        void set_GIFConfirmation(bool val);
     };
 
     AyuGramSettings &getInstance();

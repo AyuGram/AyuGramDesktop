@@ -368,6 +368,7 @@ void ActivateBotCommand(ClickHandlerContext context, int row, int column) {
 		const auto itemId = item->fullId();
 		const auto topicRootId = item->topicRootId();
 		const auto history = item->history();
+
 		controller->show(Ui::MakeConfirmBox({
 			.text = tr::lng_bot_share_phone(),
 			.confirmed = [=] {

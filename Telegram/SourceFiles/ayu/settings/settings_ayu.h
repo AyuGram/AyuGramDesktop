@@ -26,6 +26,8 @@ namespace Settings {
         void SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
         void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container);
 
+        void SetupBetaFunctions(not_null<Ui::VerticalLayout *> container);
+
         void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> null);
         void setupContent(not_null<Window::SessionController *> controller);
     };
