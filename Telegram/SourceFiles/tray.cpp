@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 
 #include <QtWidgets/QApplication>
+#include <ayu/ayu_settings.h>
 
 namespace Core {
 
@@ -94,6 +95,29 @@ void Tray::rebuildMenu() {
 			std::move(notificationsText),
 			[=] { toggleSoundNotifications(); });
 	}
+
+    auto turnGhostModeText = _textUpdates.events(
+    ) | rpl::map([=] {
+        auto settings = AyuSettings::AyuGramSettings();
+        bool ghostModeEnabled = settings.getGhostModeValue();
+
+        return ghostModeEnabled
+                ? tr::ayu_DisableGhostMode(tr::now)
+                : tr::ayu_EnableGhostMode(tr::now);
+    });
+
+    _tray.addAction(rpl::single(QString("Toggle ghost mode")), [=] {
+        auto settings = &AyuSettings::getInstance();
+        bool ghostMode = (bool) AyuSettings::get_ghostModeEnabled();
+
+        settings->set_sendReadPackets(!ghostMode);
+        settings->set_sendOnlinePackets(!ghostMode);
+        settings->set_sendUploadProgress(!ghostMode);
+
+        settings->set_sendOfflinePacketAfterOnline(ghostMode);
+
+        AyuSettings::save();
+    });
 
 	_tray.addAction(tr::ayu_QuitFromTray(), [] { Core::Quit(); });
 

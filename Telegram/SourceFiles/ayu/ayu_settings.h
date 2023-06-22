@@ -110,6 +110,8 @@ namespace AyuSettings {
 
         void set_stickerConfirmation(bool val);
         void set_GIFConfirmation(bool val);
+
+        bool getGhostModeValue();
     };
 
     AyuGramSettings &getInstance();
