@@ -46,6 +46,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 #include <QtWidgets/QApplication>
+#include <ayu/ayu_settings.h>
+#include <ui/boxes/confirm_box.h>
 
 namespace ChatHelpers {
 namespace {
@@ -516,9 +518,11 @@ void GifsListWidget::selectInlineResult(
 		if (forceSend
 			|| (media && media->image(PhotoSize::Thumbnail))
 			|| (media && media->image(PhotoSize::Large))) {
+            // why photo type in GIF sender?
 			_photoChosen.fire({
 				.photo = photo,
 				.options = options });
+
 		} else if (!photo->loading(PhotoSize::Thumbnail)) {
 			photo->load(PhotoSize::Thumbnail, Data::FileOrigin());
 		}
@@ -526,12 +530,25 @@ void GifsListWidget::selectInlineResult(
 		const auto media = document->activeMediaView();
 		const auto preview = Data::VideoPreviewState(media.get());
 		if (forceSend || (media && preview.loaded())) {
-			_fileChosen.fire({
-				.document = document,
-				.options = options,
-				.messageSendingFrom = messageSendingFrom(),
-				.caption = std::move(caption),
-			});
+            auto settings = &AyuSettings::getInstance();
+            auto sendGIFCallback = [=, this] {
+                _fileChosen.fire({
+                     .document = document,
+                     .options = options,
+                     .messageSendingFrom = messageSendingFrom(),
+                });
+            };
+
+            if (settings->GIFConfirmation) {
+                Ui::show(Ui::MakeConfirmBox({
+                        .text = rpl::single(QString("Do you want to send this GIF?")),
+                        .confirmed = sendGIFCallback,
+                        .confirmText = rpl::single(QString("Send")),
+                }));
+            }
+            else {
+                sendGIFCallback();
+            }
 		} else if (!preview.usingThumbnail()) {
 			if (preview.loading()) {
 				document->cancel();

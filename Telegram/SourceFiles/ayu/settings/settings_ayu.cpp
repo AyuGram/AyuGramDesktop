@@ -336,6 +336,34 @@ namespace Settings {
             settings->set_stickerConfirmation(enabled);
             AyuSettings::save();
         }, container->lifetime());
+
+        AddButton(
+                container,
+                rpl::single(QString("Send GIF confirmation")),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->GIFConfirmation)
+        )->toggledValue(
+        ) | rpl::filter([=] (bool enabled) {
+            return (enabled != settings->GIFConfirmation);
+        }) | rpl::start_with_next([=] (bool enabled) {
+            settings->set_GIFConfirmation(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
+
+        AddButton(
+                container,
+                rpl::single(QString("Send voice confirmation")),
+                st::settingsButtonNoIcon
+        )->toggleOn(
+                rpl::single(settings->voiceConfirmation)
+        )->toggledValue(
+        ) | rpl::filter([=] (bool enabled) {
+            return (enabled != settings->voiceConfirmation);
+        }) | rpl::start_with_next([=] (bool enabled) {
+            settings->set_voiceConfirmation(enabled);
+            AyuSettings::save();
+        }, container->lifetime());
     }
 
     void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {

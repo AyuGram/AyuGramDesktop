@@ -153,12 +153,17 @@ namespace AyuSettings {
         GIFConfirmation = val;
     }
 
+    void AyuGramSettings::set_voiceConfirmation(bool val) {
+        voiceConfirmation = val;
+    }
+
     bool AyuGramSettings::getGhostModeValue() {
         return (!sendReadPackets
                 && !sendOnlinePackets
                 && !sendUploadProgress
                 && sendOfflinePacketAfterOnline);
     }
+
 
 
     rpl::producer<QString> get_deletedMarkReactive() {

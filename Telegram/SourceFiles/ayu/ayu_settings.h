@@ -39,6 +39,7 @@ namespace AyuSettings {
             // ~ Beta functionality
             stickerConfirmation = false;
             GIFConfirmation = false;
+            voiceConfirmation = false;
 
             /*
              * showPeerId = 0 means no ID shown
@@ -86,6 +87,8 @@ namespace AyuSettings {
 
     QS_FIELD(bool, GIFConfirmation)
 
+    QS_FIELD(bool, voiceConfirmation)
+
     public:
         void set_sendReadPackets(bool val);
         void set_sendOnlinePackets(bool val);
@@ -110,6 +113,7 @@ namespace AyuSettings {
 
         void set_stickerConfirmation(bool val);
         void set_GIFConfirmation(bool val);
+        void set_voiceConfirmation(bool val);
 
         bool getGhostModeValue();
     };

@@ -5,6 +5,8 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
+#include <ayu/ayu_settings.h>
+#include <ayu/boxes/voice_confirmation_box.h>
 #include "history/view/controls/history_view_voice_record_bar.h"
 
 #include "api/api_send_progress.h"
@@ -51,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_media_player.h"
 
 #include <tgcalls/VideoCaptureInterface.h>
+#include "boxes/abstract_box.h"
 
 namespace HistoryView::Controls {
 namespace {
@@ -2188,6 +2191,48 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 			});
 		}));
 	}
+<<<<<<< HEAD
+=======
+	instance()->stop(crl::guard(this, [=](Result &&data) {
+		if (data.bytes.isEmpty()) {
+			// Close everything.
+			stop(false);
+			return;
+		}
+
+		window()->raise();
+		window()->activateWindow();
+		const auto duration = Duration(data.samples);
+        auto settings = &AyuSettings::getInstance();
+
+		if (type == StopType::Send) {
+            auto sendVoiceCallback = [=, this] {
+                _sendVoiceRequests.fire({ data.bytes, data.waveform, duration });
+            };
+
+            if (settings->voiceConfirmation) {
+                Ui::show(AyuUi::MakeConfirmBox({
+                        .text = rpl::single(QString("Do you want to send voice message?")),
+                        .confirmed = sendVoiceCallback,
+                        .confirmText = rpl::single(QString("Send"))
+                }));
+            }
+            else {
+                sendVoiceCallback();
+            }
+
+		} else if (type == StopType::Listen) {
+			_listen = std::make_unique<ListenWrap>(
+				this,
+				&_show->session(),
+				std::move(data),
+				_cancelFont);
+			_listenChanges.fire({});
+
+			_lockShowing = false;
+		}
+	}));
+>>>>>>> 243245d680 (feat: send GIF|voice confirmation by settings toggles)
 }
 
 void VoiceRecordBar::drawDuration(QPainter &p) {
@@ -2244,6 +2289,7 @@ void VoiceRecordBar::drawMessage(QPainter &p, float64 recordActive) {
 
 void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 	if (isListenState()) {
+<<<<<<< HEAD
 		if (takeTTLState()) {
 			options.ttlSeconds = std::numeric_limits<int>::max();
 		}
@@ -2254,6 +2300,30 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			.options = options,
 			.video = !_data.minithumbs.isNull(),
 		});
+=======
+		const auto data = _listen->data();
+        auto settings = &AyuSettings::getInstance();
+
+        auto sendVoiceCallback = [=, this] {
+            _sendVoiceRequests.fire({
+                data->bytes,
+                data->waveform,
+                Duration(data->samples),
+                options
+            });
+        };
+
+        if (settings->voiceConfirmation) {
+            Ui::show(AyuUi::MakeConfirmBox({
+                    .text = rpl::single(QString("Do you want to send voice message?")),
+                    .confirmed = sendVoiceCallback,
+                    .confirmText = rpl::single(QString("Send"))
+            }));
+        }
+        else {
+            sendVoiceCallback();
+        }
+>>>>>>> 243245d680 (feat: send GIF|voice confirmation by settings toggles)
 	}
 }
 
