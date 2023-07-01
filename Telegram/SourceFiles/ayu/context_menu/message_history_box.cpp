@@ -1,3 +1,10 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2023
+
 #include <styles/style_layers.h>
 #include <styles/style_boxes.h>
 #include <ui/effects/scroll_content_shadow.h>

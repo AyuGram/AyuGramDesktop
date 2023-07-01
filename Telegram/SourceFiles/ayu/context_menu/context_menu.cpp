@@ -1,3 +1,10 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2023
+
 #include "context_menu.h"
 #include "history/history_inner_widget.h"
 #include "lang_auto.h"

@@ -1,3 +1,10 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2023
+
 #include "confirmation_box.h"
 #include "ayu/ayu_settings.h"
 #include "window/window_session_controller.h"

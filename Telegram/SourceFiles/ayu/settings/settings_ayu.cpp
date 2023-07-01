@@ -1,4 +1,10 @@
-#include <ui/boxes/single_choice_box.h>
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2023
+
 #include "ayu/boxes/edit_edited_mark.h"
 #include "ayu/boxes/edit_deleted_mark.h"
 #include "ayu/ayu_settings.h"
@@ -22,6 +28,7 @@
 #include "apiwrap.h"
 #include "api/api_blocked_peers.h"
 #include "ui/widgets/continuous_sliders.h"
+#include "ui/boxes/single_choice_box.h"
 
 namespace Settings {
 
@@ -180,7 +187,8 @@ namespace Settings {
         }, container->lifetime());
     }
 
-    void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+    void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
+                                 not_null<Window::SessionController *> controller) {
         auto settings = &AyuSettings::getInstance();
 
         AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
@@ -242,9 +250,8 @@ namespace Settings {
         AddDividerText(container, tr::ayu_SettingsCustomizationHint());
     }
 
-
-
-    void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+    void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
+                              not_null<Window::SessionController *> controller) {
         auto settings = &AyuSettings::getInstance();
 
         const auto options = std::vector{
@@ -253,7 +260,7 @@ namespace Settings {
                 QString("Bot API")
         };
 
-        auto currentVal = AyuSettings::get_showPeerId() | rpl::map([=] (int val) {
+        auto currentVal = AyuSettings::get_showPeerId() | rpl::map([=](int val) {
             return options[val];
         });
 
@@ -263,7 +270,7 @@ namespace Settings {
                 currentVal,
                 st::settingsButtonNoIcon);
         button->addClickHandler([=] {
-            controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+            controller->show(Box([=](not_null<Ui::GenericBox *> box) {
                 const auto save = [=](int index) {
                     settings->set_showPeerId(index);
                     AyuSettings::save();
@@ -306,7 +313,7 @@ namespace Settings {
         updateLabel(settings->recentStickersCount);
 
         slider->setPseudoDiscrete(
-                40 + 1, // thx tg
+                100 + 1, // thx tg
                 [=](int amount) { return amount; },
                 settings->recentStickersCount,
                 [=](int amount) { updateLabel(amount); },
@@ -330,9 +337,9 @@ namespace Settings {
         )->toggleOn(
                 rpl::single(settings->stickerConfirmation)
         )->toggledValue(
-        ) | rpl::filter([=] (bool enabled) {
+        ) | rpl::filter([=](bool enabled) {
             return (enabled != settings->stickerConfirmation);
-        }) | rpl::start_with_next([=] (bool enabled) {
+        }) | rpl::start_with_next([=](bool enabled) {
             settings->set_stickerConfirmation(enabled);
             AyuSettings::save();
         }, container->lifetime());
@@ -344,9 +351,9 @@ namespace Settings {
         )->toggleOn(
                 rpl::single(settings->GIFConfirmation)
         )->toggledValue(
-        ) | rpl::filter([=] (bool enabled) {
+        ) | rpl::filter([=](bool enabled) {
             return (enabled != settings->GIFConfirmation);
-        }) | rpl::start_with_next([=] (bool enabled) {
+        }) | rpl::start_with_next([=](bool enabled) {
             settings->set_GIFConfirmation(enabled);
             AyuSettings::save();
         }, container->lifetime());
@@ -358,15 +365,16 @@ namespace Settings {
         )->toggleOn(
                 rpl::single(settings->voiceConfirmation)
         )->toggledValue(
-        ) | rpl::filter([=] (bool enabled) {
+        ) | rpl::filter([=](bool enabled) {
             return (enabled != settings->voiceConfirmation);
-        }) | rpl::start_with_next([=] (bool enabled) {
+        }) | rpl::start_with_next([=](bool enabled) {
             settings->set_voiceConfirmation(enabled);
             AyuSettings::save();
         }, container->lifetime());
     }
 
-    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+    void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
+                                   not_null<Window::SessionController *> controller) {
         AddSkip(container);
         SetupGhostEssentials(container);
 

@@ -5,8 +5,6 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include <ayu/ayu_settings.h>
-#include <ayu/boxes/voice_confirmation_box.h>
 #include "history/view/controls/history_view_voice_record_bar.h"
 
 #include "api/api_send_progress.h"
@@ -53,6 +51,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_media_player.h"
 
 #include <tgcalls/VideoCaptureInterface.h>
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/boxes/voice_confirmation_box.h"
 #include "boxes/abstract_box.h"
 
 namespace HistoryView::Controls {
