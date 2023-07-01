@@ -164,7 +164,7 @@ namespace AyuSettings {
         voiceConfirmation = val;
     }
 
-    bool AyuGramSettings::getGhostModeValue() {
+    bool AyuGramSettings::get_ghostModeEnabled() const {
         return (!sendReadPackets
                 && !sendOnlinePackets
                 && !sendUploadProgress
@@ -179,11 +179,11 @@ namespace AyuSettings {
         return editedMarkReactive.value();
     }
 
-    rpl::producer<int> get_showPeerId() {
+    rpl::producer<int> get_showPeerIdReactive() {
         return showPeerIdReactive.value();
     }
 
-    rpl::producer<bool> get_ghostModeEnabled() {
+    rpl::producer<bool> get_ghostModeEnabledReactive() {
         return ghostModeEnabled.value();
     }
 }

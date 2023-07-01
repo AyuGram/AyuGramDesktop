@@ -122,7 +122,7 @@ namespace AyuSettings {
         void set_GIFConfirmation(bool val);
         void set_voiceConfirmation(bool val);
 
-        bool getGhostModeValue();
+        bool get_ghostModeEnabled() const;
     };
 
     AyuGramSettings &getInstance();
@@ -133,8 +133,8 @@ namespace AyuSettings {
 
     rpl::producer<QString> get_deletedMarkReactive();
     rpl::producer<QString> get_editedMarkReactive();
-    rpl::producer<int> get_showPeerId();
+    rpl::producer<int> get_showPeerIdReactive();
 
     // computed fields
-    rpl::producer<bool> get_ghostModeEnabled();
+    rpl::producer<bool> get_ghostModeEnabledReactive();
 }

@@ -260,7 +260,7 @@ namespace Settings {
                 QString("Bot API")
         };
 
-        auto currentVal = AyuSettings::get_showPeerId() | rpl::map([=](int val) {
+        auto currentVal = AyuSettings::get_showPeerIdReactive() | rpl::map([=](int val) {
             return options[val];
         });
 
