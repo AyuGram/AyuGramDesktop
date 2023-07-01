@@ -19,14 +19,6 @@ Also, we have a cool **purple icon**.
 
 Follow our [Telegram channel](https://t.me/ayugram1338). FAQ can be found here.
 
-<<<<<<< HEAD
-Version **4.9.9** was the last that supports older systems
-
-* [macOS 10.12](https://updates.tdesktop.com/tmac/tsetup.4.9.9.dmg)
-* [Linux with glibc < 2.28 static build](https://updates.tdesktop.com/tlinux/tsetup.4.9.9.tar.xz)
-
-Version **2.4.4** was the last that supports older systems
-=======
 ## May I get banned?
 
 Well, *you* **can't**, because you're just an ordinary user.
@@ -37,7 +29,6 @@ Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/
 
 ### Remarks
 
-<<<<<<< HEAD
 * Qt 6 ([LGPL](http://doc.qt.io/qt-6/lgpl.html)) and Qt 5.15 ([LGPL](http://doc.qt.io/qt-5/lgpl.html)) slightly patched
 * OpenSSL 3.2.1 ([Apache License 2.0](https://www.openssl.org/source/apache-license-2.0.txt))
 * WebRTC ([New BSD License](https://github.com/desktop-app/tg_owt/blob/master/LICENSE))
@@ -85,4 +76,19 @@ Make sure you have these components installed with VS Build Tools:
 - C++ MFC latest (x86 & x64)
 - C++ ATL latest (x86 & x64)
 - latest Windows 11 SDK
->>>>>>> eaba9781a5 (upload: import Ayu initial)
+=======
+
+## Credits
+
+- [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
+- [Kotatogram](https://github.com/kotatogram/kotatogram-desktop)
+- [64Gram](https://github.com/TDesktop-x64/tdesktop)
+- [SQLite](https://github.com/sqlite/sqlite)
+- [sqlite_orm](https://github.com/fnc12/sqlite_orm)
+
+### Very special thanks to
+
+- [JSON for Modern C++](https://github.com/nlohmann/json)
+- [BitConverter](https://github.com/YanjieHe/BitConverter)
+- [Not Enough Standards](https://github.com/Alairion/not-enough-standards)
+>>>>>>> f62eea3952 (feat: refactor)

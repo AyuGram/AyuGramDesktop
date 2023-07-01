@@ -10,6 +10,8 @@
 #include "rpl/producer.h"
 #include "rpl/variable.h"
 
+using json = nlohmann::json;
+
 namespace AyuSettings {
     const QString filename = "tdata/ayu_settings.json";
     std::optional<AyuGramSettings> settings = std::nullopt;
@@ -66,22 +68,23 @@ namespace AyuSettings {
             return;
         }
         file.open(QIODevice::ReadOnly);
-        QByteArray json = file.readAll();
+        QByteArray data = file.readAll();
         file.close();
 
         initialize();
-        settings->fromJson(json);
+        json p = json::parse(data);
+        settings = p.template get<AyuGramSettings>();
         postinitialize();
     }
 
     void save() {
         initialize();
 
-        QByteArray json = settings->toRawJson();
+        json p = settings.value();
 
         QFile file(filename);
         file.open(QIODevice::WriteOnly);
-        file.write(json);
+        file.write(p.dump().c_str());
         file.close();
 
         postinitialize();

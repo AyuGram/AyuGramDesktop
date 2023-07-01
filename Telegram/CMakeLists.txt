@@ -99,35 +99,43 @@ nice_target_sources(Telegram ${src_loc}
 PRIVATE
     ${style_files}
 
-    ayu/qserializer.h
     ayu/ayu_state.cpp
     ayu/ayu_state.h
     ayu/ayu_settings.cpp
     ayu/ayu_settings.h
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
-    ayu/boxes/voice_confirmation_box.cpp
-    ayu/boxes/voice_confirmation_box.h
-    ayu/boxes/confirmation_box.cpp
-    ayu/boxes/confirmation_box.h
-    ayu/boxes/edit_deleted_mark.cpp
-    ayu/boxes/edit_deleted_mark.h
-    ayu/boxes/edit_edited_mark.cpp
-    ayu/boxes/edit_edited_mark.h
-    ayu/context_menu/context_menu.cpp
-    ayu/context_menu/context_menu.h
-    ayu/context_menu/message_history_box.cpp
-    ayu/context_menu/message_history_box.h
-    ayu/settings/settings_ayu.cpp
-    ayu/settings/settings_ayu.h
-    ayu/sqlite/sqlite3.c
-    ayu/sqlite/sqlite3.h
-    ayu/sqlite/sqlite_orm.h
+    ayu/ui/utils/ayu_profile_values.cpp
+    ayu/ui/utils/ayu_profile_values.h
+    ayu/ui/settings/settings_ayu.cpp
+    ayu/ui/settings/settings_ayu.h
+    ayu/ui/context_menu/context_menu.cpp
+    ayu/ui/context_menu/context_menu.h
+    ayu/ui/context_menu/message_history_box.cpp
+    ayu/ui/context_menu/message_history_box.h
+    ayu/ui/boxes/voice_confirmation_box.cpp
+    ayu/ui/boxes/voice_confirmation_box.h
+    ayu/ui/boxes/confirmation_box.cpp
+    ayu/ui/boxes/confirmation_box.h
+    ayu/ui/boxes/edit_deleted_mark.cpp
+    ayu/ui/boxes/edit_deleted_mark.h
+    ayu/ui/boxes/edit_edited_mark.cpp
+    ayu/ui/boxes/edit_edited_mark.h
+    ayu/sync/ayu_sync_controller.cpp
+    ayu/sync/ayu_sync_controller.h
+    ayu/sync/models.h
+    ayu/sync/utils/ayu_pipe_wrapper.cpp
+    ayu/sync/utils/ayu_pipe_wrapper.h
+    ayu/libs/pipe.hpp
+    ayu/libs/json.hpp
+    ayu/libs/json_ext.hpp
+    ayu/libs/bit_converter.hpp
+    ayu/libs/sqlite/sqlite3.c
+    ayu/libs/sqlite/sqlite3.h
+    ayu/libs/sqlite/sqlite_orm.h
     ayu/database/entities.h
     ayu/database/ayu_database.cpp
     ayu/database/ayu_database.h
-    ayu/utils/ayu_profile_values.cpp
-    ayu/utils/ayu_profile_values.h
 
     api/api_attached_stickers.cpp
     api/api_attached_stickers.h

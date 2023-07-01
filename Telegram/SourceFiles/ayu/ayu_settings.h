@@ -8,16 +8,12 @@
 #pragma once
 
 #include "rpl/producer.h"
-
-#define QS_HAS_JSON
-
 #include "lang_auto.h"
-#include "qserializer.h"
+#include "ayu/libs/json.hpp"
+#include "ayu/libs/json_ext.hpp"
 
 namespace AyuSettings {
-    class AyuGramSettings : public QSerializer {
-    Q_GADGET
-
+    class AyuGramSettings {
     public:
         AyuGramSettings() {
             // ~ Ghost essentials
@@ -56,74 +52,91 @@ namespace AyuSettings {
             showPeerId = 2;
 
             showMessageSeconds = false;
+            stickerConfirmation = false;
+            GIFConfirmation = false;
+            voiceConfirmation = false;
         }
 
-        QS_SERIALIZABLE
-
-    QS_FIELD(bool, sendReadPackets)
-
-    QS_FIELD(bool, sendOnlinePackets)
-
-    QS_FIELD(bool, sendUploadProgress)
-
-    QS_FIELD(bool, sendOfflinePacketAfterOnline)
-
-    QS_FIELD(bool, markReadAfterSend)
-
-    QS_FIELD(bool, useScheduledMessages)
-
-    QS_FIELD(bool, keepDeletedMessages)
-
-    QS_FIELD(bool, keepMessagesHistory)
-
-    QS_FIELD(bool, enableAds)
-
-    QS_FIELD(QString, deletedMark)
-
-    QS_FIELD(QString, editedMark)
-
-    QS_FIELD(int, recentStickersCount)
-
-    QS_FIELD(bool, showGhostToggleInDrawer)
-
-    QS_FIELD(int, showPeerId)
-
-    QS_FIELD(bool, showMessageSeconds)
-
-    QS_FIELD(bool, stickerConfirmation)
-
-    QS_FIELD(bool, GIFConfirmation)
-
-    QS_FIELD(bool, voiceConfirmation)
+        bool sendReadPackets;
+        bool sendOnlinePackets;
+        bool sendUploadProgress;
+        bool sendOfflinePacketAfterOnline;
+        bool markReadAfterSend;
+        bool useScheduledMessages;
+        bool keepDeletedMessages;
+        bool keepMessagesHistory;
+        bool enableAds;
+        QString deletedMark;
+        QString editedMark;
+        int recentStickersCount;
+        bool showGhostToggleInDrawer;
+        int showPeerId;
+        bool showMessageSeconds;
+        bool stickerConfirmation;
+        bool GIFConfirmation;
+        bool voiceConfirmation;
 
     public:
         void set_sendReadPackets(bool val);
+
         void set_sendOnlinePackets(bool val);
+
         void set_sendUploadProgress(bool val);
 
         void set_sendOfflinePacketAfterOnline(bool val);
+
         void set_markReadAfterSend(bool val);
 
         void set_useScheduledMessages(bool val);
 
         void set_keepDeletedMessages(bool val);
+
         void set_keepMessagesHistory(bool val);
 
         void set_enableAds(bool val);
 
         void set_deletedMark(QString val);
+
         void set_editedMark(QString val);
+
         void set_recentStickersCount(int val);
+
         void set_showGhostToggleInDrawer(bool val);
+
         void set_showPeerId(int val);
+
         void set_showMessageSeconds(bool val);
 
         void set_stickerConfirmation(bool val);
+
         void set_GIFConfirmation(bool val);
+
         void set_voiceConfirmation(bool val);
 
         bool get_ghostModeEnabled() const;
     };
+
+    NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+            AyuGramSettings,
+            sendReadPackets,
+            sendOnlinePackets,
+            sendUploadProgress,
+            sendOfflinePacketAfterOnline,
+            markReadAfterSend,
+            useScheduledMessages,
+            keepDeletedMessages,
+            keepMessagesHistory,
+            enableAds,
+            deletedMark,
+            editedMark,
+            recentStickersCount,
+            showGhostToggleInDrawer,
+            showPeerId,
+            showMessageSeconds,
+            stickerConfirmation,
+            GIFConfirmation,
+            voiceConfirmation
+    );
 
     AyuGramSettings &getInstance();
 
@@ -132,7 +145,9 @@ namespace AyuSettings {
     void save();
 
     rpl::producer<QString> get_deletedMarkReactive();
+
     rpl::producer<QString> get_editedMarkReactive();
+
     rpl::producer<int> get_showPeerIdReactive();
 
     // computed fields

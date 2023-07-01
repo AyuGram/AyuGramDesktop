@@ -84,7 +84,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 
 #include "ayu/ayu_settings.h"
-#include "ayu/boxes/confirmation_box.h"
+#include "ayu/ui/boxes/confirmation_box.h"
 #include "styles/style_ayu_icons.h"
 
 namespace Window {

@@ -5,10 +5,10 @@
 //
 // Copyright @Radolyn, 2023
 
-#include "ayu/boxes/edit_edited_mark.h"
-#include "ayu/boxes/edit_deleted_mark.h"
+#include "ayu/ui/boxes/edit_edited_mark.h"
+#include "ayu/ui/boxes/edit_deleted_mark.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/settings/settings_ayu.h"
+#include "settings_ayu.h"
 
 #include "lang_auto.h"
 #include "mainwindow.h"
