@@ -15,6 +15,7 @@ class SyncBatch : public SyncEvent {
     class SyncBatchArgs {
         std::vector<SyncEvent> events;
     };
+
     SyncBatchArgs args;
 };
 
@@ -27,6 +28,7 @@ class SyncRead : public SyncEvent {
         int untilId;
         int unread;
     };
+
     SyncReadArgs args;
 };
 
@@ -37,6 +39,7 @@ class SyncForce : public SyncEvent {
     class SyncForceArgs {
         int fromDate;
     };
+
     SyncForceArgs args;
 };
 
@@ -46,6 +49,7 @@ class SyncForceFinish : public SyncEvent {
 
     class SyncForceFinishArgs {
     };
+
     SyncForceFinishArgs args;
 };
 

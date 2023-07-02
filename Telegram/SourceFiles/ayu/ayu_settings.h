@@ -112,8 +112,6 @@ namespace AyuSettings {
         void set_GIFConfirmation(bool val);
 
         void set_voiceConfirmation(bool val);
-
-        bool get_ghostModeEnabled() const;
     };
 
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
@@ -151,5 +149,7 @@ namespace AyuSettings {
     rpl::producer<int> get_showPeerIdReactive();
 
     // computed fields
+    bool get_ghostModeEnabled();
+
     rpl::producer<bool> get_ghostModeEnabledReactive();
 }

@@ -14,7 +14,7 @@
 constexpr auto kMaxChannelId = -1000000000000;
 
 
-QString IDString(not_null<PeerData*> peer) {
+QString IDString(not_null<PeerData *> peer) {
     auto resultId = QString::number(peerIsUser(peer->id)
                                     ? peerToUser(peer->id).bare
                                     : peerIsChat(peer->id)
@@ -35,6 +35,6 @@ QString IDString(not_null<PeerData*> peer) {
     return resultId;
 }
 
-rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer) {
+rpl::producer<TextWithEntities> IDValue(not_null<PeerData *> peer) {
     return rpl::single(IDString(peer)) | Ui::Text::ToWithEntities();
 }

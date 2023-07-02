@@ -94,9 +94,9 @@ namespace AyuUi {
 
     object_ptr<Ui::GenericBox> MakeInformBox(v::text::data text) {
         return MakeConfirmBox({
-                  .text = std::move(text),
-                  .inform = true,
-        });
+                                      .text = std::move(text),
+                                      .inform = true,
+                              });
     }
 
 } // namespace AyuUi

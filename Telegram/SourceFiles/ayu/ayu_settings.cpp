@@ -18,6 +18,8 @@ namespace AyuSettings {
 
     rpl::variable<bool> sendReadPacketsReactive;
     rpl::variable<bool> sendOnlinePacketsReactive;
+    rpl::variable<bool> sendUploadProgressReactive;
+    rpl::variable<bool> sendOfflinePacketAfterOnlineReactive;
 
     rpl::variable<QString> deletedMarkReactive;
     rpl::variable<QString> editedMarkReactive;
@@ -27,22 +29,39 @@ namespace AyuSettings {
 
     rpl::lifetime lifetime = rpl::lifetime();
 
+    bool ghostModeEnabled_util(AyuGramSettings &settingsUtil) {
+        return (!settingsUtil.sendReadPackets
+                && !settingsUtil.sendOnlinePackets
+                && !settingsUtil.sendUploadProgress
+                && settingsUtil.sendOfflinePacketAfterOnline);
+    }
+
     void initialize() {
         if (settings.has_value()) {
             return;
         }
 
-        settings = std::optional(AyuGramSettings());
+        settings = AyuGramSettings();
 
         sendReadPacketsReactive.value() | rpl::filter([=](bool val) {
             return (val != settings->sendReadPackets);
         }) | rpl::start_with_next([=](bool val) {
-            ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
+            ghostModeEnabled = ghostModeEnabled_util(settings.value());
         }, lifetime);
         sendOnlinePacketsReactive.value() | rpl::filter([=](bool val) {
             return (val != settings->sendOnlinePackets);
         }) | rpl::start_with_next([=](bool val) {
-            ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
+            ghostModeEnabled = ghostModeEnabled_util(settings.value());
+        }, lifetime);
+        sendUploadProgressReactive.value() | rpl::filter([=](bool val) {
+            return (val != settings->sendUploadProgress);
+        }) | rpl::start_with_next([=](bool val) {
+            ghostModeEnabled = ghostModeEnabled_util(settings.value());
+        }, lifetime);
+        sendOfflinePacketAfterOnlineReactive.value() | rpl::filter([=](bool val) {
+            return (val != settings->sendOfflinePacketAfterOnline);
+        }) | rpl::start_with_next([=](bool val) {
+            ghostModeEnabled = ghostModeEnabled_util(settings.value());
         }, lifetime);
     }
 
@@ -54,7 +73,7 @@ namespace AyuSettings {
         editedMarkReactive = settings->editedMark;
         showPeerIdReactive = settings->showPeerId;
 
-        ghostModeEnabled = !settings->sendReadPackets && !settings->sendOnlinePackets;
+        ghostModeEnabled = ghostModeEnabled_util(settings.value());
     }
 
     AyuGramSettings &getInstance() {
@@ -102,10 +121,12 @@ namespace AyuSettings {
 
     void AyuGramSettings::set_sendUploadProgress(bool val) {
         sendUploadProgress = val;
+        sendUploadProgressReactive = val;
     }
 
     void AyuGramSettings::set_sendOfflinePacketAfterOnline(bool val) {
         sendOfflinePacketAfterOnline = val;
+        sendOfflinePacketAfterOnlineReactive = val;
     }
 
     void AyuGramSettings::set_markReadAfterSend(bool val) {
@@ -167,11 +188,8 @@ namespace AyuSettings {
         voiceConfirmation = val;
     }
 
-    bool AyuGramSettings::get_ghostModeEnabled() const {
-        return (!sendReadPackets
-                && !sendOnlinePackets
-                && !sendUploadProgress
-                && sendOfflinePacketAfterOnline);
+    bool get_ghostModeEnabled() {
+        return ghostModeEnabled.current();
     }
 
     rpl::producer<QString> get_deletedMarkReactive() {

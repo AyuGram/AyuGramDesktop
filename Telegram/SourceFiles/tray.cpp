@@ -98,8 +98,7 @@ void Tray::rebuildMenu() {
 
     auto turnGhostModeText = _textUpdates.events(
     ) | rpl::map([=] {
-        auto settings = &AyuSettings::getInstance();
-        bool ghostModeEnabled = settings->get_ghostModeEnabled();
+        bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
 
         return ghostModeEnabled
                 ? tr::ayu_DisableGhostMode(tr::now)
@@ -108,7 +107,7 @@ void Tray::rebuildMenu() {
 
     _tray.addAction(std::move(turnGhostModeText), [=] {
         auto settings = &AyuSettings::getInstance();
-        bool ghostMode = !settings->get_ghostModeEnabled();
+        bool ghostMode = !AyuSettings::get_ghostModeEnabled();
 
         settings->set_sendReadPackets(!ghostMode);
         settings->set_sendOnlinePackets(!ghostMode);

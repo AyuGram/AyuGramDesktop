@@ -36,5 +36,6 @@ namespace AyuState {
     }
 
     void setAllowSendReadPacket(bool val, int resetAfter = 1);
+
     bool getAllowSendPacket();
 }

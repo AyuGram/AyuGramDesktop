@@ -32,7 +32,7 @@ json ayu_pipe_wrapper::receive() {
     char buff[4096];
 
     while (length > 0) {
-        auto readSize = std::min(length, (int)sizeof(buff));
+        auto readSize = std::min(length, (int) sizeof(buff));
         is.read(buff, readSize);
         sb.sputn(buff, readSize);
         length -= readSize;
