@@ -12,7 +12,7 @@ include(lib_ui/cmake/generate_styles.cmake)
 include(cmake/generate_numbers.cmake)
 
 set(style_files
-    ayu/ayu_icons.style
+    ayu/ui/ayu_icons.style
 
     ui/td_common.style
     ui/filter_icons.style
