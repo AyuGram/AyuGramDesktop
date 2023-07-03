@@ -31,13 +31,13 @@ namespace Settings {
 
         void SetupQoLToggles(not_null<Ui::VerticalLayout *> container);
 
-        void
-        SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
+        void SetupCustomization(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
 
-        void
-        SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
+        void SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
 
         void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container);
+
+        void SetupAyuSync(not_null<Ui::VerticalLayout *> container);
 
         void SetupBetaFunctions(not_null<Ui::VerticalLayout *> container);
 

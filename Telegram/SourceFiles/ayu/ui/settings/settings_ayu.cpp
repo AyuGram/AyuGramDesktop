@@ -5,6 +5,7 @@
 //
 // Copyright @Radolyn, 2023
 
+#include "ayu/sync/ayu_sync_controller.h"
 #include "ayu/ui/boxes/edit_edited_mark.h"
 #include "ayu/ui/boxes/edit_deleted_mark.h"
 #include "ayu/ayu_settings.h"
@@ -325,6 +326,23 @@ namespace Settings {
                 });
     }
 
+    void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container) {
+        AddSubsectionTitle(container, rpl::single(QString("AyuSync")));
+
+        auto text = AyuSync::isAgentDownloaded() ?
+                QString("Open preferences") :
+                QString("Download agent");
+
+        AddButton(
+                container,
+                rpl::single(text),
+                st::settingsButtonNoIcon
+        )->addClickHandler([=] {
+            auto controller = &AyuSync::getControllerInstance();
+            controller->initializeAgent();
+        });
+    }
+
     void Ayu::SetupBetaFunctions(not_null<Ui::VerticalLayout *> container) {
         auto settings = &AyuSettings::getInstance();
 
@@ -392,6 +410,9 @@ namespace Settings {
 
         AddSkip(container);
         SetupCustomization(container, controller);
+
+        AddSkip(container);
+        SetupAyuSync(container);
 
         AddSkip(container);
         SetupBetaFunctions(container);

@@ -7,10 +7,34 @@
 
 #pragma once
 
+#include "ayu/libs/json.hpp"
+#include "utils/ayu_pipe_wrapper.h"
+
+using json = nlohmann::json;
+
+const std::string AgentFilename =
+#ifdef _WIN32
+        "AyuSyncAgent.exe";
+#else
+        "AyuSyncAgent";
+#endif
+
+const std::string AgentPath = "./AyuSync/" + AgentFilename;
+
 namespace AyuSync {
-
     class ayu_sync_controller {
+    public:
+        void initializeAgent();
 
+        void invokeHandler(json p);
+    private:
+        void receiver();
+
+        std::unique_ptr<ayu_pipe_wrapper> pipe;
     };
 
-} // AyuSync
+    ayu_sync_controller &getControllerInstance();
+
+    bool isAgentDownloaded();
+    bool isAgentRunning();
+}

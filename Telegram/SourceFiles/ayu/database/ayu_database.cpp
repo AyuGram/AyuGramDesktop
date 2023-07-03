@@ -7,9 +7,10 @@
 
 #include "ayu_database.h"
 
+#include <QString>
+
 #include "entities.h"
-#include "ayu/sqlite/sqlite_orm.h"
-#include "QtCore/QString"
+#include "ayu/libs/sqlite/sqlite_orm.h"
 #include "main/main_session.h"
 
 using namespace sqlite_orm;

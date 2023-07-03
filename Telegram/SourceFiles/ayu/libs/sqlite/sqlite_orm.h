@@ -362,7 +362,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <system_error>  // std::error_code, std::system_error
 #include <string>  //  std::string
@@ -7458,7 +7458,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <memory>  // std::unique_ptr
 #include <type_traits>  // std::integral_constant
@@ -7917,7 +7917,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <type_traits>  //  std::enable_if_t, std::is_arithmetic, std::is_same, std::true_type, std::false_type, std::make_index_sequence, std::index_sequence
 #include <memory>  //  std::default_delete
@@ -8371,7 +8371,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <type_traits>  //  std::enable_if_t, std::is_arithmetic, std::is_same, std::enable_if
 #include <stdlib.h>  //  atof, atoi, atoll
@@ -8789,7 +8789,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <string>  //  std::string
 #include <utility>  //  std::move
@@ -9978,7 +9978,7 @@ namespace sqlite_orm {
 }
 #pragma once
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <memory>  //  std::unique_ptr/shared_ptr, std::make_unique/std::make_shared
 #include <system_error>  //  std::system_error
@@ -10019,12 +10019,12 @@ namespace sqlite_orm {
 
 // #include "mapped_row_extractor.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 
 // #include "object_from_column_builder.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 #include <type_traits>  //  std::is_member_object_pointer
 
 // #include "functional/static_magic.h"
@@ -10282,7 +10282,7 @@ namespace sqlite_orm {
 
 // #include "function.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 #include <type_traits>
 #include <string>  //  std::string
 #include <tuple>  //  std::tuple
@@ -10809,7 +10809,7 @@ namespace sqlite_orm {
 
 // #include "view.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 #include <string>  //  std::string
 #include <utility>  //  std::forward, std::move
 #include <tuple>  //  std::tuple, std::make_tuple
@@ -10820,7 +10820,7 @@ namespace sqlite_orm {
 
 // #include "iterator.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 #include <memory>  //  std::shared_ptr, std::unique_ptr, std::make_shared
 #include <type_traits>  //  std::decay
 #include <utility>  //  std::move
@@ -10946,7 +10946,7 @@ namespace sqlite_orm {
 
 // #include "prepared_statement.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <memory>  //  std::unique_ptr
 #include <iterator>  //  std::iterator_traits
@@ -10964,7 +10964,7 @@ namespace sqlite_orm {
 
 // #include "connection_holder.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <atomic>
 #include <string>  //  std::string
@@ -12893,7 +12893,7 @@ namespace sqlite_orm {
 
 // #include "storage_base.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <functional>  //  std::function, std::bind
 #include <string>  //  std::string
@@ -12914,7 +12914,7 @@ namespace sqlite_orm {
 
 // #include "pragma.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <string>  //  std::string
 #include <functional>  //  std::function
@@ -13556,7 +13556,7 @@ namespace sqlite_orm {
 
 // #include "limit_accessor.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <map>  //  std::map
 #include <functional>  //  std::function
@@ -13782,7 +13782,7 @@ namespace sqlite_orm {
 
 // #include "backup.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <system_error>  //  std::system_error
 #include <string>  //  std::string
@@ -13860,7 +13860,7 @@ namespace sqlite_orm {
 
 // #include "values_to_tuple.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 #include <type_traits>  //  std::index_sequence, std::make_index_sequence
 #include <tuple>  //  std::tuple, std::tuple_size, std::get
@@ -13871,7 +13871,7 @@ namespace sqlite_orm {
 
 // #include "arg_values.h"
 
-#include "ayu/sqlite/sqlite3.h"
+#include "ayu/libs/sqlite/sqlite3.h"
 
 
 // #include "row_extractor.h"
