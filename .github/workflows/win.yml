@@ -138,7 +138,6 @@ jobs:
           del /S Libraries\*.obj
 
       - name: Telegram Desktop build.
-        continue-on-error: true
         if: env.ONLY_CACHE == 'false'
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
@@ -155,14 +154,12 @@ jobs:
           msbuild -m Telegram.sln /p:Configuration=Debug,Platform=${{ matrix.arch }},DebugSymbols=false,DebugType=none
 
       - name: Move artifact.
-        continue-on-error: true
         if: (env.UPLOAD_ARTIFACT == 'true') || ${{ github.ref == 'refs/heads/nightly' }}
         run: |
           mkdir artifact
           move %TBUILD%\%REPO_NAME%\out\Debug\AyuGram.exe artifact/
       - uses: actions/upload-artifact@master
         name: Upload artifact.
-        continue-on-error: true
         if: (env.UPLOAD_ARTIFACT == 'true') || ${{ github.ref == 'refs/heads/nightly' }}
         with:
           name: ${{ env.ARTIFACT_NAME }}
