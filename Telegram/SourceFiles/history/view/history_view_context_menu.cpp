@@ -98,7 +98,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
-#include "ayu/context_menu/message_history_box.h"
+#include "ayu/ui/context_menu/message_history_box.h"
 
 namespace HistoryView {
 namespace {

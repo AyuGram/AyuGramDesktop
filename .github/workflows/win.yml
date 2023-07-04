@@ -1,6 +1,7 @@
 name: Windows.
 
 on:
+  workflow_dispatch:
   push:
     paths-ignore:
       - 'docs/**'
@@ -48,8 +49,7 @@ jobs:
 
     strategy:
       matrix:
-        arch: [Win32, x64]
-        generator: ["", "Ninja Multi-Config"]
+        arch: [Win32]
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -201,11 +201,42 @@ jobs:
         run: |
           set OUT=%TBUILD%\%REPO_NAME%\out\Debug
           mkdir artifact
+<<<<<<< HEAD
           move %OUT%\Telegram.exe artifact/
           move %OUT%\Updater.exe artifact/
       - uses: actions/upload-artifact@v4
+=======
+          move %TBUILD%\%REPO_NAME%\out\Debug\AyuGram.exe artifact/
+      - uses: actions/upload-artifact@master
+>>>>>>> d37022c9f4 (feat: build Win32 using Actions (#2))
         name: Upload artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: artifact\
+
+  release:
+    name: Release
+    needs: [windows]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Merge Releases
+      uses: actions/download-artifact@v2
+      with:
+        name: Telegram_Win32
+        path: artifact
+
+    - name: Upload release
+      uses: Hs1r1us/Release-AIO@v1.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        # The name of the tag
+        tag_name: prelease-${{ github.run_number }}
+        prerelease: true
+        release_name: Ayugram CI
+        asset_files: './artifact'

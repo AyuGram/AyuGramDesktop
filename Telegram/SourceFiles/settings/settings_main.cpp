@@ -83,7 +83,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtGui/QWindow>
 
-#include "ayu/settings/settings_ayu.h"
+#include "ayu/ui/settings/settings_ayu.h"
 
 namespace Settings {
 namespace {

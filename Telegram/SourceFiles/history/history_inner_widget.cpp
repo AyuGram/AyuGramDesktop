@@ -109,7 +109,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
 
-#include "ayu/context_menu/context_menu.h"
+#include "ayu/ui/context_menu/context_menu.h"
 #include "styles/style_ayu_icons.h"
 
 namespace {
