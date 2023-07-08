@@ -14,9 +14,9 @@ using json = nlohmann::json;
 
 const std::string AgentFilename =
 #ifdef _WIN32
-        "AyuSyncAgent.exe";
+        "AyuSync.Agent.exe";
 #else
-        "AyuSyncAgent";
+        "AyuSync.Agent";
 #endif
 
 const std::string AgentPath = "./AyuSync/" + AgentFilename;

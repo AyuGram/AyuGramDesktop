@@ -414,6 +414,8 @@ namespace Settings {
         AddSkip(container);
         SetupAyuSync(container);
 
+        AddDivider(container);
+
         AddSkip(container);
         SetupBetaFunctions(container);
 

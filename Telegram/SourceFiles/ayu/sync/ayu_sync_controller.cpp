@@ -43,19 +43,27 @@ namespace AyuSync {
 
         if (!isAgentRunning()) {
             auto configPath = std::filesystem::absolute("./tdata/sync_preferences.json");
-            auto process = nes::process{AgentPath, {configPath.string()}};
+            auto process = nes::process{AgentPath, {configPath.string(), ""}, nes::process_options::none};
             process.detach();
         }
 
-        pipe = std::make_unique<ayu_pipe_wrapper>();
-
         std::thread receiverThread(&ayu_sync_controller::receiver, this);
+        receiverThread.detach();
     }
 
     void ayu_sync_controller::receiver() {
+        pipe = std::make_unique<ayu_pipe_wrapper>();
+
         while (true) {
             auto p = pipe->receive();
-            invokeHandler(p);
+            if (p == std::nullopt) {
+                continue;
+            }
+
+            std::string s = p->dump();
+            LOG(("[AyuSync] Received message: %1").arg(QString::fromStdString(s)));
+
+            invokeHandler(p.value());
         }
     }
 

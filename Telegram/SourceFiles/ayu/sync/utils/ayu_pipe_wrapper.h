@@ -18,9 +18,8 @@ public:
     template<class T>
     void send(T obj);
 
-    json receive();
+    std::optional<json> receive();
 
 private:
-    nes::basic_pipe_istream<char> is{"AyuSync"};
-    nes::basic_pipe_ostream<char> os{"AyuSync"};
+    nes::pipe_istream is{"AyuSync"};
 };

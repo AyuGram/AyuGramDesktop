@@ -138,7 +138,7 @@ public:
             {
                 native_mode = mode & std::ios_base::in ? PIPE_ACCESS_INBOUND : PIPE_ACCESS_OUTBOUND;
 
-                handle = CreateNamedPipeW(std::data(native_name), native_mode, PIPE_READMODE_BYTE | PIPE_WAIT, 1, buf_size, buf_size, 0, nullptr);
+                handle = CreateNamedPipeW(std::data(native_name), native_mode, PIPE_READMODE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, buf_size, buf_size, 0, nullptr);
                 if(handle == INVALID_HANDLE_VALUE)
                     return false;
 

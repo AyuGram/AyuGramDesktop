@@ -11,21 +11,30 @@
 
 template<class T>
 void ayu_pipe_wrapper::send(T obj) {
-    auto s = json(obj).dump();
-    auto length = s.length();
-    char lengthBuff[4];
-    bit_converter::i32_to_bytes(length, false, lengthBuff);
-
-    os.write(lengthBuff, 4);
-    os.write(s.c_str(), length);
-    os.flush();
+//    auto s = json(obj).dump();
+//    auto length = s.length();
+//    char lengthBuff[4];
+//    bit_converter::i32_to_bytes(length, false, lengthBuff);
+//
+//    os.write(lengthBuff, 4);
+//    os.write(s.c_str(), length);
+//    os.flush();
+    throw std::logic_error("not implemented");
 }
 
-json ayu_pipe_wrapper::receive() {
+std::optional<json> ayu_pipe_wrapper::receive() {
+    if (!is.is_open()) {
+        return std::nullopt;
+    }
+
     char lengthBuff[4];
     is.read(lengthBuff, 4);
 
     auto length = bit_converter::bytes_to_i32(lengthBuff, false);
+
+    if (length <= 0) {
+        return std::nullopt;
+    }
 
     auto sb = std::stringbuf();
     char buff[4096];
