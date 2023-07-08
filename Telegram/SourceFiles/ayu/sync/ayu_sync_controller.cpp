@@ -68,11 +68,11 @@ namespace AyuSync {
     }
 
     void ayu_sync_controller::invokeHandler(json p) {
-        DEBUG_LOG(("Invoking handler on %1").arg(p.dump().c_str()));
+        LOG(("Invoking handler on %1").arg(p.dump().c_str()));
 
         auto userId = p["userId"].get<long>();
         auto type = p["type"].get<std::string>();
 
-        DEBUG_LOG(("userId: %1, type: %1").arg(userId).arg(type.c_str()));
+        LOG(("userId: %1, type: %1").arg(userId).arg(type.c_str()));
     }
 }
