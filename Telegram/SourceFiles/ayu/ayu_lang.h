@@ -10,36 +10,36 @@
 #include <QtNetwork/QNetworkReply>
 #include <QtXml/QDomDocument>
 
-class CustomLangPack : public QObject {
-Q_OBJECT
+class CustomLangPack : public QObject
+{
+	Q_OBJECT
 
-    Q_DISABLE_COPY(CustomLangPack)
+	Q_DISABLE_COPY(CustomLangPack)
 
 public:
-    static CustomLangPack *currentInstance();
+	static CustomLangPack* currentInstance();
 
-    static void initInstance();
+	static void initInstance();
 
-    static CustomLangPack *instance;
+	static CustomLangPack* instance;
 
-    void fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId);
+	void fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId);
 
-    void loadDefaultLangFile();
+	void loadDefaultLangFile();
 
-    void parseLangFile(QJsonDocument str);
+	void parseLangFile(QJsonDocument str);
 
 public Q_SLOTS:
+	void fetchFinished();
 
-    void fetchFinished();
-
-    void fetchError(QNetworkReply::NetworkError e);
+	void fetchError(QNetworkReply::NetworkError e);
 
 private:
-    CustomLangPack();
+	CustomLangPack();
 
-    ~CustomLangPack() = default;
+	~CustomLangPack() override = default;
 
-    QNetworkAccessManager networkManager;
-    QNetworkReply *_chkReply = nullptr;
-    bool needFallback = false;
+	QNetworkAccessManager networkManager;
+	QNetworkReply* _chkReply = nullptr;
+	bool needFallback = false;
 };

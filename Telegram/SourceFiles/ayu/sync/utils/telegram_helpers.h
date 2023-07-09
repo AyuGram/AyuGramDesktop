@@ -9,7 +9,7 @@
 
 #include "core/application.h"
 #include "main/main_account.h"
-#include "main/main_session.h"
 #include "main/main_domain.h"
+#include "main/main_session.h"
 
 Main::Session* getSession(long userId);

@@ -1,66 +1,77 @@
 #pragma once
 
+#include "ayu/libs/json.hpp"
+
 #include <string>
 #include <vector>
 
-class SyncEvent {
+class SyncEvent
+{
 public:
-    std::string type = "sync_unspecified";
-    long userId = 0;
+	std::string type = "sync_unspecified";
+	long userId = 0;
 };
 
-class SyncBatch : public SyncEvent {
+class SyncBatch : public SyncEvent
+{
 public:
-    std::string type = "sync_batch";
-    long userId;
+	std::string type = "sync_batch";
+	long userId;
 
-    class SyncBatchArgs {
-    public:
-        std::vector<SyncEvent> events;
-    };
+	class SyncBatchArgs
+	{
+	public:
+		std::vector<SyncEvent> events;
+	};
 
-    SyncBatchArgs args;
+	SyncBatchArgs args;
 };
 
-class SyncRead : public SyncEvent {
+class SyncRead : public SyncEvent
+{
 public:
-    std::string type = "sync_read";
-    long userId;
+	std::string type = "sync_read";
+	long userId;
 
-    class SyncReadArgs {
-    public:
-        long dialogId;
-        int untilId;
-        int unread;
-    };
+	class SyncReadArgs
+	{
+	public:
+		long dialogId;
+		int untilId;
+		int unread;
+	};
 
-    SyncReadArgs args;
+	SyncReadArgs args;
 };
 
-class SyncForce : public SyncEvent {
+class SyncForce : public SyncEvent
+{
 public:
-    std::string type = "sync_force";
-    long userId;
+	std::string type = "sync_force";
+	long userId;
 
-    class SyncForceArgs {
-    public:
-        int fromDate;
-    };
+	class SyncForceArgs
+	{
+	public:
+		int fromDate;
+	};
 
-    SyncForceArgs args;
+	SyncForceArgs args;
 };
 
-class SyncForceFinish : public SyncEvent {
+class SyncForceFinish : public SyncEvent
+{
 public:
-    std::string type = "sync_force_finish";
-    long userId;
+	std::string type = "sync_force_finish";
+	long userId;
 
-    class SyncForceFinishArgs {
-    public:
-        short dummy; // required to be JSON serializable
-    };
+	class SyncForceFinishArgs
+	{
+	public:
+		short dummy; // required to be JSON serializable
+	};
 
-    SyncForceFinishArgs args;
+	SyncForceFinishArgs args;
 };
 
 
@@ -73,4 +84,3 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForce::SyncForceArgs, fromDate)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForce, type, userId, args)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForceFinish::SyncForceFinishArgs, dummy)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForceFinish, type, userId, args)
-

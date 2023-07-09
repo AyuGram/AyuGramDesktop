@@ -5,47 +5,52 @@
 //
 // Copyright @Radolyn, 2023
 
-#include <sstream>
 #include "ayu_pipe_wrapper.h"
+#include <sstream>
 #include "ayu/libs/bit_converter.hpp"
 
-template<class T>
-void ayu_pipe_wrapper::send(T obj) {
-//    auto s = json(obj).dump();
-//    auto length = s.length();
-//    char lengthBuff[4];
-//    bit_converter::i32_to_bytes(length, false, lengthBuff);
-//
-//    os.write(lengthBuff, 4);
-//    os.write(s.c_str(), length);
-//    os.flush();
-    throw std::logic_error("not implemented");
+template <class T>
+void ayu_pipe_wrapper::send(T obj)
+{
+	//    auto s = json(obj).dump();
+	//    auto length = s.length();
+	//    char lengthBuff[4];
+	//    bit_converter::i32_to_bytes(length, false, lengthBuff);
+	//
+	//    os.write(lengthBuff, 4);
+	//    os.write(s.c_str(), length);
+	//    os.flush();
+	throw std::logic_error("not implemented");
 }
 
-std::optional<json> ayu_pipe_wrapper::receive() {
-    if (!is.is_open()) {
-        return std::nullopt;
-    }
+std::optional<json> ayu_pipe_wrapper::receive()
+{
+	if (!is.is_open())
+	{
+		return std::nullopt;
+	}
 
-    char lengthBuff[4];
-    is.read(lengthBuff, 4);
+	char lengthBuff[4];
+	is.read(lengthBuff, 4);
 
-    auto length = bit_converter::bytes_to_i32(lengthBuff, false);
+	auto length = bit_converter::bytes_to_i32(lengthBuff, false);
 
-    if (length <= 0) {
-        return std::nullopt;
-    }
+	if (length <= 0)
+	{
+		return std::nullopt;
+	}
 
-    auto sb = std::stringbuf();
-    char buff[4096];
+	auto sb = std::stringbuf();
+	char buff[4096];
 
-    while (length > 0) {
-        auto readSize = std::min(length, (int) sizeof(buff));
-        is.read(buff, readSize);
-        sb.sputn(buff, readSize);
-        length -= readSize;
-    }
+	while (length > 0)
+	{
+		auto readSize = std::min(length, static_cast<int>(sizeof(buff)));
+		is.read(buff, readSize);
+		sb.sputn(buff, readSize);
+		length -= readSize;
+	}
 
-    auto p = json::parse(sb.str());
-    return p;
+	auto p = json::parse(sb.str());
+	return p;
 }

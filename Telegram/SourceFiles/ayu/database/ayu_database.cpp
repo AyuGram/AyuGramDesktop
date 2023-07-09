@@ -27,56 +27,59 @@ auto storage = make_storage("ayugram.db",
 );
 
 
-namespace AyuDatabase {
-    void addEditedMessage(
-            long userId,
-            long dialogId,
-            long messageId,
-            const QString &text,
-            bool isDocument,
-            QString path,
-            long date) {
+namespace AyuDatabase
+{
+	void addEditedMessage(
+		long userId,
+		long dialogId,
+		long messageId,
+		const QString& text,
+		bool isDocument,
+		QString path,
+		long date)
+	{
+		EditedMessage entity;
+		entity.userId = userId;
+		entity.dialogId = dialogId;
+		entity.messageId = messageId;
+		entity.text = text.toStdString();
+		entity.isDocument = isDocument;
+		entity.path = path.toStdString();
+		entity.date = date;
 
-        EditedMessage entity;
-        entity.userId = userId;
-        entity.dialogId = dialogId;
-        entity.messageId = messageId;
-        entity.text = text.toStdString();
-        entity.isDocument = isDocument;
-        entity.path = path.toStdString();
-        entity.date = date;
+		storage.sync_schema();
 
-        storage.sync_schema();
+		storage.begin_transaction();
+		storage.insert(entity);
+		storage.commit();
+	}
 
-        storage.begin_transaction();
-        storage.insert(entity);
-        storage.commit();
-    }
+	std::vector<EditedMessage> getEditedMessages(
+		long userId,
+		long dialogId,
+		long messageId
+	)
+	{
+		return storage.get_all<EditedMessage>(
+			where(
+				c(&EditedMessage::userId) == userId and
+				c(&EditedMessage::dialogId) == dialogId and
+				c(&EditedMessage::messageId) == messageId)
+		);
+	}
 
-    std::vector<EditedMessage> getEditedMessages(
-            long userId,
-            long dialogId,
-            long messageId
-    ) {
+	std::vector<EditedMessage> getEditedMessages(HistoryItem* item)
+	{
+		auto userId = item->displayFrom()->id.value;
+		auto dialogId = item->history()->peer->id.value;
+		auto msgId = item->id.bare;
+		//        auto some = &item->history()->session().account();
 
-        return storage.get_all<EditedMessage>(
-                where(
-                        c(&EditedMessage::userId) == userId and
-                        c(&EditedMessage::dialogId) == dialogId and
-                        c(&EditedMessage::messageId) == messageId)
-        );
-    }
+		return getEditedMessages(static_cast<long>(userId), static_cast<long>(dialogId), static_cast<long>(msgId));
+	}
 
-    std::vector<EditedMessage> getEditedMessages(HistoryItem *item) {
-        auto userId = item->displayFrom()->id.value;
-        auto dialogId = item->history()->peer->id.value;
-        auto msgId = item->id.bare;
-//        auto some = &item->history()->session().account();
-
-        return getEditedMessages((long) userId, (long) dialogId, (long) msgId);
-    }
-
-    bool editedMessagesTableExists() {
-        return storage.table_exists("editedmessage");
-    }
+	bool editedMessagesTableExists()
+	{
+		return storage.table_exists("editedmessage");
+	}
 }

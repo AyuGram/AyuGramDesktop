@@ -8,19 +8,24 @@
 #include "telegram_helpers.h"
 #include "data/data_peer_id.h"
 
-Main::Session* getSession(long userId) {
-    for (auto &[index, account] : Core::App().domain().accounts()) {
-        if (const auto session = account->maybeSession()) {
-            if (session->userId().bare == userId) {
-                return session;
-            }
-        }
-    }
+Main::Session* getSession(long userId)
+{
+	for (auto& [index, account] : Core::App().domain().accounts())
+	{
+		if (const auto session = account->maybeSession())
+		{
+			if (session->userId().bare == userId)
+			{
+				return session;
+			}
+		}
+	}
 
-    return nullptr;
+	return nullptr;
 }
 
-PeerId dialogIdToPeerId(long dialogId) {
-    auto peerId = PeerId();
-    return peerId;
+PeerId dialogIdToPeerId(long dialogId)
+{
+	auto peerId = PeerId();
+	return peerId;
 }

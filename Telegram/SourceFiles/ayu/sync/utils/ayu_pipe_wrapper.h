@@ -13,13 +13,14 @@
 
 using json = nlohmann::json;
 
-class ayu_pipe_wrapper {
+class ayu_pipe_wrapper
+{
 public:
-    template<class T>
-    void send(T obj);
+	template <class T>
+	void send(T obj);
 
-    std::optional<json> receive();
+	std::optional<json> receive();
 
 private:
-    nes::pipe_istream is{"AyuSync"};
+	nes::pipe_istream is{"AyuSync"};
 };
