@@ -8,6 +8,7 @@
 #pragma once
 
 #include "ayu/libs/json.hpp"
+#include "models.h"
 #include "utils/ayu_pipe_wrapper.h"
 
 using json = nlohmann::json;
@@ -25,6 +26,10 @@ namespace AyuSync {
     class ayu_sync_controller {
     public:
         void initializeAgent();
+
+        void onSyncForce(SyncForce ev);
+        void onSyncBatch(json ev);
+        void onSyncRead(SyncRead ev);
 
         void invokeHandler(json p);
     private:

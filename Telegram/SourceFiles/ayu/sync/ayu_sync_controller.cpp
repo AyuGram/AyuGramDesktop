@@ -8,6 +8,11 @@
 #include "ayu_sync_controller.h"
 #include "ayu/libs/process.hpp"
 #include "ayu/sync/utils/process_utils.hpp"
+#include "ayu/sync/models.h"
+#include "data/data_session.h"
+#include "history/history.h"
+#include "ayu/sync/utils/telegram_helpers.h"
+
 
 #include <QString>
 #include <thread>
@@ -73,6 +78,39 @@ namespace AyuSync {
         auto userId = p["userId"].get<long>();
         auto type = p["type"].get<std::string>();
 
-        LOG(("userId: %1, type: %1").arg(userId).arg(type.c_str()));
+        LOG(("userId: %1, type: %2").arg(userId).arg(type.c_str()));
+
+        // todo: check if account exists
+
+        if (type == "sync_force") {
+            auto ev = p.template get<SyncForce>();
+            onSyncForce(ev);
+        } else if (type == "sync_batch") {
+            onSyncBatch(p);
+        } else if (type == "sync_read") {
+            auto ev = p.template get<SyncRead>();
+            onSyncRead(ev);
+        } else {
+            LOG(("Unknown sync type: %1").arg(type.c_str()));
+        }
+    }
+
+    void ayu_sync_controller::onSyncForce(SyncForce ev) {
+
+    }
+
+    void ayu_sync_controller::onSyncBatch(json ev) {
+
+    }
+
+    void ayu_sync_controller::onSyncRead(SyncRead ev) {
+        auto session = getSession(ev.userId);
+
+        auto peer = PeerId(abs(ev.args.dialogId));
+
+        auto history = session->data().history(peer);
+        if (history) {
+            history->inboxRead(ev.args.untilId, ev.args.unread);
+        }
     }
 }
