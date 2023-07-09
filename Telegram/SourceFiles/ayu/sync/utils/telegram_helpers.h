@@ -7,9 +7,13 @@
 
 #pragma once
 
+#include "ayu/sync/models.h"
+
 #include "core/application.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 
-Main::Session* getSession(long userId);
+Main::Session* getSession(ID userId);
+void dispatchToMainThread(std::function<void()> callback);
+not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session);

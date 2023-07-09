@@ -17,6 +17,8 @@
 #include <QString>
 #include <thread>
 
+#include "core/sandbox.h"
+
 namespace AyuSync
 {
 	std::optional<ayu_sync_controller> controller = std::nullopt;
@@ -97,7 +99,7 @@ namespace AyuSync
 
 		if (type == "sync_force")
 		{
-			auto ev = p.template get<SyncForce>();
+			auto ev = p.get<SyncForce>();
 			onSyncForce(ev);
 		}
 		else if (type == "sync_batch")
@@ -106,7 +108,7 @@ namespace AyuSync
 		}
 		else if (type == "sync_read")
 		{
-			auto ev = p.template get<SyncRead>();
+			auto ev = p.get<SyncRead>();
 			onSyncRead(ev);
 		}
 		else
@@ -115,24 +117,29 @@ namespace AyuSync
 		}
 	}
 
-	void ayu_sync_controller::onSyncForce(SyncForce ev)
+	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncForce(SyncForce ev)
 	{
 	}
 
-	void ayu_sync_controller::onSyncBatch(json ev)
+	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncBatch(json ev)
 	{
 	}
 
-	void ayu_sync_controller::onSyncRead(SyncRead ev)
+	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncRead(SyncRead ev)
 	{
-		auto session = getSession(ev.userId);
-
-		auto peer = PeerId(abs(ev.args.dialogId));
-
-		auto history = session->data().history(peer);
-		if (history)
+		dispatchToMainThread([=]
 		{
-			history->inboxRead(ev.args.untilId, ev.args.unread);
-		}
+			auto session = getSession(ev.userId);
+			auto history = getHistoryFromDialogId(ev.args.dialogId, session);
+
+			if (history->folderKnown())
+			{
+				history->inboxRead(ev.args.untilId, ev.args.unread);
+			}
+			else
+			{
+				LOG(("Unknown dialog %1").arg(ev.args.dialogId));
+			}
+		});
 	}
 }

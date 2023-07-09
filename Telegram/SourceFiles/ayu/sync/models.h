@@ -5,18 +5,20 @@
 #include <string>
 #include <vector>
 
+#define ID long long
+
 class SyncEvent
 {
 public:
 	std::string type = "sync_unspecified";
-	long userId = 0;
+	ID userId = 0;
 };
 
 class SyncBatch : public SyncEvent
 {
 public:
 	std::string type = "sync_batch";
-	long userId;
+	ID userId;
 
 	class SyncBatchArgs
 	{
@@ -31,12 +33,12 @@ class SyncRead : public SyncEvent
 {
 public:
 	std::string type = "sync_read";
-	long userId;
+	ID userId;
 
 	class SyncReadArgs
 	{
 	public:
-		long dialogId;
+		ID dialogId;
 		int untilId;
 		int unread;
 	};
@@ -48,7 +50,7 @@ class SyncForce : public SyncEvent
 {
 public:
 	std::string type = "sync_force";
-	long userId;
+	ID userId;
 
 	class SyncForceArgs
 	{
@@ -63,7 +65,7 @@ class SyncForceFinish : public SyncEvent
 {
 public:
 	std::string type = "sync_force_finish";
-	long userId;
+	ID userId;
 
 	class SyncForceFinishArgs
 	{
