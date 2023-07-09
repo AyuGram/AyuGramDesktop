@@ -15,5 +15,6 @@
 #include "main/main_session.h"
 
 Main::Session* getSession(ID userId);
+bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback);
 not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session);

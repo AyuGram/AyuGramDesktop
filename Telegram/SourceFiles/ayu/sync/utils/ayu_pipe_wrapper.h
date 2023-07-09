@@ -22,5 +22,5 @@ public:
 	std::optional<json> receive();
 
 private:
-	nes::pipe_istream is{"AyuSync"};
+	nes::basic_pipe_istream<unsigned char> is{"AyuSync"};
 };

@@ -32,6 +32,11 @@ Main::Session* getSession(ID userId)
 	return nullptr;
 }
 
+bool accountExists(ID userId)
+{
+	return userId == 0 || getSession(userId) != nullptr;
+}
+
 void dispatchToMainThread(std::function<void()> callback)
 {
 	auto timer = new QTimer();

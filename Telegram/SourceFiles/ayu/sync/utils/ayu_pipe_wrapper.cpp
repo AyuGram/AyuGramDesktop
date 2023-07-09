@@ -9,6 +9,8 @@
 #include <sstream>
 #include "ayu/libs/bit_converter.hpp"
 
+using stringbuf = std::basic_stringbuf<unsigned char, std::char_traits<unsigned char>, std::allocator<unsigned char>>;
+
 template <class T>
 void ayu_pipe_wrapper::send(T obj)
 {
@@ -30,25 +32,30 @@ std::optional<json> ayu_pipe_wrapper::receive()
 		return std::nullopt;
 	}
 
-	char lengthBuff[4];
+	unsigned char lengthBuff[4];
 	is.read(lengthBuff, 4);
 
 	auto length = bit_converter::bytes_to_i32(lengthBuff, false);
+
+	LOG(("ayu_pipe_wrapper::receive() length: %1").arg(length));
 
 	if (length <= 0)
 	{
 		return std::nullopt;
 	}
 
-	auto sb = std::stringbuf();
-	char buff[4096];
+	auto sb = stringbuf();
+	unsigned char buff[4096];
 
 	while (length > 0)
 	{
 		auto readSize = std::min(length, static_cast<int>(sizeof(buff)));
 		is.read(buff, readSize);
-		sb.sputn(buff, readSize);
-		length -= readSize;
+
+		auto reallyRead = is.gcount();
+
+		sb.sputn(buff, reallyRead);
+		length -= reallyRead;
 	}
 
 	auto p = json::parse(sb.str());

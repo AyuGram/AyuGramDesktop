@@ -95,7 +95,11 @@ namespace AyuSync
 
 		LOG(("userId: %1, type: %2").arg(userId).arg(type.c_str()));
 
-		// todo: check if account exists
+		if (!accountExists(userId))
+		{
+			LOG(("Sync for unknown account: %1").arg(userId));
+			return;
+		}
 
 		if (type == "sync_force")
 		{
@@ -117,15 +121,19 @@ namespace AyuSync
 		}
 	}
 
-	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncForce(SyncForce ev)
+	void ayu_sync_controller::onSyncForce(SyncForce ev)
 	{
 	}
 
-	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncBatch(json ev)
+	void ayu_sync_controller::onSyncBatch(json ev)
 	{
+		for (auto& item : ev["args"]["events"])
+		{
+			invokeHandler(item);
+		}
 	}
 
-	DECLSPEC_NOINLINE void ayu_sync_controller::onSyncRead(SyncRead ev)
+	void ayu_sync_controller::onSyncRead(SyncRead ev)
 	{
 		dispatchToMainThread([=]
 		{
