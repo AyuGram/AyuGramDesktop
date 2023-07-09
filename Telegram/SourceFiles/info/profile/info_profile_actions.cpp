@@ -482,6 +482,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		}
 
         if (settings->showPeerId != 0) {
+        	
             auto idDrawableText = IDValue(
                     user
             ) | rpl::map([](TextWithEntities &&text) {
@@ -566,11 +567,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		}
 
         if (settings->showPeerId != 0 && !_topic) {
-        	
-        	auto idDrawableText = IDValue(
-        		_peer
+            auto idDrawableText = IDValue(
+                    _peer
         		) | rpl::map([](TextWithEntities &&text) {
-        			return Ui::Text::Code(text.text);
+                    return Ui::Text::Code(text.text);
         	});
             auto idInfo = addInfoOneLine(
                     rpl::single(QString("ID")),

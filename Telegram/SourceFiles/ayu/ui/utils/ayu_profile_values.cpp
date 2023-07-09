@@ -21,7 +21,7 @@ QString IDString(not_null<PeerData *> peer) {
                                       ? peerToChat(peer->id).bare
                                       : peerIsChannel(peer->id)
                                         ? peerToChannel(peer->id).bare
-                                        : peer->id.value );
+                                        : peer->id.value);
 
     auto const settings = &AyuSettings::getInstance();
     if (settings->showPeerId == 2) {
