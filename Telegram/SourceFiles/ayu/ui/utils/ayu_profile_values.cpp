@@ -21,7 +21,7 @@ QString IDString(not_null<PeerData *> peer) {
                                       ? peerToChat(peer->id).bare
                                       : peerIsChannel(peer->id)
                                         ? peerToChannel(peer->id).bare
-                                        : peer->id.value);
+                                        : peer->id.value );
 
     auto const settings = &AyuSettings::getInstance();
     if (settings->showPeerId == 2) {
@@ -35,6 +35,17 @@ QString IDString(not_null<PeerData *> peer) {
     return resultId;
 }
 
+QString IDString(MsgId topic_root_id) {
+    auto resultId = QString::number(topic_root_id.bare);
+
+    return resultId;
+}
+
+
 rpl::producer<TextWithEntities> IDValue(not_null<PeerData *> peer) {
     return rpl::single(IDString(peer)) | Ui::Text::ToWithEntities();
+}
+
+rpl::producer<TextWithEntities> IDValue(MsgId topic_root_id) {
+    return rpl::single(IDString(topic_root_id)) | Ui::Text::ToWithEntities();
 }
