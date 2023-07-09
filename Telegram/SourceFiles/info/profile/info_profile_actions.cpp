@@ -1555,6 +1555,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		}
 
         if (settings->showPeerId != 0) {
+        	
             auto idDrawableText = IDValue(
                     user
             ) | rpl::map([](TextWithEntities &&text) {
@@ -1654,12 +1655,12 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 
-        if (settings->showPeerId != 0) {
+        if (settings->showPeerId != 0 && !_topic) {
             auto idDrawableText = IDValue(
                     _peer
-            ) | rpl::map([](TextWithEntities &&text) {
-                return Ui::Text::Code(text.text);
-            });
+        		) | rpl::map([](TextWithEntities &&text) {
+                    return Ui::Text::Code(text.text);
+        	});
             auto idInfo = addInfoOneLine(
                     rpl::single(QString("ID")),
                     std::move(idDrawableText),
@@ -1676,6 +1677,30 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
                 return false;
             });
         }
+
+		if (settings->showPeerId != 0 && _topic) {
+			const auto topicRootId = _topic->rootId();
+			auto idDrawableText = IDValue(
+				_peer->forumTopicFor(topicRootId)->topicRootId()
+				) | rpl::map([](TextWithEntities &&text) {
+					return Ui::Text::Code(text.text);
+			});
+			auto idInfo = addInfoOneLine(
+					rpl::single(QString("ID")),
+					std::move(idDrawableText),
+					tr::ayu_ContextCopyID(tr::now)
+			);
+
+			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto &&...) {
+				const auto idText = IDString(peer);
+				if (!idText.isEmpty()) {
+					QGuiApplication::clipboard()->setText(idText);
+					const auto msg = tr::ayu_IDCopiedToast(tr::now);
+					controller->showToast(msg);
+				}
+				return false;
+			});
+		}
 	}
 	if (!_peer->isSelf()) {
 		// No notifications toggle for Self => no separator.
