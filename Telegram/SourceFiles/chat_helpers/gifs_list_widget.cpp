@@ -530,25 +530,28 @@ void GifsListWidget::selectInlineResult(
 		const auto media = document->activeMediaView();
 		const auto preview = Data::VideoPreviewState(media.get());
 		if (forceSend || (media && preview.loaded())) {
-            auto settings = &AyuSettings::getInstance();
-            auto sendGIFCallback = [=, this] {
-                _fileChosen.fire({
-                     .document = document,
-                     .options = options,
-                     .messageSendingFrom = messageSendingFrom(),
-                });
-            };
+			auto settings = &AyuSettings::getInstance();
+			auto sendGIFCallback = [=, this]
+			{
+				_fileChosen.fire({
+					.document = document,
+					.options = options,
+					.messageSendingFrom = messageSendingFrom(),
+				});
+			};
 
-            if (settings->GIFConfirmation) {
-                Ui::show(Ui::MakeConfirmBox({
-                        .text = rpl::single(QString("Do you want to send this GIF?")),
-                        .confirmed = sendGIFCallback,
-                        .confirmText = rpl::single(QString("Send")),
-                }));
-            }
-            else {
-                sendGIFCallback();
-            }
+			if (settings->GIFConfirmation)
+			{
+				Ui::show(Ui::MakeConfirmBox({
+					.text = rpl::single(QString("Do you want to send this GIF?")),
+					.confirmed = sendGIFCallback,
+					.confirmText = rpl::single(QString("Send")),
+				}));
+			}
+			else
+			{
+				sendGIFCallback();
+			}
 		} else if (!preview.usingThumbnail()) {
 			if (preview.loading()) {
 				document->cancel();

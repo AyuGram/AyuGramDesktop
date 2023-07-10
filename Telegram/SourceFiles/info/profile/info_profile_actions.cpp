@@ -1241,7 +1241,7 @@ bool SetClickContext(
 }
 
 object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
-    auto settings = &AyuSettings::getInstance();
+	auto settings = &AyuSettings::getInstance();
 
 	auto result = object_ptr<Ui::VerticalLayout>(_wrap);
 	auto tracker = Ui::MultiSlideTracker();

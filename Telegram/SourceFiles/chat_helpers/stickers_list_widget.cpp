@@ -1888,36 +1888,39 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 				&& (e->modifiers() & Qt::ControlModifier)) {
 				showStickerSetBox(document, set.id);
 			} else {
-                auto settings = &AyuSettings::getInstance();
-                if (settings->stickerConfirmation) {
-                    // it is necessary to store it here, because section & index can be changed by cursor position (guess)
-                    int currentSection = sticker->section;
-                    int currentIndex = sticker->index;
-                    auto sendStickerCallback = [=, this] {
-                        _chosen.fire({
-                                 .document = document,
-                                 .messageSendingFrom = messageSentAnimationInfo(
-                                         currentSection,
-                                         currentIndex,
-                                         document),
-                         });
-                    };
+				auto settings = &AyuSettings::getInstance();
+				if (settings->stickerConfirmation)
+				{
+					// it is necessary to store it here, because section & index can be changed by cursor position (guess)
+					int currentSection = sticker->section;
+					int currentIndex = sticker->index;
+					auto sendStickerCallback = [=, this]
+					{
+						_chosen.fire({
+							.document = document,
+							.messageSendingFrom = messageSentAnimationInfo(
+								currentSection,
+								currentIndex,
+								document),
+						});
+					};
 
-                    Ui::show(Ui::MakeConfirmBox({
-                            .text = rpl::single(QString("Do you want to send this sticker?")),
-                            .confirmed = sendStickerCallback,
-                            .confirmText = rpl::single(QString("Send")),
-                    }));
-                }
-                else {
-                    _chosen.fire({
-                             .document = document,
-                             .messageSendingFrom = messageSentAnimationInfo(
-                                     sticker->section,
-                                     sticker->index,
-                                     document),
-                     });
-                }
+					Ui::show(Ui::MakeConfirmBox({
+						.text = rpl::single(QString("Do you want to send this sticker?")),
+						.confirmed = sendStickerCallback,
+						.confirmText = rpl::single(QString("Send")),
+					}));
+				}
+				else
+				{
+					_chosen.fire({
+						.document = document,
+						.messageSendingFrom = messageSentAnimationInfo(
+							sticker->section,
+							sticker->index,
+							document),
+					});
+				}
 			}
 		} else if (auto set = std::get_if<OverSet>(&pressed)) {
 			Assert(set->section >= 0 && set->section < sets.size());

@@ -96,32 +96,35 @@ void Tray::rebuildMenu() {
 			[=] { toggleSoundNotifications(); });
 	}
 
-    auto turnGhostModeText = _textUpdates.events(
-    ) | rpl::map([=] {
-        bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
+	auto turnGhostModeText = _textUpdates.events(
+	) | rpl::map([=]
+	{
+		bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
 
-        return ghostModeEnabled
-                ? tr::ayu_DisableGhostMode(tr::now)
-                : tr::ayu_EnableGhostMode(tr::now);
-    });
+		return ghostModeEnabled
+			       ? tr::ayu_DisableGhostMode(tr::now)
+			       : tr::ayu_EnableGhostMode(tr::now);
+	});
 
-    _tray.addAction(std::move(turnGhostModeText), [=] {
-        auto settings = &AyuSettings::getInstance();
-        bool ghostMode = !AyuSettings::get_ghostModeEnabled();
+	_tray.addAction(std::move(turnGhostModeText), [=]
+	{
+		auto settings = &AyuSettings::getInstance();
+		bool ghostMode = !AyuSettings::get_ghostModeEnabled();
 
-        settings->set_sendReadPackets(!ghostMode);
-        settings->set_sendOnlinePackets(!ghostMode);
-        settings->set_sendUploadProgress(!ghostMode);
+		settings->set_sendReadPackets(!ghostMode);
+		settings->set_sendOnlinePackets(!ghostMode);
+		settings->set_sendUploadProgress(!ghostMode);
 
-        settings->set_sendOfflinePacketAfterOnline(ghostMode);
+		settings->set_sendOfflinePacketAfterOnline(ghostMode);
 
-        AyuSettings::save();
-    });
+		AyuSettings::save();
+	});
 
-    auto quitText = _textUpdates.events(
-    ) | rpl::map([=] {
-        return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
-    });
+	auto quitText = _textUpdates.events(
+	) | rpl::map([=]
+	{
+		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
+	});
 	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
 
 	updateMenuText();

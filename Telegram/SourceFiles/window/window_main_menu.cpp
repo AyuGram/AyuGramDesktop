@@ -712,26 +712,28 @@ void MainMenu::setupMenu() {
 		)->setClickedCallback([=] {
 			controller->showPeerHistory(controller->session().user());
 		});
-        addAction(
-                rpl::single(QString("LRead Messages")),
-                { &st::settingsIconForward, kIconPurple }
-        )->setClickedCallback([=] {
-            auto settings = &AyuSettings::getInstance();
-            auto prev = settings->sendReadPackets;
-            settings->set_sendReadPackets(false);
+		addAction(
+			rpl::single(QString("LRead Messages")),
+			{&st::settingsIconForward, kIconPurple}
+		)->setClickedCallback([=]
+		{
+			auto settings = &AyuSettings::getInstance();
+			auto prev = settings->sendReadPackets;
+			settings->set_sendReadPackets(false);
 
-            auto chats = controller->session().data().chatsList();
-            MarkAsReadChatListHack(chats);
+			auto chats = controller->session().data().chatsList();
+			MarkAsReadChatListHack(chats);
 
-            settings->set_sendReadPackets(prev);
-        });
-        addAction(
-                rpl::single(QString("SRead Messages")),
-                { &st::settingsIconForward, kIconPurple }
-        )->setClickedCallback([=] {
-            auto box = Box<AyuUi::ConfirmationBox>(controller);
-            Ui::show(std::move(box));
-        });
+			settings->set_sendReadPackets(prev);
+		});
+		addAction(
+			rpl::single(QString("SRead Messages")),
+			{&st::settingsIconForward, kIconPurple}
+		)->setClickedCallback([=]
+		{
+			auto box = Box<AyuUi::ConfirmationBox>(controller);
+			Ui::show(std::move(box));
+		});
 	} else {
 		addAction(
 			tr::lng_profile_add_contact(),
@@ -793,24 +795,26 @@ void MainMenu::setupMenu() {
 			toggle);
 	}, _nightThemeToggle->lifetime());
 
-    const auto settings = &AyuSettings::getInstance();
-    if (settings->showGhostToggleInDrawer) {
-        _ghostModeToggle = addAction(
-                tr::ayu_DrawerGhostModeToggle(),
-                {&st::ayuGhostIcon, kIconPurple}
-        )->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->showGhostToggleInDrawer)
+	{
+		_ghostModeToggle = addAction(
+			tr::ayu_DrawerGhostModeToggle(),
+			{&st::ayuGhostIcon, kIconPurple}
+		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
-        _ghostModeToggle->toggledChanges(
-        ) | rpl::start_with_next([=](bool ghostMode) {
-            settings->set_sendReadPackets(!ghostMode);
-            settings->set_sendOnlinePackets(!ghostMode);
-            settings->set_sendUploadProgress(!ghostMode);
+		_ghostModeToggle->toggledChanges(
+		) | rpl::start_with_next([=](bool ghostMode)
+		{
+			settings->set_sendReadPackets(!ghostMode);
+			settings->set_sendOnlinePackets(!ghostMode);
+			settings->set_sendUploadProgress(!ghostMode);
 
-            settings->set_sendOfflinePacketAfterOnline(ghostMode);
+			settings->set_sendOfflinePacketAfterOnline(ghostMode);
 
-            AyuSettings::save();
-        }, _ghostModeToggle->lifetime());
-    }
+			AyuSettings::save();
+		}, _ghostModeToggle->lifetime());
+	}
 
 	Core::App().settings().systemDarkModeValue(
 	) | rpl::start_with_next([=](std::optional<bool> darkMode) {

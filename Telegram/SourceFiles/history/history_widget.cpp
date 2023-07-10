@@ -4669,18 +4669,20 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 }
 
 void HistoryWidget::send(Api::SendOptions options) {
-    // AyuGram useScheduledMessages
-    const auto settings = &AyuSettings::getInstance();
-    if (settings->useScheduledMessages && !options.scheduled) {
-        DEBUG_LOG(("[AyuGram] Scheduling message"));
-        auto current = base::unixtime::now();
-        options.scheduled = current + 12;
-    }
+	// AyuGram useScheduledMessages
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->useScheduledMessages && !options.scheduled)
+	{
+		DEBUG_LOG(("[AyuGram] Scheduling message"));
+		auto current = base::unixtime::now();
+		options.scheduled = current + 12;
+	}
 
-    if (!settings->sendReadPackets && settings->markReadAfterSend) {
-        AyuState::setAllowSendReadPacket(true);
-        _history->session().data().histories().readInboxOnNewMessage(_history->lastMessage());
-    }
+	if (!settings->sendReadPackets && settings->markReadAfterSend)
+	{
+		AyuState::setAllowSendReadPacket(true);
+		_history->session().data().histories().readInboxOnNewMessage(_history->lastMessage());
+	}
 
 	if (!_history) {
 		return;

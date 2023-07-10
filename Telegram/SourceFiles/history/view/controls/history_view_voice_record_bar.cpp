@@ -2193,8 +2193,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 			});
 		}));
 	}
-<<<<<<< HEAD
-=======
+
 	instance()->stop(crl::guard(this, [=](Result &&data) {
 		if (data.bytes.isEmpty()) {
 			// Close everything.
@@ -2205,24 +2204,27 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		window()->raise();
 		window()->activateWindow();
 		const auto duration = Duration(data.samples);
-        auto settings = &AyuSettings::getInstance();
 
-		if (type == StopType::Send) {
-            auto sendVoiceCallback = [=, this] {
-                _sendVoiceRequests.fire({ data.bytes, data.waveform, duration });
-            };
+		auto settings = &AyuSettings::getInstance();
+		if (type == StopType::Send)
+		{
+			auto sendVoiceCallback = [=, this]
+			{
+				_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
+			};
 
-            if (settings->voiceConfirmation) {
-                Ui::show(AyuUi::MakeConfirmBox({
-                        .text = rpl::single(QString("Do you want to send voice message?")),
-                        .confirmed = sendVoiceCallback,
-                        .confirmText = rpl::single(QString("Send"))
-                }));
-            }
-            else {
-                sendVoiceCallback();
-            }
-
+			if (settings->voiceConfirmation)
+			{
+				Ui::show(AyuUi::MakeConfirmBox({
+					.text = rpl::single(QString("Do you want to send voice message?")),
+					.confirmed = sendVoiceCallback,
+					.confirmText = rpl::single(QString("Send"))
+				}));
+			}
+			else
+			{
+				sendVoiceCallback();
+			}
 		} else if (type == StopType::Listen) {
 			_listen = std::make_unique<ListenWrap>(
 				this,
@@ -2234,7 +2236,6 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 			_lockShowing = false;
 		}
 	}));
->>>>>>> 243245d680 (feat: send GIF|voice confirmation by settings toggles)
 }
 
 void VoiceRecordBar::drawDuration(QPainter &p) {
@@ -2304,17 +2305,19 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		});
 =======
 		const auto data = _listen->data();
-        auto settings = &AyuSettings::getInstance();
+		auto settings = &AyuSettings::getInstance();
 
-        auto sendVoiceCallback = [=, this] {
-            _sendVoiceRequests.fire({
-                data->bytes,
-                data->waveform,
-                Duration(data->samples),
-                options
-            });
-        };
+		auto sendVoiceCallback = [=, this]
+		{
+			_sendVoiceRequests.fire({
+				data->bytes,
+				data->waveform,
+				Duration(data->samples),
+				options
+			});
+		};
 
+<<<<<<< HEAD
         if (settings->voiceConfirmation) {
             Ui::show(AyuUi::MakeConfirmBox({
                     .text = rpl::single(QString("Do you want to send voice message?")),
@@ -2326,6 +2329,20 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
             sendVoiceCallback();
         }
 >>>>>>> 243245d680 (feat: send GIF|voice confirmation by settings toggles)
+=======
+		if (settings->voiceConfirmation)
+		{
+			Ui::show(AyuUi::MakeConfirmBox({
+				.text = rpl::single(QString("Do you want to send voice message?")),
+				.confirmed = sendVoiceCallback,
+				.confirmText = rpl::single(QString("Send"))
+			}));
+		}
+		else
+		{
+			sendVoiceCallback();
+		}
+>>>>>>> f72e7178f5 (fix: reformat with resharper)
 	}
 }
 

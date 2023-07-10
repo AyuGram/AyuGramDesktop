@@ -1383,24 +1383,28 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		}
 	}
 
-    if (item != nullptr) {
-        if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty())) {
-            result->addAction(QString("History"), [=] {
-                auto box = Box<AyuUi::MessageHistoryBox>(item);
-                Ui::show(std::move(box));
-            }, &st::menuIconInfo);
-        }
+	if (item != nullptr)
+	{
+		if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty()))
+		{
+			result->addAction(QString("History"), [=]
+			{
+				auto box = Box<AyuUi::MessageHistoryBox>(item);
+				Ui::show(std::move(box));
+			}, &st::menuIconInfo);
+		}
 
-        const auto settings = &AyuSettings::getInstance();
-        const auto history = item->history();
-        result->addAction(QString("Hide"), [=]() {
-            const auto initKeepDeleted = settings->keepDeletedMessages;
+		const auto settings = &AyuSettings::getInstance();
+		const auto history = item->history();
+		result->addAction(QString("Hide"), [=]()
+		{
+			const auto initKeepDeleted = settings->keepDeletedMessages;
 
-            settings->set_keepDeletedMessages(false);
-            history->destroyMessage(item);
-            settings->set_keepDeletedMessages(initKeepDeleted);
-        }, &st::menuIconClear);
-    }
+			settings->set_keepDeletedMessages(false);
+			history->destroyMessage(item);
+			settings->set_keepDeletedMessages(initKeepDeleted);
+		}, &st::menuIconClear);
+	}
 
 	if (!view || !list->hasCopyRestriction(view->data())) {
 		AddCopyLinkAction(result, link);
