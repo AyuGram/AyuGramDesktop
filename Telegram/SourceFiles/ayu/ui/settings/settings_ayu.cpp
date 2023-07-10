@@ -376,7 +376,7 @@ namespace Settings
 			st::settingsButtonNoIcon
 		)->addClickHandler([=]
 		{
-			auto controller = &AyuSync::getControllerInstance();
+			auto controller = &AyuSync::getInstance();
 			controller->initializeAgent();
 		});
 	}

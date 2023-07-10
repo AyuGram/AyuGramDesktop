@@ -18,3 +18,4 @@ Main::Session* getSession(ID userId);
 bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback);
 not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session);
+ID getDialogIdFromPeer(not_null<PeerData*> peer);

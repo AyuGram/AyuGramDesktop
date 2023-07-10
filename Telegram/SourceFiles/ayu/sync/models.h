@@ -7,6 +7,8 @@
 
 #define ID long long
 
+using json = nlohmann::json;
+
 class SyncEvent
 {
 public:
@@ -17,13 +19,15 @@ public:
 class SyncBatch : public SyncEvent
 {
 public:
-	std::string type = "sync_batch";
-	ID userId;
+	explicit SyncBatch()
+	{
+		type = "sync_batch";
+	}
 
 	class SyncBatchArgs
 	{
 	public:
-		std::vector<SyncEvent> events;
+		std::vector<json> events;
 	};
 
 	SyncBatchArgs args;
@@ -32,8 +36,10 @@ public:
 class SyncRead : public SyncEvent
 {
 public:
-	std::string type = "sync_read";
-	ID userId;
+	explicit SyncRead()
+	{
+		type = "sync_read";
+	}
 
 	class SyncReadArgs
 	{
@@ -49,8 +55,10 @@ public:
 class SyncForce : public SyncEvent
 {
 public:
-	std::string type = "sync_force";
-	ID userId;
+	explicit SyncForce()
+	{
+		type = "sync_force";
+	}
 
 	class SyncForceArgs
 	{
@@ -64,8 +72,10 @@ public:
 class SyncForceFinish : public SyncEvent
 {
 public:
-	std::string type = "sync_force_finish";
-	ID userId;
+	explicit SyncForceFinish()
+	{
+		type = "sync_force_finish";
+	}
 
 	class SyncForceFinishArgs
 	{

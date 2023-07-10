@@ -17,7 +17,10 @@
 #include <QString>
 #include <thread>
 
-#include "core/sandbox.h"
+#include "data/data_histories.h"
+
+#include "history/history_item.h"
+#include "history/view/history_view_element.h"
 
 namespace AyuSync
 {
@@ -30,7 +33,7 @@ namespace AyuSync
 
 	bool isAgentRunning()
 	{
-		return is_process_running(AgentFilename);
+		return isProcessRunning(AgentFilename);
 	}
 
 	void initialize()
@@ -43,7 +46,7 @@ namespace AyuSync
 		controller = ayu_sync_controller();
 	}
 
-	ayu_sync_controller& getControllerInstance()
+	ayu_sync_controller& getInstance()
 	{
 		initialize();
 		return controller.value();
@@ -56,20 +59,44 @@ namespace AyuSync
 			return;
 		}
 
-		if (!isAgentRunning())
+		if (isAgentRunning())
 		{
-			auto configPath = std::filesystem::absolute("./tdata/sync_preferences.json");
-			auto process = nes::process{AgentPath, {configPath.string(), ""}, nes::process_options::none};
-			process.detach();
+			killProcess(AgentFilename);
 		}
+
+		auto configPath = std::filesystem::absolute("./tdata/sync_preferences.json");
+		auto process = nes::process{AgentPath, {configPath.string(), ""}, nes::process_options::none};
+		process.detach();
 
 		std::thread receiverThread(&ayu_sync_controller::receiver, this);
 		receiverThread.detach();
+
+		initialized = true;
+	}
+
+	void ayu_sync_controller::syncRead(not_null<History*> history, MsgId untilId)
+	{
+		if (!initialized)
+		{
+			return;
+		}
+
+		SyncRead ev;
+		ev.userId = history->owner().session().userId().bare;
+
+		ev.args.dialogId = getDialogIdFromPeer(history->peer);
+		ev.args.untilId = untilId.bare;
+		ev.args.unread = history->unreadCount();
+
+		pipe->send(ev);
 	}
 
 	void ayu_sync_controller::receiver()
 	{
 		pipe = std::make_unique<ayu_pipe_wrapper>();
+		pipe->connect();
+
+		LOG(("Pipe created"));
 
 		while (true)
 		{
@@ -123,6 +150,47 @@ namespace AyuSync
 
 	void ayu_sync_controller::onSyncForce(SyncForce ev)
 	{
+		auto session = getSession(ev.userId);
+		auto histories = session->data().chatsList();
+
+		SyncBatch readsBatchEvent;
+		readsBatchEvent.userId = ev.userId;
+
+		for (const auto& row : histories->indexed()->all())
+		{
+			if (const auto history = row->history())
+			{
+				auto dialogId = getDialogIdFromPeer(history->peer);
+
+				SyncRead readEv;
+				readEv.userId = ev.userId;
+
+				history->calculateFirstUnreadMessage();
+				auto unreadElement = history->firstUnreadMessage();
+
+				if (!unreadElement && history->unreadCount())
+				{
+					LOG(("No unread can be calculated for %1").arg(dialogId));
+					continue;
+				}
+
+				auto untilId = unreadElement ? unreadElement->data()->id.bare : history->lastMessage()->id.bare;
+
+				readEv.args.dialogId = dialogId;
+				readEv.args.untilId = untilId;
+				readEv.args.unread = history->unreadCount();
+
+				readsBatchEvent.args.events.emplace_back(readEv);
+			}
+		}
+
+		pipe->send(readsBatchEvent);
+
+		// send finish event
+		SyncForceFinish newEv;
+		newEv.userId = ev.userId;
+
+		pipe->send(newEv);
 	}
 
 	void ayu_sync_controller::onSyncBatch(json ev)

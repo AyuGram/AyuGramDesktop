@@ -65,3 +65,21 @@ not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session)
 
 	return session->data().history(peerFromChat(abs(dialogId)));
 }
+
+ID getDialogIdFromPeer(not_null<PeerData*> peer)
+{
+	auto peerId = peerIsUser(peer->id)
+		              ? peerToUser(peer->id).bare
+		              : peerIsChat(peer->id)
+		              ? peerToChat(peer->id).bare
+		              : peerIsChannel(peer->id)
+		              ? peerToChannel(peer->id).bare
+		              : peer->id.value;
+
+	if (peer->isChannel() || peer->isChat())
+	{
+		peerId = -peerId;
+	}
+
+	return peerId;
+}

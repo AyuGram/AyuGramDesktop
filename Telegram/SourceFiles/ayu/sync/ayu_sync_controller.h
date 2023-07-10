@@ -9,6 +9,9 @@
 
 #include "models.h"
 #include "ayu/libs/json.hpp"
+
+#include "history/history.h"
+
 #include "utils/ayu_pipe_wrapper.h"
 
 using json = nlohmann::json;
@@ -29,6 +32,8 @@ namespace AyuSync
 	public:
 		void initializeAgent();
 
+		void syncRead(not_null<History*> history, MsgId untilId);
+
 		void onSyncForce(SyncForce ev);
 		void onSyncBatch(json ev);
 		void onSyncRead(SyncRead ev);
@@ -39,9 +44,10 @@ namespace AyuSync
 		void receiver();
 
 		std::unique_ptr<ayu_pipe_wrapper> pipe;
+		bool initialized;
 	};
 
-	ayu_sync_controller& getControllerInstance();
+	ayu_sync_controller& getInstance();
 
 	bool isAgentDownloaded();
 	bool isAgentRunning();

@@ -85,7 +85,7 @@ public:
     using off_type     = typename Traits::off_type;
 
 public:
-    static constexpr std::size_t buf_size{1024};
+    static constexpr std::size_t buf_size{4096};
 
 public:
     basic_pipe_streambuf() = default;
@@ -138,7 +138,7 @@ public:
             {
                 native_mode = mode & std::ios_base::in ? PIPE_ACCESS_INBOUND : PIPE_ACCESS_OUTBOUND;
 
-                handle = CreateNamedPipeW(std::data(native_name), native_mode, PIPE_READMODE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, buf_size, buf_size, 0, nullptr);
+                handle = CreateNamedPipeW(std::data(native_name), native_mode, PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, buf_size, buf_size, 0, nullptr);
                 if(handle == INVALID_HANDLE_VALUE)
                     return false;
 
