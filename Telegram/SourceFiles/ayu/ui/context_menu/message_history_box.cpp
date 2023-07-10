@@ -55,7 +55,6 @@ namespace AyuUi
 	{
 		setTitle(tr::ayu_EditsHistoryTitle());
 
-		//        setDimensionsToContent(st::boxWideWidth, _content);
 		setDimensions(st::boxWideWidth, 900);
 		SetupShadowsToScrollContent(this, _scroll, _contentHeight.events());
 	}

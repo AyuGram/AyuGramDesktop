@@ -26,11 +26,7 @@ namespace AyuUi
 
 	void ConfirmationBox::prepare()
 	{
-		//        setTitle(rpl::single(QString("Confirmation for SRead")));
-		auto details = TextWithEntities();
-		details.text = QString("Do you want to read all messages?");
-
-		_text.create(this, rpl::single(std::move(details)), st::boxLabel);
+		_text.create(this, tr::ayu_ReadConfirmationBoxQuestion(), st::boxLabel);
 
 		auto fullHeight = st::boxPadding.top()
 			+ _text->height()
@@ -38,7 +34,7 @@ namespace AyuUi
 
 		setDimensions(st::boxWidth, fullHeight);
 
-		addButton(rpl::single(QString("Read")), [=, this]
+		addButton(tr::ayu_ReadConfirmationBoxActionText(), [=, this]
 		{
 			ReadAllPeers();
 			closeBox();

@@ -2640,7 +2640,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		return;
 	}
 
-	// AyuGram keepMessagesHistory
+	// AyuGram saveMessagesHistory
 	const auto settings = &AyuSettings::getInstance();
 	HistoryMessageEdition edit;
 
@@ -2649,7 +2649,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		goto proceed;
 	}
 	edit = HistoryMessageEdition(_session, data.c_message());
-	if (settings->keepMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide)
+	if (settings->saveMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide)
 	{
 		const auto history = existing->history();
 		const auto msg = existing->originalText();

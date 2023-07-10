@@ -39,9 +39,9 @@ namespace AyuUi
 	{
 		const auto settings = &AyuSettings::getInstance();
 		const auto history = item->history();
-		_ayuSubMenu->addAction(QString("Hide"), [=]()
+		_ayuSubMenu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
 		{
-			const auto initKeepDeleted = settings->keepDeletedMessages;
+			const auto initKeepDeleted = settings->saveDeletedMessages;
 
 			settings->set_keepDeletedMessages(false);
 			history->destroyMessage(item);

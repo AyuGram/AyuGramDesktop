@@ -582,9 +582,9 @@ not_null<HistoryItem*> History::insertItem(
 void History::destroyMessage(not_null<HistoryItem*> item) {
 	Expects(item->isHistoryEntry() || !item->mainView());
 
-	// AyuGram keepDeletedMessages
+	// AyuGram saveDeletedMessages
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->keepDeletedMessages && item->isRegular() && !item->isGroupMigrate())
+	if (settings->saveDeletedMessages && item->isRegular() && !item->isGroupMigrate())
 	{
 		if (!item->isService())
 		{

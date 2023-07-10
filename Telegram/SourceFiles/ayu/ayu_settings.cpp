@@ -108,7 +108,14 @@ namespace AyuSettings
 
 		initialize();
 		json p = json::parse(data);
-		settings = p.get<AyuGramSettings>();
+		try
+		{
+			settings = p.get<AyuGramSettings>();
+		}
+		catch (...)
+		{
+			LOG(("AyuGramSettings: failed to parse settings file"));
+		}
 		postinitialize();
 	}
 
@@ -162,12 +169,12 @@ namespace AyuSettings
 
 	void AyuGramSettings::set_keepDeletedMessages(bool val)
 	{
-		keepDeletedMessages = val;
+		saveDeletedMessages = val;
 	}
 
 	void AyuGramSettings::set_keepMessagesHistory(bool val)
 	{
-		keepMessagesHistory = val;
+		saveMessagesHistory = val;
 	}
 
 	void AyuGramSettings::set_enableAds(bool val)

@@ -4,6 +4,7 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
+
 #pragma once
 
 #include "ui/boxes/confirm_box.h"

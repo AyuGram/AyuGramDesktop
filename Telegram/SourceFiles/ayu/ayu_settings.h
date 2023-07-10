@@ -30,8 +30,8 @@ namespace AyuSettings
 			useScheduledMessages = false;
 
 			// ~ Message edits & deletion history
-			keepDeletedMessages = true;
-			keepMessagesHistory = true;
+			saveDeletedMessages = true;
+			saveMessagesHistory = true;
 
 			// ~ QoL toggles
 			enableAds = false;
@@ -42,11 +42,6 @@ namespace AyuSettings
 			recentStickersCount = 20;
 			showGhostToggleInDrawer = true;
 
-			// ~ Beta functionality
-			stickerConfirmation = false;
-			GIFConfirmation = false;
-			voiceConfirmation = false;
-
 			/*
 			 * showPeerId = 0 means no ID shown
 			 * showPeerId = 1 means ID shown as for Telegram API devs
@@ -55,6 +50,8 @@ namespace AyuSettings
 			showPeerId = 2;
 
 			showMessageSeconds = false;
+
+			// ~ Beta functionality
 			stickerConfirmation = false;
 			GIFConfirmation = false;
 			voiceConfirmation = false;
@@ -66,8 +63,8 @@ namespace AyuSettings
 		bool sendOfflinePacketAfterOnline;
 		bool markReadAfterSend;
 		bool useScheduledMessages;
-		bool keepDeletedMessages;
-		bool keepMessagesHistory;
+		bool saveDeletedMessages;
+		bool saveMessagesHistory;
 		bool enableAds;
 		QString deletedMark;
 		QString editedMark;
@@ -125,8 +122,8 @@ namespace AyuSettings
 		sendOfflinePacketAfterOnline,
 		markReadAfterSend,
 		useScheduledMessages,
-		keepDeletedMessages,
-		keepMessagesHistory,
+		saveDeletedMessages,
+		saveMessagesHistory,
 		enableAds,
 		deletedMark,
 		editedMark,

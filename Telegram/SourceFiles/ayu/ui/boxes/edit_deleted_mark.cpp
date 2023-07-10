@@ -32,7 +32,7 @@ EditDeletedMarkBox::EditDeletedMarkBox(QWidget*) :
 	_text(
 		this,
 		st::defaultInputField,
-		rpl::single(QString("Deleted Mark")),
+		tr::ayu_DeletedMarkText(),
 		AyuSettings::getInstance().deletedMark)
 {
 }
@@ -42,12 +42,12 @@ void EditDeletedMarkBox::prepare()
 	const auto defaultDeletedMark = "🧹";
 	auto newHeight = st::contactPadding.top() + _text->height();
 
-	setTitle(rpl::single(QString("Edit Deleted Mark")));
+	setTitle(tr::ayu_DeletedMarkText());
 
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
 
-	addLeftButton(rpl::single(QString("Reset")), [=] { _text->setText(defaultDeletedMark); });
+	addLeftButton(tr::ayu_BoxActionReset(), [=] { _text->setText(defaultDeletedMark); });
 
 	addButton(tr::lng_settings_save(), [=] { save(); });
 	addButton(tr::lng_cancel(), [=] { closeBox(); });

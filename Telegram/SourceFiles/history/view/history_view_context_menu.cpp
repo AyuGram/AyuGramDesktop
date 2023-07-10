@@ -1398,7 +1398,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		const auto history = item->history();
 		result->addAction(QString("Hide"), [=]()
 		{
-			const auto initKeepDeleted = settings->keepDeletedMessages;
+			const auto initKeepDeleted = settings->saveDeletedMessages;
 
 			settings->set_keepDeletedMessages(false);
 			history->destroyMessage(item);

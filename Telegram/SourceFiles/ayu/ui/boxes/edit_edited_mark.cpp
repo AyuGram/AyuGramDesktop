@@ -32,7 +32,7 @@ EditEditedMarkBox::EditEditedMarkBox(QWidget*) :
 	_text(
 		this,
 		st::defaultInputField,
-		rpl::single(QString("Edited mark")),
+		tr::ayu_EditedMarkText(),
 		AyuSettings::getInstance().editedMark)
 {
 }
@@ -43,12 +43,12 @@ void EditEditedMarkBox::prepare()
 	const auto defaultEditedMark = tr::lng_edited(tr::now);
 	auto newHeight = st::contactPadding.top() + _text->height();
 
-	setTitle(rpl::single(QString("Edit edited Mark")));
+	setTitle(tr::ayu_EditedMarkText());
 
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
 
-	addLeftButton(rpl::single(QString("Reset")), [=] { _text->setText(defaultEditedMark); });
+	addLeftButton(tr::ayu_BoxActionReset(), [=] { _text->setText(defaultEditedMark); });
 	addButton(tr::lng_settings_save(), [=] { save(); });
 	addButton(tr::lng_cancel(), [=] { closeBox(); });
 

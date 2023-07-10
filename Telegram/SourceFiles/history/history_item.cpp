@@ -3259,7 +3259,7 @@ void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	msgsigned->isAnonymousRank = !isDiscussionPost()
 		&& this->author()->isMegagroup();
 
-	if (settings->keepDeletedMessages)
+	if (settings->saveDeletedMessages)
 	{
 		history()->owner().requestItemViewRefresh(this);
 	}

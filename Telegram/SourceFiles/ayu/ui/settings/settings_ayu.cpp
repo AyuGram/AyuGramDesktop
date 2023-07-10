@@ -157,14 +157,14 @@ namespace Settings
 
 		AddButton(
 			container,
-			tr::ayu_KeepDeletedMessages(),
+			tr::ayu_SaveDeletedMessages(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->keepDeletedMessages)
+			rpl::single(settings->saveDeletedMessages)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->keepDeletedMessages);
+			return (enabled != settings->saveDeletedMessages);
 		}) | start_with_next([=](bool enabled)
 		{
 			settings->set_keepDeletedMessages(enabled);
@@ -173,14 +173,14 @@ namespace Settings
 
 		AddButton(
 			container,
-			tr::ayu_KeepMessagesHistory(),
+			tr::ayu_SaveMessagesHistory(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->keepMessagesHistory)
+			rpl::single(settings->saveMessagesHistory)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->keepMessagesHistory);
+			return (enabled != settings->saveMessagesHistory);
 		}) | start_with_next([=](bool enabled)
 		{
 			settings->set_keepMessagesHistory(enabled);
@@ -366,13 +366,13 @@ namespace Settings
 
 	void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout*> container)
 	{
-		AddSubsectionTitle(container, rpl::single(QString("AyuSync")));
+		AddSubsectionTitle(container, tr::ayu_AyuSyncHeader());
 
-		auto text = AyuSync::isAgentDownloaded() ? QString("Open preferences") : QString("Download agent");
+		auto text = AyuSync::isAgentDownloaded() ? tr::ayu_AyuSyncOpenPreferences() : tr::ayu_AyuSyncDownloadAgent();
 
 		AddButton(
 			container,
-			rpl::single(text),
+			text,
 			st::settingsButtonNoIcon
 		)->addClickHandler([=]
 		{
@@ -385,11 +385,11 @@ namespace Settings
 	{
 		auto settings = &AyuSettings::getInstance();
 
-		AddSubsectionTitle(container, rpl::single(QString("Beta functions")));
+		AddSubsectionTitle(container, tr::ayu_BetaFeatures());
 
 		AddButton(
 			container,
-			rpl::single(QString("Send sticker confirmation")),
+			tr::ayu_StickerConfirmation(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
 			rpl::single(settings->stickerConfirmation)
@@ -405,7 +405,7 @@ namespace Settings
 
 		AddButton(
 			container,
-			rpl::single(QString("Send GIF confirmation")),
+			tr::ayu_GIFConfirmation(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
 			rpl::single(settings->GIFConfirmation)
@@ -421,7 +421,7 @@ namespace Settings
 
 		AddButton(
 			container,
-			rpl::single(QString("Send voice confirmation")),
+			tr::ayu_VoiceConfirmation(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
 			rpl::single(settings->voiceConfirmation)
