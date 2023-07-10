@@ -53,7 +53,7 @@ rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer)
 	return rpl::single(IDString(peer)) | Ui::Text::ToWithEntities();
 }
 
-rpl::producer<TextWithEntities> IDValue(MsgId topic_root_id)
+rpl::producer<TextWithEntities> IDValue(MsgId topicRootId)
 {
-	return rpl::single(IDString(topic_root_id)) | Ui::Text::ToWithEntities();
+	return rpl::single(IDString(topicRootId)) | Ui::Text::ToWithEntities();
 }

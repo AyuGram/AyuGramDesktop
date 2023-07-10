@@ -10,7 +10,8 @@
 #include "message_history_box.h"
 #include "ayu/ayu_state.h"
 #include "ayu/database/ayu_database.h"
-#include "base/unixtime.h"
+#include "ayu/messages/ayu_messages_controller.h"
+
 #include "history/history_inner_widget.h"
 #include "settings/settings_common.h"
 #include "styles/style_chat.h"
@@ -25,7 +26,7 @@ namespace AyuUi
 
 	void AyuPopupMenu::addHistoryAction(HistoryItem* item)
 	{
-		if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty()))
+		if (AyuMessages::getInstance().hasRevisions(item))
 		{
 			_ayuSubMenu->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
 			{
@@ -41,11 +42,11 @@ namespace AyuUi
 		const auto history = item->history();
 		_ayuSubMenu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
 		{
-			const auto initKeepDeleted = settings->saveDeletedMessages;
+			const auto initSaveDeleted = settings->saveDeletedMessages;
 
 			settings->set_keepDeletedMessages(false);
 			history->destroyMessage(item);
-			settings->set_keepDeletedMessages(initKeepDeleted);
+			settings->set_keepDeletedMessages(initSaveDeleted);
 		}, &st::menuIconClear);
 	}
 

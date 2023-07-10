@@ -19,3 +19,4 @@ bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback);
 not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session);
 ID getDialogIdFromPeer(not_null<PeerData*> peer);
+std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem*> item);

@@ -8,12 +8,16 @@
 #include "telegram_helpers.h"
 #include <functional>
 #include <QTimer>
+
+#include "api/api_text_entities.h"
+
 #include "data/data_peer_id.h"
 
 #include "ayu/sync/models.h"
 
 #include "data/data_session.h"
 #include "history/history.h"
+#include "history/history_item.h"
 
 
 Main::Session* getSession(ID userId)
@@ -82,4 +86,30 @@ ID getDialogIdFromPeer(not_null<PeerData*> peer)
 	}
 
 	return peerId;
+}
+
+std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem*> item)
+{
+	if (item->emptyText())
+	{
+		return std::make_pair("", "");
+	}
+
+	auto textWithEntities = item->originalText();
+	auto text = textWithEntities.text.toStdString();
+	auto entities = EntitiesToMTP(&item->history()->owner().session(), textWithEntities.entities,
+	                              Api::ConvertOption::SkipLocal);
+
+	if (entities.v.isEmpty())
+	{
+		return std::make_pair(text, "");
+	}
+
+	auto buff = mtpBuffer();
+	for (auto entity : entities.v)
+	{
+		entity.write(buff);
+	}
+
+	return std::make_pair(text, std::string(reinterpret_cast<char*>(buff.data()), buff.size()));
 }

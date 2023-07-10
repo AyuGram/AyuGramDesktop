@@ -13,22 +13,9 @@
 
 namespace AyuDatabase
 {
-	void addEditedMessage(
-		long userId,
-		long dialogId,
-		long messageId,
-		const QString& text,
-		bool isDocument,
-		QString path,
-		long date);
+	void initialize();
 
-	std::vector<EditedMessage> getEditedMessages(
-		long userId,
-		long dialogId,
-		long messageId
-	);
-
-	std::vector<EditedMessage> getEditedMessages(HistoryItem* item);
-
-	bool editedMessagesTableExists();
+	void addEditedMessage(const EditedMessage& message);
+	std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId);
+	bool hasRevisions(ID userId, ID dialogId, ID messageId);
 }

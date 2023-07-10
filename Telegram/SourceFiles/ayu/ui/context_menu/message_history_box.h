@@ -5,8 +5,10 @@
 //
 // Copyright @Radolyn, 2023
 
-#include <ui/layers/box_content.h>
+#pragma once
+
 #include "history/history_item.h"
+#include "ui/layers/box_content.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/vertical_layout.h"
 

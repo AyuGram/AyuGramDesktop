@@ -83,8 +83,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
 
+// AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
+#include "ayu/messages/ayu_messages_controller.h"
 
 namespace Data {
 namespace {
@@ -2682,23 +2684,13 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 			}
 		}
 
-		auto flags = MessageFlag::HasFromId
-			| MessageFlag::HasReplyInfo
-			| MessageFlag::HasPostAuthor;
-
-		if (existing->isPost())
-		{
-			flags |= MessageFlag::Post;
-		}
-
 		// adding msg data to local ayu db (table:editedMessage)
 		auto userId = existing->displayFrom()->id.value;
 		auto dialogId = history->peer->id.value;
 		auto msgId = existing->id.bare;
 		bool isDocument = media && media->document();
 
-		AyuDatabase::addEditedMessage((long)userId, (long)dialogId, (long)msgId, msg.text, isDocument, QString(""),
-		                              (long)crl::now());
+		AyuMessages::getInstance().addEditedMessage(edit, existing);
 
 		if (!media || !(media->photo() || media->document()))
 		{
@@ -2714,37 +2706,6 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 			//                    MTP_messageMediaEmpty(),
 			//                    HistoryMessageMarkupData(),
 			//                    existing->groupId().empty() ? 0 : existing->groupId().value);
-		}
-		else
-		{
-			if (media->photo())
-			{
-				//                history->addNewLocalMessage(
-				//                        history->nextNonHistoryEntryId(),
-				//                        flags,
-				//                        UserId(),
-				//                        existing->id,
-				//                        base::unixtime::now(),
-				//                        existing->author()->id,
-				//                        "AyuGram"_q,
-				//                        media->photo(),
-				//                        existing->originalText(),
-				//                        HistoryMessageMarkupData());
-			}
-			else if (media->document())
-			{
-				//                history->addNewLocalMessage(
-				//                        history->nextNonHistoryEntryId(),
-				//                        flags,
-				//                        UserId(),
-				//                        existing->id,
-				//                        base::unixtime::now(),
-				//                        existing->author()->id,
-				//                        "AyuGram"_q,
-				//                        media->document(),
-				//                        existing->originalText(),
-				//                        HistoryMessageMarkupData());
-			}
 		}
 	}
 

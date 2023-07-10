@@ -96,8 +96,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+// AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
+#include "ayu/messages/ayu_messages_controller.h"
 #include "ayu/ui/context_menu/message_history_box.h"
 
 namespace HistoryView {
@@ -1383,11 +1385,11 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		}
 	}
 
-	if (item != nullptr)
+	if (item)
 	{
-		if (AyuDatabase::editedMessagesTableExists() && !((AyuDatabase::getEditedMessages(item)).empty()))
+		if (AyuMessages::getInstance().hasRevisions(item))
 		{
-			result->addAction(QString("History"), [=]
+			result->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
 			{
 				auto box = Box<AyuUi::MessageHistoryBox>(item);
 				Ui::show(std::move(box));
@@ -1396,7 +1398,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 
 		const auto settings = &AyuSettings::getInstance();
 		const auto history = item->history();
-		result->addAction(QString("Hide"), [=]()
+		result->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
 		{
 			const auto initKeepDeleted = settings->saveDeletedMessages;
 

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#define ID long long
+#include "ayu/database/entities.h"
 
 using json = nlohmann::json;
 

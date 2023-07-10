@@ -105,6 +105,7 @@ PRIVATE
     ayu/ayu_settings.h
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
+    ayu/ayu_constants.h
     ayu/ui/utils/ayu_profile_values.cpp
     ayu/ui/utils/ayu_profile_values.h
     ayu/ui/settings/settings_ayu.cpp
@@ -129,6 +130,8 @@ PRIVATE
     ayu/sync/utils/process_utils.hpp
     ayu/sync/utils/telegram_helpers.cpp
     ayu/sync/utils/telegram_helpers.h
+    ayu/messages/ayu_messages_controller.cpp
+    ayu/messages/ayu_messages_controller.h
     ayu/libs/pipe.hpp
     ayu/libs/json.hpp
     ayu/libs/json_ext.hpp

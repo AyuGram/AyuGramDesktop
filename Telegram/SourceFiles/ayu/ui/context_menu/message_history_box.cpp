@@ -6,14 +6,15 @@
 // Copyright @Radolyn, 2023
 
 #include "message_history_box.h"
-#include <styles/style_boxes.h>
-#include <styles/style_layers.h>
-#include <styles/style_settings.h>
-#include <ui/effects/scroll_content_shadow.h>
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
+#include "ayu/messages/ayu_messages_controller.h"
+
 #include "history/history.h"
 #include "settings/settings_common.h"
+#include "styles/style_boxes.h"
+#include "styles/style_layers.h"
+#include "ui/effects/scroll_content_shadow.h"
 
 using namespace Settings;
 
@@ -61,7 +62,7 @@ namespace AyuUi
 
 	void MessageHistoryBox::addEditedMessagesToLayout(HistoryItem* item)
 	{
-		auto messages = AyuDatabase::getEditedMessages(item);
+		auto messages = AyuMessages::getInstance().getEditedMessages(item);
 		if (messages.empty())
 		{
 			return;
