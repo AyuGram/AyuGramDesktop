@@ -112,10 +112,10 @@ PRIVATE
     ayu/ui/settings/settings_ayu.h
     ayu/ui/context_menu/context_menu.cpp
     ayu/ui/context_menu/context_menu.h
-    ayu/ui/context_menu/message_history_box.cpp
-    ayu/ui/context_menu/message_history_box.h
     ayu/ui/boxes/voice_confirmation_box.cpp
     ayu/ui/boxes/voice_confirmation_box.h
+    ayu/ui/boxes/message_history_box.cpp
+    ayu/ui/boxes/message_history_box.h
     ayu/ui/boxes/confirmation_box.cpp
     ayu/ui/boxes/confirmation_box.h
     ayu/ui/boxes/edit_deleted_mark.cpp

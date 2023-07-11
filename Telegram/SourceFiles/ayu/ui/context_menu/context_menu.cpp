@@ -7,10 +7,10 @@
 
 #include "context_menu.h"
 #include "lang_auto.h"
-#include "message_history_box.h"
 #include "ayu/ayu_state.h"
 #include "ayu/database/ayu_database.h"
 #include "ayu/messages/ayu_messages_controller.h"
+#include "ayu/ui/boxes/message_history_box.h"
 
 #include "history/history_inner_widget.h"
 #include "settings/settings_common.h"
