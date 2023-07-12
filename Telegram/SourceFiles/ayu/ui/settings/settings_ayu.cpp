@@ -488,6 +488,9 @@ namespace Settings
 		AddSkip(container);
 		SetupSendConfirmations(container);
 
+		AddSkip(container);
+		SetupProfileSettings(container);
+
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
 
