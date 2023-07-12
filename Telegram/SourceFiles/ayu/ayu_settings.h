@@ -35,6 +35,7 @@ namespace AyuSettings
 
 			// ~ QoL toggles
 			enableAds = false;
+			copyUsernameAsLink = true;
 
 			// ~ Customization
 			deletedMark = "🧹";
@@ -55,10 +56,6 @@ namespace AyuSettings
 			stickerConfirmation = false;
 			GIFConfirmation = false;
 			voiceConfirmation = false;
-
-			// profile settings
-
-			copyUsernameAsLink = true;
 		}
 
 		bool sendReadPackets;

@@ -110,16 +110,22 @@ namespace {
 		std::shared_ptr<Ui::Show> show,
 		const QString &addToLink) {
 	return [=](QString link) {
-		if (auto settings = &AyuSettings::getInstance(); !settings->copyUsernameAsLink) link = '@' + peer->userName();
+		auto settings = &AyuSettings::getInstance();
+		if (!settings->copyUsernameAsLink)
+		{
+			link = '@' + peer->userName();
+		}
 		else
 		{
-			if (!link.startsWith(u"https://"_q)) {
+			if (!link.startsWith(u"https://"_q))
+			{
 				link = peer->session().createInternalLinkFull(peer->userName())
 					+ addToLink;
 			}
 		}
-		
-		if (!link.isEmpty()) {
+
+		if (!link.isEmpty())
+		{
 			QGuiApplication::clipboard()->setText(link);
 			show->showToast(tr::lng_username_copied(tr::now));
 		}
@@ -655,7 +661,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupMuteToggle() {
 	const auto makeThread = [=] {
 		return topicRootId
 			? static_cast<Data::Thread*>(peer->forumTopicFor(topicRootId))
-			: peer->owner().history(peer->id).get();
+			: peer->owner().history(peer).get();
 	};
 	auto result = object_ptr<Ui::SettingsButton>(
 		_wrap,

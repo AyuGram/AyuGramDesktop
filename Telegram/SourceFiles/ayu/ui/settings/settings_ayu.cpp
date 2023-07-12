@@ -211,6 +211,22 @@ namespace Settings
 			settings->set_enableAds(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
+		
+		AddButton(
+			container,
+			rpl::single(QString("Copy username as link")),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->copyUsernameAsLink)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->copyUsernameAsLink);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_copyUsernameAsLink(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 	}
 
 	void Ayu::SetupCustomization(not_null<Ui::VerticalLayout*> container,
@@ -438,30 +454,6 @@ namespace Settings
 		}, container->lifetime());
 	}
 
-	void Ayu::SetupProfileSettings(not_null<Ui::VerticalLayout*> container)
-	{
-		auto settings = &AyuSettings::getInstance();
-
-		AddSubsectionTitle(container, rpl::single(QString("Profile settings")));
-
-		AddButton(
-			container,
-			rpl::single(QString("Copy username as link")),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(settings->copyUsernameAsLink)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
-		{
-			return (enabled != settings->copyUsernameAsLink);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_copyUsernameAsLink(enabled);
-			AyuSettings::save();
-		}, container->lifetime());
-
-	}
-
 	void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 	                               not_null<Window::SessionController*> controller)
 	{
@@ -490,9 +482,6 @@ namespace Settings
 
 		AddSkip(container);
 		SetupSendConfirmations(container);
-
-		AddSkip(container);
-		SetupProfileSettings(container);
 		
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
