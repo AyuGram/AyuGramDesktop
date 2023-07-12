@@ -3916,7 +3916,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_WALMode" = "Enable WAL mode";
 "ayu_CleanDatabase" = "Clean database";
 "ayu_CleanDatabaseNotification" = "AyuGram database cleaned";
-"ayu_BetaFeatures" = "Beta features";
+"ayu_SendConfirmations" = "Send Confirmations";
 "ayu_StickerConfirmation" = "Confirmation when sending stickers";
 "ayu_GIFConfirmation" = "Confirmation when sending GIFs";
 "ayu_VoiceConfirmation" = "Confirmation when sending voice messages";
@@ -3941,3 +3941,4 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ContextCopyID" = "Copy ID";
 "ayu_IDCopiedToast" = "ID copied to clipboard.";
 "ayu_ContextHideMessage" = "Hide";
+"ayu_CopyUsernameAsLink" = "Copy username as link";

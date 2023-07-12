@@ -381,11 +381,11 @@ namespace Settings
 		});
 	}
 
-	void Ayu::SetupBetaFunctions(not_null<Ui::VerticalLayout*> container)
+	void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout*> container)
 	{
 		auto settings = &AyuSettings::getInstance();
 
-		AddSubsectionTitle(container, tr::ayu_BetaFeatures());
+		AddSubsectionTitle(container, tr::ayu_SendConfirmations());
 
 		AddButton(
 			container,
@@ -436,6 +436,29 @@ namespace Settings
 		}, container->lifetime());
 	}
 
+	void Ayu::SetupProfileSettings(not_null<Ui::VerticalLayout*> container)
+	{
+		auto settings = &AyuSettings::getInstance();
+
+		AddSubsectionTitle(container, tr::ayu_CopyUsernameAsLink());
+
+		AddButton(
+			container,
+			tr::ayu_StickerConfirmation(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->copyUsernameAsLink)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->copyUsernameAsLink);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_stickerConfirmation(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+	}
+
 	void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 	                               not_null<Window::SessionController*> controller)
 	{
@@ -463,7 +486,7 @@ namespace Settings
 		AddDivider(container);
 
 		AddSkip(container);
-		SetupBetaFunctions(container);
+		SetupSendConfirmations(container);
 
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
