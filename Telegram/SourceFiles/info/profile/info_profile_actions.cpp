@@ -655,7 +655,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupMuteToggle() {
 	const auto makeThread = [=] {
 		return topicRootId
 			? static_cast<Data::Thread*>(peer->forumTopicFor(topicRootId))
-			: peer->owner().history(peer).get();
+			: peer->owner().history(peer->id).get();
 	};
 	auto result = object_ptr<Ui::SettingsButton>(
 		_wrap,

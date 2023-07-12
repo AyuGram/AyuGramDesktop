@@ -23,7 +23,9 @@
 #include "platform/platform_specific.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
+#include "styles/style_basic.h"
 #include "styles/style_settings.h"
+#include "styles/style_widgets.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -440,11 +442,11 @@ namespace Settings
 	{
 		auto settings = &AyuSettings::getInstance();
 
-		AddSubsectionTitle(container, tr::ayu_CopyUsernameAsLink());
+		AddSubsectionTitle(container, rpl::single(QString("Profile settings")));
 
 		AddButton(
 			container,
-			tr::ayu_StickerConfirmation(),
+			rpl::single(QString("Copy username as link")),
 			st::settingsButtonNoIcon
 		)->toggleOn(
 			rpl::single(settings->copyUsernameAsLink)
@@ -454,9 +456,10 @@ namespace Settings
 			return (enabled != settings->copyUsernameAsLink);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_stickerConfirmation(enabled);
+			settings->set_copyUsernameAsLink(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
+
 	}
 
 	void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
@@ -490,7 +493,7 @@ namespace Settings
 
 		AddSkip(container);
 		SetupProfileSettings(container);
-
+		
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
 
