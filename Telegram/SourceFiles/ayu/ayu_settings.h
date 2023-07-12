@@ -35,6 +35,7 @@ namespace AyuSettings
 
 			// ~ QoL toggles
 			enableAds = false;
+			copyUsernameAsLink = true;
 
 			// ~ Customization
 			deletedMark = "🧹";
@@ -75,6 +76,7 @@ namespace AyuSettings
 		bool stickerConfirmation;
 		bool GIFConfirmation;
 		bool voiceConfirmation;
+		bool copyUsernameAsLink;
 
 	public:
 		void set_sendReadPackets(bool val);
@@ -112,6 +114,8 @@ namespace AyuSettings
 		void set_GIFConfirmation(bool val);
 
 		void set_voiceConfirmation(bool val);
+
+		void set_copyUsernameAsLink(bool val);
 	};
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
@@ -133,7 +137,8 @@ namespace AyuSettings
 		showMessageSeconds,
 		stickerConfirmation,
 		GIFConfirmation,
-		voiceConfirmation
+		voiceConfirmation,
+		copyUsernameAsLink
 	);
 
 	AyuGramSettings& getInstance();

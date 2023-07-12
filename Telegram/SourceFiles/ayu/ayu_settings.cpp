@@ -230,6 +230,11 @@ namespace AyuSettings
 		voiceConfirmation = val;
 	}
 
+	void AyuGramSettings::set_copyUsernameAsLink(bool val)
+	{
+		copyUsernameAsLink = val;
+	}
+
 	bool get_ghostModeEnabled()
 	{
 		return ghostModeEnabled.current();

@@ -23,7 +23,9 @@
 #include "platform/platform_specific.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
+#include "styles/style_basic.h"
 #include "styles/style_settings.h"
+#include "styles/style_widgets.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -209,6 +211,22 @@ namespace Settings
 			settings->set_enableAds(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
+		
+		AddButton(
+			container,
+			rpl::single(QString("Copy username as link")),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->copyUsernameAsLink)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->copyUsernameAsLink);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_copyUsernameAsLink(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 	}
 
 	void Ayu::SetupCustomization(not_null<Ui::VerticalLayout*> container,
@@ -381,7 +399,7 @@ namespace Settings
 		});
 	}
 
-	void Ayu::SetupBetaFunctions(not_null<Ui::VerticalLayout*> container)
+	void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout*> container)
 	{
 		auto settings = &AyuSettings::getInstance();
 
@@ -463,8 +481,8 @@ namespace Settings
 		AddDivider(container);
 
 		AddSkip(container);
-		SetupBetaFunctions(container);
-
+		SetupSendConfirmations(container);
+		
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
 

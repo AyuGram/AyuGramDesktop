@@ -190,22 +190,24 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 		const QString &addToLink) {
 	const auto weak = base::make_weak(controller);
 	return [=](QString link) {
-		if (link.startsWith(u"internal:"_q)) {
-			Core::App().openInternalUrl(link,
-				QVariant::fromValue(ClickHandlerContext{
-					.sessionWindow = weak,
-				}));
-			return;
-		} else if (!link.startsWith(u"https://"_q)) {
-			link = peer->session().createInternalLinkFull(peer->username())
-				+ addToLink;
+		auto settings = &AyuSettings::getInstance();
+		if (!settings->copyUsernameAsLink)
+		{
+			link = '@' + peer->userName();
 		}
-		if (!link.isEmpty()) {
-			TextUtilities::SetClipboardText({ link });
-			if (const auto strong = weak.get()) {
-				strong->showToast(
-					tr::lng_channel_public_link_copied(tr::now));
+		else
+		{
+			if (!link.startsWith(u"https://"_q))
+			{
+				link = peer->session().createInternalLinkFull(peer->userName())
+					+ addToLink;
 			}
+		}
+
+		if (!link.isEmpty())
+		{
+			QGuiApplication::clipboard()->setText(link);
+			show->showToast(tr::lng_username_copied(tr::now));
 		}
 	};
 }
