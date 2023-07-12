@@ -110,7 +110,7 @@ namespace {
 		std::shared_ptr<Ui::Show> show,
 		const QString &addToLink) {
 	return [=](QString link) {
-		if (auto settings = &AyuSettings::getInstance(); settings->copyUsernameAsLink) link = '@' + peer->userName();
+		if (auto settings = &AyuSettings::getInstance(); !settings->copyUsernameAsLink) link = '@' + peer->userName();
 		else
 		{
 			if (!link.startsWith(u"https://"_q)) {
