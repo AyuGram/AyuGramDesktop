@@ -387,7 +387,7 @@ namespace Settings
 	{
 		auto settings = &AyuSettings::getInstance();
 
-		AddSubsectionTitle(container, tr::ayu_SendConfirmations());
+		AddSubsectionTitle(container, tr::ayu_BetaFeatures());
 
 		AddButton(
 			container,
