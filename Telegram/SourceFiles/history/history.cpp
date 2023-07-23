@@ -613,11 +613,17 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 				flags |= MessageFlag::Post;
 			}
 
+            FullReplyTo replyTo = {
+                    .msgId = item->id,
+                    .topicRootId = item->topicRootId(),
+                    .storyId = {}
+            };
+
 			addNewLocalMessage(
 				session().data().nextLocalMessageId(),
 				flags,
 				UserId(),
-				item->id,
+                replyTo,
 				base::unixtime::now(),
 				item->author()->id,
 				"AyuGram"_q,

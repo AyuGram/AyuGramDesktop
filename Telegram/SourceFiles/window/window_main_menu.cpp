@@ -714,7 +714,7 @@ void MainMenu::setupMenu() {
 		});
 		addAction(
 			rpl::single(QString("LRead Messages")),
-			{&st::settingsIconForward, kIconPurple}
+			{ &st::menuIconMarkRead }
 		)->setClickedCallback([=]
 		{
 			auto settings = &AyuSettings::getInstance();
@@ -728,7 +728,7 @@ void MainMenu::setupMenu() {
 		});
 		addAction(
 			rpl::single(QString("SRead Messages")),
-			{&st::settingsIconForward, kIconPurple}
+			{ &st::menuIconMarkRead }
 		)->setClickedCallback([=]
 		{
 			auto box = Box<AyuUi::ConfirmationBox>(controller);
@@ -800,7 +800,7 @@ void MainMenu::setupMenu() {
 	{
 		_ghostModeToggle = addAction(
 			tr::ayu_DrawerGhostModeToggle(),
-			{&st::ayuGhostIcon, kIconPurple}
+            { &st::menuIconSilent } // todo: fix `ayuGhostIcon`
 		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
 		_ghostModeToggle->toggledChanges(
