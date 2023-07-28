@@ -193,7 +193,7 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 		auto settings = &AyuSettings::getInstance();
 		if (!settings->copyUsernameAsLink)
 		{
-			link = '@' + peer->userName();
+			link = '@' + link.mid(13);
 		}
 		else
 		{
