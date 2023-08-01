@@ -274,9 +274,9 @@ void Histories::readInboxTill(
 
 	AyuSync::getInstance().syncRead(history, tillId);
 
-	// AyuGram sendReadPackets
+	// AyuGram sendReadMessages
 	const auto settings = &AyuSettings::getInstance();
-	auto allow = settings->sendReadPackets;
+	auto allow = settings->sendReadMessages;
 	auto reallyAllow = AyuState::getAllowSendPacket(); // will return true if `allow`
 	if (!reallyAllow)
 	{

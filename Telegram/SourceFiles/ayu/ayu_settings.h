@@ -20,13 +20,13 @@ namespace AyuSettings
 		AyuGramSettings()
 		{
 			// ~ Ghost essentials
-			sendReadPackets = true;
+			sendReadMessages = true;
+			sendReadStories = true;
 			sendOnlinePackets = true;
 			sendUploadProgress = true;
-
 			sendOfflinePacketAfterOnline = false;
-			markReadAfterSend = true;
 
+			markReadAfterSend = true;
 			useScheduledMessages = false;
 
 			// ~ Message edits & deletion history
@@ -35,6 +35,7 @@ namespace AyuSettings
 
 			// ~ QoL toggles
 			enableAds = false;
+			disableStories = false;
 			copyUsernameAsLink = true;
 
 			// ~ Customization
@@ -52,13 +53,14 @@ namespace AyuSettings
 
 			showMessageSeconds = false;
 
-			// ~ Beta functionality
+			// ~ Confirmations
 			stickerConfirmation = false;
-			GIFConfirmation = false;
+			gifConfirmation = false;
 			voiceConfirmation = false;
 		}
 
-		bool sendReadPackets;
+		bool sendReadMessages;
+		bool sendReadStories;
 		bool sendOnlinePackets;
 		bool sendUploadProgress;
 		bool sendOfflinePacketAfterOnline;
@@ -67,6 +69,8 @@ namespace AyuSettings
 		bool saveDeletedMessages;
 		bool saveMessagesHistory;
 		bool enableAds;
+		bool disableStories;
+		bool copyUsernameAsLink;
 		QString deletedMark;
 		QString editedMark;
 		int recentStickersCount;
@@ -74,18 +78,21 @@ namespace AyuSettings
 		int showPeerId;
 		bool showMessageSeconds;
 		bool stickerConfirmation;
-		bool GIFConfirmation;
+		bool gifConfirmation;
 		bool voiceConfirmation;
-		bool copyUsernameAsLink;
 
 	public:
-		void set_sendReadPackets(bool val);
+		void set_sendReadMessages(bool val);
+
+		void set_sendReadStories(bool val);
 
 		void set_sendOnlinePackets(bool val);
 
 		void set_sendUploadProgress(bool val);
 
 		void set_sendOfflinePacketAfterOnline(bool val);
+
+		void set_ghostModeEnabled(bool val);
 
 		void set_markReadAfterSend(bool val);
 
@@ -111,7 +118,7 @@ namespace AyuSettings
 
 		void set_stickerConfirmation(bool val);
 
-		void set_GIFConfirmation(bool val);
+		void set_gifConfirmation(bool val);
 
 		void set_voiceConfirmation(bool val);
 
@@ -120,7 +127,8 @@ namespace AyuSettings
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
 		AyuGramSettings,
-		sendReadPackets,
+		sendReadMessages,
+		sendReadStories,
 		sendOnlinePackets,
 		sendUploadProgress,
 		sendOfflinePacketAfterOnline,
@@ -136,7 +144,7 @@ namespace AyuSettings
 		showPeerId,
 		showMessageSeconds,
 		stickerConfirmation,
-		GIFConfirmation,
+		gifConfirmation,
 		voiceConfirmation,
 		copyUsernameAsLink
 	);

@@ -18,6 +18,6 @@ namespace AyuState
 	bool getAllowSendPacket()
 	{
 		auto settings = &AyuSettings::getInstance();
-		return settings->sendReadPackets || processVariable(allowSendReadPacket);
+		return settings->sendReadMessages || processVariable(allowSendReadPacket);
 	}
 }

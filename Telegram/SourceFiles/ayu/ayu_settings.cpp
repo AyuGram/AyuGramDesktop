@@ -17,7 +17,8 @@ namespace AyuSettings
 	const QString filename = "tdata/ayu_settings.json";
 	std::optional<AyuGramSettings> settings = std::nullopt;
 
-	rpl::variable<bool> sendReadPacketsReactive;
+	rpl::variable<bool> sendReadMessagesReactive;
+	rpl::variable<bool> sendReadStoriesReactive;
 	rpl::variable<bool> sendOnlinePacketsReactive;
 	rpl::variable<bool> sendUploadProgressReactive;
 	rpl::variable<bool> sendOfflinePacketAfterOnlineReactive;
@@ -32,10 +33,12 @@ namespace AyuSettings
 
 	bool ghostModeEnabled_util(AyuGramSettings& settingsUtil)
 	{
-		return (!settingsUtil.sendReadPackets
+		return
+			!settingsUtil.sendReadMessages
+			&& !settingsUtil.sendReadStories
 			&& !settingsUtil.sendOnlinePackets
 			&& !settingsUtil.sendUploadProgress
-			&& settingsUtil.sendOfflinePacketAfterOnline);
+			&& settingsUtil.sendOfflinePacketAfterOnline;
 	}
 
 	void initialize()
@@ -47,13 +50,22 @@ namespace AyuSettings
 
 		settings = AyuGramSettings();
 
-		sendReadPacketsReactive.value() | rpl::filter([=](bool val)
+		sendReadMessagesReactive.value() | rpl::filter([=](bool val)
 		{
-			return (val != settings->sendReadPackets);
+			return (val != settings->sendReadMessages);
 		}) | start_with_next([=](bool val)
 		{
 			ghostModeEnabled = ghostModeEnabled_util(settings.value());
 		}, lifetime);
+		// ..
+		sendReadStoriesReactive.value() | rpl::filter([=](bool val)
+		{
+			return (val != settings->sendReadStories);
+		}) | start_with_next([=](bool val)
+		{
+			ghostModeEnabled = ghostModeEnabled_util(settings.value());
+		}, lifetime);
+		// ..
 		sendOnlinePacketsReactive.value() | rpl::filter([=](bool val)
 		{
 			return (val != settings->sendOnlinePackets);
@@ -61,6 +73,7 @@ namespace AyuSettings
 		{
 			ghostModeEnabled = ghostModeEnabled_util(settings.value());
 		}, lifetime);
+		// ..
 		sendUploadProgressReactive.value() | rpl::filter([=](bool val)
 		{
 			return (val != settings->sendUploadProgress);
@@ -68,6 +81,7 @@ namespace AyuSettings
 		{
 			ghostModeEnabled = ghostModeEnabled_util(settings.value());
 		}, lifetime);
+		// ..
 		sendOfflinePacketAfterOnlineReactive.value() | rpl::filter([=](bool val)
 		{
 			return (val != settings->sendOfflinePacketAfterOnline);
@@ -79,7 +93,7 @@ namespace AyuSettings
 
 	void postinitialize()
 	{
-		sendReadPacketsReactive = settings->sendReadPackets;
+		sendReadMessagesReactive = settings->sendReadMessages;
 		sendOnlinePacketsReactive = settings->sendOnlinePackets;
 
 		deletedMarkReactive = settings->deletedMark;
@@ -133,10 +147,16 @@ namespace AyuSettings
 		postinitialize();
 	}
 
-	void AyuGramSettings::set_sendReadPackets(bool val)
+	void AyuGramSettings::set_sendReadMessages(bool val)
 	{
-		sendReadPackets = val;
-		sendReadPacketsReactive = val;
+		sendReadMessages = val;
+		sendReadMessagesReactive = val;
+	}
+
+	void AyuGramSettings::set_sendReadStories(bool val)
+	{
+		sendReadStories = val;
+		sendReadStoriesReactive = val;
 	}
 
 	void AyuGramSettings::set_sendOnlinePackets(bool val)
@@ -155,6 +175,15 @@ namespace AyuSettings
 	{
 		sendOfflinePacketAfterOnline = val;
 		sendOfflinePacketAfterOnlineReactive = val;
+	}
+
+	void AyuGramSettings::set_ghostModeEnabled(bool val)
+	{
+		set_sendReadMessages(!val);
+		set_sendReadStories(!val);
+		set_sendOnlinePackets(!val);
+		set_sendUploadProgress(!val);
+		set_sendOfflinePacketAfterOnline(val);
 	}
 
 	void AyuGramSettings::set_markReadAfterSend(bool val)
@@ -220,9 +249,9 @@ namespace AyuSettings
 		stickerConfirmation = val;
 	}
 
-	void AyuGramSettings::set_GIFConfirmation(bool val)
+	void AyuGramSettings::set_gifConfirmation(bool val)
 	{
-		GIFConfirmation = val;
+		gifConfirmation = val;
 	}
 
 	void AyuGramSettings::set_voiceConfirmation(bool val)

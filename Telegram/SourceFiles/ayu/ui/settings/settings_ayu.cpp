@@ -56,49 +56,65 @@ namespace Settings
 
 		AddButton(
 			container,
-			tr::ayu_SendReadPackets(),
+			tr::ayu_DontReadMessages(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->sendReadPackets)
+			rpl::single(!settings->sendReadMessages)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->sendReadPackets);
+			return (enabled == settings->sendReadMessages);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_sendReadPackets(enabled);
+			settings->set_sendReadMessages(!enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 
 		AddButton(
 			container,
-			tr::ayu_SendOnlinePackets(),
+			tr::ayu_DontReadStories(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->sendOnlinePackets)
+			rpl::single(!settings->sendReadStories)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->sendOnlinePackets);
+			return (enabled == settings->sendReadStories);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_sendOnlinePackets(enabled);
+			settings->set_sendReadStories(!enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 
 		AddButton(
 			container,
-			tr::ayu_SendUploadProgress(),
+			tr::ayu_DontSendOnlinePackets(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->sendUploadProgress)
+			rpl::single(!settings->sendOnlinePackets)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->sendUploadProgress);
+			return (enabled == settings->sendOnlinePackets);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_sendUploadProgress(enabled);
+			settings->set_sendOnlinePackets(!enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+
+		AddButton(
+			container,
+			tr::ayu_DontSendUploadProgress(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(!settings->sendUploadProgress)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled == settings->sendUploadProgress);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_sendUploadProgress(!enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 
@@ -198,23 +214,23 @@ namespace Settings
 
 		AddButton(
 			container,
-			tr::ayu_EnableAds(),
+			tr::ayu_DisableAds(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->enableAds)
+			rpl::single(!settings->enableAds)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->enableAds);
+			return (enabled == settings->enableAds);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_enableAds(enabled);
+			settings->set_enableAds(!enabled);
 			AyuSettings::save();
 		}, container->lifetime());
-		
+
 		AddButton(
 			container,
-			rpl::single(QString("Copy username as link")),
+			tr::ayu_CopyUsernameAsLink(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
 			rpl::single(settings->copyUsernameAsLink)
@@ -403,7 +419,7 @@ namespace Settings
 	{
 		auto settings = &AyuSettings::getInstance();
 
-		AddSubsectionTitle(container, tr::ayu_BetaFeatures());
+		AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
 
 		AddButton(
 			container,
@@ -426,14 +442,14 @@ namespace Settings
 			tr::ayu_GIFConfirmation(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(settings->GIFConfirmation)
+			rpl::single(settings->gifConfirmation)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled != settings->GIFConfirmation);
+			return (enabled != settings->gifConfirmation);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_GIFConfirmation(enabled);
+			settings->set_gifConfirmation(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 
@@ -482,7 +498,7 @@ namespace Settings
 
 		AddSkip(container);
 		SetupSendConfirmations(container);
-		
+
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
 

@@ -713,21 +713,21 @@ void MainMenu::setupMenu() {
 			controller->showPeerHistory(controller->session().user());
 		});
 		addAction(
-			rpl::single(QString("LRead Messages")),
+			tr::ayu_LReadMessages(),
 			{ &st::menuIconMarkRead }
 		)->setClickedCallback([=]
 		{
 			auto settings = &AyuSettings::getInstance();
-			auto prev = settings->sendReadPackets;
-			settings->set_sendReadPackets(false);
+			auto prev = settings->sendReadMessages;
+			settings->set_sendReadMessages(false);
 
 			auto chats = controller->session().data().chatsList();
 			MarkAsReadChatListHack(chats);
 
-			settings->set_sendReadPackets(prev);
+			settings->set_sendReadMessages(prev);
 		});
 		addAction(
-			rpl::single(QString("SRead Messages")),
+			tr::ayu_SReadMessages(),
 			{ &st::menuIconMarkRead }
 		)->setClickedCallback([=]
 		{
@@ -799,18 +799,14 @@ void MainMenu::setupMenu() {
 	if (settings->showGhostToggleInDrawer)
 	{
 		_ghostModeToggle = addAction(
-			tr::ayu_DrawerGhostModeToggle(),
+			tr::ayu_GhostModeToggle(),
             { &st::menuIconSilent } // todo: fix `ayuGhostIcon`
 		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
 		_ghostModeToggle->toggledChanges(
 		) | rpl::start_with_next([=](bool ghostMode)
 		{
-			settings->set_sendReadPackets(!ghostMode);
-			settings->set_sendOnlinePackets(!ghostMode);
-			settings->set_sendUploadProgress(!ghostMode);
-
-			settings->set_sendOfflinePacketAfterOnline(ghostMode);
+			settings->set_ghostModeEnabled(ghostMode);
 
 			AyuSettings::save();
 		}, _ghostModeToggle->lifetime());

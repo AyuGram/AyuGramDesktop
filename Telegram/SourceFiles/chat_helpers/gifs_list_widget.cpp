@@ -540,7 +540,7 @@ void GifsListWidget::selectInlineResult(
 				});
 			};
 
-			if (settings->GIFConfirmation)
+			if (settings->gifConfirmation)
 			{
 				Ui::show(Ui::MakeConfirmBox({
 					.text = rpl::single(QString("Do you want to send this GIF?")),

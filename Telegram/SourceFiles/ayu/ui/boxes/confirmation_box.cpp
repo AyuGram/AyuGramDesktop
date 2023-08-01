@@ -53,12 +53,12 @@ namespace AyuUi
 	void ConfirmationBox::ReadAllPeers()
 	{
 		auto settings = &AyuSettings::getInstance();
-		auto prev = settings->sendReadPackets;
-		settings->set_sendReadPackets(true);
+		auto prev = settings->sendReadMessages;
+		settings->set_sendReadMessages(true);
 
 		auto chats = _controller->session().data().chatsList();
 		Window::MarkAsReadChatListHack(chats);
 
-		settings->set_sendReadPackets(prev);
+		settings->set_sendReadMessages(prev);
 	}
 }

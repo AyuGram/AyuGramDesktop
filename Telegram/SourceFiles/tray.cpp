@@ -109,13 +109,9 @@ void Tray::rebuildMenu() {
 	_tray.addAction(std::move(turnGhostModeText), [=]
 	{
 		auto settings = &AyuSettings::getInstance();
-		bool ghostMode = !AyuSettings::get_ghostModeEnabled();
+		bool ghostMode = AyuSettings::get_ghostModeEnabled();
 
-		settings->set_sendReadPackets(!ghostMode);
-		settings->set_sendOnlinePackets(!ghostMode);
-		settings->set_sendUploadProgress(!ghostMode);
-
-		settings->set_sendOfflinePacketAfterOnline(ghostMode);
+		settings->set_ghostModeEnabled(!ghostMode);
 
 		AyuSettings::save();
 	});

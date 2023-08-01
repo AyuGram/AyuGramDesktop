@@ -26,6 +26,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/show.h"
 #include "ui/text/text_utilities.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Data {
 namespace {
 
@@ -1366,11 +1370,21 @@ void Stories::sendMarkAsReadRequest(
 		checkQuitPreventFinished();
 	};
 
-	const auto api = &_owner->session().api();
-	api->request(MTPstories_ReadStories(
-		peer->input,
-		MTP_int(tillId)
-	)).done(finish).fail(finish).send();
+	// AyuGram sendReadStories
+	const auto settings = &AyuSettings::getInstance();
+
+	if (settings->sendReadStories)
+	{
+		const auto api = &_owner->session().api();
+		api->request(MTPstories_ReadStories(
+			peer->asUser()->inputUser,
+			MTP_int(tillId)
+		)).done(finish).fail(finish).send();
+	}
+	else
+	{
+		finish();
+	}
 }
 
 void Stories::checkQuitPreventFinished() {

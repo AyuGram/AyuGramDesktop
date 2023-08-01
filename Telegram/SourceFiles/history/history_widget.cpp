@@ -4678,7 +4678,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 		options.scheduled = current + 12;
 	}
 
-	if (!settings->sendReadPackets && settings->markReadAfterSend)
+	if (!settings->sendReadMessages && settings->markReadAfterSend)
 	{
 		AyuState::setAllowSendReadPacket(true);
 		_history->session().data().histories().readInboxOnNewMessage(_history->lastMessage());
