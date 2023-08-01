@@ -98,6 +98,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTextEdit>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Dialogs {
 namespace {
 
@@ -1345,6 +1349,13 @@ void Widget::setupMainMenuToggle() {
 }
 
 void Widget::setupStories() {
+	// AyuGram disableStories
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->disableStories)
+	{
+		return;
+	}
+	
 	_stories->verticalScrollEvents(
 	) | rpl::start_with_next([=](not_null<QWheelEvent*> e) {
 		_scroll->viewportEvent(e);

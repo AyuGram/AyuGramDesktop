@@ -211,6 +211,11 @@ namespace AyuSettings
 		enableAds = val;
 	}
 
+	void AyuGramSettings::set_disableStories(bool val)
+	{
+		disableStories = val;
+	}
+
 	void AyuGramSettings::set_deletedMark(QString val)
 	{
 		deletedMark = std::move(val);

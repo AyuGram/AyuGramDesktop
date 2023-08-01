@@ -104,6 +104,10 @@ namespace AyuSettings
 
 		void set_enableAds(bool val);
 
+		void set_disableStories(bool val);
+
+		void set_copyUsernameAsLink(bool val);
+
 		void set_deletedMark(QString val);
 
 		void set_editedMark(QString val);
@@ -121,8 +125,6 @@ namespace AyuSettings
 		void set_gifConfirmation(bool val);
 
 		void set_voiceConfirmation(bool val);
-
-		void set_copyUsernameAsLink(bool val);
 	};
 
 	NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
@@ -137,6 +139,8 @@ namespace AyuSettings
 		saveDeletedMessages,
 		saveMessagesHistory,
 		enableAds,
+		disableStories,
+		copyUsernameAsLink,
 		deletedMark,
 		editedMark,
 		recentStickersCount,
@@ -145,8 +149,7 @@ namespace AyuSettings
 		showMessageSeconds,
 		stickerConfirmation,
 		gifConfirmation,
-		voiceConfirmation,
-		copyUsernameAsLink
+		voiceConfirmation
 	);
 
 	AyuGramSettings& getInstance();

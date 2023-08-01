@@ -230,6 +230,22 @@ namespace Settings
 
 		AddButton(
 			container,
+			tr::ayu_DisableStories(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->disableStories)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->disableStories);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_disableStories(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+
+		AddButton(
+			container,
 			tr::ayu_CopyUsernameAsLink(),
 			st::settingsButtonNoIcon
 		)->toggleOn(

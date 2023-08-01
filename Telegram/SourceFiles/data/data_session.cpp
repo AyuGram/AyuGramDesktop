@@ -321,7 +321,12 @@ Session::Session(not_null<Main::Session*> session)
 			}
 		}, _lifetime);
 
-		_stories->loadMore(Data::StorySourcesList::NotHidden);
+		// AyuGram disableStories
+		const auto settings = &AyuSettings::getInstance();
+		if (!settings->disableStories)
+		{
+			_stories->loadMore(Data::StorySourcesList::NotHidden);
+		}
 	});
 
 	session->appConfig().ignoredRestrictionReasonsChanges(
