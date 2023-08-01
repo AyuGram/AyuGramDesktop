@@ -2172,6 +2172,7 @@ endif()
 
 if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     include(GNUInstallDirs)
+    configure_file("../lib/xdg/org.ayugram.desktop.service" "${CMAKE_CURRENT_BINARY_DIR}/org.ayugram.desktop.service" @ONLY)
     configure_file("../lib/xdg/org.ayugram.desktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/org.ayugram.desktop.metainfo.xml" @ONLY)
     generate_appdata_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/org.ayugram.desktop.metainfo.xml")
     install(TARGETS Telegram RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
