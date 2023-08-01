@@ -206,9 +206,9 @@ namespace AyuSettings
 		saveMessagesHistory = val;
 	}
 
-	void AyuGramSettings::set_enableAds(bool val)
+	void AyuGramSettings::set_disableAds(bool val)
 	{
-		enableAds = val;
+		disableAds = val;
 	}
 
 	void AyuGramSettings::set_disableStories(bool val)

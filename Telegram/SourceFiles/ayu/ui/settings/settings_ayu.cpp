@@ -217,14 +217,14 @@ namespace Settings
 			tr::ayu_DisableAds(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
-			rpl::single(!settings->enableAds)
+			rpl::single(settings->disableAds)
 		)->toggledValue(
 		) | rpl::filter([=](bool enabled)
 		{
-			return (enabled == settings->enableAds);
+			return (enabled != settings->disableAds);
 		}) | start_with_next([=](bool enabled)
 		{
-			settings->set_enableAds(!enabled);
+			settings->set_disableAds(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 

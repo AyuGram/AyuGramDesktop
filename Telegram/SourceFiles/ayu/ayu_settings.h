@@ -34,7 +34,7 @@ namespace AyuSettings
 			saveMessagesHistory = true;
 
 			// ~ QoL toggles
-			enableAds = false;
+			disableAds = true;
 			disableStories = false;
 			copyUsernameAsLink = true;
 
@@ -68,7 +68,7 @@ namespace AyuSettings
 		bool useScheduledMessages;
 		bool saveDeletedMessages;
 		bool saveMessagesHistory;
-		bool enableAds;
+		bool disableAds;
 		bool disableStories;
 		bool copyUsernameAsLink;
 		QString deletedMark;
@@ -102,7 +102,7 @@ namespace AyuSettings
 
 		void set_keepMessagesHistory(bool val);
 
-		void set_enableAds(bool val);
+		void set_disableAds(bool val);
 
 		void set_disableStories(bool val);
 
@@ -138,7 +138,7 @@ namespace AyuSettings
 		useScheduledMessages,
 		saveDeletedMessages,
 		saveMessagesHistory,
-		enableAds,
+		disableAds,
 		disableStories,
 		copyUsernameAsLink,
 		deletedMark,
