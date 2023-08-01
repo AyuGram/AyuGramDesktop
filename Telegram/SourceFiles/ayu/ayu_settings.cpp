@@ -248,6 +248,11 @@ namespace AyuSettings
 	{
 		showMessageSeconds = val;
 	}
+	
+	void AyuGramSettings::set_hideAllChatsFolder(bool val)
+	{
+		hideAllChatsFolder = val;
+	}
 
 	void AyuGramSettings::set_stickerConfirmation(bool val)
 	{

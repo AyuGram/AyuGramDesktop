@@ -51,6 +51,7 @@ namespace AyuSettings
 			 */
 			showPeerId = 2;
 
+			hideAllChatsFolder = false;
 			showMessageSeconds = false;
 
 			// ~ Confirmations
@@ -76,6 +77,7 @@ namespace AyuSettings
 		int recentStickersCount;
 		bool showGhostToggleInDrawer;
 		int showPeerId;
+		bool hideAllChatsFolder;
 		bool showMessageSeconds;
 		bool stickerConfirmation;
 		bool gifConfirmation;
@@ -120,6 +122,8 @@ namespace AyuSettings
 
 		void set_showMessageSeconds(bool val);
 
+		void set_hideAllChatsFolder(bool val);
+
 		void set_stickerConfirmation(bool val);
 
 		void set_gifConfirmation(bool val);
@@ -147,6 +151,7 @@ namespace AyuSettings
 		showGhostToggleInDrawer,
 		showPeerId,
 		showMessageSeconds,
+		hideAllChatsFolder,
 		stickerConfirmation,
 		gifConfirmation,
 		voiceConfirmation

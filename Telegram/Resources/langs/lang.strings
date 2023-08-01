@@ -7078,6 +7078,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CustomizationHeader" = "Customization";
 "ayu_DeletedMarkText" = "Deleted mark";
 "ayu_EditedMarkText" = "Edited mark";
+"ayu_HideAllChats" = "Hide \"All chats\" folder";
 "ayu_ShowGhostToggleInDrawer" = "Show ghost mode toggle";
 "ayu_ShowKllButtonInDrawer" = "Show kill app button";
 "ayu_SettingsShowID" = "Show peer ID";

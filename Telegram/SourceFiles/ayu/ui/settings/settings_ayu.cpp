@@ -298,6 +298,22 @@ namespace Settings
 
 		AddButton(
 			container,
+			tr::ayu_HideAllChats(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->hideAllChatsFolder)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->hideAllChatsFolder);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_hideAllChatsFolder(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+		
+		AddButton(
+			container,
 			tr::ayu_ShowGhostToggleInDrawer(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
