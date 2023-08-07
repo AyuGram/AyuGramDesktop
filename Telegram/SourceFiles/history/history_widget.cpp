@@ -4678,10 +4678,11 @@ void HistoryWidget::send(Api::SendOptions options) {
 		options.scheduled = current + 12;
 	}
 
-	if (!settings->sendReadMessages && settings->markReadAfterSend)
+    auto lastMessage = _history->lastMessage();
+	if (!settings->sendReadMessages && settings->markReadAfterSend && lastMessage)
 	{
 		AyuState::setAllowSendReadPacket(true);
-		_history->session().data().histories().readInboxOnNewMessage(_history->lastMessage());
+		_history->session().data().histories().readInboxOnNewMessage(lastMessage);
 	}
 
 	if (!_history) {
