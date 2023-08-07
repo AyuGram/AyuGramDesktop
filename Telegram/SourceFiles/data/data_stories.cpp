@@ -1472,13 +1472,13 @@ void Stories::sendIncrementViewsRequests() {
 				_owner->peer(peer)->asUser()->inputUser,
 				MTP_vector<MTPint>(std::move(ids))
 			)).done(finish).fail(finish).send();
+			_incrementViewsPending.remove(peer);
 		}
 		else
 		{
+			_incrementViewsPending.remove(peer);
 			finish();
 		}
-
-		_incrementViewsPending.remove(peer);
 	}
 }
 
