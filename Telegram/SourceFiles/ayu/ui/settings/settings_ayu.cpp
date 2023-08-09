@@ -24,14 +24,233 @@
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
 #include "styles/style_basic.h"
+#include "styles/style_boxes.h"
+#include "styles/style_info.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
+
+#include "ui/painter.h"
 #include "ui/boxes/single_choice_box.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+
+constexpr auto GhostModeOptionsCount = 5;
+
+class PainterHighQualityEnabler;
+
+not_null<Ui::RpWidget*> AddInnerToggle(
+	not_null<Ui::VerticalLayout*> container,
+	const style::SettingsButton& st,
+	std::vector<not_null<Ui::AbstractCheckView*>> innerCheckViews,
+	not_null<Ui::SlideWrap<>*> wrap,
+	rpl::producer<QString> buttonLabel,
+	std::optional<QString> locked,
+	Settings::IconDescriptor&& icon)
+{
+	const auto button = container->add(object_ptr<Ui::SettingsButton>(
+		container,
+		nullptr,
+		st));
+	if (icon)
+	{
+		AddButtonIcon(button, st, std::move(icon));
+	}
+
+	const auto toggleButton = Ui::CreateChild<Ui::SettingsButton>(
+		container.get(),
+		nullptr,
+		st);
+
+	struct State final
+	{
+		State(const style::Toggle& st, Fn<void()> c)
+			: checkView(st, false, c)
+		{
+		}
+
+		Ui::ToggleView checkView;
+		Ui::Animations::Simple animation;
+		rpl::event_stream<> anyChanges;
+		std::vector<not_null<Ui::AbstractCheckView*>> innerChecks;
+	};
+	const auto state = button->lifetime().make_state<State>(
+		st.toggle,
+		[=] { toggleButton->update(); });
+	state->innerChecks = std::move(innerCheckViews);
+	const auto countChecked = [=]
+	{
+		return ranges::count_if(
+			state->innerChecks,
+			[](const auto& v) { return v->checked(); });
+	};
+	for (const auto& innerCheck : state->innerChecks)
+	{
+		innerCheck->checkedChanges(
+		) | rpl::to_empty | start_to_stream(
+			state->anyChanges,
+			button->lifetime());
+	}
+	const auto checkView = &state->checkView;
+	{
+		const auto separator = Ui::CreateChild<Ui::RpWidget>(container.get());
+		separator->paintRequest(
+		) | start_with_next([=, bg = st.textBgOver]
+		{
+			auto p = QPainter(separator);
+			p.fillRect(separator->rect(), bg);
+		}, separator->lifetime());
+		const auto separatorHeight = 2 * st.toggle.border
+			+ st.toggle.diameter;
+		button->geometryValue(
+		) | start_with_next([=](const QRect& r)
+		{
+			const auto w = st::rightsButtonToggleWidth;
+			constexpr auto kLineWidth = static_cast<int>(1);
+			toggleButton->setGeometry(
+				r.x() + r.width() - w,
+				r.y(),
+				w,
+				r.height());
+			separator->setGeometry(
+				toggleButton->x() - kLineWidth,
+				r.y() + (r.height() - separatorHeight) / 2,
+				kLineWidth,
+				separatorHeight);
+		}, toggleButton->lifetime());
+
+		const auto checkWidget = Ui::CreateChild<Ui::RpWidget>(toggleButton);
+		checkWidget->resize(checkView->getSize());
+		checkWidget->paintRequest(
+		) | start_with_next([=]
+		{
+			auto p = QPainter(checkWidget);
+			checkView->paint(p, 0, 0, checkWidget->width());
+		}, checkWidget->lifetime());
+		toggleButton->sizeValue(
+		) | start_with_next([=](const QSize& s)
+		{
+			checkWidget->moveToRight(
+				st.toggleSkip,
+				(s.height() - checkWidget->height()) / 2);
+		}, toggleButton->lifetime());
+	}
+	state->anyChanges.events_starting_with(
+		rpl::empty_value()
+	) | rpl::map(countChecked) | start_with_next([=](int count)
+	{
+		checkView->setChecked(count == GhostModeOptionsCount, anim::type::normal);
+	}, toggleButton->lifetime());
+	checkView->setLocked(locked.has_value());
+	checkView->finishAnimating();
+
+	const auto totalInnerChecks = state->innerChecks.size();
+	const auto label = Ui::CreateChild<Ui::FlatLabel>(
+		button,
+		combine(
+			std::move(buttonLabel),
+			state->anyChanges.events_starting_with(
+				rpl::empty_value()
+			) | rpl::map(countChecked)
+		) | rpl::map([=](const QString& t, int checked)
+		{
+			auto count = Ui::Text::Bold("  "
+				+ QString::number(checked)
+				+ '/'
+				+ QString::number(totalInnerChecks));
+			return TextWithEntities::Simple(t).append(std::move(count));
+		}));
+	label->setAttribute(Qt::WA_TransparentForMouseEvents);
+	const auto arrow = Ui::CreateChild<Ui::RpWidget>(button);
+	{
+		const auto& icon = st::permissionsExpandIcon;
+		arrow->resize(icon.size());
+		arrow->paintRequest(
+		) | start_with_next([=, &icon]
+		{
+			auto p = QPainter(arrow);
+			const auto center = QPointF(
+				icon.width() / 2.,
+				icon.height() / 2.);
+			const auto progress = state->animation.value(
+				wrap->toggled() ? 1. : 0.);
+			auto hq = std::optional<PainterHighQualityEnabler>();
+			if (progress > 0.)
+			{
+				hq.emplace(p);
+				p.translate(center);
+				p.rotate(progress * 180.);
+				p.translate(-center);
+			}
+			icon.paint(p, 0, 0, arrow->width());
+		}, arrow->lifetime());
+	}
+	button->sizeValue(
+	) | start_with_next([=, &st](const QSize& s)
+	{
+		const auto labelLeft = st.padding.left();
+		const auto labelRight = s.width() - toggleButton->width();
+
+		label->resizeToWidth(labelRight - labelLeft - arrow->width());
+		label->moveToLeft(
+			labelLeft,
+			(s.height() - label->height()) / 2);
+		arrow->moveToLeft(
+			std::min(
+				labelLeft + label->naturalWidth(),
+				labelRight - arrow->width()),
+			(s.height() - arrow->height()) / 2);
+	}, button->lifetime());
+	wrap->toggledValue(
+	) | rpl::skip(1) | start_with_next([=](bool toggled)
+	{
+		state->animation.start(
+			[=] { arrow->update(); },
+			toggled ? 0. : 1.,
+			toggled ? 1. : 0.,
+			st::slideWrapDuration);
+	}, button->lifetime());
+
+	const auto handleLocked = [=]
+	{
+		if (locked.has_value())
+		{
+			Ui::Toast::Show(container, *locked);
+			return true;
+		}
+		return false;
+	};
+
+	button->clicks(
+	) | start_with_next([=]
+	{
+		if (!handleLocked())
+		{
+			wrap->toggle(!wrap->toggled(), anim::type::normal);
+		}
+	}, button->lifetime());
+
+	toggleButton->clicks(
+	) | start_with_next([=]
+	{
+		if (!handleLocked())
+		{
+			const auto checked = !checkView->checked();
+			for (const auto& innerCheck : state->innerChecks)
+			{
+				innerCheck->setChecked(checked, anim::type::normal);
+			}
+		}
+	}, toggleButton->lifetime());
+
+	return button;
+}
 
 namespace Settings
 {
@@ -54,85 +273,141 @@ namespace Settings
 
 		AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
 
-		AddButton(
-			container,
-			tr::ayu_DontReadMessages(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(!settings->sendReadMessages)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
-		{
-			return (enabled == settings->sendReadMessages);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_sendReadMessages(!enabled);
-			AyuSettings::save();
-		}, container->lifetime());
+		const auto widget = object_ptr<Ui::VerticalLayout>(this);
 
-		AddButton(
-			container,
-			tr::ayu_DontReadStories(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(!settings->sendReadStories)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
-		{
-			return (enabled == settings->sendReadStories);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_sendReadStories(!enabled);
-			AyuSettings::save();
-		}, container->lifetime());
+		widget->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				tr::ayu_GhostEssentialsHeader(),
+				st::rightsHeaderLabel),
+			st::rightsHeaderMargin);
 
-		AddButton(
-			container,
-			tr::ayu_DontSendOnlinePackets(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(!settings->sendOnlinePackets)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
+		const auto addCheckbox = [&](
+			not_null<Ui::VerticalLayout*> verticalLayout,
+			const QString& label,
+			const bool isCheckedOrig)
 		{
-			return (enabled == settings->sendOnlinePackets);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_sendOnlinePackets(!enabled);
-			AyuSettings::save();
-		}, container->lifetime());
+			const auto checkView = [&]() -> not_null<Ui::AbstractCheckView*>
+			{
+				const auto checkbox = verticalLayout->add(
+					object_ptr<Ui::Checkbox>(
+						verticalLayout,
+						label,
+						isCheckedOrig,
+						st::settingsCheckbox),
+					st::rightsButton.padding);
+				const auto button = Ui::CreateChild<Ui::RippleButton>(
+					verticalLayout.get(),
+					st::defaultRippleAnimation);
+				button->stackUnder(checkbox);
+				combine(
+					verticalLayout->widthValue(),
+					checkbox->geometryValue()
+				) | start_with_next([=](int w, const QRect& r)
+				{
+					button->setGeometry(0, r.y(), w, r.height());
+				}, button->lifetime());
+				checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+				const auto checkView = checkbox->checkView();
+				button->setClickedCallback([=]
+				{
+					checkView->setChecked(
+						!checkView->checked(),
+						anim::type::normal);
+				});
 
-		AddButton(
-			container,
-			tr::ayu_DontSendUploadProgress(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(!settings->sendUploadProgress)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
-		{
-			return (enabled == settings->sendUploadProgress);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_sendUploadProgress(!enabled);
-			AyuSettings::save();
-		}, container->lifetime());
+				return checkView;
+			}();
+			checkView->checkedChanges(
+			) | start_with_next([=](bool checked)
+			{
+			}, verticalLayout->lifetime());
 
-		AddButton(
+			return checkView;
+		};
+
+		struct NestedEntry
+		{
+			QString checkboxLabel;
+			bool initial;
+			std::function<void(bool)> callback;
+		};
+
+		struct LabeledEntryGroup
+		{
+			std::vector<NestedEntry> nested;
+		};
+
+		std::vector checkboxes{
+			NestedEntry{
+				tr::ayu_DontReadMessages(tr::now), !settings->sendReadMessages, [=](bool enabled)
+				{
+					settings->set_sendReadMessages(!enabled);
+					AyuSettings::save();
+				}
+			},
+			NestedEntry{
+				tr::ayu_DontReadStories(tr::now), !settings->sendReadStories, [=](bool enabled)
+				{
+					settings->set_sendReadStories(!enabled);
+					AyuSettings::save();
+				}
+			},
+			NestedEntry{
+				tr::ayu_DontSendOnlinePackets(tr::now), !settings->sendOnlinePackets, [=](bool enabled)
+				{
+					settings->set_sendOnlinePackets(!enabled);
+					AyuSettings::save();
+				}
+			},
+			NestedEntry{
+				tr::ayu_DontSendUploadProgress(tr::now), !settings->sendUploadProgress, [=](bool enabled)
+				{
+					settings->set_sendUploadProgress(!enabled);
+					AyuSettings::save();
+				}
+			},
+			NestedEntry{
+				tr::ayu_SendOfflinePacketAfterOnline(tr::now), settings->sendOfflinePacketAfterOnline, [=](bool enabled)
+				{
+					settings->set_sendOfflinePacketAfterOnline(enabled);
+					AyuSettings::save();
+				}
+			},
+		};
+
+		auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			container,
-			tr::ayu_SendOfflinePacketAfterOnline(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(settings->sendOfflinePacketAfterOnline)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
+			object_ptr<Ui::VerticalLayout>(container));
+		const auto verticalLayout = wrap->entity();
+		auto innerChecks = std::vector<not_null<Ui::AbstractCheckView*>>();
+		for (const auto& entry : checkboxes)
 		{
-			return (enabled != settings->sendOfflinePacketAfterOnline);
-		}) | start_with_next([=](bool enabled)
+			const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
+			c->checkedValue(
+			) | start_with_next([=](bool enabled)
+			{
+				entry.callback(enabled);
+			}, container->lifetime());
+			innerChecks.push_back(c);
+		}
+
+		const auto raw = wrap.data();
+		raw->hide(anim::type::instant);
+		AddInnerToggle(
+			container,
+			st::rightsButton,
+			innerChecks,
+			raw,
+			tr::ayu_GhostModeToggle(),
+			std::nullopt,
+			{});
+		container->add(std::move(wrap));
+		container->widthValue(
+		) | start_with_next([=](int w)
 		{
-			settings->set_sendOfflinePacketAfterOnline(enabled);
-			AyuSettings::save();
-		}, container->lifetime());
+			raw->resizeToWidth(w);
+		}, raw->lifetime());
 
 		AddButton(
 			container,
@@ -311,7 +586,7 @@ namespace Settings
 			settings->set_hideAllChatsFolder(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
-		
+
 		AddButton(
 			container,
 			tr::ayu_ShowGhostToggleInDrawer(),

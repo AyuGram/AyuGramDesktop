@@ -613,7 +613,6 @@ void SetupSections(
 		controller,
 		container,
 		showOther);
-
 	const auto addSection = [&](
 			rpl::producer<QString> label,
 			Type type,
@@ -627,6 +626,15 @@ void SetupSections(
 			showOther(type);
 		});
 	};
+
+	AddSkip(container);
+	addSection(
+		tr::ayu_AyuPreferences(),
+		Ayu::Id(),
+		{&st::settingsPremiumIconStar, kIconPurple});
+	AddSkip(container);
+	AddDivider(container);
+
 	if (controller->session().supportMode()) {
 		SetupSupport(controller, container);
 
@@ -703,10 +711,6 @@ void SetupSections(
 		tr::lng_settings_section_devices(),
 		Calls::Id(),
 		{ &st::settingsIconCalls, kIconGreen });
-    addSection(
-        tr::ayu_AyuPreferences(),
-        Ayu::Id(),
-        { &st::settingsPremiumIconStar, kIconPurple });
 
 	SetupPowerSavingButton(&controller->window(), container);
 	SetupLanguageButton(&controller->window(), container);
