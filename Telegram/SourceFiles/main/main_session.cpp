@@ -59,6 +59,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/spellchecker_common.h"
 #endif // TDESKTOP_DISABLE_SPELLCHECK
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Main {
 namespace {
 
@@ -279,11 +283,21 @@ rpl::producer<> Session::downloaderTaskFinished() const {
 }
 
 bool Session::premium() const {
+	auto settings = &AyuSettings::getInstance();
+	if (settings->localPremium) {
+		return true;
+	}
+
 	return _user->isPremium();
 }
 
 bool Session::premiumPossible() const {
-	return premium() || premiumCanBuy();
+	auto settings = &AyuSettings::getInstance();
+	if (settings->localPremium) {
+		return true;
+	}
+
+	return premium() || _premiumPossible.current();
 }
 
 bool Session::premiumBadgesShown() const {
@@ -299,6 +313,12 @@ rpl::producer<bool> Session::premiumPossibleValue() const {
 	}) | rpl::map([=] {
 		return _user->isPremium();
 	});
+
+	auto settings = &AyuSettings::getInstance();
+	if (settings->localPremium) {
+		premium = rpl::single(true);
+	}
+
 	return rpl::combine(
 		std::move(premium),
 		_premiumPossible.value(),

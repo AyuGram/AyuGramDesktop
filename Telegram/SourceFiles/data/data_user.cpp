@@ -34,6 +34,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "styles/style_chat.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/sync/utils/telegram_helpers.h"
+
+
 namespace {
 
 // User with hidden last seen stays online in UI for such amount of seconds.
@@ -500,6 +505,18 @@ bool UserData::isFake() const {
 }
 
 bool UserData::isPremium() const {
+	if (id) {
+		auto settings = &AyuSettings::getInstance();
+		if (settings->localPremium)
+		{
+			if (getSession(id.value))
+			{
+				return true;
+			}
+		}
+	}
+
+
 	return flags() & UserDataFlag::Premium;
 }
 

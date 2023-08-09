@@ -219,6 +219,11 @@ namespace AyuSettings
 		disableStories = val;
 	}
 
+	void AyuGramSettings::set_localPremium(bool val)
+	{
+		localPremium = val;
+	}
+
 	void AyuGramSettings::set_deletedMark(QString val)
 	{
 		deletedMark = std::move(val);

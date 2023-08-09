@@ -7155,4 +7155,5 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IDCopiedToast" = "ID copied to clipboard.";
 "ayu_ContextHideMessage" = "Hide";
 "ayu_ContextCopyCallbackData" = "Copy Callback Data";
+"ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits, except translator.\n**Enjoy the star near your nickname!**";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";

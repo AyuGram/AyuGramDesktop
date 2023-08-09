@@ -36,6 +36,7 @@ namespace AyuSettings
 			// ~ QoL toggles
 			disableAds = true;
 			disableStories = false;
+			localPremium = false;
 			copyUsernameAsLink = true;
 
 			// ~ Customization
@@ -71,6 +72,7 @@ namespace AyuSettings
 		bool saveMessagesHistory;
 		bool disableAds;
 		bool disableStories;
+		bool localPremium;
 		bool copyUsernameAsLink;
 		QString deletedMark;
 		QString editedMark;
@@ -108,6 +110,8 @@ namespace AyuSettings
 
 		void set_disableStories(bool val);
 
+		void set_localPremium(bool val);
+
 		void set_copyUsernameAsLink(bool val);
 
 		void set_deletedMark(QString val);
@@ -144,6 +148,7 @@ namespace AyuSettings
 		saveMessagesHistory,
 		disableAds,
 		disableStories,
+		localPremium,
 		copyUsernameAsLink,
 		deletedMark,
 		editedMark,

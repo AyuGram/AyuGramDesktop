@@ -63,6 +63,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Settings {
 namespace {
 
@@ -1143,6 +1147,13 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 						Ui::Text::RichLangValue);
 			}
 		}
+
+		auto settings = &AyuSettings::getInstance();
+		if (settings->localPremium)
+		{
+			return tr::ayu_LocalPremiumNotice(Ui::Text::RichLangValue);
+		}
+
 		return rpl::conditional(
 			Data::AmPremiumValue(&_controller->session()),
 			_controller->session().api().premium().statusTextValue(),
