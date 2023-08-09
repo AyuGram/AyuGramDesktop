@@ -618,8 +618,6 @@ namespace Settings
 			settings->set_showMessageSeconds(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
-
-		AddDividerText(container, tr::ayu_SettingsCustomizationHint());
 	}
 
 	void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
@@ -782,29 +780,40 @@ namespace Settings
 	{
 		AddSkip(container);
 		SetupGhostEssentials(container);
+		AddSkip(container);
 
 		AddDivider(container);
 
 		AddSkip(container);
 		SetupSpyEssentials(container);
+		AddSkip(container);
 
 		AddDivider(container);
 
 		AddSkip(container);
 		SetupQoLToggles(container);
+		AddSkip(container);
 
 		AddDivider(container);
 
 		AddSkip(container);
 		SetupCustomization(container, controller);
-
 		AddSkip(container);
-		SetupAyuSync(container);
+		AddDividerText(container, tr::ayu_SettingsCustomizationHint());
 
-		AddDivider(container);
+		// todo: compilation flag
+		if (false)
+		{
+			AddSkip(container);
+			SetupAyuSync(container);
+			AddSkip(container);
+
+			AddDivider(container);
+		}
 
 		AddSkip(container);
 		SetupSendConfirmations(container);
+		AddSkip(container);
 
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}
