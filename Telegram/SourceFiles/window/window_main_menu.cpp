@@ -714,7 +714,7 @@ void MainMenu::setupMenu() {
 		});
 		addAction(
 			tr::ayu_LReadMessages(),
-			{ &st::menuIconMarkRead }
+			{ &st::ayuLReadMenuIcon }
 		)->setClickedCallback([=]
 		{
 			auto settings = &AyuSettings::getInstance();
@@ -728,7 +728,7 @@ void MainMenu::setupMenu() {
 		});
 		addAction(
 			tr::ayu_SReadMessages(),
-			{ &st::menuIconMarkRead }
+			{ &st::ayuSReadMenuIcon }
 		)->setClickedCallback([=]
 		{
 			auto box = Box<AyuUi::ConfirmationBox>(controller);

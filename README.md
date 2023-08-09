@@ -88,6 +88,7 @@ Make sure you have these components installed with VS Build Tools:
 
 ### Very special thanks to
 
+- [Solar Icon Set](https://solariconset.com/)
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [BitConverter](https://github.com/YanjieHe/BitConverter)
 - [Not Enough Standards](https://github.com/Alairion/not-enough-standards)
