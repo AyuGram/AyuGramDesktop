@@ -94,6 +94,9 @@ namespace AyuSettings
 	void postinitialize()
 	{
 		sendReadMessagesReactive = settings->sendReadMessages;
+		sendReadStoriesReactive = settings->sendReadStories;
+		sendUploadProgressReactive = settings->sendUploadProgress;
+		sendOfflinePacketAfterOnlineReactive = settings->sendOfflinePacketAfterOnline;
 		sendOnlinePacketsReactive = settings->sendOnlinePackets;
 
 		deletedMarkReactive = settings->deletedMark;
@@ -248,7 +251,7 @@ namespace AyuSettings
 	{
 		showMessageSeconds = val;
 	}
-	
+
 	void AyuGramSettings::set_hideAllChatsFolder(bool val)
 	{
 		hideAllChatsFolder = val;
