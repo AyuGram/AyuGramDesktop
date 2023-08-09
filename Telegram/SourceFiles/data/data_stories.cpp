@@ -1380,6 +1380,18 @@ void Stories::toggleHidden(
 void Stories::sendMarkAsReadRequest(
 		not_null<PeerData*> peer,
 		StoryId tillId) {
+	Expects(peer->isUser());
+
+	// AyuGram sendReadStories
+	const auto settings = &AyuSettings::getInstance();
+
+	if (!settings->sendReadStories)
+	{
+		_markReadRequests.clear();
+		_markReadPending.clear();
+		return;
+	}
+
 	const auto peerId = peer->id;
 	_markReadRequests.emplace(peerId);
 	const auto finish = [=] {
@@ -1390,22 +1402,11 @@ void Stories::sendMarkAsReadRequest(
 		}
 		checkQuitPreventFinished();
 	};
-
-	// AyuGram sendReadStories
-	const auto settings = &AyuSettings::getInstance();
-
-	if (settings->sendReadStories)
-	{
-		const auto api = &_owner->session().api();
-		api->request(MTPstories_ReadStories(
-			peer->asUser()->inputUser,
-			MTP_int(tillId)
-		)).done(finish).fail(finish).send();
-	}
-	else
-	{
-		finish();
-	}
+	const auto api = &_owner->session().api();
+	api->request(MTPstories_ReadStories(
+		peer->asUser()->inputUser,
+		MTP_int(tillId)
+	)).done(finish).fail(finish).send();
 }
 
 void Stories::checkQuitPreventFinished() {
@@ -1437,6 +1438,17 @@ void Stories::sendIncrementViewsRequests() {
 	if (_incrementViewsPending.empty()) {
 		return;
 	}
+
+	// AyuGram sendReadStories
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->sendReadStories)
+	{
+		_incrementViewsPending.clear();
+		_incrementViewsRequests.clear();
+		return;
+	}
+
+	auto ids = QVector<MTPint>();
 	struct Prepared {
 		PeerId peer = 0;
 		QVector<MTPint> ids;
