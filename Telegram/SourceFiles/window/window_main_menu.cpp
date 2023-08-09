@@ -800,7 +800,7 @@ void MainMenu::setupMenu() {
 	{
 		_ghostModeToggle = addAction(
 			tr::ayu_GhostModeToggle(),
-            { &st::menuIconSilent } // todo: fix `ayuGhostIcon`
+            { &st::ayuGhostIcon }
 		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
 		_ghostModeToggle->toggledChanges(
