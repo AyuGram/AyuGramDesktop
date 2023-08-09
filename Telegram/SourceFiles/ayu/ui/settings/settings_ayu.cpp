@@ -505,22 +505,6 @@ namespace Settings
 
 		AddButton(
 			container,
-			tr::ayu_LocalPremium(),
-			st::settingsButtonNoIcon
-		)->toggleOn(
-			rpl::single(settings->localPremium)
-		)->toggledValue(
-		) | rpl::filter([=](bool enabled)
-		{
-			return (enabled != settings->localPremium);
-		}) | start_with_next([=](bool enabled)
-		{
-			settings->set_localPremium(enabled);
-			AyuSettings::save();
-		}, container->lifetime());
-
-		AddButton(
-			container,
 			tr::ayu_DisableStories(),
 			st::settingsButtonNoIcon
 		)->toggleOn(
@@ -532,6 +516,22 @@ namespace Settings
 		}) | start_with_next([=](bool enabled)
 		{
 			settings->set_disableStories(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+
+		AddButton(
+			container,
+			tr::ayu_LocalPremium(),
+			st::settingsButtonNoIcon
+		)->toggleOn(
+			rpl::single(settings->localPremium)
+		)->toggledValue(
+		) | rpl::filter([=](bool enabled)
+		{
+			return (enabled != settings->localPremium);
+		}) | start_with_next([=](bool enabled)
+		{
+			settings->set_localPremium(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
 
