@@ -634,6 +634,7 @@ void SetupSections(
 		{&st::settingsPremiumIconStar, kIconPurple});
 	AddSkip(container);
 	AddDivider(container);
+    AddSkip(container);
 
 	if (controller->session().supportMode()) {
 		SetupSupport(controller, container);
