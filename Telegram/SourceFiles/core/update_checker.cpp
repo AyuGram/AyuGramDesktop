@@ -1251,9 +1251,13 @@ void Updater::start(bool forceWait) {
 		startImplementation(
 			&_httpImplementation,
 			std::make_unique<HttpChecker>(_testing));
-		startImplementation(
-			&_mtpImplementation,
-			std::make_unique<MtpChecker>(_session, _testing));
+
+        // AyuGram: removed
+        if (false) {
+            startImplementation(
+                    &_mtpImplementation,
+                    std::make_unique<MtpChecker>(_session, _testing));
+        }
 
 		_checking.fire({});
 	} else {
