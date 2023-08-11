@@ -270,12 +270,10 @@ rpl::producer<bool> Session::premiumPossibleValue() const {
 		return (change.diff & UserDataFlag::Premium);
 	}) | rpl::map([=] {
 		return _user->isPremium();
-	});
-
-	auto settings = &AyuSettings::getInstance();
-	if (settings->localPremium) {
-		premium = rpl::single(true);
-	}
+	}) | rpl::map([=] {
+        auto settings = &AyuSettings::getInstance();
+        return settings->localPremium;
+    });
 
 	return rpl::combine(
 		std::move(premium),

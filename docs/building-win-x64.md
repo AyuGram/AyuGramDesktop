@@ -14,10 +14,6 @@ Choose an empty folder for the future build, for example **D:\\TBuild**. It will
 
 All commands (if not stated otherwise) will be launched from **x64 Native Tools Command Prompt for VS 2022.bat** (should be in **Start Menu > Visual Studio 2022** menu folder). Pay attention not to use any other Command Prompt.
 
-### Obtain your API credentials
-
-You will require **api_id** and **api_hash** to access the Telegram API servers. To learn how to obtain them [click here][api_credentials].
-
 ## Install third party software
 
 * Download **Python 3.10** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
@@ -39,7 +35,7 @@ Go to ***BuildPath*\\tdesktop\\Telegram** and run
 
 * Open ***BuildPath*\\tdesktop\\out\\Telegram.sln** in Visual Studio 2022
 * Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
-* The result Telegram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
+* The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
 
 ### Qt Visual Studio Tools
 
@@ -49,5 +45,3 @@ For better debugging you may want to install Qt Visual Studio Tools:
 * Go to **Online** tab
 * Search for **Qt**
 * Install **Qt Visual Studio Tools** extension
-
-[api_credentials]: api_credentials.md
