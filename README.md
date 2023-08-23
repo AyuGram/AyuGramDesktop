@@ -29,7 +29,7 @@ Well, *you* **can't**, because you're just an ordinary user.
 
 Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md).
 
-AUR package also available [here](https://aur.archlinux.org/packages/ayugram-desktop-git).
+If you're using **Arch Linux** based distro, you can install ``ayugram-desktop-git`` package from the AUR
 
 ### Remarks
 
