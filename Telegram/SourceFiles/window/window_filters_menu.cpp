@@ -218,6 +218,12 @@ void FiltersMenu::refresh() {
 	// After the filters are refreshed, the scroll is reset,
 	// so we have to restore it.
 	_scroll.scrollToY(oldTop);
+
+    // Fix active chat folder when hide all chats is enabled.
+    if (settings->hideAllChatsFolder) {
+        const auto lookup_id = filters->lookupId(premium() ? 0 : 1);
+        _session->setActiveChatsFilter(lookup_id);
+    }
 }
 
 void FiltersMenu::setupList() {

@@ -69,6 +69,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QWindow>
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "data/data_chat_filters.h"
 
 namespace HistoryView {
 namespace {
@@ -770,7 +773,14 @@ void TopBarWidget::infoClicked() {
 
 void TopBarWidget::backClicked() {
 	if (_activeChat.key.folder()) {
-		_controller->closeFolder();
+		auto settings = &AyuSettings::getInstance();
+		if (settings->hideAllChatsFolder) {
+			const auto filters = &_controller->session().data().chatsFilters();
+			const auto lookup_id = filters->lookupId(_controller->session().premium() ? 0 : 1);
+			_controller->setActiveChatsFilter(lookup_id);
+		} else {
+			_controller->closeFolder();
+		}
 	} else if (_activeChat.section == Section::ChatsList
 		&& _activeChat.key.history()
 		&& _activeChat.key.history()->isForum()) {
