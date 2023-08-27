@@ -631,7 +631,7 @@ void SetupSections(
 	addSection(
 		tr::ayu_AyuPreferences(),
 		Ayu::Id(),
-		{&st::settingsPremiumIconStar, kIconPurple});
+        { .icon = &st::menuIconPremium });
 	AddSkip(container);
 	AddDivider(container);
     AddSkip(container);
