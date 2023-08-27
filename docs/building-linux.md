@@ -36,6 +36,14 @@ Or, to create a debug build, run
         -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
         -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
 
+<<<<<<< HEAD
+=======
+**P. S. If docker image build takes too long, cherry-pick [this](https://github.com/TDesktop-x64/tdesktop/commit/b99c084862053f441caa6525837a7e193cc671f7) commit.**
+
+If you need a backward compatible binary (running on older OS like the official one), you should build the binary with LTO.  
+To do this, add `-D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON` option.
+
+>>>>>>> 58e1c9ff54 (feat: more AyuGram branding)
 The built files will be in the `out` directory.
 
 ### Visual Studio Code integration

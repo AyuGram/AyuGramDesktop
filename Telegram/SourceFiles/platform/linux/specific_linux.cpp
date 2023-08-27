@@ -235,8 +235,7 @@ bool GenerateDesktopFile(
 
 	DEBUG_LOG(("App Info: placing .desktop file to %1").arg(targetPath));
 	if (!QDir(targetPath).exists()) QDir().mkpath(targetPath);
-
-	const auto sourceFile = u":/misc/org.telegram.desktop.desktop"_q;
+	const auto sourceFile = u":/misc/ayugram.desktop.desktop"_q;
 	const auto targetFile = targetPath
 		+ QGuiApplication::desktopFileName()
 		+ u".desktop"_q;
@@ -384,7 +383,7 @@ bool GenerateDesktopFile(
 			hashMd5Hex(exePath.constData(), exePath.size(), md5Hash);
 		}
 
-		QFile::remove(u"%1org.ayugram.desktop.%2.desktop"_q.arg(
+		QFile::remove(u"%1ayugram.desktop.%2.desktop"_q.arg(
 			targetPath,
 			md5Hash));
 	}
@@ -691,30 +690,11 @@ void start() {
 		}
 
 		if (!Core::UpdaterDisabled()) {
-<<<<<<< HEAD
-			return u"org.telegram.desktop._%1"_q.arg(
-				Core::Launcher::Instance().instanceHash().constData());
-		}
-
-		return u"org.telegram.desktop"_q;
-=======
-			QByteArray md5Hash(h);
-			if (!Launcher::Instance().customWorkingDir()) {
-				const auto exePath = QFile::encodeName(
-					cExeDir() + cExeName());
-
-				hashMd5Hex(
-					exePath.constData(),
-					exePath.size(),
-					md5Hash.data());
-			}
-
 			return u"org.ayugram.desktop._%1.desktop"_q.arg(
 				md5Hash.constData());
 		}
 
 		return u"org.ayugram.desktop.desktop"_q;
->>>>>>> a53c40e03b (feat: linux improvements)
 	}());
 
 	LOG(("App ID: %1").arg(QGuiApplication::desktopFileName()));

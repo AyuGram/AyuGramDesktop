@@ -4,30 +4,38 @@
 
 ## Features
 
-- Disable read packets sending
-- Disable online packets sending
-- Disable typing & upload packets sending
-- Auto offline
-- Messages history (+ deleted ones)
-- Using scheduled messages to keep offline
+- Full ghost mode (flexible)
+- Messages history
+- Anti-recall
+- Some appearance customization stuff
+- Local Telegram Premium
+- Sync read states and message history with AyuSync *(TBA)*
 
-Technically, we have the **Ghost mode** starter pack.
+![AyuGram Preferences](.github/preview.png)
 
-Also, we have a cool **purple icon**.
+## Downloads
 
-## Downloads? / FAQ?
+### Windows
 
+<<<<<<< HEAD
 Follow our [Telegram channel](https://t.me/ayugram1338). FAQ can be found here.
+=======
+You can download prebuilt Windows binary from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases) or from the [Telegram topic](https://t.me/ayugramchat/12788).
 
-## May I get banned?
+Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) if you want to build by yourself.
+>>>>>>> 58e1c9ff54 (feat: more AyuGram branding)
 
-Well, *you* **can't**, because you're just an ordinary user.
+### Arch Linux
 
-## How to build
+You can install `ayugram-desktop-git` or `ayugram-desktop-bin` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
-Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md).
+These packages maintained by [westpain](https://github.com/incycledream). *We're not responsible for them.*
 
-### Remarks
+### Any other Linux distro
+
+Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+
+### Remarks for Windows
 
 * Qt 6 ([LGPL](http://doc.qt.io/qt-6/lgpl.html)) and Qt 5.15 ([LGPL](http://doc.qt.io/qt-5/lgpl.html)) slightly patched
 * OpenSSL 3.2.1 ([Apache License 2.0](https://www.openssl.org/source/apache-license-2.0.txt))
@@ -77,6 +85,13 @@ Make sure you have these components installed with VS Build Tools:
 - C++ ATL latest (x86 & x64)
 - latest Windows 11 SDK
 =======
+
+## Donation
+
+If you enjoy using **AyuGram** and want to send us a tip, here's how you can do it:
+
+- Using [Boosty](https://boosty.to/alexeyzavar) - any card and PayPal
+- Using cryptocurrency - `TRpbajq38qU8joThgAfKJLyEPbNjzsdPJ1` (Tron + USDT)
 
 ## Credits
 

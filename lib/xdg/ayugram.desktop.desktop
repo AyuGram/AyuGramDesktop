@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=AyuGram Desktop
-Comment=Unofficial desktop version of Telegram messaging app
+Comment=Desktop version of AyuGram - ToS breaking Telegram client
 TryExec=ayugram-desktop
 Exec=DESKTOPINTEGRATION=1 ayugram-desktop -- %u
 Icon=telegram
@@ -18,5 +18,5 @@ X-GNOME-SingleWindow=true
 
 [Desktop Action quit]
 Exec=ayugram-desktop -quit
-Name=Quit Telegram
+Name=Quit AyuGram
 Icon=application-exit

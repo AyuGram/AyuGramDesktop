@@ -1,6 +1,6 @@
 # Contributing
 
-This document describes how you can contribute to Telegram Desktop. Please read it carefully.
+This document describes how you can contribute to AyuGram Desktop.
 
 **Table of Contents**
 
@@ -17,20 +17,15 @@ This document describes how you can contribute to Telegram Desktop. Please read 
 
 ## What contributions are accepted
 
-We highly appreciate your contributions in the matter of fixing bugs and optimizing the Telegram Desktop source code and its documentation. In case of fixing the existing user experience please push to your fork and [submit a pull request][pr].
+We highly appreciate your contributions in the matter of fixing bugs and optimizing the AyuGram Desktop source code and its documentation. In case of fixing the existing user experience please push to your fork and [submit a pull request][pr].
 
-Wait for us. We try to review your pull requests as fast as possible.
-If we find issues with your pull request, we may suggest some changes and improvements.
+If you have a translations-related contribution, check out [our Crowdin][translate].
 
-Unfortunately we **do not merge** any pull requests that have new feature implementations, translations to new languages and those which introduce any new user interface elements.
-
-If you have a translations-related contribution, check out [Translations platform][translate].
-
-Telegram Desktop is not a standalone application but a part of [Telegram project][telegram], so all the decisions about the features, languages, user experience, user interface and the design are made inside Telegram team, often according to some roadmap which is not public.
+Highly appreciated feature implementations from [Android app][android_repo].
 
 ## Build instructions
 
-See the [README.md][build_instructions] for details on the various build
+See [folder with instructions][build_instructions] for details on the various build
 environments.
 
 ## Pull upstream changes into your fork regularly
@@ -39,7 +34,7 @@ Telegram Desktop is advancing quickly. It is therefore critical that you pull up
 
 To pull in upstream changes:
 
-    git remote add upstream https://github.com/telegramdesktop/tdesktop.git
+    git remote add upstream https://github.com/AyuGram/AyuGramDesktop.git
     git fetch upstream master
 
 Check the log to be sure that you actually want the changes, before merging:
@@ -58,7 +53,7 @@ For more info, see [GitHub Help][help_fork_repo].
 
 ## How to get your pull request accepted
 
-We want to improve Telegram Desktop with your contributions. But we also want to provide a stable experience for our users and the community. Follow these rules and you should succeed without a problem!
+We want to improve AyuGram Desktop with your contributions. But we also want to provide a stable experience for our users and the community. Follow these rules and you should succeed without a problem!
 
 ### Keep your pull requests limited to a single issue
 
@@ -112,7 +107,8 @@ Before you submit a pull request, please test your changes. Verify that Telegram
 [help_fork_repo]: https://help.github.com/articles/fork-a-repo/
 [help_change_commit_message]: https://help.github.com/articles/changing-a-commit-message/
 [commit_message]: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
-[pr]: https://github.com/telegramdesktop/tdesktop/compare
-[build_instructions]: https://github.com/telegramdesktop/tdesktop/blob/master/README.md#build-instructions
+[pr]: https://github.com/AyuGram/AyuGramDesktop/compare
+[build_instructions]: https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs
 [closing-issues-via-commit-messages]: https://help.github.com/articles/closing-issues-via-commit-messages/
-[translate]: https://translations.telegram.org
+[translate]: https://crowdin.com/project/ayugram
+[android_repo]: https://github.com/AyuGram/AyuGram4A
