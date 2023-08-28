@@ -307,7 +307,8 @@ bool Session::premiumBadgesShown() const {
 rpl::producer<bool> Session::premiumPossibleValue() const {
 	using namespace rpl::mappers;
 
-	auto premium = _user->flagsValue(
+	// fix issue with GCC
+	rpl::producer<bool> premium = _user->flagsValue(
 	) | rpl::filter([=](UserData::Flags::Change change) {
 		return (change.diff & UserDataFlag::Premium);
 	}) | rpl::map([=] {
