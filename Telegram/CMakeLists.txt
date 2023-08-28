@@ -106,6 +106,8 @@ PRIVATE
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
     ayu/ayu_constants.h
+    ayu/ui/ayu_lottie.cpp
+    ayu/ui/ayu_lottie.h
     ayu/ui/utils/ayu_profile_values.cpp
     ayu/ui/utils/ayu_profile_values.h
     ayu/ui/settings/settings_ayu.cpp
