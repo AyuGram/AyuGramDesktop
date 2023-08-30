@@ -9,7 +9,7 @@
 
 #include "ayu/ayu_constants.h"
 #include "ayu/database/ayu_database.h"
-#include "ayu/sync/utils/telegram_helpers.h"
+#include "ayu/utils/telegram_helpers.h"
 
 #include "base/unixtime.h"
 

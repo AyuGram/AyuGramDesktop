@@ -83,9 +83,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+// AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/ui/settings/settings_ayu.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/ui/boxes/confirmation_box.h"
 #include "styles/style_ayu_icons.h"
+
 
 namespace Window {
 namespace {
@@ -810,6 +814,22 @@ void MainMenu::setupMenu() {
 
 			AyuSettings::save();
 		}, _ghostModeToggle->lifetime());
+	}
+
+	if (StreamerMode.value()) {
+		_streamerModeToggle = addAction(
+			    tr::ayu_StreamerModeToggle(),
+			    { &st::ayuStreamerModeMenuIcon }
+	    )->toggleOn(rpl::single(AyuFeatures::StreamerMode::isEnabled()));
+
+		_streamerModeToggle->toggledChanges(
+		) | rpl::start_with_next([=](bool enabled) {
+			if (enabled) {
+				AyuFeatures::StreamerMode::enable();
+			} else {
+				AyuFeatures::StreamerMode::disable();
+			}
+		}, _streamerModeToggle->lifetime());
 	}
 
 	Core::App().settings().systemDarkModeValue(

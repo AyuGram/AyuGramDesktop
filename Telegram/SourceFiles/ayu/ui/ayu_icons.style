@@ -5,3 +5,4 @@ ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
 ayuMenuIcon: icon {{ "ayu/ayu_menu", menuIconColor }};
 ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};
 ayuSReadMenuIcon: icon {{ "ayu/sread", menuIconColor }};
+ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};

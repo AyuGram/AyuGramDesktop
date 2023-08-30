@@ -22,7 +22,7 @@
 
 Main::Session* getSession(ID userId)
 {
-	for (auto& [index, account] : Core::App().domain().accounts())
+	for (const auto& [index, account] : Core::App().domain().accounts())
 	{
 		if (const auto session = account->maybeSession())
 		{

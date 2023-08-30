@@ -9,7 +9,7 @@
 
 #include "entities.h"
 #include "ayu/libs/sqlite/sqlite_orm.h"
-#include "ayu/sync/utils/telegram_helpers.h"
+#include "ayu/utils/telegram_helpers.h"
 
 using namespace sqlite_orm;
 auto storage = make_storage(

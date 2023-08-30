@@ -9,7 +9,7 @@
 #include "ayu/libs/process.hpp"
 #include "ayu/sync/models.h"
 #include "ayu/sync/utils/process_utils.hpp"
-#include "ayu/sync/utils/telegram_helpers.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "data/data_session.h"
 #include "history/history.h"
 

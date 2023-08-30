@@ -15,11 +15,15 @@
 #include "lang_auto.h"
 #include "mainwindow.h"
 #include "api/api_blocked_peers.h"
+
+#include "ayu/features/streamer_mode/streamer_mode.h"
+
 #include "boxes/connection_box.h"
 #include "core/application.h"
 #include "data/data_session.h"
 #include "lang/lang_instance.h"
 #include "main/main_session.h"
+#include "media/system_media_controls_manager.h"
 #include "platform/platform_specific.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
@@ -31,6 +35,7 @@
 #include "styles/style_widgets.h"
 
 #include "ui/painter.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -44,6 +49,17 @@
 constexpr auto GhostModeOptionsCount = 5;
 
 class PainterHighQualityEnabler;
+
+const char kStreamerMode[] =
+	"streamer-mode";
+
+base::options::toggle StreamerMode({
+	.id = kStreamerMode,
+	.name = "Show streamer mode toggles",
+	.description = "Streamer mode completely hides AyuGram windows and notifications from capture apps.",
+	.scope = base::options::windows,
+	.restartRequired = true
+});
 
 not_null<Ui::RpWidget*> AddInnerToggle(
 	not_null<Ui::VerticalLayout*> container,
@@ -112,7 +128,7 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 		) | start_with_next([=](const QRect& r)
 		{
 			const auto w = st::rightsButtonToggleWidth;
-			constexpr auto kLineWidth = static_cast<int>(1);
+			constexpr auto kLineWidth = 1;
 			toggleButton->setGeometry(
 				r.x() + r.width() - w,
 				r.y(),
@@ -267,6 +283,69 @@ namespace Settings
 		setupContent(controller);
 	}
 
+	void Ayu::AddPlatformOption(
+		not_null<Window::SessionController*> window,
+		not_null<Ui::VerticalLayout*> container,
+		base::options::option<bool>& option,
+		rpl::producer<> resetClicks)
+	{
+		auto& lifetime = container->lifetime();
+		const auto name = option.name().isEmpty() ? option.id() : option.name();
+		const auto toggles = lifetime.make_state<rpl::event_stream<bool>>();
+		std::move(
+			resetClicks
+		) | rpl::map_to(
+			option.defaultValue()
+		) | start_to_stream(*toggles, lifetime);
+
+		const auto button = AddButton(
+			container,
+			rpl::single(name),
+			(option.relevant()
+				 ? st::settingsButtonNoIcon
+				 : st::settingsOptionDisabled)
+		)->toggleOn(toggles->events_starting_with(option.value()));
+
+		const auto restarter = (option.relevant() && option.restartRequired())
+			                       ? button->lifetime().make_state<base::Timer>()
+			                       : nullptr;
+		if (restarter)
+		{
+			restarter->setCallback([=]
+			{
+				window->show(Ui::MakeConfirmBox({
+					.text = tr::lng_settings_need_restart(),
+					.confirmed = [] { Core::Restart(); },
+					.confirmText = tr::lng_settings_restart_now(),
+					.cancelText = tr::lng_settings_restart_later(),
+				}));
+			});
+		}
+		button->toggledChanges(
+		) | start_with_next([=, &option](bool toggled)
+		{
+			if (!option.relevant() && toggled != option.defaultValue())
+			{
+				toggles->fire_copy(option.defaultValue());
+				window->showToast(
+					tr::lng_settings_experimental_irrelevant(tr::now));
+				return;
+			}
+			option.set(toggled);
+			if (restarter)
+			{
+				restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
+			}
+		}, container->lifetime());
+
+		const auto& description = option.description();
+		if (!description.isEmpty())
+		{
+			AddSkip(container);
+			AddDividerText(container, rpl::single(description));
+		}
+	}
+
 	void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout*> container)
 	{
 		auto settings = &AyuSettings::getInstance();
@@ -331,11 +410,6 @@ namespace Settings
 			QString checkboxLabel;
 			bool initial;
 			std::function<void(bool)> callback;
-		};
-
-		struct LabeledEntryGroup
-		{
-			std::vector<NestedEntry> nested;
 		};
 
 		std::vector checkboxes{
@@ -791,6 +865,13 @@ namespace Settings
 		}, container->lifetime());
 	}
 
+	void Ayu::SetupExperimental(not_null<Ui::VerticalLayout*> container,
+	                            not_null<Window::SessionController*> controller)
+	{
+		AddSubsectionTitle(container, tr::lng_settings_experimental());
+		AddPlatformOption(controller, container, StreamerMode, rpl::producer<>());
+	}
+
 	void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 	                               not_null<Window::SessionController*> controller)
 	{
@@ -818,7 +899,7 @@ namespace Settings
 		AddDividerText(container, tr::ayu_SettingsCustomizationHint());
 
 		// todo: compilation flag
-		if (false)
+		if constexpr (false)
 		{
 			AddSkip(container);
 			SetupAyuSync(container);
@@ -830,6 +911,9 @@ namespace Settings
 		AddSkip(container);
 		SetupSendConfirmations(container);
 		AddSkip(container);
+
+		AddDivider(container);
+		SetupExperimental(container, controller);
 
 		AddDividerText(container, tr::ayu_SettingsWatermark());
 	}

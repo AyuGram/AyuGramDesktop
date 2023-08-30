@@ -106,6 +106,8 @@ PRIVATE
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
     ayu/ayu_constants.h
+    ayu/utils/telegram_helpers.cpp
+    ayu/utils/telegram_helpers.h
     ayu/ui/ayu_lottie.cpp
     ayu/ui/ayu_lottie.h
     ayu/ui/utils/ayu_profile_values.cpp
@@ -130,8 +132,6 @@ PRIVATE
     ayu/sync/utils/ayu_pipe_wrapper.cpp
     ayu/sync/utils/ayu_pipe_wrapper.h
     ayu/sync/utils/process_utils.hpp
-    ayu/sync/utils/telegram_helpers.cpp
-    ayu/sync/utils/telegram_helpers.h
     ayu/messages/ayu_messages_controller.cpp
     ayu/messages/ayu_messages_controller.h
     ayu/libs/pipe.hpp
@@ -141,6 +141,9 @@ PRIVATE
     ayu/libs/sqlite/sqlite3.c
     ayu/libs/sqlite/sqlite3.h
     ayu/libs/sqlite/sqlite_orm.h
+    ayu/features/streamer_mode/streamer_mode_windows.cpp
+    ayu/features/streamer_mode/streamer_mode_linux.cpp
+    ayu/features/streamer_mode/streamer_mode.h
     ayu/database/entities.h
     ayu/database/ayu_database.cpp
     ayu/database/ayu_database.h

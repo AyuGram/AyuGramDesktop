@@ -224,6 +224,11 @@ namespace AyuSettings
 		localPremium = val;
 	}
 
+	void AyuGramSettings::set_copyUsernameAsLink(bool val)
+	{
+		copyUsernameAsLink = val;
+	}
+
 	void AyuGramSettings::set_deletedMark(QString val)
 	{
 		deletedMark = std::move(val);
@@ -275,11 +280,6 @@ namespace AyuSettings
 	void AyuGramSettings::set_voiceConfirmation(bool val)
 	{
 		voiceConfirmation = val;
-	}
-
-	void AyuGramSettings::set_copyUsernameAsLink(bool val)
-	{
-		copyUsernameAsLink = val;
 	}
 
 	bool get_ghostModeEnabled()
