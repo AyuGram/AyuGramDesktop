@@ -99,6 +99,7 @@ public:
 		TopRight = 1,
 		BottomRight = 2,
 		BottomLeft = 3,
+		TopCenter = 4,
 	};
 	enum class NotifyView {
 		ShowPreview = 0,
@@ -131,11 +132,16 @@ public:
 
 	[[nodiscard]] static bool IsLeftCorner(ScreenCorner corner) {
 		return (corner == ScreenCorner::TopLeft)
-			|| (corner == ScreenCorner::BottomLeft);
+			|| (corner == ScreenCorner::BottomLeft)
+			|| (corner == ScreenCorner::TopCenter);
 	}
 	[[nodiscard]] static bool IsTopCorner(ScreenCorner corner) {
 		return (corner == ScreenCorner::TopLeft)
-			|| (corner == ScreenCorner::TopRight);
+			|| (corner == ScreenCorner::TopRight)
+			|| (corner == ScreenCorner::TopCenter);
+	}
+	[[nodiscard]] static bool IsTopCenterCorner(ScreenCorner corner) {
+		return corner == ScreenCorner::TopCenter;
 	}
 
 	[[nodiscard]] QByteArray serialize() const;

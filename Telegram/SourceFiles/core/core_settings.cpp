@@ -910,7 +910,8 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	case ScreenCorner::TopLeft:
 	case ScreenCorner::TopRight:
 	case ScreenCorner::BottomRight:
-	case ScreenCorner::BottomLeft: _notificationsCorner = uncheckedNotificationsCorner; break;
+	case ScreenCorner::BottomLeft:
+	case ScreenCorner::TopCenter:_notificationsCorner = uncheckedNotificationsCorner; break;
 	}
 	_includeMutedCounter = (includeMutedCounter == 1);
 	_includeMutedCounterFolders = (includeMutedCounterFolders == 1);

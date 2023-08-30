@@ -53,6 +53,11 @@ namespace Notifications {
 namespace Default {
 namespace {
 
+[[nodiscard]] int notifyWidth() {
+	const auto corner = Core::App().settings().notificationsCorner();
+	return Core::Settings::IsTopCenterCorner(corner) ? st::notifyWidth * 1.5 : st::notifyWidth;
+}
+
 [[nodiscard]] QPoint notificationStartPosition() {
 	const auto corner = Core::App().settings().notificationsCorner();
 	const auto window = Core::App().activePrimaryWindow();
@@ -61,10 +66,15 @@ namespace {
 		: QGuiApplication::primaryScreen()->availableGeometry();
 	const auto isLeft = Core::Settings::IsLeftCorner(corner);
 	const auto isTop = Core::Settings::IsTopCorner(corner);
-	const auto x = (isLeft == rtl())
-		? (r.x() + r.width() - st::notifyWidth - st::notifyDeltaX)
+	auto x = (isLeft == rtl())
+		? (r.x() + r.width() - notifyWidth() - st::notifyDeltaX)
 		: (r.x() + st::notifyDeltaX);
 	const auto y = isTop ? r.y() : (r.y() + r.height());
+
+	if (Core::Settings::IsTopCenterCorner(corner)) {
+		x = (r.x() + r.width() / 2 - notifyWidth() / 2);
+	}
+
 	return QPoint(x, y);
 }
 
@@ -681,7 +691,7 @@ Notification::Notification(
 	}
 
 	auto position = computePosition(st::notifyMinHeight);
-	updateGeometry(position.x(), position.y(), st::notifyWidth, st::notifyMinHeight);
+	updateGeometry(position.x(), position.y(), notifyWidth(), st::notifyMinHeight);
 
 	_userpicLoaded = !Ui::PeerUserpicLoading(_userpicView);
 	updateNotifyDisplay();
@@ -1271,7 +1281,9 @@ HideAllButton::HideAllButton(
 	setCursor(style::cur_pointer);
 
 	auto position = computePosition(st::notifyHideAllHeight);
-	updateGeometry(position.x(), position.y(), st::notifyWidth, st::notifyHideAllHeight);
+	updateGeometry(position.x(), position.y(), notifyWidth(), st::notifyHideAllHeight);
+	hide();
+	createWinId();
 
 	style::PaletteChanged(
 	) | rpl::start_with_next([=] {

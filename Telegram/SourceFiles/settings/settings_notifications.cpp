@@ -116,7 +116,7 @@ private:
 
 	int _oldCount;
 
-	std::vector<SampleWidget*> _cornerSamples[4];
+	std::vector<SampleWidget*> _cornerSamples[5];
 
 };
 
@@ -347,6 +347,27 @@ void NotificationsCount::paintEvent(QPaintEvent *e) {
 			p.setOpacity(1.);
 		}
 	}
+
+	// support for top center notifications
+	auto screenCorner = static_cast<ScreenCorner>(4);
+	auto isLeft = Core::Settings::IsLeftCorner(screenCorner);
+	auto isTop = true;
+	auto sampleLeft = screenRect.x() + screenRect.width() / 2 - st::notificationSampleSize.width() / 2;
+	auto sampleTop = screenRect.y() + st::notificationsSampleTopSkip;
+	if (static_cast<int>(_chosenCorner) == 4) {
+		auto count = _oldCount;
+		for (int i = 0; i != kMaxNotificationsCount; ++i) {
+			auto opacity = _sampleOpacities[i].value((i < count) ? 1. : 0.);
+			p.setOpacity(opacity);
+			p.drawPixmapLeft(sampleLeft, sampleTop, width(), _notificationSampleSmall);
+			sampleTop += (isTop ? 1 : -1) * (st::notificationSampleSize.height() + st::notificationsSampleMargin);
+		}
+		p.setOpacity(1.);
+	} else {
+		p.setOpacity(st::notificationSampleOpacity);
+		p.drawPixmapLeft(sampleLeft, sampleTop, width(), _notificationSampleSmall);
+		p.setOpacity(1.);
+	}
 }
 
 void NotificationsCount::setCount(int count) {
@@ -500,6 +521,7 @@ void NotificationsCount::mouseMoveEvent(QMouseEvent *e) {
 	auto topRight = style::rtlrect(screenRect.x() + screenRect.width() - cornerWidth, screenRect.y(), cornerWidth, cornerHeight, width());
 	auto bottomRight = style::rtlrect(screenRect.x() + screenRect.width() - cornerWidth, screenRect.y() + screenRect.height() - cornerHeight, cornerWidth, cornerHeight, width());
 	auto bottomLeft = style::rtlrect(screenRect.x(), screenRect.y() + screenRect.height() - cornerHeight, cornerWidth, cornerHeight, width());
+	auto topCenter = style::rtlrect(screenRect.x() + cornerWidth, screenRect.y(), cornerWidth, cornerHeight, width());
 	if (topLeft.contains(e->pos())) {
 		setOverCorner(ScreenCorner::TopLeft);
 	} else if (topRight.contains(e->pos())) {
@@ -508,7 +530,9 @@ void NotificationsCount::mouseMoveEvent(QMouseEvent *e) {
 		setOverCorner(ScreenCorner::BottomRight);
 	} else if (bottomLeft.contains(e->pos())) {
 		setOverCorner(ScreenCorner::BottomLeft);
-	} else {
+	} else if (topCenter.contains(e->pos())) {
+		setOverCorner(ScreenCorner::TopCenter);
+	} else{
 		clearOverCorner();
 	}
 }
@@ -547,6 +571,11 @@ void NotificationsCount::setOverCorner(ScreenCorner corner) {
 		auto isTop = Core::Settings::IsTopCorner(_overCorner);
 		auto sampleLeft = (isLeft == rtl()) ? (r.x() + r.width() - st::notifyWidth - st::notifyDeltaX) : (r.x() + st::notifyDeltaX);
 		auto sampleTop = isTop ? (r.y() + st::notifyDeltaY) : (r.y() + r.height() - st::notifyDeltaY - st::notifyMinHeight);
+
+		if (Core::Settings::IsTopCenterCorner(_overCorner)) {
+			sampleLeft = (r.x() + r.width() / 2 - st::notifyWidth / 2);
+		}
+
 		for (int i = samplesLeave; i != samplesNeeded; ++i) {
 			auto widget = std::make_unique<SampleWidget>(this, _notificationSampleLarge);
 			widget->move(sampleLeft, sampleTop + (isTop ? 1 : -1) * i * (st::notifyMinHeight + st::notifyDeltaY));
