@@ -98,6 +98,7 @@ If you enjoy using **AyuGram** and want to send us a tip, here's how you can do 
 - [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
 - [Kotatogram](https://github.com/kotatogram/kotatogram-desktop)
 - [64Gram](https://github.com/TDesktop-x64/tdesktop)
+- [Forkgram](https://github.com/forkgram/tdesktop)
 - [SQLite](https://github.com/sqlite/sqlite)
 - [sqlite_orm](https://github.com/fnc12/sqlite_orm)
 

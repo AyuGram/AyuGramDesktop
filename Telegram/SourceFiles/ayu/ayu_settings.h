@@ -14,6 +14,10 @@
 
 namespace AyuSettings
 {
+	const auto DEFAULT_ICON = QString("default");
+	const auto ALT_ICON = QString("alt");
+	const auto NOTHING_ICON = QString("nothing");
+
 	class AyuGramSettings
 	{
 	public:
@@ -40,6 +44,7 @@ namespace AyuSettings
 			copyUsernameAsLink = true;
 
 			// ~ Customization
+			appIcon = DEFAULT_ICON;
 			deletedMark = "🧹";
 			editedMark = tr::lng_edited(tr::now);
 			recentStickersCount = 20;
@@ -74,6 +79,7 @@ namespace AyuSettings
 		bool disableStories;
 		bool localPremium;
 		bool copyUsernameAsLink;
+		QString appIcon;
 		QString deletedMark;
 		QString editedMark;
 		int recentStickersCount;
@@ -114,6 +120,8 @@ namespace AyuSettings
 
 		void set_copyUsernameAsLink(bool val);
 
+		void set_appIcon(QString val);
+
 		void set_deletedMark(QString val);
 
 		void set_editedMark(QString val);
@@ -150,6 +158,7 @@ namespace AyuSettings
 		disableStories,
 		localPremium,
 		copyUsernameAsLink,
+		appIcon,
 		deletedMark,
 		editedMark,
 		recentStickersCount,
@@ -174,7 +183,6 @@ namespace AyuSettings
 
 	rpl::producer<int> get_showPeerIdReactive();
 
-	// computed fields
 	bool get_ghostModeEnabled();
 
 	rpl::producer<bool> get_ghostModeEnabledReactive();

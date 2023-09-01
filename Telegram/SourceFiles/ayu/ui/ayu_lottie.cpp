@@ -7,8 +7,10 @@
 
 #include "ayu_lottie.h"
 
-namespace AyuUi {
-	std::unique_ptr<Lottie::Icon> getLottie(const QString& text) {
+namespace AyuUi
+{
+	std::unique_ptr<Lottie::Icon> getLottie(const QString& text)
+	{
 		// todo: some kind of mapping
 		// Lottie::MakeIcon({.json = QString(), .sizeOverride = {24, 24}});
 		return nullptr;

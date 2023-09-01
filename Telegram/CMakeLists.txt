@@ -110,8 +110,12 @@ PRIVATE
     ayu/utils/telegram_helpers.h
     ayu/ui/ayu_lottie.cpp
     ayu/ui/ayu_lottie.h
+    ayu/ui/ayu_assets.cpp
+    ayu/ui/ayu_assets.h
     ayu/ui/utils/ayu_profile_values.cpp
     ayu/ui/utils/ayu_profile_values.h
+    ayu/ui/settings/icon_picker.cpp
+    ayu/ui/settings/icon_picker.h
     ayu/ui/settings/settings_ayu.cpp
     ayu/ui/settings/settings_ayu.h
     ayu/ui/context_menu/context_menu.cpp
@@ -1798,6 +1802,8 @@ endif()
 
 nice_target_sources(Telegram ${res_loc}
 PRIVATE
+    qrc/ayu/ayu.qrc
+
     qrc/emoji_1.qrc
     qrc/emoji_2.qrc
     qrc/emoji_3.qrc

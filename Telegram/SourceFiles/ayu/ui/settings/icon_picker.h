@@ -7,9 +7,14 @@
 
 #pragma once
 
-#include "lottie/lottie_icon.h"
+#include "ui/rp_widget.h"
 
-namespace AyuUi
+class IconPicker : public Ui::RpWidget
 {
-	std::unique_ptr<Lottie::Icon> getLottie(const QString& text);
-}
+public:
+	IconPicker(QWidget* parent);
+
+protected:
+	void paintEvent(QPaintEvent* e) override;
+	void mousePressEvent(QMouseEvent* e) override;
+};

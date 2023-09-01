@@ -229,6 +229,11 @@ namespace AyuSettings
 		copyUsernameAsLink = val;
 	}
 
+	void AyuGramSettings::set_appIcon(QString val)
+	{
+		appIcon = std::move(val);
+	}
+
 	void AyuGramSettings::set_deletedMark(QString val)
 	{
 		deletedMark = std::move(val);

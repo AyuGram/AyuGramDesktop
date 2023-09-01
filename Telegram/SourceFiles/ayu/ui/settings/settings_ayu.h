@@ -44,6 +44,8 @@ namespace Settings
 
 		void SetupQoLToggles(not_null<Ui::VerticalLayout*> container);
 
+		void SetupAppIcon(not_null<Ui::VerticalLayout*> container);
+
 		void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 		                        not_null<Window::SessionController*> controller);
 

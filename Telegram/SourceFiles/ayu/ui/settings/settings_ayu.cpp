@@ -34,6 +34,7 @@
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 
+#include "icon_picker.h"
 #include "ui/painter.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
@@ -626,12 +627,21 @@ namespace Settings
 		}, container->lifetime());
 	}
 
+	void Ayu::SetupAppIcon(not_null<Ui::VerticalLayout*> container)
+	{
+		container->add(
+			object_ptr<IconPicker>(container),
+			st::settingsSubsectionTitlePadding);
+	}
+
 	void Ayu::SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	                             not_null<Window::SessionController*> controller)
 	{
 		auto settings = &AyuSettings::getInstance();
 
 		AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
+
+		SetupAppIcon(container);
 
 		auto btn = AddButtonWithLabel(
 			container,
