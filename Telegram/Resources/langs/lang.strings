@@ -7163,4 +7163,5 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ContextCopyCallbackData" = "Copy Callback Data";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits, except translator.\n**Enjoy the star near your nickname!**";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";
+"ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "App will close in 5 seconds.";

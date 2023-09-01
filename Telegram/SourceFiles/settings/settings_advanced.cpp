@@ -145,8 +145,8 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		tr::lng_settings_check_now(),
 		st::settingsButtonNoIcon));
 	const auto update = Ui::CreateChild<Button>(
-		check,
-		tr::lng_update_telegram(),
+		check.get(),
+		tr::ayu_UpdateAyuGram(),
 		st::settingsUpdate);
 	update->hide();
 	check->widthValue() | rpl::start_with_next([=](int width) {
