@@ -25,7 +25,7 @@ StartWidget::StartWidget(
 : Step(parent, account, data, true) {
 	setMouseTracking(true);
 	setTitleText(rpl::single(u"AyuGram Desktop"_q));
-	setDescriptionText(tr::lng_intro_about());
+	setDescriptionText(tr::ayu_IntroAbout());
 	show();
 }
 

@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ui/ayu_assets.h"
+#include "ui/painter.h"
 
 
 namespace Platform {
@@ -170,7 +171,8 @@ bool DarkTasbarValueValid/* = false*/;
 		return Window::WithSmallCounter(std::move(result), std::move(args));
 	}
 	QPainter p(&result);
-	const auto half = args.size / 2;
+	PainterHighQualityEnabler hq(p); // AyuGram: fix for lq icons
+	const auto half = d.size / 2;
 	args.size = half;
 	p.drawPixmap(
 		half,

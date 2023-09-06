@@ -1,8 +1,13 @@
 <RCC>
     <qresource prefix="/gui">
+        <file alias="art/ayu/default/logo256.png">../../art/ayu/default/logo256.png</file>
+        <file alias="art/ayu/default/logo256_no_margin.png">../../art/ayu/default/logo256_no_margin.png</file>
+        <file alias="art/ayu/default/logo256_no_margin.ico">../../art/ayu/default/logo256_no_margin.ico</file>
         <file alias="art/ayu/alt/logo256.png">../../art/ayu/alt/logo256.png</file>
         <file alias="art/ayu/alt/logo256_no_margin.png">../../art/ayu/alt/logo256_no_margin.png</file>
+        <file alias="art/ayu/alt/logo256_no_margin.ico">../../art/ayu/alt/logo256_no_margin.ico</file>
         <file alias="art/ayu/nothing/logo256.png">../../art/ayu/nothing/logo256.png</file>
         <file alias="art/ayu/nothing/logo256_no_margin.png">../../art/ayu/nothing/logo256_no_margin.png</file>
+        <file alias="art/ayu/nothing/logo256_no_margin.ico">../../art/ayu/nothing/logo256_no_margin.ico</file>
     </qresource>
 </RCC>

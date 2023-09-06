@@ -395,8 +395,8 @@ MainMenu::MainMenu(
 	parentResized();
 
 	_telegram->setMarkedText(Ui::Text::Link(
-		u"Telegram Desktop"_q,
-		u"https://desktop.telegram.org"_q));
+		u"AyuGram Desktop"_q,
+		u"https://ayugram.one"_q));
 	_telegram->setLinksTrusted();
 	_version->setMarkedText(
 		Ui::Text::Link(

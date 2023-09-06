@@ -108,6 +108,8 @@ PRIVATE
     ayu/ayu_constants.h
     ayu/utils/telegram_helpers.cpp
     ayu/utils/telegram_helpers.h
+    ayu/utils/windows_utils.cpp
+    ayu/utils/windows_utils.h
     ayu/ui/ayu_lottie.cpp
     ayu/ui/ayu_lottie.h
     ayu/ui/ayu_assets.cpp

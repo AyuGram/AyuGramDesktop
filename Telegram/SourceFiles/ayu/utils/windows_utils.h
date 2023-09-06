@@ -4,15 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
-void loadAppIco();
-
-QImage logoPreview();
-QImage logoAltPreview();
-QImage logoNothingPreview();
-
-QString currentAppLogoName();
-QImage currentAppLogo();
-QImage currentAppLogoNoMargin();
+void reloadAppIconFromTaskBar();
