@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
+#ifdef Q_OS_WIN
+
 #include "windows_utils.h"
 
 #include <ShlObj_core.h>
@@ -44,3 +46,5 @@ void reloadAppIconFromTaskBar() {
 		SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 	}
 }
+
+#endif

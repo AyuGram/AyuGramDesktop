@@ -923,6 +923,7 @@ namespace Settings
 		AddSkip(container);
 
 		AddDivider(container);
+		AddSkip(container);
 		SetupExperimental(container, controller);
 
 		AddDividerText(container, tr::ayu_SettingsWatermark());
