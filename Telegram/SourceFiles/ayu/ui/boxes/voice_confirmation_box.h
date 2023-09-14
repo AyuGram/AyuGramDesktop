@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "ui/boxes/confirm_box.h"
@@ -13,10 +12,12 @@
 
 namespace AyuUi
 {
-	void VoiceConfirmBox(not_null<Ui::GenericBox*> box, Ui::ConfirmBoxArgs&& args);
 
-	[[nodiscard]] object_ptr<Ui::GenericBox> MakeConfirmBox(
-		Ui::ConfirmBoxArgs&& args);
+void VoiceConfirmBox(not_null<Ui::GenericBox *> box, Ui::ConfirmBoxArgs &&args);
 
-	[[nodiscard]] object_ptr<Ui::GenericBox> MakeInformBox(v::text::data text);
+[[nodiscard]] object_ptr<Ui::GenericBox> MakeConfirmBox(
+	Ui::ConfirmBoxArgs &&args);
+
+[[nodiscard]] object_ptr<Ui::GenericBox> MakeInformBox(v::text::data text);
+
 } // namespace Ui

@@ -17,48 +17,52 @@
 
 namespace AyuUi
 {
-	ConfirmationBox::ConfirmationBox(
-		QWidget*,
-		not_null<Window::SessionController*> controller) : _controller(controller)
+
+ConfirmationBox::ConfirmationBox(
+	QWidget *,
+	not_null<Window::SessionController *> controller)
+	: _controller(controller)
+{
+	//
+}
+
+void ConfirmationBox::prepare()
+{
+	_text.create(this, tr::ayu_ReadConfirmationBoxQuestion(), st::boxLabel);
+
+	auto fullHeight = st::boxPadding.top()
+		+ _text->height()
+		+ st::boxPadding.bottom();
+
+	setDimensions(st::boxWidth, fullHeight);
+
+	addButton(tr::ayu_ReadConfirmationBoxActionText(), [=, this]
 	{
-		//
-	}
+		ReadAllPeers();
+		closeBox();
+	});
+	addButton(tr::lng_cancel(), [=, this]
+	{ closeBox(); });
+}
 
-	void ConfirmationBox::prepare()
-	{
-		_text.create(this, tr::ayu_ReadConfirmationBoxQuestion(), st::boxLabel);
+void ConfirmationBox::resizeEvent(QResizeEvent *e)
+{
+	BoxContent::resizeEvent(e);
 
-		auto fullHeight = st::boxPadding.top()
-			+ _text->height()
-			+ st::boxPadding.bottom();
+	const auto &padding = st::boxPadding;
+	_text->moveToLeft(padding.left(), padding.top());
+}
 
-		setDimensions(st::boxWidth, fullHeight);
+void ConfirmationBox::ReadAllPeers()
+{
+	auto settings = &AyuSettings::getInstance();
+	auto prev = settings->sendReadMessages;
+	settings->set_sendReadMessages(true);
 
-		addButton(tr::ayu_ReadConfirmationBoxActionText(), [=, this]
-		{
-			ReadAllPeers();
-			closeBox();
-		});
-		addButton(tr::lng_cancel(), [=, this] { closeBox(); });
-	}
+	auto chats = _controller->session().data().chatsList();
+	Window::MarkAsReadChatListHack(chats);
 
-	void ConfirmationBox::resizeEvent(QResizeEvent* e)
-	{
-		BoxContent::resizeEvent(e);
+	settings->set_sendReadMessages(prev);
+}
 
-		const auto& padding = st::boxPadding;
-		_text->moveToLeft(padding.left(), padding.top());
-	}
-
-	void ConfirmationBox::ReadAllPeers()
-	{
-		auto settings = &AyuSettings::getInstance();
-		auto prev = settings->sendReadMessages;
-		settings->set_sendReadMessages(true);
-
-		auto chats = _controller->session().data().chatsList();
-		Window::MarkAsReadChatListHack(chats);
-
-		settings->set_sendReadMessages(prev);
-	}
 }

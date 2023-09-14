@@ -14,112 +14,105 @@
 
 namespace AyuUi
 {
-	void VoiceConfirmBox(not_null<Ui::GenericBox*> box, Ui::ConfirmBoxArgs&& args)
+
+void VoiceConfirmBox(not_null<Ui::GenericBox *> box, Ui::ConfirmBoxArgs &&args)
+{
+	const auto weak = MakeWeak(box);
+	const auto lifetime = box->lifetime().make_state<rpl::lifetime>();
+
+	v::match(args.text, [](v::null_t)
 	{
-		const auto weak = MakeWeak(box);
-		const auto lifetime = box->lifetime().make_state<rpl::lifetime>();
+	}, [&](auto &&)
+			 {
+				 const auto label = box->addRow(
+					 object_ptr<Ui::FlatLabel>(
+						 box.get(),
+						 v::text::take_marked(std::move(args.text)),
+						 args.labelStyle ? *args.labelStyle : st::boxLabel),
+					 st::boxPadding);
+				 if (args.labelFilter) {
+					 label->setClickHandlerFilter(std::move(args.labelFilter));
+				 }
+			 });
 
-		v::match(args.text, [](v::null_t)
-		         {
-		         }, [&](auto&&)
-		         {
-			         const auto label = box->addRow(
-				         object_ptr<Ui::FlatLabel>(
-					         box.get(),
-					         v::text::take_marked(std::move(args.text)),
-					         args.labelStyle ? *args.labelStyle : st::boxLabel),
-				         st::boxPadding);
-			         if (args.labelFilter)
-			         {
-				         label->setClickHandlerFilter(std::move(args.labelFilter));
-			         }
-		         });
-
-		const auto prepareCallback = [&](Ui::ConfirmBoxArgs::Callback& callback)
+	const auto prepareCallback = [&](Ui::ConfirmBoxArgs::Callback &callback)
+	{
+		return [=, confirmed = std::move(callback)]()
 		{
-			return [=, confirmed = std::move(callback)]()
-			{
-				if (const auto callbackPtr = std::get_if<1>(&confirmed))
-				{
-					if (auto callback = (*callbackPtr))
-					{
-						callback();
-					}
+			if (const auto callbackPtr = std::get_if<1>(&confirmed)) {
+				if (auto callback = (*callbackPtr)) {
+					callback();
 				}
-				else if (const auto callbackPtr = std::get_if<2>(&confirmed))
-				{
-					if (auto callback = (*callbackPtr))
-					{
-						callback(crl::guard(weak, [=] { weak->closeBox(); }));
-					}
+			}
+			else if (const auto callbackPtr = std::get_if<2>(&confirmed)) {
+				if (auto callback = (*callbackPtr)) {
+					callback(crl::guard(weak, [=]
+					{ weak->closeBox(); }));
 				}
-				else if (weak)
-				{
-					weak->closeBox();
-				}
-			};
+			}
+			else if (weak) {
+				weak->closeBox();
+			}
 		};
+	};
 
-		const auto& defaultButtonStyle = box->getDelegate()->style().button;
+	const auto &defaultButtonStyle = box->getDelegate()->style().button;
 
-		const auto confirmButton = box->addButton(
-			v::text::take_plain(std::move(args.confirmText), tr::lng_box_ok()),
-			[=, c = prepareCallback(args.confirmed)]()
+	const auto confirmButton = box->addButton(
+		v::text::take_plain(std::move(args.confirmText), tr::lng_box_ok()),
+		[=, c = prepareCallback(args.confirmed)]()
+		{
+			lifetime->destroy();
+			c();
+
+			weak->closeBox();
+		},
+		args.confirmStyle ? *args.confirmStyle : defaultButtonStyle);
+	box->events(
+	) | start_with_next([=](not_null<QEvent *> e)
+						{
+							if ((e->type() != QEvent::KeyPress) || !confirmButton) {
+								return;
+							}
+							const auto k = static_cast<QKeyEvent *>(e.get());
+							if (k->key() == Qt::Key_Enter || k->key() == Qt::Key_Return) {
+								confirmButton->clicked(Qt::KeyboardModifiers(), Qt::LeftButton);
+							}
+						}, box->lifetime());
+
+	if (!args.inform) {
+		const auto cancelButton = box->addButton(
+			v::text::take_plain(std::move(args.cancelText), tr::lng_cancel()),
+			crl::guard(weak, [=, c = prepareCallback(args.cancelled)]()
 			{
 				lifetime->destroy();
 				c();
+			}),
+			args.cancelStyle ? *args.cancelStyle : defaultButtonStyle);
 
-				weak->closeBox();
-			},
-			args.confirmStyle ? *args.confirmStyle : defaultButtonStyle);
-		box->events(
-		) | start_with_next([=](not_null<QEvent*> e)
+		box->boxClosing(
+		) | start_with_next(crl::guard(cancelButton, [=]
 		{
-			if ((e->type() != QEvent::KeyPress) || !confirmButton)
-			{
-				return;
-			}
-			const auto k = static_cast<QKeyEvent*>(e.get());
-			if (k->key() == Qt::Key_Enter || k->key() == Qt::Key_Return)
-			{
-				confirmButton->clicked(Qt::KeyboardModifiers(), Qt::LeftButton);
-			}
-		}, box->lifetime());
-
-		if (!args.inform)
-		{
-			const auto cancelButton = box->addButton(
-				v::text::take_plain(std::move(args.cancelText), tr::lng_cancel()),
-				crl::guard(weak, [=, c = prepareCallback(args.cancelled)]()
-				{
-					lifetime->destroy();
-					c();
-				}),
-				args.cancelStyle ? *args.cancelStyle : defaultButtonStyle);
-
-			box->boxClosing(
-			) | start_with_next(crl::guard(cancelButton, [=]
-			{
-				cancelButton->clicked(Qt::KeyboardModifiers(), Qt::LeftButton);
-			}), *lifetime);
-		}
-
-		if (args.strictCancel)
-		{
-			lifetime->destroy();
-		}
+			cancelButton->clicked(Qt::KeyboardModifiers(), Qt::LeftButton);
+		}), *lifetime);
 	}
 
-	object_ptr<Ui::GenericBox> MakeConfirmBox(Ui::ConfirmBoxArgs&& args)
-	{
-		return Box(VoiceConfirmBox, std::move(args));
+	if (args.strictCancel) {
+		lifetime->destroy();
 	}
+}
 
-	object_ptr<Ui::GenericBox> MakeInformBox(v::text::data text)
-	{
-		return MakeConfirmBox({
-			.text = std::move(text),
-			.inform = true,
-		});
-	}
+object_ptr<Ui::GenericBox> MakeConfirmBox(Ui::ConfirmBoxArgs &&args)
+{
+	return Box(VoiceConfirmBox, std::move(args));
+}
+
+object_ptr<Ui::GenericBox> MakeInformBox(v::text::data text)
+{
+	return MakeConfirmBox({
+							  .text = std::move(text),
+							  .inform = true,
+						  });
+}
+
 } // namespace AyuUi

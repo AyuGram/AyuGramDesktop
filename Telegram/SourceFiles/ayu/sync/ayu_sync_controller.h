@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "models.h"
@@ -16,39 +15,44 @@
 
 using json = nlohmann::json;
 
-const std::string AgentFilename =
 #ifdef _WIN32
-	"AyuSync.Agent.exe";
+
+const std::string AgentFilename = "AyuSync.Agent.exe";
+
 #else
-	"AyuSync.Agent";
+
+const std::string AgentFilename = "AyuSync.Agent";
+
 #endif
 
 const std::string AgentPath = "./AyuSync/" + AgentFilename;
 
 namespace AyuSync
 {
-	class ayu_sync_controller
-	{
-	public:
-		void initializeAgent();
 
-		void syncRead(not_null<History*> history, MsgId untilId);
+class ayu_sync_controller
+{
+public:
+	void initializeAgent();
 
-		void onSyncForce(SyncForce ev);
-		void onSyncBatch(json ev);
-		void onSyncRead(SyncRead ev);
+	void syncRead(not_null<History *> history, MsgId untilId);
 
-		void invokeHandler(json p);
+	void onSyncForce(SyncForce ev);
+	void onSyncBatch(json ev);
+	void onSyncRead(SyncRead ev);
 
-	private:
-		void receiver();
+	void invokeHandler(json p);
 
-		std::unique_ptr<ayu_pipe_wrapper> pipe;
-		bool initialized;
-	};
+private:
+	void receiver();
 
-	ayu_sync_controller& getInstance();
+	std::unique_ptr<ayu_pipe_wrapper> pipe;
+	bool initialized;
+};
 
-	bool isAgentDownloaded();
-	bool isAgentRunning();
+ayu_sync_controller &getInstance();
+
+bool isAgentDownloaded();
+bool isAgentRunning();
+
 }

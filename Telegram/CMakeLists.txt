@@ -106,6 +106,8 @@ PRIVATE
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
     ayu/ayu_constants.h
+    ayu/utils/ayu_mapper.cpp
+    ayu/utils/ayu_mapper.h
     ayu/utils/telegram_helpers.cpp
     ayu/utils/telegram_helpers.h
     ayu/utils/windows_utils.cpp
@@ -122,6 +124,12 @@ PRIVATE
     ayu/ui/settings/settings_ayu.h
     ayu/ui/context_menu/context_menu.cpp
     ayu/ui/context_menu/context_menu.h
+    ayu/ui/sections/edited/edited_log_inner.cpp
+    ayu/ui/sections/edited/edited_log_inner.h
+    ayu/ui/sections/edited/edited_log_item.cpp
+    ayu/ui/sections/edited/edited_log_item.h
+    ayu/ui/sections/edited/edited_log_section.cpp
+    ayu/ui/sections/edited/edited_log_section.h
     ayu/ui/boxes/voice_confirmation_box.cpp
     ayu/ui/boxes/voice_confirmation_box.h
     ayu/ui/boxes/message_history_box.cpp

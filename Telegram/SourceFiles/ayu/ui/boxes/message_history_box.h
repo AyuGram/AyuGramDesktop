@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "history/history_item.h"
@@ -14,24 +13,26 @@
 
 namespace AyuUi
 {
-	class MessageHistoryBox : public Ui::BoxContent
-	{
-	public:
-		MessageHistoryBox(QWidget*, HistoryItem* item);
 
-	protected:
-		void prepare() override;
+class MessageHistoryBox : public Ui::BoxContent
+{
+public:
+	MessageHistoryBox(QWidget *, HistoryItem *item);
 
-		void resizeEvent(QResizeEvent* e) override;
+protected:
+	void prepare() override;
 
-	private:
-		void setupControls();
+	void resizeEvent(QResizeEvent *e) override;
 
-		void addEditedMessagesToLayout(HistoryItem* item);
+private:
+	void setupControls();
 
-		object_ptr<Ui::VerticalLayout> _content;
-		const base::unique_qptr<Ui::ScrollArea> _scroll;
+	void addEditedMessagesToLayout(HistoryItem *item);
 
-		rpl::event_stream<int> _contentHeight;
-	};
+	object_ptr<Ui::VerticalLayout> _content;
+	const base::unique_qptr<Ui::ScrollArea> _scroll;
+
+	rpl::event_stream<int> _contentHeight;
+};
+
 }

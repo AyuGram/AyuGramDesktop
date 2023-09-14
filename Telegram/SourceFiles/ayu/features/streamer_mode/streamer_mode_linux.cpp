@@ -14,30 +14,34 @@
 
 namespace AyuFeatures::StreamerMode
 {
-	bool isEnabledVal;
 
-	bool isEnabled()
-	{
-		return isEnabledVal;
-	}
+bool isEnabledVal;
 
-	void enable()
-	{
-		isEnabledVal = true;
-	}
+bool isEnabled()
+{
+	return isEnabledVal;
+}
 
-	void disable()
-	{
-		isEnabledVal = false;
-	}
+void enable()
+{
+	isEnabledVal = true;
+}
 
-	void hideWidgetWindow(QWidget* widget) {
+void disable()
+{
+	isEnabledVal = false;
+}
 
-	}
+void hideWidgetWindow(QWidget *widget)
+{
 
-	void showWidgetWindow(QWidget* widget) {
+}
 
-	}
+void showWidgetWindow(QWidget *widget)
+{
+
+}
+
 }
 
 #endif

@@ -26,14 +26,13 @@ void ayu_pipe_wrapper::send(json p)
 	bit_converter::i32_to_bytes(length, false, lengthBuff);
 
 	os->write(lengthBuff, 4);
-	os->write(reinterpret_cast<const unsigned char*>(s.c_str()), length);
+	os->write(reinterpret_cast<const unsigned char *>(s.c_str()), length);
 	os->flush();
 }
 
 std::optional<json> ayu_pipe_wrapper::receive()
 {
-	if (!is->is_open())
-	{
+	if (!is->is_open()) {
 		return std::nullopt;
 	}
 
@@ -44,16 +43,14 @@ std::optional<json> ayu_pipe_wrapper::receive()
 
 	LOG(("ayu_pipe_wrapper::receive() length: %1").arg(length));
 
-	if (length <= 0)
-	{
+	if (length <= 0) {
 		return std::nullopt;
 	}
 
 	auto sb = stringbuf();
 	unsigned char buff[4096];
 
-	while (length > 0)
-	{
+	while (length > 0) {
 		auto readSize = std::min(length, static_cast<int>(sizeof(buff)));
 		is->read(buff, readSize);
 

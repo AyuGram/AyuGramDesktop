@@ -1,10 +1,15 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2023
 #pragma once
-
-#include "ayu/libs/json.hpp"
 
 #include <string>
 #include <vector>
 
+#include "ayu/libs/json.hpp"
 #include "ayu/database/entities.h"
 
 using json = nlohmann::json;
@@ -30,7 +35,41 @@ public:
 		std::vector<json> events;
 	};
 
-	SyncBatchArgs args;
+	SyncBatchArgs args{};
+};
+
+class SyncForce : public SyncEvent
+{
+public:
+	explicit SyncForce()
+	{
+		type = "sync_force";
+	}
+
+	class SyncForceArgs
+	{
+	public:
+		int fromDate;
+	};
+
+	SyncForceArgs args{};
+};
+
+class SyncForceFinish : public SyncEvent
+{
+public:
+	explicit SyncForceFinish()
+	{
+		type = "sync_force_finish";
+	}
+
+	class SyncForceFinishArgs
+	{
+	public:
+		short dummy; // required to be JSON serializable
+	};
+
+	SyncForceFinishArgs args{};
 };
 
 class SyncRead : public SyncEvent
@@ -49,50 +88,53 @@ public:
 		int unread;
 	};
 
-	SyncReadArgs args;
+	SyncReadArgs args{};
 };
 
-class SyncForce : public SyncEvent
+class SyncDeletedMessage : public SyncEvent
 {
 public:
-	explicit SyncForce()
+	explicit SyncDeletedMessage()
 	{
-		type = "sync_force";
+		type = "sync_deleted_message";
 	}
 
-	class SyncForceArgs
+	class SyncDeletedMessageArgs
 	{
 	public:
-		int fromDate;
+		json message;
 	};
 
-	SyncForceArgs args;
+	SyncDeletedMessageArgs args{};
 };
 
-class SyncForceFinish : public SyncEvent
+class SyncEditedMessage : public SyncEvent
 {
 public:
-	explicit SyncForceFinish()
+	explicit SyncEditedMessage()
 	{
-		type = "sync_force_finish";
+		type = "sync_edited_message";
 	}
 
-	class SyncForceFinishArgs
+	class SyncEditedMessageArgs
 	{
 	public:
-		short dummy; // required to be JSON serializable
+		json message;
 	};
 
-	SyncForceFinishArgs args;
+	SyncEditedMessageArgs args{};
 };
-
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncEvent, type, userId)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncBatch::SyncBatchArgs, events)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncBatch, type, userId, args)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncRead::SyncReadArgs, dialogId, untilId, unread)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncRead, type, userId, args)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForce::SyncForceArgs, fromDate)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForce, type, userId, args)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForceFinish::SyncForceFinishArgs, dummy)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncForceFinish, type, userId, args)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncRead::SyncReadArgs, dialogId, untilId, unread)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncRead, type, userId, args)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncDeletedMessage::SyncDeletedMessageArgs, message)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncDeletedMessage, type, userId, args)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncEditedMessage::SyncEditedMessageArgs, message)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SyncEditedMessage, type, userId, args)

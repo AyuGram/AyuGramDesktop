@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "mainwindow.h"
@@ -78,22 +77,24 @@
 
 #include "history/view/history_view_context_menu.h"
 
-#include <ayu/ayu_settings.h>
-#include <styles/style_info.h>
+#include "ayu/ayu_settings.h"
+#include "styles/style_info.h"
 
 namespace AyuUi
 {
-	class AyuPopupMenu
-	{
-	public:
-		AyuPopupMenu(HistoryInner* parent);
 
-		void addHistoryAction(HistoryItem* item);
+class AyuPopupMenu
+{
+public:
+	AyuPopupMenu(HistoryInner *parent);
 
-		void addHideMessageAction(HistoryItem* item) const;
+	void addHistoryAction(HistoryItem *item);
 
-		void addReadUntilAction(HistoryItem* item) const;
+	void addHideMessageAction(HistoryItem *item) const;
 
-		std::unique_ptr<Ui::PopupMenu> _ayuSubMenu;
-	};
+	void addReadUntilAction(HistoryItem *item) const;
+
+	std::unique_ptr<Ui::PopupMenu> _ayuSubMenu;
+};
+
 }

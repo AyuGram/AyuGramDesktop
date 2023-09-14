@@ -28,7 +28,8 @@
 
 #include "ayu/ayu_settings.h"
 
-EditDeletedMarkBox::EditDeletedMarkBox(QWidget*) :
+EditDeletedMarkBox::EditDeletedMarkBox(QWidget *)
+	:
 	_text(
 		this,
 		st::defaultInputField,
@@ -47,12 +48,16 @@ void EditDeletedMarkBox::prepare()
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
 
-	addLeftButton(tr::ayu_BoxActionReset(), [=] { _text->setText(defaultDeletedMark); });
+	addLeftButton(tr::ayu_BoxActionReset(), [=]
+	{ _text->setText(defaultDeletedMark); });
 
-	addButton(tr::lng_settings_save(), [=] { save(); });
-	addButton(tr::lng_cancel(), [=] { closeBox(); });
+	addButton(tr::lng_settings_save(), [=]
+	{ save(); });
+	addButton(tr::lng_cancel(), [=]
+	{ closeBox(); });
 
-	connect(_text, &Ui::InputField::submitted, [=] { submit(); });
+	connect(_text, &Ui::InputField::submitted, [=]
+	{ submit(); });
 }
 
 void EditDeletedMarkBox::setInnerFocus()
@@ -62,26 +67,24 @@ void EditDeletedMarkBox::setInnerFocus()
 
 void EditDeletedMarkBox::submit()
 {
-	if (_text->getLastText().trimmed().isEmpty())
-	{
+	if (_text->getLastText().trimmed().isEmpty()) {
 		_text->setFocus();
 		_text->showError();
 	}
-	else
-	{
+	else {
 		save();
 	}
 }
 
-void EditDeletedMarkBox::resizeEvent(QResizeEvent* e)
+void EditDeletedMarkBox::resizeEvent(QResizeEvent *e)
 {
 	BoxContent::resizeEvent(e);
 
 	_text->resize(
 		width()
-		- st::boxPadding.left()
-		- st::newGroupInfoPadding.left()
-		- st::boxPadding.right(),
+			- st::boxPadding.left()
+			- st::newGroupInfoPadding.left()
+			- st::boxPadding.right(),
 		_text->height());
 
 	const auto left = st::boxPadding.left() + st::newGroupInfoPadding.left();

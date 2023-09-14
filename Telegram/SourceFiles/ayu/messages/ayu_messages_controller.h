@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "ayu/database/entities.h"
@@ -13,13 +12,15 @@
 
 namespace AyuMessages
 {
-	class ayu_messages_controller
-	{
-	public:
-		void addEditedMessage(HistoryMessageEdition& edition, not_null<HistoryItem*> item);
-		std::vector<EditedMessage> getEditedMessages(HistoryItem* item);
-		bool hasRevisions(not_null<HistoryItem*> item);
-	};
 
-	ayu_messages_controller& getInstance();
+class ayu_messages_controller
+{
+public:
+	void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem *> item);
+	std::vector<EditedMessage> getEditedMessages(HistoryItem *item);
+	bool hasRevisions(not_null<HistoryItem *> item);
+};
+
+ayu_messages_controller &getInstance();
+
 }

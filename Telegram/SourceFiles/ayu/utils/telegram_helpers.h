@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "ayu/sync/models.h"
@@ -14,9 +13,9 @@
 #include "main/main_domain.h"
 #include "main/main_session.h"
 
-Main::Session* getSession(ID userId);
+Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback);
-not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session);
-ID getDialogIdFromPeer(not_null<PeerData*> peer);
-std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem*> item);
+not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session);
+ID getDialogIdFromPeer(not_null<PeerData *> peer);
+std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);

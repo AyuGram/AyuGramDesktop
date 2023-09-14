@@ -9,10 +9,13 @@
 #include "ayu/ayu_settings.h"
 
 static QString LAST_LOADED_NAME;
+
 static QImage LAST_LOADED;
+
 static QImage LAST_LOADED_NO_MARGIN;
 
-void loadAppIco() {
+void loadAppIco()
+{
 	auto settings = &AyuSettings::getInstance();
 
 	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
@@ -31,8 +34,7 @@ void loadAppIco() {
 void loadIcons()
 {
 	auto settings = &AyuSettings::getInstance();
-	if (LAST_LOADED_NAME != settings->appIcon)
-	{
+	if (LAST_LOADED_NAME != settings->appIcon) {
 		LAST_LOADED_NAME = settings->appIcon;
 
 		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/logo256.png").arg(settings->appIcon));

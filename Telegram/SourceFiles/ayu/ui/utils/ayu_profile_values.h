@@ -4,12 +4,11 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 
-QString IDString(not_null<PeerData*> peer);
+QString IDString(not_null<PeerData *> peer);
 QString IDString(MsgId topic_root_id);
 
-rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer);
+rpl::producer<TextWithEntities> IDValue(not_null<PeerData *> peer);
 rpl::producer<TextWithEntities> IDValue(MsgId topicRootId);

@@ -14,40 +14,42 @@
 
 namespace AyuFeatures::StreamerMode
 {
-	bool isEnabledVal;
 
-	bool isEnabled()
-	{
-		return isEnabledVal;
-	}
+bool isEnabledVal;
 
-	void enable()
-	{
-		auto handle = Core::App().activeWindow()->widget()->psHwnd();
-		SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
+bool isEnabled()
+{
+	return isEnabledVal;
+}
 
-		isEnabledVal = true;
-	}
+void enable()
+{
+	auto handle = Core::App().activeWindow()->widget()->psHwnd();
+	SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
 
-	void disable()
-	{
-		auto handle = Core::App().activeWindow()->widget()->psHwnd();
-		SetWindowDisplayAffinity(handle, WDA_NONE);
+	isEnabledVal = true;
+}
 
-		isEnabledVal = false;
-	}
+void disable()
+{
+	auto handle = Core::App().activeWindow()->widget()->psHwnd();
+	SetWindowDisplayAffinity(handle, WDA_NONE);
 
-	void hideWidgetWindow(QWidget* widget)
-	{
-		auto handle = reinterpret_cast<HWND>(widget->window()->winId());
-		SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
-	}
+	isEnabledVal = false;
+}
 
-	void showWidgetWindow(QWidget* widget)
-	{
-		auto handle = reinterpret_cast<HWND>(widget->window()->winId());
-		SetWindowDisplayAffinity(handle, WDA_NONE);
-	}
+void hideWidgetWindow(QWidget *widget)
+{
+	auto handle = reinterpret_cast<HWND>(widget->window()->winId());
+	SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
+}
+
+void showWidgetWindow(QWidget *widget)
+{
+	auto handle = reinterpret_cast<HWND>(widget->window()->winId());
+	SetWindowDisplayAffinity(handle, WDA_NONE);
+}
+
 }
 
 #endif

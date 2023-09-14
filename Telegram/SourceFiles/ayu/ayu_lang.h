@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include <QtNetwork/QNetworkReply>
@@ -12,18 +11,18 @@
 
 class CustomLangPack : public QObject
 {
-	Q_OBJECT
+Q_OBJECT
 
 	Q_DISABLE_COPY(CustomLangPack)
 
 public:
-	static CustomLangPack* currentInstance();
+	static CustomLangPack *currentInstance();
 
 	static void initInstance();
 
-	static CustomLangPack* instance;
+	static CustomLangPack *instance;
 
-	void fetchCustomLangPack(const QString& langPackId, const QString& langPackBaseId);
+	void fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId);
 
 	void loadDefaultLangFile();
 
@@ -40,6 +39,6 @@ private:
 	~CustomLangPack() override = default;
 
 	QNetworkAccessManager networkManager;
-	QNetworkReply* _chkReply = nullptr;
+	QNetworkReply *_chkReply = nullptr;
 	bool needFallback = false;
 };

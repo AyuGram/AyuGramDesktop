@@ -6,11 +6,9 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "lottie/lottie_icon.h"
-
-namespace AyuUi
+namespace AyuMapper
 {
 
-std::unique_ptr<Lottie::Icon> getLottie(const QString &text);
+int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item);
 
-}
+} // namespace AyuMapper

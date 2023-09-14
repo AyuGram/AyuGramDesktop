@@ -101,6 +101,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/database/ayu_database.h"
 #include "ayu/messages/ayu_messages_controller.h"
 #include "ayu/ui/boxes/message_history_box.h"
+#include "ayu/ui/sections/edited/edited_log_section.h"
 
 namespace HistoryView {
 namespace {
@@ -1391,8 +1392,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 		{
 			result->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
 			{
-				auto box = Box<AyuUi::MessageHistoryBox>(item);
-				Ui::show(std::move(box));
+				item->history()->session().tryResolveWindow()->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
 			}, &st::menuIconInfo);
 		}
 

@@ -14,301 +14,315 @@ using json = nlohmann::json;
 
 namespace AyuSettings
 {
-	const QString filename = "tdata/ayu_settings.json";
-	std::optional<AyuGramSettings> settings = std::nullopt;
 
-	rpl::variable<bool> sendReadMessagesReactive;
-	rpl::variable<bool> sendReadStoriesReactive;
-	rpl::variable<bool> sendOnlinePacketsReactive;
-	rpl::variable<bool> sendUploadProgressReactive;
-	rpl::variable<bool> sendOfflinePacketAfterOnlineReactive;
+const QString filename = "tdata/ayu_settings.json";
 
-	rpl::variable<QString> deletedMarkReactive;
-	rpl::variable<QString> editedMarkReactive;
-	rpl::variable<int> showPeerIdReactive;
+std::optional<AyuGramSettings> settings = std::nullopt;
 
-	rpl::variable<bool> ghostModeEnabled;
+rpl::variable<bool> sendReadMessagesReactive;
 
-	rpl::lifetime lifetime = rpl::lifetime();
+rpl::variable<bool> sendReadStoriesReactive;
 
-	bool ghostModeEnabled_util(AyuGramSettings& settingsUtil)
-	{
-		return
-			!settingsUtil.sendReadMessages
+rpl::variable<bool> sendOnlinePacketsReactive;
+
+rpl::variable<bool> sendUploadProgressReactive;
+
+rpl::variable<bool> sendOfflinePacketAfterOnlineReactive;
+
+rpl::variable<QString> deletedMarkReactive;
+
+rpl::variable<QString> editedMarkReactive;
+
+rpl::variable<int> showPeerIdReactive;
+
+rpl::variable<bool> ghostModeEnabled;
+
+rpl::lifetime lifetime = rpl::lifetime();
+
+bool ghostModeEnabled_util(AyuGramSettings &settingsUtil)
+{
+	return
+		!settingsUtil.sendReadMessages
 			&& !settingsUtil.sendReadStories
 			&& !settingsUtil.sendOnlinePackets
 			&& !settingsUtil.sendUploadProgress
 			&& settingsUtil.sendOfflinePacketAfterOnline;
+}
+
+void initialize()
+{
+	if (settings.has_value()) {
+		return;
 	}
 
-	void initialize()
-	{
-		if (settings.has_value())
-		{
-			return;
-		}
+	settings = AyuGramSettings();
 
-		settings = AyuGramSettings();
+	sendReadMessagesReactive.value() | rpl::filter([=](bool val)
+												   {
+													   return (val != settings->sendReadMessages);
+												   }) | start_with_next([=](bool val)
+																		{
+																			ghostModeEnabled =
+																				ghostModeEnabled_util(settings.value());
+																		}, lifetime);
+	// ..
+	sendReadStoriesReactive.value() | rpl::filter([=](bool val)
+												  {
+													  return (val != settings->sendReadStories);
+												  }) | start_with_next([=](bool val)
+																	   {
+																		   ghostModeEnabled =
+																			   ghostModeEnabled_util(settings.value());
+																	   }, lifetime);
+	// ..
+	sendOnlinePacketsReactive.value() | rpl::filter([=](bool val)
+													{
+														return (val != settings->sendOnlinePackets);
+													}) | start_with_next([=](bool val)
+																		 {
+																			 ghostModeEnabled =
+																				 ghostModeEnabled_util(settings
+																										   .value());
+																		 }, lifetime);
+	// ..
+	sendUploadProgressReactive.value() | rpl::filter([=](bool val)
+													 {
+														 return (val != settings->sendUploadProgress);
+													 }) | start_with_next([=](bool val)
+																		  {
+																			  ghostModeEnabled =
+																				  ghostModeEnabled_util(settings
+																											.value());
+																		  }, lifetime);
+	// ..
+	sendOfflinePacketAfterOnlineReactive.value() | rpl::filter([=](bool val)
+															   {
+																   return (val
+																	   != settings->sendOfflinePacketAfterOnline);
+															   }) | start_with_next([=](bool val)
+																					{
+																						ghostModeEnabled =
+																							ghostModeEnabled_util(
+																								settings.value());
+																					}, lifetime);
+}
 
-		sendReadMessagesReactive.value() | rpl::filter([=](bool val)
-		{
-			return (val != settings->sendReadMessages);
-		}) | start_with_next([=](bool val)
-		{
-			ghostModeEnabled = ghostModeEnabled_util(settings.value());
-		}, lifetime);
-		// ..
-		sendReadStoriesReactive.value() | rpl::filter([=](bool val)
-		{
-			return (val != settings->sendReadStories);
-		}) | start_with_next([=](bool val)
-		{
-			ghostModeEnabled = ghostModeEnabled_util(settings.value());
-		}, lifetime);
-		// ..
-		sendOnlinePacketsReactive.value() | rpl::filter([=](bool val)
-		{
-			return (val != settings->sendOnlinePackets);
-		}) | start_with_next([=](bool val)
-		{
-			ghostModeEnabled = ghostModeEnabled_util(settings.value());
-		}, lifetime);
-		// ..
-		sendUploadProgressReactive.value() | rpl::filter([=](bool val)
-		{
-			return (val != settings->sendUploadProgress);
-		}) | start_with_next([=](bool val)
-		{
-			ghostModeEnabled = ghostModeEnabled_util(settings.value());
-		}, lifetime);
-		// ..
-		sendOfflinePacketAfterOnlineReactive.value() | rpl::filter([=](bool val)
-		{
-			return (val != settings->sendOfflinePacketAfterOnline);
-		}) | start_with_next([=](bool val)
-		{
-			ghostModeEnabled = ghostModeEnabled_util(settings.value());
-		}, lifetime);
+void postinitialize()
+{
+	sendReadMessagesReactive = settings->sendReadMessages;
+	sendReadStoriesReactive = settings->sendReadStories;
+	sendUploadProgressReactive = settings->sendUploadProgress;
+	sendOfflinePacketAfterOnlineReactive = settings->sendOfflinePacketAfterOnline;
+	sendOnlinePacketsReactive = settings->sendOnlinePackets;
+
+	deletedMarkReactive = settings->deletedMark;
+	editedMarkReactive = settings->editedMark;
+	showPeerIdReactive = settings->showPeerId;
+
+	ghostModeEnabled = ghostModeEnabled_util(settings.value());
+}
+
+AyuGramSettings &getInstance()
+{
+	initialize();
+	return settings.value();
+}
+
+void load()
+{
+	QFile file(filename);
+	if (!file.exists()) {
+		return;
 	}
+	file.open(QIODevice::ReadOnly);
+	QByteArray data = file.readAll();
+	file.close();
 
-	void postinitialize()
-	{
-		sendReadMessagesReactive = settings->sendReadMessages;
-		sendReadStoriesReactive = settings->sendReadStories;
-		sendUploadProgressReactive = settings->sendUploadProgress;
-		sendOfflinePacketAfterOnlineReactive = settings->sendOfflinePacketAfterOnline;
-		sendOnlinePacketsReactive = settings->sendOnlinePackets;
-
-		deletedMarkReactive = settings->deletedMark;
-		editedMarkReactive = settings->editedMark;
-		showPeerIdReactive = settings->showPeerId;
-
-		ghostModeEnabled = ghostModeEnabled_util(settings.value());
+	initialize();
+	json p = json::parse(data);
+	try {
+		settings = p.get<AyuGramSettings>();
 	}
-
-	AyuGramSettings& getInstance()
-	{
-		initialize();
-		return settings.value();
+	catch (...) {
+		LOG(("AyuGramSettings: failed to parse settings file"));
 	}
+	postinitialize();
+}
 
-	void load()
-	{
-		QFile file(filename);
-		if (!file.exists())
-		{
-			return;
-		}
-		file.open(QIODevice::ReadOnly);
-		QByteArray data = file.readAll();
-		file.close();
+void save()
+{
+	initialize();
 
-		initialize();
-		json p = json::parse(data);
-		try
-		{
-			settings = p.get<AyuGramSettings>();
-		}
-		catch (...)
-		{
-			LOG(("AyuGramSettings: failed to parse settings file"));
-		}
-		postinitialize();
-	}
+	json p = settings.value();
 
-	void save()
-	{
-		initialize();
+	QFile file(filename);
+	file.open(QIODevice::WriteOnly);
+	file.write(p.dump().c_str());
+	file.close();
 
-		json p = settings.value();
+	postinitialize();
+}
 
-		QFile file(filename);
-		file.open(QIODevice::WriteOnly);
-		file.write(p.dump().c_str());
-		file.close();
+void AyuGramSettings::set_sendReadMessages(bool val)
+{
+	sendReadMessages = val;
+	sendReadMessagesReactive = val;
+}
 
-		postinitialize();
-	}
+void AyuGramSettings::set_sendReadStories(bool val)
+{
+	sendReadStories = val;
+	sendReadStoriesReactive = val;
+}
 
-	void AyuGramSettings::set_sendReadMessages(bool val)
-	{
-		sendReadMessages = val;
-		sendReadMessagesReactive = val;
-	}
+void AyuGramSettings::set_sendOnlinePackets(bool val)
+{
+	sendOnlinePackets = val;
+	sendOnlinePacketsReactive = val;
+}
 
-	void AyuGramSettings::set_sendReadStories(bool val)
-	{
-		sendReadStories = val;
-		sendReadStoriesReactive = val;
-	}
+void AyuGramSettings::set_sendUploadProgress(bool val)
+{
+	sendUploadProgress = val;
+	sendUploadProgressReactive = val;
+}
 
-	void AyuGramSettings::set_sendOnlinePackets(bool val)
-	{
-		sendOnlinePackets = val;
-		sendOnlinePacketsReactive = val;
-	}
+void AyuGramSettings::set_sendOfflinePacketAfterOnline(bool val)
+{
+	sendOfflinePacketAfterOnline = val;
+	sendOfflinePacketAfterOnlineReactive = val;
+}
 
-	void AyuGramSettings::set_sendUploadProgress(bool val)
-	{
-		sendUploadProgress = val;
-		sendUploadProgressReactive = val;
-	}
+void AyuGramSettings::set_ghostModeEnabled(bool val)
+{
+	set_sendReadMessages(!val);
+	set_sendReadStories(!val);
+	set_sendOnlinePackets(!val);
+	set_sendUploadProgress(!val);
+	set_sendOfflinePacketAfterOnline(val);
+}
 
-	void AyuGramSettings::set_sendOfflinePacketAfterOnline(bool val)
-	{
-		sendOfflinePacketAfterOnline = val;
-		sendOfflinePacketAfterOnlineReactive = val;
-	}
+void AyuGramSettings::set_markReadAfterSend(bool val)
+{
+	markReadAfterSend = val;
+}
 
-	void AyuGramSettings::set_ghostModeEnabled(bool val)
-	{
-		set_sendReadMessages(!val);
-		set_sendReadStories(!val);
-		set_sendOnlinePackets(!val);
-		set_sendUploadProgress(!val);
-		set_sendOfflinePacketAfterOnline(val);
-	}
+void AyuGramSettings::set_useScheduledMessages(bool val)
+{
+	useScheduledMessages = val;
+}
 
-	void AyuGramSettings::set_markReadAfterSend(bool val)
-	{
-		markReadAfterSend = val;
-	}
+void AyuGramSettings::set_keepDeletedMessages(bool val)
+{
+	saveDeletedMessages = val;
+}
 
-	void AyuGramSettings::set_useScheduledMessages(bool val)
-	{
-		useScheduledMessages = val;
-	}
+void AyuGramSettings::set_keepMessagesHistory(bool val)
+{
+	saveMessagesHistory = val;
+}
 
-	void AyuGramSettings::set_keepDeletedMessages(bool val)
-	{
-		saveDeletedMessages = val;
-	}
+void AyuGramSettings::set_disableAds(bool val)
+{
+	disableAds = val;
+}
 
-	void AyuGramSettings::set_keepMessagesHistory(bool val)
-	{
-		saveMessagesHistory = val;
-	}
+void AyuGramSettings::set_disableStories(bool val)
+{
+	disableStories = val;
+}
 
-	void AyuGramSettings::set_disableAds(bool val)
-	{
-		disableAds = val;
-	}
+void AyuGramSettings::set_localPremium(bool val)
+{
+	localPremium = val;
+}
 
-	void AyuGramSettings::set_disableStories(bool val)
-	{
-		disableStories = val;
-	}
+void AyuGramSettings::set_copyUsernameAsLink(bool val)
+{
+	copyUsernameAsLink = val;
+}
 
-	void AyuGramSettings::set_localPremium(bool val)
-	{
-		localPremium = val;
-	}
+void AyuGramSettings::set_appIcon(QString val)
+{
+	appIcon = std::move(val);
+}
 
-	void AyuGramSettings::set_copyUsernameAsLink(bool val)
-	{
-		copyUsernameAsLink = val;
-	}
+void AyuGramSettings::set_deletedMark(QString val)
+{
+	deletedMark = std::move(val);
+	deletedMarkReactive = deletedMark;
+}
 
-	void AyuGramSettings::set_appIcon(QString val)
-	{
-		appIcon = std::move(val);
-	}
+void AyuGramSettings::set_editedMark(QString val)
+{
+	editedMark = std::move(val);
+	editedMarkReactive = editedMark;
+}
 
-	void AyuGramSettings::set_deletedMark(QString val)
-	{
-		deletedMark = std::move(val);
-		deletedMarkReactive = deletedMark;
-	}
+void AyuGramSettings::set_recentStickersCount(int val)
+{
+	recentStickersCount = val;
+}
 
-	void AyuGramSettings::set_editedMark(QString val)
-	{
-		editedMark = std::move(val);
-		editedMarkReactive = editedMark;
-	}
+void AyuGramSettings::set_showGhostToggleInDrawer(bool val)
+{
+	showGhostToggleInDrawer = val;
+}
 
-	void AyuGramSettings::set_recentStickersCount(int val)
-	{
-		recentStickersCount = val;
-	}
+void AyuGramSettings::set_showPeerId(int val)
+{
+	showPeerId = val;
+	showPeerIdReactive = val;
+}
 
-	void AyuGramSettings::set_showGhostToggleInDrawer(bool val)
-	{
-		showGhostToggleInDrawer = val;
-	}
+void AyuGramSettings::set_showMessageSeconds(bool val)
+{
+	showMessageSeconds = val;
+}
 
-	void AyuGramSettings::set_showPeerId(int val)
-	{
-		showPeerId = val;
-		showPeerIdReactive = val;
-	}
+void AyuGramSettings::set_hideAllChatsFolder(bool val)
+{
+	hideAllChatsFolder = val;
+}
 
-	void AyuGramSettings::set_showMessageSeconds(bool val)
-	{
-		showMessageSeconds = val;
-	}
+void AyuGramSettings::set_stickerConfirmation(bool val)
+{
+	stickerConfirmation = val;
+}
 
-	void AyuGramSettings::set_hideAllChatsFolder(bool val)
-	{
-		hideAllChatsFolder = val;
-	}
+void AyuGramSettings::set_gifConfirmation(bool val)
+{
+	gifConfirmation = val;
+}
 
-	void AyuGramSettings::set_stickerConfirmation(bool val)
-	{
-		stickerConfirmation = val;
-	}
+void AyuGramSettings::set_voiceConfirmation(bool val)
+{
+	voiceConfirmation = val;
+}
 
-	void AyuGramSettings::set_gifConfirmation(bool val)
-	{
-		gifConfirmation = val;
-	}
+bool get_ghostModeEnabled()
+{
+	return ghostModeEnabled.current();
+}
 
-	void AyuGramSettings::set_voiceConfirmation(bool val)
-	{
-		voiceConfirmation = val;
-	}
+rpl::producer<QString> get_deletedMarkReactive()
+{
+	return deletedMarkReactive.value();
+}
 
-	bool get_ghostModeEnabled()
-	{
-		return ghostModeEnabled.current();
-	}
+rpl::producer<QString> get_editedMarkReactive()
+{
+	return editedMarkReactive.value();
+}
 
-	rpl::producer<QString> get_deletedMarkReactive()
-	{
-		return deletedMarkReactive.value();
-	}
+rpl::producer<int> get_showPeerIdReactive()
+{
+	return showPeerIdReactive.value();
+}
 
-	rpl::producer<QString> get_editedMarkReactive()
-	{
-		return editedMarkReactive.value();
-	}
+rpl::producer<bool> get_ghostModeEnabledReactive()
+{
+	return ghostModeEnabled.value();
+}
 
-	rpl::producer<int> get_showPeerIdReactive()
-	{
-		return showPeerIdReactive.value();
-	}
-
-	rpl::producer<bool> get_ghostModeEnabledReactive()
-	{
-		return ghostModeEnabled.value();
-	}
 }

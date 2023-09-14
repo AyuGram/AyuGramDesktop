@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "base/timer.h"
@@ -14,14 +13,14 @@
 class EditEditedMarkBox : public Ui::BoxContent
 {
 public:
-	EditEditedMarkBox(QWidget*);
+	EditEditedMarkBox(QWidget *);
 
 protected:
 	void setInnerFocus() override;
 
 	void prepare() override;
 
-	void resizeEvent(QResizeEvent* e) override;
+	void resizeEvent(QResizeEvent *e) override;
 
 private:
 	void submit();

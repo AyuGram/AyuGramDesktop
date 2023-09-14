@@ -4,44 +4,45 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #pragma once
 
 #include "ayu_settings.h"
 
 namespace AyuState
 {
-	namespace
-	{
-		class AyuStateVariable
-		{
-		public:
-			bool val;
-			int resetAfter;
-		};
 
-		AyuStateVariable allowSendReadPacket;
+namespace
+{
 
-		bool processVariable(AyuStateVariable& variable)
-		{
-			if (variable.resetAfter == -1)
-			{
-				return variable.val;
-			}
+class AyuStateVariable
+{
+public:
+	bool val;
+	int resetAfter;
+};
 
-			variable.resetAfter -= 1;
-			auto val = variable.val;
+AyuStateVariable allowSendReadPacket;
 
-			if (variable.resetAfter == 0)
-			{
-				variable.val = false;
-			}
-
-			return val;
-		}
+bool processVariable(AyuStateVariable &variable)
+{
+	if (variable.resetAfter == -1) {
+		return variable.val;
 	}
 
-	void setAllowSendReadPacket(bool val, int resetAfter = 1);
+	variable.resetAfter -= 1;
+	auto val = variable.val;
 
-	bool getAllowSendPacket();
+	if (variable.resetAfter == 0) {
+		variable.val = false;
+	}
+
+	return val;
+}
+
+}
+
+void setAllowSendReadPacket(bool val, int resetAfter = 1);
+
+bool getAllowSendPacket();
+
 }

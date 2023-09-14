@@ -20,14 +20,11 @@
 #include "history/history_item.h"
 
 
-Main::Session* getSession(ID userId)
+Main::Session *getSession(ID userId)
 {
-	for (const auto& [index, account] : Core::App().domain().accounts())
-	{
-		if (const auto session = account->maybeSession())
-		{
-			if (session->userId().bare == userId)
-			{
+	for (const auto &[index, account] : Core::App().domain().accounts()) {
+		if (const auto session = account->maybeSession()) {
+			if (session->userId().bare == userId) {
 				return session;
 			}
 		}
@@ -54,62 +51,56 @@ void dispatchToMainThread(std::function<void()> callback)
 	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, 0));
 }
 
-not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session* session)
+not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session)
 {
-	if (dialogId > 0)
-	{
+	if (dialogId > 0) {
 		return session->data().history(peerFromUser(dialogId));
 	}
 
 	auto history = session->data().history(peerFromChannel(abs(dialogId)));
-	if (history->folderKnown())
-	{
+	if (history->folderKnown()) {
 		return history;
 	}
 
 	return session->data().history(peerFromChat(abs(dialogId)));
 }
 
-ID getDialogIdFromPeer(not_null<PeerData*> peer)
+ID getDialogIdFromPeer(not_null<PeerData *> peer)
 {
 	auto peerId = peerIsUser(peer->id)
-		              ? peerToUser(peer->id).bare
-		              : peerIsChat(peer->id)
-		              ? peerToChat(peer->id).bare
-		              : peerIsChannel(peer->id)
-		              ? peerToChannel(peer->id).bare
-		              : peer->id.value;
+				  ? peerToUser(peer->id).bare
+				  : peerIsChat(peer->id)
+					? peerToChat(peer->id).bare
+					: peerIsChannel(peer->id)
+					  ? peerToChannel(peer->id).bare
+					  : peer->id.value;
 
-	if (peer->isChannel() || peer->isChat())
-	{
+	if (peer->isChannel() || peer->isChat()) {
 		peerId = -peerId;
 	}
 
 	return peerId;
 }
 
-std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem*> item)
+std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item)
 {
-	if (item->emptyText())
-	{
+	if (item->emptyText()) {
 		return std::make_pair("", "");
 	}
 
 	auto textWithEntities = item->originalText();
 	auto text = textWithEntities.text.toStdString();
 	auto entities = EntitiesToMTP(&item->history()->owner().session(), textWithEntities.entities,
-	                              Api::ConvertOption::SkipLocal);
+								  Api::ConvertOption::SkipLocal);
 
-	if (entities.v.isEmpty())
-	{
+	if (entities.v.isEmpty()) {
 		return std::make_pair(text, "");
 	}
 
 	auto buff = mtpBuffer();
-	for (auto entity : entities.v)
-	{
+	for (auto entity : entities.v) {
 		entity.write(buff);
 	}
 
-	return std::make_pair(text, std::string(reinterpret_cast<char*>(buff.data()), buff.size()));
+	return std::make_pair(text, std::string(reinterpret_cast<char *>(buff.data()), buff.size()));
 }
