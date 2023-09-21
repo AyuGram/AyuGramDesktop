@@ -83,18 +83,10 @@
 namespace AyuUi
 {
 
-class AyuPopupMenu
-{
-public:
-	AyuPopupMenu(HistoryInner *parent);
+void AddHistoryAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
 
-	void addHistoryAction(HistoryItem *item);
+void AddHideMessageAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
 
-	void addHideMessageAction(HistoryItem *item) const;
-
-	void addReadUntilAction(HistoryItem *item) const;
-
-	std::unique_ptr<Ui::PopupMenu> _ayuSubMenu;
-};
+void AddReadUntilAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
 
 }

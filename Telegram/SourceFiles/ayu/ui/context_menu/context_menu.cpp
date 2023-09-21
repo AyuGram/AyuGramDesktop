@@ -21,26 +21,22 @@
 namespace AyuUi
 {
 
-AyuPopupMenu::AyuPopupMenu(HistoryInner *parent)
-{
-	_ayuSubMenu = std::make_unique<Ui::PopupMenu>(parent, st::popupMenuWithIcons);
-}
-
-void AyuPopupMenu::addHistoryAction(HistoryItem *item)
+void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 {
 	if (AyuMessages::getInstance().hasRevisions(item)) {
-		_ayuSubMenu->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
+		menu->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
 		{
-			item->history()->session().tryResolveWindow()->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
+			item->history()->session().tryResolveWindow()
+				->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
 		}, &st::menuIconInfo);
 	}
 }
 
-void AyuPopupMenu::addHideMessageAction(HistoryItem *item) const
+void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 {
 	const auto settings = &AyuSettings::getInstance();
 	const auto history = item->history();
-	_ayuSubMenu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
+	menu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
 	{
 		const auto initSaveDeleted = settings->saveDeletedMessages;
 
@@ -50,10 +46,15 @@ void AyuPopupMenu::addHideMessageAction(HistoryItem *item) const
 	}, &st::menuIconClear);
 }
 
-void AyuPopupMenu::addReadUntilAction(HistoryItem *item) const
+void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 {
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->sendReadMessages) {
+		return;
+	}
+
 	const auto history = item->history();
-	_ayuSubMenu->addAction(tr::ayu_ReadUntilMenuText(tr::now), [=]()
+	menu->addAction(tr::ayu_ReadUntilMenuText(tr::now), [=]()
 	{
 		AyuState::setAllowSendReadPacket(true);
 		history->session().data().histories().readInboxOnNewMessage(item);

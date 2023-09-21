@@ -2468,32 +2468,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				Window::ToggleMessagePinned(controller, pinItemId, !isPinned);
 			}), isPinned ? &st::menuIconUnpin : &st::menuIconPin);
 		}
-		if (!item->isService()
-			&& peerIsChannel(itemId.peer)
-			&& !_peer->isMegagroup()) {
-			constexpr auto kMinViewsCount = 10;
-			if (const auto channel = _peer->asChannel()) {
-				if ((channel->flags() & ChannelDataFlag::CanGetStatistics)
-					|| (channel->canPostMessages()
-						&& item->viewsCount() >= kMinViewsCount)) {
-					auto callback = crl::guard(controller, [=] {
-						controller->showSection(
-							Info::Statistics::Make(channel, itemId, {}));
-					});
-					_menu->addAction(
-						tr::lng_stats_title(tr::now),
-						std::move(callback),
-						&st::menuIconStats);
-				}
-			}
-		}
-        // ayu context menu options
-        auto ayuSubMenu = AyuUi::AyuPopupMenu(this);
-        ayuSubMenu.addHistoryAction(item);
-        ayuSubMenu.addHideMessageAction(item);
-        ayuSubMenu.addReadUntilAction(item);
-
-        _menu->addAction(QString("Ayu"), std::move(ayuSubMenu._ayuSubMenu), &st::ayuMenuIcon, &st::ayuMenuIcon);
+		AyuUi::AddHistoryAction(_menu, item);
+		AyuUi::AddHideMessageAction(_menu, item);
 	};
 	const auto addPhotoActions = [&](not_null<PhotoData*> photo, HistoryItem *item) {
 		const auto media = photo->activeMediaView();
@@ -2711,6 +2687,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					&st::menuIconSelect);
 			}();
 		}
+
+		AyuUi::AddReadUntilAction(_menu, item);
 	};
 
 	const auto addReplyAction = [&](HistoryItem *item) {

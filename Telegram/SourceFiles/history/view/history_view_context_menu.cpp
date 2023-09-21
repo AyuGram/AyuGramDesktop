@@ -96,12 +96,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
 #include "ayu/messages/ayu_messages_controller.h"
+#include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/ui/boxes/message_history_box.h"
 #include "ayu/ui/sections/edited/edited_log_section.h"
+
 
 namespace HistoryView {
 namespace {
@@ -1041,6 +1044,11 @@ void AddMessageActions(
 		not_null<Ui::PopupMenu*> menu,
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
+	if (request.item) {
+		AyuUi::AddHistoryAction(menu, request.item);
+		AyuUi::AddHideMessageAction(menu, request.item);
+	}
+
 	AddPostLinkAction(menu, request);
 	AddForwardAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
@@ -1049,6 +1057,11 @@ void AddMessageActions(
 	AddReportAction(menu, request, list);
 	AddSelectionAction(menu, request, list);
 	AddRescheduleAction(menu, request, list);
+
+	if (request.item)
+	{
+		AyuUi::AddReadUntilAction(menu, request.item);
+	}
 }
 
 void AddCopyLinkAction(
@@ -1384,28 +1397,6 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 				}, &st::menuIconTranslate);
 			}
 		}
-	}
-
-	if (item)
-	{
-		if (AyuMessages::getInstance().hasRevisions(item))
-		{
-			result->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
-			{
-				item->history()->session().tryResolveWindow()->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
-			}, &st::menuIconInfo);
-		}
-
-		const auto settings = &AyuSettings::getInstance();
-		const auto history = item->history();
-		result->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
-		{
-			const auto initKeepDeleted = settings->saveDeletedMessages;
-
-			settings->set_keepDeletedMessages(false);
-			history->destroyMessage(item);
-			settings->set_keepDeletedMessages(initKeepDeleted);
-		}, &st::menuIconClear);
 	}
 
 	if (!view || !list->hasCopyRestriction(view->data())) {
