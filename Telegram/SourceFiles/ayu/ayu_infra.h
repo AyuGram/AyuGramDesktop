@@ -6,14 +6,9 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "lottie/lottie_icon.h"
-#include "ayu/ayu_lottie.h"
-
-namespace AyuUi
+namespace AyuInfra
 {
 
-class AyuLottieImpl : public AyuLottie {
-	std::unique_ptr<Lottie::Icon> getLottie(const QString &text) override;
-};
+void init();
 
 }

@@ -105,6 +105,8 @@ PRIVATE
     ayu/ayu_settings.h
     ayu/ayu_lang.cpp
     ayu/ayu_lang.h
+    ayu/ayu_infra.cpp
+    ayu/ayu_infra.h
     ayu/ayu_constants.h
     ayu/utils/ayu_mapper.cpp
     ayu/utils/ayu_mapper.h
