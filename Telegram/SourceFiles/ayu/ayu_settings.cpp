@@ -6,16 +6,19 @@
 // Copyright @Radolyn, 2023
 
 #include "ayu_settings.h"
+
 #include "rpl/lifetime.h"
 #include "rpl/producer.h"
 #include "rpl/variable.h"
+
+#include <fstream>
 
 using json = nlohmann::json;
 
 namespace AyuSettings
 {
 
-const QString filename = "tdata/ayu_settings.json";
+const std::string filename = "tdata/ayu_settings.json";
 
 std::optional<AyuGramSettings> settings = std::nullopt;
 
@@ -130,16 +133,17 @@ AyuGramSettings &getInstance()
 
 void load()
 {
-	QFile file(filename);
-	if (!file.exists()) {
+	std::ifstream file(filename);
+	if (!file.good()) {
 		return;
 	}
-	file.open(QIODevice::ReadOnly);
-	QByteArray data = file.readAll();
-	file.close();
 
 	initialize();
-	json p = json::parse(data);
+
+	json p;
+	file >> p;
+	file.close();
+
 	try {
 		settings = p.get<AyuGramSettings>();
 	}
@@ -155,9 +159,9 @@ void save()
 
 	json p = settings.value();
 
-	QFile file(filename);
-	file.open(QIODevice::WriteOnly);
-	file.write(p.dump().c_str());
+	std::ofstream file;
+	file.open(filename);
+	file << p.dump(4);
 	file.close();
 
 	postinitialize();

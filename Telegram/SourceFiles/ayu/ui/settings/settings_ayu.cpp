@@ -47,8 +47,6 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
-constexpr auto GhostModeOptionsCount = 5;
-
 class PainterHighQualityEnabler;
 
 const char kStreamerMode[] =
@@ -160,17 +158,19 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 									(s.height() - checkWidget->height()) / 2);
 							}, toggleButton->lifetime());
 	}
+
+	const auto totalInnerChecks = state->innerChecks.size();
+
 	state->anyChanges.events_starting_with(
 		rpl::empty_value()
 	) | rpl::map(countChecked) | start_with_next([=](int count)
 												 {
-													 checkView->setChecked(count == GhostModeOptionsCount,
+													 checkView->setChecked(count == totalInnerChecks,
 																		   anim::type::normal);
 												 }, toggleButton->lifetime());
 	checkView->setLocked(locked.has_value());
 	checkView->finishAnimating();
 
-	const auto totalInnerChecks = state->innerChecks.size();
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
 		button,
 		combine(
@@ -344,11 +344,8 @@ void Ayu::AddPlatformOption(
 	}
 }
 
-void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
-{
+void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
-
-	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
 
 	const auto widget = object_ptr<Ui::VerticalLayout>(this);
 
@@ -372,7 +369,7 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 					label,
 					isCheckedOrig,
 					st::settingsCheckbox),
-				st::rightsButton.padding);
+				st::powerSavingButton.padding);
 			const auto button = Ui::CreateChild<Ui::RippleButton>(
 				verticalLayout.get(),
 				st::defaultRippleAnimation);
@@ -467,7 +464,7 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 	raw->hide(anim::type::instant);
 	AddInnerToggle(
 		container,
-		st::rightsButton,
+		st::powerSavingButtonNoIcon,
 		innerChecks,
 		raw,
 		tr::ayu_GhostModeToggle(),
@@ -479,22 +476,136 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 						{
 							raw->resizeToWidth(w);
 						}, raw->lifetime());
+}
 
-	AddButton(
+void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	const auto widget = object_ptr<Ui::VerticalLayout>(this);
+
+	widget->add(
+		object_ptr<Ui::FlatLabel>(
+			container,
+			tr::ayu_MarkReadAfterAction(),
+			st::rightsHeaderLabel),
+		st::rightsHeaderMargin);
+
+	const auto addCheckbox = [&](
+		not_null<Ui::VerticalLayout *> verticalLayout,
+		const QString &label,
+		const bool isCheckedOrig)
+	{
+		const auto checkView = [&]() -> not_null<Ui::AbstractCheckView *>
+		{
+			const auto checkbox = verticalLayout->add(
+				object_ptr<Ui::Checkbox>(
+					verticalLayout,
+					label,
+					isCheckedOrig,
+					st::settingsCheckbox),
+				st::powerSavingButton.padding);
+			const auto button = Ui::CreateChild<Ui::RippleButton>(
+				verticalLayout.get(),
+				st::defaultRippleAnimation);
+			button->stackUnder(checkbox);
+			combine(
+				verticalLayout->widthValue(),
+				checkbox->geometryValue()
+			) | start_with_next([=](int w, const QRect &r)
+								{
+									button->setGeometry(0, r.y(), w, r.height());
+								}, button->lifetime());
+			checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+			const auto checkView = checkbox->checkView();
+			button->setClickedCallback([=]
+									   {
+										   checkView->setChecked(
+											   !checkView->checked(),
+											   anim::type::normal);
+									   });
+
+			return checkView;
+		}();
+		checkView->checkedChanges(
+		) | start_with_next([=](bool checked)
+							{
+							}, verticalLayout->lifetime());
+
+		return checkView;
+	};
+
+	struct NestedEntry
+	{
+		QString checkboxLabel;
+		bool initial;
+		std::function<void(bool)> callback;
+	};
+
+	std::vector checkboxes{
+		NestedEntry{
+			tr::ayu_MarkReadAfterSend(tr::now), false, [=](bool enabled)
+			{
+//				settings->set_sendReadMessages(!enabled);
+//				AyuSettings::save();
+			}
+		},
+		NestedEntry{
+			tr::ayu_MarkReadAfterReaction(tr::now), false, [=](bool enabled)
+			{
+//				settings->set_sendReadStories(!enabled);
+//				AyuSettings::save();
+			}
+		},
+		NestedEntry{
+			tr::ayu_MarkReadAfterPoll(tr::now), false, [=](bool enabled)
+			{
+//				settings->set_sendOnlinePackets(!enabled);
+//				AyuSettings::save();
+			}
+		},
+	};
+
+	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 		container,
-		tr::ayu_MarkReadAfterSend(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->markReadAfterSend)
-	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->markReadAfterSend);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_markReadAfterSend(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+		object_ptr<Ui::VerticalLayout>(container));
+	const auto verticalLayout = wrap->entity();
+	auto innerChecks = std::vector<not_null<Ui::AbstractCheckView *>>();
+	for (const auto &entry : checkboxes) {
+		const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
+		c->checkedValue(
+		) | start_with_next([=](bool enabled)
+							{
+								entry.callback(enabled);
+							}, container->lifetime());
+		innerChecks.push_back(c);
+	}
+
+	const auto raw = wrap.data();
+	raw->hide(anim::type::instant);
+	AddInnerToggle(
+		container,
+		st::powerSavingButtonNoIcon,
+		innerChecks,
+		raw,
+		tr::ayu_MarkReadAfterAction(),
+		std::nullopt,
+		{});
+	container->add(std::move(wrap));
+	container->widthValue(
+	) | start_with_next([=](int w)
+						{
+							raw->resizeToWidth(w);
+						}, raw->lifetime());
+}
+
+void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
+{
+	auto settings = &AyuSettings::getInstance();
+
+	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
+
+	SetupGhostModeToggle(container);
+	SetupReadAfterActionToggle(container);
 
 	AddButton(
 		container,

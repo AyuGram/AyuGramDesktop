@@ -38,6 +38,10 @@ private:
 		base::options::option<bool> &option,
 		rpl::producer<> resetClicks);
 
+	void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container);
+
+	void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container);
+
 	void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container);
 
 	void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container);

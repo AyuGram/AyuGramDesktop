@@ -145,7 +145,7 @@ public:
 	void set_voiceConfirmation(bool val);
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	AyuGramSettings,
 	sendReadMessages,
 	sendReadStories,
