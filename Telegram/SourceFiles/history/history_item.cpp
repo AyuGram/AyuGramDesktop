@@ -268,7 +268,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 		});
 	}, [&](const MTPDmessageMediaPhoto &media) -> Result {
 		const auto photo = media.vphoto();
-		if (media.vttl_seconds()) {
+		if (media.vttl_seconds() && false) {  // AyuGram: show expiring messages
 			LOG(("App Error: "
 				"Unexpected MTPMessageMediaPhoto "
 				"with ttl_seconds in CreateMedia."));
@@ -426,9 +426,7 @@ HistoryItem::HistoryItem(
 		setServiceText({
 			tr::lng_message_empty(tr::now, Ui::Text::WithEntities)
 		});
-	} else if ((checked == MediaCheckResult::HasUnsupportedTimeToLive)
-			|| (checked == MediaCheckResult::HasExpiredMediaTimeToLive)) {
-		createServiceFromMtp(data);
+	} else if (checked == MediaCheckResult::HasTimeToLive && false) { // AyuGram: show ex		createServiceFromMtp(data);
 		setReactions(data.vreactions());
 		applyTTL(data);
 	} else if (checked == MediaCheckResult::HasStoryMention) {
@@ -440,6 +438,22 @@ HistoryItem::HistoryItem(
 		createComponents(data);
 		if (const auto media = data.vmedia()) {
 			setMedia(*media);
+			if (checked == MediaCheckResult::HasTimeToLive) {
+				media->match([&](const MTPDmessageMediaPhoto &media) {
+					auto time = media.vttl_seconds()->v;
+					setAyuHint("🕓 " + QString::number(time) + "s");
+				}, [&](const MTPDmessageMediaDocument &media) {
+					auto time = media.vttl_seconds()->v;
+					setAyuHint("🕓 " + QString::number(time) + "s");
+				}, [&](const MTPDmessageMediaWebPage &media) {
+				}, [&](const MTPDmessageMediaGame &media) {
+				}, [&](const MTPDmessageMediaInvoice &media) {
+				}, [&](const MTPDmessageMediaPoll &media) {
+				}, [&](const MTPDmessageMediaDice &media) {
+				}, [&](const MTPDmessageMediaStory &media) {
+				}, [&](const auto &) {
+				});
+			}
 		}
 		auto textWithEntities = TextWithEntities{
 			qs(data.vmessage()),
@@ -3232,12 +3246,7 @@ void HistoryItem::setForwardsCount(int count) {
 	history()->owner().notifyItemDataChange(this);
 }
 
-void HistoryItem::setPostAuthor(const QString &postAuthor) {
-    const auto settings = &AyuSettings::getInstance();
-    if (settings->keepDeletedMessages && !(_flags & MessageFlag::HasPostAuthor)) {
-        _flags |= MessageFlag::HasPostAuthor;
-    }
-
+void HistoryItem::setPostAuthor(const QString &author) {
 	auto msgsigned = Get<HistoryMessageSigned>();
 	if (msgsigned && msgsigned->viaBusinessBot) {
 		return;
@@ -3259,11 +3268,36 @@ void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	msgsigned->isAnonymousRank = !isDiscussionPost()
 		&& this->author()->isMegagroup();
 
-	if (settings->saveDeletedMessages)
+	history()->owner().requestItemResize(this);
+}
+
+void HistoryItem::setAyuHint(const QString &hint) {
+	const auto settings = &AyuSettings::getInstance();
+	if (!(_flags & MessageFlag::HasPostAuthor))
 	{
-		history()->owner().requestItemViewRefresh(this);
+		_flags |= MessageFlag::HasPostAuthor;
 	}
 
+	auto msgsigned = Get<HistoryMessageSigned>();
+	if (hint.isEmpty()) {
+		if (!msgsigned) {
+			return;
+		}
+		RemoveComponents(HistoryMessageSigned::Bit());
+		history()->owner().requestItemResize(this);
+		return;
+	}
+	if (!msgsigned) {
+		AddComponents(HistoryMessageSigned::Bit());
+		msgsigned = Get<HistoryMessageSigned>();
+	} else if (msgsigned->author == hint) {
+		return;
+	}
+	msgsigned->author = hint;
+	msgsigned->isAnonymousRank = !isDiscussionPost()
+		&& this->author()->isMegagroup();
+
+	history()->owner().requestItemViewRefresh(this);
 	history()->owner().requestItemResize(this);
 }
 
