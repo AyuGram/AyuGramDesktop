@@ -85,9 +85,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "ayu/ui/settings/settings_ayu.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/ui/boxes/confirmation_box.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "styles/style_ayu_icons.h"
 
 
@@ -726,7 +727,7 @@ void MainMenu::setupMenu() {
 			settings->set_sendReadMessages(false);
 
 			auto chats = controller->session().data().chatsList();
-			MarkAsReadChatListHack(chats);
+			MarkAsReadChatList(chats);
 
 			settings->set_sendReadMessages(prev);
 		});

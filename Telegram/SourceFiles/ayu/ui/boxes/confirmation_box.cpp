@@ -8,6 +8,7 @@
 #include "confirmation_box.h"
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "styles/style_layers.h"
@@ -60,7 +61,7 @@ void ConfirmationBox::ReadAllPeers()
 	settings->set_sendReadMessages(true);
 
 	auto chats = _controller->session().data().chatsList();
-	Window::MarkAsReadChatListHack(chats);
+	MarkAsReadChatList(chats);
 
 	settings->set_sendReadMessages(prev);
 }

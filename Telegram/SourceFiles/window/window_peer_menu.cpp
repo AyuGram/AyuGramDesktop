@@ -1714,15 +1714,8 @@ void Filler::addToggleFee() {
 
 } // namespace
 
-void PeerMenuExportChat(
-		not_null<Window::SessionController*> controller,
-		not_null<PeerData*> peer) {
-	base::call_delayed(st::defaultPopupMenu.showDuration, [=] {
-		Core::App().exportManager().start(peer);
-	});
-}
-void MarkAsReadChatListHack(not_null<Dialogs::MainList*> list) {
-    MarkAsReadChatList(list);
+void PeerMenuExportChat(not_null<PeerData*> peer) {
+	Core::App().exportManager().start(peer);
 }
 
 void PeerMenuDeleteContact(

@@ -12,6 +12,7 @@
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
+#include "dialogs/dialogs_main_list.h"
 
 Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
@@ -19,3 +20,6 @@ void dispatchToMainThread(std::function<void()> callback);
 not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session);
 ID getDialogIdFromPeer(not_null<PeerData *> peer);
 std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);
+
+void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
+void MarkAsReadThread(not_null<Data::Thread*> thread);
