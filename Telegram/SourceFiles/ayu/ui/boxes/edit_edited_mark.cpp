@@ -21,6 +21,7 @@
 #include "ui/controls/userpic_button.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/special_fields.h"
 
 #include <QtGui/QGuiApplication>
@@ -55,8 +56,10 @@ void EditEditedMarkBox::prepare()
 	addButton(tr::lng_cancel(), [=]
 	{ closeBox(); });
 
-	connect(_text, &Ui::InputField::submitted, [=]
-	{ submit(); });
+	const auto submitted = [=]
+	{ submit(); };
+	_text->submits(
+	) | rpl::start_with_next(submitted, _text->lifetime());
 }
 
 void EditEditedMarkBox::setInnerFocus()

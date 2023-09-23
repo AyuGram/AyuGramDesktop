@@ -7,45 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_main_menu.h"
 
-#include "apiwrap.h"
-#include "base/event_filter.h"
-#include "base/qt_signal_producer.h"
-#include "boxes/about_box.h"
-#include "boxes/peer_list_controllers.h"
-#include "boxes/premium_preview_box.h"
-#include "calls/group/calls_group_common.h"
-#include "calls/calls_box_controller.h"
-#include "calls/calls_instance.h"
-#include "core/application.h"
-#include "core/click_handler_types.h"
-#include "data/data_changes.h"
-#include "data/data_document_media.h"
-#include "data/data_folder.h"
-#include "data/data_group_call.h"
-#include "data/data_session.h"
-#include "data/data_stories.h"
-#include "data/data_user.h"
-#include "info/info_memento.h"
-#include "info/profile/info_profile_badge.h"
-#include "info/profile/info_profile_emoji_status_panel.h"
-#include "info/profile/info_profile_icon.h"
-#include "info/stories/info_stories_widget.h"
-#include "lang/lang_keys.h"
-#include "main/main_account.h"
-#include "main/main_domain.h"
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "mtproto/mtproto_config.h"
-#include "settings/settings_advanced.h"
-#include "settings/settings_calls.h"
-#include "settings/settings_information.h"
-#include "storage/localstorage.h"
-#include "storage/storage_account.h"
-#include "support/support_templates.h"
-#include "tde2e/tde2e_api.h"
-#include "tde2e/tde2e_integration.h"
-#include "ui/boxes/confirm_box.h"
-#include "lang_auto.h"
 #include "window/themes/window_theme.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
@@ -75,7 +36,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h" // infoTopBarMenu
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
-#include "tray.h"
 
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
@@ -90,6 +50,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ui/boxes/confirmation_box.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "styles/style_ayu_icons.h"
+#include "tray.h"
+#include "lang_auto.h"
 
 
 namespace Window {

@@ -9,6 +9,7 @@
 #include "ayu_lang.h"
 #include "ayu/ayu_lottie.h"
 #include "ayu/ui/ayu_lottie.h"
+#include "ayu/database/ayu_database.h"
 #include "lang/lang_instance.h"
 
 namespace AyuInfra
@@ -30,10 +31,15 @@ void initLottie() {
 	AyuUi::setLottieImpl(std::make_shared<AyuUi::AyuLottieImpl>());
 }
 
+void initDatabase() {
+	AyuDatabase::initialize();
+}
+
 void init()
 {
 	initLang();
 	initLottie();
+	initDatabase();
 }
 
 }

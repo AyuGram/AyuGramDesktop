@@ -20,7 +20,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "webrtc/webrtc_device_common.h"
 #include "window/section_widget.h"
 
+// AyuGram includes
 #include "ayu/ayu_settings.h"
+
 
 namespace Core {
 namespace {
@@ -911,7 +913,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	case ScreenCorner::TopRight:
 	case ScreenCorner::BottomRight:
 	case ScreenCorner::BottomLeft:
-	case ScreenCorner::TopCenter:_notificationsCorner = uncheckedNotificationsCorner; break;
+	case ScreenCorner::TopCenter: _notificationsCorner = uncheckedNotificationsCorner; break;
 	}
 	_includeMutedCounter = (includeMutedCounter == 1);
 	_includeMutedCounterFolders = (includeMutedCounterFolders == 1);
