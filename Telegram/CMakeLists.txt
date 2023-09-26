@@ -142,6 +142,8 @@ PRIVATE
     ayu/ui/boxes/edit_deleted_mark.h
     ayu/ui/boxes/edit_edited_mark.cpp
     ayu/ui/boxes/edit_edited_mark.h
+    ayu/ui/boxes/font_selector.cpp
+    ayu/ui/boxes/font_selector.h
     ayu/sync/ayu_sync_controller.cpp
     ayu/sync/ayu_sync_controller.h
     ayu/sync/models.h

@@ -273,6 +273,16 @@ void AyuGramSettings::set_showGhostToggleInDrawer(bool val)
 	showGhostToggleInDrawer = val;
 }
 
+void AyuGramSettings::set_commonFont(QString val)
+{
+	commonFont = val;
+}
+
+void AyuGramSettings::set_monoFont(QString val)
+{
+	monoFont = val;
+}
+
 void AyuGramSettings::set_showPeerId(int val)
 {
 	showPeerId = val;
