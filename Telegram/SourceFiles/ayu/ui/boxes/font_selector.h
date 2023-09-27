@@ -1,17 +1,9 @@
+// This is the source code of AyuGram for Desktop.
 //
-// Created by MaxPlays on 12/09/2023.
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
 //
-
-#ifndef TELEGRAM_FONT_SELECTOR_H
-#define TELEGRAM_FONT_SELECTOR_H
-
-/*
-This file is part of Telegram Desktop,
-the official desktop application for the Telegram messaging service.
-
-For license and copyright information please follow this link:
-https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
-*/
+// Copyright @Radolyn, 2023
 #pragma once
 
 #include "lang/lang_cloud_manager.h"
@@ -36,10 +28,12 @@ namespace Window
 class SessionController;
 
 } // namespace Window
+
+
 namespace AyuUi
 {
 
-class FontSelectorBox: public Ui::BoxContent
+class FontSelectorBox : public Ui::BoxContent
 {
 public:
 	FontSelectorBox(QWidget *, Window::SessionController *controller, Fn<void(QString font)> hook);
@@ -69,5 +63,3 @@ private:
 };
 
 }
-
-#endif //TELEGRAM_FONT_SELECTOR_H

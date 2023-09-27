@@ -1,13 +1,28 @@
 <RCC>
     <qresource prefix="/gui">
-        <file alias="art/ayu/default/logo256.png">../../art/ayu/default/logo256.png</file>
-        <file alias="art/ayu/default/logo256_no_margin.png">../../art/ayu/default/logo256_no_margin.png</file>
-        <file alias="art/ayu/default/logo256_no_margin.ico">../../art/ayu/default/logo256_no_margin.ico</file>
-        <file alias="art/ayu/alt/logo256.png">../../art/ayu/alt/logo256.png</file>
-        <file alias="art/ayu/alt/logo256_no_margin.png">../../art/ayu/alt/logo256_no_margin.png</file>
-        <file alias="art/ayu/alt/logo256_no_margin.ico">../../art/ayu/alt/logo256_no_margin.ico</file>
-        <file alias="art/ayu/nothing/logo256.png">../../art/ayu/nothing/logo256.png</file>
-        <file alias="art/ayu/nothing/logo256_no_margin.png">../../art/ayu/nothing/logo256_no_margin.png</file>
-        <file alias="art/ayu/nothing/logo256_no_margin.ico">../../art/ayu/nothing/logo256_no_margin.ico</file>
+        <file alias="art/ayu/alt/app.png">../../art/ayu/alt/app.png</file>
+        <file alias="art/ayu/alt/app_preview.png">../../art/ayu/alt/app_preview.png</file>
+        <file alias="art/ayu/alt/app_icon.ico">../../art/ayu/alt/app_icon.ico</file>
+        <file alias="art/ayu/bard/app.png">../../art/ayu/bard/app.png</file>
+        <file alias="art/ayu/bard/app_preview.png">../../art/ayu/bard/app_preview.png</file>
+        <file alias="art/ayu/bard/app_icon.ico">../../art/ayu/bard/app_icon.ico</file>
+        <file alias="art/ayu/default/app.png">../../art/ayu/default/app.png</file>
+        <file alias="art/ayu/default/app_preview.png">../../art/ayu/default/app_preview.png</file>
+        <file alias="art/ayu/default/app_icon.ico">../../art/ayu/default/app_icon.ico</file>
+        <file alias="art/ayu/discord/app.png">../../art/ayu/discord/app.png</file>
+        <file alias="art/ayu/discord/app_preview.png">../../art/ayu/discord/app_preview.png</file>
+        <file alias="art/ayu/discord/app_icon.ico">../../art/ayu/discord/app_icon.ico</file>
+        <file alias="art/ayu/extera/app.png">../../art/ayu/extera/app.png</file>
+        <file alias="art/ayu/extera/app_preview.png">../../art/ayu/extera/app_preview.png</file>
+        <file alias="art/ayu/extera/app_icon.ico">../../art/ayu/extera/app_icon.ico</file>
+        <file alias="art/ayu/nothing/app.png">../../art/ayu/nothing/app.png</file>
+        <file alias="art/ayu/nothing/app_preview.png">../../art/ayu/nothing/app_preview.png</file>
+        <file alias="art/ayu/nothing/app_icon.ico">../../art/ayu/nothing/app_icon.ico</file>
+        <file alias="art/ayu/spotify/app.png">../../art/ayu/spotify/app.png</file>
+        <file alias="art/ayu/spotify/app_preview.png">../../art/ayu/spotify/app_preview.png</file>
+        <file alias="art/ayu/spotify/app_icon.ico">../../art/ayu/spotify/app_icon.ico</file>
+        <file alias="art/ayu/yaplus/app.png">../../art/ayu/yaplus/app.png</file>
+        <file alias="art/ayu/yaplus/app_preview.png">../../art/ayu/yaplus/app_preview.png</file>
+        <file alias="art/ayu/yaplus/app_icon.ico">../../art/ayu/yaplus/app_icon.ico</file>
     </qresource>
 </RCC>

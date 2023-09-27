@@ -1,14 +1,10 @@
+// This is the source code of AyuGram for Desktop.
 //
-// Created by MaxPlays on 12/09/2023.
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
 //
-/*
-This file is part of Telegram Desktop,
-the official desktop application for the Telegram messaging service.
-
-For license and copyright information please follow this link:
-https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
-*/
-#include "boxes/language_box.h"
+// Copyright @Radolyn, 2023
+#include "font_selector.h"
 
 #include "data/data_peer_values.h"
 #include "ui/widgets/checkbox.h"
@@ -41,7 +37,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_passport.h"
 #include "styles/style_chat_helpers.h"
-#include "font_selector.h"
 
 #include <QtGui/QGuiApplication>
 #include <QFontDatabase>
@@ -58,7 +53,7 @@ struct Font
 namespace AyuUi
 {
 
-class Rows: public Ui::RpWidget
+class Rows : public Ui::RpWidget
 {
 public:
 	Rows(
@@ -229,7 +224,7 @@ private:
 
 };
 
-class Content: public Ui::RpWidget
+class Content : public Ui::RpWidget
 {
 public:
 	Content(
@@ -263,7 +258,7 @@ std::vector<Font> PrepareFonts()
 	auto fonts = std::vector<Font>();
 	QFontDatabase base;
 
-	for (const auto &font: base.families()) {
+	for (const auto &font : base.families()) {
 		Font fontItem = {
 			.FontName=font,
 			.id=font
@@ -289,7 +284,7 @@ Rows::Rows(
 		Qt::LayoutDirectionAuto
 	};
 	_rows.reserve(data.size());
-	for (const auto &item: data) {
+	for (const auto &item : data) {
 		_rows.push_back(Row{item});
 		auto &row = _rows.back();
 		row.check = std::make_unique<Ui::RadioView>(
@@ -448,7 +443,7 @@ void Rows::mouseReleaseEvent(QMouseEvent *e)
 				 {
 					 showMenu(data.index);
 				 }, [](v::null_t)
-				 {});
+				 { });
 	}
 }
 
@@ -544,14 +539,14 @@ void Rows::filter(const QString &query)
 			const QStringList &haystack,
 			const QString &needle)
 		{
-			for (const auto &item: haystack) {
+			for (const auto &item : haystack) {
 				if (item.startsWith(needle)) {
 					return true;
 				}
 			}
 			return false;
 		};
-		for (const auto &needle: needles) {
+		for (const auto &needle : needles) {
 			if (!find(haystack, needle)) {
 				return true;
 			}
@@ -562,7 +557,7 @@ void Rows::filter(const QString &query)
 	if (!_query.isEmpty()) {
 		_filtered.clear();
 		_filtered.reserve(_rows.size());
-		for (auto &row: _rows) {
+		for (auto &row : _rows) {
 			if (!skip(row.keywords, _query)) {
 				_filtered.push_back(&row);
 			}
@@ -617,7 +612,7 @@ rpl::producer<Font> Rows::activations() const
 
 void Rows::changeChosen(const QString &chosen)
 {
-	for (const auto &row: _rows) {
+	for (const auto &row : _rows) {
 		row.check->setChecked(row.data.id == chosen, anim::type::normal);
 	}
 }
@@ -871,12 +866,12 @@ void Content::setupContent(
 {
 	using namespace rpl::mappers;
 
-	const auto current = AyuFonts::getCommonFont();
+	const auto current = AyuFonts::getMainFont();
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 	const auto add = [&](const std::vector<Font> &list)
 	{
 		if (list.empty()) {
-			return (Rows *) nullptr;
+			return (Rows *)nullptr;
 		}
 		const auto wrap = content->add(
 			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
@@ -1105,7 +1100,7 @@ void AyuUi::FontSelectorBox::prepare()
 		closeBox();
 	});
 
-	setTitle(rpl::single(qs("Font customisation")));
+	setTitle(tr::ayu_CustomizeFontTitle());
 
 	const auto topContainer = Ui::CreateChild<Ui::VerticalLayout>(this);
 	setupTop(topContainer);
@@ -1226,5 +1221,4 @@ AyuUi::FontSelectorBox::Show(Window::SessionController *controller, const Fn<voi
 	Ui::show(Box<FontSelectorBox>(controller, hook));
 
 	return result;
-
 }

@@ -109,7 +109,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 			[](const auto &v)
 			{ return v->checked(); });
 	};
-	for (const auto &innerCheck: state->innerChecks) {
+	for (const auto &innerCheck : state->innerChecks) {
 		innerCheck->checkedChanges(
 		) | rpl::to_empty | start_to_stream(
 			state->anyChanges,
@@ -260,7 +260,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 						{
 							if (!handleLocked()) {
 								const auto checked = !checkView->checked();
-								for (const auto &innerCheck: state->innerChecks) {
+								for (const auto &innerCheck : state->innerChecks) {
 									innerCheck->setChecked(checked, anim::type::normal);
 								}
 							}
@@ -452,7 +452,7 @@ void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 		object_ptr<Ui::VerticalLayout>(container));
 	const auto verticalLayout = wrap->entity();
 	auto innerChecks = std::vector<not_null<Ui::AbstractCheckView *>>();
-	for (const auto &entry: checkboxes) {
+	for (const auto &entry : checkboxes) {
 		const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
 		c->checkedValue(
 		) | start_with_next([=](bool enabled)
@@ -573,7 +573,7 @@ void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 		object_ptr<Ui::VerticalLayout>(container));
 	const auto verticalLayout = wrap->entity();
 	auto innerChecks = std::vector<not_null<Ui::AbstractCheckView *>>();
-	for (const auto &entry: checkboxes) {
+	for (const auto &entry : checkboxes) {
 		const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
 		c->checkedValue(
 		) | start_with_next([=](bool enabled)
@@ -828,6 +828,11 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 											 settings->set_showMessageSeconds(enabled);
 											 AyuSettings::save();
 										 }, container->lifetime());
+
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+	SetupFonts(container, controller);
 }
 
 void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
@@ -915,6 +920,52 @@ void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> containe
 		});
 }
 
+void Ayu::SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller)
+{
+	const auto settings = &AyuSettings::getInstance();
+
+	const auto commonButton = AddButtonWithLabel(
+		container,
+		tr::ayu_MainFont(),
+		rpl::single(
+			settings->mainFont.isEmpty() ? tr::ayu_FontDefault(tr::now) : settings->mainFont
+		),
+		st::settingsButtonNoIcon);
+	const auto commonGuard = Ui::CreateChild<base::binary_guard>(commonButton.get());
+
+	commonButton->addClickHandler([=]
+								  {
+									  *commonGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
+									  {
+										  auto ayuSettings = &AyuSettings::getInstance();
+
+										  ayuSettings->set_mainFont(std::move(font));
+										  AyuSettings::save();
+									  });
+								  });
+
+	const auto monoButton = AddButtonWithLabel(
+		container,
+		tr::ayu_MonospaceFont(),
+		rpl::single(
+			settings->monoFont.isEmpty() ? tr::ayu_FontDefault(tr::now) : settings->monoFont
+		),
+		st::settingsButtonNoIcon);
+	const auto monoGuard = Ui::CreateChild<base::binary_guard>(monoButton.get());
+
+	monoButton->addClickHandler([=]
+								{
+									*monoGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
+									{
+										auto ayuSettings = &AyuSettings::getInstance();
+
+										ayuSettings->set_monoFont(std::move(font));
+										AyuSettings::save();
+									});
+								});
+
+}
+
 void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container)
 {
 	AddSubsectionTitle(container, tr::ayu_AyuSyncHeader());
@@ -992,52 +1043,6 @@ void Ayu::SetupExperimental(not_null<Ui::VerticalLayout *> container,
 {
 	AddSubsectionTitle(container, tr::lng_settings_experimental());
 	AddPlatformOption(controller, container, StreamerMode, rpl::producer<>());
-
-	const auto commonButton = AddButtonWithLabel(
-		container,
-		rpl::single(qs("Customise main font")),
-		rpl::single(
-			AyuSettings::getInstance().commonFont.isEmpty() ? qs("Default") : AyuSettings::getInstance().commonFont
-		),
-		st::settingsButtonNoIcon);
-	const auto commonGuard = Ui::CreateChild<base::binary_guard>(commonButton.get());
-
-	commonButton->addClickHandler([=]
-								  {
-									  const auto m = commonButton->clickModifiers();
-									  *commonGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-									  {
-										  auto ayuSettings = &AyuSettings::getInstance();
-
-										  ayuSettings->set_commonFont(std::move(font));
-										  AyuSettings::save();
-									  });
-								  });
-
-	const auto monoButton = AddButtonWithLabel(
-		container,
-		rpl::single(qs("Customise mono font")),
-		rpl::single(
-			AyuSettings::getInstance().monoFont.isEmpty() ? qs("Default")
-														  : AyuSettings::getInstance().monoFont
-		),
-		st::settingsButtonNoIcon);
-	const auto monoGuard = Ui::CreateChild<base::binary_guard>(monoButton.get());
-
-	monoButton->addClickHandler([=]
-								{
-									const auto m = monoButton->clickModifiers();
-									*monoGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-									{
-										auto ayuSettings = &AyuSettings::getInstance();
-
-										ayuSettings->set_monoFont(std::move(font));
-										AyuSettings::save();
-									});
-								});
-
-
-	AddDividerText(container, rpl::single(qs("Here you can customise fonts for AyuGram")));
 }
 
 void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,

@@ -18,7 +18,17 @@ const auto DEFAULT_ICON = QString("default");
 
 const auto ALT_ICON = QString("alt");
 
+const auto DISCORD_ICON = QString("discord");
+
+const auto SPOTIFY_ICON = QString("spotify");
+
+const auto EXTERA_ICON = QString("extera");
+
 const auto NOTHING_ICON = QString("nothing");
+
+const auto BARD_ICON = QString("bard");
+
+const auto YAPLUS_ICON = QString("yaplus");
 
 class AyuGramSettings
 {
@@ -51,7 +61,7 @@ public:
 		editedMark = tr::lng_edited(tr::now);
 		recentStickersCount = 20;
 		showGhostToggleInDrawer = true;
-		commonFont = "";
+		mainFont = "";
 		monoFont = "";
 
 		/*
@@ -88,7 +98,7 @@ public:
 	QString editedMark;
 	int recentStickersCount;
 	bool showGhostToggleInDrawer;
-	QString commonFont;
+	QString mainFont;
 	QString monoFont;
 	int showPeerId;
 	bool hideAllChatsFolder;
@@ -136,7 +146,7 @@ public:
 
 	void set_showGhostToggleInDrawer(bool val);
 
-	void set_commonFont(QString val);
+	void set_mainFont(QString val);
 
 	void set_monoFont(QString val);
 
@@ -173,7 +183,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	editedMark,
 	recentStickersCount,
 	showGhostToggleInDrawer,
-	commonFont,
+	mainFont,
 	monoFont,
 	showPeerId,
 	showMessageSeconds,

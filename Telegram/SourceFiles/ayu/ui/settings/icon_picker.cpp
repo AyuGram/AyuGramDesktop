@@ -20,23 +20,40 @@
 #include "ayu/utils/windows_utils.h"
 #endif
 
-void drawIcon(QPainter &p, const QImage &icon, int offset, bool selected)
+const QVector<QString> icons{
+	AyuSettings::DEFAULT_ICON,
+	AyuSettings::ALT_ICON,
+	AyuSettings::DISCORD_ICON,
+	AyuSettings::SPOTIFY_ICON,
+	AyuSettings::EXTERA_ICON,
+	AyuSettings::NOTHING_ICON,
+	AyuSettings::BARD_ICON,
+	AyuSettings::YAPLUS_ICON
+};
+
+const auto rows = icons.size() / 4 + std::min(1, icons.size() % 4);
+
+const auto padding = 14;
+
+void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected)
 {
+	xOffset += padding;
+
 	if (selected) {
 		p.save();
 		p.setPen(QPen(st::iconPreviewStroke, 2));
-		p.drawEllipse(offset + 2, 2, 68, 68);
+		p.drawEllipse(xOffset + 2, yOffset + 2, 68, 68);
 		p.restore();
 	}
 
-	auto rect = QRect(offset + 4, 4, 64, 64);
+	auto rect = QRect(xOffset + 4, yOffset + 4, 64, 64);
 	p.drawImage(rect, icon);
 }
 
 IconPicker::IconPicker(QWidget *parent)
 	: RpWidget(parent)
 {
-	setMinimumSize(st::boxWidth, 72);
+	setMinimumSize(st::boxWidth, 72 * rows);
 }
 
 void IconPicker::paintEvent(QPaintEvent *e)
@@ -44,14 +61,16 @@ void IconPicker::paintEvent(QPaintEvent *e)
 	Painter p(this);
 	PainterHighQualityEnabler hq(p);
 
-	auto icon1 = logoPreview().scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-	auto icon2 = logoAltPreview().scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-	auto icon3 = logoNothingPreview().scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	for (int row = 0; row < rows; row++) {
+		const auto columns = std::min(4, icons.size() - row * 4);
+		for (int i = 0; i < columns; i++) {
+			auto const idx = i + row * 4;
 
-	// todo: center
-	drawIcon(p, icon1, 0, currentAppLogoName() == AyuSettings::DEFAULT_ICON);
-	drawIcon(p, icon2, 0 + 64 + 16, currentAppLogoName() == AyuSettings::ALT_ICON);
-	drawIcon(p, icon3, 0 + 64 + 16 + 64 + 16, currentAppLogoName() == AyuSettings::NOTHING_ICON);
+			const auto &iconName = icons[idx];
+			auto icon = loadPreview(iconName).scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+			drawIcon(p, icon, (64 + 16) * i, row * (64 + 8), currentAppLogoName() == iconName);
+		}
+	}
 }
 
 void IconPicker::mousePressEvent(QMouseEvent *e)
@@ -60,17 +79,22 @@ void IconPicker::mousePressEvent(QMouseEvent *e)
 	auto changed = false;
 
 	auto x = e->pos().x();
-	if (x <= 64 && settings->appIcon != AyuSettings::DEFAULT_ICON) {
-		settings->set_appIcon(AyuSettings::DEFAULT_ICON);
-		changed = true;
-	}
-	else if (x >= 64 + 16 && x <= 64 + 16 + 64 && settings->appIcon != AyuSettings::ALT_ICON) {
-		settings->set_appIcon(AyuSettings::ALT_ICON);
-		changed = true;
-	}
-	else if (x >= 64 + 16 + 64 + 16 && x < 64 + 16 + 64 + 16 + 64 && settings->appIcon != AyuSettings::NOTHING_ICON) {
-		settings->set_appIcon(AyuSettings::NOTHING_ICON);
-		changed = true;
+	for (int row = 0; row < rows; row++) {
+		const auto columns = std::min(4, icons.size() - row * 4);
+		for (int i = 0; i < columns; i++) {
+			auto const idx = i + row * 4;
+			auto const xOffset = (64 + 16) * i + padding;
+			auto const yOffset = row * (64 + 8);
+
+			if (x >= xOffset && x <= xOffset + 64 && e->pos().y() >= yOffset && e->pos().y() <= yOffset + 64) {
+				const auto &iconName = icons[idx];
+				if (settings->appIcon != iconName) {
+					settings->set_appIcon(iconName);
+					changed = true;
+					break;
+				}
+			}
+		}
 	}
 
 	if (changed) {

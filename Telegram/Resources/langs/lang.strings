@@ -7094,12 +7094,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFilters" = "Message Filters";
 "ayu_RegexFiltersAmount" = "filters";
 "ayu_RegexFiltersHeader" = "Filters";
+"ayu_RegexFiltersShared" = "Shared filters";
 "ayu_FiltersHideFromBlocked" = "Hide from blocked users";
-"ayu_RegexFiltersEnableInChats" = "Enable in chats";
-"ayu_RegexFiltersCaseInsensitive" = "Case insensitive expressions";
+"ayu_FiltersHideFromBlockedNote" = "Message filters were enabled.";
+"ayu_RegexFiltersEnableSharedInChats" = "Enable shared filters in chats";
 "ayu_RegexFiltersAdd" = "Add filter";
 "ayu_RegexFiltersEdit" = "Edit filter";
 "ayu_RegexFiltersPlaceholder" = "Expression";
+"ayu_EnableExpression" = "Enable expression";
+"ayu_CaseInsensitiveExpression" = "Case insensitive expression";
 "ayu_RegexFiltersAddError" = "Regex syntax error";
 "ayu_AyuSyncHeader" = "AyuSync";
 "ayu_AyuSyncStatusTitle" = "Sync status";
@@ -7125,6 +7128,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IconAlternative" = "AyuGram Alt";
 "ayu_IconNothing" = "Nothing";
 "ayu_WALMode" = "Enable WAL mode";
+"ayu_PushNotificationCount" = "FCM notifications received";
 "ayu_ClearAyuDatabase" = "Clear Ayu Database";
 "ayu_ClearAyuDatabaseNotification" = "AyuGram database cleared";
 "ayu_ClearAyuAttachments" = "Clear Ayu Attachments";
@@ -7150,6 +7154,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_EditsHistoryTitle" = "Edits history";
 "ayu_EditsHistoryMenuText" = "History";
 "ayu_ClearDeletedMenuText" = "Clear Deleted";
+"ayu_ViewFiltersMenuText" = "View Filters";
+"ayu_OneViewTTL" = "one view";
 "ayu_ReadUntilMenuText" = "Read Message";
 "ayu_DeleteKeepLocally" = "Keep locally";
 "ayu_BoxActionReset" = "Reset";
@@ -7164,6 +7170,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_HideNextViewsDescriptionAyu" = "Hide my views forever, until Ghost Mode disabled.";
 "ayu_EnableGhostModeStories" = "Enable Ghost Mode";
 "ayu_GhostModeIsActive" = "Ghost Mode Is Active";
+"ayu_MainFont" = "Application font";
+"ayu_MonospaceFont" = "Monospace font";
+"ayu_FontDefault" = "Default";
+"ayu_CustomizeFontTitle" = "Customize font";
 "ayu_AyuForwardStatusForwarding" = "Forwarding messages…";
 "ayu_AyuForwardStatusLoadingMedia" = "Loading media…";
 "ayu_AyuForwardForwardingDescription" = "Please keep this window open while AyuGram is forwarding your messages.";

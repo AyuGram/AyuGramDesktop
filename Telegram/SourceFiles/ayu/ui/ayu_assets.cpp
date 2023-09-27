@@ -28,7 +28,7 @@ void loadAppIco()
 		f.remove();
 	}
 	f.close();
-	QFile::copy(qsl(":/gui/art/ayu/%1/logo256_no_margin.ico").arg(settings->appIcon), tempIconPath);
+	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings->appIcon), tempIconPath);
 }
 
 void loadIcons()
@@ -37,24 +37,14 @@ void loadIcons()
 	if (LAST_LOADED_NAME != settings->appIcon) {
 		LAST_LOADED_NAME = settings->appIcon;
 
-		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/logo256.png").arg(settings->appIcon));
-		LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/ayu/%1/logo256_no_margin.png").arg(settings->appIcon));
+		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app.png").arg(settings->appIcon));
+		LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(settings->appIcon));
 	}
 }
 
-QImage logoPreview()
+QImage loadPreview(QString name)
 {
-	return QImage(qsl(":/gui/art/ayu/default/logo256.png"));
-}
-
-QImage logoAltPreview()
-{
-	return QImage(qsl(":/gui/art/ayu/alt/logo256.png"));
-}
-
-QImage logoNothingPreview()
-{
-	return QImage(qsl(":/gui/art/ayu/nothing/logo256.png"));
+	return QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(name));
 }
 
 QString currentAppLogoName()

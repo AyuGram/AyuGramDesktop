@@ -40,10 +40,10 @@ void initDatabase()
 
 void initFonts()
 {
-	auto ayuSettings = AyuSettings::getInstance();
+	auto settings = &AyuSettings::getInstance();
 
-	AyuFonts::setCommonFont(ayuSettings.commonFont);
-	AyuFonts::setMonoFont(ayuSettings.monoFont);
+	AyuFonts::setMainFont(settings->mainFont);
+	AyuFonts::setMonoFont(settings->monoFont);
 }
 
 void init()

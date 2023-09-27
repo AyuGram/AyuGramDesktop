@@ -8,9 +8,7 @@
 
 void loadAppIco();
 
-QImage logoPreview();
-QImage logoAltPreview();
-QImage logoNothingPreview();
+QImage loadPreview(QString name);
 
 QString currentAppLogoName();
 QImage currentAppLogo();

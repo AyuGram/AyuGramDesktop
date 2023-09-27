@@ -273,9 +273,9 @@ void AyuGramSettings::set_showGhostToggleInDrawer(bool val)
 	showGhostToggleInDrawer = val;
 }
 
-void AyuGramSettings::set_commonFont(QString val)
+void AyuGramSettings::set_mainFont(QString val)
 {
-	commonFont = val;
+	mainFont = val;
 }
 
 void AyuGramSettings::set_monoFont(QString val)
