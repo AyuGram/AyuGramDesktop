@@ -124,17 +124,7 @@ private:
 		}
 	};
 
-	struct MenuSelection
-	{
-		int index = 0;
-
-		inline bool operator==(const MenuSelection &other) const
-		{
-			return (index == other.index);
-		}
-	};
-
-	using Selection = std::variant<v::null_t, RowSelection, MenuSelection>;
+	using Selection = std::variant<v::null_t, RowSelection>;
 
 	void updateSelected(Selection selected);
 
@@ -174,10 +164,6 @@ private:
 
 	int countAvailableWidth(int newWidth) const;
 
-	QRect menuToggleArea() const;
-
-	QRect menuToggleArea(not_null<const Row *> row) const;
-
 	void repaint(Selection selected);
 
 	void repaint(int index);
@@ -188,19 +174,7 @@ private:
 
 	void activateByIndex(int index);
 
-	void showMenu(int index);
-
 	void setForceRippled(not_null<Row *> row, bool rippled);
-
-	bool canShare(not_null<const Row *> row) const;
-
-	bool canRemove(not_null<const Row *> row) const;
-
-	bool hasMenu(not_null<const Row *> row) const;
-
-	void share(not_null<const Row *> row) const;
-
-	void remove(not_null<Row *> row);
 
 	void restore(not_null<Row *> row);
 
@@ -214,9 +188,6 @@ private:
 	bool _areOfficial = false;
 	bool _mouseSelection = false;
 	QPoint _globalMousePosition;
-	base::unique_qptr<Ui::DropdownMenu> _menu;
-	int _menuShownIndex = -1;
-	bool _menuOtherEntered = false;
 
 	rpl::event_stream<bool> _hasSelection;
 	rpl::event_stream<Font> _activations;
@@ -307,23 +278,6 @@ Rows::Rows(
 void Rows::mouseMoveEvent(QMouseEvent *e)
 {
 	const auto position = e->globalPos();
-	if (_menu) {
-		const auto rect = (_menuShownIndex >= 0)
-						  ? menuToggleArea(&rowByIndex(_menuShownIndex))
-						  : QRect();
-		if (rect.contains(e->pos())) {
-			if (!_menuOtherEntered) {
-				_menuOtherEntered = true;
-				_menu->otherEnter();
-			}
-		}
-		else {
-			if (_menuOtherEntered) {
-				_menuOtherEntered = false;
-				_menu->otherLeave();
-			}
-		}
-	}
 	if (!_mouseSelection && position == _globalMousePosition) {
 		return;
 	}
@@ -344,14 +298,8 @@ void Rows::mouseMoveEvent(QMouseEvent *e)
 		return -1;
 	}();
 	const auto row = (index >= 0) ? &rowByIndex(index) : nullptr;
-	const auto inMenuToggle = (index >= 0 && hasMenu(row))
-							  ? menuToggleArea(row).contains(e->pos())
-							  : false;
 	if (index < 0) {
 		updateSelected({});
-	}
-	else if (inMenuToggle) {
-		updateSelected(MenuSelection{index});
 	}
 	else if (!row->removed) {
 		updateSelected(RowSelection{index});
@@ -370,33 +318,15 @@ void Rows::mousePressEvent(QMouseEvent *e)
 	}
 }
 
-QRect Rows::menuToggleArea() const
-{
-	const auto size = st::topBarSearch.width;
-	const auto top = (DefaultRowHeight() - size) / 2;
-	const auto skip = st::boxScroll.width
-		- st::boxScroll.deltax
-		+ top;
-	const auto left = width() - skip - size;
-	return QRect(left, top, size, size);
-}
-
-QRect Rows::menuToggleArea(not_null<const Row *> row) const
-{
-	return menuToggleArea().translated(0, row->top);
-}
-
 void Rows::addRipple(Selection selected, QPoint position)
 {
 	Expects(!v::is_null(selected));
 
 	ensureRippleBySelection(selected);
 
-	const auto menu = v::is<MenuSelection>(selected);
 	const auto &row = rowBySelection(selected);
-	const auto menuArea = menuToggleArea(&row);
 	auto &ripple = rippleBySelection(&row, selected);
-	const auto topleft = menu ? menuArea.topLeft() : QPoint(0, row.top);
+	const auto topleft = QPoint(0, row.top);
 	ripple->add(position - topleft);
 }
 
@@ -411,11 +341,7 @@ void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected)
 	if (ripple) {
 		return;
 	}
-	const auto menu = v::is<MenuSelection>(selected);
-	const auto menuArea = menuToggleArea(row);
-	auto mask = menu
-				? Ui::RippleAnimation::EllipseMask(menuArea.size())
-				: Ui::RippleAnimation::RectMask({width(), row->height});
+	auto mask = Ui::RippleAnimation::RectMask({width(), row->height});
 	ripple = std::make_unique<Ui::RippleAnimation>(
 		st::defaultRippleAnimation,
 		std::move(mask),
@@ -425,54 +351,15 @@ void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected)
 
 void Rows::mouseReleaseEvent(QMouseEvent *e)
 {
-	if (_menu && e->button() == Qt::LeftButton) {
-		if (_menu->isHiding()) {
-			_menu->otherEnter();
-		}
-		else {
-			_menu->otherLeave();
-		}
-	}
 	const auto pressed = _pressed;
 	updatePressed({});
 	if (pressed == _selected) {
 		v::match(pressed, [&](RowSelection data)
 		{
 			activateByIndex(data.index);
-		}, [&](MenuSelection data)
-				 {
-					 showMenu(data.index);
-				 }, [](v::null_t)
+		}, [](v::null_t)
 				 { });
 	}
-}
-
-bool Rows::canShare(not_null<const Row *> row) const
-{
-	return !_areOfficial && !row->data.id.startsWith('#');
-}
-
-bool Rows::canRemove(not_null<const Row *> row) const
-{
-	return !_areOfficial && !row->check->checked();
-}
-
-bool Rows::hasMenu(not_null<const Row *> row) const
-{
-	return canShare(row) || canRemove(row);
-}
-
-void Rows::share(not_null<const Row *> row) const
-{
-	const auto link = u"https://t.me/setlanguage/"_q + row->data.id;
-	QGuiApplication::clipboard()->setText(link);
-	Ui::Toast::Show(tr::lng_username_copied(tr::now));
-}
-
-void Rows::remove(not_null<Row *> row)
-{
-	row->removed = true;
-	Local::removeRecentLanguage(row->data.id);
 }
 
 void Rows::restore(not_null<Row *> row)
@@ -480,31 +367,8 @@ void Rows::restore(not_null<Row *> row)
 	row->removed = false;
 }
 
-void Rows::showMenu(int index)
-{
-	const auto row = &rowByIndex(index);
-}
-
 void Rows::setForceRippled(not_null<Row *> row, bool rippled)
 {
-	if (row->menuToggleForceRippled != rippled) {
-		row->menuToggleForceRippled = rippled;
-		auto &ripple = rippleBySelection(row, MenuSelection{});
-		if (row->menuToggleForceRippled) {
-			ensureRippleBySelection(row, MenuSelection{});
-			if (ripple->empty()) {
-				ripple->addFading();
-			}
-			else {
-				ripple->lastUnstop();
-			}
-		}
-		else {
-			if (ripple) {
-				ripple->lastStop();
-			}
-		}
-	}
 	repaint(*row);
 }
 
@@ -516,18 +380,12 @@ void Rows::activateByIndex(int index)
 void Rows::leaveEventHook(QEvent *e)
 {
 	updateSelected({});
-	if (_menu && _menuOtherEntered) {
-		_menuOtherEntered = false;
-		_menu->otherLeave();
-	}
 }
 
 void Rows::filter(const QString &query)
 {
 	updateSelected({});
 	updatePressed({});
-	_menu = nullptr;
-	_menuShownIndex = -1;
 
 	_query = TextUtilities::PrepareSearchWords(query);
 
@@ -583,10 +441,7 @@ int Rows::indexFromSelection(Selection selected) const
 	return v::match(selected, [&](RowSelection data)
 	{
 		return data.index;
-	}, [&](MenuSelection data)
-					{
-						return data.index;
-					}, [](v::null_t)
+	}, [](v::null_t)
 					{
 						return -1;
 					});
@@ -734,9 +589,7 @@ std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
 	not_null<Row *> row,
 	Selection selected)
 {
-	return v::is<MenuSelection>(selected)
-		   ? row->menuToggleRipple
-		   : row->ripple;
+	return row->ripple;
 }
 
 const std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
@@ -784,7 +637,7 @@ int Rows::resizeGetHeight(int newWidth)
 
 int Rows::countAvailableWidth(int newWidth) const
 {
-	const auto right = width() - menuToggleArea().x();
+	const auto right = 0;
 	return newWidth
 		- st::passportRowPadding.left()
 		- st::langsRadio.diameter
@@ -809,10 +662,7 @@ void Rows::paintEvent(QPaintEvent *e)
 		+ st::langsRadio.diameter
 		+ st::passportRowPadding.left();
 	const auto availableWidth = countAvailableWidth();
-	const auto menu = menuToggleArea();
-	const auto selectedIndex = (_menuShownIndex >= 0)
-							   ? _menuShownIndex
-							   : indexFromSelection(!v::is_null(_pressed) ? _pressed : _selected);
+	const auto selectedIndex = indexFromSelection(!v::is_null(_pressed) ? _pressed : _selected);
 	for (auto i = 0, till = count(); i != till; ++i) {
 		const auto &row = rowByIndex(i);
 		if (row.top + row.height <= clip.y()) {
