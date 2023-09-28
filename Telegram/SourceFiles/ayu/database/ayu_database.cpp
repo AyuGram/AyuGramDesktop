@@ -10,9 +10,11 @@
 #include "entities.h"
 #include "ayu/libs/sqlite/sqlite_orm.h"
 
+#include "base/unixtime.h"
+
 using namespace sqlite_orm;
 
-auto storage = make_storage("ayugram.db",
+auto storage = make_storage("./tdata/ayudata.db",
 							make_table("DeletedMessage",
 									   make_column("userId", &DeletedMessage::userId),
 									   make_column("dialogId", &DeletedMessage::dialogId),
@@ -97,7 +99,41 @@ namespace AyuDatabase
 
 void initialize()
 {
-	storage.sync_schema();
+	// move to `tdata` from legacy version
+	if (std::filesystem::exists("ayugram.db")) {
+		try {
+			std::filesystem::rename("ayugram.db", "./tdata/ayudata.db");
+		}
+		catch (std::filesystem::filesystem_error &e) {
+			LOG(("Failed to move database: %1").arg(e.what()));
+		}
+	}
+
+	try {
+		storage.sync_schema();
+	}
+	catch (...) {
+		auto time = base::unixtime::now();
+
+		LOG(("Failed to sync database schema"));
+		LOG(("Moving current database just in case"));
+
+		if (std::filesystem::exists("./tdata/ayudata.db")) {
+			std::filesystem::rename("./tdata/ayudata.db", QString("./tdata/ayudata_%1.db").arg(time).toStdString());
+		}
+
+		if (std::filesystem::exists("./tdata/ayudata.db-shm")) {
+			std::filesystem::rename("./tdata/ayudata.db-shm",
+									QString("./tdata/ayudata_%1.db-shm").arg(time).toStdString());
+		}
+
+		if (std::filesystem::exists("./tdata/ayudata.db-wal")) {
+			std::filesystem::rename("./tdata/ayudata.db-wal",
+									QString("./tdata/ayudata_%1.db-wal").arg(time).toStdString());
+		}
+
+		storage.sync_schema();
+	}
 
 	storage.begin_transaction();
 	storage.commit();
