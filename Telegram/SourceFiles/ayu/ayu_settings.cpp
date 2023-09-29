@@ -235,6 +235,11 @@ void AyuGramSettings::set_disableStories(bool val)
 	disableStories = val;
 }
 
+void AyuGramSettings::set_disableNotificationsDelay(bool val)
+{
+	disableNotificationsDelay = val;
+}
+
 void AyuGramSettings::set_localPremium(bool val)
 {
 	localPremium = val;

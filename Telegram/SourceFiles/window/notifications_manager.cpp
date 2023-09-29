@@ -43,6 +43,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QWindow>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 #if __has_include(<gio/gio.hpp>)
 #include <gio/gio.hpp>
 #endif // __has_include(<gio/gio.hpp>)
@@ -350,6 +354,12 @@ System::Timing System::countTiming(
 	} else if (cOtherOnline() >= t) {
 		delay = config.notifyDefaultDelay;
 	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->disableNotificationsDelay) {
+		delay = minimalDelay;
+	}
+
 	return {
 		.delay = delay,
 		.when = ms + delay,

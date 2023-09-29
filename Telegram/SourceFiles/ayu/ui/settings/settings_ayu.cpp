@@ -705,6 +705,22 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 
 	AddButton(
 		container,
+		tr::ayu_DisableNotificationsDelay(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->disableNotificationsDelay)
+	)->toggledValue(
+	) | rpl::filter([=](bool enabled)
+					{
+						return (enabled != settings->disableNotificationsDelay);
+					}) | start_with_next([=](bool enabled)
+										 {
+											 settings->set_disableNotificationsDelay(enabled);
+											 AyuSettings::save();
+										 }, container->lifetime());
+
+	AddButton(
+		container,
 		tr::ayu_LocalPremium(),
 		st::settingsButtonNoIcon
 	)->toggleOn(

@@ -52,6 +52,7 @@ public:
 		// ~ QoL toggles
 		disableAds = true;
 		disableStories = false;
+		disableNotificationsDelay = false;
 		localPremium = false;
 		copyUsernameAsLink = true;
 
@@ -91,6 +92,7 @@ public:
 	bool saveMessagesHistory;
 	bool disableAds;
 	bool disableStories;
+	bool disableNotificationsDelay;
 	bool localPremium;
 	bool copyUsernameAsLink;
 	QString appIcon;
@@ -131,6 +133,8 @@ public:
 	void set_disableAds(bool val);
 
 	void set_disableStories(bool val);
+
+	void set_disableNotificationsDelay(bool val);
 
 	void set_localPremium(bool val);
 
@@ -176,6 +180,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	saveMessagesHistory,
 	disableAds,
 	disableStories,
+	disableNotificationsDelay,
 	localPremium,
 	copyUsernameAsLink,
 	appIcon,

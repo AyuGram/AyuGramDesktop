@@ -7077,8 +7077,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageSavingSaveForBots" = "Save in bot dialogs";
 "ayu_QoLTogglesHeader" = "Useful features";
 "ayu_KeepAliveService" = "AyuGram Push Service";
-"ayu_DisableStories" = "Disable stories";
 "ayu_DisableAds" = "Disable ads";
+"ayu_DisableStories" = "Disable stories";
+"ayu_DisableNotificationsDelay" = "Disable notify delay";
 "ayu_LocalPremium" = "Local Telegram Premium";
 "ayu_CopyUsernameAsLink" = "Copy username as link";
 "ayu_CustomizationHeader" = "Customization";
