@@ -7188,6 +7188,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ContextCopyCallbackData" = "Copy Callback Data";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits, except translator.\n**Enjoy the star near your nickname!**";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";
+"ayu_ConfirmationSticker" = "Do you want to send this sticker?";
+"ayu_ConfirmationGIF" = "Do you want to send this GIF?";
+"ayu_ConfirmationVoice" = "Do you want to send this voice message?";
 "ayu_IntroAbout" = "Welcome to the AyuGram Desktop.\nIt's cool and looks less ugly.";
 "ayu_AboutText1" = "Just a cool Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";

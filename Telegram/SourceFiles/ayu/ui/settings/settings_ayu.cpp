@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "settings_ayu.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/sync/ayu_sync_controller.h"

@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ayu_profile_values.h"
 #include "ayu/ayu_settings.h"
 #include "data/data_peer.h"

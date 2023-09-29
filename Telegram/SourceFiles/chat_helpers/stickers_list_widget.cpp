@@ -1908,9 +1908,9 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 					};
 
 					Ui::show(Ui::MakeConfirmBox({
-						.text = rpl::single(QString("Do you want to send this sticker?")),
+						.text = tr::ayu_ConfirmationSticker(),
 						.confirmed = sendStickerCallback,
-						.confirmText = rpl::single(QString("Send")),
+						.confirmText = tr::lng_send_button()
 					}));
 				}
 				else

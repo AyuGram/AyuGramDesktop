@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ayu_lottie.h"
 
 namespace AyuUi

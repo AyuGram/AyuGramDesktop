@@ -521,11 +521,9 @@ void GifsListWidget::selectInlineResult(
 		if (forceSend
 			|| (media && media->image(PhotoSize::Thumbnail))
 			|| (media && media->image(PhotoSize::Large))) {
-            // why photo type in GIF sender?
 			_photoChosen.fire({
 				.photo = photo,
 				.options = options });
-
 		} else if (!photo->loading(PhotoSize::Thumbnail)) {
 			photo->load(PhotoSize::Thumbnail, Data::FileOrigin());
 		}
@@ -546,9 +544,9 @@ void GifsListWidget::selectInlineResult(
 			if (settings->gifConfirmation)
 			{
 				Ui::show(Ui::MakeConfirmBox({
-					.text = rpl::single(QString("Do you want to send this GIF?")),
+					.text = tr::ayu_ConfirmationGIF(),
 					.confirmed = sendGIFCallback,
-					.confirmText = rpl::single(QString("Send")),
+					.confirmText = tr::lng_send_button()
 				}));
 			}
 			else

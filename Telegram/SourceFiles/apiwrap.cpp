@@ -4414,13 +4414,14 @@ void ApiWrap::sendMediaWithRandomId(
 		Api::SendOptions options,
 		uint64 randomId,
 		Fn<void(bool)> done) {
-    // AyuGram useScheduledMessages
-    const auto settings = &AyuSettings::getInstance();
-    if (settings->useScheduledMessages && !options.scheduled) {
-        DEBUG_LOG(("[AyuGram] Scheduling message"));
-        auto current = base::unixtime::now();
-        options.scheduled = current + 12;
-    }
+	// AyuGram useScheduledMessages
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->useScheduledMessages && !options.scheduled)
+	{
+		DEBUG_LOG(("[AyuGram] Scheduling message"));
+		auto current = base::unixtime::now();
+		options.scheduled = current + 12;
+	}
 
 	const auto history = item->history();
 	const auto replyTo = item->replyTo();

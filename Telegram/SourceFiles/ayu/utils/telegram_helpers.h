@@ -22,4 +22,4 @@ ID getDialogIdFromPeer(not_null<PeerData *> peer);
 std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);
 
 void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
-void MarkAsReadThread(not_null<Data::Thread*> thread);
+void MarkAsReadThread(not_null<Data::Thread *> thread);

@@ -83,10 +83,10 @@
 namespace AyuUi
 {
 
-void AddHistoryAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
+void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item);
 
-void AddHideMessageAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
+void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item);
 
-void AddReadUntilAction(not_null<Ui::PopupMenu *>menu, HistoryItem *item);
+void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item);
 
 }

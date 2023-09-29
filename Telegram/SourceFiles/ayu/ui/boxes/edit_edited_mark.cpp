@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "edit_edited_mark.h"
 
 #include "base/random.h"

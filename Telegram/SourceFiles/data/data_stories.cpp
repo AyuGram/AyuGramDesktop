@@ -1421,6 +1421,7 @@ void Stories::sendMarkAsReadRequest(
 		}
 		checkQuitPreventFinished();
 	};
+
 	const auto api = &_owner->session().api();
 	api->request(MTPstories_ReadStories(
 		peer->asUser()->inputUser,

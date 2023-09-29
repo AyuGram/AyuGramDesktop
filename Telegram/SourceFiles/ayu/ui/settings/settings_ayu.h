@@ -24,7 +24,7 @@ extern base::options::toggle StreamerMode;
 namespace Settings
 {
 
-class Ayu: public Section<Ayu>
+class Ayu : public Section<Ayu>
 {
 public:
 	Ayu(QWidget *parent, not_null<Window::SessionController *> controller);

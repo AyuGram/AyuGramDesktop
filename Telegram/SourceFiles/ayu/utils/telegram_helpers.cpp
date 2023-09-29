@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "telegram_helpers.h"
 #include <functional>
 #include <QTimer>

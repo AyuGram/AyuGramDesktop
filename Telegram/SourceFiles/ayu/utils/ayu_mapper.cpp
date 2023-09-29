@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ayu_mapper.h"
 
 #include "history/history_item.h"
@@ -15,11 +14,12 @@
 namespace AyuMapper
 {
 
-int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item) {
+int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item)
+{
 	int flags = 0;
 
 	const auto thread = item->topic()
-						? (Data::Thread*)item->topic()
+						? (Data::Thread *)item->topic()
 						: item->history();
 	const auto unseen = item->unread(thread);
 	if (unseen) {
@@ -80,7 +80,6 @@ int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item) {
 	}
 
 	return flags;
-
 }
 
 }

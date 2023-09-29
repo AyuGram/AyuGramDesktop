@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ui/boxes/confirm_box.h"
 
 #include "voice_confirmation_box.h"

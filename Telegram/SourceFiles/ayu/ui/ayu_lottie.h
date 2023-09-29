@@ -12,7 +12,8 @@
 namespace AyuUi
 {
 
-class AyuLottieImpl : public AyuLottie {
+class AyuLottieImpl : public AyuLottie
+{
 	std::unique_ptr<Lottie::Icon> getLottie(const QString &text) override;
 };
 

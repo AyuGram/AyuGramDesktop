@@ -2217,9 +2217,9 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 			if (settings->voiceConfirmation)
 			{
 				Ui::show(AyuUi::MakeConfirmBox({
-					.text = rpl::single(QString("Do you want to send voice message?")),
+					.text = tr::ayu_ConfirmationVoice(),
 					.confirmed = sendVoiceCallback,
-					.confirmText = rpl::single(QString("Send"))
+					.confirmText = tr::lng_send_button()
 				}));
 			}
 			else
@@ -2334,9 +2334,9 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		if (settings->voiceConfirmation)
 		{
 			Ui::show(AyuUi::MakeConfirmBox({
-				.text = rpl::single(QString("Do you want to send voice message?")),
+				.text = tr::ayu_ConfirmationVoice(),
 				.confirmed = sendVoiceCallback,
-				.confirmText = rpl::single(QString("Send"))
+				.confirmText = tr::lng_send_button()
 			}));
 		}
 		else

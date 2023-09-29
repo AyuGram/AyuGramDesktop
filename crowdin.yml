@@ -1,3 +1,0 @@
-files:
-  - source: /ayu-scripts/desktop-specific.json
-    translation: /ayu-scripts/translations/%two_letters_code%.json

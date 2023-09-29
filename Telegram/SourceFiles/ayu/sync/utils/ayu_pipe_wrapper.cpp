@@ -4,10 +4,9 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ayu_pipe_wrapper.h"
-#include <sstream>
 #include "ayu/libs/bit_converter.hpp"
+#include <sstream>
 
 using stringbuf = std::basic_stringbuf<unsigned char, std::char_traits<unsigned char>, std::allocator<unsigned char>>;
 

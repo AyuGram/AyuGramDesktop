@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "message_history_box.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"

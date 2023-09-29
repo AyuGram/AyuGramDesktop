@@ -4,7 +4,6 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-
 #include "ayu_messages_controller.h"
 
 #include "ayu/ayu_constants.h"
@@ -59,7 +58,8 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 
 	if (auto edited = item->Get<HistoryMessageEdited>()) {
 		message.editDate = edited->date;
-	} else {
+	}
+	else {
 		message.editDate = base::unixtime::now();
 	}
 
