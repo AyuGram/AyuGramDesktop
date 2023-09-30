@@ -7136,9 +7136,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ClearAyuAttachmentsNotification" = "AyuGram attachments folder cleared";
 "ayu_EraseLocalDatabase" = "Erase Local Database";
 "ayu_ConfirmationsTitle" = "Confirmations";
-"ayu_StickerConfirmation" = "Confirmation when sending stickers";
-"ayu_GIFConfirmation" = "Confirmation when sending GIFs";
-"ayu_VoiceConfirmation" = "Confirmation when sending voice messages";
+"ayu_StickerConfirmation" = "For stickers";
+"ayu_GIFConfirmation" = "For GIFs";
+"ayu_VoiceConfirmation" = "For voice messages";
 "ayu_KillApp" = "Kill App";
 "ayu_LReadMessages" = "Read on Local";
 "ayu_SReadMessages" = "Read on Server";
