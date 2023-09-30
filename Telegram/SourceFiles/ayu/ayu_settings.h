@@ -87,6 +87,8 @@ public:
 	bool sendUploadProgress;
 	bool sendOfflinePacketAfterOnline;
 	bool markReadAfterSend;
+	bool markReadAfterReaction;
+	bool markReadAfterPoll;
 	bool useScheduledMessages;
 	bool saveDeletedMessages;
 	bool saveMessagesHistory;
@@ -123,6 +125,10 @@ public:
 	void set_ghostModeEnabled(bool val);
 
 	void set_markReadAfterSend(bool val);
+
+	void set_markReadAfterReaction(bool val);
+
+	void set_markReadAfterPoll(bool val);
 
 	void set_useScheduledMessages(bool val);
 
@@ -175,6 +181,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	sendUploadProgress,
 	sendOfflinePacketAfterOnline,
 	markReadAfterSend,
+	markReadAfterReaction,
+	markReadAfterPoll,
 	useScheduledMessages,
 	saveDeletedMessages,
 	saveMessagesHistory,

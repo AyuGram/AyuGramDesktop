@@ -69,6 +69,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 	not_null<Ui::SlideWrap<> *> wrap,
 	rpl::producer<QString> buttonLabel,
 	std::optional<QString> locked,
+	bool toggledWhenAll,
 	Settings::IconDescriptor &&icon)
 {
 	const auto button = container->add(object_ptr<Ui::SettingsButton>(
@@ -165,8 +166,14 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 		rpl::empty_value()
 	) | rpl::map(countChecked) | start_with_next([=](int count)
 												 {
-													 checkView->setChecked(count == totalInnerChecks,
-																		   anim::type::normal);
+													 if (toggledWhenAll) {
+														 checkView->setChecked(count == totalInnerChecks,
+																			   anim::type::normal);
+													 }
+													 else {
+														 checkView->setChecked(count != 0,
+																			   anim::type::normal);
+													 }
 												 }, toggleButton->lifetime());
 	checkView->setLocked(locked.has_value());
 	checkView->finishAnimating();
@@ -470,6 +477,7 @@ void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 		raw,
 		tr::ayu_GhostModeToggle(),
 		std::nullopt,
+		true,
 		{});
 	container->add(std::move(wrap));
 	container->widthValue(
@@ -545,24 +553,24 @@ void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 
 	std::vector checkboxes{
 		NestedEntry{
-			tr::ayu_MarkReadAfterSend(tr::now), false, [=](bool enabled)
+			tr::ayu_MarkReadAfterSend(tr::now), settings->markReadAfterSend, [=](bool enabled)
 			{
-//				settings->set_sendReadMessages(!enabled);
-//				AyuSettings::save();
+				settings->set_markReadAfterSend(enabled);
+				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_MarkReadAfterReaction(tr::now), false, [=](bool enabled)
+			tr::ayu_MarkReadAfterReaction(tr::now), settings->markReadAfterReaction, [=](bool enabled)
 			{
-//				settings->set_sendReadStories(!enabled);
-//				AyuSettings::save();
+				settings->set_markReadAfterReaction(enabled);
+				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_MarkReadAfterPoll(tr::now), false, [=](bool enabled)
+			tr::ayu_MarkReadAfterPoll(tr::now), settings->markReadAfterPoll, [=](bool enabled)
 			{
-//				settings->set_sendOnlinePackets(!enabled);
-//				AyuSettings::save();
+				settings->set_markReadAfterPoll(enabled);
+				AyuSettings::save();
 			}
 		},
 	};
@@ -591,6 +599,7 @@ void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 		raw,
 		tr::ayu_MarkReadAfterAction(),
 		std::nullopt,
+		false,
 		{});
 	container->add(std::move(wrap));
 	container->widthValue(

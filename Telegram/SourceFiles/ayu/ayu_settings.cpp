@@ -210,6 +210,16 @@ void AyuGramSettings::set_markReadAfterSend(bool val)
 	markReadAfterSend = val;
 }
 
+void AyuGramSettings::set_markReadAfterReaction(bool val)
+{
+	markReadAfterReaction = val;
+}
+
+void AyuGramSettings::set_markReadAfterPoll(bool val)
+{
+	markReadAfterPoll = val;
+}
+
 void AyuGramSettings::set_useScheduledMessages(bool val)
 {
 	useScheduledMessages = val;
