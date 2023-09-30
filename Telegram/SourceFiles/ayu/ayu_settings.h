@@ -43,6 +43,8 @@ public:
 		sendOfflinePacketAfterOnline = false;
 
 		markReadAfterSend = true;
+		markReadAfterReaction = true;
+		markReadAfterPoll = true;
 		useScheduledMessages = false;
 
 		// ~ Message edits & deletion history
