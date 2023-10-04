@@ -33,27 +33,28 @@ const QVector<QString> icons{
 
 const auto rows = icons.size() / 4 + std::min(1, icons.size() % 4);
 
-const auto padding = 14;
-
 void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected)
 {
-	xOffset += padding;
+	xOffset += st::cpPadding;
 
 	if (selected) {
 		p.save();
-		p.setPen(QPen(st::iconPreviewStroke, 2));
-		p.drawEllipse(xOffset + 2, yOffset + 2, 68, 68);
+		p.setPen(QPen(st::iconPreviewStroke, st::cpPenSize));
+		p.drawEllipse(xOffset + st::cpSelectedPadding,
+					  yOffset + st::cpSelectedPadding,
+					  st::cpIconSize + st::cpSelectedPadding * 2,
+					  st::cpIconSize + st::cpSelectedPadding * 2);
 		p.restore();
 	}
 
-	auto rect = QRect(xOffset + 4, yOffset + 4, 64, 64);
+	auto rect = QRect(xOffset + st::cpImagePadding, yOffset + st::cpImagePadding, st::cpIconSize, st::cpIconSize);
 	p.drawImage(rect, icon);
 }
 
 IconPicker::IconPicker(QWidget *parent)
 	: RpWidget(parent)
 {
-	setMinimumSize(st::boxWidth, 72 * rows);
+	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows);
 }
 
 void IconPicker::paintEvent(QPaintEvent *e)
@@ -67,8 +68,13 @@ void IconPicker::paintEvent(QPaintEvent *e)
 			auto const idx = i + row * 4;
 
 			const auto &iconName = icons[idx];
-			auto icon = loadPreview(iconName).scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-			drawIcon(p, icon, (64 + 16) * i, row * (64 + 8), currentAppLogoName() == iconName);
+			auto icon = loadPreview(iconName)
+				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+			drawIcon(p,
+					 icon,
+					 (st::cpIconSize + st::cpSpacingX) * i,
+					 row * (st::cpIconSize + st::cpSpacingY),
+					 currentAppLogoName() == iconName);
 		}
 	}
 }
@@ -83,10 +89,11 @@ void IconPicker::mousePressEvent(QMouseEvent *e)
 		const auto columns = std::min(4, icons.size() - row * 4);
 		for (int i = 0; i < columns; i++) {
 			auto const idx = i + row * 4;
-			auto const xOffset = (64 + 16) * i + padding;
-			auto const yOffset = row * (64 + 8);
+			auto const xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
+			auto const yOffset = row * (st::cpIconSize + st::cpSpacingY);
 
-			if (x >= xOffset && x <= xOffset + 64 && e->pos().y() >= yOffset && e->pos().y() <= yOffset + 64) {
+			if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
+				&& e->pos().y() <= yOffset + st::cpIconSize) {
 				const auto &iconName = icons[idx];
 				if (settings->appIcon != iconName) {
 					settings->set_appIcon(iconName);
