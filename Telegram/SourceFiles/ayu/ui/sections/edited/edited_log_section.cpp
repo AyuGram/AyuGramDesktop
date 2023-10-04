@@ -82,7 +82,7 @@ FixedBar::FixedBar(
 	: TWidget(parent), _controller(controller), _peer(peer), _backButton(
 	this,
 	&controller->session(),
-	tr::lng_admin_log_title_all(tr::now),
+	tr::lng_terms_back(tr::now),
 	controller->adaptive().oneColumnValue()), _cancel(this, st::historyAdminLogCancelSearch)
 {
 	_backButton->moveToLeft(0, 0);
@@ -160,10 +160,6 @@ Widget::Widget(
 	  _scroll(this, st::historyScroll, false),
 	  _fixedBar(this, controller, peer),
 	  _fixedBarShadow(this),
-	  _whatIsThis(
-		  this,
-		  tr::lng_admin_log_about(tr::now),
-		  st::historyComposeButton),
 	  _item(item)
 {
 	_fixedBar->move(0, 0);
@@ -192,13 +188,6 @@ Widget::Widget(
 							 {
 								 onScroll();
 							 }, lifetime());
-
-	_whatIsThis->setClickedCallback([=]
-									{
-										controller->show(Ui::MakeInformBox(peer->isMegagroup()
-																		   ? tr::lng_admin_log_about_text()
-																		   : tr::lng_admin_log_about_text_channel()));
-									});
 
 	setupShortcuts();
 }
@@ -297,7 +286,7 @@ void Widget::resizeEvent(QResizeEvent *e)
 	_fixedBarShadow->resize(contentWidth, st::lineWidth);
 
 	auto bottom = height();
-	auto scrollHeight = bottom - _fixedBar->height() - _whatIsThis->height();
+	auto scrollHeight = bottom - _fixedBar->height();
 	auto scrollSize = QSize(contentWidth, scrollHeight);
 	if (_scroll->size() != scrollSize) {
 		_scroll->resize(scrollSize);
@@ -312,8 +301,6 @@ void Widget::resizeEvent(QResizeEvent *e)
 		auto scrollTop = _scroll->scrollTop();
 		_inner->setVisibleTopBottom(scrollTop, scrollTop + _scroll->height());
 	}
-	auto fullWidthButtonRect = myrtlrect(0, bottom - _whatIsThis->height(), contentWidth, _whatIsThis->height());
-	_whatIsThis->setGeometry(fullWidthButtonRect);
 }
 
 void Widget::paintEvent(QPaintEvent *e)

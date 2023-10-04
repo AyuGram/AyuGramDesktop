@@ -80,7 +80,6 @@ private:
 	QPointer<InnerWidget> _inner;
 	object_ptr<FixedBar> _fixedBar;
 	object_ptr<Ui::PlainShadow> _fixedBarShadow;
-	object_ptr<Ui::FlatButton> _whatIsThis;
 	not_null<HistoryItem *> _item;
 
 };

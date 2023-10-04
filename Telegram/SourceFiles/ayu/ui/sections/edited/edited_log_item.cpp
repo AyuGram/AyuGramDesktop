@@ -791,7 +791,16 @@ void GenerateItems(
 {
 	const auto session = &history->session();
 	const auto id = message.fakeId;
-	const auto from = history->owner().user(message.fromId);
+	PeerData* from = history->owner().userLoaded(message.fromId);
+	if (!from) {
+		from = history->owner().channelLoaded(message.fromId);
+	}
+	if (!from) {
+		from = reinterpret_cast<PeerData *>(history->owner().chatLoaded(message.fromId));
+	}
+	if (!from) {
+		return;
+	}
 	const auto date = message.entityCreateDate;
 	const auto addPart = [&](
 		not_null<HistoryItem *> item,

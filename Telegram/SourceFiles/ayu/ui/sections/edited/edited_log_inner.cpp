@@ -1424,7 +1424,6 @@ void InnerWidget::mouseActionCancel()
 	_mouseAction = MouseAction::None;
 	_dragStartPosition = QPoint(0, 0);
 	_wasSelectedText = false;
-	//_widget->noSelectingScroll(); // TODO
 }
 
 void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton button)
@@ -1640,99 +1639,6 @@ void InnerWidget::updateSelected()
 void InnerWidget::performDrag()
 {
 	if (_mouseAction != MouseAction::Dragging) return;
-
-	//auto uponSelected = false;
-	//if (_mouseActionItem) {
-	//	if (!_selected.isEmpty() && _selected.cbegin().value() == FullSelection) {
-	//		uponSelected = _selected.contains(_mouseActionItem);
-	//	} else {
-	//		StateRequest request;
-	//		request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
-	//		auto dragState = _mouseActionItem->textState(_dragStartPosition.x(), _dragStartPosition.y(), request);
-	//		uponSelected = (dragState.cursor == CursorState::Text);
-	//		if (uponSelected) {
-	//			if (_selected.isEmpty() ||
-	//				_selected.cbegin().value() == FullSelection ||
-	//				_selected.cbegin().key() != _mouseActionItem
-	//				) {
-	//				uponSelected = false;
-	//			} else {
-	//				uint16 selFrom = _selected.cbegin().value().from, selTo = _selected.cbegin().value().to;
-	//				if (dragState.symbol < selFrom || dragState.symbol >= selTo) {
-	//					uponSelected = false;
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-	//auto pressedHandler = ClickHandler::getPressed();
-
-	//if (dynamic_cast<VoiceSeekClickHandler*>(pressedHandler.data())) {
-	//	return;
-	//}
-
-	//TextWithEntities sel;
-	//QList<QUrl> urls;
-	//if (uponSelected) {
-	//	sel = getSelectedText();
-	//} else if (pressedHandler) {
-	//	sel = { pressedHandler->dragText(), EntitiesInText() };
-	//	//if (!sel.isEmpty() && sel.at(0) != '/' && sel.at(0) != '@' && sel.at(0) != '#') {
-	//	//	urls.push_back(QUrl::fromEncoded(sel.toUtf8())); // Google Chrome crashes in Mac OS X O_o
-	//	//}
-	//}
-	//if (auto mimeData = mimeDataFromTextWithEntities(sel)) {
-	//	updateDragSelection(0, 0, false);
-	//	_widget->noSelectingScroll();
-
-	//	if (!urls.isEmpty()) mimeData->setUrls(urls);
-	//	if (uponSelected && !Adaptive::OneColumn()) {
-	//		auto selectedState = getSelectionState();
-	//		if (selectedState.count > 0 && selectedState.count == selectedState.canForwardCount) {
-	//			session().data().setMimeForwardIds(getSelectedItems());
-	//			mimeData->setData(u"application/x-td-forward"_q, "1");
-	//		}
-	//	}
-	//	_controller->window()->launchDrag(std::move(mimeData));
-	//	return;
-	//} else {
-	//	auto forwardMimeType = QString();
-	//	auto pressedMedia = static_cast<HistoryView::Media*>(nullptr);
-	//	if (auto pressedItem = Element::Pressed()) {
-	//		pressedMedia = pressedItem->media();
-	//		if (_mouseCursorState == CursorState::Date) {
-	//			forwardMimeType = u"application/x-td-forward"_q;
-	//			session().data().setMimeForwardIds(
-	//				session().data().itemOrItsGroup(pressedItem->data()));
-	//		}
-	//	}
-	//	if (auto pressedLnkItem = Element::PressedLink()) {
-	//		if ((pressedMedia = pressedLnkItem->media())) {
-	//			if (forwardMimeType.isEmpty()
-	//				&& pressedMedia->dragItemByHandler(pressedHandler)) {
-	//				forwardMimeType = u"application/x-td-forward"_q;
-	//				session().data().setMimeForwardIds(
-	//					{ 1, pressedLnkItem->fullId() });
-	//			}
-	//		}
-	//	}
-	//	if (!forwardMimeType.isEmpty()) {
-	//		auto mimeData = std::make_unique<QMimeData>();
-	//		mimeData->setData(forwardMimeType, "1");
-	//		if (auto document = (pressedMedia ? pressedMedia->getDocument() : nullptr)) {
-	//			auto filepath = document->filepath(true);
-	//			if (!filepath.isEmpty()) {
-	//				QList<QUrl> urls;
-	//				urls.push_back(QUrl::fromLocalFile(filepath));
-	//				mimeData->setUrls(urls);
-	//			}
-	//		}
-
-	//		// This call enters event loop and can destroy any QObject.
-	//		_controller->window()->launchDrag(std::move(mimeData));
-	//		return;
-	//	}
-	//} // TODO
 }
 
 int InnerWidget::itemTop(not_null<const Element *> view) const
@@ -1758,6 +1664,7 @@ void InnerWidget::resizeItem(not_null<Element *> view)
 void InnerWidget::refreshItem(not_null<const Element *> view)
 {
 	// No need to refresh views in admin log.
+	// sogl
 }
 
 QPoint InnerWidget::mapPointToItem(QPoint point, const Element *view) const
