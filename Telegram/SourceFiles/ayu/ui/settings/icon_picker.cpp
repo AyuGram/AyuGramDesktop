@@ -31,7 +31,8 @@ const QVector<QString> icons{
 	AyuSettings::YAPLUS_ICON
 };
 
-const auto rows = icons.size() / 4 + std::min(1, icons.size() % 4);
+// `static_cast<int>()` fix Linux build
+const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
 
 void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected)
 {
@@ -63,7 +64,8 @@ void IconPicker::paintEvent(QPaintEvent *e)
 	PainterHighQualityEnabler hq(p);
 
 	for (int row = 0; row < rows; row++) {
-		const auto columns = std::min(4, icons.size() - row * 4);
+		// `static_cast<int>()` fix Linux build
+		const auto columns = std::min(4, static_cast<int>(icons.size()) - row * 4);
 		for (int i = 0; i < columns; i++) {
 			auto const idx = i + row * 4;
 
@@ -86,7 +88,8 @@ void IconPicker::mousePressEvent(QMouseEvent *e)
 
 	auto x = e->pos().x();
 	for (int row = 0; row < rows; row++) {
-		const auto columns = std::min(4, icons.size() - row * 4);
+		// `static_cast<int>()` fix Linux build
+		const auto columns = std::min(4, static_cast<int>(icons.size()) - row * 4);
 		for (int i = 0; i < columns; i++) {
 			auto const idx = i + row * 4;
 			auto const xOffset = (st::cpIconSize + st::cpSpacingX) * i + st::cpPadding;
