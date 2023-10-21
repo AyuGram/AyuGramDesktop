@@ -23,3 +23,5 @@ std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryIt
 
 void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
 void MarkAsReadThread(not_null<Data::Thread *> thread);
+
+QString formatTTL(int time);

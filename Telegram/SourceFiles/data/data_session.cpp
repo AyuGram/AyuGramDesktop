@@ -2697,22 +2697,6 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 		bool isDocument = media && media->document();
 
 		AyuMessages::getInstance().addEditedMessage(edit, existing);
-
-		if (!media || !(media->photo() || media->document()))
-		{
-			//            history->addNewLocalMessage(
-			//                    history->nextNonHistoryEntryId(),
-			//                    flags,
-			//                    UserId(),
-			//                    existing->id,
-			//                    base::unixtime::now(),
-			//                    existing->author()->id,
-			//                    "AyuGram"_q,
-			//                    msg,
-			//                    MTP_messageMediaEmpty(),
-			//                    HistoryMessageMarkupData(),
-			//                    existing->groupId().empty() ? 0 : existing->groupId().value);
-		}
 	}
 
 proceed:

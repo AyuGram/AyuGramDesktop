@@ -532,26 +532,29 @@ void GifsListWidget::selectInlineResult(
 		const auto preview = Data::VideoPreviewState(media.get());
 		if (forceSend || (media && preview.loaded())) {
 			auto settings = &AyuSettings::getInstance();
-			auto sendGIFCallback = [=, this]
-			{
-				_fileChosen.fire({
-					.document = document,
-					.options = options,
-					.messageSendingFrom = messageSendingFrom(),
-				});
-			};
 
-			if (settings->gifConfirmation)
-			{
+			if (settings->gifConfirmation) {
+				auto sendGIFCallback = [=, this]
+				{
+					_fileChosen.fire({
+										 .document = document,
+										 .options = options,
+										 .messageSendingFrom = messageSendingFrom(),
+									 });
+				};
+
 				Ui::show(Ui::MakeConfirmBox({
-					.text = tr::ayu_ConfirmationGIF(),
-					.confirmed = sendGIFCallback,
-					.confirmText = tr::lng_send_button()
-				}));
+												.text = tr::ayu_ConfirmationGIF(),
+												.confirmed = sendGIFCallback,
+												.confirmText = tr::lng_send_button()
+											}));
 			}
-			else
-			{
-				sendGIFCallback();
+			else {
+				_fileChosen.fire({
+									 .document = document,
+									 .options = options,
+									 .messageSendingFrom = messageSendingFrom(),
+								 });
 			}
 		} else if (!preview.usingThumbnail()) {
 			if (preview.loading()) {

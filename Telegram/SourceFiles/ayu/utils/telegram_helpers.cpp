@@ -10,6 +10,7 @@
 
 #include "api/api_text_entities.h"
 
+#include "lang_auto.h"
 #include "apiwrap.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
@@ -222,4 +223,12 @@ void MarkAsReadThread(not_null<Data::Thread *> thread)
 	if (thread->unreadReactions().has()) {
 		sendReadReactions(thread);
 	}
+}
+
+QString formatTTL(int time) {
+	if (time == 0x7FFFFFFF) {
+		return QString("👀 %1").arg(tr::ayu_OneViewTTL(tr::now));
+	}
+
+	return QString("🕓 %1s").arg(time);
 }

@@ -2207,24 +2207,21 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		const auto duration = Duration(data.samples);
 
 		auto settings = &AyuSettings::getInstance();
-		if (type == StopType::Send)
-		{
-			auto sendVoiceCallback = [=, this]
-			{
-				_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
-			};
+		if (type == StopType::Send) {
+			if (settings->voiceConfirmation) {
+				auto sendVoiceCallback = [=, this]
+				{
+					_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
+				};
 
-			if (settings->voiceConfirmation)
-			{
 				Ui::show(AyuUi::MakeConfirmBox({
-					.text = tr::ayu_ConfirmationVoice(),
-					.confirmed = sendVoiceCallback,
-					.confirmText = tr::lng_send_button()
-				}));
+												   .text = tr::ayu_ConfirmationVoice(),
+												   .confirmed = sendVoiceCallback,
+												   .confirmText = tr::lng_send_button()
+											   }));
 			}
-			else
-			{
-				sendVoiceCallback();
+			else {
+				_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
 			}
 		} else if (type == StopType::Listen) {
 			_listen = std::make_unique<ListenWrap>(
@@ -2308,16 +2305,18 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		const auto data = _listen->data();
 		auto settings = &AyuSettings::getInstance();
 
-		auto sendVoiceCallback = [=, this]
-		{
-			_sendVoiceRequests.fire({
-				data->bytes,
-				data->waveform,
-				Duration(data->samples),
-				options
-			});
-		};
+		if (settings->voiceConfirmation) {
+			auto sendVoiceCallback = [=, this]
+			{
+				_sendVoiceRequests.fire({
+											data->bytes,
+											data->waveform,
+											Duration(data->samples),
+											options
+										});
+			};
 
+<<<<<<< HEAD
 <<<<<<< HEAD
         if (settings->voiceConfirmation) {
             Ui::show(AyuUi::MakeConfirmBox({
@@ -2333,15 +2332,21 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 =======
 		if (settings->voiceConfirmation)
 		{
+=======
+>>>>>>> b2ce1d2d15 (fix: a bunch of fixes)
 			Ui::show(AyuUi::MakeConfirmBox({
-				.text = tr::ayu_ConfirmationVoice(),
-				.confirmed = sendVoiceCallback,
-				.confirmText = tr::lng_send_button()
-			}));
+											   .text = tr::ayu_ConfirmationVoice(),
+											   .confirmed = sendVoiceCallback,
+											   .confirmText = tr::lng_send_button()
+										   }));
 		}
-		else
-		{
-			sendVoiceCallback();
+		else {
+			_sendVoiceRequests.fire({
+										data->bytes,
+										data->waveform,
+										Duration(data->samples),
+										options
+									});
 		}
 >>>>>>> f72e7178f5 (fix: reformat with resharper)
 	}

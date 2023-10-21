@@ -73,6 +73,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
 
 
 namespace {
@@ -291,7 +292,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 		});
 	}, [&](const MTPDmessageMediaDocument &media) -> Result {
 		const auto document = media.vdocument();
-		if (media.vttl_seconds() && media.is_video()) {
+		if (media.vttl_seconds() && false) {  // AyuGram: show expiring messages
 			LOG(("App Error: "
 				"Unexpected MTPMessageMediaDocument "
 				"with ttl_seconds in CreateMedia."));
@@ -438,15 +439,15 @@ HistoryItem::HistoryItem(
 		applyTTL(data);
 	} else {
 		createComponents(data);
-		if (const auto media = data.vmedia()) {
+		if (media) {
 			setMedia(*media);
 			if (checked == MediaCheckResult::HasTimeToLive) {
 				media->match([&](const MTPDmessageMediaPhoto &media) {
 					auto time = media.vttl_seconds()->v;
-					setAyuHint("🕓 " + QString::number(time) + "s");
+					setAyuHint(formatTTL(time));
 				}, [&](const MTPDmessageMediaDocument &media) {
 					auto time = media.vttl_seconds()->v;
-					setAyuHint("🕓 " + QString::number(time) + "s");
+					setAyuHint(formatTTL(time));
 				}, [&](const MTPDmessageMediaWebPage &media) {
 				}, [&](const MTPDmessageMediaGame &media) {
 				}, [&](const MTPDmessageMediaInvoice &media) {
