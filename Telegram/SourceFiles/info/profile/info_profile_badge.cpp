@@ -21,6 +21,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "styles/style_info.h"
 
+// AyuGram includes
+#include "styles/style_ayu_icons.h"
+
+
 namespace Info::Profile {
 namespace {
 
@@ -155,6 +159,16 @@ void Badge::setContent(Content content) {
 					? st::windowSubTextFg
 					: st::attentionButtonFg));
 			}, _view->lifetime());
+	} break;
+	case BadgeType::AyuGram:
+	case BadgeType::Extera: {
+		const auto icon = &st::infoExteraBadge;
+		_view->resize(icon->size());
+		_view->paintRequest(
+		) | rpl::start_with_next([=, check = _view.data()]{
+			Painter p(check);
+			icon->paint(p, 0, 0, check->width());
+		}, _view->lifetime());
 	} break;
 	}
 

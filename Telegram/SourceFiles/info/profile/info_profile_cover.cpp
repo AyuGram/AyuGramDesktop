@@ -58,6 +58,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_dialogs.h"
 #include "styles/style_menu_icons.h"
 
+// AyuGram includes
+#include "ayu/utils/telegram_helpers.h"
+
+
 namespace Info::Profile {
 namespace {
 
@@ -636,19 +640,16 @@ Cover::Cover(
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
 		}))
-, _verified(
-	std::make_unique<Badge>(
-		this,
-		st::infoPeerBadge,
-		&peer->session(),
-		VerifiedContentForPeer(peer),
-		_emojiStatusPanel.get(),
-		[=] {
-			return controller->isGifPausedAtLeastFor(
-				Window::GifPauseReason::Layer);
-		}))
-, _parentForTooltip(std::move(parentForTooltip))
-, _badgeTooltipHide([=] { hideBadgeTooltip(); })
+, _devBadge(
+		std::make_unique<Badge>(
+			this,
+			st::infoPeerBadge,
+			peer,
+			_emojiStatusPanel.get(),
+			[=] {
+				return controller->isGifPausedAtLeastFor(
+					Window::GifPauseReason::Layer);
+			}))
 , _userpic(topic
 	? nullptr
 	: object_ptr<Ui::UserpicButton>(
@@ -718,6 +719,16 @@ Cover::Cover(
 	) | rpl::start_with_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
+
+	if (isAyuGramRelated(getBareID(_peer))) {
+		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::AyuGram});
+	}
+	else if (isExteraRelated(getBareID(_peer))) {
+		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
+	}
+	else {
+		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
+	}
 
 	initViewers(std::move(title));
 	setupChildGeometry();
@@ -1127,10 +1138,18 @@ void Cover::refreshNameGeometry(int newWidth) {
 	_name->moveToLeft(nameLeft, _st.nameTop, newWidth);
 	const auto badgeLeft = nameLeft + _name->width();
 	_badge->move(badgeLeft, badgeTop, badgeBottom);
+<<<<<<< HEAD
 	_verified->move(
 		badgeLeft + (badgeWidget ? badgeWidget->width() : 0),
 		badgeTop,
 		badgeBottom);
+=======
+
+	const auto devBadgeLeft = badgeLeft + (_badge->widget() ? (_badge->widget()->width() + 2) : 0) + 4;
+	const auto devBadgeTop = _st.nameTop;
+	const auto devBadgeBottom = _st.nameTop + _name->height();
+	_devBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
+>>>>>>> 8e7b12a23a (feat: add dev badges)
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {

@@ -38,11 +38,11 @@ class EmojiStatusPanel;
 enum class BadgeType : uchar {
 	None = 0x00,
 	Verified = 0x01,
-	BotVerified = 0x02,
-	Premium = 0x04,
-	Scam = 0x08,
-	Fake = 0x10,
-	Direct = 0x20,
+	Premium = 0x02,
+	Scam = 0x04,
+	Fake = 0x08,
+	AyuGram = 0x10,
+	Extera = 0x20,
 };
 inline constexpr bool is_flag_type(BadgeType) { return true; }
 
@@ -75,9 +75,9 @@ public:
 
 	[[nodiscard]] Data::CustomEmojiSizeTag sizeTag() const;
 
-private:
 	void setContent(Content content);
 
+private:
 	const not_null<QWidget*> _parent;
 	const style::InfoPeerBadge &_st;
 	const not_null<Main::Session*> _session;

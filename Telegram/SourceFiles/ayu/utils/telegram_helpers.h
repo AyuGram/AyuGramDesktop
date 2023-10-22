@@ -21,6 +21,11 @@ not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session);
 ID getDialogIdFromPeer(not_null<PeerData *> peer);
 std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);
 
+ID getBareID(not_null<PeerData *> peer);
+
+bool isAyuGramRelated(ID peerId);
+bool isExteraRelated(ID peerId);
+
 void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
 void MarkAsReadThread(not_null<Data::Thread *> thread);
 

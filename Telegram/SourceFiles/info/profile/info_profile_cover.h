@@ -160,7 +160,7 @@ private:
 	const std::unique_ptr<Badge> _botVerify;
 	rpl::variable<Badge::Content> _badgeContent;
 	const std::unique_ptr<Badge> _badge;
-	const std::unique_ptr<Badge> _verified;
+	const std::unique_ptr<Badge> _devBadge;
 	rpl::variable<int> _onlineCount;
 
 	const Fn<not_null<QWidget*>()> _parentForTooltip;

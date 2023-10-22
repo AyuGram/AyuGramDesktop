@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2023
 #include "ayu_profile_values.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "data/data_peer.h"
 #include "ui/text/text_utilities.h"
 
@@ -14,13 +15,7 @@ constexpr auto kMaxChannelId = -1000000000000;
 
 QString IDString(not_null<PeerData *> peer)
 {
-	auto resultId = QString::number(peerIsUser(peer->id)
-									? peerToUser(peer->id).bare
-									: peerIsChat(peer->id)
-									  ? peerToChat(peer->id).bare
-									  : peerIsChannel(peer->id)
-										? peerToChannel(peer->id).bare
-										: peer->id.value);
+	auto resultId = QString::number(getBareID(peer));
 
 	const auto settings = &AyuSettings::getInstance();
 	if (settings->showPeerId == 2) {
