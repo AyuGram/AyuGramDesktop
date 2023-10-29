@@ -615,11 +615,11 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 				flags |= MessageFlag::Post;
 			}
 
-            FullReplyTo replyTo = {
-                    .msgId = item->id,
-                    .topicRootId = item->topicRootId(),
-                    .storyId = {}
-            };
+			FullReplyTo replyTo = {
+				.messageId = item->fullId(),
+				.storyId = {},
+				.topicRootId = item->topicRootId(),
+			};
 
 			addNewLocalMessage(
 				session().data().nextLocalMessageId(),
