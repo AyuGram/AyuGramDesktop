@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=AyuGram Desktop
+Comment=Desktop version of AyuGram - ToS breaking Telegram client
+TryExec=ayugram-desktop
+Exec=DESKTOPINTEGRATION=1 ayugram-desktop -- %u
+Icon=ayugram
+Terminal=false
+StartupWMClass=AyuGram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=ayugram-desktop -quit
+Name=Quit AyuGram
+Icon=application-exit
