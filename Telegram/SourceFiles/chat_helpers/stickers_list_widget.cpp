@@ -1891,37 +1891,27 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 				showStickerSetBox(document, set.id);
 			} else {
 				auto settings = &AyuSettings::getInstance();
-				if (settings->stickerConfirmation)
-				{
-					// it is necessary to store it here, because section & index can be changed by cursor position (guess)
-					int currentSection = sticker->section;
-					int currentIndex = sticker->index;
-					auto sendStickerCallback = [=, this]
-					{
-						_chosen.fire({
-							.document = document,
-							.messageSendingFrom = messageSentAnimationInfo(
-								currentSection,
-								currentIndex,
-								document),
-						});
-					};
-
-					Ui::show(Ui::MakeConfirmBox({
-						.text = tr::ayu_ConfirmationSticker(),
-						.confirmed = sendStickerCallback,
-						.confirmText = tr::lng_send_button()
-					}));
-				}
-				else
+				auto from = messageSentAnimationInfo(
+					sticker->section,
+					sticker->index,
+					document);
+				auto sendStickerCallback = crl::guard(this, [=, this]
 				{
 					_chosen.fire({
-						.document = document,
-						.messageSendingFrom = messageSentAnimationInfo(
-							sticker->section,
-							sticker->index,
-							document),
-					});
+									 .document = document,
+									 .messageSendingFrom = from,
+								 });
+				});
+
+				if (settings->stickerConfirmation) {
+					Ui::show(Ui::MakeConfirmBox({
+													.text = tr::ayu_ConfirmationSticker(),
+													.confirmed = sendStickerCallback,
+													.confirmText = tr::lng_send_button()
+												}));
+				}
+				else {
+					sendStickerCallback();
 				}
 			}
 		} else if (auto set = std::get_if<OverSet>(&pressed)) {

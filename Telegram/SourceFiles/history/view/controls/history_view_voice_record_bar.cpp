@@ -2206,14 +2206,14 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		window()->activateWindow();
 		const auto duration = Duration(data.samples);
 
-		auto settings = &AyuSettings::getInstance();
 		if (type == StopType::Send) {
-			if (settings->voiceConfirmation) {
-				auto sendVoiceCallback = [=, this]
-				{
-					_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
-				};
+			auto settings = &AyuSettings::getInstance();
+			auto sendVoiceCallback = crl::guard(this, [=, this]
+			{
+				_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
+			});
 
+			if (settings->voiceConfirmation) {
 				Ui::show(AyuUi::MakeConfirmBox({
 												   .text = tr::ayu_ConfirmationVoice(),
 												   .confirmed = sendVoiceCallback,
@@ -2221,7 +2221,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 											   }));
 			}
 			else {
-				_sendVoiceRequests.fire({data.bytes, data.waveform, duration});
+				sendVoiceCallback();
 			}
 		} else if (type == StopType::Listen) {
 			_listen = std::make_unique<ListenWrap>(
@@ -2292,17 +2292,26 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 	if (isListenState()) {
 		const auto data = _listen->data();
 		auto settings = &AyuSettings::getInstance();
+		auto sendVoiceCallback = crl::guard(this, [=, this]
+		{
+			_sendVoiceRequests.fire({
+										data->bytes,
+										data->waveform,
+										Duration(data->samples),
+										options
+									});
+		});
 
-        if (settings->voiceConfirmation) {
-            Ui::show(AyuUi::MakeConfirmBox({
-                    .text = rpl::single(QString("Do you want to send voice message?")),
-                    .confirmed = sendVoiceCallback,
-                    .confirmText = rpl::single(QString("Send"))
-            }));
-        }
-        else {
-            sendVoiceCallback();
-        }
+		if (settings->voiceConfirmation) {
+			Ui::show(AyuUi::MakeConfirmBox({
+											   .text = tr::ayu_ConfirmationVoice(),
+											   .confirmed = sendVoiceCallback,
+											   .confirmText = tr::lng_send_button()
+										   }));
+		}
+		else {
+			sendVoiceCallback();
+		}
 	}
 }
 
