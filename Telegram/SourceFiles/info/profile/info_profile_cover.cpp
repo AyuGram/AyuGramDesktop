@@ -649,7 +649,7 @@ Cover::Cover(
 			[=] {
 				return controller->isGifPausedAtLeastFor(
 					Window::GifPauseReason::Layer);
-			}))
+			}, 0, BadgeType::None | BadgeType::AyuGram | BadgeType::Extera))
 , _userpic(topic
 	? nullptr
 	: object_ptr<Ui::UserpicButton>(
@@ -729,6 +729,10 @@ Cover::Cover(
 	else {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
 	}
+
+	_devBadge->updated() | rpl::start_with_next([=] {
+		refreshNameGeometry(width());
+	}, _name->lifetime());
 
 	initViewers(std::move(title));
 	setupChildGeometry();
@@ -1116,13 +1120,13 @@ void Cover::refreshNameGeometry(int newWidth) {
 	if (verifiedWidget) {
 		nameWidth -= verifiedWidget->width();
 	}
-	if (badgeWidget) {
-		nameWidth -= badgeWidget->width();
+
+	if (const auto widget = _devBadge->widget()) {
+		nameWidth -= st::infoVerifiedCheckPosition.x() + widget->width();
 	}
-	if (verifiedWidget || badgeWidget) {
-		nameWidth -= st::infoVerifiedCheckPosition.x();
-	}
-	auto nameLeft = _st.nameLeft;
+	_name->resizeToNaturalWidth(nameWidth);
+	_name->moveToLeft(_st.nameLeft, _st.nameTop, newWidth);
+	const auto badgeLeft = _st.nameLeft + _name->width();
 	const auto badgeTop = _st.nameTop;
 	const auto badgeBottom = _st.nameTop + _name->height();
 	const auto margins = LargeCustomEmojiMargins();
@@ -1138,18 +1142,11 @@ void Cover::refreshNameGeometry(int newWidth) {
 	_name->moveToLeft(nameLeft, _st.nameTop, newWidth);
 	const auto badgeLeft = nameLeft + _name->width();
 	_badge->move(badgeLeft, badgeTop, badgeBottom);
-<<<<<<< HEAD
-	_verified->move(
-		badgeLeft + (badgeWidget ? badgeWidget->width() : 0),
-		badgeTop,
-		badgeBottom);
-=======
 
 	const auto devBadgeLeft = badgeLeft + (_badge->widget() ? (_badge->widget()->width() + 2) : 0) + 4;
 	const auto devBadgeTop = _st.nameTop;
 	const auto devBadgeBottom = _st.nameTop + _name->height();
 	_devBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
->>>>>>> 8e7b12a23a (feat: add dev badges)
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {
