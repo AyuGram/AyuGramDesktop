@@ -566,8 +566,8 @@ rightsToggle: Toggle(defaultToggle) {
 	toggledFg: windowBgActive;
 	untoggledFg: attentionButtonFg;
 	lockIcon: icon {{ "info/info_rights_lock", windowBgActive }};
-	xsize: 8px;
-	vsize: 5px;
+	xsize: 0px;
+	vsize: 0px;
 	vshift: 1px;
 	stroke: 2px;
 	duration: universalDuration;
