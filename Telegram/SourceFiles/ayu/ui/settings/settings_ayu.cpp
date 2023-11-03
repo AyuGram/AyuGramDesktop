@@ -62,23 +62,17 @@ base::options::toggle StreamerMode(
 	}
 );
 
-not_null<Ui::RpWidget *> AddInnerToggle(
-	not_null<Ui::VerticalLayout *> container,
-	const style::SettingsButton &st,
-	std::vector<not_null<Ui::AbstractCheckView *>> innerCheckViews,
-	not_null<Ui::SlideWrap<> *> wrap,
-	rpl::producer<QString> buttonLabel,
-	std::optional<QString> locked,
-	bool toggledWhenAll,
-	Settings::IconDescriptor &&icon)
+not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container,
+										const style::SettingsButton &st,
+										std::vector<not_null<Ui::AbstractCheckView *>> innerCheckViews,
+										not_null<Ui::SlideWrap<> *> wrap,
+										rpl::producer<QString> buttonLabel,
+										bool toggledWhenAll)
 {
 	const auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
 		nullptr,
-		st));
-	if (icon) {
-		AddButtonIcon(button, st, std::move(icon));
-	}
+		st::settingsButtonNoIcon));
 
 	const auto toggleButton = Ui::CreateChild<Ui::SettingsButton>(
 		container.get(),
@@ -175,7 +169,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 																			   anim::type::normal);
 													 }
 												 }, toggleButton->lifetime());
-	checkView->setLocked(locked.has_value());
+	checkView->setLocked(false);
 	checkView->finishAnimating();
 
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
@@ -244,31 +238,18 @@ not_null<Ui::RpWidget *> AddInnerToggle(
 											   st::slideWrapDuration);
 									   }, button->lifetime());
 
-	const auto handleLocked = [=]
-	{
-		if (locked.has_value()) {
-			Ui::Toast::Show(container, *locked);
-			return true;
-		}
-		return false;
-	};
-
 	button->clicks(
 	) | start_with_next([=]
 						{
-							if (!handleLocked()) {
-								wrap->toggle(!wrap->toggled(), anim::type::normal);
-							}
+							wrap->toggle(!wrap->toggled(), anim::type::normal);
 						}, button->lifetime());
 
 	toggleButton->clicks(
 	) | start_with_next([=]
 						{
-							if (!handleLocked()) {
-								const auto checked = !checkView->checked();
-								for (const auto &innerCheck : state->innerChecks) {
-									innerCheck->setChecked(checked, anim::type::normal);
-								}
+							const auto checked = !checkView->checked();
+							for (const auto &innerCheck : state->innerChecks) {
+								innerCheck->setChecked(checked, anim::type::normal);
 							}
 						}, toggleButton->lifetime());
 
@@ -476,9 +457,7 @@ void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 		innerChecks,
 		raw,
 		tr::ayu_GhostModeToggle(),
-		std::nullopt,
-		true,
-		{});
+		true);
 	container->add(std::move(wrap));
 	container->widthValue(
 	) | start_with_next([=](int w)
@@ -598,9 +577,7 @@ void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 		innerChecks,
 		raw,
 		tr::ayu_MarkReadAfterAction(),
-		std::nullopt,
-		false,
-		{});
+		false);
 	container->add(std::move(wrap));
 	container->widthValue(
 	) | start_with_next([=](int w)
