@@ -507,8 +507,10 @@ not_null<Ui::RpWidget*> AddInnerToggle(
 			[=] { arrow->update(); },
 			toggled ? 0. : 1.,
 			toggled ? 1. : 0.,
-			st::slideWrapDuration);
+			st::slideWrapDuration,
+			anim::easeOutCubic);
 	}, button->lifetime());
+	wrap->ease = anim::easeOutCubic;
 
 	const auto handleLocked = [=] {
 		if (locked.has_value()) {

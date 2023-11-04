@@ -235,8 +235,10 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 											   { arrow->update(); },
 											   toggled ? 0. : 1.,
 											   toggled ? 1. : 0.,
-											   st::slideWrapDuration);
+											   st::slideWrapDuration,
+											   anim::easeOutCubic);
 									   }, button->lifetime());
+	wrap->ease = anim::easeOutCubic;
 
 	button->clicks(
 	) | start_with_next([=]
