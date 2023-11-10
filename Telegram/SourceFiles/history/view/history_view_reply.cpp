@@ -35,6 +35,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -727,13 +731,15 @@ void Reply::paint(
 			inBubble,
 			colorIndexPlusOne)]
 		: nullptr;
-	const auto rippleColor = cache->bg;
+	const auto rippleColor = cache->bg2;
 	if (!inBubble) {
 		cache->bg = QColor(0, 0, 0, 0);
 	}
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
-	if (backgroundEmoji) {
+
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->simpleQuotesAndReplies && backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
 			backgroundEmoji,

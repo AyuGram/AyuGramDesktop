@@ -7045,6 +7045,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram keys generated
 
 "ayu_AyuPreferences" = "AyuGram Preferences";
+"ayu_DocsText" = "Documentation";
 "ayu_GhostEssentialsHeader" = "Ghost essentials";
 "ayu_DontReadMessages" = "Don't read messages";
 "ayu_DontReadStories" = "Don't read stories";
@@ -7105,6 +7106,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_EnableExpression" = "Enable expression";
 "ayu_CaseInsensitiveExpression" = "Case insensitive expression";
 "ayu_RegexFiltersAddError" = "Regex syntax error";
+"ayu_RegexFilterQuickAdd" = "Add filter";
 "ayu_AyuSyncHeader" = "AyuSync";
 "ayu_AyuSyncStatusTitle" = "Sync status";
 "ayu_AyuSyncStatusOk" = "connected";
@@ -7127,7 +7129,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AyuSyncDownloadAgent" = "Download agent";
 "ayu_IconDefault" = "Default";
 "ayu_IconAlternative" = "AyuGram Alt";
+"ayu_IconDiscord" = "Discord";
+"ayu_IconSpotify" = "Spotify";
+"ayu_IconExtera" = "extera";
 "ayu_IconNothing" = "Nothing";
+"ayu_IconBard" = "Google Bard";
+"ayu_IconYaPlus" = "Yandex Plus";
 "ayu_WALMode" = "Enable WAL mode";
 "ayu_PushNotificationCount" = "FCM notifications received";
 "ayu_ClearAyuDatabase" = "Clear Ayu Database";
@@ -7154,8 +7161,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableStreamerModeTray" = "Disable Streamer Mode";
 "ayu_EditsHistoryTitle" = "Edits history";
 "ayu_EditsHistoryMenuText" = "History";
+"ayu_PeekOnlineMenuText" = "Peek Online";
 "ayu_ClearDeletedMenuText" = "Clear Deleted";
 "ayu_ViewFiltersMenuText" = "View Filters";
+"ayu_PeekOnlineSuccess" = "Peeked via";
 "ayu_OneViewTTL" = "one view";
 "ayu_ReadUntilMenuText" = "Read Message";
 "ayu_DeleteKeepLocally" = "Keep locally";
@@ -7166,11 +7175,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ClearDeletedMessagesText" = "Are you sure you want to clear all deleted messages in this chat?";
 "ayu_ClearDeletedMessagesActionText" = "Clear";
 "ayu_SuggestGhostModeTitle" = "Ghost Mode";
-"ayu_SuggestGhostModeStoryText" = "Do you want to enable Ghost Mode before viewing the story?";
-"ayu_SuggestGhostModeStoryActionText" = "Enable";
+"ayu_SuggestGhostModeStoryText" = "Do you want to enable **Ghost Mode** before viewing the story?";
+"ayu_SuggestGhostModeStoryActionTextYes" = "Yes";
+"ayu_SuggestGhostModeStoryActionTextNo" = "No";
 "ayu_HideNextViewsDescriptionAyu" = "Hide my views forever, until Ghost Mode disabled.";
 "ayu_EnableGhostModeStories" = "Enable Ghost Mode";
 "ayu_GhostModeIsActive" = "Ghost Mode Is Active";
+"ayu_SimpleQuotesAndReplies" = "Simple quotes & replies";
 "ayu_MainFont" = "Application font";
 "ayu_MonospaceFont" = "Monospace font";
 "ayu_FontDefault" = "Default";
@@ -7180,6 +7191,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AyuForwardForwardingDescription" = "Please keep this window open while AyuGram is forwarding your messages.";
 "ayu_AyuForwardLoadingMediaDescription" = "Please keep this window open while AyuGram is downloading media from your messages.";
 "ayu_DeleteDateMenuText" = "Delete Date";
+"ayu_ForwardableMenuText" = "Forwardable";
+"ayu_ForwardableMenuTextNo" = "No";
 "ayu_LikelyOfflineStatus" = "offline ?";
 "ayu_GhostModeShortcut" = "Enter with Ghost";
 "ayu_SettingsShowMessageSeconds" = "Show message seconds";

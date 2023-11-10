@@ -802,6 +802,22 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 
 	AddButton(
 		container,
+		tr::ayu_SimpleQuotesAndReplies(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->simpleQuotesAndReplies)
+	)->toggledValue(
+	) | rpl::filter([=](bool enabled)
+					{
+						return (enabled != settings->simpleQuotesAndReplies);
+					}) | start_with_next([=](bool enabled)
+										 {
+											 settings->set_simpleQuotesAndReplies(enabled);
+											 AyuSettings::save();
+										 }, container->lifetime());
+
+	AddButton(
+		container,
 		tr::ayu_ShowGhostToggleInDrawer(),
 		st::settingsButtonNoIcon
 	)->toggleOn(

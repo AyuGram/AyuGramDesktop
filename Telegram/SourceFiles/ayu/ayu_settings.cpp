@@ -265,6 +265,10 @@ void AyuGramSettings::set_appIcon(QString val)
 	appIcon = std::move(val);
 }
 
+void AyuGramSettings::set_simpleQuotesAndReplies(bool val) {
+	simpleQuotesAndReplies = val;
+}
+
 void AyuGramSettings::set_deletedMark(QString val)
 {
 	deletedMark = std::move(val);

@@ -17,6 +17,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Ui {
 namespace {
 
@@ -39,8 +43,14 @@ void EnsureBlockquoteCache(
 	cache = std::make_unique<Text::QuotePaintCache>();
 	const auto &colors = values();
 	cache->bg = colors.bg;
+	cache->bg2 = colors.bg;
 	cache->outlines = colors.outlines;
 	cache->icon = colors.name;
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->simpleQuotesAndReplies) {
+		cache->bg = QColor(0, 0, 0, 0);
+	}
 }
 
 void EnsurePreCache(

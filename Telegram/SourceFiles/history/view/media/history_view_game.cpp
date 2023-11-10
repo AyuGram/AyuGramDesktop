@@ -231,7 +231,7 @@ void Game::draw(Painter &p, const PaintContext &context) const {
 	Ui::Text::FillQuotePaint(p, outer, *cache, _st);
 
 	if (_ripple) {
-		_ripple->paint(p, outer.x(), outer.y(), width(), &cache->bg);
+		_ripple->paint(p, outer.x(), outer.y(), width(), &cache->bg2);
 		if (_ripple->empty()) {
 			_ripple = nullptr;
 		}

@@ -60,6 +60,7 @@ public:
 
 		// ~ Customization
 		appIcon = DEFAULT_ICON;
+		simpleQuotesAndReplies = true;
 		deletedMark = "🧹";
 		editedMark = tr::lng_edited(tr::now);
 		recentStickersCount = 20;
@@ -100,6 +101,7 @@ public:
 	bool localPremium;
 	bool copyUsernameAsLink;
 	QString appIcon;
+	bool simpleQuotesAndReplies;
 	QString deletedMark;
 	QString editedMark;
 	int recentStickersCount;
@@ -149,6 +151,8 @@ public:
 	void set_copyUsernameAsLink(bool val);
 
 	void set_appIcon(QString val);
+
+	void set_simpleQuotesAndReplies(bool val);
 
 	void set_deletedMark(QString val);
 
