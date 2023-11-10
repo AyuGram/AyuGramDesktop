@@ -807,22 +807,6 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 
 	AddButton(
 		container,
-		tr::ayu_ShowGhostToggleInDrawer(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->showGhostToggleInDrawer)
-	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showGhostToggleInDrawer);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showGhostToggleInDrawer(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
-
-	AddButton(
-		container,
 		tr::ayu_SettingsShowMessageSeconds(),
 		st::settingsButtonNoIcon
 	)->toggleOn(

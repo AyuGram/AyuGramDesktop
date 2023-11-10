@@ -103,23 +103,25 @@ void Tray::rebuildMenu() {
 
 	auto settings = &AyuSettings::getInstance();
 
-	auto turnGhostModeText = _textUpdates.events(
-	) | rpl::map([=]
-	{
-		bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
+	if (settings->showGhostToggleInTray) {
+		auto turnGhostModeText = _textUpdates.events(
+		) | rpl::map([=]
+					 {
+						 bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
 
-		return ghostModeEnabled
-			       ? tr::ayu_DisableGhostModeTray(tr::now)
-			       : tr::ayu_EnableGhostModeTray(tr::now);
-	});
-	_tray.addAction(std::move(turnGhostModeText), [=]
-	{
-		bool ghostMode = AyuSettings::get_ghostModeEnabled();
+						 return ghostModeEnabled
+								? tr::ayu_DisableGhostModeTray(tr::now)
+								: tr::ayu_EnableGhostModeTray(tr::now);
+					 });
+		_tray.addAction(std::move(turnGhostModeText), [=]
+		{
+			bool ghostMode = AyuSettings::get_ghostModeEnabled();
 
-		settings->set_ghostModeEnabled(!ghostMode);
+			settings->set_ghostModeEnabled(!ghostMode);
 
-		AyuSettings::save();
-	});
+			AyuSettings::save();
+		});
+	}
 
 	if (settings->showStreamerToggleInTray) {
 		auto turnStreamerModeText = _textUpdates.events(
