@@ -101,6 +101,8 @@ void Tray::rebuildMenu() {
 			[=] { toggleSoundNotifications(); });
 	}
 
+	auto settings = &AyuSettings::getInstance();
+
 	auto turnGhostModeText = _textUpdates.events(
 	) | rpl::map([=]
 	{
@@ -112,7 +114,6 @@ void Tray::rebuildMenu() {
 	});
 	_tray.addAction(std::move(turnGhostModeText), [=]
 	{
-		auto settings = &AyuSettings::getInstance();
 		bool ghostMode = AyuSettings::get_ghostModeEnabled();
 
 		settings->set_ghostModeEnabled(!ghostMode);
@@ -120,7 +121,7 @@ void Tray::rebuildMenu() {
 		AyuSettings::save();
 	});
 
-	if (StreamerMode.value()) {
+	if (settings->showStreamerToggleInTray) {
 		auto turnStreamerModeText = _textUpdates.events(
 		) | rpl::map([=] {
 			bool streamerModeEnabled = AyuFeatures::StreamerMode::isEnabled();

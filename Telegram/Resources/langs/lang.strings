@@ -7093,6 +7093,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SettingsShowID_Hide" = "Hide";
 "ayu_SettingsRecentStickersCount" = "Recent stickers count";
 "ayu_SettingsCustomizationHint" = "After making changes to the \"Customization\" section, you must restart the application.";
+"ayu_DrawerElementsHeader" = "Drawer Elements";
+"ayu_TrayElementsHeader" = "Tray Elements";
 "ayu_RegexFilters" = "Message Filters";
 "ayu_RegexFiltersAmount" = "filters";
 "ayu_RegexFiltersHeader" = "Filters";

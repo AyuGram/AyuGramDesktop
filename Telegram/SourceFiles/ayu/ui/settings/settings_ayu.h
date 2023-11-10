@@ -17,10 +17,6 @@ class Controller;
 class SessionController;
 } // namespace Window
 
-extern const char kStreamerMode[];
-
-extern base::options::toggle StreamerMode;
-
 namespace Settings
 {
 
@@ -53,6 +49,10 @@ private:
 	void SetupCustomization(not_null<Ui::VerticalLayout *> container,
 							not_null<Window::SessionController *> controller);
 
+	void SetupDrawerElements(not_null<Ui::VerticalLayout *> container);
+
+	void SetupTrayElements(not_null<Ui::VerticalLayout *> container);
+
 	void SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
 
 	void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container);
@@ -62,9 +62,6 @@ private:
 	void SetupAyuSync(not_null<Ui::VerticalLayout *> container);
 
 	void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container);
-
-	void SetupExperimental(not_null<Ui::VerticalLayout *> container,
-						   not_null<Window::SessionController *> controller);
 
 	void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> null);
 

@@ -63,8 +63,16 @@ public:
 		simpleQuotesAndReplies = true;
 		deletedMark = "🧹";
 		editedMark = tr::lng_edited(tr::now);
-		recentStickersCount = 20;
+		recentStickersCount = 50;
+
+		showLReadToggleInDrawer = true;
+		showSReadToggleInDrawer = true;
 		showGhostToggleInDrawer = true;
+		showStreamerToggleInDrawer = false;
+
+		showGhostToggleInTray = true;
+		showStreamerToggleInTray = false;
+
 		mainFont = "";
 		monoFont = "";
 
@@ -105,7 +113,12 @@ public:
 	QString deletedMark;
 	QString editedMark;
 	int recentStickersCount;
+	bool showLReadToggleInDrawer;
+	bool showSReadToggleInDrawer;
 	bool showGhostToggleInDrawer;
+	bool showStreamerToggleInDrawer;
+	bool showGhostToggleInTray;
+	bool showStreamerToggleInTray;
 	QString mainFont;
 	QString monoFont;
 	int showPeerId;
@@ -160,7 +173,17 @@ public:
 
 	void set_recentStickersCount(int val);
 
+	void set_showLReadToggleInDrawer(bool val);
+
+	void set_showSReadToggleInDrawer(bool val);
+
 	void set_showGhostToggleInDrawer(bool val);
+
+	void set_showStreamerToggleInDrawer(bool val);
+
+	void set_showGhostToggleInTray(bool val);
+
+	void set_showStreamerToggleInTray(bool val);
 
 	void set_mainFont(QString val);
 
@@ -201,7 +224,12 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	deletedMark,
 	editedMark,
 	recentStickersCount,
+	showLReadToggleInDrawer,
+	showSReadToggleInDrawer,
 	showGhostToggleInDrawer,
+	showStreamerToggleInDrawer,
+	showGhostToggleInTray,
+	showStreamerToggleInTray,
 	mainFont,
 	monoFont,
 	showPeerId,

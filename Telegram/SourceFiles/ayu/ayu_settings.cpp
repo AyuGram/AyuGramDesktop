@@ -286,9 +286,34 @@ void AyuGramSettings::set_recentStickersCount(int val)
 	recentStickersCount = val;
 }
 
+void AyuGramSettings::set_showLReadToggleInDrawer(bool val)
+{
+	showLReadToggleInDrawer = val;
+}
+
+void AyuGramSettings::set_showSReadToggleInDrawer(bool val)
+{
+	showSReadToggleInDrawer = val;
+}
+
 void AyuGramSettings::set_showGhostToggleInDrawer(bool val)
 {
 	showGhostToggleInDrawer = val;
+}
+
+void AyuGramSettings::set_showStreamerToggleInDrawer(bool val)
+{
+	showStreamerToggleInDrawer = val;
+}
+
+void AyuGramSettings::set_showGhostToggleInTray(bool val)
+{
+	showGhostToggleInTray = val;
+}
+
+void AyuGramSettings::set_showStreamerToggleInTray(bool val)
+{
+	showStreamerToggleInTray = val;
 }
 
 void AyuGramSettings::set_mainFont(QString val)
