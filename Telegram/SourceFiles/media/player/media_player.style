@@ -284,8 +284,8 @@ mediaPlayerClose: IconButton(mediaPlayerRepeatButton) {
 	}
 }
 mediaPlayerPlayback: FilledSlider {
-	fullWidth: 6px;
-	lineWidth: 2px;
+	fullWidth: 8px;
+	lineWidth: 4px;
 	activeFg: mediaPlayerActiveFg;
 	inactiveFg: mediaPlayerInactiveFg;
 	disabledFg: mediaPlayerDisabledFg;
