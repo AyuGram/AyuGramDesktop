@@ -731,7 +731,7 @@ void Reply::paint(
 			inBubble,
 			colorIndexPlusOne)]
 		: nullptr;
-	const auto rippleColor = cache->bg2;
+	const auto rippleColor = cache->bg;
 	if (!inBubble) {
 		cache->bg = QColor(0, 0, 0, 0);
 	}
@@ -755,7 +755,7 @@ void Reply::paint(
 	}
 
 	if (_ripple.animation) {
-		_ripple.animation->paint(p, x, y, w, &rippleColor);
+		_ripple.animation->paint(p, x, y, w, &cache->bg2);
 		if (_ripple.animation->empty()) {
 			_ripple.animation.reset();
 		}
