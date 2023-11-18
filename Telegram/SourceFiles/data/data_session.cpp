@@ -2659,42 +2659,12 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 	edit = HistoryMessageEdition(_session, data.c_message());
 	if (settings->saveMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide)
 	{
-		const auto history = existing->history();
 		const auto msg = existing->originalText();
-
-		const auto media = existing->media();
 
 		if (edit.textWithEntities == msg)
 		{
-			// check if media changed
-
-			if (!edit.mtpMedia)
-			{
-				goto proceed;
-			}
-
-			if (edit.mtpMedia->type() == mtpc_messageMediaPhoto
-				&& media->photo()
-				&& edit.mtpMedia->c_messageMediaPhoto().vphoto()->c_photo().vaccess_hash() == media->photo()->mtpInput()
-				.c_inputPhoto().vaccess_hash())
-			{
-				goto proceed;
-			}
-
-			if (edit.mtpMedia->type() == mtpc_messageMediaDocument
-				&& media->document()
-				&& edit.mtpMedia->c_messageMediaDocument().vdocument()->c_document().vaccess_hash() == media->document()
-				->mtpInput().c_inputDocument().vaccess_hash())
-			{
-				goto proceed;
-			}
+			goto proceed;
 		}
-
-		// adding msg data to local ayu db (table:editedMessage)
-		auto userId = existing->displayFrom()->id.value;
-		auto dialogId = history->peer->id.value;
-		auto msgId = existing->id.bare;
-		bool isDocument = media && media->document();
 
 		AyuMessages::getInstance().addEditedMessage(edit, existing);
 	}
