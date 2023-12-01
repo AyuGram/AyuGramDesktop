@@ -16,8 +16,6 @@
 #include "mainwindow.h"
 #include "api/api_blocked_peers.h"
 
-#include "ayu/features/streamer_mode/streamer_mode.h"
-
 #include "boxes/connection_box.h"
 #include "core/application.h"
 #include "data/data_session.h"
@@ -438,7 +436,10 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_UseScheduledMessages(),
+		tr::ayu_UseScheduledMessages() | rpl::map([=](QString val)
+												  {
+													  return val + " β";
+												  }),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->useScheduledMessages)
