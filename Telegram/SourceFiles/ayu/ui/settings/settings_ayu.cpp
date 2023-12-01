@@ -30,13 +30,12 @@
 #include "styles/style_basic.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
-#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
+#include "styles/style_ayu_styles.h"
 
 #include "icon_picker.h"
 #include "ui/painter.h"
-#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -710,7 +709,15 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 							  Ui::show(std::move(box));
 						  });
 
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+
 	SetupRecentStickersLimitSlider(container);
+
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
 
 	SetupShowPeerId(container, controller);
 
@@ -938,17 +945,15 @@ void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> containe
 		object_ptr<Button>(container,
 						   tr::ayu_SettingsRecentStickersCount(),
 						   st::settingsButtonNoIcon)
-	);
+	)->setAttribute(Qt::WA_TransparentForMouseEvents);
 
 	auto recentStickersLimitSlider = MakeSliderWithLabel(
 		container,
-		st::settingsScale,
+		st::autoDownloadLimitSlider,
 		st::settingsScaleLabel,
-		st::normalFont->spacew * 2,
-		st::settingsScaleLabel.style.font->width("300%"));
-	container->add(
-		std::move(recentStickersLimitSlider.widget),
-		st::settingsScalePadding);
+		0,
+		st::settingsScaleLabel.style.font->width("30%"));
+	container->add(std::move(recentStickersLimitSlider.widget), st::recentStickersLimitPadding);
 	const auto slider = recentStickersLimitSlider.slider;
 	const auto label = recentStickersLimitSlider.label;
 
