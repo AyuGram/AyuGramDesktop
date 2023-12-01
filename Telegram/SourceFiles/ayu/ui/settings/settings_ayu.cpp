@@ -47,6 +47,7 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 #include "styles/style_ayu_icons.h"
+#include "ui/vertical_list.h"
 
 
 class PainterHighQualityEnabler;
@@ -261,66 +262,6 @@ Ayu::Ayu(
 	: Section(parent)
 {
 	setupContent(controller);
-}
-
-void Ayu::AddPlatformOption(
-	not_null<Window::SessionController *> window,
-	not_null<Ui::VerticalLayout *> container,
-	base::options::option<bool> &option,
-	rpl::producer<> resetClicks)
-{
-	auto &lifetime = container->lifetime();
-	const auto name = option.name().isEmpty() ? option.id() : option.name();
-	const auto toggles = lifetime.make_state<rpl::event_stream<bool>>();
-	std::move(
-		resetClicks
-	) | rpl::map_to(
-		option.defaultValue()
-	) | start_to_stream(*toggles, lifetime);
-
-	const auto button = AddButton(
-		container,
-		rpl::single(name),
-		(option.relevant()
-		 ? st::settingsButtonNoIcon
-		 : st::settingsOptionDisabled)
-	)->toggleOn(toggles->events_starting_with(option.value()));
-
-	const auto restarter = (option.relevant() && option.restartRequired())
-						   ? button->lifetime().make_state<base::Timer>()
-						   : nullptr;
-	if (restarter) {
-		restarter->setCallback([=]
-							   {
-								   window->show(Ui::MakeConfirmBox({
-																	   .text = tr::lng_settings_need_restart(),
-																	   .confirmed = []
-																	   { Core::Restart(); },
-																	   .confirmText = tr::lng_settings_restart_now(),
-																	   .cancelText = tr::lng_settings_restart_later(),
-																   }));
-							   });
-	}
-	button->toggledChanges(
-	) | start_with_next([=, &option](bool toggled)
-						{
-							if (!option.relevant() && toggled != option.defaultValue()) {
-								toggles->fire_copy(option.defaultValue());
-								window->showToast(
-									tr::lng_settings_experimental_irrelevant(tr::now));
-								return;
-							}
-							option.set(toggled);
-							if (restarter) {
-								restarter->callOnce(st::settingsButtonNoIcon.toggle.duration);
-							}
-						}, container->lifetime());
-
-	const auto &description = option.description();
-	if (!description.isEmpty()) {
-		AddSkip(container);
-		AddDividerText(container, rpl::single(description));
-	}
 }
 
 void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
@@ -586,7 +527,7 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 	SetupGhostModeToggle(container);
 	SetupReadAfterActionToggle(container);
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_UseScheduledMessages(),
 		st::settingsButtonNoIcon
@@ -609,7 +550,7 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 
 	AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_SaveDeletedMessages(),
 		st::settingsButtonNoIcon
@@ -625,7 +566,7 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_SaveMessagesHistory(),
 		st::settingsButtonNoIcon
@@ -648,7 +589,7 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 
 	AddSubsectionTitle(container, tr::ayu_QoLTogglesHeader());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_DisableAds(),
 		st::settingsButtonNoIcon
@@ -664,7 +605,7 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_DisableStories(),
 		st::settingsButtonNoIcon
@@ -680,7 +621,7 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_DisableNotificationsDelay(),
 		st::settingsButtonNoIcon
@@ -696,7 +637,7 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_LocalPremium(),
 		st::settingsButtonNoIcon
@@ -712,7 +653,7 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_CopyUsernameAsLink(),
 		st::settingsButtonNoIcon
@@ -733,7 +674,7 @@ void Ayu::SetupAppIcon(not_null<Ui::VerticalLayout *> container)
 {
 	container->add(
 		object_ptr<IconPicker>(container),
-		st::settingsSubsectionTitlePadding);
+		st::settingsCheckboxPadding);
 }
 
 void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
@@ -773,7 +714,7 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 
 	SetupShowPeerId(container, controller);
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_HideAllChats(),
 		st::settingsButtonNoIcon
@@ -789,7 +730,7 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_SimpleQuotesAndReplies(),
 		st::settingsButtonNoIcon
@@ -805,7 +746,7 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_SettingsShowMessageSeconds(),
 		st::settingsButtonNoIcon
@@ -840,7 +781,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_DrawerElementsHeader());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_LReadMessages(),
 		st::settingsButton,
@@ -857,7 +798,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_SReadMessages(),
 		st::settingsButton,
@@ -874,7 +815,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_GhostModeToggle(),
 		st::settingsButton,
@@ -891,7 +832,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_StreamerModeToggle(),
 		st::settingsButton,
@@ -916,7 +857,7 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_TrayElementsHeader());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_EnableGhostModeTray(),
 		st::settingsButtonNoIcon
@@ -932,7 +873,7 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_EnableStreamerModeTray(),
 		st::settingsButtonNoIcon
@@ -994,10 +935,9 @@ void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> containe
 	auto settings = &AyuSettings::getInstance();
 
 	container->add(
-		CreateButton(
-			container,
-			tr::ayu_SettingsRecentStickersCount(),
-			st::settingsButtonNoIcon)
+		object_ptr<Button>(container,
+						   tr::ayu_SettingsRecentStickersCount(),
+						   st::settingsButtonNoIcon)
 	);
 
 	auto recentStickersLimitSlider = MakeSliderWithLabel(
@@ -1086,7 +1026,7 @@ void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container)
 
 	auto text = AyuSync::isAgentDownloaded() ? tr::ayu_AyuSyncOpenPreferences() : tr::ayu_AyuSyncDownloadAgent();
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		text,
 		st::settingsButtonNoIcon
@@ -1103,7 +1043,7 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 
 	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_StickerConfirmation(),
 		st::settingsButtonNoIcon
@@ -1119,7 +1059,7 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_GIFConfirmation(),
 		st::settingsButtonNoIcon
@@ -1135,7 +1075,7 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 											 AyuSettings::save();
 										 }, container->lifetime());
 
-	AddButton(
+	AddButtonWithIcon(
 		container,
 		tr::ayu_VoiceConfirmation(),
 		st::settingsButtonNoIcon

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "base/options.h"
+#include "settings/settings_common_session.h"
 #include "settings/settings_common.h"
 
 class BoxContent;
@@ -28,12 +29,6 @@ public:
 	[[nodiscard]] rpl::producer<QString> title() override;
 
 private:
-	void AddPlatformOption(
-		not_null<Window::SessionController *> window,
-		not_null<Ui::VerticalLayout *> container,
-		base::options::option<bool> &option,
-		rpl::producer<> resetClicks);
-
 	void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container);
 
 	void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container);

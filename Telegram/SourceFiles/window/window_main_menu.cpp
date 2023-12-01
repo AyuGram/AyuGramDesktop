@@ -46,8 +46,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
-#include "ayu/ui/settings/settings_ayu.h"
 #include "ayu/ui/boxes/confirmation_box.h"
+#include "boxes/abstract_box.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "styles/style_ayu_icons.h"
 #include "tray.h"

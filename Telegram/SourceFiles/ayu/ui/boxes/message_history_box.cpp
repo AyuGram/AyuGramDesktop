@@ -14,6 +14,7 @@
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "ui/effects/scroll_content_shadow.h"
+#include "ui/vertical_list.h"
 
 using namespace Settings;
 
