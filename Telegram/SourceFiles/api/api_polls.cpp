@@ -22,7 +22,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 
 // AyuGram includes
-#include "ayu/ayu_state.h"
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
 
 
 namespace Api {
@@ -180,8 +181,7 @@ void Polls::sendVotes(
 		const auto settings = &AyuSettings::getInstance();
 		if (!settings->sendReadMessages && settings->markReadAfterPoll && item)
 		{
-			AyuState::setAllowSendReadPacket(true);
-			item->history()->session().data().histories().readInboxOnNewMessage(item);
+			readHistory(item);
 		}
 	}).fail([=] {
 		_pollVotesRequestIds.erase(itemId);

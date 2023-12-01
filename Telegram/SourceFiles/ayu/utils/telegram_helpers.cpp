@@ -10,6 +10,7 @@
 
 #include "api/api_text_entities.h"
 
+#include "data/data_channel.h"
 #include "lang_auto.h"
 #include "apiwrap.h"
 #include "data/data_forum.h"
@@ -23,6 +24,7 @@
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_unread_things.h"
+#include "data/data_histories.h"
 
 // https://github.com/AyuGram/AyuGram4AX/blob/rewrite/TMessagesProj/src/main/java/com/radolyn/ayugram/AyuConstants.java
 std::unordered_set<ID> ayugram_channels = {
@@ -32,6 +34,7 @@ std::unordered_set<ID> ayugram_channels = {
 	1947958814, // @ayugramfun
 	1815864846, // @ayugramfcm
 };
+
 std::unordered_set<ID> ayugram_devs = {
 	139303278, // @alexeyzavar
 	778327202, // @sharapagorg
@@ -53,6 +56,7 @@ std::unordered_set<ID> extera_channels = {
 	1516526055, // @moexci
 	1622008530, // @moe_chat
 };
+
 std::unordered_set<ID> extera_devs = {
 	963080346,
 	1282540315,
@@ -153,7 +157,8 @@ std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryIt
 	return std::make_pair(text, std::string(reinterpret_cast<char *>(buff.data()), buff.size()));
 }
 
-ID getBareID(not_null<PeerData *> peer) {
+ID getBareID(not_null<PeerData *> peer)
+{
 	return peerIsUser(peer->id)
 		   ? peerToUser(peer->id).bare
 		   : peerIsChat(peer->id)
@@ -288,7 +293,36 @@ void MarkAsReadThread(not_null<Data::Thread *> thread)
 	}
 }
 
-QString formatTTL(int time) {
+void readHistory(not_null<HistoryItem *> message)
+{
+	const auto history = message->history();
+	const auto tillId = message->id;
+
+	history->session().data().histories()
+		.sendRequest(history, Data::Histories::RequestType::ReadInbox, [=](Fn<void()> finish)
+		{
+			if (const auto channel = history->peer->asChannel()) {
+				return history->session().api().request(MTPchannels_ReadHistory(
+					channel->inputChannel,
+					MTP_int(tillId)
+				)).send();
+			}
+			else {
+				return history->session().api().request(MTPmessages_ReadHistory(
+					history->peer->input,
+					MTP_int(tillId)
+				)).done([=](const MTPmessages_AffectedMessages &result)
+						{
+							history->session().api().applyAffectedMessages(history->peer, result);
+						}).fail([=]
+								{
+								}).send();
+			}
+		});
+}
+
+QString formatTTL(int time)
+{
 	if (time == 0x7FFFFFFF) {
 		return QString("👀 %1").arg(tr::ayu_OneViewTTL(tr::now));
 	}

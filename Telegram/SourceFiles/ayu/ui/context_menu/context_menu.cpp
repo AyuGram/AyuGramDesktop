@@ -16,6 +16,7 @@
 #include "ui/widgets/popup_menu.h"
 
 #include "ayu/ui/sections/edited/edited_log_section.h"
+#include "ayu/utils/telegram_helpers.h"
 
 
 namespace AyuUi
@@ -53,11 +54,9 @@ void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 		return;
 	}
 
-	const auto history = item->history();
 	menu->addAction(tr::ayu_ReadUntilMenuText(tr::now), [=]()
 	{
-		AyuState::setAllowSendReadPacket(true);
-		history->session().data().histories().readInboxOnNewMessage(item);
+		readHistory(item);
 	}, &st::menuIconShowInChat);
 }
 

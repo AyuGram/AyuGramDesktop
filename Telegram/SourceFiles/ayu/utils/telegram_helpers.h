@@ -29,4 +29,6 @@ bool isExteraRelated(ID peerId);
 void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
 void MarkAsReadThread(not_null<Data::Thread *> thread);
 
+void readHistory(not_null<HistoryItem *> message);
+
 QString formatTTL(int time);
