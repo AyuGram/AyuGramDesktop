@@ -48,7 +48,7 @@ public:
 		useScheduledMessages = false;
 
 		// ~ Message edits & deletion history
-		saveDeletedMessages = true;
+		saveDeletedMessages = false;
 		saveMessagesHistory = true;
 
 		// ~ QoL toggles

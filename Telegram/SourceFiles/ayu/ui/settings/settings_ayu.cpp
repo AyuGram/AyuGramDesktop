@@ -551,7 +551,10 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SaveDeletedMessages(),
+		tr::ayu_SaveDeletedMessages() | rpl::map([=](QString val)
+												 {
+													 return val + " β";
+												 }),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveDeletedMessages)
