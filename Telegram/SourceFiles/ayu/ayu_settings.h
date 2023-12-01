@@ -54,6 +54,8 @@ public:
 		// ~ QoL toggles
 		disableAds = true;
 		disableStories = false;
+		collapseSimilarChannels = true;
+		hideSimilarChannels = false;
 		disableNotificationsDelay = false;
 		localPremium = false;
 		copyUsernameAsLink = true;
@@ -105,6 +107,8 @@ public:
 	bool saveMessagesHistory;
 	bool disableAds;
 	bool disableStories;
+	bool collapseSimilarChannels;
+	bool hideSimilarChannels;
 	bool disableNotificationsDelay;
 	bool localPremium;
 	bool copyUsernameAsLink;
@@ -149,13 +153,17 @@ public:
 
 	void set_useScheduledMessages(bool val);
 
-	void set_keepDeletedMessages(bool val);
+	void set_saveDeletedMessages(bool val);
 
-	void set_keepMessagesHistory(bool val);
+	void set_saveMessagesHistory(bool val);
 
 	void set_disableAds(bool val);
 
 	void set_disableStories(bool val);
+
+	void set_collapseSimilarChannels(bool val);
+
+	void set_hideSimilarChannels(bool val);
 
 	void set_disableNotificationsDelay(bool val);
 
@@ -217,6 +225,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	saveMessagesHistory,
 	disableAds,
 	disableStories,
+	collapseSimilarChannels,
+	hideSimilarChannels,
 	disableNotificationsDelay,
 	localPremium,
 	copyUsernameAsLink,

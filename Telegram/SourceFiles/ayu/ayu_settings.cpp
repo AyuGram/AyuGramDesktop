@@ -225,12 +225,12 @@ void AyuGramSettings::set_useScheduledMessages(bool val)
 	useScheduledMessages = val;
 }
 
-void AyuGramSettings::set_keepDeletedMessages(bool val)
+void AyuGramSettings::set_saveDeletedMessages(bool val)
 {
 	saveDeletedMessages = val;
 }
 
-void AyuGramSettings::set_keepMessagesHistory(bool val)
+void AyuGramSettings::set_saveMessagesHistory(bool val)
 {
 	saveMessagesHistory = val;
 }
@@ -243,6 +243,16 @@ void AyuGramSettings::set_disableAds(bool val)
 void AyuGramSettings::set_disableStories(bool val)
 {
 	disableStories = val;
+}
+
+void AyuGramSettings::set_collapseSimilarChannels(bool val)
+{
+	collapseSimilarChannels = val;
+}
+
+void AyuGramSettings::set_hideSimilarChannels(bool val)
+{
+	hideSimilarChannels = val;
 }
 
 void AyuGramSettings::set_disableNotificationsDelay(bool val)

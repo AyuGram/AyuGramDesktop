@@ -40,9 +40,9 @@ void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 	{
 		const auto initSaveDeleted = settings->saveDeletedMessages;
 
-		settings->set_keepDeletedMessages(false);
+		settings->set_saveDeletedMessages(false);
 		history->destroyMessage(item);
-		settings->set_keepDeletedMessages(initSaveDeleted);
+		settings->set_saveDeletedMessages(initSaveDeleted);
 	}, &st::menuIconClear);
 }
 

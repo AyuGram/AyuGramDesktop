@@ -7183,7 +7183,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_HideNextViewsDescriptionAyu" = "Hide my views forever, until Ghost Mode disabled.";
 "ayu_EnableGhostModeStories" = "Enable Ghost Mode";
 "ayu_GhostModeIsActive" = "Ghost Mode Is Active";
-"ayu_SimpleQuotesAndReplies" = "Simple quotes & replies";
+"ayu_SimpleQuotesAndReplies" = "Disable colorful replies";
+"ayu_DisableSimilarChannels" = "Disable similar channels";
+"ayu_CollapseSimilarChannels" = "Collapse similar channels";
+"ayu_HideSimilarChannelsTab" = "Hide similar channels tab";
 "ayu_MainFont" = "Application font";
 "ayu_MonospaceFont" = "Monospace font";
 "ayu_FontDefault" = "Default";

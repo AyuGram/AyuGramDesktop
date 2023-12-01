@@ -36,6 +36,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "styles/style_info.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Info {
 namespace Profile {
 
@@ -141,6 +145,8 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	using namespace rpl::mappers;
 	using MediaType = Media::Type;
 
+	const auto settings = &AyuSettings::getInstance();
+
 	auto content = object_ptr<Ui::VerticalLayout>(parent);
 	auto tracker = Ui::MultiSlideTracker();
 	auto addMediaButton = [&](
@@ -176,7 +182,11 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	const auto addSimilarPeersButton = [&](
 			not_null<PeerData*> peer,
 			const style::icon &icon) {
-		auto result = Media::AddSimilarPeersButton(
+		if (settings->hideSimilarChannels) {
+			return;
+		}
+
+		auto result = Media::AddSimilarChannelsButton(
 			content,
 			_controller,
 			peer,
