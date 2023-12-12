@@ -18,7 +18,7 @@
 namespace AyuUi
 {
 
-ConfirmationBox::ConfirmationBox(
+ServerReadConfirmationBox::ServerReadConfirmationBox(
 	QWidget *,
 	not_null<Window::SessionController *> controller)
 	: _controller(controller)
@@ -26,7 +26,7 @@ ConfirmationBox::ConfirmationBox(
 	//
 }
 
-void ConfirmationBox::prepare()
+void ServerReadConfirmationBox::prepare()
 {
 	_text.create(this, tr::ayu_ReadConfirmationBoxQuestion(), st::boxLabel);
 
@@ -45,7 +45,7 @@ void ConfirmationBox::prepare()
 	{ closeBox(); });
 }
 
-void ConfirmationBox::resizeEvent(QResizeEvent *e)
+void ServerReadConfirmationBox::resizeEvent(QResizeEvent *e)
 {
 	BoxContent::resizeEvent(e);
 
@@ -53,7 +53,7 @@ void ConfirmationBox::resizeEvent(QResizeEvent *e)
 	_text->moveToLeft(padding.left(), padding.top());
 }
 
-void ConfirmationBox::ReadAllPeers()
+void ServerReadConfirmationBox::ReadAllPeers()
 {
 	auto settings = &AyuSettings::getInstance();
 	auto prev = settings->sendReadMessages;

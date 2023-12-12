@@ -12,10 +12,10 @@
 namespace AyuUi
 {
 
-class ConfirmationBox : public Ui::BoxContent
+class ServerReadConfirmationBox : public Ui::BoxContent
 {
 public:
-	ConfirmationBox(QWidget *, not_null<Window::SessionController *> controller);
+	ServerReadConfirmationBox(QWidget *, not_null<Window::SessionController *> controller);
 
 protected:
 	void prepare() override;
