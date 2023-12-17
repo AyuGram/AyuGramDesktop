@@ -11,6 +11,15 @@
 #include "core/core_settings.h"
 #include "lang/lang_instance.h"
 
+// hard-coded languages
+std::map<QString, QString> langMapping = {
+	{"pt-br", "pt"},
+	{"zh-hans-beta", "zh-hans"},
+	{"zh-hant-beta", "zh-hant"},
+	{"zh-hans-raw", "zh-hans"},
+	{"zh-hant-raw", "zh-hant"},
+};
+
 CustomLangPack *CustomLangPack::instance = nullptr;
 
 CustomLangPack::CustomLangPack() = default;
@@ -30,11 +39,7 @@ void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QStrin
 {
 	LOG(("Current Language pack ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
-	auto finalLangPackId = langPackId;
-	if (finalLangPackId == qsl("pt-br")) {
-		// meh
-		finalLangPackId = qsl("pt");
-	}
+	auto finalLangPackId = langMapping.contains(langPackId) ? langMapping[langPackId] : langPackId;
 
 	const auto proxy = Core::App().settings().proxy().isEnabled()
 					   ? Core::App().settings().proxy().selected()
@@ -44,13 +49,15 @@ void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QStrin
 		networkManager.setProxy(LocaleProxy);
 	}
 
+	// using `jsdelivr` since China (...and maybe other?) users have some problems with GitHub
+	// https://crowdin.com/project/ayugram/discussions/6
 	QUrl url;
 	if (!finalLangPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/Languages/l10n_main/values/langs/%1/Shared.json").arg(
+		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
 			finalLangPackId));
 	}
 	else {
-		url.setUrl(qsl("https://raw.githubusercontent.com/AyuGram/Languages/l10n_main/values/langs/%1/Shared.json").arg(
+		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
 			needFallback ? langPackBaseId : finalLangPackId));
 	}
 	_chkReply = networkManager.get(QNetworkRequest(url));
