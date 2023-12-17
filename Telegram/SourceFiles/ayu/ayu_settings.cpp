@@ -139,15 +139,19 @@ void load()
 
 	initialize();
 
-	json p;
-	file >> p;
-	file.close();
-
 	try {
-		settings = p.get<AyuGramSettings>();
-	}
-	catch (...) {
-		LOG(("AyuGramSettings: failed to parse settings file"));
+		json p;
+		file >> p;
+		file.close();
+
+		try {
+			settings = p.get<AyuGramSettings>();
+		}
+		catch (...) {
+			LOG(("AyuGramSettings: failed to parse settings file"));
+		}
+	} catch (...) {
+		LOG(("AyuGramSettings: failed to read settings file (not json-like)"));
 	}
 	postinitialize();
 }
