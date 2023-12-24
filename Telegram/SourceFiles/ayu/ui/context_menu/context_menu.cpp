@@ -10,9 +10,7 @@
 #include "ayu/messages/ayu_messages_controller.h"
 #include "ayu/ui/boxes/message_history_box.h"
 
-#include "history/history_inner_widget.h"
-#include "settings/settings_common.h"
-#include "styles/style_chat.h"
+#include "styles/style_ayu_icons.h"
 #include "ui/widgets/popup_menu.h"
 
 #include "ayu/ui/sections/edited/edited_log_section.h"
@@ -29,22 +27,23 @@ void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 		{
 			item->history()->session().tryResolveWindow()
 				->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
-		}, &st::menuIconInfo);
+		},  &st::ayuEditsHistoryIcon);
 	}
 }
 
 void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 {
-	const auto settings = &AyuSettings::getInstance();
-	const auto history = item->history();
-	menu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
-	{
-		const auto initSaveDeleted = settings->saveDeletedMessages;
-
-		settings->set_saveDeletedMessages(false);
-		history->destroyMessage(item);
-		settings->set_saveDeletedMessages(initSaveDeleted);
-	}, &st::menuIconClear);
+	// todo: rework
+//	const auto settings = &AyuSettings::getInstance();
+//	const auto history = item->history();
+//	menu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
+//	{
+//		const auto initSaveDeleted = settings->saveDeletedMessages;
+//
+//		settings->set_saveDeletedMessages(false);
+//		history->destroyMessage(item);
+//		settings->set_saveDeletedMessages(initSaveDeleted);
+//	}, &st::menuIconClear);
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
