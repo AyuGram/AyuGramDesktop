@@ -1291,11 +1291,21 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 }
 
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
+	auto text = std::move(prepared.text);
+	if (!prepared.text.empty()) {
+		const auto settings = &AyuSettings::getInstance();
+		text = text.append(QString(" (%1)").arg(QLocale().toString(
+			base::unixtime::parse(_date),
+			settings->showMessageSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+										 : QLocale::system().timeFormat(QLocale::ShortFormat)
+		)));
+	}
+
 	AddComponents(HistoryServiceData::Bit());
 	_flags &= ~MessageFlag::HasTextLinks;
 	const auto data = Get<HistoryServiceData>();
 	const auto had = !_text.empty();
-	_text = std::move(prepared.text);
+	_text = std::move(text);
 	data->textLinks = std::move(prepared.links);
 	if (had) {
 		_history->owner().requestItemTextRefresh(this);
