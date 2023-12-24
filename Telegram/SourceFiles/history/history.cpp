@@ -586,14 +586,11 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 
 	// AyuGram saveDeletedMessages
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->saveDeletedMessages && item->isRegular() && !item->isGroupMigrate())
-	{
-		if (!item->isService())
-		{
+	if (settings->saveDeletedMessages && item->isRegular() && !item->isGroupMigrate()) {
+		if (!item->isService()) {
 			item->setAyuHint(settings->deletedMark);
 		}
-		else
-		{
+		else {
 			const auto msg = TextWithEntities{
 				"Message deleted",
 				{
@@ -610,8 +607,7 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 				| MessageFlag::HasReplyInfo
 				| MessageFlag::HasPostAuthor;
 
-			if (item->isPost())
-			{
+			if (item->isPost()) {
 				flags |= MessageFlag::Post;
 			}
 
@@ -625,7 +621,7 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 				session().data().nextLocalMessageId(),
 				flags,
 				UserId(),
-                replyTo,
+				replyTo,
 				base::unixtime::now(),
 				item->author()->id,
 				"AyuGram"_q,
