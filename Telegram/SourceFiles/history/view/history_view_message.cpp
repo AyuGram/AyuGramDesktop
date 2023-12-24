@@ -3869,9 +3869,7 @@ bool Message::unwrapped() const {
 		return false;
 	}
 	const auto media = this->media();
-	return media
-		? (!hasVisibleText() && media->unwrapped())
-		: item->isEmpty();
+	return media == nullptr && item->isEmpty();
 }
 
 int Message::minWidthForMedia() const {

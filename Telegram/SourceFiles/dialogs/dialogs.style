@@ -137,9 +137,9 @@ forumDialogJumpArrowPosition: point(3px, 3px);
 forumDialogJumpPadding: margins(8px, 3px, 8px, 3px);
 forumDialogJumpRadius: 11px;
 
-dialogsOnlineBadgeStroke: 2px;
-dialogsOnlineBadgeSize: 10px;
-dialogsOnlineBadgeSkip: point(0px, 2px);
+dialogsOnlineBadgeStroke: 3px;
+dialogsOnlineBadgeSize: 12px;
+dialogsOnlineBadgeSkip: point(0px, 0px);
 dialogsOnlineBadgeDuration: 150;
 
 dialogsCallBadgeSize: 16px;
