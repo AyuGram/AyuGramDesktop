@@ -938,7 +938,10 @@ TextForMimeData InnerWidget::getSelectedText() const
 
 void InnerWidget::keyPressEvent(QKeyEvent *e)
 {
-	if (e == QKeySequence::Copy && _selectedItem != nullptr) {
+	if (e->key() == Qt::Key_Escape) {
+		_controller->showBackFromStack();
+	}
+	else if (e == QKeySequence::Copy && _selectedItem != nullptr) {
 		copySelectedText();
 #ifdef Q_OS_MAC
 		} else if (e->key() == Qt::Key_E && e->modifiers().testFlag(Qt::ControlModifier)) {
