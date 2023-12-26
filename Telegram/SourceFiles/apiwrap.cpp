@@ -1306,11 +1306,6 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!settings->sendReadMessages) {
-		return;
-	}
-
 	auto markedIds = QVector<MTPint>();
 	auto channelMarkedIds = base::flat_map<
 		not_null<ChannelData*>,
@@ -1326,6 +1321,12 @@ void ApiWrap::markContentsRead(
 			markedIds.push_back(MTP_int(item->id));
 		}
 	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->sendReadMessages) {
+		return;
+	}
+
 	if (!markedIds.isEmpty()) {
 		request(MTPmessages_ReadMessageContents(
 			MTP_vector<MTPint>(markedIds)
