@@ -3,7 +3,7 @@ Name=AyuGram Desktop
 Comment=Desktop version of AyuGram - ToS breaking Telegram client
 TryExec=ayugram-desktop
 Exec=DESKTOPINTEGRATION=1 ayugram-desktop -- %u
-Icon=telegram
+Icon=ayugram
 Terminal=false
 StartupWMClass=AyuGram
 Type=Application
