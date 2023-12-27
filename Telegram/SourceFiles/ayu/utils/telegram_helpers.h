@@ -16,7 +16,7 @@
 
 Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
-void dispatchToMainThread(std::function<void()> callback);
+void dispatchToMainThread(std::function<void()> callback, int delay = 0);
 not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session);
 ID getDialogIdFromPeer(not_null<PeerData *> peer);
 std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);

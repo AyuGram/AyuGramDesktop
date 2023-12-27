@@ -1046,6 +1046,7 @@ void AddMessageActions(
 	if (request.item) {
 		AyuUi::AddHistoryAction(menu, request.item);
 		AyuUi::AddHideMessageAction(menu, request.item);
+		AyuUi::AddUserMessagesAction(menu, request.item);
 	}
 
 	AddPostLinkAction(menu, request);

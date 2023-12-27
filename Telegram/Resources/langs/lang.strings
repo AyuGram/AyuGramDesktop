@@ -7061,7 +7061,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SpyEssentialsHeader" = "Spy essentials";
 "ayu_SaveDeletedMessages" = "Save deleted messages";
 "ayu_SaveMessagesHistory" = "Save edits history";
-"ayu_MessageSavingBtn" = "Message Saving Preferences";
+"ayu_MessageSavingActionBarHeader" = "Message Saving Preferences";
+"ayu_MessageSavingBtn" = "Preferences";
+"ayu_MessageSavingSubTitle" = "Configure media & per dialog saving";
 "ayu_MessageSavingMediaHeader" = "Media";
 "ayu_MessageSavingSaveMedia" = "Save media";
 "ayu_MessageSavingSaveMediaHint" = "Click for more";
@@ -7076,6 +7078,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageSavingSaveFormatting" = "Save formatting";
 "ayu_MessageSavingSaveReactions" = "Save reactions";
 "ayu_MessageSavingSaveForBots" = "Save in bot dialogs";
+"ayu_SpyAllToggle" = "Spy on people";
+"ayu_SpySaveReadMarks" = "Save read date";
+"ayu_SpySaveLastActivity" = "Save last activity";
 "ayu_QoLTogglesHeader" = "Useful features";
 "ayu_KeepAliveService" = "AyuGram Push Service";
 "ayu_DisableAds" = "Disable ads";
@@ -7109,6 +7114,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CaseInsensitiveExpression" = "Case insensitive expression";
 "ayu_RegexFiltersAddError" = "Regex syntax error";
 "ayu_RegexFilterQuickAdd" = "Add filter";
+"ayu_RegexFilterBulletinText" = "Filter added to the **Shared filters**.";
+"ayu_RegexFilterBulletinAction" = "Move to current chat";
 "ayu_AyuSyncHeader" = "AyuSync";
 "ayu_AyuSyncStatusTitle" = "Sync status";
 "ayu_AyuSyncStatusOk" = "connected";
@@ -7168,6 +7175,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ViewFiltersMenuText" = "View Filters";
 "ayu_PeekOnlineSuccess" = "Peeked via";
 "ayu_OneViewTTL" = "one view";
+"ayu_UserMessagesMenuText" = "User Messages";
 "ayu_ReadUntilMenuText" = "Read Message";
 "ayu_DeleteKeepLocally" = "Keep locally";
 "ayu_BoxActionReset" = "Reset";
@@ -7196,6 +7204,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AyuForwardForwardingDescription" = "Please keep this window open while AyuGram is forwarding your messages.";
 "ayu_AyuForwardLoadingMediaDescription" = "Please keep this window open while AyuGram is downloading media from your messages.";
 "ayu_DeleteDateMenuText" = "Delete Date";
+"ayu_ReadDateMenuText" = "Read Date";
+"ayu_ContentsReadDateMenuText" = "Contents Read Date";
 "ayu_ForwardableMenuText" = "Forwardable";
 "ayu_ForwardableMenuTextNo" = "No";
 "ayu_LikelyOfflineStatus" = "offline ?";

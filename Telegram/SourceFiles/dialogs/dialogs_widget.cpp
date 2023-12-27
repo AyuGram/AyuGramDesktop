@@ -1355,7 +1355,7 @@ void Widget::setupStories() {
 	{
 		return;
 	}
-	
+
 	_stories->verticalScrollEvents(
 	) | rpl::start_with_next([=](not_null<QWheelEvent*> e) {
 		_scroll->viewportEvent(e);
@@ -2757,14 +2757,21 @@ void Widget::showMainMenu() {
 	controller()->widget()->showMainMenu();
 }
 
-void Widget::searchMessages(SearchState state) {
-	if (const auto peer = state.inChat.peer()) {
-		if (_openedForum && peer->forum() != _openedForum) {
-			controller()->closeForum();
+void Widget::searchMessages(const QString &query, Key inChat, UserData *from) {
+	if (_childList) {
+		const auto forum = controller()->shownForum().current();
+		const auto topic = inChat.topic();
+		if ((forum && forum->channel() == inChat.peer())
+			|| (topic && topic->forum() == forum)) {
+			_childList->searchMessages(query, inChat, from);
+			return;
 		}
 	}
-	applySearchState(std::move(state));
-	session().local().saveRecentSearchHashtags(_searchState.query);
+
+	if (inChat && from) {
+		setSearchInChat(inChat, from);
+		applyFilterUpdate(true);
+	}
 }
 
 void Widget::searchTopics() {

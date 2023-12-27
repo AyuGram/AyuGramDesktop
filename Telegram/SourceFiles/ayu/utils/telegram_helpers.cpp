@@ -90,7 +90,7 @@ bool accountExists(ID userId)
 	return userId == 0 || getSession(userId) != nullptr;
 }
 
-void dispatchToMainThread(std::function<void()> callback)
+void dispatchToMainThread(std::function<void()> callback, int delay)
 {
 	auto timer = new QTimer();
 	timer->moveToThread(qApp->thread());
@@ -100,7 +100,7 @@ void dispatchToMainThread(std::function<void()> callback)
 		callback();
 		timer->deleteLater();
 	});
-	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, 0));
+	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, delay));
 }
 
 not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session)
