@@ -109,7 +109,6 @@ void ClearBotStartToken(PeerData *peer) {
 // AyuGram includes
 #include "ayu/utils/telegram_helpers.h"
 
-
 enum StackItemType {
 	HistoryStackItem,
 	SectionStackItem,

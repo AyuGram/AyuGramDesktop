@@ -87,6 +87,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
 #include "ayu/messages/ayu_messages_controller.h"
+#include "ayu/ayu_state.h"
 
 
 namespace Data {
@@ -2748,6 +2749,11 @@ void Session::registerMessage(not_null<HistoryItem*> item) {
 	const auto peerId = item->history()->peer->id;
 	const auto list = messagesListForInsert(peerId);
 	const auto itemId = item->id;
+
+	if (AyuState::isHidden(item)) {
+		return;
+	}
+
 	const auto i = list->find(itemId);
 	if (i != list->end()) {
 		LOG(("App Error: Trying to re-registerMessage()."));

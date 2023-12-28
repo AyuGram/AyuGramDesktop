@@ -44,6 +44,9 @@ private:
 	void SetupCustomization(not_null<Ui::VerticalLayout *> container,
 							not_null<Window::SessionController *> controller);
 
+	void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
+								  not_null<Window::SessionController *> controller);
+
 	void SetupDrawerElements(not_null<Ui::VerticalLayout *> container);
 
 	void SetupTrayElements(not_null<Ui::VerticalLayout *> container);

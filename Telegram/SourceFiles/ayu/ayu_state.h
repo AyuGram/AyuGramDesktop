@@ -8,37 +8,15 @@
 
 #include "ayu_settings.h"
 
+#include "history/history.h"
+#include "history/history_item.h"
+
 namespace AyuState
 {
 
-namespace
-{
-
-class AyuStateVariable
-{
-public:
-	bool val;
-	int resetAfter;
-};
-
-AyuStateVariable allowSendReadPacket;
-
-bool processVariable(AyuStateVariable &variable)
-{
-	if (variable.resetAfter == -1) {
-		return variable.val;
-	}
-
-	variable.resetAfter -= 1;
-	auto val = variable.val;
-
-	if (variable.resetAfter == 0) {
-		variable.val = false;
-	}
-
-	return val;
-}
-
-}
+void hide(PeerId peerId, MsgId messageId);
+void hide(not_null<HistoryItem *> item);
+bool isHidden(PeerId peerId, MsgId messageId);
+bool isHidden(not_null<HistoryItem *> item);
 
 }

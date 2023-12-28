@@ -110,6 +110,7 @@ PRIVATE
     ayu/ayu_constants.h
     ayu/utils/ayu_mapper.cpp
     ayu/utils/ayu_mapper.h
+    ayu/utils/qt_key_modifiers_extended.h
     ayu/utils/telegram_helpers.cpp
     ayu/utils/telegram_helpers.h
     ayu/utils/windows_utils.cpp
@@ -126,6 +127,8 @@ PRIVATE
     ayu/ui/settings/settings_ayu.h
     ayu/ui/context_menu/context_menu.cpp
     ayu/ui/context_menu/context_menu.h
+    ayu/ui/context_menu/menu_item_subtext.cpp
+    ayu/ui/context_menu/menu_item_subtext.h
     ayu/ui/sections/edited/edited_log_inner.cpp
     ayu/ui/sections/edited/edited_log_inner.h
     ayu/ui/sections/edited/edited_log_item.cpp

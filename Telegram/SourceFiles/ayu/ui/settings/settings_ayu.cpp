@@ -28,6 +28,7 @@
 #include "styles/style_basic.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 #include "styles/style_ayu_styles.h"
@@ -333,6 +334,50 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 						}, raw->lifetime());
 }
 
+void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> container,
+										 not_null<Window::SessionController *> controller,
+										 int initialState,
+										 std::vector<QString> options,
+										 rpl::producer<QString> text,
+										 rpl::producer<QString> boxTitle,
+										 const style::icon &icon,
+										 const Fn<void(int)> &setter)
+{
+	auto reactiveVal = container->lifetime().make_state<rpl::variable<int>>(initialState);
+
+	rpl::producer<QString> rightTextReactive = reactiveVal->value() | rpl::map(
+		[=](int val)
+		{
+			return options[val];
+		});
+
+	Settings::AddButtonWithLabel(
+		container,
+		std::move(text),
+		rightTextReactive,
+		st::settingsButton,
+		{&icon})->addClickHandler(
+		[=]
+		{
+			controller->show(Box(
+				[=](not_null<Ui::GenericBox *> box)
+				{
+					const auto save = [=](int index) mutable
+					{
+						setter(index);
+
+						reactiveVal->force_assign(index);
+					};
+					SingleChoiceBox(box, {
+						.title = boxTitle,
+						.options = options,
+						.initialSelection = reactiveVal->current(),
+						.callback = save,
+					});
+				}));
+		});
+}
+
 namespace Settings
 {
 
@@ -436,22 +481,25 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_UseScheduledMessages() | rpl::map([=](QString val)
-												  {
-													  return val + " β";
-												  }),
+		tr::ayu_UseScheduledMessages() | rpl::map(
+			[=](QString val)
+			{
+				return val + " β";
+			}),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->useScheduledMessages)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->useScheduledMessages);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_useScheduledMessages(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->useScheduledMessages);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_useScheduledMessages(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
@@ -462,22 +510,25 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SaveDeletedMessages() | rpl::map([=](QString val)
-												 {
-													 return val + " β";
-												 }),
+		tr::ayu_SaveDeletedMessages() | rpl::map(
+			[=](QString val)
+			{
+				return val + " β";
+			}),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveDeletedMessages)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->saveDeletedMessages);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_saveDeletedMessages(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->saveDeletedMessages);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_saveDeletedMessages(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -486,14 +537,16 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->saveMessagesHistory)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->saveMessagesHistory);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_saveMessagesHistory(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->saveMessagesHistory);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_saveMessagesHistory(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
@@ -509,14 +562,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->disableAds)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->disableAds);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_disableAds(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableAds);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_disableAds(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -525,14 +580,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->disableStories)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->disableStories);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_disableStories(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableStories);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_disableStories(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -541,14 +598,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->simpleQuotesAndReplies)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->simpleQuotesAndReplies);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_simpleQuotesAndReplies(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->simpleQuotesAndReplies);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_simpleQuotesAndReplies(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	std::vector checkboxes = {
 		NestedEntry{
@@ -580,14 +639,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->disableNotificationsDelay)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->disableNotificationsDelay);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_disableNotificationsDelay(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableNotificationsDelay);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_disableNotificationsDelay(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -596,14 +657,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->localPremium)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->localPremium);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_localPremium(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->localPremium);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_localPremium(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -612,14 +675,16 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->copyUsernameAsLink)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->copyUsernameAsLink);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_copyUsernameAsLink(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->copyUsernameAsLink);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_copyUsernameAsLink(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupAppIcon(not_null<Ui::VerticalLayout *> container)
@@ -647,11 +712,12 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 		AyuSettings::get_deletedMarkReactive(),
 		st::settingsButtonNoIcon
 	);
-	btn->addClickHandler([=]()
-						 {
-							 auto box = Box<EditDeletedMarkBox>();
-							 Ui::show(std::move(box));
-						 });
+	btn->addClickHandler(
+		[=]()
+		{
+			auto box = Box<EditDeletedMarkBox>();
+			Ui::show(std::move(box));
+		});
 
 	auto btn2 = AddButtonWithLabel(
 		container,
@@ -659,11 +725,12 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 		AyuSettings::get_editedMarkReactive(),
 		st::settingsButtonNoIcon
 	);
-	btn2->addClickHandler([=]()
-						  {
-							  auto box = Box<EditEditedMarkBox>();
-							  Ui::show(std::move(box));
-						  });
+	btn2->addClickHandler(
+		[=]()
+		{
+			auto box = Box<EditEditedMarkBox>();
+			Ui::show(std::move(box));
+		});
 
 	AddSkip(container);
 	AddDivider(container);
@@ -684,14 +751,16 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 	)->toggleOn(
 		rpl::single(settings->hideAllChatsFolder)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->hideAllChatsFolder);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_hideAllChatsFolder(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideAllChatsFolder);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideAllChatsFolder(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -700,17 +769,20 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 	)->toggleOn(
 		rpl::single(settings->showMessageSeconds)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showMessageSeconds);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showMessageSeconds(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showMessageSeconds);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showMessageSeconds(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddSkip(container);
 	AddDivider(container);
+	SetupContextMenuElements(container, controller);
 	SetupDrawerElements(container);
 	AddSkip(container);
 	AddDivider(container);
@@ -719,6 +791,91 @@ void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
 	AddDivider(container);
 	AddSkip(container);
 	SetupFonts(container, controller);
+}
+
+void Ayu::SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
+								   not_null<Window::SessionController *> controller)
+{
+	auto settings = &AyuSettings::getInstance();
+
+	AddSkip(container);
+	AddSubsectionTitle(container, tr::ayu_ContextMenuElementsHeader());
+
+	const auto options = std::vector{
+		tr::ayu_SettingsContextMenuItemHidden(tr::now),
+		tr::ayu_SettingsContextMenuItemShown(tr::now),
+		tr::ayu_SettingsContextMenuItemExtended(tr::now),
+	};
+
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showReactionsPanelInContextMenu,
+		options,
+		tr::ayu_SettingsContextMenuReactionsPanel(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconReactions,
+		[=](int index)
+		{
+			settings->set_showReactionsPanelInContextMenu(index);
+			AyuSettings::save();
+		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showViewsPanelInContextMenu,
+		options,
+		tr::ayu_SettingsContextMenuViewsPanel(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconShowInChat,
+		[=](int index)
+		{
+			settings->set_showViewsPanelInContextMenu(index);
+			AyuSettings::save();
+		});
+
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showHideMessageInContextMenu,
+		options,
+		tr::ayu_ContextHideMessage(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconClear,
+		[=](int index)
+		{
+			settings->set_showHideMessageInContextMenu(index);
+			AyuSettings::save();
+		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showUserMessagesInContextMenu,
+		options,
+		tr::ayu_UserMessagesMenuText(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconTTL,
+		[=](int index)
+		{
+			settings->set_showUserMessagesInContextMenu(index);
+			AyuSettings::save();
+		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showMessageDetailsInContextMenu,
+		options,
+		tr::ayu_MessageDetailsPC(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconInfo,
+		[=](int index)
+		{
+			settings->set_showMessageDetailsInContextMenu(index);
+			AyuSettings::save();
+		});
+
+	AddSkip(container);
+	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
 }
 
 void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
@@ -736,14 +893,16 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showLReadToggleInDrawer)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showLReadToggleInDrawer);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showLReadToggleInDrawer(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showLReadToggleInDrawer);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showLReadToggleInDrawer(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -753,14 +912,16 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showSReadToggleInDrawer)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showSReadToggleInDrawer);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showSReadToggleInDrawer(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showSReadToggleInDrawer);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showSReadToggleInDrawer(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -770,14 +931,16 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showGhostToggleInDrawer)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showGhostToggleInDrawer);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showGhostToggleInDrawer(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showGhostToggleInDrawer);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showGhostToggleInDrawer(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -787,14 +950,16 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showStreamerToggleInDrawer)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showStreamerToggleInDrawer);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showStreamerToggleInDrawer(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showStreamerToggleInDrawer);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showStreamerToggleInDrawer(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
@@ -811,14 +976,16 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showGhostToggleInTray)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showGhostToggleInTray);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showGhostToggleInTray(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showGhostToggleInTray);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showGhostToggleInTray(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -827,14 +994,16 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->showStreamerToggleInTray)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->showStreamerToggleInTray);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_showStreamerToggleInTray(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showStreamerToggleInTray);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showStreamerToggleInTray(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
@@ -848,33 +1017,36 @@ void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 		QString("Bot API")
 	};
 
-	auto currentVal = AyuSettings::get_showPeerIdReactive() | rpl::map([=](int val)
-																	   {
-																		   return options[val];
-																	   });
+	auto currentVal = AyuSettings::get_showPeerIdReactive() | rpl::map(
+		[=](int val)
+		{
+			return options[val];
+		});
 
 	const auto button = AddButtonWithLabel(
 		container,
 		tr::ayu_SettingsShowID(),
 		currentVal,
 		st::settingsButtonNoIcon);
-	button->addClickHandler([=]
-							{
-								controller->show(Box([=](not_null<Ui::GenericBox *> box)
-													 {
-														 const auto save = [=](int index)
-														 {
-															 settings->set_showPeerId(index);
-															 AyuSettings::save();
-														 };
-														 SingleChoiceBox(box, {
-															 .title = tr::ayu_SettingsShowID(),
-															 .options = options,
-															 .initialSelection = settings->showPeerId,
-															 .callback = save,
-														 });
-													 }));
-							});
+	button->addClickHandler(
+		[=]
+		{
+			controller->show(Box(
+				[=](not_null<Ui::GenericBox *> box)
+				{
+					const auto save = [=](int index)
+					{
+						settings->set_showPeerId(index);
+						AyuSettings::save();
+					};
+					SingleChoiceBox(box, {
+						.title = tr::ayu_SettingsShowID(),
+						.options = options,
+						.initialSelection = settings->showPeerId,
+						.callback = save,
+					});
+				}));
+		});
 }
 
 void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
@@ -932,16 +1104,17 @@ void Ayu::SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::
 		st::settingsButtonNoIcon);
 	const auto commonGuard = Ui::CreateChild<base::binary_guard>(commonButton.get());
 
-	commonButton->addClickHandler([=]
-								  {
-									  *commonGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-									  {
-										  auto ayuSettings = &AyuSettings::getInstance();
+	commonButton->addClickHandler(
+		[=]
+		{
+			*commonGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
+			{
+				auto ayuSettings = &AyuSettings::getInstance();
 
-										  ayuSettings->set_mainFont(std::move(font));
-										  AyuSettings::save();
-									  });
-								  });
+				ayuSettings->set_mainFont(std::move(font));
+				AyuSettings::save();
+			});
+		});
 
 	const auto monoButton = AddButtonWithLabel(
 		container,
@@ -952,16 +1125,17 @@ void Ayu::SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::
 		st::settingsButtonNoIcon);
 	const auto monoGuard = Ui::CreateChild<base::binary_guard>(monoButton.get());
 
-	monoButton->addClickHandler([=]
-								{
-									*monoGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-									{
-										auto ayuSettings = &AyuSettings::getInstance();
+	monoButton->addClickHandler(
+		[=]
+		{
+			*monoGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
+			{
+				auto ayuSettings = &AyuSettings::getInstance();
 
-										ayuSettings->set_monoFont(std::move(font));
-										AyuSettings::save();
-									});
-								});
+				ayuSettings->set_monoFont(std::move(font));
+				AyuSettings::save();
+			});
+		});
 
 }
 
@@ -975,11 +1149,12 @@ void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container)
 		container,
 		text,
 		st::settingsButtonNoIcon
-	)->addClickHandler([=]
-					   {
-						   auto controller = &AyuSync::getInstance();
-						   controller->initializeAgent();
-					   });
+	)->addClickHandler(
+		[=]
+		{
+			auto controller = &AyuSync::getInstance();
+			controller->initializeAgent();
+		});
 }
 
 void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
@@ -995,14 +1170,16 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->stickerConfirmation)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->stickerConfirmation);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_stickerConfirmation(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->stickerConfirmation);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_stickerConfirmation(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1011,14 +1188,16 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->gifConfirmation)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->gifConfirmation);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_gifConfirmation(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->gifConfirmation);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_gifConfirmation(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1027,14 +1206,16 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 	)->toggleOn(
 		rpl::single(settings->voiceConfirmation)
 	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-					{
-						return (enabled != settings->voiceConfirmation);
-					}) | start_with_next([=](bool enabled)
-										 {
-											 settings->set_voiceConfirmation(enabled);
-											 AyuSettings::save();
-										 }, container->lifetime());
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->voiceConfirmation);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_voiceConfirmation(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
 }
 
 void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,

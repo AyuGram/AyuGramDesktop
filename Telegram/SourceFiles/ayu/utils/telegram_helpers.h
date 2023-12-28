@@ -14,6 +14,8 @@
 #include "main/main_session.h"
 #include "dialogs/dialogs_main_list.h"
 
+using Callback = Fn<void(const QString&, UserData *)>;
+
 Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback, int delay = 0);
@@ -32,3 +34,14 @@ void MarkAsReadThread(not_null<Data::Thread *> thread);
 void readHistory(not_null<HistoryItem *> message);
 
 QString formatTTL(int time);
+QString formatDateTime(const QDateTime &date);
+
+QString getDCName(int dc);
+
+QString getMediaSize(not_null<HistoryItem *> message);
+QString getMediaMime(not_null<HistoryItem *> message);
+QString getMediaName(not_null<HistoryItem *> message);
+QString getMediaResolution(not_null<HistoryItem *> message);
+QString getMediaDC(not_null<HistoryItem *> message);
+
+void searchById(ID userId, Main::Session *session, const Callback& callback);

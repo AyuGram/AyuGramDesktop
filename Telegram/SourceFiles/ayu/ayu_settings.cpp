@@ -59,54 +59,64 @@ void initialize()
 
 	settings = AyuGramSettings();
 
-	sendReadMessagesReactive.value() | rpl::filter([=](bool val)
-												   {
-													   return (val != settings->sendReadMessages);
-												   }) | start_with_next([=](bool val)
-																		{
-																			ghostModeEnabled =
-																				ghostModeEnabled_util(settings.value());
-																		}, lifetime);
+	sendReadMessagesReactive.value() | rpl::filter(
+		[=](bool val)
+		{
+			return (val != settings->sendReadMessages);
+		}) | start_with_next(
+		[=](bool val)
+		{
+			ghostModeEnabled =
+				ghostModeEnabled_util(settings.value());
+		}, lifetime);
 	// ..
-	sendReadStoriesReactive.value() | rpl::filter([=](bool val)
-												  {
-													  return (val != settings->sendReadStories);
-												  }) | start_with_next([=](bool val)
-																	   {
-																		   ghostModeEnabled =
-																			   ghostModeEnabled_util(settings.value());
-																	   }, lifetime);
+	sendReadStoriesReactive.value() | rpl::filter(
+		[=](bool val)
+		{
+			return (val != settings->sendReadStories);
+		}) | start_with_next(
+		[=](bool val)
+		{
+			ghostModeEnabled =
+				ghostModeEnabled_util(settings.value());
+		}, lifetime);
 	// ..
-	sendOnlinePacketsReactive.value() | rpl::filter([=](bool val)
-													{
-														return (val != settings->sendOnlinePackets);
-													}) | start_with_next([=](bool val)
-																		 {
-																			 ghostModeEnabled =
-																				 ghostModeEnabled_util(settings
-																										   .value());
-																		 }, lifetime);
+	sendOnlinePacketsReactive.value() | rpl::filter(
+		[=](bool val)
+		{
+			return (val != settings->sendOnlinePackets);
+		}) | start_with_next(
+		[=](bool val)
+		{
+			ghostModeEnabled =
+				ghostModeEnabled_util(settings
+										  .value());
+		}, lifetime);
 	// ..
-	sendUploadProgressReactive.value() | rpl::filter([=](bool val)
-													 {
-														 return (val != settings->sendUploadProgress);
-													 }) | start_with_next([=](bool val)
-																		  {
-																			  ghostModeEnabled =
-																				  ghostModeEnabled_util(settings
-																											.value());
-																		  }, lifetime);
+	sendUploadProgressReactive.value() | rpl::filter(
+		[=](bool val)
+		{
+			return (val != settings->sendUploadProgress);
+		}) | start_with_next(
+		[=](bool val)
+		{
+			ghostModeEnabled =
+				ghostModeEnabled_util(settings
+										  .value());
+		}, lifetime);
 	// ..
-	sendOfflinePacketAfterOnlineReactive.value() | rpl::filter([=](bool val)
-															   {
-																   return (val
-																	   != settings->sendOfflinePacketAfterOnline);
-															   }) | start_with_next([=](bool val)
-																					{
-																						ghostModeEnabled =
-																							ghostModeEnabled_util(
-																								settings.value());
-																					}, lifetime);
+	sendOfflinePacketAfterOnlineReactive.value() | rpl::filter(
+		[=](bool val)
+		{
+			return (val
+				!= settings->sendOfflinePacketAfterOnline);
+		}) | start_with_next(
+		[=](bool val)
+		{
+			ghostModeEnabled =
+				ghostModeEnabled_util(
+					settings.value());
+		}, lifetime);
 }
 
 void postinitialize()
@@ -150,7 +160,8 @@ void load()
 		catch (...) {
 			LOG(("AyuGramSettings: failed to parse settings file"));
 		}
-	} catch (...) {
+	}
+	catch (...) {
 		LOG(("AyuGramSettings: failed to read settings file (not json-like)"));
 	}
 	postinitialize();
@@ -279,7 +290,8 @@ void AyuGramSettings::set_appIcon(QString val)
 	appIcon = std::move(val);
 }
 
-void AyuGramSettings::set_simpleQuotesAndReplies(bool val) {
+void AyuGramSettings::set_simpleQuotesAndReplies(bool val)
+{
 	simpleQuotesAndReplies = val;
 }
 
@@ -298,6 +310,31 @@ void AyuGramSettings::set_editedMark(QString val)
 void AyuGramSettings::set_recentStickersCount(int val)
 {
 	recentStickersCount = val;
+}
+
+void AyuGramSettings::set_showReactionsPanelInContextMenu(int val)
+{
+	showReactionsPanelInContextMenu = val;
+}
+
+void AyuGramSettings::set_showViewsPanelInContextMenu(int val)
+{
+	showViewsPanelInContextMenu = val;
+}
+
+void AyuGramSettings::set_showHideMessageInContextMenu(int val)
+{
+	showHideMessageInContextMenu = val;
+}
+
+void AyuGramSettings::set_showUserMessagesInContextMenu(int val)
+{
+	showUserMessagesInContextMenu = val;
+}
+
+void AyuGramSettings::set_showMessageDetailsInContextMenu(int val)
+{
+	showMessageDetailsInContextMenu = val;
 }
 
 void AyuGramSettings::set_showLReadToggleInDrawer(bool val)

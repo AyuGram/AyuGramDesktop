@@ -76,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_state.h"
 
 
 namespace {
@@ -1587,6 +1588,10 @@ void History::viewReplaced(not_null<const Element*> was, Element *now) {
 
 void History::addItemToBlock(not_null<HistoryItem*> item) {
 	Expects(!item->mainView());
+
+	if (AyuState::isHidden(item)) {
+		return;
+	}
 
 	auto block = prepareBlockForAddingItem();
 

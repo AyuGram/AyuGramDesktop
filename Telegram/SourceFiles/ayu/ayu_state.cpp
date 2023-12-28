@@ -8,4 +8,31 @@
 
 namespace AyuState
 {
+
+std::unordered_map<PeerId, std::unordered_set<MsgId>> hiddenMessages;
+
+void hide(PeerId peerId, MsgId messageId)
+{
+	hiddenMessages[peerId].insert(messageId);
+}
+
+void hide(not_null<HistoryItem *> item)
+{
+	hide(item->history()->peer->id, item->id);
+}
+
+bool isHidden(PeerId peerId, MsgId messageId)
+{
+	auto it = hiddenMessages.find(peerId);
+	if (it != hiddenMessages.end()) {
+		return it->second.find(messageId) != it->second.end();
+	}
+	return false;
+}
+
+bool isHidden(not_null<HistoryItem *> item)
+{
+	return isHidden(item->history()->peer->id, item->id);
+}
+
 }
