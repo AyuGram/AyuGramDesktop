@@ -1112,9 +1112,11 @@ QSize OverlayWidget::flipSizeByRotation(QSize size) const {
 
 bool OverlayWidget::hasCopyMediaRestriction(bool skipPremiumCheck) const {
 	if (const auto story = _stories ? _stories->story() : nullptr) {
-		return skipPremiumCheck
-			? !story->canDownloadIfPremium()
-			: !story->canDownloadChecked();
+		// AyuGram: removed; allow downloading any stories
+		return false;
+//		return skipPremiumCheck
+//			? !story->canDownloadIfPremium()
+//			: !story->canDownloadChecked();
 	}
 	return (_history && !_history->peer->allowsForwarding())
 		|| (_message && _message->forbidsSaving());
