@@ -3285,33 +3285,48 @@ void HistoryItem::setPostAuthor(const QString &author) {
 }
 
 void HistoryItem::setAyuHint(const QString &hint) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!(_flags & MessageFlag::HasPostAuthor))
-	{
-		_flags |= MessageFlag::HasPostAuthor;
-	}
+	try {
+		const auto settings = &AyuSettings::getInstance();
+		if (!(_flags & MessageFlag::HasPostAuthor)) {
+			_flags |= MessageFlag::HasPostAuthor;
+		}
 
-	auto msgsigned = Get<HistoryMessageSigned>();
-	if (hint.isEmpty()) {
-		if (!msgsigned) {
+		auto msgsigned = Get<HistoryMessageSigned>();
+		if (hint.isEmpty()) {
+			if (!msgsigned) {
+				return;
+			}
+			RemoveComponents(HistoryMessageSigned::Bit());
+			history()->owner().requestItemResize(this);
 			return;
 		}
-		RemoveComponents(HistoryMessageSigned::Bit());
-		history()->owner().requestItemResize(this);
-		return;
-	}
-	if (!msgsigned) {
-		AddComponents(HistoryMessageSigned::Bit());
-		msgsigned = Get<HistoryMessageSigned>();
-	} else if (msgsigned->postAuthor == hint) {
-		return;
-	}
-	msgsigned->postAuthor = hint;
-	msgsigned->isAnonymousRank = !isDiscussionPost()
-		&& this->author()->isMegagroup();
 
-	history()->owner().requestItemViewRefresh(this);
-	history()->owner().requestItemResize(this);
+		if (!isService()) {
+			if (!msgsigned) {
+				AddComponents(HistoryMessageSigned::Bit());
+				msgsigned = Get<HistoryMessageSigned>();
+			}
+			else if (msgsigned->postAuthor == hint) {
+				return;
+			}
+			msgsigned->postAuthor = hint;
+			msgsigned->isAnonymousRank = !isDiscussionPost()
+				&& this->author()->isMegagroup();
+		}
+		else {
+			const auto data = Get<HistoryServiceData>();
+			auto prepared = PreparedServiceText{
+				.text = _text.append(" ").append(hint),
+				.links = data->textLinks
+			};
+			setServiceText(std::move(prepared));
+		}
+
+		history()->owner().requestItemViewRefresh(this);
+		history()->owner().requestItemResize(this);
+	} catch (...) {
+		LOG(("AyuGram: crash in setting hint"));
+	}
 }
 
 void HistoryItem::setReplies(HistoryMessageRepliesData &&data) {

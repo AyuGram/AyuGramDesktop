@@ -2809,10 +2809,17 @@ void Session::unregisterMessageTTL(
 }
 
 void Session::checkTTLs() {
+	const auto settings = &AyuSettings::getInstance();
+
 	_ttlCheckTimer.cancel();
 	const auto now = base::unixtime::now();
 	while (!_ttlMessages.empty() && _ttlMessages.begin()->first <= now) {
-		_ttlMessages.begin()->second.front()->destroy();
+		if (!settings->saveDeletedMessages) {
+			_ttlMessages.begin()->second.front()->destroy();
+		}
+		else {
+			_ttlMessages.begin()->second.front()->setAyuHint(settings->deletedMark);
+		}
 	}
 	scheduleNextTTLs();
 }
@@ -2831,7 +2838,15 @@ void Session::processMessagesDeleted(
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
 			const auto history = i->second->history();
-			i->second->destroy();
+
+			const auto settings = &AyuSettings::getInstance();
+			if (!settings->saveDeletedMessages) {
+				i->second->destroy();
+			}
+			else {
+				i->second->setAyuHint(settings->deletedMark);
+			}
+
 			if (!history->chatListMessageKnown()) {
 				historiesToCheck.emplace(history);
 			}
@@ -2849,7 +2864,15 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
 			const auto history = item->history();
-			item->destroy();
+
+			const auto settings = &AyuSettings::getInstance();
+			if (!settings->saveDeletedMessages) {
+				item->destroy();
+			}
+			else {
+				item->setAyuHint(settings->deletedMark);
+			}
+
 			if (!history->chatListMessageKnown()) {
 				historiesToCheck.emplace(history);
 			}
