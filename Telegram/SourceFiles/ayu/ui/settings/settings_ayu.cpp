@@ -942,6 +942,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 			AyuSettings::save();
 		}, container->lifetime());
 
+#ifdef WIN32
 	AddButtonWithIcon(
 		container,
 		tr::ayu_StreamerModeToggle(),
@@ -960,6 +961,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 			settings->set_showStreamerToggleInDrawer(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
+#endif
 }
 
 void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
@@ -987,6 +989,7 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 			AyuSettings::save();
 		}, container->lifetime());
 
+#ifdef WIN32
 	AddButtonWithIcon(
 		container,
 		tr::ayu_EnableStreamerModeTray(),
@@ -1004,6 +1007,7 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 			settings->set_showStreamerToggleInTray(enabled);
 			AyuSettings::save();
 		}, container->lifetime());
+#endif
 }
 
 void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
