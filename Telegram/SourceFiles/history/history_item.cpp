@@ -1292,7 +1292,7 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	auto text = std::move(prepared.text);
-	if (!prepared.text.empty()) {
+	if (!text.text.isEmpty()) {
 		const auto settings = &AyuSettings::getInstance();
 		text = text.append(QString(" (%1)").arg(QLocale().toString(
 			base::unixtime::parse(_date),
