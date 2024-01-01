@@ -73,6 +73,7 @@ public:
 		// 2 - show with SHIFT or CTRL pressed
 		showReactionsPanelInContextMenu = 1;
 		showViewsPanelInContextMenu = 1;
+		showHideMessageInContextMenu = 0;
 		showUserMessagesInContextMenu = 2;
 		showMessageDetailsInContextMenu = 2;
 

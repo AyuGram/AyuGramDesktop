@@ -1292,13 +1292,15 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	auto text = std::move(prepared.text);
-	if (!text.text.isEmpty()) {
-		const auto settings = &AyuSettings::getInstance();
-		text = text.append(QString(" (%1)").arg(QLocale().toString(
-			base::unixtime::parse(_date),
-			settings->showMessageSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-										 : QLocale::system().timeFormat(QLocale::ShortFormat)
-		)));
+
+	const auto settings = &AyuSettings::getInstance();
+	const auto timeString = QString(" (%1)").arg(QLocale().toString(
+		base::unixtime::parse(_date),
+		settings->showMessageSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+									 : QLocale::system().timeFormat(QLocale::ShortFormat)
+	));
+	if (!text.text.isEmpty() && !text.text.contains(timeString)) {
+		text = text.append(timeString);
 	}
 
 	AddComponents(HistoryServiceData::Bit());
@@ -3316,7 +3318,7 @@ void HistoryItem::setAyuHint(const QString &hint) {
 		else {
 			const auto data = Get<HistoryServiceData>();
 			auto prepared = PreparedServiceText{
-				.text = _text.append(" ").append(hint),
+				.text = _text.append(QString(" (%1)").arg(hint)),
 				.links = data->textLinks
 			};
 			setServiceText(std::move(prepared));
