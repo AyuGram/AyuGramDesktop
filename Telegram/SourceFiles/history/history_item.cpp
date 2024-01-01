@@ -292,7 +292,7 @@ std::unique_ptr<Data::Media> HistoryItem::CreateMedia(
 		});
 	}, [&](const MTPDmessageMediaDocument &media) -> Result {
 		const auto document = media.vdocument();
-		if (media.vttl_seconds() && false) {  // AyuGram: show expiring messages
+		if (false) {  // AyuGram: show expiring messages
 			LOG(("App Error: "
 				"Unexpected MTPMessageMediaDocument "
 				"with ttl_seconds in CreateMedia."));
@@ -429,8 +429,8 @@ HistoryItem::HistoryItem(
 		setServiceText({
 			tr::lng_message_empty(tr::now, Ui::Text::WithEntities)
 		});
-	} else if (checked == MediaCheckResult::HasTimeToLive && false) { // AyuGram: show ex		createServiceFromMtp(data);
-		setReactions(data.vreactions());
+	} else if (checked == MediaCheckResult::HasExpiredMediaTimeToLive) {
+		createServiceFromMtp(data);
 		applyTTL(data);
 	} else if (checked == MediaCheckResult::HasStoryMention) {
 		setMedia(*data.vmedia());
@@ -441,7 +441,7 @@ HistoryItem::HistoryItem(
 		createComponents(data);
 		if (media) {
 			setMedia(*media);
-			if (checked == MediaCheckResult::HasTimeToLive) {
+			if (checked == MediaCheckResult::HasUnsupportedTimeToLive) {
 				media->match([&](const MTPDmessageMediaPhoto &media) {
 					auto time = media.vttl_seconds()->v;
 					setAyuHint(formatTTL(time));
