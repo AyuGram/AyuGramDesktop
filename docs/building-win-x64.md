@@ -4,7 +4,6 @@
 - [Install third party software](#install-third-party-software)
 - [Clone source code and prepare libraries](#clone-source-code-and-prepare-libraries)
 - [Build the project](#build-the-project)
-- [Qt Visual Studio Tools](#qt-visual-studio-tools)
 
 ## Prepare folder
 
@@ -26,6 +25,8 @@ Open **x64 Native Tools Command Prompt for VS 2022.bat**, go to ***BuildPath*** 
     git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
     tdesktop\Telegram\build\prepare\win.bat
 
+You may encounter an error saying that your IP is not allowed - simply turn on VPN.
+
 ## Build the project
 
 Go to ***BuildPath*\\tdesktop\\Telegram** and run
@@ -35,12 +36,3 @@ Go to ***BuildPath*\\tdesktop\\Telegram** and run
 * Open ***BuildPath*\\tdesktop\\out\\Telegram.sln** in Visual Studio 2022
 * Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
 * The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
-
-### Qt Visual Studio Tools
-
-For better debugging you may want to install Qt Visual Studio Tools:
-
-* Open **Extensions** -> **Manage Extensions**
-* Go to **Online** tab
-* Search for **Qt**
-* Install **Qt Visual Studio Tools** extension

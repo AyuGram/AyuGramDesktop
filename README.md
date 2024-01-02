@@ -9,11 +9,17 @@
 - Anti-recall
 - Font customization
 - Streamer mode
-- Material Design switches
 - Local Telegram Premium
-- Sync read states and message history with AyuSync *(TBA)*
+- Enhanced appearance
 
-<img src='.github/demos/demo1.png' width='250'> <img src='.github/demos/demo2.png' width='250'> <img src='.github/demos/demo3.png' width='250'>
+And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
+
+## Preferences screenshots
+
+<img src='.github/demos/demo1.png' width='268'>
+<img src='.github/demos/demo2.png' width='268'>
+<img src='.github/demos/demo3.png' width='268'>
+<img src='.github/demos/demo4.png' width='268'>
 
 ## Downloads
 
@@ -25,12 +31,7 @@ Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/
 
 ### Arch Linux
 
-It is recommended to build AyuGram from source on any Linux distro.
-
-But if you're brave enough, you can install `ayugram-desktop-git` or `ayugram-desktop-bin`
-from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
-
-These packages maintained by [westpain](https://github.com/incycledream). *We're not responsible for them.*
+You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### Any other Linux distro
 
@@ -90,24 +91,28 @@ Make sure you have these components installed with VS Build Tools:
 
 ## Donation
 
-If you enjoy using **AyuGram** and want to send us a tip, here's how you can do it:
+Enjoy using **AyuGram**? Consider sending us a tip!
 
-- Using [Boosty](https://boosty.to/alexeyzavar) - any card and PayPal
-- Using cryptocurrency - `TRpbajq38qU8joThgAfKJLyEPbNjzsdPJ1` (Tron + USDT)
+[Here's available methods.](https://docs.ayugram.one/donate/)
 
 ## Credits
+
+### Telegram clients
 
 - [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
 - [Kotatogram](https://github.com/kotatogram/kotatogram-desktop)
 - [64Gram](https://github.com/TDesktop-x64/tdesktop)
 - [Forkgram](https://github.com/forkgram/tdesktop)
-- [SQLite](https://github.com/sqlite/sqlite)
-- [sqlite_orm](https://github.com/fnc12/sqlite_orm)
 
-### Very special thanks to
+### Libraries used
 
-- [Solar Icon Set](https://solariconset.com/)
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [BitConverter](https://github.com/YanjieHe/BitConverter)
 - [Not Enough Standards](https://github.com/Alairion/not-enough-standards)
->>>>>>> f62eea3952 (feat: refactor)
+- [SQLite](https://github.com/sqlite/sqlite)
+- [sqlite_orm](https://github.com/fnc12/sqlite_orm)
+
+### Icons
+
+- [Solar Icon Set](https://www.figma.com/community/file/1166831539721848736)
+>>>>>>> 2f069bcd02 (feat: update README.md)
