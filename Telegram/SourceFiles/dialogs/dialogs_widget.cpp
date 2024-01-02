@@ -968,13 +968,20 @@ void Widget::chosenRow(const ChosenRow &row) {
 		}
 		return;
 	} else if (history) {
+		const auto settings = &AyuSettings::getInstance();
 		const auto peer = history->peer;
-		const auto showAtMsgId = controller()->uniqueChatsInSearchResults(
-			_searchState
-		) ? ShowAtUnreadMsgId : row.message.fullId.msg;
-		auto params = Window::SectionShow(
-			Window::SectionShow::Way::ClearStack);
-		params.highlight = Window::SearchHighlightId(_searchState.query);
+		if (row.message.fullId.msg == ShowAtUnreadMsgId) {
+			if (row.userpicClick
+				&& peer->hasActiveStories()
+				&& !peer->isSelf()
+				&& !settings->disableStories) {
+				controller()->openPeerStories(peer->id);
+				return;
+			}
+		}
+		const auto showAtMsgId = controller()->uniqueChatsInSearchResults()
+			? ShowAtUnreadMsgId
+			: row.message.fullId.msg;
 		if (row.newWindow) {
 			controller()->showInNewWindow(peer, showAtMsgId);
 		} else {
@@ -2330,6 +2337,13 @@ void Widget::updateStoriesVisibility() {
 	if (!_stories) {
 		return;
 	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->disableStories) {
+		_stories->setVisible(false);
+		return;
+	}
+
 	const auto hidden = (_showAnimation != nullptr)
 		|| _openedForum
 		|| !_widthAnimationCache.isNull()

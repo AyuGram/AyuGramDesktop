@@ -213,15 +213,8 @@ Main::Session &Stories::session() const {
 }
 
 void Stories::apply(const MTPDupdateStory &data) {
-	// AyuGram disableStories
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
-		return;
-	}
-
-	const auto peerId = peerFromUser(data.vuser_id());
-	const auto user = not_null(_owner->peer(peerId)->asUser());
+	const auto peerId = peerFromMTP(data.vpeer());
+	const auto peer = _owner->peer(peerId);
 	const auto now = base::unixtime::now();
 	const auto idDates = parseAndApply(peer, data.vstory(), now);
 	if (!idDates) {
@@ -269,25 +262,18 @@ void Stories::apply(const MTPDupdateStory &data) {
 }
 
 void Stories::apply(const MTPDupdateReadStories &data) {
-
-	// AyuGram disableStories
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
-		return;
-	}
-
-	bumpReadTill(peerFromUser(data.vuser_id()), data.vmax_id().v);
+	bumpReadTill(peerFromMTP(data.vpeer()), data.vmax_id().v);
 }
 
-void Stories::apply(not_null<PeerData*> peer, const MTPUserStories *data) {
-	// AyuGram disableStories
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
-		return;
-	}
+void Stories::apply(const MTPStoriesStealthMode &stealthMode) {
+	const auto &data = stealthMode.data();
+	_stealthMode = StealthMode{
+		.enabledTill = data.vactive_until_date().value_or_empty(),
+		.cooldownTill = data.vcooldown_until_date().value_or_empty(),
+	};
+}
 
+void Stories::apply(not_null<PeerData*> peer, const MTPPeerStories *data) {
 	if (!data) {
 		applyDeletedFromSources(peer->id, StorySourcesList::NotHidden);
 		applyDeletedFromSources(peer->id, StorySourcesList::Hidden);
@@ -299,14 +285,7 @@ void Stories::apply(not_null<PeerData*> peer, const MTPUserStories *data) {
 	}
 }
 
-Story *Stories::applyFromWebpage(PeerId peerId, const MTPstoryItem &story) {
-	// AyuGram disableStories
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
-		return nullptr;
-	}
-
+Story *Stories::applySingle(PeerId peerId, const MTPstoryItem &story) {
 	const auto idDates = parseAndApply(
 		_owner->peer(peerId),
 		story,
