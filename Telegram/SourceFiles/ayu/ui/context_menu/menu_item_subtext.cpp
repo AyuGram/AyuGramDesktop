@@ -216,9 +216,12 @@ ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu *> menu,
 												 not_null<Main::Session *> session,
 												 ID authorId)
 	: ActionWithSubText(menu, menu->st(), st::menuIconStickers, [=]
-{ }, tr::ayu_MessageDetailsPackOwnerPC(tr::now), tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now)),
+{ }, tr::ayu_MessageDetailsPackOwnerPC(tr::now), QString()),
 	  _session(session)
 {
+	const auto fetchingText = tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now);
+	_subText = QString(fetchingText);
+
 	searchAuthor(authorId);
 }
 
@@ -227,16 +230,21 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId)
 	searchById(authorId, _session, [=](const QString &username, UserData *user)
 	{
 		if (username.isEmpty() && !user) {
-			_subText = tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now);
-			setClickedCallback([=] {
-				const auto text = QString("int32: %1\nint64: %2").arg(authorId).arg(0x100000000L + authorId);
-				QGuiApplication::clipboard()->setText(text);
-			});
+			const auto notFoundText = tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now);
+			_subText = QString(notFoundText);
+			setClickedCallback(
+				[=]
+				{
+					const auto text =
+						QString("int32: %1\nint64: %2").arg(authorId).arg(0x100000000L + authorId);
+					QGuiApplication::clipboard()->setText(text);
+				});
 
-			crl::on_main([=]
-						 {
-							 update();
-						 });
+			crl::on_main(
+				[=]
+				{
+					update();
+				});
 			return;
 		}
 
@@ -258,10 +266,11 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId)
 		setClickedCallback(callback);
 
 		_subText = title;
-		crl::on_main([=]
-					 {
-						 update();
-					 });
+		crl::on_main(
+			[=]
+			{
+				update();
+			});
 	});
 }
 
