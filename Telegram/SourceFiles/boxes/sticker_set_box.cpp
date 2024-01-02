@@ -66,6 +66,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtSvg/QSvgRenderer>
 
+// AyuGram includes
+#include "ayu/utils/telegram_helpers.h"
+#include "window/window_session_controller.h"
+#include "data/data_user.h"
+
+
 namespace {
 
 constexpr auto kStickersPerRow = 5;
@@ -723,34 +729,26 @@ void StickerSetBox::updateButtons() {
 					? tr::lng_stickers_copied_emoji(tr::now)
 					: tr::lng_stickers_copied(tr::now));
 		};
-		const auto fillSetCreatorMenu = [&] {
-			using Filler = Fn<void(not_null<Ui::PopupMenu*>)>;
-			if (!_inner->amSetCreator()) {
-				return Filler(nullptr);
+		const auto addAuthorPack = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>>& menu) {
+			if (type == Data::StickersType::Stickers) {
+				(*menu)->addAction(tr::ayu_MessageDetailsPackOwnerPC(tr::now), [=]
+				{
+					searchById(_inner->setId() >> 32, _session, [=](const QString &username, UserData *user)
+					{
+						if (!user) {
+							showToast(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
+							return;
+						}
+
+						if (const auto window = _session->tryResolveWindow()) {
+							if (const auto mainWidget = window->widget()->sessionController()) {
+								mainWidget->showPeer(user);
+							}
+						}
+					});
+				}, &st::menuIconProfile);
 			}
-			const auto data = &_session->data();
-			return Filler([=, show = _show, set = _set](
-					not_null<Ui::PopupMenu*> menu) {
-				const auto done = [inner = _inner](const TLStickerSet &set) {
-					if (const auto raw = inner.data()) {
-						raw->applySet(set);
-					}
-				};
-				menu->addAction(
-					tr::lng_stickers_context_edit_name(tr::now),
-					[=] {
-						show->showBox(Box(ChangeSetNameBox, data, set, done));
-					},
-					&st::menuIconEdit);
-				menu->addAction(
-					tr::lng_stickers_context_reorder(tr::now),
-					[=] {
-						_inner->setReorderState(true);
-						updateButtons();
-					},
-					&st::menuIconManage);
-			});
-		}();
+		};
 		if (_inner->notInstalled()) {
 			if (!_session->premium()
 				&& _session->premiumPossible()
@@ -798,6 +796,7 @@ void StickerSetBox::updateButtons() {
 							: tr::lng_stickers_share_pack)(tr::now),
 						[=] { share(); closeBox(); },
 						&st::menuIconShare);
+					addAuthorPack(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
@@ -850,6 +849,7 @@ void StickerSetBox::updateButtons() {
 							archive,
 							&st::menuIconArchive);
 					}
+					addAuthorPack(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
