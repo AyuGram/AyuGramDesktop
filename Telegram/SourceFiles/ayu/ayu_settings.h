@@ -88,14 +88,15 @@ public:
 		mainFont = "";
 		monoFont = "";
 
+		hideNotificationCounters = false;
+		hideAllChatsFolder = false;
+
 		/*
 		 * showPeerId = 0 means no ID shown
 		 * showPeerId = 1 means ID shown as for Telegram API devs
 		 * showPeerId = 2 means ID shown as for Bot API devs (-100)
 		 */
 		showPeerId = 2;
-
-		hideAllChatsFolder = false;
 		showMessageSeconds = false;
 
 		// ~ Confirmations
@@ -149,8 +150,10 @@ public:
 	QString mainFont;
 	QString monoFont;
 
-	int showPeerId;
+	bool hideNotificationCounters;
 	bool hideAllChatsFolder;
+
+	int showPeerId;
 	bool showMessageSeconds;
 
 	bool stickerConfirmation;
@@ -205,9 +208,11 @@ public:
 	void set_mainFont(QString val);
 	void set_monoFont(QString val);
 
+	void set_hideNotificationCounters(bool val);
+	void set_hideAllChatsFolder(bool val);
+
 	void set_showPeerId(int val);
 	void set_showMessageSeconds(bool val);
-	void set_hideAllChatsFolder(bool val);
 
 	void set_stickerConfirmation(bool val);
 	void set_gifConfirmation(bool val);
@@ -252,9 +257,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showStreamerToggleInTray,
 	mainFont,
 	monoFont,
+	hideNotificationCounters,
+	hideAllChatsFolder,
 	showPeerId,
 	showMessageSeconds,
-	hideAllChatsFolder,
 	stickerConfirmation,
 	gifConfirmation,
 	voiceConfirmation

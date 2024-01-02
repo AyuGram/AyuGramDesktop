@@ -7075,9 +7075,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MaximumMediaSizeCellular" = "Media size limit (cellular data)";
 "ayu_MaximumMediaSizeWiFi" = "Media size limit (WiFi)";
 "ayu_MessageSavingOtherHeader" = "Other";
-"ayu_MessageSavingSaveFormatting" = "Save formatting";
 "ayu_MessageSavingSaveReactions" = "Save reactions";
 "ayu_MessageSavingSaveForBots" = "Save in bot dialogs";
+"ayu_MessageSavingSavePath" = "Attachments folder";
+"ayu_MessageSavingSavePathTitle" = "Choose folder";
 "ayu_SpyAllToggle" = "Spy on people";
 "ayu_SpySaveReadMarks" = "Save read date";
 "ayu_SpySaveLastActivity" = "Save last activity";
@@ -7091,6 +7092,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CustomizationHeader" = "Customization";
 "ayu_DeletedMarkText" = "Deleted mark";
 "ayu_EditedMarkText" = "Edited mark";
+"ayu_HideNotificationCounters" = "Hide notification counters";
 "ayu_HideAllChats" = "Hide \"All chats\" folder";
 "ayu_ShowGhostToggleInDrawer" = "Show ghost mode toggle";
 "ayu_ShowKllButtonInDrawer" = "Show kill app button";
@@ -7112,6 +7114,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFiltersAmount" = "filters";
 "ayu_RegexFiltersHeader" = "Filters";
 "ayu_RegexFiltersShared" = "Shared filters";
+"ayu_RegexFiltersExcluded" = "Excluded filters";
 "ayu_FiltersHideFromBlocked" = "Hide from blocked users";
 "ayu_FiltersHideFromBlockedNote" = "Message filters were enabled.";
 "ayu_RegexFiltersEnableSharedInChats" = "Enable shared filters in chats";

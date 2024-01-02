@@ -394,7 +394,7 @@ Ayu::Ayu(
 	setupContent(controller);
 }
 
-void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
+void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -441,7 +441,7 @@ void Ayu::SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 	AddCollapsibleToggle(container, tr::ayu_GhostEssentialsHeader(), checkboxes, true);
 }
 
-void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
+void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -472,7 +472,7 @@ void Ayu::SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 	AddCollapsibleToggle(container, tr::ayu_MarkReadAfterAction(), checkboxes, false);
 }
 
-void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
+void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -502,7 +502,7 @@ void Ayu::SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 		}, container->lifetime());
 }
 
-void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
+void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -549,7 +549,7 @@ void Ayu::SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 		}, container->lifetime());
 }
 
-void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
+void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -687,113 +687,14 @@ void Ayu::SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		}, container->lifetime());
 }
 
-void Ayu::SetupAppIcon(not_null<Ui::VerticalLayout *> container)
+void SetupAppIcon(not_null<Ui::VerticalLayout *> container)
 {
 	container->add(
 		object_ptr<IconPicker>(container),
 		st::settingsCheckboxPadding);
 }
 
-void Ayu::SetupCustomization(not_null<Ui::VerticalLayout *> container,
-							 not_null<Window::SessionController *> controller)
-{
-	auto settings = &AyuSettings::getInstance();
-
-	AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
-
-	SetupAppIcon(container);
-
-	AddDivider(container);
-	AddSkip(container);
-
-	auto btn = AddButtonWithLabel(
-		container,
-		tr::ayu_DeletedMarkText(),
-		AyuSettings::get_deletedMarkReactive(),
-		st::settingsButtonNoIcon
-	);
-	btn->addClickHandler(
-		[=]()
-		{
-			auto box = Box<EditDeletedMarkBox>();
-			Ui::show(std::move(box));
-		});
-
-	auto btn2 = AddButtonWithLabel(
-		container,
-		tr::ayu_EditedMarkText(),
-		AyuSettings::get_editedMarkReactive(),
-		st::settingsButtonNoIcon
-	);
-	btn2->addClickHandler(
-		[=]()
-		{
-			auto box = Box<EditEditedMarkBox>();
-			Ui::show(std::move(box));
-		});
-
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
-
-	SetupRecentStickersLimitSlider(container);
-
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
-
-	SetupShowPeerId(container, controller);
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_HideAllChats(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->hideAllChatsFolder)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->hideAllChatsFolder);
-		}) | start_with_next(
-		[=](bool enabled)
-		{
-			settings->set_hideAllChatsFolder(enabled);
-			AyuSettings::save();
-		}, container->lifetime());
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_SettingsShowMessageSeconds(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->showMessageSeconds)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->showMessageSeconds);
-		}) | start_with_next(
-		[=](bool enabled)
-		{
-			settings->set_showMessageSeconds(enabled);
-			AyuSettings::save();
-		}, container->lifetime());
-
-	AddSkip(container);
-	AddDivider(container);
-	SetupContextMenuElements(container, controller);
-	SetupDrawerElements(container);
-	AddSkip(container);
-	AddDivider(container);
-	SetupTrayElements(container);
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
-	SetupFonts(container, controller);
-}
-
-void Ayu::SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
+void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
 								   not_null<Window::SessionController *> controller)
 {
 	auto settings = &AyuSettings::getInstance();
@@ -878,7 +779,7 @@ void Ayu::SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
 }
 
-void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
+void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -964,7 +865,7 @@ void Ayu::SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 #endif
 }
 
-void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
+void SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1010,7 +911,7 @@ void Ayu::SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 #endif
 }
 
-void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
+void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 						  not_null<Window::SessionController *> controller)
 {
 	auto settings = &AyuSettings::getInstance();
@@ -1053,7 +954,7 @@ void Ayu::SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 		});
 }
 
-void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
+void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1095,7 +996,7 @@ void Ayu::SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> containe
 		});
 }
 
-void Ayu::SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller)
+void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller)
 {
 	const auto settings = &AyuSettings::getInstance();
 
@@ -1143,7 +1044,7 @@ void Ayu::SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::
 
 }
 
-void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container)
+void SetupAyuSync(not_null<Ui::VerticalLayout *> container)
 {
 	AddSubsectionTitle(container, tr::ayu_AyuSyncHeader());
 
@@ -1161,7 +1062,7 @@ void Ayu::SetupAyuSync(not_null<Ui::VerticalLayout *> container)
 		});
 }
 
-void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
+void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1222,7 +1123,142 @@ void Ayu::SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 		}, container->lifetime());
 }
 
-void Ayu::SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
+void SetupMarks(not_null<Ui::VerticalLayout *> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddButtonWithLabel(
+		container,
+		tr::ayu_DeletedMarkText(),
+		AyuSettings::get_deletedMarkReactive(),
+		st::settingsButtonNoIcon
+	)->addClickHandler(
+		[=]()
+		{
+			auto box = Box<EditDeletedMarkBox>();
+			Ui::show(std::move(box));
+		});
+
+	AddButtonWithLabel(
+		container,
+		tr::ayu_EditedMarkText(),
+		AyuSettings::get_editedMarkReactive(),
+		st::settingsButtonNoIcon
+	)->addClickHandler(
+		[=]()
+		{
+			auto box = Box<EditEditedMarkBox>();
+			Ui::show(std::move(box));
+		});
+}
+
+void SetupFolderSettings(not_null<Ui::VerticalLayout *> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_HideNotificationCounters(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideNotificationCounters)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideNotificationCounters);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideNotificationCounters(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_HideAllChats(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideAllChatsFolder)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideAllChatsFolder);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideAllChatsFolder(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+}
+
+void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+	auto settings = &AyuSettings::getInstance();
+
+	SetupShowPeerId(container, controller);
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_SettingsShowMessageSeconds(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->showMessageSeconds)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showMessageSeconds);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showMessageSeconds(enabled);
+			AyuSettings::save();
+		}, container->lifetime());
+
+}
+
+void SetupCustomization(not_null<Ui::VerticalLayout *> container,
+						not_null<Window::SessionController *> controller)
+{
+	AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
+
+	SetupAppIcon(container);
+
+	AddDivider(container);
+	AddSkip(container);
+
+	SetupMarks(container);
+
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+
+	SetupRecentStickersLimitSlider(container);
+
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+
+	SetupFolderSettings(container);
+	AddSkip(container);
+	AddDivider(container);
+
+	AddSkip(container);
+	SetupNerdSettings(container, controller);
+
+	AddSkip(container);
+	AddDivider(container);
+	SetupContextMenuElements(container, controller);
+	SetupDrawerElements(container);
+	AddSkip(container);
+	AddDivider(container);
+	SetupTrayElements(container);
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+	SetupFonts(container, controller);
+}
+
+void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
 							   not_null<Window::SessionController *> controller)
 {
 	AddSkip(container);

@@ -383,14 +383,19 @@ void AyuGramSettings::set_showPeerId(int val)
 	showPeerIdReactive = val;
 }
 
-void AyuGramSettings::set_showMessageSeconds(bool val)
+void AyuGramSettings::set_hideNotificationCounters(bool val)
 {
-	showMessageSeconds = val;
+	hideNotificationCounters = val;
 }
 
 void AyuGramSettings::set_hideAllChatsFolder(bool val)
 {
 	hideAllChatsFolder = val;
+}
+
+void AyuGramSettings::set_showMessageSeconds(bool val)
+{
+	showMessageSeconds = val;
 }
 
 void AyuGramSettings::set_stickerConfirmation(bool val)

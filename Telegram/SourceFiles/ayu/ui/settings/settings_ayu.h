@@ -29,40 +29,6 @@ public:
 	[[nodiscard]] rpl::producer<QString> title() override;
 
 private:
-	void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container);
-
-	void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container);
-
-	void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container);
-
-	void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container);
-
-	void SetupQoLToggles(not_null<Ui::VerticalLayout *> container);
-
-	void SetupAppIcon(not_null<Ui::VerticalLayout *> container);
-
-	void SetupCustomization(not_null<Ui::VerticalLayout *> container,
-							not_null<Window::SessionController *> controller);
-
-	void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
-								  not_null<Window::SessionController *> controller);
-
-	void SetupDrawerElements(not_null<Ui::VerticalLayout *> container);
-
-	void SetupTrayElements(not_null<Ui::VerticalLayout *> container);
-
-	void SetupShowPeerId(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
-
-	void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container);
-
-	void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller);
-
-	void SetupAyuSync(not_null<Ui::VerticalLayout *> container);
-
-	void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container);
-
-	void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> null);
-
 	void setupContent(not_null<Window::SessionController *> controller);
 };
 

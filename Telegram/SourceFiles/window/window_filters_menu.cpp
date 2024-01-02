@@ -289,17 +289,19 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 		: Ui::FilterIcon::All);
 	raw->setIconOverride(icons.normal, icons.active);
 	if (id >= 0) {
-		rpl::combine(
-			Data::UnreadStateValue(&_session->session(), id),
-			Data::IncludeMutedCounterFoldersValue()
-		) | rpl::start_with_next([=](
-				const Dialogs::UnreadState &state,
-				bool includeMuted) {
-			const auto chats = state.chats;
-			const auto chatsMuted = state.chatsMuted;
-			const auto muted = (chatsMuted + state.marksMuted);
-			const auto count = (chats + state.marks)
-				- (includeMuted ? 0 : muted);
+		UnreadStateValue(
+			&_session->session(),
+			id
+		) | rpl::start_with_next([=](const Dialogs::UnreadState &state) {
+			auto count = (state.chats + state.marks);
+			auto muted = (state.chatsMuted + state.marksMuted);
+
+			const auto settings = &AyuSettings::getInstance();
+			if (settings->hideNotificationCounters) {
+				count = 0;
+				muted = 0;
+			}
+
 			const auto string = !count
 				? QString()
 				: (count > 999)
