@@ -53,6 +53,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_layers.h"
 
+// AyuGram includes
+#include "ayu/ui/settings/settings_ayu.h"
+
+
 namespace Info {
 namespace {
 
@@ -401,7 +405,12 @@ void WrapWidget::setupTopBarMenuToggle() {
 		&& (wrap() != Wrap::Side || hasStackHistory())) {
 		addTopBarMenuButton();
 		addProfileCallsButton();
-	} else if (section.type() == Section::Type::Settings) {
+	} else if (section.type() == Section::Type::Settings
+		&& (section.settingsType()
+				== ::Settings::CloudPasswordEmailConfirmId()
+			|| section.settingsType() == ::Settings::Main::Id()
+			|| section.settingsType() == ::Settings::Chat::Id()
+			|| section.settingsType() == ::Settings::Ayu::Id())) {
 		addTopBarMenuButton();
 		if (section.settingsType() == ::Settings::Information::Id()
 			|| section.settingsType() == ::Settings::Main::Id()) {
