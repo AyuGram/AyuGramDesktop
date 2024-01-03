@@ -736,7 +736,7 @@ void StickerSetBox::updateButtons() {
 					searchById(_inner->setId() >> 32, _session, [=](const QString &username, UserData *user)
 					{
 						if (!user) {
-							showToast(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
+							showToast(tr::ayu_UserNotFoundMessage(tr::now));
 							return;
 						}
 

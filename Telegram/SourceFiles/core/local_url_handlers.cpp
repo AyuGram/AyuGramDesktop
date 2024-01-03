@@ -79,6 +79,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 
+// AyuGram includes
+#include "ayu/ayu_url_handlers.h"
+
+
 namespace Core {
 namespace {
 
@@ -1670,6 +1674,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^ton/?(^\\?.*)?(#|$)"_q,
 			ResolveTonSettings
+        },
+        {
+			u"^user\\?(.+)(#|$)"_q,
+			AyuUrlHandlers::ResolveUser
 		},
 		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
