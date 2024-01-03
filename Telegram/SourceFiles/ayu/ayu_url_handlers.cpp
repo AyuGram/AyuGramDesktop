@@ -9,6 +9,7 @@
 #include "base/qthelp_url.h"
 
 #include "lang_auto.h"
+#include "mainwindow.h"
 #include "ui/boxes/confirm_box.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "boxes/abstract_box.h"
@@ -51,6 +52,18 @@ bool ResolveUser(
 		Ui::show(Ui::MakeInformBox(tr::ayu_UserNotFoundMessage()));
 	});
 
+	return true;
+}
+
+bool HandleAyu(
+	Window::SessionController *controller,
+	const Match &match,
+	const QVariant &context)
+{
+	if (!controller) {
+		return false;
+	}
+	controller->showToast(QString(":3"), 500);
 	return true;
 }
 
