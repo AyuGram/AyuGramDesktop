@@ -157,6 +157,11 @@ private:
 		int progress = 0);
 
 	const not_null<ApiWrap*> _api;
+	base::flat_map<mtpRequestId, QByteArray> requestsSent;
+	base::flat_map<mtpRequestId, int32> docRequestsSent;
+	base::flat_map<mtpRequestId, int32> dcMap;
+	uint32 sentSize = 0; // FileSize: Right now any file size fits 32 bit.
+	uint32 sentSizes[MTP::kUploadSessionsCountMax] = { 0 };
 
 	std::vector<Entry> _queue;
 

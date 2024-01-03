@@ -23,6 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "apiwrap.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Storage {
 namespace {
 
@@ -65,6 +69,18 @@ constexpr auto kAcceptAsFastIfTotalAtLeast = 512 * 1024;
 
 [[nodiscard]] const char *ThumbnailFormat(const QString &mime) {
 	return Core::IsMimeSticker(mime) ? "WEBP" : "JPG";
+}
+
+int UploadSessionsCount() {
+	const auto settings = &AyuSettings::getInstance();
+	static const auto count = settings->uploadSpeedBoost ? 8 : 2;
+	return count;
+}
+
+int UploadSessionsInterval() {
+	const auto settings = &AyuSettings::getInstance();
+	static const auto interval = settings->uploadSpeedBoost ? 25 : kUploadRequestInterval;
+	return interval;
 }
 
 } // namespace
@@ -347,24 +363,33 @@ void Uploader::upload(
 	}
 }
 
-void Uploader::failed(FullMsgId itemId) {
-	const auto i = ranges::find(_queue, itemId, &Entry::itemId);
-	if (i != end(_queue)) {
-		const auto entry = std::move(*i);
-		_queue.erase(i);
-		notifyFailed(entry);
-	} else if (const auto coverId = _videoIdToCoverId.take(itemId)) {
-		if (const auto video = _videoWaitingCover.take(*coverId)) {
-			const auto document = session().data().document(video->id);
-			if (document->uploading()) {
-				document->status = FileUploadFailed;
-			}
-			_documentFailed.fire_copy(video->fullId);
-		}
-		failed(*coverId);
-	} else if (const auto video = _videoWaitingCover.take(itemId)) {
-		_videoIdToCoverId.remove(video->fullId);
-		const auto document = session().data().document(video->id);
+void Uploader::currentFailed() {
+	auto j = queue.find(uploadingId);
+	if (j != queue.end()) {
+		const auto [msgId, file] = std::move(*j);
+		queue.erase(j);
+		notifyFailed(msgId, file);
+	}
+
+	cancelRequests();
+	dcMap.clear();
+	uploadingId = FullMsgId();
+	sentSize = 0;
+	for (int i = 0; i <UploadSessionsCount(); ++i) {
+		sentSizes[i] = 0;
+	}
+
+	sendNext();
+}
+
+void Uploader::notifyFailed(FullMsgId id, const File &file) {
+	const auto type = file.type();
+	if (type == SendMediaType::Photo) {
+		_photoFailed.fire_copy(id);
+	} else if (type == SendMediaType::File
+		|| type == SendMediaType::ThemeFile
+		|| type == SendMediaType::Audio) {
+		const auto document = session().data().document(file.id());
 		if (document->uploading()) {
 			document->status = FileUploadFailed;
 		}
@@ -399,87 +424,14 @@ void Uploader::notifyFailed(const Entry &entry) {
 }
 
 void Uploader::stopSessions() {
-	if (ranges::any_of(_sentPerDcIndex, rpl::mappers::_1 != 0)) {
-		_stopSessionsTimer.callOnce(kKillSessionTimeout);
-	} else {
-		for (auto i = 0; i != int(_sentPerDcIndex.size()); ++i) {
-			_api->instance().stopSession(MTP::uploadDcId(i));
-		}
-		_sentPerDcIndex.clear();
-		_dcIndicesWithFastRequests.clear();
+	for (int i = 0; i < UploadSessionsCount(); ++i) {
+		_api->instance().stopSession(MTP::uploadDcId(i));
 	}
 }
 
-QByteArray Uploader::readDocPart(not_null<Entry*> entry) {
-	const auto checked = [&](QByteArray result) {
-		if ((entry->file->type == SendMediaType::File
-			|| entry->file->type == SendMediaType::ThemeFile
-			|| entry->file->type == SendMediaType::Audio
-			|| entry->file->type == SendMediaType::Round)
-			&& entry->docSize <= kUseBigFilesFrom) {
-			entry->md5Hash.feed(result.data(), result.size());
-		}
-		if (result.isEmpty()
-			|| (result.size() > entry->docPartSize)
-			|| ((result.size() < entry->docPartSize
-				&& entry->docPartsSent + 1 != entry->docPartsCount))) {
-			return QByteArray();
-		}
-		return result;
-	};
-	auto &content = entry->file->content;
-	if (!content.isEmpty()) {
-		const auto offset = entry->docPartsSent * entry->docPartSize;
-		return checked(content.mid(offset, entry->docPartSize));
-	} else if (!entry->docFile) {
-		const auto filepath = entry->file->filepath;
-		entry->docFile = std::make_unique<QFile>(filepath);
-		if (!entry->docFile->open(QIODevice::ReadOnly)) {
-			return QByteArray();
-		}
-	}
-	return checked(entry->docFile->read(entry->docPartSize));
-}
-
-bool Uploader::canAddDcIndex() const {
-	const auto count = int(_sentPerDcIndex.size());
-	return (count < kMaxSessionsCount)
-		&& (count == int(_dcIndicesWithFastRequests.size()));
-}
-
-std::optional<uchar> Uploader::chooseDcIndexForNextRequest(
-		const base::flat_set<uchar> &used) {
-	for (auto i = 0, count = int(_sentPerDcIndex.size()); i != count; ++i) {
-		if (!_sentPerDcIndex[i] && !used.contains(i)) {
-			return i;
-		}
-	}
-	if (canAddDcIndex()) {
-		const auto result = int(_sentPerDcIndex.size());
-		_sentPerDcIndex.push_back(0);
-		_dcIndicesWithFastRequests.clear();
-		_latestDcIndexAdded = crl::now();
-
-		DEBUG_LOG(("Uploader: Added dc index %1.").arg(result));
-		return result;
-	}
-	auto result = std::optional<int>();
-	for (auto i = 0, count = int(_sentPerDcIndex.size()); i != count; ++i) {
-		if (!used.contains(i)
-			&& (!result.has_value()
-				|| _sentPerDcIndex[i] < _sentPerDcIndex[*result])) {
-			result = i;
-		}
-	}
-	return result;
-}
-
-Uploader::Entry *Uploader::chooseEntryForNextRequest() {
-	if (!_pendingFromRemovedDcIndices.empty()) {
-		const auto itemId = _pendingFromRemovedDcIndices.front().itemId;
-		const auto i = ranges::find(_queue, itemId, &Entry::itemId);
-		Assert(i != end(_queue));
-		return &*i;
+void Uploader::sendNext() {
+	if (sentSize >= (UploadSessionsCount() * 512 * 1024) || _pausedId.msg) {
+		return;
 	}
 
 	for (auto i = begin(_queue); i != end(_queue); ++i) {
@@ -632,28 +584,10 @@ void Uploader::maybeSend() {
 		_stopSessionsTimer.cancel();
 	}
 
-	auto usedDcIndices = base::flat_set<uchar>();
-	while (true) {
-		const auto maybeDcIndex = chooseDcIndexForNextRequest(usedDcIndices);
-		if (!maybeDcIndex.has_value()) {
-			break;
-		}
-		const auto dcIndex = *maybeDcIndex;
-		while (true) {
-			const auto entry = chooseEntryForNextRequest();
-			if (!entry) {
-				return;
-			}
-			const auto result = sendPart(entry, dcIndex);
-			if (result == SendResult::DcIndexFull) {
-				return;
-			} else if (result == SendResult::Success) {
-				break;
-			}
-			// If this entry failed, we try the next one.
-		}
-		if (_sentPerDcIndex[dcIndex] >= kAcceptAsFastIfTotalAtLeast) {
-			usedDcIndices.emplace(dcIndex);
+	auto todc = 0;
+	for (auto dc = 1; dc != UploadSessionsCount(); ++dc) {
+		if (sentSizes[dc] < sentSizes[todc]) {
+			todc = dc;
 		}
 	}
 	if (usedDcIndices.empty()) {
@@ -661,6 +595,7 @@ void Uploader::maybeSend() {
 	} else {
 		_nextTimer.callOnce(kUploadRequestInterval);
 	}
+	_nextTimer.callOnce(crl::time(UploadSessionsInterval()));
 }
 
 void Uploader::cancel(FullMsgId itemId) {
@@ -710,9 +645,14 @@ void Uploader::cancelAllRequests() {
 }
 
 void Uploader::clear() {
-	_queue.clear();
-	cancelAllRequests();
-	stopSessions();
+	queue.clear();
+	cancelRequests();
+	dcMap.clear();
+	sentSize = 0;
+	for (int i = 0; i < UploadSessionsCount(); ++i) {
+		_api->instance().stopSession(MTP::uploadDcId(i));
+		sentSizes[i] = 0;
+	}
 	_stopSessionsTimer.cancel();
 }
 

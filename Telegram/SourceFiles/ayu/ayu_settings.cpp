@@ -270,6 +270,11 @@ void AyuGramSettings::set_hideSimilarChannels(bool val)
 	hideSimilarChannels = val;
 }
 
+void AyuGramSettings::set_uploadSpeedBoost(bool val)
+{
+	uploadSpeedBoost = val;
+}
+
 void AyuGramSettings::set_disableNotificationsDelay(bool val)
 {
 	disableNotificationsDelay = val;

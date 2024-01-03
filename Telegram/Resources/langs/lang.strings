@@ -7222,6 +7222,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableSimilarChannels" = "Disable similar channels";
 "ayu_CollapseSimilarChannels" = "Collapse similar channels";
 "ayu_HideSimilarChannelsTab" = "Hide similar channels tab";
+"ayu_UploadSpeedBoostPC" = "Upload speed boost";
 "ayu_MainFont" = "Application font";
 "ayu_MonospaceFont" = "Monospace font";
 "ayu_FontDefault" = "Default";
