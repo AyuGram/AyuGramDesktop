@@ -13,6 +13,9 @@ static QImage LAST_LOADED;
 
 static QImage LAST_LOADED_NO_MARGIN;
 
+namespace AyuAssets
+{
+
 void loadAppIco()
 {
 	auto settings = &AyuSettings::getInstance();
@@ -61,4 +64,6 @@ QImage currentAppLogoNoMargin()
 {
 	loadIcons();
 	return LAST_LOADED_NO_MARGIN;
+}
+
 }

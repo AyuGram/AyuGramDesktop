@@ -21,14 +21,14 @@
 #endif
 
 const QVector<QString> icons{
-	AyuSettings::DEFAULT_ICON,
-	AyuSettings::ALT_ICON,
-	AyuSettings::DISCORD_ICON,
-	AyuSettings::SPOTIFY_ICON,
-	AyuSettings::EXTERA_ICON,
-	AyuSettings::NOTHING_ICON,
-	AyuSettings::BARD_ICON,
-	AyuSettings::YAPLUS_ICON
+	AyuAssets::DEFAULT_ICON,
+	AyuAssets::ALT_ICON,
+	AyuAssets::DISCORD_ICON,
+	AyuAssets::SPOTIFY_ICON,
+	AyuAssets::EXTERA_ICON,
+	AyuAssets::NOTHING_ICON,
+	AyuAssets::BARD_ICON,
+	AyuAssets::YAPLUS_ICON
 };
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
@@ -51,6 +51,19 @@ void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool se
 	p.drawImage(rect, icon);
 }
 
+void applyIcon()
+{
+#ifdef Q_OS_WIN
+	AyuAssets::loadAppIco();
+	reloadAppIconFromTaskBar();
+#endif
+
+	Window::OverrideApplicationIcon(AyuAssets::currentAppLogo());
+	Core::App().refreshApplicationIcon();
+	Core::App().tray().updateIconCounters();
+	Core::App().domain().notifyUnreadBadgeChanged();
+}
+
 IconPicker::IconPicker(QWidget *parent)
 	: RpWidget(parent)
 {
@@ -70,13 +83,13 @@ void IconPicker::paintEvent(QPaintEvent *e)
 			auto const idx = i + row * 4;
 
 			const auto &iconName = icons[idx];
-			auto icon = loadPreview(iconName)
+			auto icon = AyuAssets::loadPreview(iconName)
 				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 			drawIcon(p,
 					 icon,
 					 (st::cpIconSize + st::cpSpacingX) * i + offset,
 					 row * (st::cpIconSize + st::cpSpacingY),
-					 currentAppLogoName() == iconName);
+					 AyuAssets::currentAppLogoName() == iconName);
 		}
 	}
 }
@@ -108,16 +121,7 @@ void IconPicker::mousePressEvent(QMouseEvent *e)
 
 	if (changed) {
 		AyuSettings::save();
-
-#ifdef Q_OS_WIN
-		loadAppIco();
-		reloadAppIconFromTaskBar();
-#endif
-
-		Window::OverrideApplicationIcon(currentAppLogo());
-		Core::App().refreshApplicationIcon();
-		Core::App().tray().updateIconCounters();
-		Core::App().domain().notifyUnreadBadgeChanged();
+		applyIcon();
 
 		repaint();
 	}

@@ -9,26 +9,11 @@
 #include "lang_auto.h"
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
+#include "ayu/ui/ayu_assets.h"
 #include "rpl/producer.h"
 
 namespace AyuSettings
 {
-
-const auto DEFAULT_ICON = QString("default");
-
-const auto ALT_ICON = QString("alt");
-
-const auto DISCORD_ICON = QString("discord");
-
-const auto SPOTIFY_ICON = QString("spotify");
-
-const auto EXTERA_ICON = QString("extera");
-
-const auto NOTHING_ICON = QString("nothing");
-
-const auto BARD_ICON = QString("bard");
-
-const auto YAPLUS_ICON = QString("yaplus");
 
 class AyuGramSettings
 {
@@ -56,12 +41,15 @@ public:
 		disableStories = false;
 		collapseSimilarChannels = true;
 		hideSimilarChannels = false;
+
+		uploadSpeedBoost = false;
+
 		disableNotificationsDelay = false;
 		localPremium = false;
 		copyUsernameAsLink = true;
 
 		// ~ Customization
-		appIcon = DEFAULT_ICON;
+		appIcon = AyuAssets::DEFAULT_ICON;
 		simpleQuotesAndReplies = true;
 		deletedMark = "🧹";
 		editedMark = tr::lng_edited(tr::now);

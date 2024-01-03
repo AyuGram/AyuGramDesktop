@@ -125,15 +125,19 @@ bool DarkTasbarValueValid/* = false*/;
 [[nodiscard]] QImage ImageIconWithCounter(
 		Window::CounterLayerArgs &&args,
 		bool supportMode,
-		bool smallIcon) {
-	static constexpr auto kCount = 3;
-	static auto ScaledLogo = std::array<QImage, kCount>();
-	static auto ScaledLogoNoMargin = std::array<QImage, kCount>();
-	static auto lastUsedIcon = currentAppLogoName();
+		bool smallIcon,
+		bool monochrome) {
+	static auto ScaledLogo = base::flat_map<int, QImage>();
+	static auto ScaledLogoNoMargin = base::flat_map<int, QImage>();
+	static auto ScaledLogoDark = base::flat_map<int, QImage>();
+	static auto ScaledLogoLight = base::flat_map<int, QImage>();
+	static auto lastUsedIcon = AyuAssets::currentAppLogoName();
 
-	if (lastUsedIcon != currentAppLogoName()) {
-		ScaledLogo = std::array<QImage, kCount>();
-		ScaledLogoNoMargin = std::array<QImage, kCount>();
+	if (lastUsedIcon != AyuAssets::currentAppLogoName()) {
+		ScaledLogo = base::flat_map<int, QImage>();
+		ScaledLogoNoMargin = base::flat_map<int, QImage>();
+		ScaledLogoDark = base::flat_map<int, QImage>();
+		ScaledLogoLight = base::flat_map<int, QImage>();
 	}
 
 	const auto darkMode = IsDarkTaskbar();
