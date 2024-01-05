@@ -2108,9 +2108,7 @@ TextWithEntities TransribedText(not_null<HistoryItem*> item) {
 }
 
 bool ItemHasTtl(HistoryItem *item) {
-	return (item && item->media())
-		? (item->media()->ttlSeconds() > 0)
-		: false;
+	return false; // AyuGram: allow downloading files with ttl
 }
 
 } // namespace HistoryView
