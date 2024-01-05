@@ -216,22 +216,23 @@ ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu *> menu,
 												 not_null<Main::Session *> session,
 												 ID authorId)
 	: ActionWithSubText(menu, menu->st(), st::menuIconStickers, [=]
-{ }, tr::ayu_MessageDetailsPackOwnerPC(tr::now), QString()),
+{ }, tr::ayu_MessageDetailsPackOwnerPC(tr::now), QString(tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now))),
 	  _session(session)
 {
-	const auto fetchingText = tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now);
-	_subText = QString(fetchingText);
-
 	searchAuthor(authorId);
 }
 
 void ActionStickerPackAuthor::searchAuthor(ID authorId)
 {
+	const auto pointer = Ui::MakeWeak(this);
 	searchById(authorId, _session, [=](const QString &username, UserData *user)
 	{
+		if (!pointer) {
+			LOG(("ContextActionStickerAuthor: searchById callback after destruction"));
+			return;
+		}
 		if (username.isEmpty() && !user) {
-			const auto notFoundText = tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now);
-			_subText = QString(notFoundText);
+			_subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
 			setClickedCallback(
 				[=]
 				{
@@ -265,7 +266,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId)
 
 		setClickedCallback(callback);
 
-		_subText = title;
+		_subText = QString(title);
 		crl::on_main(
 			[=]
 			{
