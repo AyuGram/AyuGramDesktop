@@ -10,10 +10,6 @@
 
 namespace base {
 
-[[nodiscard]] inline bool IsShiftPressed() {
-	return (QGuiApplication::keyboardModifiers() == Qt::ShiftModifier);
-}
-
 [[nodiscard]] inline bool IsExtendedContextMenuModifierPressed() {
 	return IsShiftPressed() || IsCtrlPressed();
 }

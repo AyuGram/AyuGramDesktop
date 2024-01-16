@@ -74,7 +74,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"close_telegram"_q    , Command::Close },
 	{ u"lock_telegram"_q     , Command::Lock },
 	{ u"minimize_telegram"_q , Command::Minimize },
-//	{ u"quit_telegram"_q     , Command::Quit },
+	{ u"quit_telegram"_q     , Command::Quit },
 
 	{ u"media_play"_q        , Command::MediaPlay },
 	{ u"media_pause"_q       , Command::MediaPause },
@@ -143,7 +143,7 @@ const auto CommandNames = base::flat_map<Command, QString>{
 	{ Command::Close          , u"close_telegram"_q },
 	{ Command::Lock           , u"lock_telegram"_q },
 	{ Command::Minimize       , u"minimize_telegram"_q },
-//	{ Command::Quit           , u"quit_telegram"_q },
+	{ Command::Quit           , u"quit_telegram"_q },
 };
 
 [[maybe_unused]] constexpr auto kNoValue = {
