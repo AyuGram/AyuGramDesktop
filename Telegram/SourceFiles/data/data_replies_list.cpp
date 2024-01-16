@@ -23,6 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Data {
 namespace {
 
@@ -1000,6 +1004,11 @@ void RepliesList::sendReadTillRequest() {
 	}
 	const auto api = &_history->session().api();
 	api->request(base::take(_readRequestId)).cancel();
+
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->sendReadMessages) {
+		return;
+	}
 
 	_readRequestId = api->request(MTPmessages_ReadDiscussion(
 		_history->peer->input,
