@@ -402,6 +402,8 @@ private:
 
 	void applyNextSearchQuery();
 
+	void showPreview();
+
 	const std::shared_ptr<Show> _show;
 	const ComposeFeatures _features;
 	const bool _onlyUnicodeEmoji;
@@ -482,6 +484,9 @@ private:
 	rpl::event_stream<EmojiChosen> _chosen;
 	rpl::event_stream<FileChosen> _customChosen;
 	rpl::event_stream<> _jumpedToPremium;
+
+	base::Timer _previewTimer;
+	bool _previewShown = false;
 
 };
 

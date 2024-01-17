@@ -55,6 +55,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
+// AyuGram includes
+#include "data/data_file_origin.h"
+#include "qapplication.h"
+
 namespace ChatHelpers {
 namespace {
 
@@ -1733,6 +1737,8 @@ void EmojiListWidget::mousePressEvent(QMouseEvent *e) {
 			_previewTimer.callOnce(QApplication::startDragTime());
 		}
 	}
+
+	_previewTimer.callOnce(QApplication::startDragTime());
 }
 
 void EmojiListWidget::mouseReleaseEvent(QMouseEvent *e) {
@@ -1740,6 +1746,11 @@ void EmojiListWidget::mouseReleaseEvent(QMouseEvent *e) {
 
 	auto pressed = _pressed;
 	setPressed(v::null);
+	if (_previewShown) {
+		_previewShown = false;
+		return;
+	}
+
 	_lastMousePos = e->globalPos();
 	if (!_picker->isHidden()) {
 		if (_picker->rect().contains(_picker->mapFromGlobal(_lastMousePos))) {
@@ -2674,10 +2685,8 @@ bool EmojiListWidget::eventHook(QEvent *e) {
 }
 
 void EmojiListWidget::updateSelected() {
-	if (!v::is_null(_pressed) || !v::is_null(_pickerSelected)) {
-		if (!_previewShown) {
-			return;
-		}
+	if ((!v::is_null(_pressed) || !v::is_null(_pickerSelected)) && !_previewShown) {
+		return;
 	}
 
 	auto newSelected = OverState{ v::null };
@@ -2745,6 +2754,31 @@ void EmojiListWidget::setSelected(OverState newSelected) {
 					document->stickerSetOrigin(),
 					document);
 			}
+		}
+	}
+
+	if (_previewShown && _pressed != _selected) {
+		if (const auto over = std::get_if<OverEmoji>(&_selected)) {
+			_pressed = _selected;
+
+			const auto section = over ? over->section : -1;
+			const auto index = over ? over->index : -1;
+
+			if (const auto document = lookupCustomEmoji(index, section)) {
+				_show->showMediaPreview(document->stickerSetOrigin(), document);
+			}
+		}
+	}
+}
+
+void EmojiListWidget::showPreview() {
+	if (const auto over = std::get_if<OverEmoji>(&_selected)) {
+		const auto section = over ? over->section : -1;
+		const auto index = over ? over->index : -1;
+
+		if (const auto document = lookupCustomEmoji(index, section)) {
+			_show->showMediaPreview(document->stickerSetOrigin(), document);
+			_previewShown = true;
 		}
 	}
 }
