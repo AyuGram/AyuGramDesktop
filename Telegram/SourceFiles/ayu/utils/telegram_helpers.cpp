@@ -197,80 +197,77 @@ void MarkAsReadChatList(not_null<Dialogs::MainList *> list)
 	ranges::for_each(mark, MarkAsReadThread);
 }
 
+void readMentions(base::weak_ptr<Data::Thread> weakThread)
+{
+	const auto thread = weakThread.get();
+	if (!thread) {
+		return;
+	}
+	const auto peer = thread->peer();
+	const auto topic = thread->asTopic();
+	const auto rootId = topic ? topic->rootId() : 0;
+	using Flag = MTPmessages_ReadMentions::Flag;
+	peer->session().api().request(MTPmessages_ReadMentions(
+		MTP_flags(rootId ? Flag::f_top_msg_id : Flag()),
+		peer->input,
+		MTP_int(rootId)
+	)).done([=](const MTPmessages_AffectedHistory &result)
+			{
+				const auto offset = peer->session().api().applyAffectedHistory(
+					peer,
+					result);
+				if (offset > 0) {
+					readMentions(weakThread);
+				}
+				else {
+					peer->owner().history(peer)->clearUnreadMentionsFor(rootId);
+				}
+			}).send();
+}
+
+void readReactions(base::weak_ptr<Data::Thread> weakThread)
+{
+	const auto thread = weakThread.get();
+	if (!thread) {
+		return;
+	}
+	const auto topic = thread->asTopic();
+	const auto peer = thread->peer();
+	const auto rootId = topic ? topic->rootId() : 0;
+	using Flag = MTPmessages_ReadReactions::Flag;
+	peer->session().api().request(MTPmessages_ReadReactions(
+		MTP_flags(rootId ? Flag::f_top_msg_id : Flag(0)),
+		peer->input,
+		MTP_int(rootId)
+	)).done([=](const MTPmessages_AffectedHistory &result)
+			{
+				const auto offset = peer->session().api().applyAffectedHistory(
+					peer,
+					result);
+				if (offset > 0) {
+					readReactions(weakThread);
+				}
+				else {
+					peer->owner().history(peer)->clearUnreadReactionsFor(rootId);
+				}
+			}).send();
+}
+
 void MarkAsReadThread(not_null<Data::Thread *> thread)
 {
 	const auto readHistory = [&](not_null<History *> history)
 	{
 		history->owner().histories().readInbox(history);
 	};
-	const auto readMentions = [=](
-		base::weak_ptr<Data::Thread> weakThread,
-		auto resend) -> void
-	{
-		const auto thread = weakThread.get();
-		if (!thread) {
-			return;
-		}
-		const auto peer = thread->peer();
-		const auto topic = thread->asTopic();
-		const auto rootId = topic ? topic->rootId() : 0;
-		using Flag = MTPmessages_ReadMentions::Flag;
-		peer->session().api().request(MTPmessages_ReadMentions(
-			MTP_flags(rootId ? Flag::f_top_msg_id : Flag()),
-			peer->input,
-			MTP_int(rootId)
-		)).done([=](const MTPmessages_AffectedHistory &result)
-				{
-					const auto offset = peer->session().api().applyAffectedHistory(
-						peer,
-						result);
-					if (offset > 0) {
-						resend(weakThread, resend);
-					}
-					else {
-						peer->owner().history(peer)->clearUnreadMentionsFor(rootId);
-					}
-				}).send();
-	};
 	const auto sendReadMentions = [=](
 		not_null<Data::Thread *> thread)
 	{
-		readMentions(base::make_weak(thread), readMentions);
-	};
-
-	const auto readReactions = [=](
-		base::weak_ptr<Data::Thread> weakThread,
-		auto resend) -> void
-	{
-		const auto thread = weakThread.get();
-		if (!thread) {
-			return;
-		}
-		const auto topic = thread->asTopic();
-		const auto peer = thread->peer();
-		const auto rootId = topic ? topic->rootId() : 0;
-		using Flag = MTPmessages_ReadReactions::Flag;
-		peer->session().api().request(MTPmessages_ReadReactions(
-			MTP_flags(rootId ? Flag::f_top_msg_id : Flag(0)),
-			peer->input,
-			MTP_int(rootId)
-		)).done([=](const MTPmessages_AffectedHistory &result)
-				{
-					const auto offset = peer->session().api().applyAffectedHistory(
-						peer,
-						result);
-					if (offset > 0) {
-						resend(weakThread, resend);
-					}
-					else {
-						peer->owner().history(peer)->clearUnreadReactionsFor(rootId);
-					}
-				}).send();
+		readMentions(base::make_weak(thread));
 	};
 	const auto sendReadReactions = [=](
 		not_null<Data::Thread *> thread)
 	{
-		readReactions(base::make_weak(thread), readReactions);
+		readReactions(base::make_weak(thread));
 	};
 
 	if (thread->chatListBadgesState().unread) {
@@ -327,6 +324,14 @@ void readHistory(not_null<HistoryItem *> message)
 								}).send();
 			}
 		});
+
+	if (history->unreadMentions().has()) {
+		readMentions(history->asThread());
+	}
+
+	if (history->unreadReactions().has()) {
+		readReactions(history->asThread());
+	}
 }
 
 QString formatTTL(int time)

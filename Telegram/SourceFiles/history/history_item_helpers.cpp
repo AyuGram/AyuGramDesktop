@@ -1286,6 +1286,35 @@ void ShowTrialTranscribesToast(int left, TimeId until) {
 	});
 }
 
+void ClearMediaAsExpired(not_null<HistoryItem*> item) {
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->saveDeletedMessages) {
+		return;
+	}
+
+	if (const auto media = item->media()) {
+		if (!media->ttlSeconds()) {
+			return;
+		}
+		if (const auto document = media->document()) {
+			item->applyEditionToHistoryCleared();
+			auto text = (document->isVideoFile()
+				? tr::lng_ttl_video_expired
+				: document->isVoiceMessage()
+				? tr::lng_ttl_voice_expired
+				: document->isVideoMessage()
+				? tr::lng_ttl_round_expired
+				: tr::lng_message_empty)(tr::now, Ui::Text::WithEntities);
+			item->updateServiceText(PreparedServiceText{ std::move(text) });
+		} else if (const auto photo = media->photo()) {
+			item->applyEditionToHistoryCleared();
+			item->updateServiceText(PreparedServiceText{
+				tr::lng_ttl_photo_expired(tr::now, Ui::Text::WithEntities)
+			});
+        }
+    }
+}
+
 int ItemsForwardSendersCount(const HistoryItemsList &list) {
 	auto peers = base::flat_set<not_null<PeerData*>>();
 	auto names = base::flat_set<QString>();

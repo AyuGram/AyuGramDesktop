@@ -42,6 +42,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -323,7 +327,10 @@ Document::Document(
 			const auto &data = &_parent->data()->history()->owner();
 			_parent->data()->removeFromSharedMediaIndex();
 			setDocumentLinks(_data, realParent, [=] {
-				_openl = nullptr;
+				const auto settings = &AyuSettings::getInstance();
+				if (!settings->saveDeletedMessages) {
+					_openl = nullptr;
+				}
 
 				auto lifetime = std::make_shared<rpl::lifetime>();
 				TTLVoiceStops(fullId) | rpl::start_with_next([=]() mutable {

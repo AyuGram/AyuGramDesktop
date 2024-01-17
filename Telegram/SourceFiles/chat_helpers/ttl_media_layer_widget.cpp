@@ -38,6 +38,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace ChatHelpers {
 namespace {
 
@@ -192,10 +196,12 @@ PreviewWrap::PreviewWrap(
 		}
 	}, lifetime());
 
+	const auto settings = &AyuSettings::getInstance();
+
 	{
 		const auto close = Ui::CreateChild<Ui::RoundButton>(
 			this,
-			item->out()
+			item->out() || settings->saveDeletedMessages
 				? tr::lng_close()
 				: tr::lng_ttl_voice_close_in(),
 			st::ttlMediaButton);
@@ -229,8 +235,8 @@ PreviewWrap::PreviewWrap(
 					) | Ui::Text::ToRichLangValue(),
 					Ui::Text::RichLangValue)
 			: (isRound
-				? tr::lng_ttl_round_tooltip_in
-				: tr::lng_ttl_voice_tooltip_in)(Ui::Text::RichLangValue);
+				? settings->saveDeletedMessages ? tr::ayu_ExpiringVideoMessageNote : tr::lng_ttl_round_tooltip_in
+				: settings->saveDeletedMessages ? tr::ayu_ExpiringVoiceMessageNote : tr::lng_ttl_voice_tooltip_in)(Ui::Text::RichLangValue);
 		const auto tooltip = Ui::CreateChild<Ui::ImportantTooltip>(
 			this,
 			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
