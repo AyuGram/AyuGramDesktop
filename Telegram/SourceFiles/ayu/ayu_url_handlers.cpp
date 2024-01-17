@@ -17,6 +17,8 @@
 #include "data/data_session.h"
 #include "data/data_user.h"
 
+#include <QDesktopServices>
+
 namespace AyuUrlHandlers
 {
 
@@ -65,6 +67,41 @@ bool HandleAyu(
 	}
 	controller->showToast(QString(":3"), 500);
 	return true;
+}
+
+bool TryHandleSpotify(const QString& url)
+{
+	if (!url.contains("spotify.com")) {
+		return false;
+	}
+
+	// docs on their url scheme
+	// https://www.iana.org/assignments/uri-schemes/prov/spotify
+
+	using namespace qthelp;
+	auto matchOptions = RegExOption::CaseInsensitive;
+	// https://regex101.com/r/l4Ogzf/2
+	auto match = regex_match(
+		u"^(https?:\\/\\/)?([a-zA-Z0-9_]+)\\.spotify\\.com\\/(?<type>track|album|artist|user|playlist)\\/(?<identifier>[a-zA-Z0-9_\\/]+?)((\\?si=.+)?)$"_q,
+		url,
+		matchOptions);
+	if (match) {
+		const auto type = match->captured("type").toLower();
+		const auto identifier = match->captured("identifier").replace("/", ":");
+
+		// '/' -> ':' for links like:
+		// https://open.spotify.com/user/1185903410/playlist/6YAnJeVC7tgOiocOG23Dd
+		// so it'll look like
+		// spotify:user:1185903410:playlist:6YAnJeVC7tgOiocOG23Dd
+
+		const auto res = QString("spotify:%1:%2").arg(type).arg(identifier);
+
+		if (!res.isEmpty()) {
+			return QDesktopServices::openUrl(QUrl(res));
+		}
+	}
+
+	return false;
 }
 
 }

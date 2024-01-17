@@ -24,4 +24,6 @@ bool HandleAyu(
 	const Match &match,
 	const QVariant &context);
 
+bool TryHandleSpotify(const QString& url);
+
 }

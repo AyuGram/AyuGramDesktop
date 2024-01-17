@@ -33,6 +33,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "mainwindow.h"
 
+// AyuGram includes
+#include "ayu/ayu_url_handlers.h"
+
+
 namespace Core {
 namespace {
 
@@ -292,6 +296,10 @@ bool UiIntegration::handleUrlClick(
 			Core::App().iv().openWithIvPreferred(controller, url, context);
 			return true;
 		}
+	}
+
+	if (AyuUrlHandlers::TryHandleSpotify(url)) {
+		return true;
 	}
 
 	auto parsed = UrlForAutoLogin(url);
