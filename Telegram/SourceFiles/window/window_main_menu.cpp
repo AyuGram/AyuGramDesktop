@@ -53,6 +53,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "tray.h"
 #include "lang_auto.h"
 
+// AyuGram includes
+#include "ayu/ui/settings/settings_ayu.h"
+
 
 namespace Window {
 namespace {
@@ -75,20 +78,9 @@ constexpr auto kPlayStatusLimit = 2;
 
 [[nodiscard]] rpl::producer<TextWithEntities> SetStatusLabel(
 		not_null<Main::Session*> session) {
-	const auto self = session->user();
-	return session->changes().peerFlagsValue(
-		self,
-		Data::PeerUpdate::Flag::EmojiStatus
-	) | rpl::map([=] {
-		return !!self->emojiStatusId();
-	}) | rpl::distinct_until_changed() | rpl::map([](bool has) {
-		const auto makeLink = [](const QString &text) {
-			return Ui::Text::Link(text);
-		};
-		return (has
-			? tr::lng_menu_change_status
-			: tr::lng_menu_set_status)(makeLink);
-	}) | rpl::flatten_latest();
+	return tr::ayu_AyuPreferences() | rpl::map([](const QString& text) {
+		return Ui::Text::Link(text);
+	});
 }
 
 } // namespace
@@ -600,7 +592,7 @@ void MainMenu::setupAccountsToggle() {
 
 void MainMenu::setupSetEmojiStatus() {
 	_setEmojiStatus->overrideLinkClickHandler([=] {
-		chooseEmojiStatus();
+		_controller->showSettings(Settings::Ayu::Id());
 	});
 }
 
