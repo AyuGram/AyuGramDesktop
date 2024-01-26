@@ -134,11 +134,17 @@ void FiltersMenu::setupMainMenuIcon() {
 	OtherAccountsUnreadState(
 		&_session->session().account()
 	) | rpl::start_with_next([=](const OthersUnreadState &state) {
-		const auto icon = !state.count
+		auto icon = !state.count
 			? nullptr
 			: !state.allMuted
 			? &st::windowFiltersMainMenuUnread
 			: &st::windowFiltersMainMenuUnreadMuted;
+
+		const auto settings = &AyuSettings::getInstance();
+		if (settings->hideNotificationCounters) {
+			icon = nullptr;
+		}
+
 		_menu.setIconOverride(icon, icon);
 	}, _outer.lifetime());
 }
