@@ -189,6 +189,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/features/messageshot/message_shot.h"
+#include "ayu/ui/boxes/message_shot_box.h"
+#include "boxes/abstract_box.h"
 
 
 namespace {
@@ -963,6 +966,10 @@ HistoryWidget::HistoryWidget(
 	_topBar->deleteSelectionRequest(
 	) | rpl::start_with_next([=] {
 		confirmDeleteSelected();
+	}, _topBar->lifetime());
+	_topBar->messageShotSelectionRequest(
+	) | rpl::start_with_next([=] {
+		messageShotSelected();
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::start_with_next([=] {
@@ -9134,6 +9141,29 @@ void HistoryWidget::confirmDeleteSelected() {
 		}));
 		controller()->show(std::move(box));
 	}
+}
+
+void HistoryWidget::messageShotSelected() {
+	if (!_list) return;
+
+	auto items = getSelectedItems();
+	if (items.empty()) {
+		return;
+	}
+
+	const auto messages = ranges::views::all(items)
+		| ranges::views::transform([this](const auto fullId) {
+			return gsl::not_null(session().data().message(fullId));
+		})
+		| ranges::to_vector;
+
+	const AyuFeatures::MessageShot::ShotConfig config = {
+		controller(),
+		std::make_shared<Ui::ChatStyle>(controller()->chatStyle()),
+		messages
+	};
+	auto box = Box<MessageShotBox>(config);
+	Ui::show(std::move(box));
 }
 
 void HistoryWidget::escape() {

@@ -5,54 +5,31 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "history/view/history_view_pinned_section.h"
+#include "history/view/history_view_sublist_section.h"
 
+#include "main/main_session.h"
+#include "core/application.h"
+#include "core/shortcuts.h"
+#include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_session.h"
+#include "data/data_peer_values.h"
+#include "data/data_user.h"
 #include "history/view/history_view_top_bar_widget.h"
 #include "history/view/history_view_translate_bar.h"
 #include "history/view/history_view_list_widget.h"
 #include "history/history.h"
-#include "history/history_item_components.h"
 #include "history/history_item.h"
-#include "history/history_view_swipe_back_session.h"
-#include "ui/boxes/confirm_box.h"
+#include "lang/lang_keys.h"
+#include "mainwidget.h"
+#include "ui/chat/chat_style.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/shadow.h"
-#include "ui/widgets/buttons.h"
-#include "ui/layers/generic_box.h"
-#include "ui/item_text_options.h"
-#include "ui/chat/chat_style.h"
-#include "ui/toast/toast.h"
-#include "ui/text/format_values.h"
-#include "ui/text/text_utilities.h"
-#include "ui/ui_utility.h"
-#include "base/timer_rpl.h"
-#include "apiwrap.h"
-#include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
-#include "window/window_peer_menu.h"
-#include "base/event_filter.h"
-#include "base/call_delayed.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "core/file_utilities.h"
-#include "main/main_session.h"
-#include "data/data_session.h"
-#include "data/data_user.h"
-#include "data/data_chat.h"
-#include "data/data_channel.h"
-#include "data/data_changes.h"
-#include "data/data_sparse_ids.h"
-#include "data/data_shared_media.h"
-#include "data/data_peer_values.h"
-#include "storage/storage_account.h"
-#include "platform/platform_specific.h"
-#include "lang/lang_keys.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_window.h"
-#include "styles/style_info.h"
-#include "styles/style_boxes.h"
-
-#include <QtCore/QMimeData>
 
 // AyuGram includes
 #include "ayu/features/messageshot/message_shot.h"
@@ -63,18 +40,16 @@ namespace {
 
 } // namespace
 
-PinnedMemento::PinnedMemento(
-	not_null<Data::Thread*> thread,
-	UniversalMsgId highlightId)
-: _thread(thread)
-, _highlightId(highlightId) {
+SublistMemento::SublistMemento(not_null<Data::SavedSublist*> sublist)
+: _sublist(sublist) {
+	const auto selfId = sublist->session().userPeerId();
 	_list.setAroundPosition({
-		.fullId = FullMsgId(_thread->peer()->id, highlightId),
+		.fullId = FullMsgId(selfId, ShowAtUnreadMsgId),
 		.date = TimeId(0),
 	});
 }
 
-object_ptr<Window::SectionWidget> PinnedMemento::createWidget(
+object_ptr<Window::SectionWidget> SublistMemento::createWidget(
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		Window::Column column,
@@ -82,33 +57,21 @@ object_ptr<Window::SectionWidget> PinnedMemento::createWidget(
 	if (column == Window::Column::Third) {
 		return nullptr;
 	}
-	auto result = object_ptr<PinnedWidget>(
+	auto result = object_ptr<SublistWidget>(
 		parent,
 		controller,
-		_thread);
+		_sublist);
 	result->setInternalState(geometry, this);
 	return result;
 }
 
-Data::ForumTopic *PinnedMemento::topicForRemoveRequests() const {
-	return _thread->asTopic();
-}
-
-Data::SavedSublist *PinnedMemento::sublistForRemoveRequests() const {
-	return _thread->asSublist();
-}
-
-PinnedWidget::PinnedWidget(
+SublistWidget::SublistWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
-	not_null<Data::Thread*> thread)
-: Window::SectionWidget(parent, controller, thread->peer())
-, WindowListDelegate(controller)
-, _thread(thread->migrateToOrMe())
-, _history(thread->owningHistory())
-, _migratedPeer(thread->asHistory()
-	? thread->asHistory()->peer->migrateFrom()
-	: nullptr)
+	not_null<Data::SavedSublist*> sublist)
+: Window::SectionWidget(parent, controller, sublist->peer())
+, _sublist(sublist)
+, _history(sublist->owner().history(sublist->session().user()))
 , _topBar(this, controller)
 , _topBarShadow(this)
 , _translateBar(std::make_unique<TranslateBar>(this, controller, _history))
@@ -116,10 +79,6 @@ PinnedWidget::PinnedWidget(
 	this,
 	controller->chatStyle()->value(lifetime(), st::historyScroll),
 	false))
-, _clearButton(std::make_unique<Ui::FlatButton>(
-	this,
-	QString(),
-	st::historyComposeButton))
 , _cornerButtons(
 		_scroll.get(),
 		controller->chatStyle(),
@@ -129,9 +88,12 @@ PinnedWidget::PinnedWidget(
 		_scroll->updateBars();
 	}, _scroll->lifetime());
 
+	setupOpenChatButton();
+	setupAboutHiddenAuthor();
+
 	Window::ChatThemeValueFromPeer(
 		controller,
-		thread->peer()
+		sublist->peer()
 	) | rpl::start_with_next([=](std::shared_ptr<Ui::ChatTheme> &&theme) {
 		_theme = std::move(theme);
 		controller->setChatStyleTheme(_theme);
@@ -139,15 +101,14 @@ PinnedWidget::PinnedWidget(
 
 	_topBar->setActiveChat(
 		TopBarWidget::ActiveChat{
-			.key = _thread,
-			.section = Dialogs::EntryState::Section::Pinned,
+			.key = sublist,
+			.section = Dialogs::EntryState::Section::SavedSublist,
 		},
 		nullptr);
 
 	_topBar->move(0, 0);
 	_topBar->resizeToWidth(width());
 	_topBar->show();
-	_topBar->setCustomTitle(tr::lng_contacts_loading(tr::now));
 
 	_topBar->deleteSelectionRequest(
 	) | rpl::start_with_next([=] {
@@ -165,6 +126,10 @@ PinnedWidget::PinnedWidget(
 	) | rpl::start_with_next([=] {
 		clearSelected();
 	}, _topBar->lifetime());
+	_topBar->searchRequest(
+	) | rpl::start_with_next([=] {
+		searchInSublist();
+	}, _topBar->lifetime());
 
 	_translateBar->raise();
 	_topBarShadow->raise();
@@ -175,7 +140,7 @@ PinnedWidget::PinnedWidget(
 
 	_inner = _scroll->setOwnedWidget(object_ptr<ListWidget>(
 		this,
-		&controller->session(),
+		controller,
 		static_cast<ListDelegate*>(this)));
 	_scroll->move(0, _topBar->height());
 	_scroll->show();
@@ -184,43 +149,54 @@ PinnedWidget::PinnedWidget(
 		onScroll();
 	}, lifetime());
 
-	_inner->scrollKeyEvents(
-	) | rpl::start_with_next([=](not_null<QKeyEvent*> e) {
-		_scroll->keyPressEvent(e);
-	}, lifetime());
-
-	setupClearButton();
+	setupShortcuts();
 	setupTranslateBar();
-	Window::SetupSwipeBackSection(this, _scroll.get(), _inner);
 }
 
-PinnedWidget::~PinnedWidget() = default;
+SublistWidget::~SublistWidget() = default;
 
-void PinnedWidget::setupClearButton() {
-	Data::CanPinMessagesValue(
-		_history->peer
-	) | rpl::start_with_next([=] {
-		refreshClearButtonText();
-	}, _clearButton->lifetime());
+void SublistWidget::setupOpenChatButton() {
+	if (_sublist->peer()->isSavedHiddenAuthor()) {
+		return;
+	}
+	_openChatButton = std::make_unique<Ui::FlatButton>(
+		this,
+		(_sublist->peer()->isBroadcast()
+			? tr::lng_saved_open_channel(tr::now)
+			: _sublist->peer()->isUser()
+			? tr::lng_saved_open_chat(tr::now)
+			: tr::lng_saved_open_group(tr::now)),
+		st::historyComposeButton);
 
-	_clearButton->setClickedCallback([=] {
-		if (!_history->peer->canPinMessages()) {
-			const auto callback = [=] {
-				controller()->showBackFromStack();
-			};
-			Window::HidePinnedBar(
-				controller(),
-				_history->peer,
-				_thread->topicRootId(),
-				_thread->monoforumPeerId(),
-				crl::guard(this, callback));
-		} else {
-			Window::UnpinAllMessages(controller(), _thread);
-		}
+	_openChatButton->setClickedCallback([=] {
+		controller()->showPeerHistory(
+			_sublist->peer(),
+			Window::SectionShow::Way::Forward);
 	});
 }
 
-void PinnedWidget::setupTranslateBar() {
+void SublistWidget::setupAboutHiddenAuthor() {
+	if (!_sublist->peer()->isSavedHiddenAuthor()) {
+		return;
+	}
+	_aboutHiddenAuthor = std::make_unique<Ui::RpWidget>(this);
+	_aboutHiddenAuthor->paintRequest() | rpl::start_with_next([=] {
+		auto p = QPainter(_aboutHiddenAuthor.get());
+		auto rect = _aboutHiddenAuthor->rect();
+
+		p.fillRect(rect, st::historyReplyBg);
+
+		p.setFont(st::normalFont);
+		p.setPen(st::windowSubTextFg);
+		p.drawText(
+			rect.marginsRemoved(
+				QMargins(st::historySendPadding, 0, st::historySendPadding, 0)),
+			tr::lng_saved_about_hidden(tr::now),
+			style::al_center);
+	}, _aboutHiddenAuthor->lifetime());
+}
+
+void SublistWidget::setupTranslateBar() {
 	controller()->adaptive().oneColumnValue(
 	) | rpl::start_with_next([=, raw = _translateBar.get()](bool one) {
 		raw->setShadowGeometryPostprocess([=](QRect geometry) {
@@ -243,24 +219,24 @@ void PinnedWidget::setupTranslateBar() {
 	_translateBar->finishAnimating();
 }
 
-void PinnedWidget::cornerButtonsShowAtPosition(
+void SublistWidget::cornerButtonsShowAtPosition(
 		Data::MessagePosition position) {
 	showAtPosition(position);
 }
 
-Data::Thread *PinnedWidget::cornerButtonsThread() {
-	return _thread;
+Data::Thread *SublistWidget::cornerButtonsThread() {
+	return nullptr;
 }
 
-FullMsgId PinnedWidget::cornerButtonsCurrentId() {
+FullMsgId SublistWidget::cornerButtonsCurrentId() {
 	return {};
 }
 
-bool PinnedWidget::cornerButtonsIgnoreVisibility() {
+bool SublistWidget::cornerButtonsIgnoreVisibility() {
 	return animatingShow();
 }
 
-std::optional<bool> PinnedWidget::cornerButtonsDownShown() {
+std::optional<bool> SublistWidget::cornerButtonsDownShown() {
 	const auto top = _scroll->scrollTop() + st::historyToDownShownAfter;
 	if (top < _scroll->scrollTopMax() || _cornerButtons.replyReturn()) {
 		return true;
@@ -270,15 +246,15 @@ std::optional<bool> PinnedWidget::cornerButtonsDownShown() {
 	return std::nullopt;
 }
 
-bool PinnedWidget::cornerButtonsUnreadMayBeShown() {
+bool SublistWidget::cornerButtonsUnreadMayBeShown() {
 	return _inner->loadedAtBottomKnown();
 }
 
-bool PinnedWidget::cornerButtonsHas(CornerButtonType type) {
+bool SublistWidget::cornerButtonsHas(CornerButtonType type) {
 	return (type == CornerButtonType::Down);
 }
 
-void PinnedWidget::showAtPosition(
+void SublistWidget::showAtPosition(
 		Data::MessagePosition position,
 		FullMsgId originId) {
 	_inner->showAtPosition(
@@ -287,24 +263,24 @@ void PinnedWidget::showAtPosition(
 		_cornerButtons.doneJumpFrom(position.fullId, originId));
 }
 
-void PinnedWidget::updateAdaptiveLayout() {
+void SublistWidget::updateAdaptiveLayout() {
 	_topBarShadow->moveToLeft(
 		controller()->adaptive().isOneColumn() ? 0 : st::lineWidth,
 		_topBar->height());
 }
 
-not_null<Data::Thread*> PinnedWidget::thread() const {
-	return _thread;
+not_null<Data::SavedSublist*> SublistWidget::sublist() const {
+	return _sublist;
 }
 
-Dialogs::RowDescriptor PinnedWidget::activeChat() const {
+Dialogs::RowDescriptor SublistWidget::activeChat() const {
 	return {
-		_thread,
+		_sublist,
 		FullMsgId(_history->peer->id, ShowAtUnreadMsgId)
 	};
 }
 
-QPixmap PinnedWidget::grabForShowAnimation(const Window::SectionSlideParams &params) {
+QPixmap SublistWidget::grabForShowAnimation(const Window::SectionSlideParams &params) {
 	_topBar->updateControlsVisibility();
 	if (params.withTopBarShadow) _topBarShadow->hide();
 	auto result = Ui::GrabWidget(this);
@@ -313,20 +289,19 @@ QPixmap PinnedWidget::grabForShowAnimation(const Window::SectionSlideParams &par
 	return result;
 }
 
-void PinnedWidget::checkActivation() {
+void SublistWidget::checkActivation() {
 	_inner->checkActivation();
 }
 
-void PinnedWidget::doSetInnerFocus() {
+void SublistWidget::doSetInnerFocus() {
 	_inner->setFocus();
 }
 
-bool PinnedWidget::showInternal(
+bool SublistWidget::showInternal(
 		not_null<Window::SectionMemento*> memento,
 		const Window::SectionShow &params) {
-	if (auto logMemento = dynamic_cast<PinnedMemento*>(memento.get())) {
-		if (logMemento->getThread() == thread()
-			|| logMemento->getThread()->migrateToOrMe() == thread()) {
+	if (auto logMemento = dynamic_cast<SublistMemento*>(memento.get())) {
+		if (logMemento->getSublist() == sublist()) {
 			restoreState(logMemento);
 			return true;
 		}
@@ -334,44 +309,40 @@ bool PinnedWidget::showInternal(
 	return false;
 }
 
-void PinnedWidget::setInternalState(
+bool SublistWidget::sameTypeAs(not_null<Window::SectionMemento*> memento) {
+	return dynamic_cast<SublistMemento*>(memento.get()) != nullptr;
+}
+
+void SublistWidget::setInternalState(
 		const QRect &geometry,
-		not_null<PinnedMemento*> memento) {
+		not_null<SublistMemento*> memento) {
 	setGeometry(geometry);
 	Ui::SendPendingMoveResizeEvents(this);
 	restoreState(memento);
 }
 
-std::shared_ptr<Window::SectionMemento> PinnedWidget::createMemento() {
-	auto result = std::make_shared<PinnedMemento>(thread());
+std::shared_ptr<Window::SectionMemento> SublistWidget::createMemento() {
+	auto result = std::make_shared<SublistMemento>(sublist());
 	saveState(result.get());
 	return result;
 }
 
-bool PinnedWidget::showMessage(
+bool SublistWidget::showMessage(
 		PeerId peerId,
 		const Window::SectionShow &params,
 		MsgId messageId) {
 	return false; // We want 'Go to original' to work.
 }
 
-void PinnedWidget::saveState(not_null<PinnedMemento*> memento) {
+void SublistWidget::saveState(not_null<SublistMemento*> memento) {
 	_inner->saveState(memento->list());
 }
 
-void PinnedWidget::restoreState(not_null<PinnedMemento*> memento) {
+void SublistWidget::restoreState(not_null<SublistMemento*> memento) {
 	_inner->restoreState(memento->list());
-	if (const auto highlight = memento->getHighlightId()) {
-		_inner->showAtPosition(Data::MessagePosition{
-			.fullId = ((highlight > 0 || !_migratedPeer)
-				? FullMsgId(_history->peer->id, highlight)
-				: FullMsgId(_migratedPeer->id, -highlight)),
-			.date = TimeId(0),
-		}, { Window::SectionShow::Way::Forward, anim::type::instant });
-	}
 }
 
-void PinnedWidget::resizeEvent(QResizeEvent *e) {
+void SublistWidget::resizeEvent(QResizeEvent *e) {
 	if (!width() || !height()) {
 		return;
 	}
@@ -379,34 +350,14 @@ void PinnedWidget::resizeEvent(QResizeEvent *e) {
 	updateControlsGeometry();
 }
 
-void PinnedWidget::recountChatWidth() {
+void SublistWidget::recountChatWidth() {
 	auto layout = (width() < st::adaptiveChatWideWidth)
 		? Window::Adaptive::ChatLayout::Normal
 		: Window::Adaptive::ChatLayout::Wide;
 	controller()->adaptive().setChatLayout(layout);
 }
 
-void PinnedWidget::setMessagesCount(int count) {
-	if (_messagesCount == count) {
-		return;
-	}
-	_messagesCount = count;
-	_topBar->setCustomTitle(
-		tr::lng_pinned_messages_title(tr::now, lt_count, count));
-	refreshClearButtonText();
-}
-
-void PinnedWidget::refreshClearButtonText() {
-	const auto can = _history->peer->canPinMessages();
-	_clearButton->setText(can
-		? tr::lng_pinned_unpin_all(
-			tr::now,
-			lt_count,
-			std::max(_messagesCount, 1)).toUpper()
-		: tr::lng_pinned_hide_all(tr::now).toUpper());
-}
-
-void PinnedWidget::updateControlsGeometry() {
+void SublistWidget::updateControlsGeometry() {
 	const auto contentWidth = width();
 
 	const auto newScrollTop = _scroll->isHidden()
@@ -415,9 +366,17 @@ void PinnedWidget::updateControlsGeometry() {
 	_topBar->resizeToWidth(contentWidth);
 	_topBarShadow->resize(contentWidth, st::lineWidth);
 
-	const auto bottom = height() - _clearButton->height();
-	_clearButton->resizeToWidth(width());
-	_clearButton->move(0, bottom);
+	auto bottom = height();
+	if (_openChatButton) {
+		_openChatButton->resizeToWidth(width());
+		bottom -= _openChatButton->height();
+		_openChatButton->move(0, bottom);
+	}
+	if (_aboutHiddenAuthor) {
+		_aboutHiddenAuthor->resize(width(), st::historyUnblock.height);
+		bottom -= _aboutHiddenAuthor->height();
+		_aboutHiddenAuthor->move(0, bottom);
+	}
 	const auto controlsHeight = 0;
 	auto top = _topBar->height();
 	_translateBar->move(0, top);
@@ -442,7 +401,7 @@ void PinnedWidget::updateControlsGeometry() {
 	_cornerButtons.updatePositions();
 }
 
-void PinnedWidget::paintEvent(QPaintEvent *e) {
+void SublistWidget::paintEvent(QPaintEvent *e) {
 	if (animatingShow()) {
 		SectionWidget::paintEvent(e);
 		return;
@@ -456,21 +415,21 @@ void PinnedWidget::paintEvent(QPaintEvent *e) {
 	SectionWidget::PaintBackground(controller(), _theme.get(), this, bg);
 }
 
-void PinnedWidget::onScroll() {
+void SublistWidget::onScroll() {
 	if (_skipScrollEvent) {
 		return;
 	}
 	updateInnerVisibleArea();
 }
 
-void PinnedWidget::updateInnerVisibleArea() {
+void SublistWidget::updateInnerVisibleArea() {
 	const auto scrollTop = _scroll->scrollTop();
 	_inner->setVisibleTopBottom(scrollTop, scrollTop + _scroll->height());
 	_cornerButtons.updateJumpDownVisibility();
 	_cornerButtons.updateUnreadThingsVisibility();
 }
 
-void PinnedWidget::showAnimatedHook(
+void SublistWidget::showAnimatedHook(
 		const Window::SectionSlideParams &params) {
 	_topBar->setAnimatingMode(true);
 	if (params.withTopBarShadow) {
@@ -478,25 +437,25 @@ void PinnedWidget::showAnimatedHook(
 	}
 }
 
-void PinnedWidget::showFinishedHook() {
+void SublistWidget::showFinishedHook() {
 	_topBar->setAnimatingMode(false);
 	_inner->showFinished();
 	_translateBar->show();
 }
 
-bool PinnedWidget::floatPlayerHandleWheelEvent(QEvent *e) {
+bool SublistWidget::floatPlayerHandleWheelEvent(QEvent *e) {
 	return _scroll->viewportEvent(e);
 }
 
-QRect PinnedWidget::floatPlayerAvailableRect() {
+QRect SublistWidget::floatPlayerAvailableRect() {
 	return mapToGlobal(_scroll->geometry());
 }
 
-Context PinnedWidget::listContext() {
-	return Context::Pinned;
+Context SublistWidget::listContext() {
+	return Context::SavedSublist;
 }
 
-bool PinnedWidget::listScrollTo(int top, bool syntetic) {
+bool SublistWidget::listScrollTo(int top, bool syntetic) {
 	top = std::clamp(top, 0, _scroll->scrollTopMax());
 	if (_scroll->scrollTop() == top) {
 		updateInnerVisibleArea();
@@ -506,7 +465,7 @@ bool PinnedWidget::listScrollTo(int top, bool syntetic) {
 	return true;
 }
 
-void PinnedWidget::listCancelRequest() {
+void SublistWidget::listCancelRequest() {
 	if (_inner && !_inner->getSelectedIds().empty()) {
 		clearSelected();
 		return;
@@ -514,77 +473,85 @@ void PinnedWidget::listCancelRequest() {
 	controller()->showBackFromStack();
 }
 
-void PinnedWidget::listDeleteRequest() {
+void SublistWidget::listDeleteRequest() {
 	confirmDeleteSelected();
 }
 
-void PinnedWidget::listTryProcessKeyInput(not_null<QKeyEvent*> e) {
+void SublistWidget::listTryProcessKeyInput(not_null<QKeyEvent*> e) {
 }
 
-rpl::producer<Data::MessagesSlice> PinnedWidget::listSource(
+rpl::producer<Data::MessagesSlice> SublistWidget::listSource(
 		Data::MessagePosition aroundId,
 		int limitBefore,
 		int limitAfter) {
 	const auto messageId = aroundId.fullId.msg
 		? aroundId.fullId.msg
 		: (ServerMaxMsgId - 1);
-
-	return SharedMediaMergedViewer(
-		&_thread->session(),
-		SharedMediaMergedKey(
-			SparseIdsMergedSlice::Key(
-				_history->peer->id,
-				_thread->topicRootId(),
-				_thread->monoforumPeerId(),
-				_migratedPeer ? _migratedPeer->id : 0,
-				messageId),
-			Storage::SharedMediaType::Pinned),
-		limitBefore,
-		limitAfter
-	) | rpl::filter([=](const SparseIdsMergedSlice &slice) {
-		const auto count = slice.fullCount();
-		if (!count.has_value()) {
-			return true;
-		} else if (*count != 0) {
-			setMessagesCount(*count);
-			return true;
-		} else {
-			controller()->showBackFromStack();
-			return false;
-		}
-	}) | rpl::map([=](SparseIdsMergedSlice &&slice) {
-		auto result = Data::MessagesSlice();
-		result.fullCount = slice.fullCount();
-		result.skippedAfter = slice.skippedAfter();
-		result.skippedBefore = slice.skippedBefore();
-		const auto count = slice.size();
-		result.ids.reserve(count);
-		if (const auto msgId = slice.nearest(messageId)) {
-			result.nearestToAround = *msgId;
-		}
-		for (auto i = 0; i != count; ++i) {
-			result.ids.push_back(slice[i]);
-		}
-		return result;
-	});
+	return [=](auto consumer) {
+		const auto pushSlice = [=] {
+			auto result = Data::MessagesSlice();
+			result.fullCount = _sublist->fullCount();
+			_topBar->setCustomTitle(result.fullCount
+				? tr::lng_forum_messages(
+					tr::now,
+					lt_count_decimal,
+					*result.fullCount)
+				: tr::lng_contacts_loading(tr::now));
+			const auto &messages = _sublist->messages();
+			const auto i = ranges::lower_bound(
+				messages,
+				messageId,
+				ranges::greater(),
+				[](not_null<HistoryItem*> item) { return item->id; });
+			const auto before = int(end(messages) - i);
+			const auto useBefore = std::min(before, limitBefore);
+			const auto after = int(i - begin(messages));
+			const auto useAfter = std::min(after, limitAfter);
+			const auto from = i - useAfter;
+			const auto till = i + useBefore;
+			auto nearestDistance = std::numeric_limits<int64>::max();
+			result.ids.reserve(useAfter + useBefore);
+			for (auto j = till; j != from;) {
+				const auto item = *--j;
+				result.ids.push_back(item->fullId());
+				const auto distance = std::abs((messageId - item->id).bare);
+				if (nearestDistance > distance) {
+					nearestDistance = distance;
+					result.nearestToAround = result.ids.back();
+				}
+			}
+			result.skippedAfter = after - useAfter;
+			result.skippedBefore = result.fullCount
+				? (*result.fullCount - after - useBefore)
+				: std::optional<int>();
+			if (!result.fullCount || useBefore < limitBefore) {
+				_sublist->owner().savedMessages().loadMore(_sublist);
+			}
+			consumer.put_next(std::move(result));
+		};
+		auto lifetime = rpl::lifetime();
+		_sublist->changes() | rpl::start_with_next(pushSlice, lifetime);
+		pushSlice();
+		return lifetime;
+	};
 }
 
-bool PinnedWidget::listAllowsMultiSelect() {
+bool SublistWidget::listAllowsMultiSelect() {
 	return true;
 }
 
-bool PinnedWidget::listIsItemGoodForSelection(
+bool SublistWidget::listIsItemGoodForSelection(
 		not_null<HistoryItem*> item) {
 	return item->isRegular() && !item->isService();
 }
 
-bool PinnedWidget::listIsLessInOrder(
+bool SublistWidget::listIsLessInOrder(
 		not_null<HistoryItem*> first,
 		not_null<HistoryItem*> second) {
-	return first->position() < second->position();
+	return first->id < second->id;
 }
 
-void PinnedWidget::listSelectionChanged(SelectedItems &&items) {
+void SublistWidget::listSelectionChanged(SelectedItems &&items) {
 	HistoryView::TopBarWidget::SelectedState state;
 	state.count = items.size();
 	for (const auto &item : items) {
@@ -598,131 +565,133 @@ void PinnedWidget::listSelectionChanged(SelectedItems &&items) {
 	_topBar->showSelected(state);
 }
 
-void PinnedWidget::listMarkReadTill(not_null<HistoryItem*> item) {
+void SublistWidget::listMarkReadTill(not_null<HistoryItem*> item) {
 }
 
-void PinnedWidget::listMarkContentsRead(
+void SublistWidget::listMarkContentsRead(
 	const base::flat_set<not_null<HistoryItem*>> &items) {
 }
 
-MessagesBarData PinnedWidget::listMessagesBar(
+MessagesBarData SublistWidget::listMessagesBar(
 		const std::vector<not_null<Element*>> &elements) {
 	return {};
 }
 
-void PinnedWidget::listContentRefreshed() {
+void SublistWidget::listContentRefreshed() {
 }
 
-void PinnedWidget::listUpdateDateLink(
+void SublistWidget::listUpdateDateLink(
 	ClickHandlerPtr &link,
 	not_null<Element*> view) {
 }
 
-bool PinnedWidget::listElementHideReply(not_null<const Element*> view) {
-	if (const auto reply = view->data()->Get<HistoryMessageReply>()) {
-		return !reply->fields().manualQuote
-			&& (reply->messageId() == _thread->topicRootId());
-	}
+bool SublistWidget::listElementHideReply(not_null<const Element*> view) {
 	return false;
 }
 
-bool PinnedWidget::listElementShownUnread(not_null<const Element*> view) {
+bool SublistWidget::listElementShownUnread(not_null<const Element*> view) {
 	return view->data()->unread(view->data()->history());
 }
 
-bool PinnedWidget::listIsGoodForAroundPosition(
+bool SublistWidget::listIsGoodForAroundPosition(
 		not_null<const Element*> view) {
 	return view->data()->isRegular();
 }
 
-void PinnedWidget::listSendBotCommand(
+void SublistWidget::listSendBotCommand(
 	const QString &command,
 	const FullMsgId &context) {
 }
 
-void PinnedWidget::listSearch(
-		const QString &query,
-		const FullMsgId &context) {
-	const auto inChat = _history->peer->isUser()
-		? Dialogs::Key()
-		: Dialogs::Key(_history);
-	controller()->searchMessages(query, inChat);
+void SublistWidget::listHandleViaClick(not_null<UserData*> bot) {
 }
 
-void PinnedWidget::listHandleViaClick(not_null<UserData*> bot) {
-}
-
-not_null<Ui::ChatTheme*> PinnedWidget::listChatTheme() {
+not_null<Ui::ChatTheme*> SublistWidget::listChatTheme() {
 	return _theme.get();
 }
 
-CopyRestrictionType PinnedWidget::listCopyRestrictionType(
+CopyRestrictionType SublistWidget::listCopyRestrictionType(
 		HistoryItem *item) {
 	return CopyRestrictionTypeFor(_history->peer, item);
 }
 
-CopyRestrictionType PinnedWidget::listCopyMediaRestrictionType(
+CopyRestrictionType SublistWidget::listCopyMediaRestrictionType(
 		not_null<HistoryItem*> item) {
 	return CopyMediaRestrictionTypeFor(_history->peer, item);
 }
 
-CopyRestrictionType PinnedWidget::listSelectRestrictionType() {
+CopyRestrictionType SublistWidget::listSelectRestrictionType() {
 	return SelectRestrictionTypeFor(_history->peer);
 }
 
-auto PinnedWidget::listAllowedReactionsValue()
+auto SublistWidget::listAllowedReactionsValue()
 -> rpl::producer<Data::AllowedReactions> {
 	return Data::PeerAllowedReactionsValue(_history->peer);
 }
 
-void PinnedWidget::listShowPremiumToast(not_null<DocumentData*> document) {
+void SublistWidget::listShowPremiumToast(not_null<DocumentData*> document) {
 }
 
-void PinnedWidget::listOpenPhoto(
+void SublistWidget::listOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) {
 	controller()->openPhoto(photo, { context });
 }
 
-void PinnedWidget::listOpenDocument(
+void SublistWidget::listOpenDocument(
 		not_null<DocumentData*> document,
 		FullMsgId context,
 		bool showInMediaView) {
 	controller()->openDocument(document, showInMediaView, { context });
 }
 
-void PinnedWidget::listPaintEmpty(
+void SublistWidget::listPaintEmpty(
 	Painter &p,
 	const Ui::ChatPaintContext &context) {
 }
 
-QString PinnedWidget::listElementAuthorRank(not_null<const Element*> view) {
+QString SublistWidget::listElementAuthorRank(not_null<const Element*> view) {
 	return {};
 }
 
-bool PinnedWidget::listElementHideTopicButton(
-		not_null<const Element*> view) {
-	return true;
-}
-
-History *PinnedWidget::listTranslateHistory() {
+History *SublistWidget::listTranslateHistory() {
 	return _history;
 }
 
-void PinnedWidget::listAddTranslatedItems(
+void SublistWidget::listAddTranslatedItems(
 	not_null<TranslateTracker*> tracker) {
 }
 
-void PinnedWidget::confirmDeleteSelected() {
+void SublistWidget::confirmDeleteSelected() {
 	ConfirmDeleteSelectedItems(_inner);
 }
 
-void PinnedWidget::confirmForwardSelected() {
+void SublistWidget::confirmForwardSelected() {
 	ConfirmForwardSelectedItems(_inner);
 }
 
-void PinnedWidget::clearSelected() {
+void SublistWidget::clearSelected() {
 	_inner->cancelSelection();
+}
+
+void SublistWidget::setupShortcuts() {
+	Shortcuts::Requests(
+	) | rpl::filter([=] {
+		return Ui::AppInFocus()
+			&& Ui::InFocusChain(this)
+			&& !controller()->isLayerShown()
+			&& (Core::App().activeWindow() == &controller()->window());
+	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
+		using Command = Shortcuts::Command;
+		request->check(Command::Search, 1) && request->handle([=] {
+			searchInSublist();
+			return true;
+		});
+	}, lifetime());
+}
+
+void SublistWidget::searchInSublist() {
+	controller()->content()->searchInChat(_sublist);
 }
 
 } // namespace HistoryView

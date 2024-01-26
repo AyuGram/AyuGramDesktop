@@ -82,6 +82,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/ui/settings/settings_ayu.h"
+#include "ayu/features/messageshot/message_shot.h"
+#include "window/themes/window_theme_preview.h"
+
+
 namespace Settings {
 namespace {
 
@@ -257,7 +263,7 @@ void ColorsPalette::show(Type type) {
 		return;
 	}
 	list.insert(list.begin(), scheme->accentColor);
-	const auto color = Core::App().settings().themesAccentColors().get(type);
+	const auto color = AyuFeatures::MessageShot::isChoosingTheme() ? AyuFeatures::MessageShot::getSelectedColorFromDefault() : Core::App().settings().themesAccentColors().get(type);
 	const auto current = color.value_or(scheme->accentColor);
 	const auto i = ranges::find(list, current);
 	if (i == end(list)) {
@@ -1519,7 +1525,19 @@ void SetupDefaultThemes(
 		container.get(),
 		container.get());
 
+	const auto updateMessageShotPalette = [=](const QString &path)
+	{
+		const Data::CloudTheme theme;
+		if (const auto preview = PreviewFromFile(QByteArray(), path, theme)) {
+			AyuFeatures::MessageShot::setPalette(preview->instance.palette);
+		}
+	};
+
 	const auto chosen = [] {
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			return AyuFeatures::MessageShot::getSelectedFromDefault();
+		}
+
 		const auto &object = Background()->themeObject();
 		if (object.cloud.id) {
 			return Type(-1);
@@ -1557,6 +1575,12 @@ void SetupDefaultThemes(
 	const auto schemeClicked = [=](
 			const Scheme &scheme,
 			Qt::KeyboardModifiers modifiers) {
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			AyuFeatures::MessageShot::setDefaultSelected(scheme.type);
+			updateMessageShotPalette(scheme.path);
+			return;
+		}
+
 		apply(scheme);
 	};
 
@@ -1600,6 +1624,16 @@ void SetupDefaultThemes(
 			return;
 		}
 		if (i != end(checks)) {
+			if (AyuFeatures::MessageShot::isChoosingTheme()) {
+				if (const auto color = AyuFeatures::MessageShot::getSelectedColorFromDefault()) {
+					const auto colorizer = ColorizerFrom(*scheme, color.value());
+					i->second->setColors(ColorsFromScheme(*scheme, colorizer));
+				} else {
+					i->second->setColors(ColorsFromScheme(*scheme));
+				}
+				return;
+			}
+
 			if (const auto color = colors.get(type)) {
 				const auto colorizer = ColorizerFrom(*scheme, *color);
 				i->second->setColors(ColorsFromScheme(*scheme, colorizer));
@@ -1609,6 +1643,21 @@ void SetupDefaultThemes(
 		}
 	};
 	group->setChangedCallback([=](Type type) {
+	    if (AyuFeatures::MessageShot::isChoosingTheme()) {
+	    	palette->show(type);
+	    	refreshColorizer(type);
+	    	group->setValue(type);
+	    	AyuFeatures::MessageShot::setDefaultSelected(type);
+
+			const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
+			if (scheme == end(kSchemesList)) {
+				return;
+			}
+
+	    	updateMessageShotPalette(scheme->path);
+	    	return;
+	    }
+
 		group->setValue(chosen());
 	});
 	for (const auto &scheme : kSchemesList) {
@@ -1659,8 +1708,32 @@ void SetupDefaultThemes(
 		}
 	}, block->lifetime());
 
+	if (AyuFeatures::MessageShot::isChoosingTheme()) {
+		palette->selected() | rpl::start_with_next([=](QColor color) {
+			AyuFeatures::MessageShot::setDefaultSelectedColor(color);
+			refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault());
+
+			const auto type = chosen();
+			const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
+			if (scheme == end(kSchemesList)) {
+				return;
+			}
+
+			updateMessageShotPalette(scheme->path);
+		}, container->lifetime());
+
+		AyuFeatures::MessageShot::resetDefaultSelectedEvents() | rpl::start_with_next([=] {
+			refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault()); // hide colorizer
+			group->setValue(Type(-1));
+		}, container->lifetime());
+	}
+
 	palette->selected(
 	) | rpl::start_with_next([=](QColor color) {
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			return;
+		}
+
 		if (Background()->editingTheme()) {
 			// We don't remember old accent color to revert it properly
 			// in Window::Theme::Revert which is called by Editor.

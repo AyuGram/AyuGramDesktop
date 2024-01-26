@@ -137,18 +137,20 @@ PRIVATE
     ayu/ui/sections/edited/edited_log_item.h
     ayu/ui/sections/edited/edited_log_section.cpp
     ayu/ui/sections/edited/edited_log_section.h
-    ayu/ui/boxes/voice_confirmation_box.cpp
-    ayu/ui/boxes/voice_confirmation_box.h
-    ayu/ui/boxes/message_history_box.cpp
-    ayu/ui/boxes/message_history_box.h
-    ayu/ui/boxes/confirmation_box.cpp
-    ayu/ui/boxes/confirmation_box.h
+    ayu/ui/boxes/server_read_confirmation_box.cpp
+    ayu/ui/boxes/server_read_confirmation_box.h
     ayu/ui/boxes/edit_deleted_mark.cpp
     ayu/ui/boxes/edit_deleted_mark.h
     ayu/ui/boxes/edit_edited_mark.cpp
     ayu/ui/boxes/edit_edited_mark.h
     ayu/ui/boxes/font_selector.cpp
     ayu/ui/boxes/font_selector.h
+    ayu/ui/boxes/theme_selector_box.cpp
+    ayu/ui/boxes/theme_selector_box.h
+    ayu/ui/boxes/message_shot_box.cpp
+    ayu/ui/boxes/message_shot_box.h
+    ayu/ui/components/image_view.cpp
+    ayu/ui/components/image_view.h
     ayu/sync/ayu_sync_controller.cpp
     ayu/sync/ayu_sync_controller.h
     ayu/sync/models.h
@@ -167,6 +169,8 @@ PRIVATE
     ayu/features/streamer_mode/streamer_mode_windows.cpp
     ayu/features/streamer_mode/streamer_mode_linux.cpp
     ayu/features/streamer_mode/streamer_mode.h
+    ayu/features/messageshot/message_shot.cpp
+    ayu/features/messageshot/message_shot.h
     ayu/database/entities.h
     ayu/database/ayu_database.cpp
     ayu/database/ayu_database.h

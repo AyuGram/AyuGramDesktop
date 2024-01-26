@@ -54,7 +54,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/ui/boxes/voice_confirmation_box.h"
 #include "boxes/abstract_box.h"
 
 
@@ -2214,11 +2213,12 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 			});
 
 			if (settings->voiceConfirmation) {
-				Ui::show(AyuUi::MakeConfirmBox({
-												   .text = tr::ayu_ConfirmationVoice(),
-												   .confirmed = sendVoiceCallback,
-												   .confirmText = tr::lng_send_button()
-											   }));
+				Ui::show(Ui::MakeConfirmBox(
+					{
+						.text = tr::ayu_ConfirmationVoice(),
+						.confirmed = sendVoiceCallback,
+						.confirmText = tr::lng_send_button()
+					}));
 			}
 			else {
 				sendVoiceCallback();
@@ -2303,11 +2303,12 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		});
 
 		if (settings->voiceConfirmation) {
-			Ui::show(AyuUi::MakeConfirmBox({
-											   .text = tr::ayu_ConfirmationVoice(),
-											   .confirmed = sendVoiceCallback,
-											   .confirmText = tr::lng_send_button()
-										   }));
+			Ui::show(Ui::MakeConfirmBox(
+				{
+					.text = tr::ayu_ConfirmationVoice(),
+					.confirmed = sendVoiceCallback,
+					.confirmText = tr::lng_send_button()
+				}));
 		}
 		else {
 			sendVoiceCallback();

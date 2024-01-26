@@ -23,3 +23,5 @@ cpSpacingY: 8px;
 cpIconSize: 64px;
 
 recentStickersLimitPadding: margins(22px, 4px, 22px, 8px);
+imageViewPadding: margins(22px, 10px, 22px, 10px);
+imageViewInnerPadding: margins(16px, 16px, 16px, 16px);

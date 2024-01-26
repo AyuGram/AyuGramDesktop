@@ -101,7 +101,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/database/ayu_database.h"
 #include "ayu/messages/ayu_messages_controller.h"
 #include "ayu/ui/context_menu/context_menu.h"
-#include "ayu/ui/boxes/message_history_box.h"
 #include "ayu/ui/sections/edited/edited_log_section.h"
 
 

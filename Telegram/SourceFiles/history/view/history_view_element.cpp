@@ -54,6 +54,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "styles/style_chat.h"
 
+// AyuGram includes
+#include "ayu/features/messageshot/message_shot.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -359,11 +363,11 @@ void UnreadBar::paint(
 		const PaintContext &context,
 		int y,
 		int w,
-		ElementChatMode mode) const {
-	const auto previousTranslation = p.transform().dx();
-	if (previousTranslation != 0) {
-		p.translate(-previousTranslation, 0);
+		bool chatWide) const {
+	if (AyuFeatures::MessageShot::isTakingShot()) {
+		return;
 	}
+
 	const auto st = context.st;
 	const auto bottom = y + height();
 	y += marginTop();
@@ -996,6 +1000,10 @@ bool Element::isTopicRootReply() const {
 }
 
 int Element::skipBlockWidth() const {
+	if (AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+		return st::msgDateDelta.x();
+	}
+
 	return st::msgDateSpace + infoWidth() - st::msgDateDelta.x();
 }
 
@@ -1569,6 +1577,10 @@ void Element::destroyUnreadBar() {
 }
 
 int Element::displayedDateHeight() const {
+	if (AyuFeatures::MessageShot::isTakingShot()) {
+		return 0;
+	}
+
 	if (auto date = Get<DateBadge>()) {
 		return date->height();
 	}

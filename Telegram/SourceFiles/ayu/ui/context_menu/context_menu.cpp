@@ -256,11 +256,14 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 
 				if (isSticker) {
 					const auto authorId = media->document()->sticker()->set.id >> 32;
-					menu2->addAction(Ui::ContextActionStickerAuthor(
-						menu2->menu(),
-						&item->history()->session(),
-						authorId
-					));
+
+					if (authorId != 0) {
+						menu2->addAction(Ui::ContextActionStickerAuthor(
+							menu2->menu(),
+							&item->history()->session(),
+							authorId
+						));
+					}
 				}
 			}
 		},

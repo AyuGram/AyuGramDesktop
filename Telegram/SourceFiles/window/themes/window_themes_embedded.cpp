@@ -14,6 +14,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "ui/style/style_palette_colorizer.h"
 
+// AyuGram includes
+#include "ayu/features/messageshot/message_shot.h"
+
+
 namespace Window {
 namespace Theme {
 namespace {
@@ -188,7 +192,7 @@ style::colorizer ColorizerForTheme(const QString &absolutePath) {
 		return {};
 	}
 	const auto &colors = Core::App().settings().themesAccentColors();
-	if (const auto accent = colors.get(i->type)) {
+	if (const auto accent = AyuFeatures::MessageShot::isChoosingTheme() ? AyuFeatures::MessageShot::getSelectedColorFromDefault() : colors.get(i->type)) {
 		return ColorizerFrom(*i, *accent);
 	}
 	return {};

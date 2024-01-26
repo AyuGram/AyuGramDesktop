@@ -6,7 +6,6 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "lang/lang_cloud_manager.h"
 #include "boxes/abstract_box.h"
 #include "base/binary_guard.h"
 

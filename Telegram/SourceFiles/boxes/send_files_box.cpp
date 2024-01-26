@@ -68,6 +68,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "base/unixtime.h"
+#include <QBuffer>
 
 
 namespace {
@@ -927,15 +928,58 @@ void SendFilesBox::addMenuButton() {
 	top->setClickedCallback([=] {
 		const auto &tabbed = _st.tabbed;
 		_menu = base::make_unique_q<Ui::PopupMenu>(top, tabbed.menu);
-		const auto position = QCursor::pos();
-		SendMenu::FillSendMenu(
-			_menu.get(),
-			_show,
-			_sendMenuDetails(),
-			_sendMenuCallback,
-			&_st.tabbed.icons,
-			position);
-		_menu->popup(position);
+		if (hasSpoilerMenu()) {
+			const auto spoilered = allWithSpoilers();
+			_menu->addAction(
+				(spoilered
+					? tr::lng_context_disable_spoiler(tr::now)
+					: tr::lng_context_spoiler_effect(tr::now)),
+				[=] { toggleSpoilers(!spoilered); },
+				spoilered ? &icons.menuSpoilerOff : &icons.menuSpoiler);
+			if (hasSendMenu()) {
+				_menu->addSeparator(&tabbed.expandedSeparator);
+			}
+		}
+		if (hasSendMenu()) {
+			SendMenu::FillSendMenu(
+				_menu.get(),
+				_sendMenuType,
+				[=] { sendSilent(); },
+				[=] { sendScheduled(); },
+				[=] { sendWhenOnline(); },
+				&_st.tabbed.icons);
+		}
+
+		using ImageInfo = Ui::PreparedFileInformation::Image;
+		if (_list.files.size() == 1 && std::get_if<ImageInfo>(&_list.files[0].information->media)) {
+			_menu->addAction(
+				tr::ayu_SendAsSticker(tr::now),
+				[=]() mutable
+				{
+					const auto file = std::move(_list.files[0]);
+					_list.files.clear();
+
+					const auto sourceImage = std::get_if<ImageInfo>(&file.information->media);
+
+					QByteArray targetArray;
+					QBuffer buffer(&targetArray);
+					buffer.open(QIODevice::WriteOnly);
+					sourceImage->data.save(&buffer, "WEBP");
+
+					QImage targetImage;
+					targetImage.loadFromData(targetArray, "WEBP");
+
+					addFiles(Storage::PrepareMediaFromImage(std::move(targetImage),
+					                                        std::move(targetArray),
+					                                        st::sendMediaPreviewSize));
+					_list.overrideSendImagesAsPhotos = false;
+					initSendWay();
+
+					send({}, false);
+				},
+				&st::menuIconStickers);
+		}
+		_menu->popup(QCursor::pos());
 		return true;
 	});
 }
@@ -1903,7 +1947,7 @@ void SendFilesBox::send(
 	{
 		DEBUG_LOG(("[AyuGram] Scheduling files"));
 		auto current = base::unixtime::now();
-		options.scheduled = current + 60; // well, files can be really big...
+		options.scheduled = current + 60; // well, files can be huge...
 	}
 
 	if ((_sendType == Api::SendType::Scheduled

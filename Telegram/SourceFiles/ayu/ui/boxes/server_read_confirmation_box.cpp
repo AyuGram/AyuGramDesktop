@@ -4,15 +4,14 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-#include "confirmation_box.h"
+#include "server_read_confirmation_box.h"
+
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "styles/style_layers.h"
-#include "ui/text/text_utilities.h"
-#include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
 
 namespace AyuUi

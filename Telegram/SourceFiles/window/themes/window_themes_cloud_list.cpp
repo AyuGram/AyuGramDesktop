@@ -35,6 +35,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+// AyuGram includes
+#include "ayu/features/messageshot/message_shot.h"
+
+
 namespace Window {
 namespace Theme {
 namespace {
@@ -333,10 +337,20 @@ rpl::producer<bool> CloudList::allShown() const {
 
 void CloudList::setup() {
 	_group->setChangedCallback([=](int selected) {
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			return;
+		}
+
 		const auto &object = Background()->themeObject();
 		_group->setValue(groupValueForId(
 			object.cloud.id ? object.cloud.id : kFakeCloudThemeId));
 	});
+
+	if (AyuFeatures::MessageShot::isChoosingTheme()) {
+		AyuFeatures::MessageShot::resetCustomSelectedEvents() | rpl::start_with_next([=] {
+			_group->setValue(-1);
+		}, _outer->lifetime());
+	}
 
 	auto cloudListChanges = rpl::single(rpl::empty) | rpl::then(
 		_window->session().data().cloudThemes().updated()
@@ -437,6 +451,13 @@ bool CloudList::applyChangesFrom(std::vector<Data::CloudTheme> &&list) {
 		changed = true;
 	}
 	_group->setValue(groupValueForId(id));
+
+	if (AyuFeatures::MessageShot::isChoosingTheme()) {
+		if (const auto selected = AyuFeatures::MessageShot::getSelectedFromCustom()) {
+			_group->setValue(groupValueForId(selected.value().id));
+		}
+	}
+
 	return changed;
 }
 
@@ -522,6 +543,14 @@ void CloudList::insert(int index, const Data::CloudTheme &theme) {
 			return;
 		}
 		const auto &cloud = i->theme;
+
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			AyuFeatures::MessageShot::setTheme(cloud);
+			AyuFeatures::MessageShot::setCustomSelected(cloud);
+			_group->setValue(groupValueForId(cloud.id));
+			return;
+		}
+
 		if (button == Qt::RightButton) {
 			showMenu(*i);
 		} else if (cloud.documentId) {

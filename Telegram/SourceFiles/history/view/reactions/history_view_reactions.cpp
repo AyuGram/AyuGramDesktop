@@ -28,6 +28,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
+// AyuGram includes
+#include "ayu/features/messageshot/message_shot.h"
+
+
 namespace HistoryView::Reactions {
 namespace {
 
@@ -549,7 +553,7 @@ void InlineList::paint(
 			p.setOpacity(1.);
 		}
 	}
-	if (!animations.empty()) {
+	if (!animations.empty() && !AyuFeatures::MessageShot::isTakingShot()) { // fix crash when taking shot
 		const auto now = context.now;
 		context.reactionInfo->effectPaint = [
 			now,

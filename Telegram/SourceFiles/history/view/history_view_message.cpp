@@ -53,6 +53,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/features/messageshot/message_shot.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -1134,13 +1138,17 @@ int Message::marginTop() const {
 	}
 	result += displayedDateHeight();
 	if (const auto bar = Get<UnreadBar>()) {
-		result += bar->height();
+		if (!AyuFeatures::MessageShot::isTakingShot()) {
+			result += bar->height();
+		}
 	}
 	if (const auto bar = Get<ForumThreadBar>()) {
 		result += bar->height();
 	}
 	if (const auto service = Get<ServicePreMessage>()) {
-		result += service->height;
+		if (!AyuFeatures::MessageShot::isTakingShot()) {
+			result += service->height;
+		}
 	}
 	return result;
 }
@@ -1211,7 +1219,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 	auto mediaOnBottom = (mediaDisplayed && media->isBubbleBottom()) || check || (entry/* && entry->isBubbleBottom()*/);
 	auto mediaOnTop = (mediaDisplayed && media->isBubbleTop()) || (entry && entry->isBubbleTop());
 
-	const auto displayInfo = needInfoDisplay();
+	const auto displayInfo = needInfoDisplay() && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date);
 	const auto reactionsInBubble = _reactions && embedReactionsInBubble();
 
 	const auto keyboard = item->inlineReplyKeyboard();
@@ -3965,6 +3973,10 @@ bool Message::displayRightActionComments() const {
 }
 
 std::optional<QSize> Message::rightActionSize() const {
+	if (AyuFeatures::MessageShot::isTakingShot()) {
+		return {};
+	}
+
 	if (displayRightActionComments()) {
 		const auto views = data()->Get<HistoryMessageViews>();
 		Assert(views != nullptr);
