@@ -25,9 +25,23 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 
 ### Windows
 
-You can download prebuilt Windows binary from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases) or from the [Telegram topic](https://t.me/ayugramchat/12788).
+#### Official
 
-Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) if you want to build by yourself.
+You can download prebuilt Windows binary from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases) or from
+the [Telegram topic](https://t.me/ayugramchat/12788).
+
+#### Scoop
+
+```bash
+scoop bucket add extras
+scoop install ayugram
+```
+
+#### Self-built
+
+Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) if you want to
+build by yourself.
+>>>>>>> 59e44d4e96 (feat: add scoop note)
 
 ### Arch Linux
 
@@ -115,4 +129,3 @@ Enjoy using **AyuGram**? Consider sending us a tip!
 ### Icons
 
 - [Solar Icon Set](https://www.figma.com/community/file/1166831539721848736)
->>>>>>> 2f069bcd02 (feat: update README.md)
