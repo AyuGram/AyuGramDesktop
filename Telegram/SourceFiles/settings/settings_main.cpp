@@ -85,6 +85,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ui/settings/settings_ayu.h"
+#include "ayu/ui/utils/ayu_profile_values.h"
 
 
 namespace Settings {
@@ -159,21 +160,7 @@ Cover::Cover(
 	_name->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
 
 	_phone->setSelectable(true);
-	_phone->setContextCopyText(tr::lng_profile_copy_phone(tr::now));
-	const auto hook = [=](Ui::FlatLabel::ContextMenuRequest request) {
-		if (request.selection.empty()) {
-			const auto c = [=] {
-				auto phone = rpl::variable<TextWithEntities>(
-					Info::Profile::PhoneValue(_user)).current().text;
-				phone.replace(' ', QString()).replace('-', QString());
-				TextUtilities::SetClipboardText({ phone });
-			};
-			request.menu->addAction(tr::lng_profile_copy_phone(tr::now), c);
-		} else {
-			_phone->fillContextMenu(request);
-		}
-	};
-	_phone->setContextMenuHook(hook);
+	_phone->setContextCopyText(tr::ayu_ContextCopyID(tr::now));
 
 	initViewers();
 	setupChildGeometry();
@@ -226,7 +213,7 @@ void Cover::initViewers() {
 		refreshNameGeometry(width());
 	}, lifetime());
 
-	Info::Profile::PhoneValue(
+	IDValue(
 		_user
 	) | rpl::start_with_next([=](const TextWithEntities &value) {
 		_phone->setText(value.text);
