@@ -467,17 +467,16 @@ void SetupRows(
 		showEditName,
 		{ &st::menuIconProfile });
 
-	const auto showChangePhone = [=] {
-		controller->show(
-			Ui::MakeInformBox(tr::lng_change_phone_error()));
-		controller->window().activate();
+	const auto copyPhone = [=] {
+		QGuiApplication::clipboard()->setText(self->phone());
+		controller->showToast(tr::lng_text_copied(tr::now), 500);
 	};
 	AddRow(
 		container,
 		tr::lng_settings_phone_label(),
 		Info::Profile::PhoneValue(self),
 		tr::lng_profile_copy_phone(tr::now),
-		showChangePhone,
+		copyPhone,
 		{ &st::menuIconPhone });
 
 	auto username = Info::Profile::UsernameValue(self);
