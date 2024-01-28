@@ -6,6 +6,11 @@
 // Copyright @Radolyn, 2023
 #include "ayu_settings.h"
 
+#include "ayu/ui/ayu_assets.h"
+
+#include "lang_auto.h"
+#include "core/application.h"
+
 #include "rpl/lifetime.h"
 #include "rpl/producer.h"
 #include "rpl/variable.h"
@@ -179,6 +184,81 @@ void save()
 	file.close();
 
 	postinitialize();
+}
+
+AyuGramSettings::AyuGramSettings()
+{
+	// ~ Ghost essentials
+	sendReadMessages = true;
+	sendReadStories = true;
+	sendOnlinePackets = true;
+	sendUploadProgress = true;
+	sendOfflinePacketAfterOnline = false;
+
+	markReadAfterSend = true;
+	markReadAfterReaction = true;
+	markReadAfterPoll = true;
+	useScheduledMessages = false;
+
+	// ~ Message edits & deletion history
+	saveDeletedMessages = false;
+	saveMessagesHistory = true;
+
+	// ~ QoL toggles
+	disableAds = true;
+	disableStories = false;
+	collapseSimilarChannels = true;
+	hideSimilarChannels = false;
+
+	uploadSpeedBoost = false;
+
+	disableNotificationsDelay = false;
+	localPremium = false;
+	copyUsernameAsLink = true;
+
+	// ~ Customization
+	appIcon = AyuAssets::DEFAULT_ICON;
+	simpleQuotesAndReplies = true;
+	deletedMark = "🧹";
+	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
+	recentStickersCount = 50;
+
+	// context menu items
+	// 0 - hide
+	// 1 - show normally
+	// 2 - show with SHIFT or CTRL pressed
+	showReactionsPanelInContextMenu = 1;
+	showViewsPanelInContextMenu = 1;
+	showHideMessageInContextMenu = 0;
+	showUserMessagesInContextMenu = 2;
+	showMessageDetailsInContextMenu = 2;
+
+	showLReadToggleInDrawer = true;
+	showSReadToggleInDrawer = true;
+	showGhostToggleInDrawer = true;
+	showStreamerToggleInDrawer = false;
+
+	showGhostToggleInTray = true;
+	showStreamerToggleInTray = false;
+
+	mainFont = "";
+	monoFont = "";
+
+	hideNotificationCounters = false;
+	hideAllChatsFolder = false;
+
+	/*
+		 * showPeerId = 0 means no ID shown
+		 * showPeerId = 1 means ID shown as for Telegram API devs
+		 * showPeerId = 2 means ID shown as for Bot API devs (-100)
+		 */
+	showPeerId = 2;
+	showMessageSeconds = false;
+
+	// ~ Confirmations
+	stickerConfirmation = false;
+	gifConfirmation = false;
+	voiceConfirmation = false;
 }
 
 void AyuGramSettings::set_sendReadMessages(bool val)
