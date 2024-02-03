@@ -565,6 +565,11 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 
 void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cache, const Callback &callback)
 {
+	if (!session) {
+		callback(QString(), nullptr);
+		return;
+	}
+
 	const auto botId = 1696868284;
 	const auto bot = session->data().userLoaded(botId);
 
@@ -690,7 +695,8 @@ void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cac
 
 void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback)
 {
-	if (userId == 0) {
+	if (userId == 0 || !session) {
+		callback(QString(), nullptr);
 		return;
 	}
 

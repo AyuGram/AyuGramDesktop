@@ -731,10 +731,19 @@ void StickerSetBox::updateButtons() {
 		};
 		const auto addAuthorPack = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>>& menu) {
 			if (type == Data::StickersType::Stickers) {
+				const auto pointer = Ui::MakeWeak(this);
 				(*menu)->addAction(tr::ayu_MessageDetailsPackOwnerPC(tr::now), [=]
 				{
+					if (!pointer) {
+						return;
+					}
+
 					searchById(_inner->setId() >> 32, _session, [=](const QString &username, UserData *user)
 					{
+						if (!pointer) {
+							return;
+						}
+
 						if (!user) {
 							showToast(tr::ayu_UserNotFoundMessage(tr::now));
 							return;
