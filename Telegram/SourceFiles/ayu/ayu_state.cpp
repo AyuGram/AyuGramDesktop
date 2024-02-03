@@ -23,9 +23,9 @@ void hide(not_null<HistoryItem *> item)
 
 bool isHidden(PeerId peerId, MsgId messageId)
 {
-	auto it = hiddenMessages.find(peerId);
+	const auto it = hiddenMessages.find(peerId);
 	if (it != hiddenMessages.end()) {
-		return it->second.find(messageId) != it->second.end();
+		return it->second.contains(messageId);
 	}
 	return false;
 }

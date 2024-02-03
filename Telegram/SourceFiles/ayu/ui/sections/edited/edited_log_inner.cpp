@@ -607,6 +607,12 @@ void InnerWidget::elementSendBotCommand(
 {
 }
 
+void InnerWidget::elementSearchInList(
+	const QString &query,
+	const FullMsgId &context)
+{
+}
+
 void InnerWidget::elementHandleViaClick(not_null<UserData *> bot)
 {
 }

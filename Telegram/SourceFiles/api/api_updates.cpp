@@ -1003,12 +1003,6 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 	bool isOnlineOrig = Core::App().hasActiveWindow(&session());
 	bool isOnline = settings->sendOnlinePackets && isOnlineOrig;
 
-	// AyuGram sendOfflinePacketAfterOnline
-	if (settings->sendOfflinePacketAfterOnline && _lastWasOnline)
-	{
-		isOnline = false;
-	}
-
 	int updateIn = config.onlineUpdatePeriod;
 	Assert(updateIn >= 0);
 	if (isOnline) {
@@ -1063,24 +1057,6 @@ void Updates::updateOnline(crl::time lastNonIdleTime, bool gotOtherOffline) {
 		updateIn = qMin(updateIn, int(_lastSetOnline + config.onlineUpdatePeriod - ms));
 		Assert(updateIn >= 0);
 	}
-
-	// AyuGram sendOfflinePacketAfterOnline
-	if (settings->sendOfflinePacketAfterOnline)
-	{
-		session().api().requestFullPeer(session().user());
-		if (session().user()->onlineTill > base::unixtime::now())
-		{
-			DEBUG_LOG(("[AyuGram] User likely appeared online"));
-
-			_onlineRequest = api().request(MTPaccount_UpdateStatus(
-				MTP_bool(true)
-			)).send();
-		}
-
-		DEBUG_LOG(("[AyuGram] Decreasing updateIn because of enabled features"));
-		updateIn = 1250;
-	}
-
 	_onlineTimer.callOnce(updateIn);
 }
 
