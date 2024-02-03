@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "styles/style_ayu_icons.h"
 
 
 namespace Ui {
@@ -325,6 +326,14 @@ ChatStyle::ChatStyle(rpl::producer<ColorIndicesCompressed> colorIndices) {
 		st::historyBubbleTailInRightSelected,
 		st::historyBubbleTailOutRight,
 		st::historyBubbleTailOutRightSelected);
+
+	make(
+		&MessageStyle::channelBadgeIcon,
+		st::inChannelBadgeIcon,
+		st::inChannelBadgeSelectedIcon,
+		st::outChannelBadgeIcon,
+		st::outChannelBadgeSelectedIcon);
+
 	make(
 		&MessageStyle::historyRepliesIcon,
 		st::historyRepliesInIcon,

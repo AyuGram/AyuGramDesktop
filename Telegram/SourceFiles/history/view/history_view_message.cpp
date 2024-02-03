@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/messageshot/message_shot.h"
+#include "styles/style_ayu_icons.h"
 
 
 namespace HistoryView {
@@ -550,6 +551,8 @@ void Message::refreshRightBadge() {
 					return msgsigned->author;
 				}
 			}
+		} else if (data()->history()->peer->isMegagroup() && data()->author()->isChannel() && !data()->out()) {
+			return tr::lng_channel_badge(tr::now);
 		}
 		const auto channel = item->history()->peer->asMegagroup();
 		const auto user = item->author()->asUser();
@@ -1030,7 +1033,8 @@ QSize Message::performCountOptimalSize() {
 					? st::msgFont->width(FastReplyText())
 					: 0;
 				if (!_rightBadge.isEmpty()) {
-					const auto badgeWidth = _rightBadge.maxWidth();
+					const auto badgeWidth =
+						_rightBadge.toString() == tr::lng_channel_badge(tr::now) ? st::inChannelBadgeIcon.width() : _rightBadge.maxWidth();
 					namew += st::msgPadding.right()
 						+ std::max(badgeWidth, replyWidth);
 				} else if (replyWidth) {
@@ -1853,7 +1857,8 @@ void Message::paintFromName(
 	if (!displayFromName()) {
 		return;
 	}
-	const auto badgeWidth = _rightBadge.isEmpty() ? 0 : _rightBadge.maxWidth();
+	const auto badgeWidth = _rightBadge.isEmpty() ? 0 :
+		_rightBadge.toString() == tr::lng_channel_badge(tr::now) ? context.messageStyle()->channelBadgeIcon.width() : _rightBadge.maxWidth();
 	const auto replyWidth = [&] {
 		if (isUnderCursor()) {
 			if (displayFastForward()) {
@@ -1961,21 +1966,19 @@ void Message::paintFromName(
 				trect.top() + st::msgFont->ascent,
 				hasFastForward() ? FastForwardText() : FastReplyText());
 		} else {
-			const auto shift = QPoint(trect.width() - rightWidth, 0);
-			const auto pen = !_rightBadgeHasBoosts
-				? QPen()
-				: !context.outbg
-				? QPen(FromNameFg(context, colorIndex()))
-				: stm->msgServiceFg->p;
-			auto colored = std::array<Ui::Text::SpecialColor, 1>{
-				{ { &pen, &pen } },
-			};
-			_rightBadge.draw(p, {
-				.position = trect.topLeft() + shift,
-				.availableWidth = rightWidth,
-				.colors = colored,
-				.now = context.now,
-			});
+			if (_rightBadge.toString() == tr::lng_channel_badge(tr::now)) {
+				stm->channelBadgeIcon.paint(
+					p,
+					trect.left() + trect.width() - rightWidth,
+					trect.top() + (_rightBadge.minHeight() - stm->channelBadgeIcon.height()) / 2,
+					rightWidth);
+			} else {
+				_rightBadge.draw(
+					p,
+					trect.left() + trect.width() - rightWidth,
+					trect.top(),
+					rightWidth);
+			}
 		}
 	}
 	trect.setY(trect.y() + st::msgNameFont->height);

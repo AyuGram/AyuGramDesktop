@@ -17,4 +17,9 @@ ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};
 ayuSReadMenuIcon: icon {{ "ayu/sread", menuIconColor }};
 ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};
 
+inChannelBadgeIcon: icon {{ "ayu/channel", msgInDateFg }};
+inChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgInDateFgSelected }};
+outChannelBadgeIcon: icon {{ "ayu/channel", msgOutDateFg }};
+outChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgOutDateFgSelected }};
+
 infoExteraBadge: icon {{ "ayu/exterabadge", profileVerifiedCheckBg }};
