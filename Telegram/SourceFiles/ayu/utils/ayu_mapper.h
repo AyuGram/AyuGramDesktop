@@ -8,6 +8,7 @@
 
 namespace AyuMapper {
 
-int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item);
+std::pair<std::string, std::vector<char>> serializeTextWithEntities(not_null<HistoryItem*> item);
+int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item);
 
 } // namespace AyuMapper

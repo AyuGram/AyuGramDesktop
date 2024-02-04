@@ -41,12 +41,12 @@
 
 class PainterHighQualityEnabler;
 
-not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container,
-										const style::SettingsButton &st,
-										std::vector<not_null<Ui::AbstractCheckView *>> innerCheckViews,
-										not_null<Ui::SlideWrap<> *> wrap,
-										rpl::producer<QString> buttonLabel,
-										bool toggledWhenAll) {
+not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
+									   const style::SettingsButton &st,
+									   std::vector<not_null<Ui::AbstractCheckView*>> innerCheckViews,
+									   not_null<Ui::SlideWrap<>*> wrap,
+									   rpl::producer<QString> buttonLabel,
+									   bool toggledWhenAll) {
 	const auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
 		nullptr,
@@ -66,7 +66,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 		Ui::ToggleView checkView;
 		Ui::Animations::Simple animation;
 		rpl::event_stream<> anyChanges;
-		std::vector<not_null<Ui::AbstractCheckView *>> innerChecks;
+		std::vector<not_null<Ui::AbstractCheckView*>> innerChecks;
 	};
 	const auto state = button->lifetime().make_state<State>(
 		st.toggle,
@@ -257,16 +257,16 @@ struct NestedEntry
 	std::function<void(bool)> callback;
 };
 
-void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
+void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 						  rpl::producer<QString> title,
 						  std::vector<NestedEntry> checkboxes,
 						  bool toggledWhenAll) {
 	const auto addCheckbox = [&](
-		not_null<Ui::VerticalLayout *> verticalLayout,
+		not_null<Ui::VerticalLayout*> verticalLayout,
 		const QString &label,
 		const bool isCheckedOrig)
 	{
-		const auto checkView = [&]() -> not_null<Ui::AbstractCheckView *>
+		const auto checkView = [&]() -> not_null<Ui::AbstractCheckView*>
 		{
 			const auto checkbox = verticalLayout->add(
 				object_ptr<Ui::Checkbox>(
@@ -311,7 +311,7 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 		container,
 		object_ptr<Ui::VerticalLayout>(container));
 	const auto verticalLayout = wrap->entity();
-	auto innerChecks = std::vector<not_null<Ui::AbstractCheckView *>>();
+	auto innerChecks = std::vector<not_null<Ui::AbstractCheckView*>>();
 	for (const auto &entry : checkboxes) {
 		const auto c = addCheckbox(verticalLayout, entry.checkboxLabel, entry.initial);
 		c->checkedValue(
@@ -341,8 +341,8 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 						raw->lifetime());
 }
 
-void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> container,
-										 not_null<Window::SessionController *> controller,
+void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container,
+										 not_null<Window::SessionController*> controller,
 										 int initialState,
 										 std::vector<QString> options,
 										 rpl::producer<QString> text,
@@ -366,7 +366,7 @@ void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> containe
 		[=]
 		{
 			controller->show(Box(
-				[=](not_null<Ui::GenericBox *> box)
+				[=](not_null<Ui::GenericBox*> box)
 				{
 					const auto save = [=](int index) mutable
 					{
@@ -393,12 +393,12 @@ rpl::producer<QString> Ayu::title() {
 
 Ayu::Ayu(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller)
+	not_null<Window::SessionController*> controller)
 	: Section(parent) {
 	setupContent(controller);
 }
 
-void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container) {
+void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
@@ -444,7 +444,7 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container) {
 	AddCollapsibleToggle(container, tr::ayu_GhostEssentialsHeader(), checkboxes, true);
 }
 
-void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container) {
+void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	std::vector checkboxes{
@@ -474,7 +474,7 @@ void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container) {
 	AddCollapsibleToggle(container, tr::ayu_MarkReadAfterAction(), checkboxes, false);
 }
 
-void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container) {
+void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	SetupGhostModeToggle(container);
@@ -504,7 +504,7 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container) {
 		container->lifetime());
 }
 
-void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container) {
+void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
@@ -552,7 +552,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container) {
 		container->lifetime());
 }
 
-void SetupQoLToggles(not_null<Ui::VerticalLayout *> container) {
+void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_QoLTogglesHeader());
@@ -718,14 +718,14 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container) {
 		container->lifetime());
 }
 
-void SetupAppIcon(not_null<Ui::VerticalLayout *> container) {
+void SetupAppIcon(not_null<Ui::VerticalLayout*> container) {
 	container->add(
 		object_ptr<IconPicker>(container),
 		st::settingsCheckboxPadding);
 }
 
-void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
-							  not_null<Window::SessionController *> controller) {
+void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
+							  not_null<Window::SessionController*> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -808,7 +808,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
 }
 
-void SetupDrawerElements(not_null<Ui::VerticalLayout *> container) {
+void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -897,7 +897,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout *> container) {
 #endif
 }
 
-void SetupTrayElements(not_null<Ui::VerticalLayout *> container) {
+void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -944,8 +944,8 @@ void SetupTrayElements(not_null<Ui::VerticalLayout *> container) {
 #endif
 }
 
-void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
-					 not_null<Window::SessionController *> controller) {
+void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
+					 not_null<Window::SessionController*> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
@@ -969,7 +969,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 		[=]
 		{
 			controller->show(Box(
-				[=](not_null<Ui::GenericBox *> box)
+				[=](not_null<Ui::GenericBox*> box)
 				{
 					const auto save = [=](int index)
 					{
@@ -987,7 +987,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 		});
 }
 
-void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container) {
+void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	container->add(
@@ -1033,7 +1033,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container) {
 		});
 }
 
-void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+void SetupFonts(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	const auto settings = &AyuSettings::getInstance();
 
 	const auto commonButton = AddButtonWithLabel(
@@ -1081,7 +1081,7 @@ void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::Sessi
 		});
 }
 
-void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container) {
+void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
@@ -1144,7 +1144,7 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container) {
 		container->lifetime());
 }
 
-void SetupMarks(not_null<Ui::VerticalLayout *> container) {
+void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddButtonWithLabel(
@@ -1172,7 +1172,7 @@ void SetupMarks(not_null<Ui::VerticalLayout *> container) {
 		});
 }
 
-void SetupFolderSettings(not_null<Ui::VerticalLayout *> container) {
+void SetupFolderSettings(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddButtonWithIcon(
@@ -1214,7 +1214,7 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout *> container) {
 		container->lifetime());
 }
 
-void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
+void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	SetupShowPeerId(container, controller);
@@ -1258,8 +1258,8 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window
 		container->lifetime());
 }
 
-void SetupCustomization(not_null<Ui::VerticalLayout *> container,
-						not_null<Window::SessionController *> controller) {
+void SetupCustomization(not_null<Ui::VerticalLayout*> container,
+						not_null<Window::SessionController*> controller) {
 	AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
 
 	SetupAppIcon(container);
@@ -1299,8 +1299,8 @@ void SetupCustomization(not_null<Ui::VerticalLayout *> container,
 	SetupFonts(container, controller);
 }
 
-void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
-						  not_null<Window::SessionController *> controller) {
+void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
+						  not_null<Window::SessionController*> controller) {
 	AddSkip(container);
 	SetupGhostEssentials(container);
 	AddSkip(container);
@@ -1332,7 +1332,7 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
 	AddDividerText(container, tr::ayu_SettingsWatermark());
 }
 
-void Ayu::setupContent(not_null<Window::SessionController *> controller) {
+void Ayu::setupContent(not_null<Window::SessionController*> controller) {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
 	SetupAyuGramSettings(content, controller);

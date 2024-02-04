@@ -98,8 +98,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/database/ayu_database.h"
-#include "ayu/messages/ayu_messages_controller.h"
+#include "ayu/data/ayu_database.h"
+#include "../../ayu/data/messages_storage.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/ui/sections/edited/edited_log_section.h"
 

@@ -128,18 +128,18 @@ private:
 		Selection selected) const;
 
 	std::unique_ptr<Ui::RippleAnimation> &rippleBySelection(
-		not_null<Row *> row,
+		not_null<Row*> row,
 		Selection selected);
 
 	[[maybe_unused]] const std::unique_ptr<Ui::RippleAnimation> &rippleBySelection(
-		not_null<const Row *> row,
+		not_null<const Row*> row,
 		Selection selected) const;
 
 	void addRipple(Selection selected, QPoint position);
 
 	void ensureRippleBySelection(Selection selected);
 
-	void ensureRippleBySelection(not_null<Row *> row, Selection selected);
+	void ensureRippleBySelection(not_null<Row*> row, Selection selected);
 
 	int indexFromSelection(Selection selected) const;
 
@@ -153,16 +153,16 @@ private:
 
 	void repaint(const Row &row);
 
-	void repaintChecked(not_null<const Row *> row);
+	void repaintChecked(not_null<const Row*> row);
 
 	void activateByIndex(int index);
 
-	void setForceRippled(not_null<Row *> row, bool rippled);
+	void setForceRippled(not_null<Row*> row, bool rippled);
 
-	void restore(not_null<Row *> row);
+	void restore(not_null<Row*> row);
 
 	std::vector<Row> _rows;
-	std::vector<not_null<Row *>> _filtered;
+	std::vector<not_null<Row*>> _filtered;
 	Selection _selected;
 	Selection _pressed;
 	QString _chosen;
@@ -312,7 +312,7 @@ void Rows::ensureRippleBySelection(Selection selected) {
 	ensureRippleBySelection(&rowBySelection(selected), selected);
 }
 
-void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected) {
+void Rows::ensureRippleBySelection(not_null<Row*> row, Selection selected) {
 	auto &ripple = rippleBySelection(row, selected);
 	if (ripple) {
 		return;
@@ -342,11 +342,11 @@ void Rows::mouseReleaseEvent(QMouseEvent *e) {
 	}
 }
 
-void Rows::restore(not_null<Row *> row) {
+void Rows::restore(not_null<Row*> row) {
 	row->removed = false;
 }
 
-void Rows::setForceRippled(not_null<Row *> row, bool rippled) {
+void Rows::setForceRippled(not_null<Row*> row, bool rippled) {
 	repaint(*row);
 }
 
@@ -483,7 +483,7 @@ void Rows::repaint(const Row &row) {
 	update(0, row.top, width(), row.height);
 }
 
-void Rows::repaintChecked(not_null<const Row *> row) {
+void Rows::repaintChecked(not_null<const Row*> row) {
 	const auto found = (ranges::find(_filtered, row) != end(_filtered));
 	if (_query.isEmpty() || found) {
 		repaint(*row);
@@ -542,16 +542,16 @@ const std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
 }
 
 std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
-	not_null<Row *> row,
+	not_null<Row*> row,
 	Selection selected) {
 	return row->ripple;
 }
 
 const std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
-	not_null<const Row *> row,
+	not_null<const Row*> row,
 	Selection selected) const {
-	return const_cast<Rows *>(this)->rippleBySelection(
-		const_cast<Row *>(row.get()),
+	return const_cast<Rows*>(this)->rippleBySelection(
+		const_cast<Row*>(row.get()),
 		selected);
 }
 
@@ -668,7 +668,7 @@ void Content::setupContent(
 	const auto add = [&](const std::vector<Font> &list)
 	{
 		if (list.empty()) {
-			return (Rows *)nullptr;
+			return (Rows*) nullptr;
 		}
 		const auto wrap = content->add(
 			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
@@ -964,7 +964,7 @@ void AyuUi::FontSelectorBox::prepare() {
 	};
 }
 
-void AyuUi::FontSelectorBox::setupTop(not_null<Ui::VerticalLayout *> container) {
+void AyuUi::FontSelectorBox::setupTop(not_null<Ui::VerticalLayout*> container) {
 	if (!_controller) {
 		return;
 	}

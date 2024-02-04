@@ -6,7 +6,7 @@
 // Copyright @Radolyn, 2023
 #include "ayu_settings.h"
 
-#include "ayu/ui/ayu_assets.h"
+#include "ayu/ui/ayu_logo.h"
 
 #include "lang_auto.h"
 #include "core/application.h"

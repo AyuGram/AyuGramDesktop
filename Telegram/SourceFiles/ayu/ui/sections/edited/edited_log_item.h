@@ -6,7 +6,7 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "ayu/database/entities.h"
+#include "ayu/data/entities.h"
 
 class History;
 
@@ -20,8 +20,8 @@ namespace EditedLog {
 class OwnedItem;
 
 void GenerateItems(
-	not_null<HistoryView::ElementDelegate *> delegate,
-	not_null<History *> history,
+	not_null<HistoryView::ElementDelegate*> delegate,
+	not_null<History*> history,
 	EditedMessage message,
 	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback);
 
@@ -31,8 +31,8 @@ class OwnedItem
 public:
 	OwnedItem(std::nullptr_t = nullptr);
 	OwnedItem(
-		not_null<HistoryView::ElementDelegate *> delegate,
-		not_null<HistoryItem *> data);
+		not_null<HistoryView::ElementDelegate*> delegate,
+		not_null<HistoryItem*> data);
 	OwnedItem(const OwnedItem &other) = delete;
 	OwnedItem &operator=(const OwnedItem &other) = delete;
 	OwnedItem(OwnedItem &&other);
@@ -47,11 +47,11 @@ public:
 		return get();
 	}
 
-	[[nodiscard]] operator HistoryView::Element *() const {
+	[[nodiscard]] operator HistoryView::Element*() const {
 		return get();
 	}
 
-	void refreshView(not_null<HistoryView::ElementDelegate *> delegate);
+	void refreshView(not_null<HistoryView::ElementDelegate*> delegate);
 	void clearView();
 
 private:

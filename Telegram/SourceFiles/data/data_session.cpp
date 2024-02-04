@@ -85,8 +85,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/database/ayu_database.h"
-#include "ayu/messages/ayu_messages_controller.h"
+#include "ayu/data/ayu_database.h"
+#include "../ayu/data/messages_storage.h"
 #include "ayu/ayu_state.h"
 
 
@@ -2650,12 +2650,11 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 
 	// AyuGram saveMessagesHistory
 	const auto settings = &AyuSettings::getInstance();
-	HistoryMessageEdition edit;
 
 	if (data.type() != mtpc_message) {
 		goto proceed;
 	}
-	edit = HistoryMessageEdition(_session, data.c_message());
+	HistoryMessageEdition edit = HistoryMessageEdition(_session, data.c_message());
 	if (settings->saveMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide) {
 		const auto msg = existing->originalText();
 
@@ -2663,7 +2662,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 			goto proceed;
 		}
 
-		AyuMessages::getInstance().addEditedMessage(edit, existing);
+		AyuMessages::addEditedMessage(edit, existing);
 	}
 
 proceed:

@@ -32,8 +32,8 @@ class FixedBar final : public TWidget
 public:
 	FixedBar(
 		QWidget *parent,
-		not_null<Window::SessionController *> controller,
-		not_null<PeerData *> peer);
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer);
 
 	// When animating mode is enabled the content is hidden and the
 	// whole fixed bar acts like a back button.
@@ -47,8 +47,8 @@ protected:
 	int resizeGetHeight(int newWidth) override;
 
 private:
-	not_null<Window::SessionController *> _controller;
-	not_null<PeerData *> _peer;
+	not_null<Window::SessionController*> _controller;
+	not_null<PeerData*> _peer;
 	object_ptr<Profile::BackButton> _backButton;
 	object_ptr<Ui::CrossButton> _cancel;
 
@@ -57,7 +57,7 @@ private:
 
 object_ptr<Window::SectionWidget> SectionMemento::createWidget(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller,
+	not_null<Window::SessionController*> controller,
 	Window::Column column,
 	const QRect &geometry) {
 	if (column == Window::Column::Third) {
@@ -70,8 +70,8 @@ object_ptr<Window::SectionWidget> SectionMemento::createWidget(
 
 FixedBar::FixedBar(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller,
-	not_null<PeerData *> peer)
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer)
 	: TWidget(parent), _controller(controller), _peer(peer), _backButton(
 		  this,
 		  &controller->session(),
@@ -140,10 +140,10 @@ void FixedBar::mousePressEvent(QMouseEvent *e) {
 
 Widget::Widget(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller,
-	not_null<PeerData *> peer,
-	not_null<HistoryItem *> item)
-	: Window::SectionWidget(parent, controller, rpl::single<PeerData *>(peer)),
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer,
+	not_null<HistoryItem*> item)
+	: Window::SectionWidget(parent, controller, rpl::single<PeerData*>(peer)),
 	  _scroll(this, st::historyScroll, false),
 	  _fixedBar(this, controller, peer),
 	  _fixedBarShadow(this),
@@ -189,7 +189,7 @@ void Widget::updateAdaptiveLayout() {
 		_fixedBar->height());
 }
 
-not_null<PeerData *> Widget::channel() const {
+not_null<PeerData*> Widget::channel() const {
 	return _inner->channel();
 }
 
@@ -212,9 +212,9 @@ void Widget::doSetInnerFocus() {
 }
 
 bool Widget::showInternal(
-	not_null<Window::SectionMemento *> memento,
+	not_null<Window::SectionMemento*> memento,
 	const Window::SectionShow &params) {
-	if (auto logMemento = dynamic_cast<SectionMemento *>(memento.get())) {
+	if (auto logMemento = dynamic_cast<SectionMemento*>(memento.get())) {
 		if (logMemento->getPeer() == channel()) {
 			restoreState(logMemento);
 			return true;
@@ -223,7 +223,7 @@ bool Widget::showInternal(
 	return false;
 }
 
-void Widget::setInternalState(const QRect &geometry, not_null<SectionMemento *> memento) {
+void Widget::setInternalState(const QRect &geometry, not_null<SectionMemento*> memento) {
 	setGeometry(geometry);
 	Ui::SendPendingMoveResizeEvents(this);
 	restoreState(memento);
@@ -239,12 +239,12 @@ std::shared_ptr<Window::SectionMemento> Widget::createMemento() {
 	return result;
 }
 
-void Widget::saveState(not_null<SectionMemento *> memento) {
+void Widget::saveState(not_null<SectionMemento*> memento) {
 	memento->setScrollTop(_scroll->scrollTop());
 	_inner->saveState(memento);
 }
 
-void Widget::restoreState(not_null<SectionMemento *> memento) {
+void Widget::restoreState(not_null<SectionMemento*> memento) {
 	_inner->restoreState(memento);
 	auto scrollTop = memento->getScrollTop();
 	_scroll->scrollToY(scrollTop);

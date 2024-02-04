@@ -10,7 +10,7 @@
 
 namespace AyuWorker {
 
-void markAsOnline(not_null<Main::Session *> session);
+void markAsOnline(not_null<Main::Session*> session);
 void initialize();
 
 }

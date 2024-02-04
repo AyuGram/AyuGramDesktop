@@ -27,9 +27,9 @@ void reloadAppIconFromTaskBar() {
 									  NULL,
 									  CLSCTX_INPROC_SERVER,
 									  IID_IShellLink,
-									  (void **)&pShellLink);
+									  (void**) &pShellLink);
 		if (SUCCEEDED(hr)) {
-			hr = pShellLink->QueryInterface(IID_IPersistFile, (void **)&pPersistFile);
+			hr = pShellLink->QueryInterface(IID_IPersistFile, (void**) &pPersistFile);
 			if (SUCCEEDED(hr)) {
 				WCHAR wszShortcutPath[MAX_PATH];
 				shortcut.toWCharArray(wszShortcutPath);

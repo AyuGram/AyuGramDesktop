@@ -119,8 +119,8 @@ PRIVATE
     ayu/utils/telegram_helpers.h
     ayu/utils/windows_utils.cpp
     ayu/utils/windows_utils.h
-    ayu/ui/ayu_assets.cpp
-    ayu/ui/ayu_assets.h
+    ayu/ui/ayu_logo.cpp
+    ayu/ui/ayu_logo.h
     ayu/ui/utils/ayu_profile_values.cpp
     ayu/ui/utils/ayu_profile_values.h
     ayu/ui/settings/icon_picker.cpp
@@ -151,8 +151,6 @@ PRIVATE
     ayu/ui/boxes/message_shot_box.h
     ayu/ui/components/image_view.cpp
     ayu/ui/components/image_view.h
-    ayu/messages/ayu_messages_controller.cpp
-    ayu/messages/ayu_messages_controller.h
     ayu/libs/json.hpp
     ayu/libs/json_ext.hpp
     ayu/libs/sqlite/sqlite3.c
@@ -163,9 +161,11 @@ PRIVATE
     ayu/features/streamer_mode/streamer_mode.h
     ayu/features/messageshot/message_shot.cpp
     ayu/features/messageshot/message_shot.h
-    ayu/database/entities.h
-    ayu/database/ayu_database.cpp
-    ayu/database/ayu_database.h
+    ayu/data/messages_storage.cpp
+    ayu/data/messages_storage.h
+    ayu/data/entities.h
+    ayu/data/ayu_database.cpp
+    ayu/data/ayu_database.h
 
     api/api_attached_stickers.cpp
     api/api_attached_stickers.h

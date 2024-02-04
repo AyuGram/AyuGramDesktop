@@ -13,7 +13,7 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_worker.h"
-#include "ayu/database/entities.h"
+#include "ayu/data/entities.h"
 #include "core/mime_type.h"
 #include "data/data_channel.h"
 #include "data/data_forum.h"
@@ -110,7 +110,7 @@ void dispatchToMainThread(std::function<void()> callback, int delay) {
 	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, delay));
 }
 
-not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session) {
+not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session *session) {
 	if (dialogId > 0) {
 		return session->data().history(peerFromUser(dialogId));
 	}
@@ -123,7 +123,7 @@ not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session) 
 	return session->data().history(peerFromChat(abs(dialogId)));
 }
 
-ID getDialogIdFromPeer(not_null<PeerData *> peer) {
+ID getDialogIdFromPeer(not_null<PeerData*> peer) {
 	auto peerId = peerIsUser(peer->id)
 					  ? peerToUser(peer->id).bare
 					  : peerIsChat(peer->id)
@@ -139,30 +139,7 @@ ID getDialogIdFromPeer(not_null<PeerData *> peer) {
 	return peerId;
 }
 
-std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item) {
-	if (item->emptyText()) {
-		return std::make_pair("", "");
-	}
-
-	auto textWithEntities = item->originalText();
-	auto text = textWithEntities.text.toStdString();
-	auto entities = EntitiesToMTP(&item->history()->owner().session(),
-								  textWithEntities.entities,
-								  Api::ConvertOption::SkipLocal);
-
-	if (entities.v.isEmpty()) {
-		return std::make_pair(text, "");
-	}
-
-	auto buff = mtpBuffer();
-	for (auto entity : entities.v) {
-		entity.write(buff);
-	}
-
-	return std::make_pair(text, std::string(reinterpret_cast<char *>(buff.data()), buff.size()));
-}
-
-ID getBareID(not_null<PeerData *> peer) {
+ID getBareID(not_null<PeerData*> peer) {
 	return peerIsUser(peer->id)
 			   ? peerToUser(peer->id).bare
 			   : peerIsChat(peer->id)
@@ -180,8 +157,8 @@ bool isExteraRelated(ID peerId) {
 	return extera_devs.contains(peerId) || extera_channels.contains(peerId);
 }
 
-void MarkAsReadChatList(not_null<Dialogs::MainList *> list) {
-	auto mark = std::vector<not_null<History *>>();
+void MarkAsReadChatList(not_null<Dialogs::MainList*> list) {
+	auto mark = std::vector<not_null<History*>>();
 	for (const auto &row : list->indexed()->all()) {
 		if (const auto history = row->history()) {
 			mark.push_back(history);
@@ -242,18 +219,18 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 	}).send();
 }
 
-void MarkAsReadThread(not_null<Data::Thread *> thread) {
-	const auto readHistory = [&](not_null<History *> history)
+void MarkAsReadThread(not_null<Data::Thread*> thread) {
+	const auto readHistory = [&](not_null<History*> history)
 	{
 		history->owner().histories().readInbox(history);
 	};
 	const auto sendReadMentions = [=](
-		not_null<Data::Thread *> thread)
+		not_null<Data::Thread*> thread)
 	{
 		readMentions(base::make_weak(thread));
 	};
 	const auto sendReadReactions = [=](
-		not_null<Data::Thread *> thread)
+		not_null<Data::Thread*> thread)
 	{
 		readReactions(base::make_weak(thread));
 	};
@@ -261,7 +238,7 @@ void MarkAsReadThread(not_null<Data::Thread *> thread) {
 	if (thread->chatListBadgesState().unread) {
 		if (const auto forum = thread->asForum()) {
 			forum->enumerateTopics([](
-				not_null<Data::ForumTopic *> topic)
+				not_null<Data::ForumTopic*> topic)
 				{
 					MarkAsReadThread(topic);
 				});
@@ -286,7 +263,7 @@ void MarkAsReadThread(not_null<Data::Thread *> thread) {
 	AyuWorker::markAsOnline(&thread->session());
 }
 
-void readHistory(not_null<HistoryItem *> message) {
+void readHistory(not_null<HistoryItem*> message) {
 	const auto history = message->history();
 	const auto tillId = message->id;
 
@@ -369,7 +346,7 @@ QString formatDateTime(const QDateTime &date) {
 	return datePart + getLocalizedAt() + timePart;
 }
 
-QString getMediaSize(not_null<HistoryItem *> message) {
+QString getMediaSize(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -410,7 +387,7 @@ QString getMediaSize(not_null<HistoryItem *> message) {
 	return Ui::FormatSizeText(size);
 }
 
-QString getMediaMime(not_null<HistoryItem *> message) {
+QString getMediaMime(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -434,7 +411,7 @@ QString getMediaMime(not_null<HistoryItem *> message) {
 	return {};
 }
 
-QString getMediaName(not_null<HistoryItem *> message) {
+QString getMediaName(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -450,7 +427,7 @@ QString getMediaName(not_null<HistoryItem *> message) {
 	return {};
 }
 
-QString getMediaResolution(not_null<HistoryItem *> message) {
+QString getMediaResolution(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -485,7 +462,7 @@ QString getMediaResolution(not_null<HistoryItem *> message) {
 	return {};
 }
 
-QString getMediaDC(not_null<HistoryItem *> message) {
+QString getMediaDC(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return {};
 	}

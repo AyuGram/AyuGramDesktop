@@ -26,7 +26,7 @@
 
 ThemeSelectorBox::ThemeSelectorBox(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller)
+	not_null<Window::SessionController*> controller)
 	: _controller(controller) {
 }
 

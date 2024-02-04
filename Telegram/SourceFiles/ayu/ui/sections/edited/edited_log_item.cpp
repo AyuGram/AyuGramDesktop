@@ -5,7 +5,7 @@
 //
 // Copyright @Radolyn, 2023
 #include "ayu/ui/sections/edited/edited_log_item.h"
-#include <ayu/database/entities.h>
+#include "ayu/data/entities.h"
 
 #include "api/api_chat_participants.h"
 #include "api/api_text_entities.h"
@@ -51,7 +51,7 @@ const auto CollectChanges = [](
 };
 
 TextWithEntities GenerateAdminChangeText(
-	not_null<ChannelData *> channel,
+	not_null<ChannelData*> channel,
 	const TextWithEntities &user,
 	ChatAdminRightsInfo newRights,
 	ChatAdminRightsInfo prevRights) {
@@ -363,7 +363,7 @@ TextWithEntities GenerateInviteLinkChangeText(
 };
 
 auto GenerateParticipantString(
-	not_null<Main::Session *> session,
+	not_null<Main::Session*> session,
 	PeerId participantId) {
 	// User name in "User name (@username)" format with entities.
 	const auto peer = session->data().peer(participantId);
@@ -401,7 +401,7 @@ auto GenerateParticipantString(
 }
 
 auto GenerateParticipantChangeText(
-	not_null<ChannelData *> channel,
+	not_null<ChannelData*> channel,
 	const Api::ChatParticipant &participant,
 	std::optional<Api::ChatParticipant> oldParticipant = std::nullopt) {
 	using Type = Api::ChatParticipant::Type;
@@ -501,7 +501,7 @@ auto GenerateParticipantChangeText(
 }
 
 TextWithEntities GenerateParticipantChangeText(
-	not_null<ChannelData *> channel,
+	not_null<ChannelData*> channel,
 	const MTPChannelParticipant &participant,
 	std::optional<MTPChannelParticipant> oldParticipant = std::nullopt) {
 	return GenerateParticipantChangeText(
@@ -515,7 +515,7 @@ TextWithEntities GenerateParticipantChangeText(
 }
 
 TextWithEntities GenerateDefaultBannedRightsChangeText(
-	not_null<ChannelData *> channel,
+	not_null<ChannelData*> channel,
 	ChatRestrictionsInfo rights,
 	ChatRestrictionsInfo oldRights) {
 	auto result = TextWithEntities{
@@ -553,7 +553,7 @@ TextWithEntities GenerateDefaultBannedRightsChangeText(
 }
 
 [[nodiscard]] TextWithEntities GenerateTopicLink(
-	not_null<ChannelData *> channel,
+	not_null<ChannelData*> channel,
 	const MTPForumTopic &topic) {
 	return topic.match([&](const MTPDforumTopic &data)
 					   {
@@ -578,8 +578,8 @@ OwnedItem::OwnedItem(std::nullptr_t) {
 }
 
 OwnedItem::OwnedItem(
-	not_null<HistoryView::ElementDelegate *> delegate,
-	not_null<HistoryItem *> data)
+	not_null<HistoryView::ElementDelegate*> delegate,
+	not_null<HistoryItem*> data)
 	: _data(data), _view(_data->createView(delegate)) {
 }
 
@@ -601,7 +601,7 @@ OwnedItem::~OwnedItem() {
 }
 
 void OwnedItem::refreshView(
-	not_null<HistoryView::ElementDelegate *> delegate) {
+	not_null<HistoryView::ElementDelegate*> delegate) {
 	_view = _data->createView(delegate);
 }
 
@@ -610,8 +610,8 @@ void OwnedItem::clearView() {
 }
 
 void GenerateItems(
-	not_null<HistoryView::ElementDelegate *> delegate,
-	not_null<History *> history,
+	not_null<HistoryView::ElementDelegate*> delegate,
+	not_null<History*> history,
 	EditedMessage message,
 	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback) {
 	const auto session = &history->session();
@@ -621,14 +621,14 @@ void GenerateItems(
 		from = history->owner().channelLoaded(message.fromId);
 	}
 	if (!from) {
-		from = reinterpret_cast<PeerData *>(history->owner().chatLoaded(message.fromId));
+		from = reinterpret_cast<PeerData*>(history->owner().chatLoaded(message.fromId));
 	}
 	if (!from) {
 		return;
 	}
 	const auto date = message.entityCreateDate;
 	const auto addPart = [&](
-		not_null<HistoryItem *> item,
+		not_null<HistoryItem*> item,
 		TimeId sentDate = 0,
 		MsgId realId = MsgId())
 	{

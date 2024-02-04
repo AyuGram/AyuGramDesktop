@@ -10,6 +10,7 @@
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "api/api_attached_stickers.h"
+#include "ayu/data/messages_storage.h"
 #include "ayu/ui/sections/edited/edited_log_section.h"
 #include "base/call_delayed.h"
 #include "base/unixtime.h"
@@ -53,7 +54,6 @@
 #include "ui/widgets/popup_menu.h"
 #include "window/window_session_controller.h"
 
-#include <ayu/messages/ayu_messages_controller.h>
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 
@@ -157,7 +157,7 @@ void InnerWidget::enumerateUserpics(Method method) {
 	// -1 means we didn't find an attached to next message yet.
 	int lowestAttachedItemTop = -1;
 
-	auto userpicCallback = [&](not_null<Element *> view, int itemtop, int itembottom)
+	auto userpicCallback = [&](not_null<Element*> view, int itemtop, int itembottom)
 	{
 		// Skip all service messages.
 		if (view->data()->isService()) {
@@ -205,7 +205,7 @@ void InnerWidget::enumerateDates(Method method) {
 	// -1 means we didn't find a same-day with previous message yet.
 	auto lowestInOneDayItemBottom = -1;
 
-	auto dateCallback = [&](not_null<Element *> view, int itemtop, int itembottom)
+	auto dateCallback = [&](not_null<Element*> view, int itemtop, int itembottom)
 	{
 		const auto item = view->data();
 		if (lowestInOneDayItemBottom < 0 && view->isInOneDayWithPrevious()) {
@@ -245,9 +245,9 @@ void InnerWidget::enumerateDates(Method method) {
 
 InnerWidget::InnerWidget(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller,
-	not_null<PeerData *> peer,
-	not_null<HistoryItem *> item)
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer,
+	not_null<HistoryItem*> item)
 	: RpWidget(parent),
 	  _controller(controller),
 	  _peer(peer),
@@ -319,7 +319,7 @@ InnerWidget::InnerWidget(
 							 },
 							 lifetime());
 	session().data().itemDataChanges(
-	) | rpl::start_with_next([=](not_null<HistoryItem *> item)
+	) | rpl::start_with_next([=](not_null<HistoryItem*> item)
 							 {
 								 if (const auto view = viewForItem(item)) {
 									 view->itemDataChanged();
@@ -519,7 +519,7 @@ HistoryView::Context InnerWidget::elementContext() {
 }
 
 bool InnerWidget::elementUnderCursor(
-	not_null<const HistoryView::Element *> view) {
+	not_null<const HistoryView::Element*> view) {
 	return (Element::Hovered() == view);
 }
 
@@ -528,7 +528,7 @@ bool InnerWidget::elementInSelectionMode() {
 }
 
 bool InnerWidget::elementIntersectsRange(
-	not_null<const Element *> view,
+	not_null<const Element*> view,
 	int from,
 	int till) {
 	Expects(view->delegate() == this);
@@ -538,22 +538,22 @@ bool InnerWidget::elementIntersectsRange(
 	return (top < till && bottom > from);
 }
 
-void InnerWidget::elementStartStickerLoop(not_null<const Element *> view) {
+void InnerWidget::elementStartStickerLoop(not_null<const Element*> view) {
 }
 
 void InnerWidget::elementShowPollResults(
-	not_null<PollData *> poll,
+	not_null<PollData*> poll,
 	FullMsgId context) {
 }
 
 void InnerWidget::elementOpenPhoto(
-	not_null<PhotoData *> photo,
+	not_null<PhotoData*> photo,
 	FullMsgId context) {
 	_controller->openPhoto(photo, {context});
 }
 
 void InnerWidget::elementOpenDocument(
-	not_null<DocumentData *> document,
+	not_null<DocumentData*> document,
 	FullMsgId context,
 	bool showInMediaView) {
 	_controller->openDocument(document, showInMediaView, {context});
@@ -574,11 +574,11 @@ bool InnerWidget::elementAnimationsPaused() {
 	return _controller->isGifPausedAtLeastFor(Window::GifPauseReason::Any);
 }
 
-bool InnerWidget::elementHideReply(not_null<const Element *> view) {
+bool InnerWidget::elementHideReply(not_null<const Element*> view) {
 	return true;
 }
 
-bool InnerWidget::elementShownUnread(not_null<const Element *> view) {
+bool InnerWidget::elementShownUnread(not_null<const Element*> view) {
 	return false;
 }
 
@@ -592,36 +592,36 @@ void InnerWidget::elementSearchInList(
 	const FullMsgId &context) {
 }
 
-void InnerWidget::elementHandleViaClick(not_null<UserData *> bot) {
+void InnerWidget::elementHandleViaClick(not_null<UserData*> bot) {
 }
 
 bool InnerWidget::elementIsChatWide() {
 	return _isChatWide;
 }
 
-not_null<Ui::PathShiftGradient *> InnerWidget::elementPathShiftGradient() {
+not_null<Ui::PathShiftGradient*> InnerWidget::elementPathShiftGradient() {
 	return _pathGradient.get();
 }
 
 void InnerWidget::elementReplyTo(const FullReplyTo &to) {
 }
 
-void InnerWidget::elementStartInteraction(not_null<const Element *> view) {
+void InnerWidget::elementStartInteraction(not_null<const Element*> view) {
 }
 
 void InnerWidget::elementStartPremium(
-	not_null<const Element *> view,
+	not_null<const Element*> view,
 	Element *replacing) {
 }
 
-void InnerWidget::elementCancelPremium(not_null<const Element *> view) {
+void InnerWidget::elementCancelPremium(not_null<const Element*> view) {
 }
 
-QString InnerWidget::elementAuthorRank(not_null<const Element *> view) {
+QString InnerWidget::elementAuthorRank(not_null<const Element*> view) {
 	return {};
 }
 
-void InnerWidget::saveState(not_null<SectionMemento *> memento) {
+void InnerWidget::saveState(not_null<SectionMemento*> memento) {
 	if (!_filterChanged) {
 		for (auto &item : _items) {
 			item.clearView();
@@ -636,7 +636,7 @@ void InnerWidget::saveState(not_null<SectionMemento *> memento) {
 	_upLoaded = _downLoaded = true; // Don't load or handle anything anymore.
 }
 
-void InnerWidget::restoreState(not_null<SectionMemento *> memento) {
+void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 	_items = memento->takeItems();
 	for (auto &item : _items) {
 		item.refreshView(this);
@@ -650,7 +650,7 @@ void InnerWidget::restoreState(not_null<SectionMemento *> memento) {
 }
 
 void InnerWidget::addEvents(Direction direction) {
-	auto messages = AyuMessages::getInstance().getEditedMessages(_item);
+	auto messages = AyuMessages::getEditedMessages(_item);
 	if (messages.empty()) {
 		return;
 	}
@@ -803,7 +803,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			context.translate(0, top);
 			p.translate(0, -top);
 
-			enumerateUserpics([&](not_null<Element *> view, int userpicTop)
+			enumerateUserpics([&](not_null<Element*> view, int userpicTop)
 			{
 				// stop the enumeration if the userpic is below the painted rect
 				if (userpicTop >= clip.top() + clip.height()) {
@@ -826,7 +826,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 
 			auto dateHeight = st::msgServicePadding.bottom() + st::msgServiceFont->height + st::msgServicePadding.top();
 			auto scrollDateOpacity = _scrollDateOpacity.value(_scrollDateShown ? 1. : 0.);
-			enumerateDates([&](not_null<Element *> view, int itemtop, int dateTop)
+			enumerateDates([&](not_null<Element*> view, int itemtop, int dateTop)
 			{
 				// stop the enumeration if the date is above the painted rect
 				if (dateTop + dateHeight <= clip.top()) {
@@ -883,7 +883,7 @@ auto InnerWidget::viewForItem(const HistoryItem *item) -> Element * {
 	return nullptr;
 }
 
-void InnerWidget::paintEmpty(Painter &p, not_null<const Ui::ChatStyle *> st) {
+void InnerWidget::paintEmpty(Painter &p, not_null<const Ui::ChatStyle*> st) {
 	auto rectWidth = st::historyAdminLogEmptyWidth;
 	auto innerWidth = rectWidth - st::historyAdminLogEmptyPadding.left() - st::historyAdminLogEmptyPadding.right();
 	auto rectHeight = st::historyAdminLogEmptyPadding.top() + _emptyText.countHeight(innerWidth)
@@ -987,11 +987,11 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					? Element::Hovered()
 					: Element::HoveredLink();
 	const auto lnkPhoto = link
-							  ? reinterpret_cast<PhotoData *>(
+							  ? reinterpret_cast<PhotoData*>(
 								  link->property(kPhotoLinkMediaProperty).toULongLong())
 							  : nullptr;
 	const auto lnkDocument = link
-								 ? reinterpret_cast<DocumentData *>(
+								 ? reinterpret_cast<DocumentData*>(
 									 link->property(kDocumentLinkMediaProperty).toULongLong())
 								 : nullptr;
 	auto lnkIsVideo = lnkDocument ? lnkDocument->isVideoFile() : false;
@@ -1179,7 +1179,7 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	}
 }
 
-void InnerWidget::savePhotoToFile(not_null<PhotoData *> photo) {
+void InnerWidget::savePhotoToFile(not_null<PhotoData*> photo) {
 	const auto media = photo->activeMediaView();
 	if (photo->isNull() || !media || !media->loaded()) {
 		return;
@@ -1200,14 +1200,14 @@ void InnerWidget::savePhotoToFile(not_null<PhotoData *> photo) {
 				   }));
 }
 
-void InnerWidget::saveDocumentToFile(not_null<DocumentData *> document) {
+void InnerWidget::saveDocumentToFile(not_null<DocumentData*> document) {
 	DocumentSaveClickHandler::Save(
 		Data::FileOrigin(),
 		document,
 		DocumentSaveClickHandler::Mode::ToNewFile);
 }
 
-void InnerWidget::copyContextImage(not_null<PhotoData *> photo) {
+void InnerWidget::copyContextImage(not_null<PhotoData*> photo) {
 	const auto media = photo->activeMediaView();
 	if (photo->isNull() || !media || !media->loaded()) {
 		return;
@@ -1219,15 +1219,15 @@ void InnerWidget::copySelectedText() {
 	TextUtilities::SetClipboardText(getSelectedText());
 }
 
-void InnerWidget::showStickerPackInfo(not_null<DocumentData *> document) {
+void InnerWidget::showStickerPackInfo(not_null<DocumentData*> document) {
 	StickerSetBox::Show(_controller->uiShow(), document);
 }
 
-void InnerWidget::cancelContextDownload(not_null<DocumentData *> document) {
+void InnerWidget::cancelContextDownload(not_null<DocumentData*> document) {
 	document->cancel();
 }
 
-void InnerWidget::showContextInFolder(not_null<DocumentData *> document) {
+void InnerWidget::showContextInFolder(not_null<DocumentData*> document) {
 	const auto filepath = document->filepath(true);
 	if (!filepath.isEmpty()) {
 		File::ShowInFolder(filepath);
@@ -1406,7 +1406,7 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 									 .elementDelegate = [weak = Ui::MakeWeak(this)]
 									 {
 										 return weak
-													? (ElementDelegate *)weak
+													? (ElementDelegate*) weak
 													: nullptr;
 									 },
 									 .sessionWindow = base::make_weak(_controller),
@@ -1503,7 +1503,7 @@ void InnerWidget::updateSelected() {
 		if (!dragState.link && itemPoint.x() >= st::historyPhotoLeft
 			&& itemPoint.x() < st::historyPhotoLeft + st::msgPhotoSize) {
 			if (!item->isService() && view->hasFromPhoto()) {
-				enumerateUserpics([&](not_null<Element *> view, int userpicTop)
+				enumerateUserpics([&](not_null<Element*> view, int userpicTop)
 				{
 					// stop enumeration if the userpic is below our point
 					if (userpicTop > point.y()) {
@@ -1594,7 +1594,7 @@ void InnerWidget::performDrag() {
 	if (_mouseAction != MouseAction::Dragging) return;
 }
 
-int InnerWidget::itemTop(not_null<const Element *> view) const {
+int InnerWidget::itemTop(not_null<const Element*> view) const {
 	return _itemsTop + view->y();
 }
 
@@ -1607,11 +1607,11 @@ void InnerWidget::repaintItem(const Element *view) {
 	update(0, top + range.top, width(), range.height);
 }
 
-void InnerWidget::resizeItem(not_null<Element *> view) {
+void InnerWidget::resizeItem(not_null<Element*> view) {
 	updateSize();
 }
 
-void InnerWidget::refreshItem(not_null<const Element *> view) {
+void InnerWidget::refreshItem(not_null<const Element*> view) {
 	// No need to refresh views in admin log.
 	// sogl
 }

@@ -50,7 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <kurlmimedata.h>
 
 // AyuGram includes
-#include "ayu/ui/ayu_assets.h"
+#include "ayu/ui/ayu_logo.h"
 
 
 namespace Window {

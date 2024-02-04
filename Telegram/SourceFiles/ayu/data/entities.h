@@ -36,6 +36,7 @@ public:
 	ID replyPeerId;
 	int replyTopId;
 	bool replyForumTopic;
+	std::vector<char> replySerialized;
 	int entityCreateDate;
 	std::string text;
 	std::vector<char> textEntities;
@@ -49,6 +50,7 @@ public:
 };
 
 using DeletedMessage = AyuMessageBase<struct DeletedMessageTag>;
+
 using EditedMessage = AyuMessageBase<struct EditedMessageTag>;
 
 class DeletedDialog
@@ -58,8 +60,47 @@ public:
 	ID userId;
 	ID dialogId;
 	ID peerId;
+	std::unique_ptr<int> folderId; // nullable
 	int topMessage;
 	int lastMessageDate;
 	int flags;
+	int entityCreateDate;
+};
+
+class RegexFilter
+{
+public:
+	std::vector<char> id;
+	std::string text;
+	bool enabled;
+	bool caseInsensitive;
+	std::unique_ptr<ID> dialogId; // nullable
+};
+
+class RegexFilterGlobalExclusion
+{
+public:
+	ID fakeId;
+	ID dialogId;
+	std::vector<char> filterId;
+};
+
+class SpyMessageRead
+{
+public:
+	ID fakeId;
+	ID userId;
+	ID dialogId;
+	int messageId;
+	int entityCreateDate;
+};
+
+class SpyMessageContentsRead
+{
+public:
+	ID fakeId;
+	ID userId;
+	ID dialogId;
+	int messageId;
 	int entityCreateDate;
 };

@@ -15,7 +15,7 @@ using Callback = Fn<void(style::palette &)>;
 class ThemeSelectorBox : public Ui::BoxContent
 {
 public:
-	ThemeSelectorBox(QWidget *parent, not_null<Window::SessionController *> controller);
+	ThemeSelectorBox(QWidget *parent, not_null<Window::SessionController*> controller);
 
 	rpl::producer<style::palette> paletteSelected();
 	rpl::producer<QString> themeNameChanged();
@@ -26,7 +26,7 @@ protected:
 private:
 	void setupContent();
 
-	not_null<Window::SessionController *> _controller;
+	not_null<Window::SessionController*> _controller;
 
 	rpl::event_stream<style::palette> _palettes;
 	rpl::event_stream<QString> _themeNames;

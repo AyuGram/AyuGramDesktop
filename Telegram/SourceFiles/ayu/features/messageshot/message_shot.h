@@ -15,9 +15,9 @@ namespace AyuFeatures::MessageShot {
 
 struct ShotConfig
 {
-	not_null<Window::SessionController *> controller;
+	not_null<Window::SessionController*> controller;
 	std::shared_ptr<Ui::ChatStyle> st;
-	std::vector<not_null<HistoryItem *>> messages;
+	std::vector<not_null<HistoryItem*>> messages;
 
 	bool showDate;
 	bool showReactions;
@@ -63,8 +63,8 @@ rpl::producer<Data::CloudTheme> themeChosen();
 void setPalette(style::palette &palette);
 rpl::producer<style::palette> paletteChosen();
 
-QImage Make(not_null<QWidget *> box, const ShotConfig &config);
+QImage Make(not_null<QWidget*> box, const ShotConfig &config);
 
-void Wrapper(not_null<HistoryView::ListWidget *> widget);
+void Wrapper(not_null<HistoryView::ListWidget*> widget);
 
 }

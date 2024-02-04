@@ -11,7 +11,7 @@
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "data/data_user.h"
-#include "database/entities.h"
+#include "data/entities.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
@@ -20,7 +20,7 @@ namespace AyuWorker {
 
 std::unordered_map<ID, bool> state;
 
-void markAsOnline(not_null<Main::Session *> session) {
+void markAsOnline(not_null<Main::Session*> session) {
 	state[session->userId().bare] = true;
 }
 

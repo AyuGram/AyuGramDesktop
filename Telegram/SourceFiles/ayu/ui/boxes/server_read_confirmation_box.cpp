@@ -18,7 +18,7 @@ namespace AyuUi {
 
 ServerReadConfirmationBox::ServerReadConfirmationBox(
 	QWidget *,
-	not_null<Window::SessionController *> controller)
+	not_null<Window::SessionController*> controller)
 	: _controller(controller) {
 	//
 }

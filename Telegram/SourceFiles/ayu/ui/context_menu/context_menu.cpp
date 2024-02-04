@@ -13,7 +13,7 @@
 #include "mainwindow.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
-#include "ayu/messages/ayu_messages_controller.h"
+#include "../../data/messages_storage.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
@@ -36,8 +36,8 @@ bool needToShowItem(int state) {
 	return state == 1 || state == 2 && base::IsExtendedContextMenuModifierPressed();
 }
 
-void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
-	if (AyuMessages::getInstance().hasRevisions(item)) {
+void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+	if (AyuMessages::hasRevisions(item)) {
 		menu->addAction(tr::ayu_EditsHistoryMenuText(tr::now),
 						[=]
 						{
@@ -48,7 +48,7 @@ void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	}
 }
 
-void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showHideMessageInContextMenu)) {
 		return;
@@ -66,7 +66,7 @@ void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 					&st::menuIconClear);
 }
 
-void AddUserMessagesAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showUserMessagesInContextMenu)) {
 		return;
@@ -92,7 +92,7 @@ void AddUserMessagesAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	}
 }
 
-void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showMessageDetailsInContextMenu)) {
 		return;
@@ -150,7 +150,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) 
 		.text = tr::ayu_MessageDetailsPC(tr::now),
 		.handler = nullptr,
 		.icon = &st::menuIconInfo,
-		.fillSubmenu = [&](not_null<Ui::PopupMenu *> menu2)
+		.fillSubmenu = [&](not_null<Ui::PopupMenu*> menu2)
 		{
 			if (hasAnyPostField) {
 				if (!messageViews.isEmpty()) {
@@ -278,7 +278,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) 
 	});
 }
 
-void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (item->isLocal()) {
 		return;
 	}

@@ -14,7 +14,7 @@ namespace AyuUi {
 class ServerReadConfirmationBox : public Ui::BoxContent
 {
 public:
-	ServerReadConfirmationBox(QWidget *, not_null<Window::SessionController *> controller);
+	ServerReadConfirmationBox(QWidget *, not_null<Window::SessionController*> controller);
 
 protected:
 	void prepare() override;
@@ -24,7 +24,7 @@ protected:
 private:
 	void ReadAllPeers();
 
-	not_null<Window::SessionController *> _controller;
+	not_null<Window::SessionController*> _controller;
 	object_ptr<Ui::FlatLabel> _text = {nullptr};
 };
 

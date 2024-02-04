@@ -4,7 +4,7 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-#include "ayu_assets.h"
+#include "ayu_logo.h"
 #include "ayu/ayu_settings.h"
 
 static QString LAST_LOADED_NAME;

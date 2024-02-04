@@ -33,11 +33,11 @@ class Widget final : public Window::SectionWidget
 public:
 	Widget(
 		QWidget *parent,
-		not_null<Window::SessionController *> controller,
-		not_null<PeerData *> peer,
-		not_null<HistoryItem *> item);
+		not_null<Window::SessionController*> controller,
+		not_null<PeerData*> peer,
+		not_null<HistoryItem*> item);
 
-	not_null<PeerData *> channel() const;
+	not_null<PeerData*> channel() const;
 	Dialogs::RowDescriptor activeChat() const override;
 
 	bool hasTopBarShadow() const override {
@@ -47,11 +47,11 @@ public:
 	QPixmap grabForShowAnimation(const Window::SectionSlideParams &params) override;
 
 	bool showInternal(
-		not_null<Window::SectionMemento *> memento,
+		not_null<Window::SectionMemento*> memento,
 		const Window::SectionShow &params) override;
 	std::shared_ptr<Window::SectionMemento> createMemento() override;
 
-	void setInternalState(const QRect &geometry, not_null<SectionMemento *> memento);
+	void setInternalState(const QRect &geometry, not_null<SectionMemento*> memento);
 
 	// Float player interface.
 	bool floatPlayerHandleWheelEvent(QEvent *e) override;
@@ -69,15 +69,15 @@ protected:
 private:
 	void onScroll();
 	void updateAdaptiveLayout();
-	void saveState(not_null<SectionMemento *> memento);
-	void restoreState(not_null<SectionMemento *> memento);
+	void saveState(not_null<SectionMemento*> memento);
+	void restoreState(not_null<SectionMemento*> memento);
 	void setupShortcuts();
 
 	object_ptr<Ui::ScrollArea> _scroll;
 	QPointer<InnerWidget> _inner;
 	object_ptr<FixedBar> _fixedBar;
 	object_ptr<Ui::PlainShadow> _fixedBarShadow;
-	not_null<HistoryItem *> _item;
+	not_null<HistoryItem*> _item;
 
 };
 
@@ -86,18 +86,18 @@ class SectionMemento : public Window::SectionMemento
 public:
 	using Element = HistoryView::Element;
 
-	SectionMemento(not_null<PeerData *> peer, not_null<HistoryItem *> item)
+	SectionMemento(not_null<PeerData*> peer, not_null<HistoryItem*> item)
 		: _peer(peer),
 		  _item(item) {
 	}
 
 	object_ptr<Window::SectionWidget> createWidget(
 		QWidget *parent,
-		not_null<Window::SessionController *> controller,
+		not_null<Window::SessionController*> controller,
 		Window::Column column,
 		const QRect &geometry) override;
 
-	not_null<PeerData *> getPeer() const {
+	not_null<PeerData*> getPeer() const {
 		return _peer;
 	}
 
@@ -137,11 +137,11 @@ public:
 	}
 
 private:
-	not_null<PeerData *> _peer;
-	not_null<HistoryItem *> _item;
+	not_null<PeerData*> _peer;
+	not_null<HistoryItem*> _item;
 	int _scrollTop = 0;
-	std::vector<not_null<UserData *>> _admins;
-	std::vector<not_null<UserData *>> _adminsCanEdit;
+	std::vector<not_null<UserData*>> _admins;
+	std::vector<not_null<UserData*>> _adminsCanEdit;
 	std::vector<OwnedItem> _items;
 	std::set<uint64> _eventIds;
 	bool _upLoaded = false;

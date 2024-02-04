@@ -21,12 +21,12 @@ namespace Settings {
 class Ayu : public Section<Ayu>
 {
 public:
-	Ayu(QWidget *parent, not_null<Window::SessionController *> controller);
+	Ayu(QWidget *parent, not_null<Window::SessionController*> controller);
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
 private:
-	void setupContent(not_null<Window::SessionController *> controller);
+	void setupContent(not_null<Window::SessionController*> controller);
 };
 
 } // namespace Settings

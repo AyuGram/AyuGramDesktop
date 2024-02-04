@@ -146,23 +146,23 @@ class MessageShotDelegate final : public HistoryView::DefaultElementDelegate
 {
 public:
 	MessageShotDelegate(
-		not_null<QWidget *> parent,
-		not_null<Ui::ChatStyle *> st,
+		not_null<QWidget*> parent,
+		not_null<Ui::ChatStyle*> st,
 		Fn<void()> update);
 
 	bool elementAnimationsPaused() override;
-	not_null<Ui::PathShiftGradient *> elementPathShiftGradient() override;
+	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
 	HistoryView::Context elementContext() override;
 	bool elementIsChatWide() override;
 
 private:
-	const not_null<QWidget *> _parent;
+	const not_null<QWidget*> _parent;
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
 };
 
 MessageShotDelegate::MessageShotDelegate(
-	not_null<QWidget *> parent,
-	not_null<Ui::ChatStyle *> st,
+	not_null<QWidget*> parent,
+	not_null<Ui::ChatStyle*> st,
 	Fn<void()> update)
 	: _parent(parent)
 	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update)) {
@@ -173,7 +173,7 @@ bool MessageShotDelegate::elementAnimationsPaused() {
 }
 
 auto MessageShotDelegate::elementPathShiftGradient()
-	-> not_null<Ui::PathShiftGradient *> {
+	-> not_null<Ui::PathShiftGradient*> {
 	return _pathGradient.get();
 }
 
@@ -234,7 +234,7 @@ QImage addPadding(const QImage &original, int padding) {
 	return paddedImage;
 }
 
-QImage Make(not_null<QWidget *> box, const ShotConfig &config) {
+QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	const auto controller = config.controller;
 	const auto st = config.st;
 	const auto messages = config.messages;
@@ -252,13 +252,13 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config) {
 															  box->update();
 														  });
 
-	std::unordered_map<not_null<HistoryItem *>, std::shared_ptr<HistoryView::Element>> createdViews;
+	std::unordered_map<not_null<HistoryItem*>, std::shared_ptr<HistoryView::Element>> createdViews;
 	createdViews.reserve(messages.size());
 	for (const auto &message : messages) {
 		createdViews.emplace(message, message->createView(delegate.get()));
 	}
 
-	auto getView = [=](not_null<HistoryItem *> msg)
+	auto getView = [=](not_null<HistoryItem*> msg)
 	{
 		return createdViews.at(msg).get();
 	};
@@ -357,7 +357,7 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config) {
 	return overlay;
 }
 
-void Wrapper(not_null<HistoryView::ListWidget *> widget) {
+void Wrapper(not_null<HistoryView::ListWidget*> widget) {
 	const auto items = widget->getSelectedIds();
 	if (items.empty()) {
 		return;

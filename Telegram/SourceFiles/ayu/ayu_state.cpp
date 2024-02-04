@@ -14,7 +14,7 @@ void hide(PeerId peerId, MsgId messageId) {
 	hiddenMessages[peerId].insert(messageId);
 }
 
-void hide(not_null<HistoryItem *> item) {
+void hide(not_null<HistoryItem*> item) {
 	hide(item->history()->peer->id, item->id);
 }
 
@@ -26,7 +26,7 @@ bool isHidden(PeerId peerId, MsgId messageId) {
 	return false;
 }
 
-bool isHidden(not_null<HistoryItem *> item) {
+bool isHidden(not_null<HistoryItem*> item) {
 	return isHidden(item->history()->peer->id, item->id);
 }
 

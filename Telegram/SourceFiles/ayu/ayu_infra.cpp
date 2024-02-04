@@ -9,7 +9,7 @@
 #include "ayu_lang.h"
 #include "ayu_worker.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/database/ayu_database.h"
+#include "ayu/data/ayu_database.h"
 #include "lang/lang_instance.h"
 
 namespace AyuInfra {

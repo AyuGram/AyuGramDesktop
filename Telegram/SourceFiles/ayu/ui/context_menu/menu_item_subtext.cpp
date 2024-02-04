@@ -10,7 +10,7 @@
 
 #include "mainwindow.h"
 #include "qguiapplication.h"
-#include "ayu/database/entities.h"
+#include "ayu/data/entities.h"
 #include "ayu/utils/telegram_helpers.h"
 
 #include "base/unixtime.h"
@@ -30,7 +30,7 @@ class ActionWithSubText : public Menu::ItemBase
 {
 public:
 	ActionWithSubText(
-		not_null<RpWidget *> parent,
+		not_null<RpWidget*> parent,
 		const style::Menu &st,
 		const style::icon &icon,
 		Fn<void()> callback,
@@ -38,9 +38,9 @@ public:
 		QString subtext);
 
 	bool isEnabled() const override;
-	not_null<QAction *> action() const override;
+	not_null<QAction*> action() const override;
 
-	void handleKeyPress(not_null<QKeyEvent *> e) override;
+	void handleKeyPress(not_null<QKeyEvent*> e) override;
 
 protected:
 	QPoint prepareRippleStartPosition() const override;
@@ -51,7 +51,7 @@ protected:
 	void prepare(const QString &title);
 	void paint(Painter &p);
 
-	const not_null<QAction *> _dummyAction;
+	const not_null<QAction*> _dummyAction;
 	const style::Menu &_st;
 	const style::icon &_icon;
 
@@ -65,10 +65,10 @@ protected:
 class ActionStickerPackAuthor final : public ActionWithSubText
 {
 public:
-	ActionStickerPackAuthor(not_null<Menu::Menu *> menu, not_null<Main::Session *> session, ID authorId);
+	ActionStickerPackAuthor(not_null<Menu::Menu*> menu, not_null<Main::Session*> session, ID authorId);
 
 private:
-	not_null<Main::Session *> _session;
+	not_null<Main::Session*> _session;
 
 	void searchAuthor(ID authorId);
 };
@@ -81,7 +81,7 @@ TextParseOptions MenuTextOptions = {
 };
 
 ActionWithSubText::ActionWithSubText(
-	not_null<RpWidget *> parent,
+	not_null<RpWidget*> parent,
 	const style::Menu &st,
 	const style::icon &icon,
 	Fn<void()> callback,
@@ -176,7 +176,7 @@ bool ActionWithSubText::isEnabled() const {
 	return true;
 }
 
-not_null<QAction *> ActionWithSubText::action() const {
+not_null<QAction*> ActionWithSubText::action() const {
 	return _dummyAction;
 }
 
@@ -192,7 +192,7 @@ int ActionWithSubText::contentHeight() const {
 	return _height;
 }
 
-void ActionWithSubText::handleKeyPress(not_null<QKeyEvent *> e) {
+void ActionWithSubText::handleKeyPress(not_null<QKeyEvent*> e) {
 	if (!isSelected()) {
 		return;
 	}
@@ -202,8 +202,8 @@ void ActionWithSubText::handleKeyPress(not_null<QKeyEvent *> e) {
 	}
 }
 
-ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu *> menu,
-												 not_null<Main::Session *> session,
+ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu*> menu,
+												 not_null<Main::Session*> session,
 												 ID authorId)
 	: ActionWithSubText(menu,
 						menu->st(),
@@ -273,7 +273,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 } // namespace
 
 base::unique_qptr<Menu::ItemBase> ContextActionWithSubText(
-	not_null<Menu::Menu *> menu,
+	not_null<Menu::Menu*> menu,
 	const style::icon &icon,
 	const QString &title,
 	const QString &subtext,
@@ -295,8 +295,8 @@ base::unique_qptr<Menu::ItemBase> ContextActionWithSubText(
 }
 
 base::unique_qptr<Menu::ItemBase> ContextActionStickerAuthor(
-	not_null<Menu::Menu *> menu,
-	not_null<Main::Session *> session,
+	not_null<Menu::Menu*> menu,
+	not_null<Main::Session*> session,
 	ID authorId) {
 	return base::make_unique_q<ActionStickerPackAuthor>(menu, session, authorId);
 }

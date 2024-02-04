@@ -10,7 +10,7 @@
 #include "core/application.h"
 #include "styles/style_layers.h"
 
-#include "ayu/ui/ayu_assets.h"
+#include "ayu/ui/ayu_logo.h"
 #include "main/main_domain.h"
 #include "styles/style_ayu_styles.h"
 #include "ui/painter.h"

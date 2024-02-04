@@ -6,7 +6,7 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "ayu/database/entities.h"
+#include "ayu/data/entities.h"
 
 #include "core/application.h"
 #include "dialogs/dialogs_main_list.h"
@@ -17,30 +17,29 @@ using Callback = Fn<void(const QString &, UserData *)>;
 Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback, int delay = 0);
-not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session);
-ID getDialogIdFromPeer(not_null<PeerData *> peer);
-std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item);
+not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session *session);
+ID getDialogIdFromPeer(not_null<PeerData*> peer);
 
-ID getBareID(not_null<PeerData *> peer);
+ID getBareID(not_null<PeerData*> peer);
 
 bool isAyuGramRelated(ID peerId);
 bool isExteraRelated(ID peerId);
 
-void MarkAsReadChatList(not_null<Dialogs::MainList *> list);
-void MarkAsReadThread(not_null<Data::Thread *> thread);
+void MarkAsReadChatList(not_null<Dialogs::MainList*> list);
+void MarkAsReadThread(not_null<Data::Thread*> thread);
 
-void readHistory(not_null<HistoryItem *> message);
+void readHistory(not_null<HistoryItem*> message);
 
 QString formatTTL(int time);
 QString formatDateTime(const QDateTime &date);
 
 QString getDCName(int dc);
 
-QString getMediaSize(not_null<HistoryItem *> message);
-QString getMediaMime(not_null<HistoryItem *> message);
-QString getMediaName(not_null<HistoryItem *> message);
-QString getMediaResolution(not_null<HistoryItem *> message);
-QString getMediaDC(not_null<HistoryItem *> message);
+QString getMediaSize(not_null<HistoryItem*> message);
+QString getMediaMime(not_null<HistoryItem*> message);
+QString getMediaName(not_null<HistoryItem*> message);
+QString getMediaResolution(not_null<HistoryItem*> message);
+QString getMediaDC(not_null<HistoryItem*> message);
 
 void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback);
 void searchById(ID userId, Main::Session *session, const Callback &callback);

@@ -12,11 +12,22 @@
 
 namespace AyuMapper {
 
-int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item) {
+std::pair<std::string, std::vector<char>> serializeTextWithEntities(not_null<HistoryItem*> item) {
+	if (item->emptyText()) {
+		return std::make_pair("", std::vector<char>());
+	}
+
+	auto textWithEntities = item->originalText();
+	std::vector<char> entities; // todo: implement writing to buffer
+
+	return std::make_pair(textWithEntities.text.toStdString(), entities);
+}
+
+int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item) {
 	int flags = 0;
 
 	const auto thread = item->topic()
-							? (Data::Thread *)item->topic()
+							? (Data::Thread*) item->topic()
 							: item->history();
 	const auto unseen = item->unread(thread);
 	if (unseen) {

@@ -44,7 +44,7 @@ protected:
 	void keyPressEvent(QKeyEvent *e) override;
 
 private:
-	void setupTop(not_null<Ui::VerticalLayout *> container);
+	void setupTop(not_null<Ui::VerticalLayout*> container);
 	[[nodiscard]] int rowsInPage() const;
 
 	Window::SessionController *_controller = nullptr;

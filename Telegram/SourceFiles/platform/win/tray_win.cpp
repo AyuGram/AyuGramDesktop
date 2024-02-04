@@ -29,7 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QBuffer>
 
 // AyuGram includes
-#include "ayu/ui/ayu_assets.h"
+#include "ayu/ui/ayu_logo.h"
 #include "ui/painter.h"
 
 

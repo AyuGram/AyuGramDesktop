@@ -4,10 +4,10 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2023
-#include "ayu_messages_controller.h"
+#include "messages_storage.h"
 
 #include "ayu/ayu_constants.h"
-#include "ayu/database/ayu_database.h"
+#include "ayu/data/ayu_database.h"
 #include "ayu/utils/ayu_mapper.h"
 #include "ayu/utils/telegram_helpers.h"
 
@@ -24,22 +24,7 @@
 
 namespace AyuMessages {
 
-std::optional<AyuMessagesController> controller = std::nullopt;
-
-void initialize() {
-	if (controller.has_value()) {
-		return;
-	}
-
-	controller = AyuMessagesController();
-}
-
-AyuMessagesController &getInstance() {
-	initialize();
-	return controller.value();
-}
-
-void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMessage &message) {
+void map(HistoryMessageEdition &edition, not_null<HistoryItem*> item, EditedMessage &message) {
 	message.userId = item->history()->owner().session().userId().bare;
 	message.dialogId = getDialogIdFromPeer(item->history()->peer);
 	message.groupedId = item->groupId().value;
@@ -61,11 +46,11 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 	message.views = item->viewsCount();
 	message.entityCreateDate = base::unixtime::now(); // todo: rework
 
-	auto serializedText = serializeTextWithEntities(item);
+	auto serializedText = AyuMapper::serializeTextWithEntities(item);
 	message.text = serializedText.first;
-	//		message.textEntities = serializedText.second;
+	message.textEntities = serializedText.second;
 
-	// todo:
+	// todo: implement mapping
 	message.mediaPath = "/";
 	message.documentType = DOCUMENT_TYPE_NONE;
 
@@ -75,14 +60,14 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 	// message.mimeType;
 }
 
-void AyuMessagesController::addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem *> item) {
+void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem*> item) {
 	EditedMessage message;
 	map(edition, item, message);
 
 	AyuDatabase::addEditedMessage(message);
 }
 
-std::vector<EditedMessage> AyuMessagesController::getEditedMessages(HistoryItem *item) {
+std::vector<EditedMessage> getEditedMessages(not_null<HistoryItem*> item) {
 	auto userId = item->history()->owner().session().userId().bare;
 	auto dialogId = getDialogIdFromPeer(item->history()->peer);
 	auto msgId = item->id.bare;
@@ -90,7 +75,7 @@ std::vector<EditedMessage> AyuMessagesController::getEditedMessages(HistoryItem 
 	return AyuDatabase::getEditedMessages(userId, dialogId, msgId);
 }
 
-bool AyuMessagesController::hasRevisions(not_null<HistoryItem *> item) {
+bool hasRevisions(not_null<HistoryItem*> item) {
 	auto userId = item->history()->owner().session().userId().bare;
 	auto dialogId = getDialogIdFromPeer(item->history()->peer);
 	auto msgId = item->id.bare;
