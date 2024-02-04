@@ -90,6 +90,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_account.h"
 
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_worker.h"
 
 namespace {
 
@@ -4105,6 +4106,8 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 					draftMonoforumPeerId,
 					UnixtimeFromMsgId(response.outerMsgId));
 			}
+
+			AyuWorker::markAsOnline(_session);
 		};
 		const auto fail = [=](
 				const MTP::Error &error,
@@ -4211,6 +4214,8 @@ void ApiWrap::sendBotStart(
 		MTP_string(token)
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);
+
+		AyuWorker::markAsOnline(_session);
 	}).fail([=](const MTP::Error &error) {
 		if (chat) {
 			const auto type = error.type();
@@ -4516,6 +4521,8 @@ void ApiWrap::sendMediaWithRandomId(
 		if (updateRecentStickers) {
 			requestRecentStickers(std::nullopt, true);
 		}
+
+		AyuWorker::markAsOnline(_session);
 	}, [=](const MTP::Error &error, const MTP::Response &response) {
 		if (done) done(false);
 		sendMessageFail(error, peer, randomId, itemId);
@@ -4733,6 +4740,8 @@ void ApiWrap::sendAlbumIfReady(not_null<SendingAlbum*> album) {
 			MTP_long(starsPaid)
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 		_sendingAlbums.remove(groupId);
+
+		AyuWorker::markAsOnline(_session);
 	}, [=](const MTP::Error &error, const MTP::Response &response) {
 		if (const auto album = _sendingAlbums.take(groupId)) {
 			for (const auto &item : (*album)->items) {

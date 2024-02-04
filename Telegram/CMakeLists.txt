@@ -99,6 +99,8 @@ nice_target_sources(Telegram ${src_loc}
 PRIVATE
     ${style_files}
 
+    ayu/ayu_worker.cpp
+    ayu/ayu_worker.h
     ayu/ayu_url_handlers.cpp
     ayu/ayu_url_handlers.h
     ayu/ayu_state.cpp

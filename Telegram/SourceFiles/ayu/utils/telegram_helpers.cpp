@@ -18,6 +18,7 @@
 #include "inline_bots/inline_bot_result.h"
 #include "lang_auto.h"
 #include "apiwrap.h"
+#include "ayu/ayu_worker.h"
 #include "data/data_forum.h"
 #include "data/data_user.h"
 #include "data/data_forum_topic.h"
@@ -41,6 +42,7 @@ std::unordered_set<ID> ayugram_channels = {
 	1434550607, // @radolyn
 	1947958814, // @ayugramfun
 	1815864846, // @ayugramfcm
+	2130395384, // @ayugram_easter
 };
 
 std::unordered_set<ID> ayugram_devs = {
@@ -296,6 +298,8 @@ void MarkAsReadThread(not_null<Data::Thread *> thread)
 	if (thread->unreadReactions().has()) {
 		sendReadReactions(thread);
 	}
+
+	AyuWorker::markAsOnline(&thread->session());
 }
 
 void readHistory(not_null<HistoryItem *> message)
@@ -310,19 +314,19 @@ void readHistory(not_null<HistoryItem *> message)
 				return history->session().api().request(MTPchannels_ReadHistory(
 					channel->inputChannel,
 					MTP_int(tillId)
-				)).send();
+				)).done([=] { AyuWorker::markAsOnline(&history->session()); }).send();
 			}
-			else {
-				return history->session().api().request(MTPmessages_ReadHistory(
-					history->peer->input,
-					MTP_int(tillId)
-				)).done([=](const MTPmessages_AffectedMessages &result)
-						{
-							history->session().api().applyAffectedMessages(history->peer, result);
-						}).fail([=]
-								{
-								}).send();
-			}
+
+			return history->session().api().request(MTPmessages_ReadHistory(
+				history->peer->input,
+				MTP_int(tillId)
+			)).done([=](const MTPmessages_AffectedMessages &result)
+			{
+				history->session().api().applyAffectedMessages(history->peer, result);
+				AyuWorker::markAsOnline(&history->session());
+			}).fail([=]
+			{
+			}).send();
 		});
 
 	if (history->unreadMentions().has()) {

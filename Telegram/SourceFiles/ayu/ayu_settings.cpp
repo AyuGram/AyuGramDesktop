@@ -17,6 +17,9 @@
 
 #include <fstream>
 
+#include "ayu_worker.h"
+#include "window/window_controller.h"
+
 using json = nlohmann::json;
 
 namespace AyuSettings
@@ -298,6 +301,12 @@ void AyuGramSettings::set_ghostModeEnabled(bool val)
 	set_sendOnlinePackets(!val);
 	set_sendUploadProgress(!val);
 	set_sendOfflinePacketAfterOnline(val);
+
+	if (const auto window = Core::App().activeWindow()) {
+		if (const auto session = window->maybeSession()) {
+			AyuWorker::markAsOnline(session); // mark as online to get offline instantly
+		}
+	}
 }
 
 void AyuGramSettings::set_markReadAfterSend(bool val)
