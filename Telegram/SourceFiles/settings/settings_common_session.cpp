@@ -41,6 +41,10 @@ void FillMenu(
 			&st::menuIconCancel);
 	} else if (type == Ayu::Id()) {
 		addAction(
+			tr::ayu_RegisterURLScheme(tr::now),
+			[=] { Core::Application::RegisterUrlScheme(); },
+			&st::menuIconLinks);
+		addAction(
 			tr::lng_restart_button(tr::now),
 			[=] { Core::Restart(); },
 			&st::menuIconRestore);

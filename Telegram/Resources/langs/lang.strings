@@ -7210,6 +7210,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_EditsHistoryMenuText" = "History";
 "ayu_PeekOnlineMenuText" = "Peek Online";
 "ayu_ClearDeletedMenuText" = "Clear Deleted";
+"ayu_ViewDeletedMenuText" = "View Deleted";
 "ayu_ViewFiltersMenuText" = "View Filters";
 "ayu_PeekOnlineSuccess" = "Peeked via";
 "ayu_OneViewTTL" = "one view";
@@ -7248,6 +7249,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageShotThemeDefault" = "Default";
 "ayu_MessageShotThemeSelectTitle" = "Select message theme";
 "ayu_MessageShotThemeApply" = "Apply";
+"ayu_MessageShotBackground" = "Background";
+"ayu_MessageShotBackgroundSelected" = "Selected";
 "ayu_MessageShotShowDate" = "Show date";
 "ayu_MessageShotShowReactions" = "Show reactions";
 "ayu_MessageShotShowColorfulReplies" = "Show colorful replies";
@@ -7272,6 +7275,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IDCopiedToast" = "ID copied to clipboard.";
 "ayu_ContextHideMessage" = "Hide";
 "ayu_ContextCopyCallbackData" = "Copy Callback Data";
+"ayu_RegisterURLScheme" = "Register URL scheme";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits, except translator.\n**Enjoy the star near your nickname!**";
 "ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";
 "ayu_ConfirmationSticker" = "Do you want to send this sticker?";
