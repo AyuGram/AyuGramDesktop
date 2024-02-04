@@ -10,8 +10,7 @@
 #include "history/history.h"
 #include "history/history_item.h"
 
-namespace AyuDatabase
-{
+namespace AyuDatabase {
 
 void initialize();
 

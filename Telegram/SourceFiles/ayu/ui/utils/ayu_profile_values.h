@@ -6,7 +6,6 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-
 QString IDString(not_null<PeerData *> peer);
 QString IDString(MsgId topic_root_id);
 

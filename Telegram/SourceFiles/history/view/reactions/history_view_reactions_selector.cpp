@@ -824,15 +824,6 @@ void Selector::finishExpand() {
 
 void Selector::paintBubble(QPainter &p, int innerWidth) {
 	// AyuGram: removed
-//	const auto &bubble = _st.icons.stripBubble;
-//	const auto bubbleRight = std::min(
-//		st::reactStripBubbleRight,
-//		(innerWidth - bubble.width()) / 2);
-//	bubble.paint(
-//		p,
-//		_inner.x() + innerWidth - bubbleRight - bubble.width(),
-//		_inner.y() + _inner.height() - _collapsedTopSkip,
-//		width());
 }
 
 void Selector::paintEvent(QPaintEvent *e) {

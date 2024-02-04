@@ -8,25 +8,23 @@
 
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 
-#include "ayu/utils/telegram_helpers.h"
-#include "ayu/database/entities.h"
 #include "mainwindow.h"
 #include "qguiapplication.h"
+#include "ayu/database/entities.h"
+#include "ayu/utils/telegram_helpers.h"
 
-#include "ui/widgets/menu/menu_action.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/painter.h"
+#include "base/unixtime.h"
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
-#include "base/unixtime.h"
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
+#include "ui/painter.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/widgets/menu/menu_action.h"
 #include "window/window_session_controller.h"
 
-namespace Ui
-{
-namespace
-{
+namespace Ui {
+namespace {
 
 class ActionWithSubText : public Menu::ItemBase
 {
@@ -95,10 +93,9 @@ ActionWithSubText::ActionWithSubText(
 	  _icon(icon),
 	  _subText(std::move(subtext)),
 	  _height(st::ttlItemPadding.top()
-				  + _st.itemStyle.font->height
-				  + st::ttlItemTimerFont->height
-				  + st::ttlItemPadding.bottom())
-{
+		  + _st.itemStyle.font->height
+		  + st::ttlItemTimerFont->height
+		  + st::ttlItemPadding.bottom()) {
 	setAcceptBoth(true);
 	initResizeHook(parent->sizeValue());
 	setClickedCallback(std::move(callback));
@@ -108,14 +105,14 @@ ActionWithSubText::ActionWithSubText(
 							 {
 								 Painter p(this);
 								 paint(p);
-							 }, lifetime());
+							 },
+							 lifetime());
 
 	enableMouseSelecting();
 	prepare(title);
 }
 
-void ActionWithSubText::paint(Painter &p)
-{
+void ActionWithSubText::paint(Painter &p) {
 	const auto selected = isSelected();
 	if (selected && _st.itemBgOver->c.alpha() < 255) {
 		p.fillRect(0, 0, width(), _height, _st.itemBg);
@@ -151,8 +148,7 @@ void ActionWithSubText::paint(Painter &p)
 		_subText);
 }
 
-void ActionWithSubText::prepare(const QString &title)
-{
+void ActionWithSubText::prepare(const QString &title) {
 	_title.setMarkedText(
 		_st.itemStyle,
 		{title},
@@ -176,33 +172,27 @@ void ActionWithSubText::prepare(const QString &title)
 	update();
 }
 
-bool ActionWithSubText::isEnabled() const
-{
+bool ActionWithSubText::isEnabled() const {
 	return true;
 }
 
-not_null<QAction *> ActionWithSubText::action() const
-{
+not_null<QAction *> ActionWithSubText::action() const {
 	return _dummyAction;
 }
 
-QPoint ActionWithSubText::prepareRippleStartPosition() const
-{
+QPoint ActionWithSubText::prepareRippleStartPosition() const {
 	return mapFromGlobal(QCursor::pos());
 }
 
-QImage ActionWithSubText::prepareRippleMask() const
-{
+QImage ActionWithSubText::prepareRippleMask() const {
 	return Ui::RippleAnimation::RectMask(size());
 }
 
-int ActionWithSubText::contentHeight() const
-{
+int ActionWithSubText::contentHeight() const {
 	return _height;
 }
 
-void ActionWithSubText::handleKeyPress(not_null<QKeyEvent *> e)
-{
+void ActionWithSubText::handleKeyPress(not_null<QKeyEvent *> e) {
 	if (!isSelected()) {
 		return;
 	}
@@ -215,64 +205,69 @@ void ActionWithSubText::handleKeyPress(not_null<QKeyEvent *> e)
 ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu *> menu,
 												 not_null<Main::Session *> session,
 												 ID authorId)
-	: ActionWithSubText(menu, menu->st(), st::menuIconStickers, [=]
-{ }, tr::ayu_MessageDetailsPackOwnerPC(tr::now), QString(tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now))),
-	  _session(session)
-{
+	: ActionWithSubText(menu,
+						menu->st(),
+						st::menuIconStickers,
+						[=]
+						{
+						},
+						tr::ayu_MessageDetailsPackOwnerPC(tr::now),
+						QString(tr::ayu_MessageDetailsPackOwnerFetchingPC(tr::now))),
+	  _session(session) {
 	searchAuthor(authorId);
 }
 
-void ActionStickerPackAuthor::searchAuthor(ID authorId)
-{
+void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 	const auto pointer = Ui::MakeWeak(this);
-	searchById(authorId, _session, [=](const QString &username, UserData *user)
-	{
-		if (!pointer) {
-			LOG(("ContextActionStickerAuthor: searchById callback after destruction"));
-			return;
-		}
-		if (username.isEmpty() && !user) {
-			_subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
-			setClickedCallback(
-				[=]
-				{
-					const auto text =
-						QString("int32: %1\nint64: %2").arg(authorId).arg(0x100000000L + authorId);
-					QGuiApplication::clipboard()->setText(text);
-				});
+	searchById(authorId,
+			   _session,
+			   [=](const QString &username, UserData *user)
+			   {
+				   if (!pointer) {
+					   LOG(("ContextActionStickerAuthor: searchById callback after destruction"));
+					   return;
+				   }
+				   if (username.isEmpty() && !user) {
+					   _subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
+					   setClickedCallback(
+						   [=]
+						   {
+							   const auto text =
+								   QString("int32: %1\nint64: %2").arg(authorId).arg(0x100000000L + authorId);
+							   QGuiApplication::clipboard()->setText(text);
+						   });
 
-			crl::on_main(
-				[=]
-				{
-					update();
-				});
-			return;
-		}
+					   crl::on_main(
+						   [=]
+						   {
+							   update();
+						   });
+					   return;
+				   }
 
-		const auto title = username.isEmpty() ? user ? user->name() : QString() : username;
-		const auto callback = [=]
-		{
-			if (user) {
-				if (const auto window = _session->tryResolveWindow()) {
-					if (const auto mainWidget = window->widget()->sessionController()) {
-						mainWidget->showPeer(user);
-					}
-				}
-			}
-			else {
-				QGuiApplication::clipboard()->setText(title);
-			}
-		};
+				   const auto title = username.isEmpty() ? user ? user->name() : QString() : username;
+				   const auto callback = [=]
+				   {
+					   if (user) {
+						   if (const auto window = _session->tryResolveWindow()) {
+							   if (const auto mainWidget = window->widget()->sessionController()) {
+								   mainWidget->showPeer(user);
+							   }
+						   }
+					   } else {
+						   QGuiApplication::clipboard()->setText(title);
+					   }
+				   };
 
-		setClickedCallback(callback);
+				   setClickedCallback(callback);
 
-		_subText = QString(title);
-		crl::on_main(
-			[=]
-			{
-				update();
-			});
-	});
+				   _subText = QString(title);
+				   crl::on_main(
+					   [=]
+					   {
+						   update();
+					   });
+			   });
 }
 
 } // namespace
@@ -282,8 +277,7 @@ base::unique_qptr<Menu::ItemBase> ContextActionWithSubText(
 	const style::icon &icon,
 	const QString &title,
 	const QString &subtext,
-	Fn<void()> callback)
-{
+	Fn<void()> callback) {
 	if (!callback) {
 		callback = [=]()
 		{
@@ -303,8 +297,7 @@ base::unique_qptr<Menu::ItemBase> ContextActionWithSubText(
 base::unique_qptr<Menu::ItemBase> ContextActionStickerAuthor(
 	not_null<Menu::Menu *> menu,
 	not_null<Main::Session *> session,
-	ID authorId)
-{
+	ID authorId) {
 	return base::make_unique_q<ActionStickerPackAuthor>(menu, session, authorId);
 }
 

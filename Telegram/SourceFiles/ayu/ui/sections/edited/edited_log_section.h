@@ -10,21 +10,19 @@
 #include "window/section_memento.h"
 #include "ayu/ui/sections/edited/edited_log_item.h"
 #include "mtproto/sender.h"
+// don't reformat includes above
 
-namespace Ui
-{
+namespace Ui {
 class ScrollArea;
 class PlainShadow;
 class FlatButton;
 } // namespace Ui
 
-namespace Profile
-{
+namespace Profile {
 class BackButton;
 } // namespace Profile
 
-namespace EditedLog
-{
+namespace EditedLog {
 
 class FixedBar;
 class InnerWidget;
@@ -42,8 +40,7 @@ public:
 	not_null<PeerData *> channel() const;
 	Dialogs::RowDescriptor activeChat() const override;
 
-	bool hasTopBarShadow() const override
-	{
+	bool hasTopBarShadow() const override {
 		return true;
 	}
 
@@ -91,8 +88,7 @@ public:
 
 	SectionMemento(not_null<PeerData *> peer, not_null<HistoryItem *> item)
 		: _peer(peer),
-		  _item(item)
-	{
+		  _item(item) {
 	}
 
 	object_ptr<Window::SectionWidget> createWidget(
@@ -101,16 +97,15 @@ public:
 		Window::Column column,
 		const QRect &geometry) override;
 
-	not_null<PeerData *> getPeer() const
-	{
+	not_null<PeerData *> getPeer() const {
 		return _peer;
 	}
-	void setScrollTop(int scrollTop)
-	{
+
+	void setScrollTop(int scrollTop) {
 		_scrollTop = scrollTop;
 	}
-	int getScrollTop() const
-	{
+
+	int getScrollTop() const {
 		return _scrollTop;
 	}
 
@@ -118,27 +113,26 @@ public:
 		std::vector<OwnedItem> &&items,
 		std::set<uint64> &&eventIds,
 		bool upLoaded,
-		bool downLoaded)
-	{
+		bool downLoaded) {
 		_items = std::move(items);
 		_eventIds = std::move(eventIds);
 		_upLoaded = upLoaded;
 		_downLoaded = downLoaded;
 	}
-	std::vector<OwnedItem> takeItems()
-	{
+
+	std::vector<OwnedItem> takeItems() {
 		return std::move(_items);
 	}
-	std::set<uint64> takeEventIds()
-	{
+
+	std::set<uint64> takeEventIds() {
 		return std::move(_eventIds);
 	}
-	bool upLoaded() const
-	{
+
+	bool upLoaded() const {
 		return _upLoaded;
 	}
-	bool downLoaded() const
-	{
+
+	bool downLoaded() const {
 		return _downLoaded;
 	}
 

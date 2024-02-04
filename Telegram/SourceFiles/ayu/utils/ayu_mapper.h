@@ -6,8 +6,7 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-namespace AyuMapper
-{
+namespace AyuMapper {
 
 int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item);
 

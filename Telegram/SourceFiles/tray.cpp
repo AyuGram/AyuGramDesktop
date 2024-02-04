@@ -105,40 +105,48 @@ void Tray::rebuildMenu() {
 
 	if (settings->showGhostToggleInTray) {
 		auto turnGhostModeText = _textUpdates.events(
-		) | rpl::map([=]
-					 {
-						 bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
+		) | rpl::map(
+			[=]
+			{
+				bool ghostModeEnabled = AyuSettings::get_ghostModeEnabled();
 
-						 return ghostModeEnabled
-								? tr::ayu_DisableGhostModeTray(tr::now)
-								: tr::ayu_EnableGhostModeTray(tr::now);
-					 });
-		_tray.addAction(std::move(turnGhostModeText), [=]
-		{
-			bool ghostMode = AyuSettings::get_ghostModeEnabled();
+				return ghostModeEnabled
+						   ? tr::ayu_DisableGhostModeTray(tr::now)
+						   : tr::ayu_EnableGhostModeTray(tr::now);
+			});
+		_tray.addAction(
+			std::move(turnGhostModeText),
+			[=]
+			{
+				bool ghostMode = AyuSettings::get_ghostModeEnabled();
 
-			settings->set_ghostModeEnabled(!ghostMode);
+				settings->set_ghostModeEnabled(!ghostMode);
 
-			AyuSettings::save();
-		});
+				AyuSettings::save();
+			});
 	}
 
 	if (settings->showStreamerToggleInTray) {
 		auto turnStreamerModeText = _textUpdates.events(
-		) | rpl::map([=] {
-			bool streamerModeEnabled = AyuFeatures::StreamerMode::isEnabled();
+		) | rpl::map(
+			[=]
+			{
+				bool streamerModeEnabled = AyuFeatures::StreamerMode::isEnabled();
 
-			return streamerModeEnabled
-			       ? tr::ayu_DisableStreamerModeTray(tr::now)
-			       : tr::ayu_EnableStreamerModeTray(tr::now);
-		});
-		_tray.addAction(std::move(turnStreamerModeText), [=] {
-			if (AyuFeatures::StreamerMode::isEnabled()) {
-				AyuFeatures::StreamerMode::disable();
-			} else {
-				AyuFeatures::StreamerMode::enable();
-			}
-		});
+				return streamerModeEnabled
+						   ? tr::ayu_DisableStreamerModeTray(tr::now)
+						   : tr::ayu_EnableStreamerModeTray(tr::now);
+			});
+		_tray.addAction(
+			std::move(turnStreamerModeText),
+			[=]
+			{
+				if (AyuFeatures::StreamerMode::isEnabled()) {
+					AyuFeatures::StreamerMode::disable();
+				} else {
+					AyuFeatures::StreamerMode::enable();
+				}
+			});
 	}
 
 	auto quitText = _textUpdates.events(

@@ -6,13 +6,10 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "ayu_settings.h"
-
 #include "history/history.h"
 #include "history/history_item.h"
 
-namespace AyuState
-{
+namespace AyuState {
 
 void hide(PeerId peerId, MsgId messageId);
 void hide(not_null<HistoryItem *> item);

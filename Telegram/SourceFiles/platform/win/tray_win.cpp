@@ -131,6 +131,7 @@ bool DarkTasbarValueValid/* = false*/;
 	static auto ScaledLogoNoMargin = base::flat_map<int, QImage>();
 	static auto ScaledLogoDark = base::flat_map<int, QImage>();
 	static auto ScaledLogoLight = base::flat_map<int, QImage>();
+
 	static auto lastUsedIcon = AyuAssets::currentAppLogoName();
 
 	if (lastUsedIcon != AyuAssets::currentAppLogoName()) {

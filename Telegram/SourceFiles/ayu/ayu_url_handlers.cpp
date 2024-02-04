@@ -10,23 +10,23 @@
 
 #include "lang_auto.h"
 #include "mainwindow.h"
-#include "ui/boxes/confirm_box.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "boxes/abstract_box.h"
 #include "core/application.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "ui/boxes/confirm_box.h"
 
 #include <QDesktopServices>
 
-namespace AyuUrlHandlers
-{
+#include "main/main_session.h"
+
+namespace AyuUrlHandlers {
 
 bool ResolveUser(
 	Window::SessionController *controller,
 	const Match &match,
-	const QVariant &context)
-{
+	const QVariant &context) {
 	if (!controller) {
 		return false;
 	}
@@ -43,16 +43,19 @@ bool ResolveUser(
 		return true;
 	}
 
-	searchById(userId, &controller->session(), false, [=](const QString &title, UserData *data)
-	{
-		if (data) {
-			controller->showPeerInfo(data);
-			return;
-		}
+	searchById(userId,
+			   &controller->session(),
+			   false,
+			   [=](const QString &title, UserData *data)
+			   {
+				   if (data) {
+					   controller->showPeerInfo(data);
+					   return;
+				   }
 
-		Core::App().hideMediaView();
-		Ui::show(Ui::MakeInformBox(tr::ayu_UserNotFoundMessage()));
-	});
+				   Core::App().hideMediaView();
+				   Ui::show(Ui::MakeInformBox(tr::ayu_UserNotFoundMessage()));
+			   });
 
 	return true;
 }
@@ -60,8 +63,7 @@ bool ResolveUser(
 bool HandleAyu(
 	Window::SessionController *controller,
 	const Match &match,
-	const QVariant &context)
-{
+	const QVariant &context) {
 	if (!controller) {
 		return false;
 	}
@@ -69,8 +71,7 @@ bool HandleAyu(
 	return true;
 }
 
-bool TryHandleSpotify(const QString& url)
-{
+bool TryHandleSpotify(const QString &url) {
 	if (!url.contains("spotify.com")) {
 		return false;
 	}
@@ -96,9 +97,7 @@ bool TryHandleSpotify(const QString& url)
 
 		const auto res = QString("spotify:%1:%2").arg(type).arg(identifier);
 
-		if (!res.isEmpty()) {
-			return QDesktopServices::openUrl(QUrl(res));
-		}
+		return QDesktopServices::openUrl(QUrl(res));
 	}
 
 	return false;

@@ -6,25 +6,23 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "history/view/history_view_element.h"
 #include "ayu/ui/sections/edited/edited_log_item.h"
 #include "ayu/ui/sections/edited/edited_log_section.h"
+#include "base/timer.h"
+#include "history/view/history_view_element.h"
 #include "menu/menu_antispam_validator.h"
+#include "mtproto/sender.h"
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 #include "ui/widgets/tooltip.h"
-#include "mtproto/sender.h"
-#include "base/timer.h"
 
 struct ChatRestrictionsInfo;
 
-namespace Main
-{
+namespace Main {
 class Session;
 } // namespace Main
 
-namespace HistoryView
-{
+namespace HistoryView {
 class Element;
 struct TextState;
 struct StateRequest;
@@ -32,20 +30,17 @@ enum class CursorState : char;
 enum class PointState : char;
 } // namespace HistoryView
 
-namespace Ui
-{
+namespace Ui {
 class PopupMenu;
 class ChatStyle;
 struct PeerUserpicView;
 } // namespace Ui
 
-namespace Window
-{
+namespace Window {
 class SessionController;
 } // namespace Window
 
-namespace EditedLog
-{
+namespace EditedLog {
 
 class SectionMemento;
 
@@ -60,23 +55,21 @@ public:
 		not_null<HistoryItem *> item);
 
 	[[nodiscard]] Main::Session &session() const;
-	[[nodiscard]] not_null<Ui::ChatTheme *> theme() const
-	{
+
+	[[nodiscard]] not_null<Ui::ChatTheme *> theme() const {
 		return _theme.get();
 	}
 
 	[[nodiscard]] rpl::producer<int> scrollToSignal() const;
 
-	[[nodiscard]] not_null<PeerData *> channel() const
-	{
+	[[nodiscard]] not_null<PeerData *> channel() const {
 		return _peer;
 	}
 
 	// Set the correct scroll position after being resized.
 	void restoreScrollPosition();
 
-	void resizeToWidth(int newWidth, int minHeight)
-	{
+	void resizeToWidth(int newWidth, int minHeight) {
 		_minHeight = minHeight;
 		return TWidget::resizeToWidth(newWidth);
 	}
@@ -161,11 +154,13 @@ protected:
 
 private:
 	using Element = HistoryView::Element;
+
 	enum class Direction
 	{
 		Up,
 		Down,
 	};
+
 	enum class MouseAction
 	{
 		None,
@@ -173,11 +168,13 @@ private:
 		Dragging,
 		Selecting,
 	};
+
 	enum class EnumItemsDirection
 	{
 		TopToBottom,
 		BottomToTop,
 	};
+
 	using TextState = HistoryView::TextState;
 	using CursorState = HistoryView::CursorState;
 	using PointState = HistoryView::PointState;

@@ -6,21 +6,18 @@
 // Copyright @Radolyn, 2023
 #include "ayu_mapper.h"
 
+#include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
-#include "history/history.h"
 
+namespace AyuMapper {
 
-namespace AyuMapper
-{
-
-int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item)
-{
+int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item) {
 	int flags = 0;
 
 	const auto thread = item->topic()
-						? (Data::Thread *)item->topic()
-						: item->history();
+							? (Data::Thread *)item->topic()
+							: item->history();
 	const auto unseen = item->unread(thread);
 	if (unseen) {
 		flags |= 1;
@@ -59,9 +56,9 @@ int mapItemFlagsToMTPFlags(not_null<HistoryItem *> item)
 	}
 
 	// todo: legacy
-//	if (item->isLegacy()) {
-//		flags |= 524288;
-//	}
+	//	if (item->isLegacy()) {
+	//		flags |= 524288;
+	//	}
 
 	if (item->hideEditedBadge()) {
 		flags |= 2097152;

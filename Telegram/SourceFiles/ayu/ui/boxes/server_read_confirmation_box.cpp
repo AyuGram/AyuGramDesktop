@@ -14,19 +14,16 @@
 #include "styles/style_layers.h"
 #include "window/window_session_controller.h"
 
-namespace AyuUi
-{
+namespace AyuUi {
 
 ServerReadConfirmationBox::ServerReadConfirmationBox(
 	QWidget *,
 	not_null<Window::SessionController *> controller)
-	: _controller(controller)
-{
+	: _controller(controller) {
 	//
 }
 
-void ServerReadConfirmationBox::prepare()
-{
+void ServerReadConfirmationBox::prepare() {
 	_text.create(this, tr::ayu_ReadConfirmationBoxQuestion(), st::boxLabel);
 
 	auto fullHeight = st::boxPadding.top()
@@ -35,25 +32,27 @@ void ServerReadConfirmationBox::prepare()
 
 	setDimensions(st::boxWidth, fullHeight);
 
-	addButton(tr::ayu_ReadConfirmationBoxActionText(), [=, this]
-	{
-		ReadAllPeers();
-		closeBox();
-	});
-	addButton(tr::lng_cancel(), [=, this]
-	{ closeBox(); });
+	addButton(tr::ayu_ReadConfirmationBoxActionText(),
+			  [=, this]
+			  {
+				  ReadAllPeers();
+				  closeBox();
+			  });
+	addButton(tr::lng_cancel(),
+			  [=, this]
+			  {
+				  closeBox();
+			  });
 }
 
-void ServerReadConfirmationBox::resizeEvent(QResizeEvent *e)
-{
+void ServerReadConfirmationBox::resizeEvent(QResizeEvent *e) {
 	BoxContent::resizeEvent(e);
 
 	const auto &padding = st::boxPadding;
 	_text->moveToLeft(padding.left(), padding.top());
 }
 
-void ServerReadConfirmationBox::ReadAllPeers()
-{
+void ServerReadConfirmationBox::ReadAllPeers() {
 	auto settings = &AyuSettings::getInstance();
 	auto prev = settings->sendReadMessages;
 	settings->set_sendReadMessages(true);

@@ -6,8 +6,7 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-namespace AyuInfra
-{
+namespace AyuInfra {
 
 void init();
 

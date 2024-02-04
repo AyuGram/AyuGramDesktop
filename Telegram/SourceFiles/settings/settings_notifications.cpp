@@ -349,9 +349,6 @@ void NotificationsCount::paintEvent(QPaintEvent *e) {
 	}
 
 	// support for top center notifications
-	auto screenCorner = static_cast<ScreenCorner>(4);
-	auto isLeft = Core::Settings::IsLeftCorner(screenCorner);
-	auto isTop = true;
 	auto sampleLeft = screenRect.x() + screenRect.width() / 2 - st::notificationSampleSize.width() / 2;
 	auto sampleTop = screenRect.y() + st::notificationsSampleTopSkip;
 	if (static_cast<int>(_chosenCorner) == 4) {
@@ -360,7 +357,7 @@ void NotificationsCount::paintEvent(QPaintEvent *e) {
 			auto opacity = _sampleOpacities[i].value((i < count) ? 1. : 0.);
 			p.setOpacity(opacity);
 			p.drawPixmapLeft(sampleLeft, sampleTop, width(), _notificationSampleSmall);
-			sampleTop += (isTop ? 1 : -1) * (st::notificationSampleSize.height() + st::notificationsSampleMargin);
+			sampleTop += st::notificationSampleSize.height() + st::notificationsSampleMargin;
 		}
 		p.setOpacity(1.);
 	} else {
@@ -532,7 +529,7 @@ void NotificationsCount::mouseMoveEvent(QMouseEvent *e) {
 		setOverCorner(ScreenCorner::BottomLeft);
 	} else if (topCenter.contains(e->pos())) {
 		setOverCorner(ScreenCorner::TopCenter);
-	} else{
+	} else {
 		clearOverCorner();
 	}
 }

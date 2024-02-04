@@ -1643,20 +1643,20 @@ void SetupDefaultThemes(
 		}
 	};
 	group->setChangedCallback([=](Type type) {
-	    if (AyuFeatures::MessageShot::isChoosingTheme()) {
-	    	palette->show(type);
-	    	refreshColorizer(type);
-	    	group->setValue(type);
-	    	AyuFeatures::MessageShot::setDefaultSelected(type);
+		if (AyuFeatures::MessageShot::isChoosingTheme()) {
+			palette->show(type);
+			refreshColorizer(type);
+			group->setValue(type);
+			AyuFeatures::MessageShot::setDefaultSelected(type);
 
 			const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
 			if (scheme == end(kSchemesList)) {
 				return;
 			}
 
-	    	updateMessageShotPalette(scheme->path);
-	    	return;
-	    }
+			updateMessageShotPalette(scheme->path);
+			return;
+		}
 
 		group->setValue(chosen());
 	});
@@ -1709,23 +1709,28 @@ void SetupDefaultThemes(
 	}, block->lifetime());
 
 	if (AyuFeatures::MessageShot::isChoosingTheme()) {
-		palette->selected() | rpl::start_with_next([=](QColor color) {
-			AyuFeatures::MessageShot::setDefaultSelectedColor(color);
-			refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault());
+		palette->selected() | rpl::start_with_next(
+			[=](QColor color)
+			{
+				AyuFeatures::MessageShot::setDefaultSelectedColor(color);
+				refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault());
 
-			const auto type = chosen();
-			const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
-			if (scheme == end(kSchemesList)) {
-				return;
-			}
+				const auto type = chosen();
+				const auto scheme = ranges::find(kSchemesList, type, &Scheme::type);
+				if (scheme == end(kSchemesList)) {
+					return;
+				}
 
-			updateMessageShotPalette(scheme->path);
-		}, container->lifetime());
+				updateMessageShotPalette(scheme->path);
+			},
+			container->lifetime());
 
-		AyuFeatures::MessageShot::resetDefaultSelectedEvents() | rpl::start_with_next([=] {
-			refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault()); // hide colorizer
-			group->setValue(Type(-1));
-		}, container->lifetime());
+		AyuFeatures::MessageShot::resetDefaultSelectedEvents() | rpl::start_with_next([=]
+			{
+				refreshColorizer(AyuFeatures::MessageShot::getSelectedFromDefault()); // hide colorizer
+				group->setValue(Type(-1));
+			},
+			container->lifetime());
 	}
 
 	palette->selected(

@@ -151,18 +151,10 @@ PRIVATE
     ayu/ui/boxes/message_shot_box.h
     ayu/ui/components/image_view.cpp
     ayu/ui/components/image_view.h
-    ayu/sync/ayu_sync_controller.cpp
-    ayu/sync/ayu_sync_controller.h
-    ayu/sync/models.h
-    ayu/sync/utils/ayu_pipe_wrapper.cpp
-    ayu/sync/utils/ayu_pipe_wrapper.h
-    ayu/sync/utils/process_utils.hpp
     ayu/messages/ayu_messages_controller.cpp
     ayu/messages/ayu_messages_controller.h
-    ayu/libs/pipe.hpp
     ayu/libs/json.hpp
     ayu/libs/json_ext.hpp
-    ayu/libs/bit_converter.hpp
     ayu/libs/sqlite/sqlite3.c
     ayu/libs/sqlite/sqlite3.h
     ayu/libs/sqlite/sqlite_orm.h

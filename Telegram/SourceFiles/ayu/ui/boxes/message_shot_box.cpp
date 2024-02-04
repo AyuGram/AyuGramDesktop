@@ -10,35 +10,32 @@
 #include <QGuiApplication>
 #include "styles/style_ayu_styles.h"
 
-#include "boxes/abstract_box.h"
+#include "lang_auto.h"
+#include "theme_selector_box.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/components/image_view.h"
+#include "boxes/abstract_box.h"
 #include "core/core_settings.h"
 #include "data/data_session.h"
-#include "lang_auto.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
-#include "ui/vertical_list.h"
-#include "theme_selector_box.h"
-#include "ayu/ayu_settings.h"
 
 MessageShotBox::MessageShotBox(
 	QWidget *parent,
 	AyuFeatures::MessageShot::ShotConfig config)
-	: _config(std::move(config))
-{
+	: _config(std::move(config)) {
 }
 
-void MessageShotBox::prepare()
-{
+void MessageShotBox::prepare() {
 	setupContent();
 }
 
-void MessageShotBox::setupContent()
-{
+void MessageShotBox::setupContent() {
 	_selectedPalette = std::make_shared<style::palette>();
 
 	const auto settings = &AyuSettings::getInstance();
@@ -70,7 +67,7 @@ void MessageShotBox::setupContent()
 	};
 
 	auto selectedTheme =
-		content->lifetime().make_state<rpl::variable<QString> >(tr::ayu_MessageShotThemeDefault(tr::now));
+		content->lifetime().make_state<rpl::variable<QString>>(tr::ayu_MessageShotThemeDefault(tr::now));
 
 	AddButtonWithLabel(
 		content,
@@ -163,24 +160,24 @@ void MessageShotBox::setupContent()
 	AddSkip(content);
 
 	addButton(tr::ayu_MessageShotSave(),
-	          [=]
-	          {
-		          const auto image = imageView->getImage();
-		          const auto path = QFileDialog::getSaveFileName(
-			          this,
-			          tr::lng_save_file(tr::now),
-			          QString(),
-			          "*.png");
+			  [=]
+			  {
+				  const auto image = imageView->getImage();
+				  const auto path = QFileDialog::getSaveFileName(
+					  this,
+					  tr::lng_save_file(tr::now),
+					  QString(),
+					  "*.png");
 
-		          if (!path.isEmpty()) {
-			          image.save(path);
-		          }
-	          });
+				  if (!path.isEmpty()) {
+					  image.save(path);
+				  }
+			  });
 	addButton(tr::ayu_MessageShotCopy(),
-	          [=]
-	          {
-		          QGuiApplication::clipboard()->setImage(imageView->getImage());
-	          });
+			  [=]
+			  {
+				  QGuiApplication::clipboard()->setImage(imageView->getImage());
+			  });
 
 	updatePreview();
 

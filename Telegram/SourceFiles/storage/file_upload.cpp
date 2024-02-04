@@ -375,7 +375,7 @@ void Uploader::currentFailed() {
 	dcMap.clear();
 	uploadingId = FullMsgId();
 	sentSize = 0;
-	for (int i = 0; i <UploadSessionsCount(); ++i) {
+	for (int i = 0; i < UploadSessionsCount(); ++i) {
 		sentSizes[i] = 0;
 	}
 
@@ -430,7 +430,7 @@ void Uploader::stopSessions() {
 }
 
 void Uploader::sendNext() {
-	if (sentSize >= (UploadSessionsCount() * 512 * 1024) || _pausedId.msg) {
+	if (sentSize >= UploadSessionsCount() * 512 * 1024 || _pausedId.msg) {
 		return;
 	}
 

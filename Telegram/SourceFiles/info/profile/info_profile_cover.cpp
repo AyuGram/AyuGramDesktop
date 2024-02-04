@@ -641,15 +641,18 @@ Cover::Cover(
 				Window::GifPauseReason::Layer);
 		}))
 , _devBadge(
-		std::make_unique<Badge>(
-			this,
-			st::infoPeerBadge,
-			peer,
-			_emojiStatusPanel.get(),
-			[=] {
-				return controller->isGifPausedAtLeastFor(
-					Window::GifPauseReason::Layer);
-			}, 0, BadgeType::None | BadgeType::AyuGram | BadgeType::Extera))
+	std::make_unique<Badge>(
+		this,
+		st::infoPeerBadge,
+		peer,
+		_emojiStatusPanel.get(),
+		[=]
+		{
+			return controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Layer);
+		},
+		0,
+		BadgeType::None | BadgeType::AyuGram | BadgeType::Extera))
 , _userpic(topic
 	? nullptr
 	: object_ptr<Ui::UserpicButton>(
@@ -722,17 +725,18 @@ Cover::Cover(
 
 	if (isAyuGramRelated(getBareID(_peer))) {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::AyuGram});
-	}
-	else if (isExteraRelated(getBareID(_peer))) {
+	} else if (isExteraRelated(getBareID(_peer))) {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
-	}
-	else {
+	} else {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
 	}
 
-	_devBadge->updated() | rpl::start_with_next([=] {
-		refreshNameGeometry(width());
-	}, _name->lifetime());
+	_devBadge->updated() | rpl::start_with_next(
+		[=]
+		{
+			refreshNameGeometry(width());
+		},
+		_name->lifetime());
 
 	initViewers(std::move(title));
 	setupChildGeometry();

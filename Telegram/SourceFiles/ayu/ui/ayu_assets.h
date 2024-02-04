@@ -8,23 +8,15 @@
 
 #define ICON(name, value) const auto name##_ICON = QStringLiteral(value)
 
-namespace AyuAssets
-{
+namespace AyuAssets {
 
 ICON(DEFAULT, "default");
-
 ICON(ALT, "alt");
-
 ICON(DISCORD, "discord");
-
 ICON(SPOTIFY, "spotify");
-
 ICON(EXTERA, "extera");
-
 ICON(NOTHING, "nothing");
-
 ICON(BARD, "bard");
-
 ICON(YAPLUS, "yaplus");
 
 void loadAppIco();

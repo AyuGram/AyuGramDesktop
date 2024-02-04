@@ -970,8 +970,8 @@ void SendFilesBox::addMenuButton() {
 					targetImage.loadFromData(targetArray, "WEBP");
 
 					addFiles(Storage::PrepareMediaFromImage(std::move(targetImage),
-					                                        std::move(targetArray),
-					                                        st::sendMediaPreviewSize));
+															std::move(targetArray),
+															st::sendMediaPreviewSize));
 					_list.overrideSendImagesAsPhotos = false;
 					initSendWay();
 
@@ -1943,8 +1943,7 @@ void SendFilesBox::send(
 		bool ctrlShiftEnter) {
 	// AyuGram useScheduledMessages
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !options.scheduled)
-	{
+	if (settings->useScheduledMessages && !options.scheduled) {
 		DEBUG_LOG(("[AyuGram] Scheduling files"));
 		auto current = base::unixtime::now();
 		options.scheduled = current + 60; // well, files can be huge...

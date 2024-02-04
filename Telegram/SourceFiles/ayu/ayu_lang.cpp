@@ -24,26 +24,22 @@ CustomLangPack *CustomLangPack::instance = nullptr;
 
 CustomLangPack::CustomLangPack() = default;
 
-void CustomLangPack::initInstance()
-{
-	if (!instance)
-		instance = new CustomLangPack;
+void CustomLangPack::initInstance() {
+	if (!instance) instance = new CustomLangPack;
 }
 
-CustomLangPack *CustomLangPack::currentInstance()
-{
+CustomLangPack *CustomLangPack::currentInstance() {
 	return instance;
 }
 
-void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId)
-{
+void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId) {
 	LOG(("Current Language pack ID: %1, Base ID: %2").arg(langPackId, langPackBaseId));
 
 	auto finalLangPackId = langMapping.contains(langPackId) ? langMapping[langPackId] : langPackId;
 
 	const auto proxy = Core::App().settings().proxy().isEnabled()
-					   ? Core::App().settings().proxy().selected()
-					   : MTP::ProxyData();
+						   ? Core::App().settings().proxy().selected()
+						   : MTP::ProxyData();
 	if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
 		QNetworkProxy LocaleProxy = ToNetworkProxy(ToDirectIpProxy(proxy));
 		networkManager.setProxy(LocaleProxy);
@@ -55,8 +51,7 @@ void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QStrin
 	if (!finalLangPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
 		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
 			finalLangPackId));
-	}
-	else {
+	} else {
 		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
 			needFallback ? langPackBaseId : finalLangPackId));
 	}
@@ -67,8 +62,7 @@ void CustomLangPack::fetchCustomLangPack(const QString &langPackId, const QStrin
 		needFallback ? (langPackBaseId.isEmpty() ? finalLangPackId : langPackBaseId) : finalLangPackId));
 }
 
-void CustomLangPack::fetchFinished()
-{
+void CustomLangPack::fetchFinished() {
 	if (!_chkReply) return;
 
 	QString langPackBaseId = Lang::GetInstance().baseId();
@@ -80,15 +74,13 @@ void CustomLangPack::fetchFinished()
 		needFallback = true;
 		_chkReply->disconnect();
 		fetchCustomLangPack("", langPackBaseId);
-	}
-	else {
+	} else {
 		QByteArray result = _chkReply->readAll().trimmed();
 		QJsonParseError error{};
 		QJsonDocument str = QJsonDocument::fromJson(result, &error);
 		if (error.error == QJsonParseError::NoError) {
 			parseLangFile(str);
-		}
-		else {
+		} else {
 			LOG(("Incorrect JSON File. Fallback to default language: English..."));
 			loadDefaultLangFile();
 		}
@@ -97,8 +89,7 @@ void CustomLangPack::fetchFinished()
 	}
 }
 
-void CustomLangPack::fetchError(QNetworkReply::NetworkError e)
-{
+void CustomLangPack::fetchError(QNetworkReply::NetworkError e) {
 	LOG(("Network error: %1").arg(e));
 
 	if (e == QNetworkReply::NetworkError::ContentNotFoundError) {
@@ -110,8 +101,7 @@ void CustomLangPack::fetchError(QNetworkReply::NetworkError e)
 			needFallback = true;
 			_chkReply->disconnect();
 			fetchCustomLangPack("", langPackBaseId);
-		}
-		else {
+		} else {
 			LOG(("AyuGram Language pack not found! Fallback to default language: English..."));
 			loadDefaultLangFile();
 			_chkReply = nullptr;
@@ -119,8 +109,7 @@ void CustomLangPack::fetchError(QNetworkReply::NetworkError e)
 	}
 }
 
-void CustomLangPack::loadDefaultLangFile()
-{
+void CustomLangPack::loadDefaultLangFile() {
 	QFile file(":/localization/en.json");
 	if (file.open(QIODevice::ReadOnly)) {
 		QJsonDocument str = QJsonDocument::fromJson(file.readAll());
@@ -133,8 +122,7 @@ void CustomLangPack::loadDefaultLangFile()
 	}
 }
 
-void CustomLangPack::parseLangFile(QJsonDocument str)
-{
+void CustomLangPack::parseLangFile(QJsonDocument str) {
 	QJsonObject json = str.object();
 	for (const QString &brokenKey : json.keys()) {
 		auto key = qsl("ayu_") + brokenKey;

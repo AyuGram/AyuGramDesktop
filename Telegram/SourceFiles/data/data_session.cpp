@@ -325,8 +325,7 @@ Session::Session(not_null<Main::Session*> session)
 
 		// AyuGram disableStories
 		const auto settings = &AyuSettings::getInstance();
-		if (!settings->disableStories)
-		{
+		if (!settings->disableStories) {
 			_stories->loadMore(Data::StorySourcesList::NotHidden);
 		}
 	});
@@ -2653,17 +2652,14 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 	const auto settings = &AyuSettings::getInstance();
 	HistoryMessageEdition edit;
 
-	if (data.type() != mtpc_message)
-	{
+	if (data.type() != mtpc_message) {
 		goto proceed;
 	}
 	edit = HistoryMessageEdition(_session, data.c_message());
-	if (settings->saveMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide)
-	{
+	if (settings->saveMessagesHistory && !existing->isLocal() && !existing->author()->isSelf() && !edit.isEditHide) {
 		const auto msg = existing->originalText();
 
-		if (edit.textWithEntities == msg || msg.empty())
-		{
+		if (edit.textWithEntities == msg || msg.empty()) {
 			goto proceed;
 		}
 
@@ -2816,8 +2812,7 @@ void Session::checkTTLs() {
 	while (!_ttlMessages.empty() && _ttlMessages.begin()->first <= now) {
 		if (!settings->saveDeletedMessages) {
 			_ttlMessages.begin()->second.front()->destroy();
-		}
-		else {
+		} else {
 			_ttlMessages.begin()->second.front()->setAyuHint(settings->deletedMark);
 		}
 	}
@@ -2842,8 +2837,7 @@ void Session::processMessagesDeleted(
 			const auto settings = &AyuSettings::getInstance();
 			if (!settings->saveDeletedMessages) {
 				i->second->destroy();
-			}
-			else {
+			} else {
 				i->second->setAyuHint(settings->deletedMark);
 			}
 
@@ -2868,8 +2862,7 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 			const auto settings = &AyuSettings::getInstance();
 			if (!settings->saveDeletedMessages) {
 				item->destroy();
-			}
-			else {
+			} else {
 				item->setAyuHint(settings->deletedMark);
 			}
 

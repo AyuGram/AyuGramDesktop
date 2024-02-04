@@ -534,23 +534,24 @@ void GifsListWidget::selectInlineResult(
 		if (forceSend || (media && preview.loaded())) {
 			auto settings = &AyuSettings::getInstance();
 			auto from = messageSendingFrom();
-			auto sendGIFCallback = crl::guard(this, [=]
-			{
-				_fileChosen.fire({
-									 .document = document,
-									 .options = options,
-									 .messageSendingFrom = from,
-								 });
-			});
+			auto sendGIFCallback = crl::guard(
+				this,
+				[=]
+				{
+					_fileChosen.fire({
+						.document = document,
+						.options = options,
+						.messageSendingFrom = from,
+					});
+				});
 
 			if (settings->gifConfirmation) {
 				Ui::show(Ui::MakeConfirmBox({
-												.text = tr::ayu_ConfirmationGIF(),
-												.confirmed = sendGIFCallback,
-												.confirmText = tr::lng_send_button()
-											}));
-			}
-			else {
+					.text = tr::ayu_ConfirmationGIF(),
+					.confirmed = sendGIFCallback,
+					.confirmText = tr::lng_send_button()
+				}));
+			} else {
 				sendGIFCallback();
 			}
 		} else if (!preview.usingThumbnail()) {

@@ -1911,8 +1911,7 @@ void SessionController::activateFirstChatsFilter() {
 	_filtersActivated = true;
 
 	auto settings = &AyuSettings::getInstance();
-	if (!settings->hideAllChatsFolder)
-	{
+	if (!settings->hideAllChatsFolder) {
 		setActiveChatsFilter(session().data().chatsFilters().defaultId());
 	}
 }

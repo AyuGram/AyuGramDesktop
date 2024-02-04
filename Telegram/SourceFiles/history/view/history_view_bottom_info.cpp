@@ -416,15 +416,16 @@ void BottomInfo::layoutDateText() {
 	const auto settings = &AyuSettings::getInstance();
 
 	const auto edited = (_data.flags & Data::Flag::Edited)
-		                    ? (settings->editedMark + ' ')
-		                    : QString();
+							? (settings->editedMark + ' ')
+							: QString();
 	const auto author = _data.author;
 	const auto prefix = !author.isEmpty() ? (author == settings->deletedMark ? u" "_q : u", "_q) : QString();
-    const auto date = edited + QLocale().toString(
-            _data.date.time(),
-            settings->showMessageSeconds ? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-                                         : QLocale::system().timeFormat(QLocale::ShortFormat)
-    );
+	const auto date = edited + QLocale().toString(
+		_data.date.time(),
+		settings->showMessageSeconds
+			? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+			: QLocale::system().timeFormat(QLocale::ShortFormat)
+	);
 	const auto afterAuthor = prefix + date;
 	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 	const auto authorWidth = st::msgDateFont->width(author);

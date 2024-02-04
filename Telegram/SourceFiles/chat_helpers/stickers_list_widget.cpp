@@ -1895,23 +1895,25 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 				auto from = messageSentAnimationInfo(
 					sticker->section,
 					sticker->index,
-					document);
-				auto sendStickerCallback = crl::guard(this, [=, this]
-				{
-					_chosen.fire({
-									 .document = document,
-									 .messageSendingFrom = from,
-								 });
-				});
+					document
+				);
+				auto sendStickerCallback = crl::guard(
+					this,
+					[=, this]
+					{
+						_chosen.fire({
+							.document = document,
+							.messageSendingFrom = from,
+						});
+					});
 
 				if (settings->stickerConfirmation) {
 					Ui::show(Ui::MakeConfirmBox({
-													.text = tr::ayu_ConfirmationSticker(),
-													.confirmed = sendStickerCallback,
-													.confirmText = tr::lng_send_button()
-												}));
-				}
-				else {
+						.text = tr::ayu_ConfirmationSticker(),
+						.confirmed = sendStickerCallback,
+						.confirmText = tr::lng_send_button()
+					}));
+				} else {
 					sendStickerCallback();
 				}
 			}

@@ -121,8 +121,6 @@ Enjoy using **AyuGram**? Consider sending us a tip!
 ### Libraries used
 
 - [JSON for Modern C++](https://github.com/nlohmann/json)
-- [BitConverter](https://github.com/YanjieHe/BitConverter)
-- [Not Enough Standards](https://github.com/Alairion/not-enough-standards)
 - [SQLite](https://github.com/sqlite/sqlite)
 - [sqlite_orm](https://github.com/fnc12/sqlite_orm)
 

@@ -10,8 +10,7 @@
 #include "ayu/libs/json_ext.hpp"
 #include "rpl/producer.h"
 
-namespace AyuSettings
-{
+namespace AyuSettings {
 
 class AyuGramSettings
 {
@@ -77,7 +76,6 @@ public:
 	bool gifConfirmation;
 	bool voiceConfirmation;
 
-public:
 	void set_sendReadMessages(bool val);
 	void set_sendReadStories(bool val);
 	void set_sendOnlinePackets(bool val);

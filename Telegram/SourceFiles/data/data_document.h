@@ -312,8 +312,7 @@ public:
 
 	std::unique_ptr<Data::UploadState> uploadingData;
 
-	int32 getDC() const
-	{
+	int32 getDC() const {
 		return _dc;
 	}
 

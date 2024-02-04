@@ -5,10 +5,10 @@
 //
 // Copyright @Radolyn, 2023
 #include "icon_picker.h"
+#include "tray.h"
 #include "ayu/ayu_settings.h"
 #include "core/application.h"
 #include "styles/style_layers.h"
-#include "tray.h"
 
 #include "ayu/ui/ayu_assets.h"
 #include "main/main_domain.h"
@@ -20,7 +20,7 @@
 #include "ayu/utils/windows_utils.h"
 #endif
 
-const QVector<QString> icons{
+const QVector icons{
 	AyuAssets::DEFAULT_ICON,
 	AyuAssets::ALT_ICON,
 	AyuAssets::DISCORD_ICON,
@@ -33,8 +33,7 @@ const QVector<QString> icons{
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
 
-void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected)
-{
+void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected) {
 	xOffset += st::cpPadding;
 
 	if (selected) {
@@ -51,8 +50,7 @@ void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool se
 	p.drawImage(rect, icon);
 }
 
-void applyIcon()
-{
+void applyIcon() {
 #ifdef Q_OS_WIN
 	AyuAssets::loadAppIco();
 	reloadAppIconFromTaskBar();
@@ -65,13 +63,11 @@ void applyIcon()
 }
 
 IconPicker::IconPicker(QWidget *parent)
-	: RpWidget(parent)
-{
+	: RpWidget(parent) {
 	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows);
 }
 
-void IconPicker::paintEvent(QPaintEvent *e)
-{
+void IconPicker::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	PainterHighQualityEnabler hq(p);
 
@@ -94,8 +90,7 @@ void IconPicker::paintEvent(QPaintEvent *e)
 	}
 }
 
-void IconPicker::mousePressEvent(QMouseEvent *e)
-{
+void IconPicker::mousePressEvent(QMouseEvent *e) {
 	auto settings = &AyuSettings::getInstance();
 	auto changed = false;
 

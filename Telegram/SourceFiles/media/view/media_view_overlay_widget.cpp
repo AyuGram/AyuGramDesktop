@@ -1114,9 +1114,6 @@ bool OverlayWidget::hasCopyMediaRestriction(bool skipPremiumCheck) const {
 	if (const auto story = _stories ? _stories->story() : nullptr) {
 		// AyuGram: removed; allow downloading any stories
 		return false;
-//		return skipPremiumCheck
-//			? !story->canDownloadIfPremium()
-//			: !story->canDownloadChecked();
 	}
 	return (_history && !_history->peer->allowsForwarding())
 		|| (_message && _message->forbidsSaving());
@@ -1153,6 +1150,7 @@ QSize OverlayWidget::videoSize() const {
 bool OverlayWidget::streamingRequiresControls() const {
 	return !_stories
 		&& _document;
+	// AyuGram: allow vieo messages seeking
 	//  && (!_document->isAnimation() || _document->isVideoMessage());
 }
 
@@ -3553,8 +3551,7 @@ void OverlayWidget::activate() {
 	QApplication::setActiveWindow(_window);
 	setFocus();
 
-	if (AyuFeatures::StreamerMode::isEnabled())
-	{
+	if (AyuFeatures::StreamerMode::isEnabled()) {
 		AyuFeatures::StreamerMode::hideWidgetWindow(_window);
 	} else {
 		AyuFeatures::StreamerMode::showWidgetWindow(_window);

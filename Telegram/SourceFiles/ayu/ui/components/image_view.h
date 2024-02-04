@@ -6,7 +6,6 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 
@@ -15,7 +14,7 @@ class ImageView : public Ui::RpWidget
 public:
 	ImageView(QWidget *parent);
 
-	void setImage(const QImage& image);
+	void setImage(const QImage &image);
 	QImage getImage() const;
 
 protected:

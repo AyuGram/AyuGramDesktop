@@ -6,11 +6,10 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "window/window_session_controller.h"
 #include "base/qthelp_regex.h"
+#include "window/window_session_controller.h"
 
-namespace AyuUrlHandlers
-{
+namespace AyuUrlHandlers {
 
 using Match = qthelp::RegularExpressionMatch;
 
@@ -24,6 +23,6 @@ bool HandleAyu(
 	const Match &match,
 	const QVariant &context);
 
-bool TryHandleSpotify(const QString& url);
+bool TryHandleSpotify(const QString &url);
 
 }

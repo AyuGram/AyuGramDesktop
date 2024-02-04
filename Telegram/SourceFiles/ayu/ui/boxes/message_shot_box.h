@@ -9,9 +9,10 @@
 #include "ayu/features/messageshot/message_shot.h"
 #include "ui/layers/box_content.h"
 
-class MessageShotBox : public Ui::BoxContent {
+class MessageShotBox : public Ui::BoxContent
+{
 public:
-	MessageShotBox(QWidget* parent, AyuFeatures::MessageShot::ShotConfig config);
+	MessageShotBox(QWidget *parent, AyuFeatures::MessageShot::ShotConfig config);
 
 protected:
 	void prepare() override;
@@ -21,5 +22,4 @@ private:
 
 	AyuFeatures::MessageShot::ShotConfig _config;
 	std::shared_ptr<style::palette> _selectedPalette;
-
 };

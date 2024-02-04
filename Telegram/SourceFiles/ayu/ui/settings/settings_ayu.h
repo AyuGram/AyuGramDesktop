@@ -6,20 +6,17 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "base/options.h"
-#include "settings/settings_common_session.h"
 #include "settings/settings_common.h"
+#include "settings/settings_common_session.h"
 
 class BoxContent;
 
-namespace Window
-{
+namespace Window {
 class Controller;
 class SessionController;
 } // namespace Window
 
-namespace Settings
-{
+namespace Settings {
 
 class Ayu : public Section<Ayu>
 {

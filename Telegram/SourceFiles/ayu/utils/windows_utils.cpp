@@ -10,8 +10,7 @@
 
 #include <ShlObj_core.h>
 
-void reloadAppIconFromTaskBar()
-{
+void reloadAppIconFromTaskBar() {
 	QString appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	QString ayugramIconPath = appdata + "/AyuGram.ico";
 
@@ -24,7 +23,10 @@ void reloadAppIconFromTaskBar()
 		IShellLink *pShellLink = NULL;
 		IPersistFile *pPersistFile = NULL;
 
-		HRESULT hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink,
+		HRESULT hr = CoCreateInstance(CLSID_ShellLink,
+									  NULL,
+									  CLSCTX_INPROC_SERVER,
+									  IID_IShellLink,
 									  (void **)&pShellLink);
 		if (SUCCEEDED(hr)) {
 			hr = pShellLink->QueryInterface(IID_IPersistFile, (void **)&pPersistFile);

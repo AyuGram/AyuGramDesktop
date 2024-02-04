@@ -10,21 +10,20 @@
 
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_chat.h"
-#include "window/themes/window_theme.h"
 #include "ui/painter.h"
+#include "window/themes/window_theme.h"
 
 ImageView::ImageView(QWidget *parent)
-	: RpWidget(parent)
-{
+	: RpWidget(parent) {
 }
 
-void ImageView::setImage(const QImage &image)
-{
+void ImageView::setImage(const QImage &image) {
 	if (this->image == image) {
 		return;
 	}
 
-	const auto set = [=] {
+	const auto set = [=]
+	{
 		this->prevImage = this->image;
 		this->image = image;
 
@@ -41,7 +40,13 @@ void ImageView::setImage(const QImage &image)
 
 		this->animation.start(
 			[=]
-			{ update(); }, 0.0, 1.0, 300, anim::easeInCubic);
+			{
+				update();
+			},
+			0.0,
+			1.0,
+			300,
+			anim::easeInCubic);
 	};
 
 	if (this->image.isNull()) {
@@ -52,22 +57,19 @@ void ImageView::setImage(const QImage &image)
 	dispatchToMainThread(set, 100);
 }
 
-QImage ImageView::getImage() const
-{
+QImage ImageView::getImage() const {
 	return image;
 }
 
-void ImageView::paintEvent(QPaintEvent *e)
-{
+void ImageView::paintEvent(QPaintEvent *e) {
 	Painter p(this);
-//	PainterHighQualityEnabler hq(p);
+	//	PainterHighQualityEnabler hq(p);
 
 	auto brush = QBrush(st::boxBg); // copy
 
 	if (Window::Theme::IsNightMode()) {
 		brush.setColor(brush.color().lighter(120));
-	}
-	else {
+	} else {
 		brush.setColor(brush.color().darker(105));
 	}
 
@@ -107,6 +109,5 @@ void ImageView::paintEvent(QPaintEvent *e)
 	}
 }
 
-void ImageView::mousePressEvent(QMouseEvent *e)
-{
+void ImageView::mousePressEvent(QMouseEvent *e) {
 }

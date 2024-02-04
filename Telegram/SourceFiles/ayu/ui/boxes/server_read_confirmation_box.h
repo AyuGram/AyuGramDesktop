@@ -9,8 +9,7 @@
 #include "ui/layers/box_content.h"
 #include "window/window_main_menu.h"
 
-namespace AyuUi
-{
+namespace AyuUi {
 
 class ServerReadConfirmationBox : public Ui::BoxContent
 {

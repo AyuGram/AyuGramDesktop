@@ -1358,8 +1358,7 @@ void Widget::setupMainMenuToggle() {
 void Widget::setupStories() {
 	// AyuGram disableStories
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
+	if (settings->disableStories) {
 		return;
 	}
 

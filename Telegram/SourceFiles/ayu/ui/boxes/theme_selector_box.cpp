@@ -6,48 +6,43 @@
 // Copyright @Radolyn, 2023
 #include "theme_selector_box.h"
 
+#include "lang_auto.h"
+#include "ayu/features/messageshot/message_shot.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
-#include "lang_auto.h"
 #include "main/main_session.h"
 #include "settings/settings_chat.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/themes/window_theme.h"
-#include "window/themes/window_theme_preview.h"
-#include "ui/vertical_list.h"
 #include "window/themes/window_themes_cloud_list.h"
-#include "ayu/features/messageshot/message_shot.h"
+#include "window/themes/window_theme_preview.h"
 
 ThemeSelectorBox::ThemeSelectorBox(
 	QWidget *parent,
 	not_null<Window::SessionController *> controller)
-	: _controller(controller)
-{
+	: _controller(controller) {
 }
 
-rpl::producer<style::palette> ThemeSelectorBox::paletteSelected()
-{
+rpl::producer<style::palette> ThemeSelectorBox::paletteSelected() {
 	return _palettes.events();
 }
 
-rpl::producer<QString> ThemeSelectorBox::themeNameChanged()
-{
+rpl::producer<QString> ThemeSelectorBox::themeNameChanged() {
 	return _themeNames.events();
 }
 
-void ThemeSelectorBox::prepare()
-{
+void ThemeSelectorBox::prepare() {
 	setupContent();
 }
 
-void ThemeSelectorBox::setupContent()
-{
+void ThemeSelectorBox::setupContent() {
 	using namespace Settings;
 
 	setTitle(tr::ayu_MessageShotThemeSelectTitle());
@@ -70,7 +65,7 @@ void ThemeSelectorBox::setupContent()
 	using namespace rpl::mappers;
 
 	const auto wrap = container->add(
-		object_ptr<Ui::SlideWrap<Ui::VerticalLayout> >(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			container,
 			object_ptr<Ui::VerticalLayout>(container))
 	)->setDuration(0);
@@ -91,13 +86,13 @@ void ThemeSelectorBox::setupContent()
 		inner->widthValue(),
 		showAll->widthValue()
 	) | rpl::start_with_next([=](int top, int outerWidth, int width)
-	                         {
-		                         showAll->moveToRight(
-			                         st::defaultSubsectionTitlePadding.left(),
-			                         top,
-			                         outerWidth);
-	                         },
-	                         showAll->lifetime());
+							 {
+								 showAll->moveToRight(
+									 st::defaultSubsectionTitlePadding.left(),
+									 top,
+									 outerWidth);
+							 },
+							 showAll->lifetime());
 
 	Ui::AddSkip(inner, st::settingsThemesTopSkip);
 
@@ -114,10 +109,10 @@ void ThemeSelectorBox::setupContent()
 
 	list->allShown(
 	) | rpl::start_with_next([=](bool shown)
-	                         {
-		                         showAll->setVisible(!shown);
-	                         },
-	                         showAll->lifetime());
+							 {
+								 showAll->setVisible(!shown);
+							 },
+							 showAll->lifetime());
 
 	showAll->addClickHandler([=]
 	{
@@ -154,8 +149,7 @@ void ThemeSelectorBox::setupContent()
 
 			if (documentView->loaded()) {
 				innerCallback();
-			}
-			else {
+			} else {
 				_controller->session().downloaderTaskFinished(
 				) | rpl::filter(
 					[=]
@@ -173,18 +167,18 @@ void ThemeSelectorBox::setupContent()
 
 	AyuFeatures::MessageShot::paletteChosen(
 	) | rpl::start_with_next([=](const auto &palette)
-	                         {
-		                         _themeNames.fire(tr::ayu_MessageShotThemeDefault(tr::now));
-		                         _selectedPalette = palette;
-	                         },
-	                         lifetime());
+							 {
+								 _themeNames.fire(tr::ayu_MessageShotThemeDefault(tr::now));
+								 _selectedPalette = palette;
+							 },
+							 lifetime());
 
 	addButton(tr::ayu_MessageShotThemeApply(),
-	          [=]
-	          {
-		          _palettes.fire(std::move(_selectedPalette));
-		          closeBox();
-	          });
+			  [=]
+			  {
+				  _palettes.fire(std::move(_selectedPalette));
+				  closeBox();
+			  });
 
 	setDimensionsToContent(st::boxWidth, container);
 }

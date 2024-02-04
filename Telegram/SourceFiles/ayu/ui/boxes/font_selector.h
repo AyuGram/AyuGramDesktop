@@ -12,8 +12,7 @@
 struct LanguageId;
 struct Font;
 
-namespace Ui
-{
+namespace Ui {
 
 class MultiSelect;
 struct ScrollToRequest;
@@ -21,16 +20,13 @@ class VerticalLayout;
 
 } // namespace Ui
 
-namespace Window
-{
+namespace Window {
 
 class SessionController;
 
 } // namespace Window
 
-
-namespace AyuUi
-{
+namespace AyuUi {
 
 class FontSelectorBox : public Ui::BoxContent
 {
@@ -38,19 +34,17 @@ public:
 	FontSelectorBox(QWidget *, Window::SessionController *controller, Fn<void(QString font)> hook);
 
 	void setInnerFocus() override;
-
 	static base::binary_guard Show(Window::SessionController *controller, const Fn<void(QString font)> hook);
+
 private:
 	QString _selectedFont;
 
 protected:
 	void prepare() override;
-
 	void keyPressEvent(QKeyEvent *e) override;
 
 private:
 	void setupTop(not_null<Ui::VerticalLayout *> container);
-
 	[[nodiscard]] int rowsInPage() const;
 
 	Window::SessionController *_controller = nullptr;

@@ -729,8 +729,7 @@ Notification::Notification(
 
 	show();
 
-	if (AyuFeatures::StreamerMode::isEnabled())
-	{
+	if (AyuFeatures::StreamerMode::isEnabled()) {
 		AyuFeatures::StreamerMode::hideWidgetWindow(this);
 	}
 }
@@ -1292,8 +1291,7 @@ HideAllButton::HideAllButton(
 
 	show();
 
-	if (AyuFeatures::StreamerMode::isEnabled())
-	{
+	if (AyuFeatures::StreamerMode::isEnabled()) {
 		AyuFeatures::StreamerMode::hideWidgetWindow(this);
 	}
 }

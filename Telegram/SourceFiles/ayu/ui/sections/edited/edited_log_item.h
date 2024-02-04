@@ -10,14 +10,12 @@
 
 class History;
 
-namespace HistoryView
-{
+namespace HistoryView {
 class ElementDelegate;
 class Element;
 } // namespace HistoryView
 
-namespace EditedLog
-{
+namespace EditedLog {
 
 class OwnedItem;
 
@@ -41,16 +39,15 @@ public:
 	OwnedItem &operator=(OwnedItem &&other);
 	~OwnedItem();
 
-	[[nodiscard]] HistoryView::Element *get() const
-	{
+	[[nodiscard]] HistoryView::Element *get() const {
 		return _view.get();
 	}
-	[[nodiscard]] HistoryView::Element *operator->() const
-	{
+
+	[[nodiscard]] HistoryView::Element *operator->() const {
 		return get();
 	}
-	[[nodiscard]] operator HistoryView::Element *() const
-	{
+
+	[[nodiscard]] operator HistoryView::Element *() const {
 		return get();
 	}
 

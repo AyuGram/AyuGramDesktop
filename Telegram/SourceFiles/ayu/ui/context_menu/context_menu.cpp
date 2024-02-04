@@ -5,87 +5,94 @@
 //
 // Copyright @Radolyn, 2023
 #include "ayu/ui/context_menu/context_menu.h"
-#include "ayu/utils/qt_key_modifiers_extended.h"
-#include "history/history_item_components.h"
+
+#include <styles/style_menu_icons.h>
+
 #include "lang_auto.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/messages/ayu_messages_controller.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
+#include "ayu/utils/qt_key_modifiers_extended.h"
+#include "history/history_item_components.h"
 
-#include "mainwidget.h"
 #include "core/mime_type.h"
 #include "styles/style_ayu_icons.h"
-#include "window/window_peer_menu.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "window/window_peer_menu.h"
 
 #include "ayu/ui/sections/edited/edited_log_section.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "base/unixtime.h"
+#include "history/view/history_view_element.h"
+#include "window/window_session_controller.h"
 
+namespace AyuUi {
 
-namespace AyuUi
-{
-
-bool needToShowItem(int state)
-{
+bool needToShowItem(int state) {
 	return state == 1 || state == 2 && base::IsExtendedContextMenuModifierPressed();
 }
 
-void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
-{
+void AddHistoryAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	if (AyuMessages::getInstance().hasRevisions(item)) {
-		menu->addAction(tr::ayu_EditsHistoryMenuText(tr::now), [=]
-		{
-			item->history()->session().tryResolveWindow()
-				->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
-		}, &st::ayuEditsHistoryIcon);
+		menu->addAction(tr::ayu_EditsHistoryMenuText(tr::now),
+						[=]
+						{
+							item->history()->session().tryResolveWindow()
+								->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
+						},
+						&st::ayuEditsHistoryIcon);
 	}
 }
 
-void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
-{
+void AddHideMessageAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showHideMessageInContextMenu)) {
 		return;
 	}
 
 	const auto history = item->history();
-	menu->addAction(tr::ayu_ContextHideMessage(tr::now), [=]()
-	{
-		item->destroy();
-		history->requestChatListMessage();
+	menu->addAction(tr::ayu_ContextHideMessage(tr::now),
+					[=]()
+					{
+						item->destroy();
+						history->requestChatListMessage();
 
-		AyuState::hide(item);
-	}, &st::menuIconClear);
+						AyuState::hide(item);
+					},
+					&st::menuIconClear);
 }
 
-void AddUserMessagesAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
-{
+void AddUserMessagesAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showUserMessagesInContextMenu)) {
 		return;
 	}
 
 	if (item->history()->peer->isChat() || item->history()->peer->isMegagroup()) {
-		menu->addAction(tr::ayu_UserMessagesMenuText(tr::now), [=]
-		{
-			if (const auto window = item->history()->session().tryResolveWindow()) {
-				if (const auto mainWidget = window->widget()->sessionController()) {
-					const auto peer = item->history()->peer;
-					const auto key = (peer && !peer->isUser())
-									 ? item->topic()
-									   ? Dialogs::Key{item->topic()}
-									   : Dialogs::Key{item->history()}
-									 : Dialogs::Key();
-					mainWidget->content()->searchMessages(QString(), key, item->from()->asUser());
-				}
-			}
-		}, &st::menuIconTTL);
+		menu->addAction(tr::ayu_UserMessagesMenuText(tr::now),
+						[=]
+						{
+							if (const auto window = item->history()->session().tryResolveWindow()) {
+								if (const auto mainWidget = window->widget()->sessionController()) {
+									const auto peer = item->history()->peer;
+									const auto key = (peer && !peer->isUser())
+														 ? item->topic()
+															   ? Dialogs::Key{item->topic()}
+															   : Dialogs::Key{item->history()}
+														 : Dialogs::Key();
+									mainWidget->content()->searchMessages(QString(), key, item->from()->asUser());
+								}
+							}
+						},
+						&st::menuIconTTL);
 	}
 }
 
-void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
-{
+void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	const auto settings = &AyuSettings::getInstance();
 	if (!needToShowItem(settings->showMessageDetailsInContextMenu)) {
 		return;
@@ -110,8 +117,9 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "NullDereference"
 	const auto messageForwardedDate =
-		isForwarded ? base::unixtime::parse(forwarded->originalDate)
-					: QDateTime();
+		isForwarded
+			? base::unixtime::parse(forwarded->originalDate)
+			: QDateTime();
 #pragma clang diagnostic pop
 
 	const auto
@@ -127,14 +135,14 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 
 	const auto hasAnyPostField =
 		!messageViews.isEmpty() ||
-			!messageForwards.isEmpty();
+		!messageForwards.isEmpty();
 
 	const auto hasAnyMediaField =
 		!mediaSize.isEmpty() ||
-			!mediaMime.isEmpty() ||
-			!mediaName.isEmpty() ||
-			!mediaResolution.isEmpty() ||
-			!mediaDC.isEmpty();
+		!mediaMime.isEmpty() ||
+		!mediaName.isEmpty() ||
+		!mediaResolution.isEmpty() ||
+		!mediaDC.isEmpty();
 
 	const auto callback = Ui::Menu::CreateAddActionCallback(menu);
 
@@ -270,8 +278,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 	});
 }
 
-void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
-{
+void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
 	if (item->isLocal()) {
 		return;
 	}
@@ -281,10 +288,12 @@ void AddReadUntilAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item)
 		return;
 	}
 
-	menu->addAction(tr::ayu_ReadUntilMenuText(tr::now), [=]()
-	{
-		readHistory(item);
-	}, &st::menuIconShowInChat);
+	menu->addAction(tr::ayu_ReadUntilMenuText(tr::now),
+					[=]()
+					{
+						readHistory(item);
+					},
+					&st::menuIconShowInChat);
 }
 
 } // namespace AyuUi

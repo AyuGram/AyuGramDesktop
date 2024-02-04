@@ -22,28 +22,24 @@
 
 #include "main/main_session.h"
 
-namespace AyuMessages
-{
+namespace AyuMessages {
 
-std::optional<ayu_messages_controller> controller = std::nullopt;
+std::optional<AyuMessagesController> controller = std::nullopt;
 
-void initialize()
-{
+void initialize() {
 	if (controller.has_value()) {
 		return;
 	}
 
-	controller = ayu_messages_controller();
+	controller = AyuMessagesController();
 }
 
-ayu_messages_controller &getInstance()
-{
+AyuMessagesController &getInstance() {
 	initialize();
 	return controller.value();
 }
 
-void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMessage &message)
-{
+void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMessage &message) {
 	message.userId = item->history()->owner().session().userId().bare;
 	message.dialogId = getDialogIdFromPeer(item->history()->peer);
 	message.groupedId = item->groupId().value;
@@ -58,8 +54,7 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 
 	if (auto edited = item->Get<HistoryMessageEdited>()) {
 		message.editDate = edited->date;
-	}
-	else {
+	} else {
 		message.editDate = base::unixtime::now();
 	}
 
@@ -68,7 +63,7 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 
 	auto serializedText = serializeTextWithEntities(item);
 	message.text = serializedText.first;
-//		message.textEntities = serializedText.second;
+	//		message.textEntities = serializedText.second;
 
 	// todo:
 	message.mediaPath = "/";
@@ -80,16 +75,14 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem *> item, EditedMes
 	// message.mimeType;
 }
 
-void ayu_messages_controller::addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem *> item)
-{
+void AyuMessagesController::addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem *> item) {
 	EditedMessage message;
 	map(edition, item, message);
 
 	AyuDatabase::addEditedMessage(message);
 }
 
-std::vector<EditedMessage> ayu_messages_controller::getEditedMessages(HistoryItem *item)
-{
+std::vector<EditedMessage> AyuMessagesController::getEditedMessages(HistoryItem *item) {
 	auto userId = item->history()->owner().session().userId().bare;
 	auto dialogId = getDialogIdFromPeer(item->history()->peer);
 	auto msgId = item->id.bare;
@@ -97,8 +90,7 @@ std::vector<EditedMessage> ayu_messages_controller::getEditedMessages(HistoryIte
 	return AyuDatabase::getEditedMessages(userId, dialogId, msgId);
 }
 
-bool ayu_messages_controller::hasRevisions(not_null<HistoryItem *> item)
-{
+bool AyuMessagesController::hasRevisions(not_null<HistoryItem *> item) {
 	auto userId = item->history()->owner().session().userId().bare;
 	auto dialogId = getDialogIdFromPeer(item->history()->peer);
 	auto msgId = item->id.bare;

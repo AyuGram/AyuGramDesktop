@@ -16,17 +16,15 @@
 #include "main/main_domain.h"
 #include "main/main_session.h"
 
-namespace AyuWorker
-{
+namespace AyuWorker {
+
 std::unordered_map<ID, bool> state;
 
-void markAsOnline(not_null<Main::Session *> session)
-{
+void markAsOnline(not_null<Main::Session *> session) {
 	state[session->userId().bare] = true;
 }
 
-void lateInit()
-{
+void lateInit() {
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
 		if (const auto session = account->maybeSession()) {
 			const auto id = session->userId().bare;
@@ -35,8 +33,7 @@ void lateInit()
 	}
 }
 
-void runOnce()
-{
+void runOnce() {
 	if (!Core::App().domain().started()) {
 		return;
 	}
@@ -72,17 +69,16 @@ void runOnce()
 	}
 }
 
-[[noreturn]] void loop()
-{
+[[noreturn]] void loop() {
 	while (true) {
 		runOnce();
 		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 }
 
-void initialize()
-{
+void initialize() {
 	std::thread t(loop);
 	t.detach();
 }
+
 }

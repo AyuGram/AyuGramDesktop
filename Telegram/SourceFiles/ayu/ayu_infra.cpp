@@ -8,15 +8,13 @@
 
 #include "ayu_lang.h"
 #include "ayu_worker.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/database/ayu_database.h"
 #include "lang/lang_instance.h"
-#include "ayu/ayu_settings.h"
 
-namespace AyuInfra
-{
+namespace AyuInfra {
 
-void initLang()
-{
+void initLang() {
 	QString langPackBaseId = Lang::GetInstance().baseId();
 	QString langPackId = Lang::GetInstance().id();
 	if (langPackId.isEmpty()) {
@@ -27,26 +25,22 @@ void initLang()
 	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
 }
 
-void initFonts()
-{
+void initFonts() {
 	auto settings = &AyuSettings::getInstance();
 
 	AyuFonts::setMainFont(settings->mainFont);
 	AyuFonts::setMonoFont(settings->monoFont);
 }
 
-void initDatabase()
-{
+void initDatabase() {
 	AyuDatabase::initialize();
 }
 
-void initWorker()
-{
+void initWorker() {
 	AyuWorker::initialize();
 }
 
-void init()
-{
+void init() {
 	initLang();
 	initDatabase();
 	initFonts();

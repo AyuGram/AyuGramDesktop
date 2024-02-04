@@ -6,10 +6,7 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "ui/rp_widget.h"
-
-namespace AyuFeatures::StreamerMode
-{
+namespace AyuFeatures::StreamerMode {
 
 bool isEnabled();
 void enable();

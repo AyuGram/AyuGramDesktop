@@ -11,10 +11,8 @@
 
 #include "base/unique_qptr.h"
 
-namespace Ui
-{
-namespace Menu
-{
+namespace Ui {
+namespace Menu {
 class Menu;
 class ItemBase;
 } // namespace Menu

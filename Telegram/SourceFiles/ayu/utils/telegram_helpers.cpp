@@ -8,31 +8,29 @@
 #include <functional>
 #include <QTimer>
 
+#include "apiwrap.h"
 #include "api/api_text_entities.h"
 
+#include "lang_auto.h"
+#include "ayu/ayu_worker.h"
+#include "ayu/database/entities.h"
 #include "core/mime_type.h"
 #include "data/data_channel.h"
-#include "data/data_document_media.h"
-#include "data/data_photo.h"
-#include "data/data_photo_media.h"
-#include "inline_bots/inline_bot_result.h"
-#include "lang_auto.h"
-#include "apiwrap.h"
-#include "ayu/ayu_worker.h"
 #include "data/data_forum.h"
-#include "data/data_user.h"
 #include "data/data_forum_topic.h"
 #include "data/data_histories.h"
 #include "data/data_peer_id.h"
+#include "data/data_photo.h"
+#include "data/data_user.h"
+#include "inline_bots/inline_bot_result.h"
 
-#include "ayu/sync/models.h"
-
-#include "data/data_session.h"
 #include "data/data_document.h"
+#include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_unread_things.h"
-#include "data/data_histories.h"
+#include "main/main_account.h"
+#include "main/main_session.h"
 #include "ui/text/format_values.h"
 
 // https://github.com/AyuGram/AyuGram4AX/blob/rewrite/TMessagesProj/src/main/java/com/radolyn/ayugram/AyuConstants.java
@@ -82,8 +80,7 @@ std::unordered_set<ID> extera_devs = {
 	139303278
 };
 
-Main::Session *getSession(ID userId)
-{
+Main::Session *getSession(ID userId) {
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
 		if (const auto session = account->maybeSession()) {
 			if (session->userId().bare == userId) {
@@ -95,26 +92,25 @@ Main::Session *getSession(ID userId)
 	return nullptr;
 }
 
-bool accountExists(ID userId)
-{
+bool accountExists(ID userId) {
 	return userId == 0 || getSession(userId) != nullptr;
 }
 
-void dispatchToMainThread(std::function<void()> callback, int delay)
-{
+void dispatchToMainThread(std::function<void()> callback, int delay) {
 	auto timer = new QTimer();
 	timer->moveToThread(qApp->thread());
 	timer->setSingleShot(true);
-	QObject::connect(timer, &QTimer::timeout, [=]()
-	{
-		callback();
-		timer->deleteLater();
-	});
+	QObject::connect(timer,
+					 &QTimer::timeout,
+					 [=]()
+					 {
+						 callback();
+						 timer->deleteLater();
+					 });
 	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, delay));
 }
 
-not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session)
-{
+not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session) {
 	if (dialogId > 0) {
 		return session->data().history(peerFromUser(dialogId));
 	}
@@ -127,15 +123,14 @@ not_null<History *> getHistoryFromDialogId(ID dialogId, Main::Session *session)
 	return session->data().history(peerFromChat(abs(dialogId)));
 }
 
-ID getDialogIdFromPeer(not_null<PeerData *> peer)
-{
+ID getDialogIdFromPeer(not_null<PeerData *> peer) {
 	auto peerId = peerIsUser(peer->id)
-				  ? peerToUser(peer->id).bare
-				  : peerIsChat(peer->id)
-					? peerToChat(peer->id).bare
-					: peerIsChannel(peer->id)
-					  ? peerToChannel(peer->id).bare
-					  : peer->id.value;
+					  ? peerToUser(peer->id).bare
+					  : peerIsChat(peer->id)
+							? peerToChat(peer->id).bare
+							: peerIsChannel(peer->id)
+								  ? peerToChannel(peer->id).bare
+								  : peer->id.value;
 
 	if (peer->isChannel() || peer->isChat()) {
 		peerId = -peerId;
@@ -144,15 +139,15 @@ ID getDialogIdFromPeer(not_null<PeerData *> peer)
 	return peerId;
 }
 
-std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item)
-{
+std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryItem *> item) {
 	if (item->emptyText()) {
 		return std::make_pair("", "");
 	}
 
 	auto textWithEntities = item->originalText();
 	auto text = textWithEntities.text.toStdString();
-	auto entities = EntitiesToMTP(&item->history()->owner().session(), textWithEntities.entities,
+	auto entities = EntitiesToMTP(&item->history()->owner().session(),
+								  textWithEntities.entities,
 								  Api::ConvertOption::SkipLocal);
 
 	if (entities.v.isEmpty()) {
@@ -167,29 +162,25 @@ std::pair<std::string, std::string> serializeTextWithEntities(not_null<HistoryIt
 	return std::make_pair(text, std::string(reinterpret_cast<char *>(buff.data()), buff.size()));
 }
 
-ID getBareID(not_null<PeerData *> peer)
-{
+ID getBareID(not_null<PeerData *> peer) {
 	return peerIsUser(peer->id)
-		   ? peerToUser(peer->id).bare
-		   : peerIsChat(peer->id)
-			 ? peerToChat(peer->id).bare
-			 : peerIsChannel(peer->id)
-			   ? peerToChannel(peer->id).bare
-			   : peer->id.value;
+			   ? peerToUser(peer->id).bare
+			   : peerIsChat(peer->id)
+					 ? peerToChat(peer->id).bare
+					 : peerIsChannel(peer->id)
+						   ? peerToChannel(peer->id).bare
+						   : peer->id.value;
 }
 
-bool isAyuGramRelated(ID peerId)
-{
+bool isAyuGramRelated(ID peerId) {
 	return ayugram_devs.contains(peerId) || ayugram_channels.contains(peerId);
 }
 
-bool isExteraRelated(ID peerId)
-{
+bool isExteraRelated(ID peerId) {
 	return extera_devs.contains(peerId) || extera_channels.contains(peerId);
 }
 
-void MarkAsReadChatList(not_null<Dialogs::MainList *> list)
-{
+void MarkAsReadChatList(not_null<Dialogs::MainList *> list) {
 	auto mark = std::vector<not_null<History *>>();
 	for (const auto &row : list->indexed()->all()) {
 		if (const auto history = row->history()) {
@@ -199,8 +190,7 @@ void MarkAsReadChatList(not_null<Dialogs::MainList *> list)
 	ranges::for_each(mark, MarkAsReadThread);
 }
 
-void readMentions(base::weak_ptr<Data::Thread> weakThread)
-{
+void readMentions(base::weak_ptr<Data::Thread> weakThread) {
 	const auto thread = weakThread.get();
 	if (!thread) {
 		return;
@@ -214,21 +204,19 @@ void readMentions(base::weak_ptr<Data::Thread> weakThread)
 		peer->input,
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result)
-			{
-				const auto offset = peer->session().api().applyAffectedHistory(
-					peer,
-					result);
-				if (offset > 0) {
-					readMentions(weakThread);
-				}
-				else {
-					peer->owner().history(peer)->clearUnreadMentionsFor(rootId);
-				}
-			}).send();
+	{
+		const auto offset = peer->session().api().applyAffectedHistory(
+			peer,
+			result);
+		if (offset > 0) {
+			readMentions(weakThread);
+		} else {
+			peer->owner().history(peer)->clearUnreadMentionsFor(rootId);
+		}
+	}).send();
 }
 
-void readReactions(base::weak_ptr<Data::Thread> weakThread)
-{
+void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 	const auto thread = weakThread.get();
 	if (!thread) {
 		return;
@@ -242,21 +230,19 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread)
 		peer->input,
 		MTP_int(rootId)
 	)).done([=](const MTPmessages_AffectedHistory &result)
-			{
-				const auto offset = peer->session().api().applyAffectedHistory(
-					peer,
-					result);
-				if (offset > 0) {
-					readReactions(weakThread);
-				}
-				else {
-					peer->owner().history(peer)->clearUnreadReactionsFor(rootId);
-				}
-			}).send();
+	{
+		const auto offset = peer->session().api().applyAffectedHistory(
+			peer,
+			result);
+		if (offset > 0) {
+			readReactions(weakThread);
+		} else {
+			peer->owner().history(peer)->clearUnreadReactionsFor(rootId);
+		}
+	}).send();
 }
 
-void MarkAsReadThread(not_null<Data::Thread *> thread)
-{
+void MarkAsReadThread(not_null<Data::Thread *> thread) {
 	const auto readHistory = [&](not_null<History *> history)
 	{
 		history->owner().histories().readInbox(history);
@@ -276,17 +262,15 @@ void MarkAsReadThread(not_null<Data::Thread *> thread)
 		if (const auto forum = thread->asForum()) {
 			forum->enumerateTopics([](
 				not_null<Data::ForumTopic *> topic)
-								   {
-									   MarkAsReadThread(topic);
-								   });
-		}
-		else if (const auto history = thread->asHistory()) {
+				{
+					MarkAsReadThread(topic);
+				});
+		} else if (const auto history = thread->asHistory()) {
 			readHistory(history);
 			if (const auto migrated = history->migrateSibling()) {
 				readHistory(migrated);
 			}
-		}
-		else if (const auto topic = thread->asTopic()) {
+		} else if (const auto topic = thread->asTopic()) {
 			topic->readTillEnd();
 		}
 	}
@@ -302,32 +286,33 @@ void MarkAsReadThread(not_null<Data::Thread *> thread)
 	AyuWorker::markAsOnline(&thread->session());
 }
 
-void readHistory(not_null<HistoryItem *> message)
-{
+void readHistory(not_null<HistoryItem *> message) {
 	const auto history = message->history();
 	const auto tillId = message->id;
 
 	history->session().data().histories()
-		.sendRequest(history, Data::Histories::RequestType::ReadInbox, [=](Fn<void()> finish)
-		{
-			if (const auto channel = history->peer->asChannel()) {
-				return history->session().api().request(MTPchannels_ReadHistory(
-					channel->inputChannel,
-					MTP_int(tillId)
-				)).done([=] { AyuWorker::markAsOnline(&history->session()); }).send();
-			}
+		.sendRequest(history,
+					 Data::Histories::RequestType::ReadInbox,
+					 [=](Fn<void()> finish)
+					 {
+						 if (const auto channel = history->peer->asChannel()) {
+							 return history->session().api().request(MTPchannels_ReadHistory(
+								 channel->inputChannel,
+								 MTP_int(tillId)
+							 )).done([=] { AyuWorker::markAsOnline(&history->session()); }).send();
+						 }
 
-			return history->session().api().request(MTPmessages_ReadHistory(
-				history->peer->input,
-				MTP_int(tillId)
-			)).done([=](const MTPmessages_AffectedMessages &result)
-			{
-				history->session().api().applyAffectedMessages(history->peer, result);
-				AyuWorker::markAsOnline(&history->session());
-			}).fail([=]
-			{
-			}).send();
-		});
+						 return history->session().api().request(MTPmessages_ReadHistory(
+							 history->peer->input,
+							 MTP_int(tillId)
+						 )).done([=](const MTPmessages_AffectedMessages &result)
+						 {
+							 history->session().api().applyAffectedMessages(history->peer, result);
+							 AyuWorker::markAsOnline(&history->session());
+						 }).fail([=]
+						 {
+						 }).send();
+					 });
 
 	if (history->unreadMentions().has()) {
 		readMentions(history->asThread());
@@ -338,8 +323,7 @@ void readHistory(not_null<HistoryItem *> message)
 	}
 }
 
-QString formatTTL(int time)
-{
+QString formatTTL(int time) {
 	if (time == 0x7FFFFFFF) {
 		return QString("👀 %1").arg(tr::ayu_OneViewTTL(tr::now));
 	}
@@ -347,8 +331,7 @@ QString formatTTL(int time)
 	return QString("🕓 %1s").arg(time);
 }
 
-QString getDCName(int dc)
-{
+QString getDCName(int dc) {
 	const auto getName = [=](int dc)
 	{
 		switch (dc) {
@@ -368,8 +351,7 @@ QString getDCName(int dc)
 	return QString("DC%1, %2").arg(dc).arg(getName(dc));
 }
 
-QString getLocalizedAt()
-{
+QString getLocalizedAt() {
 	static const auto val = tr::lng_mediaview_date_time(
 		tr::now,
 		lt_date,
@@ -379,8 +361,7 @@ QString getLocalizedAt()
 	return val;
 }
 
-QString formatDateTime(const QDateTime &date)
-{
+QString formatDateTime(const QDateTime &date) {
 	const auto locale = QLocale::system();
 	const auto datePart = locale.toString(date.date(), QLocale::ShortFormat);
 	const auto timePart = locale.toString(date, "HH:mm:ss");
@@ -388,8 +369,7 @@ QString formatDateTime(const QDateTime &date)
 	return datePart + getLocalizedAt() + timePart;
 }
 
-QString getMediaSize(not_null<HistoryItem *> message)
-{
+QString getMediaSize(not_null<HistoryItem *> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -400,10 +380,11 @@ QString getMediaSize(not_null<HistoryItem *> message)
 	const auto photo = media->photo();
 
 	int64 size = -1;
-	if (document) { // any file
+	if (document) {
+		// any file
 		size = document->size;
-	}
-	else if (photo && photo->hasVideo()) { // video
+	} else if (photo && photo->hasVideo()) {
+		// video
 		size = photo->videoByteSize(Data::PhotoSize::Large);
 		if (size == 0) {
 			size = photo->videoByteSize(Data::PhotoSize::Small);
@@ -411,8 +392,8 @@ QString getMediaSize(not_null<HistoryItem *> message)
 		if (size == 0) {
 			size = photo->videoByteSize(Data::PhotoSize::Thumbnail);
 		}
-	}
-	else if (photo && !photo->hasVideo()) { // photo
+	} else if (photo && !photo->hasVideo()) {
+		// photo
 		size = photo->imageByteSize(Data::PhotoSize::Large);
 		if (size == 0) {
 			size = photo->imageByteSize(Data::PhotoSize::Small);
@@ -429,8 +410,7 @@ QString getMediaSize(not_null<HistoryItem *> message)
 	return Ui::FormatSizeText(size);
 }
 
-QString getMediaMime(not_null<HistoryItem *> message)
-{
+QString getMediaMime(not_null<HistoryItem *> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -440,21 +420,21 @@ QString getMediaMime(not_null<HistoryItem *> message)
 	const auto document = media->document();
 	const auto photo = media->photo();
 
-	if (document) { // any file
+	if (document) {
+		// any file
 		return document->mimeString();
-	}
-	else if (photo && photo->hasVideo()) { // video
+	} else if (photo && photo->hasVideo()) {
+		// video
 		return "video/mp4";
-	}
-	else if (photo && !photo->hasVideo()) { // photo
+	} else if (photo && !photo->hasVideo()) {
+		// photo
 		return "image/jpeg";
 	}
 
 	return {};
 }
 
-QString getMediaName(not_null<HistoryItem *> message)
-{
+QString getMediaName(not_null<HistoryItem *> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -470,8 +450,7 @@ QString getMediaName(not_null<HistoryItem *> message)
 	return {};
 }
 
-QString getMediaResolution(not_null<HistoryItem *> message)
-{
+QString getMediaResolution(not_null<HistoryItem *> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -492,8 +471,7 @@ QString getMediaResolution(not_null<HistoryItem *> message)
 
 	if (document) {
 		return formatQSize(document->dimensions);
-	}
-	else if (photo) {
+	} else if (photo) {
 		auto result = photo->size(Data::PhotoSize::Large);
 		if (!result.has_value()) {
 			result = photo->size(Data::PhotoSize::Small);
@@ -507,8 +485,7 @@ QString getMediaResolution(not_null<HistoryItem *> message)
 	return {};
 }
 
-QString getMediaDC(not_null<HistoryItem *> message)
-{
+QString getMediaDC(not_null<HistoryItem *> message) {
 	if (!message->media()) {
 		return {};
 	}
@@ -520,16 +497,14 @@ QString getMediaDC(not_null<HistoryItem *> message)
 
 	if (document) {
 		return getDCName(document->getDC());
-	}
-	else if (photo) {
+	} else if (photo) {
 		return getDCName(photo->getDC());
 	}
 
 	return {};
 }
 
-void resolveUser(ID userId, const QString &username, Main::Session *session, const Callback &callback)
-{
+void resolveUser(ID userId, const QString &username, Main::Session *session, const Callback &callback) {
 	auto normalized = username.trimmed().toLower();
 	if (normalized.isEmpty()) {
 		callback(QString(), nullptr);
@@ -545,30 +520,29 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 	session->api().request(MTPcontacts_ResolveUsername(
 		MTP_string(normalized)
 	)).done([=](const MTPcontacts_ResolvedPeer &result)
-			{
-				Expects(result.type() == mtpc_contacts_resolvedPeer);
+	{
+		Expects(result.type() == mtpc_contacts_resolvedPeer);
 
-				auto &data = result.c_contacts_resolvedPeer();
-				session->data().processUsers(data.vusers());
-				session->data().processChats(data.vchats());
-				const auto peer = session->data().peerLoaded(
-					peerFromMTP(data.vpeer()));
-				if (const auto user = peer ? peer->asUser() : nullptr) {
-					if (user->id.value == userId) {
-						callback(normalized, user);
-						return;
-					}
-				}
+		auto &data = result.c_contacts_resolvedPeer();
+		session->data().processUsers(data.vusers());
+		session->data().processChats(data.vchats());
+		const auto peer = session->data().peerLoaded(
+			peerFromMTP(data.vpeer()));
+		if (const auto user = peer ? peer->asUser() : nullptr) {
+			if (user->id.value == userId) {
+				callback(normalized, user);
+				return;
+			}
+		}
 
-				callback(normalized, nullptr);
-			}).fail([=]
-					{
-						callback(QString(), nullptr);
-					}).send();
+		callback(normalized, nullptr);
+	}).fail([=]
+	{
+		callback(QString(), nullptr);
+	}).send();
 }
 
-void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cache, const Callback &callback)
-{
+void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cache, const Callback &callback) {
 	if (!session) {
 		callback(QString(), nullptr);
 		return;
@@ -579,12 +553,14 @@ void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cac
 
 	if (!bot) {
 		if (searchUserFlag) {
-			resolveUser(botId, "tgdb_bot", session, [=](const QString &title, UserData *data)
-			{
-				searchUser(userId, session, false, false, callback);
-			});
-		}
-		else {
+			resolveUser(botId,
+						"tgdb_bot",
+						session,
+						[=](const QString &title, UserData *data)
+						{
+							searchUser(userId, session, false, false, callback);
+						});
+		} else {
 			callback(QString(), nullptr);
 		}
 		return;
@@ -598,107 +574,113 @@ void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cac
 		MTP_string(QString::number(userId)),
 		MTP_string("")
 	)).done([=](const MTPmessages_BotResults &result)
-			{
-				if (result.type() != mtpc_messages_botResults) {
-					callback(QString(), nullptr);
-					return;
+	{
+		if (result.type() != mtpc_messages_botResults) {
+			callback(QString(), nullptr);
+			return;
+		}
+		auto &d = result.c_messages_botResults();
+		session->data().processUsers(d.vusers());
+
+		auto &v = d.vresults().v;
+		auto queryId = d.vquery_id().v;
+
+		auto added = 0;
+		for (const auto &res : v) {
+			const auto message = res.match(
+				[&](const MTPDbotInlineResult &data)
+				{
+					return &data.vsend_message();
+				},
+				[&](const MTPDbotInlineMediaResult &data)
+				{
+					return &data.vsend_message();
+				});
+
+			const auto text = message->match(
+				[&](const MTPDbotInlineMessageMediaAuto &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageText &data)
+				{
+					return qs(data.vmessage());
+				},
+				[&](const MTPDbotInlineMessageMediaGeo &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageMediaVenue &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageMediaContact &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageMediaInvoice &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageMediaWebPage &data)
+				{
+					return QString();
+				});
+
+			if (text.isEmpty()) {
+				continue;
+			}
+
+			ID id = 0; // 🆔
+			QString title; // 🏷
+			QString username; // 📧
+
+			for (const auto &line : text.split('\n')) {
+				if (line.startsWith("🆔")) {
+					id = line.mid(line.indexOf(':') + 1).toLongLong();
+				} else if (line.startsWith("🏷")) {
+					title = line.mid(line.indexOf(':') + 1);
+				} else if (line.startsWith("📧")) {
+					username = line.mid(line.indexOf(':') + 1);
 				}
-				auto &d = result.c_messages_botResults();
-				session->data().processUsers(d.vusers());
+			}
 
-				auto &v = d.vresults().v;
-				auto queryId = d.vquery_id().v;
+			if (id == 0) {
+				continue;
+			}
 
-				auto added = 0;
-				for (const auto &res : v) {
-					const auto message = res.match(
-						[&](const MTPDbotInlineResult &data)
-						{
-							return &data.vsend_message();
-						}, [&](const MTPDbotInlineMediaResult &data)
-						{
-							return &data.vsend_message();
-						});
+			if (id != userId) {
+				continue;
+			}
 
-					const auto text = message->match(
-						[&](const MTPDbotInlineMessageMediaAuto &data)
-						{
-							return QString();
-						}, [&](const MTPDbotInlineMessageText &data)
-						{
-							return qs(data.vmessage());
-						}, [&](const MTPDbotInlineMessageMediaGeo &data)
-						{
-							return QString();
-						}, [&](const MTPDbotInlineMessageMediaVenue &data)
-						{
-							return QString();
-						}, [&](const MTPDbotInlineMessageMediaContact &data)
-						{
-							return QString();
-						}, [&](const MTPDbotInlineMessageMediaInvoice &data)
-						{
-							return QString();
-						}, [&](const MTPDbotInlineMessageMediaWebPage &data)
-						{
-							return QString();
-						});
+			if (!username.isEmpty()) {
+				resolveUser(id,
+							username,
+							session,
+							[=](const QString &titleInner, UserData *data)
+							{
+								if (data) {
+									callback(titleInner, data);
+								} else {
+									callback(title, nullptr);
+								}
+							});
+				return;
+			}
 
-					if (text.isEmpty()) {
-						continue;
-					}
+			if (!title.isEmpty()) {
+				callback(title, nullptr);
+			}
+		}
 
-					ID id = 0; // 🆔
-					QString title; // 🏷
-					QString username; // 📧
-
-					for (const auto &line : text.split('\n')) {
-						if (line.startsWith("🆔")) {
-							id = line.mid(line.indexOf(':') + 1).toLongLong();
-						}
-						else if (line.startsWith("🏷")) {
-							title = line.mid(line.indexOf(':') + 1);
-						}
-						else if (line.startsWith("📧")) {
-							username = line.mid(line.indexOf(':') + 1);
-						}
-					}
-
-					if (id == 0) {
-						continue;
-					}
-
-					if (id != userId) {
-						continue;
-					}
-
-					if (!username.isEmpty()) {
-						resolveUser(id, username, session, [=](const QString &titleInner, UserData *data)
-						{
-							if (data) {
-								callback(titleInner, data);
-							}
-							else {
-								callback(title, nullptr);
-							}
-						});
-						return;
-					}
-
-					if (!title.isEmpty()) {
-						callback(title, nullptr);
-					}
-				}
-
-				callback(QString(), nullptr);
-			}).fail([=]
-					{
-						callback(QString(), nullptr);
-					}).handleAllErrors().send();
+		callback(QString(), nullptr);
+	}).fail([=]
+	{
+		callback(QString(), nullptr);
+	}).handleAllErrors().send();
 }
 
-void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback)
-{
+void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback) {
 	if (userId == 0 || !session) {
 		callback(QString(), nullptr);
 		return;
@@ -710,23 +692,24 @@ void searchById(ID userId, Main::Session *session, bool retry, const Callback &c
 		return;
 	}
 
-	searchUser(userId, session, true, true, [=](const QString &title, UserData *data)
-	{
-		if (data && data->accessHash()) {
-			callback(title, data);
-		}
-		else {
-			if (retry) {
-				searchById(0x100000000 + userId, session, false, callback);
-			}
-			else {
-				callback(QString(), nullptr);
-			}
-		}
-	});
+	searchUser(userId,
+			   session,
+			   true,
+			   true,
+			   [=](const QString &title, UserData *data)
+			   {
+				   if (data && data->accessHash()) {
+					   callback(title, data);
+				   } else {
+					   if (retry) {
+						   searchById(0x100000000 + userId, session, false, callback);
+					   } else {
+						   callback(QString(), nullptr);
+					   }
+				   }
+			   });
 }
 
-void searchById(ID userId, Main::Session *session, const Callback &callback)
-{
+void searchById(ID userId, Main::Session *session, const Callback &callback) {
 	searchById(userId, session, true, callback);
 }

@@ -6,23 +6,19 @@
 // Copyright @Radolyn, 2023
 #include "ayu_state.h"
 
-namespace AyuState
-{
+namespace AyuState {
 
 std::unordered_map<PeerId, std::unordered_set<MsgId>> hiddenMessages;
 
-void hide(PeerId peerId, MsgId messageId)
-{
+void hide(PeerId peerId, MsgId messageId) {
 	hiddenMessages[peerId].insert(messageId);
 }
 
-void hide(not_null<HistoryItem *> item)
-{
+void hide(not_null<HistoryItem *> item) {
 	hide(item->history()->peer->id, item->id);
 }
 
-bool isHidden(PeerId peerId, MsgId messageId)
-{
+bool isHidden(PeerId peerId, MsgId messageId) {
 	const auto it = hiddenMessages.find(peerId);
 	if (it != hiddenMessages.end()) {
 		return it->second.contains(messageId);
@@ -30,8 +26,7 @@ bool isHidden(PeerId peerId, MsgId messageId)
 	return false;
 }
 
-bool isHidden(not_null<HistoryItem *> item)
-{
+bool isHidden(not_null<HistoryItem *> item) {
 	return isHidden(item->history()->peer->id, item->id);
 }
 

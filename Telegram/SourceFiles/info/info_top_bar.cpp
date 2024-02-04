@@ -506,8 +506,7 @@ void TopBar::updateControlsVisibility(anim::type animated) {
 void TopBar::setStories(rpl::producer<Dialogs::Stories::Content> content) {
 	// AyuGram disableStories
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->disableStories)
-	{
+	if (settings->disableStories) {
 		return;
 	}
 	

@@ -10,10 +10,9 @@
 
 #include "history/history_item_edition.h"
 
-namespace AyuMessages
-{
+namespace AyuMessages {
 
-class ayu_messages_controller
+class AyuMessagesController
 {
 public:
 	void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem *> item);
@@ -21,6 +20,6 @@ public:
 	bool hasRevisions(not_null<HistoryItem *> item);
 };
 
-ayu_messages_controller &getInstance();
+AyuMessagesController &getInstance();
 
 }

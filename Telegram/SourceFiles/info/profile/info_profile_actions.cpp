@@ -185,21 +185,15 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	const auto weak = base::make_weak(controller);
 	return [=](QString link) {
 		auto settings = &AyuSettings::getInstance();
-		if (!settings->copyUsernameAsLink)
-		{
+		if (!settings->copyUsernameAsLink) {
 			link = '@' + link.mid(13);
-		}
-		else
-		{
-			if (!link.startsWith(u"https://"_q))
-			{
+		} else {
+			if (!link.startsWith(u"https://"_q)) {
 				link = peer->session().createInternalLinkFull(peer->userName())
 					+ addToLink;
 			}
 		}
-
-		if (!link.isEmpty())
-		{
+		if (!link.isEmpty()) {
 			QGuiApplication::clipboard()->setText(link);
 			show->showToast(tr::lng_username_copied(tr::now));
 		}
@@ -1550,11 +1544,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			).text->setLinksTrusted();
 		}
 
-		if (settings->showPeerId != 0)
-		{
+		if (settings->showPeerId != 0) {
 			auto idDrawableText = IDValue(
 				user
-			) | rpl::map([](TextWithEntities&& text)
+			) | rpl::map([](TextWithEntities &&text)
 			{
 				return Ui::Text::Code(text.text);
 			});
@@ -1564,11 +1557,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				tr::ayu_ContextCopyID(tr::now)
 			);
 
-			idInfo.text->setClickHandlerFilter([=](auto&&...)
+			idInfo.text->setClickHandlerFilter([=](auto &&...)
 			{
 				const auto idText = IDString(user);
-				if (!idText.isEmpty())
-				{
+				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
 					const auto msg = tr::ayu_IDCopiedToast(tr::now);
 					controller->showToast(msg);
@@ -1654,11 +1646,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 
-		if (settings->showPeerId != 0 && !_topic)
-		{
+		if (settings->showPeerId != 0 && !_topic) {
 			auto idDrawableText = IDValue(
 				_peer
-			) | rpl::map([](TextWithEntities&& text)
+			) | rpl::map([](TextWithEntities &&text)
 			{
 				return Ui::Text::Code(text.text);
 			});
@@ -1668,11 +1659,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				tr::ayu_ContextCopyID(tr::now)
 			);
 
-			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto&&...)
+			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto &&...)
 			{
 				const auto idText = IDString(peer);
-				if (!idText.isEmpty())
-				{
+				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
 					const auto msg = tr::ayu_IDCopiedToast(tr::now);
 					controller->showToast(msg);
@@ -1681,12 +1671,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			});
 		}
 
-		if (settings->showPeerId != 0 && _topic)
-		{
-			const auto topicRootId = _topic->rootId();
+		if (settings->showPeerId != 0 && _topic) {
 			auto idDrawableText = IDValue(
 				_peer->forumTopicFor(topicRootId)->topicRootId()
-			) | rpl::map([](TextWithEntities&& text)
+			) | rpl::map([](TextWithEntities &&text)
 			{
 				return Ui::Text::Code(text.text);
 			});
@@ -1696,11 +1684,10 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				tr::ayu_ContextCopyID(tr::now)
 			);
 
-			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto&&...)
+			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto &&...)
 			{
 				const auto idText = IDString(peer);
-				if (!idText.isEmpty())
-				{
+				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
 					const auto msg = tr::ayu_IDCopiedToast(tr::now);
 					controller->showToast(msg);

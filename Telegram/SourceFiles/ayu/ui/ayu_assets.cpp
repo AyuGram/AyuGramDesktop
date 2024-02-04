@@ -8,16 +8,12 @@
 #include "ayu/ayu_settings.h"
 
 static QString LAST_LOADED_NAME;
-
 static QImage LAST_LOADED;
-
 static QImage LAST_LOADED_NO_MARGIN;
 
-namespace AyuAssets
-{
+namespace AyuAssets {
 
-void loadAppIco()
-{
+void loadAppIco() {
 	auto settings = &AyuSettings::getInstance();
 
 	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
@@ -33,8 +29,7 @@ void loadAppIco()
 	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings->appIcon), tempIconPath);
 }
 
-void loadIcons()
-{
+void loadIcons() {
 	auto settings = &AyuSettings::getInstance();
 	if (LAST_LOADED_NAME != settings->appIcon) {
 		LAST_LOADED_NAME = settings->appIcon;
@@ -44,24 +39,20 @@ void loadIcons()
 	}
 }
 
-QImage loadPreview(QString name)
-{
+QImage loadPreview(QString name) {
 	return QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(name));
 }
 
-QString currentAppLogoName()
-{
+QString currentAppLogoName() {
 	return LAST_LOADED_NAME;
 }
 
-QImage currentAppLogo()
-{
+QImage currentAppLogo() {
 	loadIcons();
 	return LAST_LOADED;
 }
 
-QImage currentAppLogoNoMargin()
-{
+QImage currentAppLogoNoMargin() {
 	loadIcons();
 	return LAST_LOADED_NO_MARGIN;
 }

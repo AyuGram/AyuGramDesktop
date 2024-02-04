@@ -6,35 +6,29 @@
 // Copyright @Radolyn, 2023
 #include "settings_ayu.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/sync/ayu_sync_controller.h"
 #include "ayu/ui/boxes/edit_deleted_mark.h"
 #include "ayu/ui/boxes/edit_edited_mark.h"
 #include "ayu/ui/boxes/font_selector.h"
 
-#include "apiwrap.h"
 #include "lang_auto.h"
-#include "mainwindow.h"
-#include "api/api_blocked_peers.h"
 
 #include "boxes/connection_box.h"
-#include "core/application.h"
 #include "data/data_session.h"
-#include "lang/lang_instance.h"
 #include "main/main_session.h"
-#include "media/system_media_controls_manager.h"
-#include "platform/platform_specific.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
+#include "styles/style_ayu_styles.h"
 #include "styles/style_basic.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
-#include "styles/style_ayu_styles.h"
 
 #include "icon_picker.h"
+#include "styles/style_ayu_icons.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -44,9 +38,6 @@
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
-#include "styles/style_ayu_icons.h"
-#include "ui/vertical_list.h"
-
 
 class PainterHighQualityEnabler;
 
@@ -55,8 +46,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 										std::vector<not_null<Ui::AbstractCheckView *>> innerCheckViews,
 										not_null<Ui::SlideWrap<> *> wrap,
 										rpl::producer<QString> buttonLabel,
-										bool toggledWhenAll)
-{
+										bool toggledWhenAll) {
 	const auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
 		nullptr,
@@ -70,8 +60,7 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 	struct State final
 	{
 		State(const style::Toggle &st, Fn<void()> c)
-			: checkView(st, false, c)
-		{
+			: checkView(st, false, c) {
 		}
 
 		Ui::ToggleView checkView;
@@ -82,14 +71,18 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 	const auto state = button->lifetime().make_state<State>(
 		st.toggle,
 		[=]
-		{ toggleButton->update(); });
+		{
+			toggleButton->update();
+		});
 	state->innerChecks = std::move(innerCheckViews);
 	const auto countChecked = [=]
 	{
 		return ranges::count_if(
 			state->innerChecks,
 			[](const auto &v)
-			{ return v->checked(); });
+			{
+				return v->checked();
+			});
 	};
 	for (const auto &innerCheck : state->innerChecks) {
 		innerCheck->checkedChanges(
@@ -105,7 +98,8 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 							{
 								auto p = QPainter(separator);
 								p.fillRect(separator->rect(), bg);
-							}, separator->lifetime());
+							},
+							separator->lifetime());
 		const auto separatorHeight = 2 * st.toggle.border
 			+ st.toggle.diameter;
 		button->geometryValue(
@@ -123,7 +117,8 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 									r.y() + (r.height() - separatorHeight) / 2,
 									kLineWidth,
 									separatorHeight);
-							}, toggleButton->lifetime());
+							},
+							toggleButton->lifetime());
 
 		const auto checkWidget = Ui::CreateChild<Ui::RpWidget>(toggleButton);
 		checkWidget->resize(checkView->getSize());
@@ -132,14 +127,16 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 							{
 								auto p = QPainter(checkWidget);
 								checkView->paint(p, 0, 0, checkWidget->width());
-							}, checkWidget->lifetime());
+							},
+							checkWidget->lifetime());
 		toggleButton->sizeValue(
 		) | start_with_next([=](const QSize &s)
 							{
 								checkWidget->moveToRight(
 									st.toggleSkip,
 									(s.height() - checkWidget->height()) / 2);
-							}, toggleButton->lifetime());
+							},
+							toggleButton->lifetime());
 	}
 
 	const auto totalInnerChecks = state->innerChecks.size();
@@ -151,12 +148,12 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 													 if (toggledWhenAll) {
 														 checkView->setChecked(count == totalInnerChecks,
 																			   anim::type::normal);
-													 }
-													 else {
+													 } else {
 														 checkView->setChecked(count != 0,
 																			   anim::type::normal);
 													 }
-												 }, toggleButton->lifetime());
+												 },
+												 toggleButton->lifetime());
 	checkView->setLocked(false);
 	checkView->finishAnimating();
 
@@ -168,13 +165,13 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 				rpl::empty_value()
 			) | rpl::map(countChecked)
 		) | rpl::map([=](const QString &t, int checked)
-					 {
-						 auto count = Ui::Text::Bold("  "
-														 + QString::number(checked)
-														 + '/'
-														 + QString::number(totalInnerChecks));
-						 return TextWithEntities::Simple(t).append(std::move(count));
-					 }));
+		{
+			auto count = Ui::Text::Bold("  "
+				+ QString::number(checked)
+				+ '/'
+				+ QString::number(totalInnerChecks));
+			return TextWithEntities::Simple(t).append(std::move(count));
+		}));
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 	const auto arrow = Ui::CreateChild<Ui::RpWidget>(button);
 	{
@@ -197,7 +194,8 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 									p.translate(-center);
 								}
 								icon.paint(p, 0, 0, arrow->width());
-							}, arrow->lifetime());
+							},
+							arrow->lifetime());
 	}
 	button->sizeValue(
 	) | start_with_next([=, &st](const QSize &s)
@@ -214,25 +212,30 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 									labelLeft + label->naturalWidth(),
 									labelRight - arrow->width()),
 								(s.height() - arrow->height()) / 2);
-						}, button->lifetime());
+						},
+						button->lifetime());
 	wrap->toggledValue(
 	) | rpl::skip(1) | start_with_next([=](bool toggled)
 									   {
 										   state->animation.start(
 											   [=]
-											   { arrow->update(); },
+											   {
+												   arrow->update();
+											   },
 											   toggled ? 0. : 1.,
 											   toggled ? 1. : 0.,
 											   st::slideWrapDuration,
 											   anim::easeOutCubic);
-									   }, button->lifetime());
+									   },
+									   button->lifetime());
 	wrap->ease = anim::easeOutCubic;
 
 	button->clicks(
 	) | start_with_next([=]
 						{
 							wrap->toggle(!wrap->toggled(), anim::type::normal);
-						}, button->lifetime());
+						},
+						button->lifetime());
 
 	toggleButton->clicks(
 	) | start_with_next([=]
@@ -241,7 +244,8 @@ not_null<Ui::RpWidget *> AddInnerToggle(not_null<Ui::VerticalLayout *> container
 							for (const auto &innerCheck : state->innerChecks) {
 								innerCheck->setChecked(checked, anim::type::normal);
 							}
-						}, toggleButton->lifetime());
+						},
+						toggleButton->lifetime());
 
 	return button;
 }
@@ -256,8 +260,7 @@ struct NestedEntry
 void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 						  rpl::producer<QString> title,
 						  std::vector<NestedEntry> checkboxes,
-						  bool toggledWhenAll)
-{
+						  bool toggledWhenAll) {
 	const auto addCheckbox = [&](
 		not_null<Ui::VerticalLayout *> verticalLayout,
 		const QString &label,
@@ -282,22 +285,24 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 			) | start_with_next([=](int w, const QRect &r)
 								{
 									button->setGeometry(0, r.y(), w, r.height());
-								}, button->lifetime());
+								},
+								button->lifetime());
 			checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
 			const auto checkView = checkbox->checkView();
 			button->setClickedCallback([=]
-									   {
-										   checkView->setChecked(
-											   !checkView->checked(),
-											   anim::type::normal);
-									   });
+			{
+				checkView->setChecked(
+					!checkView->checked(),
+					anim::type::normal);
+			});
 
 			return checkView;
 		}();
 		checkView->checkedChanges(
 		) | start_with_next([=](bool checked)
 							{
-							}, verticalLayout->lifetime());
+							},
+							verticalLayout->lifetime());
 
 		return checkView;
 	};
@@ -313,7 +318,8 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 		) | start_with_next([=](bool enabled)
 							{
 								entry.callback(enabled);
-							}, container->lifetime());
+							},
+							container->lifetime());
 		innerChecks.push_back(c);
 	}
 
@@ -331,7 +337,8 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout *> container,
 	) | start_with_next([=](int w)
 						{
 							raw->resizeToWidth(w);
-						}, raw->lifetime());
+						},
+						raw->lifetime());
 }
 
 void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> container,
@@ -341,8 +348,7 @@ void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> containe
 										 rpl::producer<QString> text,
 										 rpl::producer<QString> boxTitle,
 										 const style::icon &icon,
-										 const Fn<void(int)> &setter)
-{
+										 const Fn<void(int)> &setter) {
 	auto reactiveVal = container->lifetime().make_state<rpl::variable<int>>(initialState);
 
 	rpl::producer<QString> rightTextReactive = reactiveVal->value() | rpl::map(
@@ -368,34 +374,31 @@ void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout *> containe
 
 						reactiveVal->force_assign(index);
 					};
-					SingleChoiceBox(box, {
-						.title = boxTitle,
-						.options = options,
-						.initialSelection = reactiveVal->current(),
-						.callback = save,
-					});
+					SingleChoiceBox(box,
+									{
+										.title = boxTitle,
+										.options = options,
+										.initialSelection = reactiveVal->current(),
+										.callback = save,
+									});
 				}));
 		});
 }
 
-namespace Settings
-{
+namespace Settings {
 
-rpl::producer<QString> Ayu::title()
-{
+rpl::producer<QString> Ayu::title() {
 	return tr::ayu_AyuPreferences();
 }
 
 Ayu::Ayu(
 	QWidget *parent,
 	not_null<Window::SessionController *> controller)
-	: Section(parent)
-{
+	: Section(parent) {
 	setupContent(controller);
 }
 
-void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
-{
+void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
@@ -441,8 +444,7 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout *> container)
 	AddCollapsibleToggle(container, tr::ayu_GhostEssentialsHeader(), checkboxes, true);
 }
 
-void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
-{
+void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	std::vector checkboxes{
@@ -472,8 +474,7 @@ void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout *> container)
 	AddCollapsibleToggle(container, tr::ayu_MarkReadAfterAction(), checkboxes, false);
 }
 
-void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
-{
+void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	SetupGhostModeToggle(container);
@@ -499,11 +500,11 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_useScheduledMessages(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 }
 
-void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
-{
+void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
@@ -528,7 +529,8 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_saveDeletedMessages(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -546,11 +548,11 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_saveMessagesHistory(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 }
 
-void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
-{
+void SetupQoLToggles(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_QoLTogglesHeader());
@@ -571,7 +573,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_disableAds(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -589,7 +592,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_disableStories(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -607,7 +611,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_simpleQuotesAndReplies(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	std::vector checkboxes = {
 		NestedEntry{
@@ -648,7 +653,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_uploadSpeedBoost(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddSkip(container);
 	AddDivider(container);
@@ -670,7 +676,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_disableNotificationsDelay(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -688,7 +695,8 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_localPremium(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -706,19 +714,18 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_copyUsernameAsLink(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 }
 
-void SetupAppIcon(not_null<Ui::VerticalLayout *> container)
-{
+void SetupAppIcon(not_null<Ui::VerticalLayout *> container) {
 	container->add(
 		object_ptr<IconPicker>(container),
 		st::settingsCheckboxPadding);
 }
 
 void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
-								   not_null<Window::SessionController *> controller)
-{
+							  not_null<Window::SessionController *> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -801,8 +808,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout *> container,
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
 }
 
-void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
-{
+void SetupDrawerElements(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -825,7 +831,8 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showLReadToggleInDrawer(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -844,7 +851,8 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showSReadToggleInDrawer(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -863,7 +871,8 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showGhostToggleInDrawer(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 #ifdef WIN32
 	AddButtonWithIcon(
@@ -883,12 +892,12 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showStreamerToggleInDrawer(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 #endif
 }
 
-void SetupTrayElements(not_null<Ui::VerticalLayout *> container)
-{
+void SetupTrayElements(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
@@ -910,7 +919,8 @@ void SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showGhostToggleInTray(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 #ifdef WIN32
 	AddButtonWithIcon(
@@ -929,13 +939,13 @@ void SetupTrayElements(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_showStreamerToggleInTray(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 #endif
 }
 
 void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
-						  not_null<Window::SessionController *> controller)
-{
+					 not_null<Window::SessionController *> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
@@ -966,18 +976,18 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout *> container,
 						settings->set_showPeerId(index);
 						AyuSettings::save();
 					};
-					SingleChoiceBox(box, {
-						.title = tr::ayu_SettingsShowID(),
-						.options = options,
-						.initialSelection = settings->showPeerId,
-						.callback = save,
-					});
+					SingleChoiceBox(box,
+									{
+										.title = tr::ayu_SettingsShowID(),
+										.options = options,
+										.initialSelection = settings->showPeerId,
+										.callback = save,
+									});
 				}));
 		});
 }
 
-void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
-{
+void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	container->add(
@@ -1003,12 +1013,17 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
 	updateLabel(settings->recentStickersCount);
 
 	slider->setPseudoDiscrete(
-		100 + 1, // thx tg
+		100 + 1,
+		// thx tg
 		[=](int amount)
-		{ return amount; },
+		{
+			return amount;
+		},
 		settings->recentStickersCount,
 		[=](int amount)
-		{ updateLabel(amount); },
+		{
+			updateLabel(amount);
+		},
 		[=](int amount)
 		{
 			updateLabel(amount);
@@ -1018,8 +1033,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout *> container)
 		});
 }
 
-void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller)
-{
+void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
 	const auto settings = &AyuSettings::getInstance();
 
 	const auto commonButton = AddButtonWithLabel(
@@ -1034,13 +1048,14 @@ void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::Sessi
 	commonButton->addClickHandler(
 		[=]
 		{
-			*commonGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-			{
-				auto ayuSettings = &AyuSettings::getInstance();
+			*commonGuard = AyuUi::FontSelectorBox::Show(controller,
+														[=](QString font)
+														{
+															auto ayuSettings = &AyuSettings::getInstance();
 
-				ayuSettings->set_mainFont(std::move(font));
-				AyuSettings::save();
-			});
+															ayuSettings->set_mainFont(std::move(font));
+															AyuSettings::save();
+														});
 		});
 
 	const auto monoButton = AddButtonWithLabel(
@@ -1055,37 +1070,18 @@ void SetupFonts(not_null<Ui::VerticalLayout *> container, not_null<Window::Sessi
 	monoButton->addClickHandler(
 		[=]
 		{
-			*monoGuard = AyuUi::FontSelectorBox::Show(controller, [=](QString font)
-			{
-				auto ayuSettings = &AyuSettings::getInstance();
+			*monoGuard = AyuUi::FontSelectorBox::Show(controller,
+													  [=](QString font)
+													  {
+														  auto ayuSettings = &AyuSettings::getInstance();
 
-				ayuSettings->set_monoFont(std::move(font));
-				AyuSettings::save();
-			});
-		});
-
-}
-
-void SetupAyuSync(not_null<Ui::VerticalLayout *> container)
-{
-	AddSubsectionTitle(container, tr::ayu_AyuSyncHeader());
-
-	auto text = AyuSync::isAgentDownloaded() ? tr::ayu_AyuSyncOpenPreferences() : tr::ayu_AyuSyncDownloadAgent();
-
-	AddButtonWithIcon(
-		container,
-		text,
-		st::settingsButtonNoIcon
-	)->addClickHandler(
-		[=]
-		{
-			auto controller = &AyuSync::getInstance();
-			controller->initializeAgent();
+														  ayuSettings->set_monoFont(std::move(font));
+														  AyuSettings::save();
+													  });
 		});
 }
 
-void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
-{
+void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
@@ -1106,7 +1102,8 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_stickerConfirmation(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1124,7 +1121,8 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_gifConfirmation(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1142,7 +1140,8 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout *> container)
 		{
 			settings->set_voiceConfirmation(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 }
 
 void SetupMarks(not_null<Ui::VerticalLayout *> container) {
@@ -1192,7 +1191,8 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout *> container) {
 		{
 			settings->set_hideNotificationCounters(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1210,7 +1210,8 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout *> container) {
 		{
 			settings->set_hideAllChatsFolder(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 }
 
 void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window::SessionController *> controller) {
@@ -1234,7 +1235,8 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window
 		{
 			settings->set_showMessageSeconds(enabled);
 			AyuSettings::save();
-		}, container->lifetime());
+		},
+		container->lifetime());
 
 	AddButtonWithIcon(
 		container,
@@ -1257,8 +1259,7 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window
 }
 
 void SetupCustomization(not_null<Ui::VerticalLayout *> container,
-						not_null<Window::SessionController *> controller)
-{
+						not_null<Window::SessionController *> controller) {
 	AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
 
 	SetupAppIcon(container);
@@ -1299,8 +1300,7 @@ void SetupCustomization(not_null<Ui::VerticalLayout *> container,
 }
 
 void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
-							   not_null<Window::SessionController *> controller)
-{
+						  not_null<Window::SessionController *> controller) {
 	AddSkip(container);
 	SetupGhostEssentials(container);
 	AddSkip(container);
@@ -1324,15 +1324,6 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsCustomizationHint());
 
-	// todo: compilation flag
-	if constexpr (false) {
-		AddSkip(container);
-		SetupAyuSync(container);
-		AddSkip(container);
-
-		AddDivider(container);
-	}
-
 	AddSkip(container);
 	SetupSendConfirmations(container);
 	AddSkip(container);
@@ -1341,8 +1332,7 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout *> container,
 	AddDividerText(container, tr::ayu_SettingsWatermark());
 }
 
-void Ayu::setupContent(not_null<Window::SessionController *> controller)
-{
+void Ayu::setupContent(not_null<Window::SessionController *> controller) {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
 	SetupAyuGramSettings(content, controller);

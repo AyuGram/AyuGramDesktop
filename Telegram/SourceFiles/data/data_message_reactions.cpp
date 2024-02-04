@@ -1491,8 +1491,7 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 		_owner->session().api().applyUpdates(result);
 
 		const auto settings = &AyuSettings::getInstance();
-		if (!settings->sendReadMessages && settings->markReadAfterReaction && item)
-		{
+		if (!settings->sendReadMessages && settings->markReadAfterReaction && item) {
 			readHistory(item);
 		}
 	}).fail([=](const MTP::Error &error) {

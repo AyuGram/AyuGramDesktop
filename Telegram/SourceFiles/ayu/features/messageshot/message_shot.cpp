@@ -8,30 +8,24 @@
 
 #include "styles/style_layers.h"
 
-#include "data/data_cloud_themes.h"
-#include "data/data_photo.h"
-#include "data/data_session.h"
-#include "history/history_inner_widget.h"
-#include "history/view/media/history_view_media.h"
-#include "main/main_session.h"
-#include "data/data_peer.h"
-#include "history/history.h"
 #include "qguiapplication.h"
 #include "ayu/ui/boxes/message_shot_box.h"
 #include "boxes/abstract_box.h"
-#include "ui/chat/chat_theme.h"
-#include "ui/painter.h"
+#include "data/data_cloud_themes.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "history/history_inner_widget.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
-#include "history/view/history_view_message.h"
-#include "styles/style_boxes.h"
+#include "history/view/media/history_view_media.h"
+#include "main/main_session.h"
 #include "styles/style_chat.h"
-#include "styles/style_ayu_styles.h"
-#include "ui/layers/box_content.h"
+#include "ui/painter.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/effects/path_shift_gradient.h"
+#include "ui/layers/box_content.h"
 
-namespace AyuFeatures::MessageShot
-{
+namespace AyuFeatures::MessageShot {
 
 ShotConfig *config;
 
@@ -49,78 +43,64 @@ bool choosingTheme = false;
 rpl::event_stream<Data::CloudTheme> themeChosenStream;
 rpl::event_stream<style::palette> paletteChosenStream;
 
-void setShotConfig(ShotConfig &config)
-{
+void setShotConfig(ShotConfig &config) {
 	MessageShot::config = &config;
 }
 
-void resetShotConfig()
-{
+void resetShotConfig() {
 	config = nullptr;
 }
 
-ShotConfig getShotConfig()
-{
+ShotConfig getShotConfig() {
 	return *config;
 }
 
-void setDefaultSelected(const Window::Theme::EmbeddedType type)
-{
+void setDefaultSelected(const Window::Theme::EmbeddedType type) {
 	resetCustomSelected();
 	defaultSelected = type;
 }
 
-Window::Theme::EmbeddedType getSelectedFromDefault()
-{
+Window::Theme::EmbeddedType getSelectedFromDefault() {
 	return defaultSelected;
 }
 
-void setDefaultSelectedColor(const QColor color)
-{
+void setDefaultSelectedColor(const QColor color) {
 	resetCustomSelected();
 	defaultSelectedColor = color;
 }
 
-std::optional<QColor> getSelectedColorFromDefault()
-{
+std::optional<QColor> getSelectedColorFromDefault() {
 	return defaultSelectedColor;
 }
 
-void setCustomSelected(const Data::CloudTheme theme)
-{
+void setCustomSelected(const Data::CloudTheme theme) {
 	resetDefaultSelected();
 	customSelected = theme;
 }
 
-std::optional<Data::CloudTheme> getSelectedFromCustom()
-{
+std::optional<Data::CloudTheme> getSelectedFromCustom() {
 	return customSelected;
 }
 
-void resetDefaultSelected()
-{
+void resetDefaultSelected() {
 	defaultSelected = Window::Theme::EmbeddedType(-1);
 	resetDefaultSelectedStream.fire({});
 }
 
-void resetCustomSelected()
-{
+void resetCustomSelected() {
 	customSelected = std::nullopt;
 	resetCustomSelectedStream.fire({});
 }
 
-rpl::producer<> resetDefaultSelectedEvents()
-{
+rpl::producer<> resetDefaultSelectedEvents() {
 	return resetDefaultSelectedStream.events();
 }
 
-rpl::producer<> resetCustomSelectedEvents()
-{
+rpl::producer<> resetCustomSelectedEvents() {
 	return resetCustomSelectedStream.events();
 }
 
-bool ignoreRender(RenderPart part)
-{
+bool ignoreRender(RenderPart part) {
 	if (!config) {
 		return false;
 	}
@@ -133,39 +113,32 @@ bool ignoreRender(RenderPart part)
 		(part == RenderPart::Reactions && ignoreReactions));
 }
 
-bool isTakingShot()
-{
+bool isTakingShot() {
 	return takingShot;
 }
 
-bool setChoosingTheme(bool val)
-{
+bool setChoosingTheme(bool val) {
 	choosingTheme = val;
 	return choosingTheme;
 }
 
-bool isChoosingTheme()
-{
+bool isChoosingTheme() {
 	return choosingTheme;
 }
 
-rpl::producer<Data::CloudTheme> themeChosen()
-{
+rpl::producer<Data::CloudTheme> themeChosen() {
 	return themeChosenStream.events();
 }
 
-void setTheme(Data::CloudTheme theme)
-{
+void setTheme(Data::CloudTheme theme) {
 	themeChosenStream.fire(std::move(theme));
 }
 
-void setPalette(style::palette &palette)
-{
+void setPalette(style::palette &palette) {
 	paletteChosenStream.fire(std::move(palette));
 }
 
-rpl::producer<style::palette> paletteChosen()
-{
+rpl::producer<style::palette> paletteChosen() {
 	return paletteChosenStream.events();
 }
 
@@ -192,33 +165,27 @@ MessageShotDelegate::MessageShotDelegate(
 	not_null<Ui::ChatStyle *> st,
 	Fn<void()> update)
 	: _parent(parent)
-	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update))
-{
+	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update)) {
 }
 
-bool MessageShotDelegate::elementAnimationsPaused()
-{
+bool MessageShotDelegate::elementAnimationsPaused() {
 	return _parent->window()->isActiveWindow();
 }
 
 auto MessageShotDelegate::elementPathShiftGradient()
-	-> not_null<Ui::PathShiftGradient *>
-{
+	-> not_null<Ui::PathShiftGradient *> {
 	return _pathGradient.get();
 }
 
-HistoryView::Context MessageShotDelegate::elementContext()
-{
+HistoryView::Context MessageShotDelegate::elementContext() {
 	return HistoryView::Context::AdminLog;
 }
 
-bool MessageShotDelegate::elementIsChatWide()
-{
+bool MessageShotDelegate::elementIsChatWide() {
 	return true;
 }
 
-QImage removePadding(const QImage &original)
-{
+QImage removePadding(const QImage &original) {
 	if (original.isNull()) {
 		return {};
 	}
@@ -248,8 +215,7 @@ QImage removePadding(const QImage &original)
 	return original.copy(bounds);
 }
 
-QImage addPadding(const QImage &original, int padding)
-{
+QImage addPadding(const QImage &original, int padding) {
 	if (original.isNull()) {
 		return {};
 	}
@@ -268,8 +234,7 @@ QImage addPadding(const QImage &original, int padding)
 	return paddedImage;
 }
 
-QImage Make(not_null<QWidget *> box, const ShotConfig &config)
-{
+QImage Make(not_null<QWidget *> box, const ShotConfig &config) {
 	const auto controller = config.controller;
 	const auto st = config.st;
 	const auto messages = config.messages;
@@ -281,11 +246,11 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config)
 	takingShot = true;
 
 	auto delegate = std::make_unique<MessageShotDelegate>(box,
-	                                                            st.get(),
-	                                                            [=]
-	                                                            {
-		                                                            box->update();
-	                                                            });
+														  st.get(),
+														  [=]
+														  {
+															  box->update();
+														  });
 
 	std::unordered_map<not_null<HistoryItem *>, std::shared_ptr<HistoryView::Element>> createdViews;
 	createdViews.reserve(messages.size());
@@ -306,8 +271,7 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config)
 			const auto nextMsg = messages[i].get();
 			if (getView(nextMsg)->isHidden()) {
 				getView(nextMsg)->setDisplayDate(false);
-			}
-			else {
+			} else {
 				const auto viewDate = getView(currentMsg)->dateTime();
 				const auto nextDate = getView(nextMsg)->dateTime();
 				getView(nextMsg)->setDisplayDate(nextDate.date() != viewDate.date());
@@ -319,8 +283,7 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config)
 		}
 
 		getView(messages[messages.size() - 1])->setAttachToNext(false);
-	}
-	else {
+	} else {
 		getView(messages[0])->setAttachToPrevious(false);
 		getView(messages[0])->setAttachToNext(false);
 	}
@@ -394,8 +357,7 @@ QImage Make(not_null<QWidget *> box, const ShotConfig &config)
 	return overlay;
 }
 
-void Wrapper(not_null<HistoryView::ListWidget *> widget)
-{
+void Wrapper(not_null<HistoryView::ListWidget *> widget) {
 	const auto items = widget->getSelectedIds();
 	if (items.empty()) {
 		return;

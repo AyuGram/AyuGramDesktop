@@ -6,15 +6,13 @@
 // Copyright @Radolyn, 2023
 #pragma once
 
-#include "ayu/sync/models.h"
+#include "ayu/database/entities.h"
 
 #include "core/application.h"
-#include "main/main_account.h"
-#include "main/main_domain.h"
-#include "main/main_session.h"
 #include "dialogs/dialogs_main_list.h"
+#include "main/main_domain.h"
 
-using Callback = Fn<void(const QString&, UserData *)>;
+using Callback = Fn<void(const QString &, UserData *)>;
 
 Main::Session *getSession(ID userId);
 bool accountExists(ID userId);
@@ -45,4 +43,4 @@ QString getMediaResolution(not_null<HistoryItem *> message);
 QString getMediaDC(not_null<HistoryItem *> message);
 
 void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback);
-void searchById(ID userId, Main::Session *session, const Callback& callback);
+void searchById(ID userId, Main::Session *session, const Callback &callback);

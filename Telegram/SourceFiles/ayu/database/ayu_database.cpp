@@ -93,25 +93,21 @@ auto storage = make_storage("./tdata/ayudata.db",
 							)
 );
 
-namespace AyuDatabase
-{
+namespace AyuDatabase {
 
-void initialize()
-{
+void initialize() {
 	// move to `tdata` from legacy version
 	if (std::filesystem::exists("ayugram.db")) {
 		try {
 			std::filesystem::rename("ayugram.db", "./tdata/ayudata.db");
-		}
-		catch (std::filesystem::filesystem_error &e) {
+		} catch (std::filesystem::filesystem_error &e) {
 			LOG(("Failed to move database: %1").arg(e.what()));
 		}
 	}
 
 	try {
 		storage.sync_schema();
-	}
-	catch (...) {
+	} catch (...) {
 		auto time = base::unixtime::now();
 
 		LOG(("Failed to sync database schema"));
@@ -138,31 +134,28 @@ void initialize()
 	storage.commit();
 }
 
-void addEditedMessage(const EditedMessage &message)
-{
+void addEditedMessage(const EditedMessage &message) {
 	storage.begin_transaction();
 	storage.insert(message);
 	storage.commit();
 }
 
-std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId)
-{
+std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId) {
 	return storage.get_all<EditedMessage>(
 		where(
 			c(&EditedMessage::userId) == userId and
-				c(&EditedMessage::dialogId) == dialogId and
-				c(&EditedMessage::messageId) == messageId
+			c(&EditedMessage::dialogId) == dialogId and
+			c(&EditedMessage::messageId) == messageId
 		)
 	);
 }
 
-bool hasRevisions(ID userId, ID dialogId, ID messageId)
-{
+bool hasRevisions(ID userId, ID dialogId, ID messageId) {
 	return storage.count<EditedMessage>(
 		where(
 			c(&EditedMessage::userId) == userId and
-				c(&EditedMessage::dialogId) == dialogId and
-				c(&EditedMessage::messageId) == messageId
+			c(&EditedMessage::dialogId) == dialogId and
+			c(&EditedMessage::messageId) == messageId
 		)
 	) > 0;
 }

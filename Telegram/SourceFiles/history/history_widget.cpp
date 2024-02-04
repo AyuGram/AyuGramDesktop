@@ -4704,16 +4704,14 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 void HistoryWidget::send(Api::SendOptions options) {
 	// AyuGram useScheduledMessages
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !options.scheduled)
-	{
+	if (settings->useScheduledMessages && !options.scheduled) {
 		DEBUG_LOG(("[AyuGram] Scheduling message"));
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
 	}
 
-    auto lastMessage = _history->lastMessage();
-	if (!settings->sendReadMessages && settings->markReadAfterSend && lastMessage)
-	{
+	auto lastMessage = _history->lastMessage();
+	if (!settings->sendReadMessages && settings->markReadAfterSend && lastMessage) {
 		readHistory(lastMessage);
 	}
 
@@ -9152,7 +9150,8 @@ void HistoryWidget::messageShotSelected() {
 	}
 
 	const auto messages = ranges::views::all(items)
-		| ranges::views::transform([this](const auto fullId) {
+		| ranges::views::transform([this](const auto fullId)
+		{
 			return gsl::not_null(session().data().message(fullId));
 		})
 		| ranges::to_vector;

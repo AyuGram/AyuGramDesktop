@@ -50,8 +50,7 @@ struct Font
 	QString id;
 };
 
-namespace AyuUi
-{
+namespace AyuUi {
 
 class Rows : public Ui::RpWidget
 {
@@ -62,38 +61,23 @@ public:
 		const QString &chosen);
 
 	void filter(const QString &query);
-
 	int count() const;
-
 	int selected() const;
-
 	void setSelected(int selected);
-
 	rpl::producer<bool> hasSelection() const;
-
 	rpl::producer<bool> isEmpty() const;
-
 	void activateSelected();
-
 	rpl::producer<Font> activations() const;
-
 	void changeChosen(const QString &chosen);
-
 	Ui::ScrollToRequest rowScrollRequest(int index) const;
-
 	static int DefaultRowHeight();
 
 protected:
 	int resizeGetHeight(int newWidth) override;
-
 	void paintEvent(QPaintEvent *e) override;
-
 	void mouseMoveEvent(QMouseEvent *e) override;
-
 	void mousePressEvent(QMouseEvent *e) override;
-
 	void mouseReleaseEvent(QMouseEvent *e) override;
-
 	void leaveEventHook(QEvent *e) override;
 
 private:
@@ -118,8 +102,7 @@ private:
 	{
 		int index = 0;
 
-		inline bool operator==(const RowSelection &other) const
-		{
+		inline bool operator==(const RowSelection &other) const {
 			return (index == other.index);
 		}
 	};
@@ -224,15 +207,14 @@ private:
 
 };
 
-std::vector<Font> PrepareFonts()
-{
+std::vector<Font> PrepareFonts() {
 	auto fonts = std::vector<Font>();
 	QFontDatabase base;
 
 	for (const auto &font : base.families()) {
 		Font fontItem = {
-			.FontName=font,
-			.id=font
+			.FontName = font,
+			.id = font
 		};
 
 		fonts.push_back(fontItem);
@@ -246,8 +228,7 @@ Rows::Rows(
 	QWidget *parent,
 	const std::vector<Font> &data,
 	const QString &chosen)
-	: RpWidget(parent), _chosen(chosen)
-{
+	: RpWidget(parent), _chosen(chosen) {
 	const auto descriptionOptions = TextParseOptions{
 		TextParseMultiline,
 		0,
@@ -262,7 +243,9 @@ Rows::Rows(
 			st::langsRadio,
 			(row.data.id == _chosen),
 			[=, row = &row]
-			{ repaint(*row); });
+			{
+				repaint(*row);
+			});
 		row.title.setText(
 			st::defaultTextStyle,
 			item.FontName,
@@ -275,8 +258,7 @@ Rows::Rows(
 	update();
 }
 
-void Rows::mouseMoveEvent(QMouseEvent *e)
-{
+void Rows::mouseMoveEvent(QMouseEvent *e) {
 	const auto position = e->globalPos();
 	if (!_mouseSelection && position == _globalMousePosition) {
 		return;
@@ -300,17 +282,14 @@ void Rows::mouseMoveEvent(QMouseEvent *e)
 	const auto row = (index >= 0) ? &rowByIndex(index) : nullptr;
 	if (index < 0) {
 		updateSelected({});
-	}
-	else if (!row->removed) {
+	} else if (!row->removed) {
 		updateSelected(RowSelection{index});
-	}
-	else {
+	} else {
 		updateSelected({});
 	}
 }
 
-void Rows::mousePressEvent(QMouseEvent *e)
-{
+void Rows::mousePressEvent(QMouseEvent *e) {
 	updatePressed(_selected);
 	if (!v::is_null(_pressed)
 		&& !rowBySelection(_pressed).menuToggleForceRippled) {
@@ -318,8 +297,7 @@ void Rows::mousePressEvent(QMouseEvent *e)
 	}
 }
 
-void Rows::addRipple(Selection selected, QPoint position)
-{
+void Rows::addRipple(Selection selected, QPoint position) {
 	Expects(!v::is_null(selected));
 
 	ensureRippleBySelection(selected);
@@ -330,13 +308,11 @@ void Rows::addRipple(Selection selected, QPoint position)
 	ripple->add(position - topleft);
 }
 
-void Rows::ensureRippleBySelection(Selection selected)
-{
+void Rows::ensureRippleBySelection(Selection selected) {
 	ensureRippleBySelection(&rowBySelection(selected), selected);
 }
 
-void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected)
-{
+void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected) {
 	auto &ripple = rippleBySelection(row, selected);
 	if (ripple) {
 		return;
@@ -346,44 +322,43 @@ void Rows::ensureRippleBySelection(not_null<Row *> row, Selection selected)
 		st::defaultRippleAnimation,
 		std::move(mask),
 		[=]
-		{ repaintChecked(row); });
+		{
+			repaintChecked(row);
+		});
 }
 
-void Rows::mouseReleaseEvent(QMouseEvent *e)
-{
+void Rows::mouseReleaseEvent(QMouseEvent *e) {
 	const auto pressed = _pressed;
 	updatePressed({});
 	if (pressed == _selected) {
-		v::match(pressed, [&](RowSelection data)
-		{
-			activateByIndex(data.index);
-		}, [](v::null_t)
-				 { });
+		v::match(pressed,
+				 [&](RowSelection data)
+				 {
+					 activateByIndex(data.index);
+				 },
+				 [](v::null_t)
+				 {
+				 });
 	}
 }
 
-void Rows::restore(not_null<Row *> row)
-{
+void Rows::restore(not_null<Row *> row) {
 	row->removed = false;
 }
 
-void Rows::setForceRippled(not_null<Row *> row, bool rippled)
-{
+void Rows::setForceRippled(not_null<Row *> row, bool rippled) {
 	repaint(*row);
 }
 
-void Rows::activateByIndex(int index)
-{
+void Rows::activateByIndex(int index) {
 	_activations.fire_copy(rowByIndex(index).data);
 }
 
-void Rows::leaveEventHook(QEvent *e)
-{
+void Rows::leaveEventHook(QEvent *e) {
 	updateSelected({});
 }
 
-void Rows::filter(const QString &query)
-{
+void Rows::filter(const QString &query) {
 	updateSelected({});
 	updatePressed({});
 
@@ -418,8 +393,7 @@ void Rows::filter(const QString &query)
 		for (auto &row : _rows) {
 			if (!skip(row.keywords, _query)) {
 				_filtered.push_back(&row);
-			}
-			else {
+			} else {
 				row.ripple = nullptr;
 			}
 		}
@@ -431,103 +405,92 @@ void Rows::filter(const QString &query)
 	_isEmpty.fire(count() == 0);
 }
 
-int Rows::count() const
-{
+int Rows::count() const {
 	return _query.isEmpty() ? _rows.size() : _filtered.size();
 }
 
-int Rows::indexFromSelection(Selection selected) const
-{
-	return v::match(selected, [&](RowSelection data)
-	{
-		return data.index;
-	}, [](v::null_t)
+int Rows::indexFromSelection(Selection selected) const {
+	return v::match(selected,
+					[&](RowSelection data)
+					{
+						return data.index;
+					},
+					[](v::null_t)
 					{
 						return -1;
 					});
 }
 
-int Rows::selected() const
-{
+int Rows::selected() const {
 	return indexFromSelection(_selected);
 }
 
-void Rows::activateSelected()
-{
+void Rows::activateSelected() {
 	const auto index = selected();
 	if (index >= 0) {
 		activateByIndex(index);
 	}
 }
 
-rpl::producer<Font> Rows::activations() const
-{
+rpl::producer<Font> Rows::activations() const {
 	return _activations.events();
 }
 
-void Rows::changeChosen(const QString &chosen)
-{
+void Rows::changeChosen(const QString &chosen) {
 	for (const auto &row : _rows) {
 		row.check->setChecked(row.data.id == chosen, anim::type::normal);
 	}
 }
 
-void Rows::setSelected(int selected)
-{
+void Rows::setSelected(int selected) {
 	_mouseSelection = false;
 	const auto limit = count();
 	if (selected >= 0 && selected < limit) {
 		updateSelected(RowSelection{selected});
-	}
-	else {
+	} else {
 		updateSelected({});
 	}
 }
 
-rpl::producer<bool> Rows::hasSelection() const
-{
+rpl::producer<bool> Rows::hasSelection() const {
 	return _hasSelection.events();
 }
 
-rpl::producer<bool> Rows::isEmpty() const
-{
+rpl::producer<bool> Rows::isEmpty() const {
 	return _isEmpty.events_starting_with(
 		count() == 0
 	) | rpl::distinct_until_changed();
 }
 
-void Rows::repaint(Selection selected)
-{
-	v::match(selected, [](v::null_t)
-	{
-	}, [&](const auto &data)
+void Rows::repaint(Selection selected) {
+	v::match(selected,
+			 [](v::null_t)
+			 {
+			 },
+			 [&](const auto &data)
 			 {
 				 repaint(data.index);
 			 });
 }
 
-void Rows::repaint(int index)
-{
+void Rows::repaint(int index) {
 	if (index >= 0) {
 		repaint(rowByIndex(index));
 	}
 }
 
-void Rows::repaint(const Row &row)
-{
+void Rows::repaint(const Row &row) {
 	update(0, row.top, width(), row.height);
 }
 
-void Rows::repaintChecked(not_null<const Row *> row)
-{
+void Rows::repaintChecked(not_null<const Row *> row) {
 	const auto found = (ranges::find(_filtered, row) != end(_filtered));
 	if (_query.isEmpty() || found) {
 		repaint(*row);
 	}
 }
 
-void Rows::updateSelected(Selection selected)
-{
+void Rows::updateSelected(Selection selected) {
 	const auto changed = (v::is_null(_selected) != v::is_null(selected));
 	repaint(_selected);
 	_selected = selected;
@@ -537,8 +500,7 @@ void Rows::updateSelected(Selection selected)
 	}
 }
 
-void Rows::updatePressed(Selection pressed)
-{
+void Rows::updatePressed(Selection pressed) {
 	if (!v::is_null(_pressed)) {
 		if (!rowBySelection(_pressed).menuToggleForceRippled) {
 			if (const auto ripple = rippleBySelection(_pressed).get()) {
@@ -549,66 +511,56 @@ void Rows::updatePressed(Selection pressed)
 	_pressed = pressed;
 }
 
-Rows::Row &Rows::rowByIndex(int index)
-{
+Rows::Row &Rows::rowByIndex(int index) {
 	Expects(index >= 0 && index < count());
 
 	return _query.isEmpty() ? _rows[index] : *_filtered[index];
 }
 
-const Rows::Row &Rows::rowByIndex(int index) const
-{
+const Rows::Row &Rows::rowByIndex(int index) const {
 	Expects(index >= 0 && index < count());
 
 	return _query.isEmpty() ? _rows[index] : *_filtered[index];
 }
 
-Rows::Row &Rows::rowBySelection(Selection selected)
-{
+Rows::Row &Rows::rowBySelection(Selection selected) {
 	return rowByIndex(indexFromSelection(selected));
 }
 
-const Rows::Row &Rows::rowBySelection(Selection selected) const
-{
+const Rows::Row &Rows::rowBySelection(Selection selected) const {
 	return rowByIndex(indexFromSelection(selected));
 }
 
 std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
-	Selection selected)
-{
+	Selection selected) {
 	return rippleBySelection(&rowBySelection(selected), selected);
 }
 
 const std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
-	Selection selected) const
-{
+	Selection selected) const {
 	return rippleBySelection(&rowBySelection(selected), selected);
 }
 
 std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
 	not_null<Row *> row,
-	Selection selected)
-{
+	Selection selected) {
 	return row->ripple;
 }
 
 const std::unique_ptr<Ui::RippleAnimation> &Rows::rippleBySelection(
 	not_null<const Row *> row,
-	Selection selected) const
-{
+	Selection selected) const {
 	return const_cast<Rows *>(this)->rippleBySelection(
 		const_cast<Row *>(row.get()),
 		selected);
 }
 
-Ui::ScrollToRequest Rows::rowScrollRequest(int index) const
-{
+Ui::ScrollToRequest Rows::rowScrollRequest(int index) const {
 	const auto &row = rowByIndex(index);
 	return Ui::ScrollToRequest(row.top, row.top + row.height);
 }
 
-int Rows::DefaultRowHeight()
-{
+int Rows::DefaultRowHeight() {
 	return st::passportRowPadding.top()
 		+ st::semiboldFont->height
 		+ st::passportRowSkip
@@ -616,8 +568,7 @@ int Rows::DefaultRowHeight()
 		+ st::passportRowPadding.bottom();
 }
 
-int Rows::resizeGetHeight(int newWidth)
-{
+int Rows::resizeGetHeight(int newWidth) {
 	const auto availableWidth = countAvailableWidth(newWidth);
 	auto result = 0;
 	for (auto i = 0, till = count(); i != till; ++i) {
@@ -635,8 +586,7 @@ int Rows::resizeGetHeight(int newWidth)
 	return result;
 }
 
-int Rows::countAvailableWidth(int newWidth) const
-{
+int Rows::countAvailableWidth(int newWidth) const {
 	const auto right = 0;
 	return newWidth
 		- st::passportRowPadding.left()
@@ -646,13 +596,11 @@ int Rows::countAvailableWidth(int newWidth) const
 		- st::passportRowIconSkip;
 }
 
-int Rows::countAvailableWidth() const
-{
+int Rows::countAvailableWidth() const {
 	return countAvailableWidth(width());
 }
 
-void Rows::paintEvent(QPaintEvent *e)
-{
+void Rows::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	const auto clip = e->rect();
@@ -667,14 +615,15 @@ void Rows::paintEvent(QPaintEvent *e)
 		const auto &row = rowByIndex(i);
 		if (row.top + row.height <= clip.y()) {
 			continue;
-		}
-		else if (row.top >= clip.y() + clip.height()) {
+		} else if (row.top >= clip.y() + clip.height()) {
 			break;
 		}
 		p.setOpacity(row.removed ? st::stickersRowDisabledOpacity : 1.);
 		p.translate(0, row.top);
 		const auto guard = gsl::finally([&]
-										{ p.translate(0, -row.top); });
+		{
+			p.translate(0, -row.top);
+		});
 
 		const auto selected = (selectedIndex == i);
 		if (selected && !row.removed) {
@@ -706,14 +655,12 @@ void Rows::paintEvent(QPaintEvent *e)
 Content::Content(
 	QWidget *parent,
 	const std::vector<Font> &fonts)
-	: RpWidget(parent)
-{
+	: RpWidget(parent) {
 	setupContent(fonts);
 }
 
 void Content::setupContent(
-	const std::vector<Font> &fonts)
-{
+	const std::vector<Font> &fonts) {
 	using namespace rpl::mappers;
 
 	const auto current = AyuFonts::getMainFont();
@@ -742,7 +689,8 @@ void Content::setupContent(
 		rows->isEmpty() | rpl::start_with_next([=](bool empty)
 											   {
 												   wrap->toggle(!empty, anim::type::instant);
-											   }, rows->lifetime());
+											   },
+											   rows->lifetime());
 
 		return rows;
 	};
@@ -767,7 +715,8 @@ void Content::setupContent(
 								 label->move(
 									 (size.width() - label->width()) / 2,
 									 (size.height() - label->height()) / 2);
-							 }, label->lifetime());
+							 },
+							 label->lifetime());
 
 	empty->toggleOn(
 		main ? main->isEmpty() : rpl::single(true),
@@ -805,8 +754,7 @@ void Content::setupContent(
 			if (main) {
 				main->setSelected(-1);
 			}
-		}
-		else {
+		} else {
 			if (main) {
 				main->setSelected(index);
 			}
@@ -836,15 +784,12 @@ void Content::setupContent(
 			const auto changed = now + rows;
 			if (changed < 0) {
 				setSelectedIndex((now > 0) ? 0 : -1);
-			}
-			else if (changed >= count) {
+			} else if (changed >= count) {
 				setSelectedIndex(count - 1);
-			}
-			else {
+			} else {
 				setSelectedIndex(changed);
 			}
-		}
-		else if (rows > 0) {
+		} else if (rows > 0) {
 			setSelectedIndex(0);
 		}
 		return selectedCoords();
@@ -885,70 +830,68 @@ void Content::setupContent(
 	};
 };
 
-void Content::filter(const QString &query)
-{
+void Content::filter(const QString &query) {
 	_filter(query);
 }
 
-rpl::producer<Font> Content::activations() const
-{
+rpl::producer<Font> Content::activations() const {
 	return _activations();
 }
 
-void Content::changeChosen(const QString &chosen)
-{
+void Content::changeChosen(const QString &chosen) {
 	_changeChosen(chosen);
 }
 
-void Content::activateBySubmit()
-{
+void Content::activateBySubmit() {
 	_activateBySubmit();
 }
 
-Ui::ScrollToRequest Content::jump(int rows)
-{
+Ui::ScrollToRequest Content::jump(int rows) {
 	return _jump(rows);
 }
 
 } // namespace
 
 AyuUi::FontSelectorBox::FontSelectorBox(QWidget *, Window::SessionController *controller, Fn<void(QString font)> hook)
-	: _controller(controller), _hook(hook)
-{
+	: _controller(controller), _hook(hook) {
 }
 
-void AyuUi::FontSelectorBox::prepare()
-{
-	addButton(tr::lng_box_ok(), [=]
-	{
+void AyuUi::FontSelectorBox::prepare() {
+	addButton(tr::lng_box_ok(),
+			  [=]
+			  {
+				  _hook(_selectedFont);
 
-		_hook(_selectedFont);
+				  _controller->show(Ui::MakeConfirmBox({
+					  .text = tr::lng_settings_need_restart(),
+					  .confirmed = []
+					  {
+						  Core::Restart();
+					  },
+					  .confirmText = tr::lng_settings_restart_now(),
+					  .cancelText = tr::lng_settings_restart_later(),
+				  }));
+				  closeBox();
+			  });
 
-		_controller->show(Ui::MakeConfirmBox({
-												 .text = tr::lng_settings_need_restart(),
-												 .confirmed = []
-												 { Core::Restart(); },
-												 .confirmText = tr::lng_settings_restart_now(),
-												 .cancelText = tr::lng_settings_restart_later(),
-											 }));
-		closeBox();
-	});
+	addLeftButton(tr::ayu_BoxActionReset(),
+				  [=]
+				  {
+					  _hook(qs(""));
 
-	addLeftButton(tr::ayu_BoxActionReset(), [=]
-	{
-		_hook(qs(""));
-
-		_controller->show(Ui::MakeConfirmBox({
-												 .text = tr::lng_settings_need_restart(),
-												 .confirmed = []
-												 { Core::Restart(); },
-												 .confirmText = tr::lng_settings_restart_now(),
-												 .cancelText = tr::lng_settings_restart_later(),
-											 }));
+					  _controller->show(Ui::MakeConfirmBox({
+						  .text = tr::lng_settings_need_restart(),
+						  .confirmed = []
+						  {
+							  Core::Restart();
+						  },
+						  .confirmText = tr::lng_settings_restart_now(),
+						  .cancelText = tr::lng_settings_restart_later(),
+					  }));
 
 
-		closeBox();
-	});
+					  closeBox();
+				  });
 
 	setTitle(tr::ayu_CustomizeFontTitle());
 
@@ -979,25 +922,27 @@ void AyuUi::FontSelectorBox::prepare()
 							 {
 								 accumulate_max(*max, height);
 								 setDimensions(st::boxWidth, qMin(*max, st::boxMaxListHeight));
-							 }, inner->lifetime());
+							 },
+							 inner->lifetime());
 	topContainer->heightValue(
 	) | rpl::start_with_next([=](int height)
 							 {
 								 setInnerTopSkip(height);
-							 }, inner->lifetime());
+							 },
+							 inner->lifetime());
 
 	select->setSubmittedCallback([=](Qt::KeyboardModifiers)
-								 {
-									 inner->activateBySubmit();
-								 });
+	{
+		inner->activateBySubmit();
+	});
 	select->setQueryChangedCallback([=](const QString &query)
-									{
-										inner->filter(query);
-									});
+	{
+		inner->filter(query);
+	});
 	select->setCancelledCallback([=]
-								 {
-									 select->clearQuery();
-								 });
+	{
+		select->clearQuery();
+	});
 
 	inner->activations(
 	) | rpl::start_with_next([=](const Font &font)
@@ -1006,7 +951,8 @@ void AyuUi::FontSelectorBox::prepare()
 									 inner->changeChosen(font.id);
 									 _selectedFont = font.id;
 								 }
-							 }, inner->lifetime());
+							 },
+							 inner->lifetime());
 
 	_setInnerFocus = [=]
 	{
@@ -1018,15 +964,13 @@ void AyuUi::FontSelectorBox::prepare()
 	};
 }
 
-void AyuUi::FontSelectorBox::setupTop(not_null<Ui::VerticalLayout *> container)
-{
+void AyuUi::FontSelectorBox::setupTop(not_null<Ui::VerticalLayout *> container) {
 	if (!_controller) {
 		return;
 	}
 }
 
-void AyuUi::FontSelectorBox::keyPressEvent(QKeyEvent *e)
-{
+void AyuUi::FontSelectorBox::keyPressEvent(QKeyEvent *e) {
 	const auto key = e->key();
 	if (key == Qt::Key_Escape) {
 		closeBox();
@@ -1036,14 +980,11 @@ void AyuUi::FontSelectorBox::keyPressEvent(QKeyEvent *e)
 	{
 		if (key == Qt::Key_Up) {
 			return _jump(-1);
-		}
-		else if (key == Qt::Key_Down) {
+		} else if (key == Qt::Key_Down) {
 			return _jump(1);
-		}
-		else if (key == Qt::Key_PageUp) {
+		} else if (key == Qt::Key_PageUp) {
 			return _jump(-rowsInPage());
-		}
-		else if (key == Qt::Key_PageDown) {
+		} else if (key == Qt::Key_PageDown) {
 			return _jump(rowsInPage());
 		}
 		return Ui::ScrollToRequest(-1, -1);
@@ -1053,19 +994,16 @@ void AyuUi::FontSelectorBox::keyPressEvent(QKeyEvent *e)
 	}
 }
 
-int AyuUi::FontSelectorBox::rowsInPage() const
-{
+int AyuUi::FontSelectorBox::rowsInPage() const {
 	return std::max(height() / AyuUi::Rows::DefaultRowHeight(), 1);
 }
 
-void AyuUi::FontSelectorBox::setInnerFocus()
-{
+void AyuUi::FontSelectorBox::setInnerFocus() {
 	_setInnerFocus();
 }
 
 base::binary_guard
-AyuUi::FontSelectorBox::Show(Window::SessionController *controller, const Fn<void(QString font)> hook)
-{
+AyuUi::FontSelectorBox::Show(Window::SessionController *controller, const Fn<void(QString font)> hook) {
 	auto result = base::binary_guard();
 
 	Ui::show(Box<FontSelectorBox>(controller, hook));

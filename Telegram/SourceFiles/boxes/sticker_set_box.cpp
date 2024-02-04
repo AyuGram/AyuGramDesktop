@@ -729,33 +729,40 @@ void StickerSetBox::updateButtons() {
 					? tr::lng_stickers_copied_emoji(tr::now)
 					: tr::lng_stickers_copied(tr::now));
 		};
-		const auto addAuthorPack = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>>& menu) {
+		const auto addAuthorPack = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
+		{
 			if (type == Data::StickersType::Stickers) {
 				const auto pointer = Ui::MakeWeak(this);
-				(*menu)->addAction(tr::ayu_MessageDetailsPackOwnerPC(tr::now), [=]
-				{
-					if (!pointer) {
-						return;
-					}
-
-					searchById(_inner->setId() >> 32, _session, [=](const QString &username, UserData *user)
+				(*menu)->addAction(
+					tr::ayu_MessageDetailsPackOwnerPC(tr::now),
+					[=]
 					{
 						if (!pointer) {
 							return;
 						}
 
-						if (!user) {
-							showToast(tr::ayu_UserNotFoundMessage(tr::now));
-							return;
-						}
+						searchById(
+							_inner->setId() >> 32,
+							_session,
+							[=](const QString &username, UserData *user)
+							{
+								if (!pointer) {
+									return;
+								}
 
-						if (const auto window = _session->tryResolveWindow()) {
-							if (const auto mainWidget = window->widget()->sessionController()) {
-								mainWidget->showPeer(user);
-							}
-						}
-					});
-				}, &st::menuIconProfile);
+								if (!user) {
+									showToast(tr::ayu_UserNotFoundMessage(tr::now));
+									return;
+								}
+
+								if (const auto window = _session->tryResolveWindow()) {
+									if (const auto mainWidget = window->widget()->sessionController()) {
+										mainWidget->showPeer(user);
+									}
+								}
+							});
+					},
+					&st::menuIconProfile);
 			}
 		};
 		if (_inner->notInstalled()) {
