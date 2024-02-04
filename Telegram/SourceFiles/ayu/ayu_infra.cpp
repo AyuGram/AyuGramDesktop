@@ -7,8 +7,6 @@
 #include "ayu_infra.h"
 
 #include "ayu_lang.h"
-#include "ayu/ayu_lottie.h"
-#include "ayu/ui/ayu_lottie.h"
 #include "ayu/database/ayu_database.h"
 #include "lang/lang_instance.h"
 #include "ayu/ayu_settings.h"
@@ -28,11 +26,6 @@ void initLang()
 	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
 }
 
-void initLottie()
-{
-	AyuUi::setLottieImpl(std::make_shared<AyuUi::AyuLottieImpl>());
-}
-
 void initDatabase()
 {
 	AyuDatabase::initialize();
@@ -49,7 +42,6 @@ void initFonts()
 void init()
 {
 	initLang();
-	initLottie();
 	initFonts();
 	initDatabase();
 }

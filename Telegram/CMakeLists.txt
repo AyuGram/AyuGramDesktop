@@ -117,8 +117,6 @@ PRIVATE
     ayu/utils/telegram_helpers.h
     ayu/utils/windows_utils.cpp
     ayu/utils/windows_utils.h
-    ayu/ui/ayu_lottie.cpp
-    ayu/ui/ayu_lottie.h
     ayu/ui/ayu_assets.cpp
     ayu/ui/ayu_assets.h
     ayu/ui/utils/ayu_profile_values.cpp
