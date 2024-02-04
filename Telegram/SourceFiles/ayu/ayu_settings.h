@@ -71,6 +71,7 @@ public:
 
 	int showPeerId;
 	bool showMessageSeconds;
+	bool showMessageShot;
 
 	bool stickerConfirmation;
 	bool gifConfirmation;
@@ -132,6 +133,7 @@ public:
 
 	void set_showPeerId(int val);
 	void set_showMessageSeconds(bool val);
+	void set_showMessageShot(bool val);
 
 	void set_stickerConfirmation(bool val);
 	void set_gifConfirmation(bool val);
@@ -181,6 +183,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	hideAllChatsFolder,
 	showPeerId,
 	showMessageSeconds,
+	showMessageShot,
 	stickerConfirmation,
 	gifConfirmation,
 	voiceConfirmation

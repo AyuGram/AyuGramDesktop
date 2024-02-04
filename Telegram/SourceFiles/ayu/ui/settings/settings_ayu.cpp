@@ -1236,6 +1236,24 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout *> container, not_null<Window
 			AyuSettings::save();
 		}, container->lifetime());
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_SettingsShowMessageShot(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->showMessageShot)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showMessageShot);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showMessageShot(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
 }
 
 void SetupCustomization(not_null<Ui::VerticalLayout *> container,

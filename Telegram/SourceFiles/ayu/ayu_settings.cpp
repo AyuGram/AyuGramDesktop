@@ -257,6 +257,7 @@ AyuGramSettings::AyuGramSettings()
 		 */
 	showPeerId = 2;
 	showMessageSeconds = false;
+	showMessageShot = true;
 
 	// ~ Confirmations
 	stickerConfirmation = false;
@@ -490,6 +491,11 @@ void AyuGramSettings::set_hideAllChatsFolder(bool val)
 void AyuGramSettings::set_showMessageSeconds(bool val)
 {
 	showMessageSeconds = val;
+}
+
+void AyuGramSettings::set_showMessageShot(bool val)
+{
+	showMessageShot = val;
 }
 
 void AyuGramSettings::set_stickerConfirmation(bool val)

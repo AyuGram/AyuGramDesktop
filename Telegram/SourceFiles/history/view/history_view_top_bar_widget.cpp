@@ -1142,9 +1142,12 @@ void TopBarWidget::updateControlsVisibility() {
 		hideChildren();
 		return;
 	}
+
+	const auto settings = &AyuSettings::getInstance();
+
 	_clear->show();
 	_delete->setVisible(_canDelete);
-	_messageShot->setVisible(true);
+	_messageShot->setVisible(settings->showMessageShot);
 	_forward->setVisible(_canForward);
 	_sendNow->setVisible(_canSendNow);
 
