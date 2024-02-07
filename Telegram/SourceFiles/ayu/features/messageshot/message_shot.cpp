@@ -237,7 +237,7 @@ QImage addPadding(const QImage &original, int padding) {
 QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	const auto controller = config.controller;
 	const auto st = config.st;
-	const auto messages = config.messages;
+	auto messages = config.messages;
 
 	if (messages.empty()) {
 		return {};
@@ -251,6 +251,21 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 														  {
 															  box->update();
 														  });
+
+	// remove deleted messages
+	messages.erase(
+		std::ranges::remove_if(
+			messages,
+			[=](const auto &message)
+			{
+				return !message || !controller->session().data().message(message->fullId());
+			}).begin(),
+		messages.end()
+	);
+
+	if (messages.empty()) {
+		return {};
+	}
 
 	std::unordered_map<not_null<HistoryItem*>, std::shared_ptr<HistoryView::Element>> createdViews;
 	createdViews.reserve(messages.size());
