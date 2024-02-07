@@ -19,6 +19,7 @@ struct ShotConfig
 	std::shared_ptr<Ui::ChatStyle> st;
 	std::vector<not_null<HistoryItem*>> messages;
 
+	bool showBackground;
 	bool showDate;
 	bool showReactions;
 };
@@ -62,6 +63,9 @@ rpl::producer<Data::CloudTheme> themeChosen();
 
 void setPalette(style::palette &palette);
 rpl::producer<style::palette> paletteChosen();
+
+// util
+QColor makeDefaultBackgroundColor();
 
 QImage Make(not_null<QWidget*> box, const ShotConfig &config);
 

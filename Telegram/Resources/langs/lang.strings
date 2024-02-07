@@ -7250,8 +7250,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageShotThemeDefault" = "Default";
 "ayu_MessageShotThemeSelectTitle" = "Select message theme";
 "ayu_MessageShotThemeApply" = "Apply";
-"ayu_MessageShotBackground" = "Background";
-"ayu_MessageShotBackgroundSelected" = "Selected";
+"ayu_MessageShotShowBackground" = "Show background";
 "ayu_MessageShotShowDate" = "Show date";
 "ayu_MessageShotShowReactions" = "Show reactions";
 "ayu_MessageShotShowColorfulReplies" = "Show colorful replies";

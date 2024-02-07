@@ -7,6 +7,7 @@
 #include "message_shot.h"
 
 #include "styles/style_layers.h"
+#include "styles/style_ayu_styles.h"
 
 #include "qguiapplication.h"
 #include "ayu/ui/boxes/message_shot_box.h"
@@ -24,6 +25,7 @@
 #include "ui/chat/chat_theme.h"
 #include "ui/effects/path_shift_gradient.h"
 #include "ui/layers/box_content.h"
+#include "window/themes/window_theme.h"
 
 namespace AyuFeatures::MessageShot {
 
@@ -185,7 +187,7 @@ bool MessageShotDelegate::elementIsChatWide() {
 	return true;
 }
 
-QImage removePadding(const QImage &original) {
+QImage removeEmptySpaceAround(const QImage &original) {
 	if (original.isNull()) {
 		return {};
 	}
@@ -211,27 +213,35 @@ QImage removePadding(const QImage &original) {
 		return {};
 	}
 
-	QRect bounds(minX, minY, maxX - minX + 1, maxY - minY + 1);
+	const QRect bounds(minX, minY, maxX - minX + 1, maxY - minY + 1);
 	return original.copy(bounds);
 }
 
-QImage addPadding(const QImage &original, int padding) {
+QImage addPadding(const QImage &original) {
 	if (original.isNull()) {
 		return {};
 	}
 
 	QImage paddedImage(
-		original.width() + padding * 2 * style::DevicePixelRatio(),
-		original.height() + padding * 2 * style::DevicePixelRatio(),
+		original.width() + 2 * st::messageShotPadding,
+		original.height() + 2 * st::messageShotPadding,
 		QImage::Format_ARGB32_Premultiplied
 	);
 	paddedImage.fill(Qt::transparent);
 
 	Painter painter(&paddedImage);
-	painter.drawImage(padding, padding, original);
+	painter.drawImage(st::messageShotPadding, st::messageShotPadding, original);
 	painter.end();
 
 	return paddedImage;
+}
+
+QColor makeDefaultBackgroundColor() {
+	if (Window::Theme::IsNightMode()) {
+		return st::boxBg->c.lighter(175);
+	}
+
+	return st::boxBg->c.darker(110);
 }
 
 QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
@@ -342,11 +352,6 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 			rect,
 			true);
 
-		// hides too much
-		// if (AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
-		// 	context.skipDrawingParts = Ui::ChatPaintContext::SkipDrawingParts::Surrounding;
-		// }
-
 		p.translate(0, y);
 		view->draw(p, context);
 		p.translate(0, -y);
@@ -367,9 +372,18 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 
 	takingShot = false;
 
-	const auto overlay = addPadding(removePadding(image), 4);
+	auto result = addPadding(removeEmptySpaceAround(image));
+	if (!config.showBackground) {
+		return result;
+	}
 
-	return overlay;
+	auto newResult = QImage(result.size(), QImage::Format_ARGB32_Premultiplied);
+	newResult.fill(makeDefaultBackgroundColor());
+
+	Painter painter(&newResult);
+	painter.drawImage(0, 0, result);
+
+	return newResult;
 }
 
 void Wrapper(not_null<HistoryView::ListWidget*> widget) {

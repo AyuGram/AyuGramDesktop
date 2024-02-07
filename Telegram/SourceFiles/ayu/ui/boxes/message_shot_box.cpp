@@ -109,6 +109,20 @@ void MessageShotBox::setupContent() {
 
 			Ui::show(std::move(box), Ui::LayerOption::KeepOther);
 		});
+	AddButtonWithIcon(
+		content,
+		tr::ayu_MessageShotShowBackground(),
+		st::settingsButtonNoIcon
+	)->toggleOn(rpl::single(false)
+	)->toggledValue(
+	) | start_with_next(
+		[=](bool enabled)
+		{
+			_config.showBackground = enabled;
+
+			updatePreview();
+		},
+		content->lifetime());
 
 	AddButtonWithIcon(
 		content,

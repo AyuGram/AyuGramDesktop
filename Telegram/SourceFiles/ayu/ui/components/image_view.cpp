@@ -6,12 +6,12 @@
 // Copyright @Radolyn, 2024
 #include "image_view.h"
 
+#include "ayu/features/messageshot/message_shot.h"
 #include "styles/style_ayu_styles.h"
 
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_chat.h"
 #include "ui/painter.h"
-#include "window/themes/window_theme.h"
 
 ImageView::ImageView(QWidget *parent)
 	: RpWidget(parent) {
@@ -63,15 +63,8 @@ QImage ImageView::getImage() const {
 
 void ImageView::paintEvent(QPaintEvent *e) {
 	Painter p(this);
-	//	PainterHighQualityEnabler hq(p);
 
-	auto brush = QBrush(st::boxBg); // copy
-
-	if (Window::Theme::IsNightMode()) {
-		brush.setColor(brush.color().lighter(120));
-	} else {
-		brush.setColor(brush.color().darker(105));
-	}
+	const auto brush = QBrush(AyuFeatures::MessageShot::makeDefaultBackgroundColor());
 
 	QPainterPath path;
 	path.addRoundedRect(rect(), st::bubbleRadiusLarge, st::bubbleRadiusLarge);
