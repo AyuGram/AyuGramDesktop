@@ -10,6 +10,7 @@
 using "ui/basic.style";
 using "ui/colors.palette";
 using "ui/widgets/widgets.style";
+using "info/info.style";
 
 iconPreviewStroke: activeButtonBg;
 
@@ -25,3 +26,33 @@ cpIconSize: 64px;
 recentStickersLimitPadding: margins(22px, 4px, 22px, 8px);
 imageViewPadding: margins(22px, 10px, 22px, 10px);
 imageViewInnerPadding: margins(16px, 16px, 16px, 16px);
+
+topBarAdmins: IconButton {
+	width: 40px;
+	height: topBarHeight;
+
+	icon: icon {{ "ayu/top_bar_admins", menuIconFg }};
+	iconOver: icon {{ "ayu/top_bar_admins", menuIconFgOver }};
+	iconPosition: point(4px, 11px);
+
+	rippleAreaPosition: point(0px, 7px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
+
+topBarRecentActions: IconButton {
+	width: 40px;
+	height: topBarHeight;
+
+	icon: icon {{ "ayu/top_bar_recent_actions", menuIconFg }};
+	iconOver: icon {{ "ayu/top_bar_recent_actions", menuIconFgOver }};
+	iconPosition: point(4px, 11px);
+
+	rippleAreaPosition: point(0px, 7px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
