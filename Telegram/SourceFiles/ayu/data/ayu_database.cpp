@@ -182,9 +182,13 @@ void initialize() {
 }
 
 void addEditedMessage(const EditedMessage &message) {
-	storage.begin_transaction();
-	storage.insert(message);
-	storage.commit();
+	try {
+		storage.begin_transaction();
+		storage.insert(message);
+		storage.commit();
+	} catch (std::exception& ex) {
+		LOG(("Failed to save edited message for some reason: %1").arg(ex.what()));
+	}
 }
 
 std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId) {
@@ -198,13 +202,18 @@ std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageI
 }
 
 bool hasRevisions(ID userId, ID dialogId, ID messageId) {
-	return storage.count<EditedMessage>(
-		where(
-			c(&EditedMessage::userId) == userId and
-			c(&EditedMessage::dialogId) == dialogId and
-			c(&EditedMessage::messageId) == messageId
-		)
-	) > 0;
+	try {
+		return storage.count<EditedMessage>(
+			where(
+				c(&EditedMessage::userId) == userId and
+				c(&EditedMessage::dialogId) == dialogId and
+				c(&EditedMessage::messageId) == messageId
+			)
+		) > 0;
+	} catch (std::exception& ex) {
+		LOG(("Failed to check if message has revisions: %1").arg(ex.what()));
+		return false;
+	}
 }
 
 }

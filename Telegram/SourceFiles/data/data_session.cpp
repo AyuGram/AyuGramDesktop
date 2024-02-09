@@ -2809,11 +2809,21 @@ void Session::checkTTLs() {
 
 	_ttlCheckTimer.cancel();
 	const auto now = base::unixtime::now();
-	while (!_ttlMessages.empty() && _ttlMessages.begin()->first <= now) {
-		if (!settings->saveDeletedMessages) {
+
+	if (settings->saveDeletedMessages) {
+		auto toBeRemoved = ranges::views::take_while(
+			_ttlMessages,
+			[now](const auto &pair) {
+				return pair.first <= now;
+			}) | ranges::views::transform([](const auto &pair) {
+				return pair.second;
+			}) | ranges::views::join;
+		for (auto &item : toBeRemoved) {
+			item->setAyuHint(settings->deletedMark);
+		}
+	} else {
+		while (!_ttlMessages.empty() && _ttlMessages.begin()->first <= now) {
 			_ttlMessages.begin()->second.front()->destroy();
-		} else {
-			_ttlMessages.begin()->second.front()->setAyuHint(settings->deletedMark);
 		}
 	}
 	scheduleNextTTLs();
