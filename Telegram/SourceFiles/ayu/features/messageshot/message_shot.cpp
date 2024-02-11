@@ -361,7 +361,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 			const auto picY = y + view->height() - st::msgPhotoSize;
 
 			auto userpicView =
-				!message->displayFrom()->activeUserpicView().null()
+				message->displayFrom()->hasUserpic()
 					? message->displayFrom()->activeUserpicView()
 					: message->displayFrom()->createUserpicView();
 			message->displayFrom()->paintUserpic(p, userpicView, picX, picY, st::msgPhotoSize);
