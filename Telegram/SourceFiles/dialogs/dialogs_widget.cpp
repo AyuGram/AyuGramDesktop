@@ -916,7 +916,8 @@ void Widget::chosenRow(const ChosenRow &row) {
 		&& row.userpicClick
 		&& (row.message.fullId.msg == ShowAtUnreadMsgId)
 		&& history->peer->hasActiveStories()
-		&& !history->peer->isSelf()) {
+		&& !history->peer->isSelf()
+		&& !AyuSettings::getInstance().disableStories) {
 		controller()->openPeerStories(history->peer->id);
 		return;
 	} else if (history
