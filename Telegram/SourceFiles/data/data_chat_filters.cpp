@@ -910,7 +910,9 @@ FilterId ChatFilters::defaultId() const {
 }
 
 FilterId ChatFilters::lookupId(int index) const {
-	Expects(index >= 0 && index < _list.size());
+	if (index >= 0 && index < _list.size()) {
+		return FilterId(); // AyuGram: fix crash when using `hideAllChatsFolder`
+	}
 
 	if (_owner->session().user()->isPremium() || !_list.front().id()) {
 		return _list[index].id();

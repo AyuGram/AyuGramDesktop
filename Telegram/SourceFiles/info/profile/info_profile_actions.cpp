@@ -138,8 +138,8 @@ constexpr auto kDay = Data::WorkingInterval::kDay;
 base::options::toggle ShowPeerIdBelowAbout({
 	.id = kOptionShowPeerIdBelowAbout,
 	.name = "Show Peer IDs in Profile",
-	.description = "Show peer IDs from API below their Bio / Description."
-		" Add contact IDs to exported data.",
+	.description = "Show peer IDs from API below their Bio / Description.",
+	.scope = static_cast<base::options::details::ScopeFlag>(0),
 });
 
 base::options::toggle ShowChannelJoinedBelowAbout({

@@ -226,9 +226,12 @@ void FiltersMenu::refresh() {
 	_scroll.scrollToY(oldTop);
 
     // Fix active chat folder when hide all chats is enabled.
-    if (settings->hideAllChatsFolder) {
-        const auto lookup_id = filters->lookupId(premium() ? 0 : 1);
-        _session->setActiveChatsFilter(lookup_id);
+	// Also check for session content existance, because it may be null
+	// and there will be an exception in `Window::SessionController::showPeerHistory`
+	// because `SessionController::content()` == nullptr
+    if (settings->hideAllChatsFolder && _session->widget()->sessionContent()) {
+        const auto lookupId = filters->lookupId(premium() ? 0 : 1);
+        _session->setActiveChatsFilter(lookupId);
     }
 }
 
