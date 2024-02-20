@@ -799,8 +799,8 @@ void TopBarWidget::backClicked() {
 		auto settings = &AyuSettings::getInstance();
 		if (settings->hideAllChatsFolder) {
 			const auto filters = &_controller->session().data().chatsFilters();
-			const auto lookup_id = filters->lookupId(_controller->session().premium() ? 0 : 1);
-			_controller->setActiveChatsFilter(lookup_id);
+			const auto lookupId = filters->lookupId(_controller->session().premium() ? 0 : 1);
+			_controller->setActiveChatsFilter(lookupId);
 		} else {
 			_controller->closeFolder();
 		}

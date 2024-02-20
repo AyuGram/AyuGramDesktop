@@ -4839,8 +4839,9 @@ void Session::registerItemView(not_null<ViewElement*> view) {
 }
 
 void Session::unregisterItemView(not_null<ViewElement*> view) {
-	if (!_heavyViewParts.contains(view)) {
-		return; // AyuGram: fix crash when using `saveDeletedMessages`
+	// Expects(!_heavyViewParts.contains(view));
+	if (_heavyViewParts.contains(view)) {
+		view->unloadHeavyPart(); // AyuGram: fix crash when using `saveDeletedMessages`
 	}
 
 	_shownSpoilers.remove(view);
