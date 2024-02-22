@@ -597,6 +597,25 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
+		tr::ayu_DisableCustomBackgrounds(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->disableCustomBackgrounds)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableCustomBackgrounds);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_disableCustomBackgrounds(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
 		tr::ayu_SimpleQuotesAndReplies(),
 		st::settingsButtonNoIcon
 	)->toggleOn(

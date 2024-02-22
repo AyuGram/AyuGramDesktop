@@ -33,6 +33,7 @@ public:
 
 	bool disableAds;
 	bool disableStories;
+	bool disableCustomBackgrounds;
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
 
@@ -94,6 +95,7 @@ public:
 
 	void set_disableAds(bool val);
 	void set_disableStories(bool val);
+	void set_disableCustomBackgrounds(bool val);
 	void set_collapseSimilarChannels(bool val);
 	void set_hideSimilarChannels(bool val);
 
@@ -153,6 +155,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	saveMessagesHistory,
 	disableAds,
 	disableStories,
+	disableCustomBackgrounds,
 	collapseSimilarChannels,
 	hideSimilarChannels,
 	uploadSpeedBoost,

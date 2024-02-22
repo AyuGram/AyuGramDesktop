@@ -200,6 +200,7 @@ AyuGramSettings::AyuGramSettings() {
 	// ~ QoL toggles
 	disableAds = true;
 	disableStories = false;
+	disableCustomBackgrounds = true;
 	collapseSimilarChannels = true;
 	hideSimilarChannels = false;
 
@@ -324,6 +325,10 @@ void AyuGramSettings::set_disableAds(bool val) {
 
 void AyuGramSettings::set_disableStories(bool val) {
 	disableStories = val;
+}
+
+void AyuGramSettings::set_disableCustomBackgrounds(bool val) {
+	disableCustomBackgrounds = val;
 }
 
 void AyuGramSettings::set_collapseSimilarChannels(bool val) {
