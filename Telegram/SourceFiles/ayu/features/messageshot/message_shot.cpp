@@ -15,6 +15,7 @@
 #include "data/data_cloud_themes.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
+#include "history/history.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
@@ -150,7 +151,8 @@ public:
 	MessageShotDelegate(
 		not_null<QWidget*> parent,
 		not_null<Ui::ChatStyle*> st,
-		Fn<void()> update);
+		Fn<void()> update,
+		bool isTopic);
 
 	bool elementAnimationsPaused() override;
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
@@ -160,14 +162,17 @@ public:
 private:
 	const not_null<QWidget*> _parent;
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
+	HistoryView::Context _context;
 };
 
 MessageShotDelegate::MessageShotDelegate(
 	not_null<QWidget*> parent,
 	not_null<Ui::ChatStyle*> st,
-	Fn<void()> update)
+	Fn<void()> update,
+	bool isTopic)
 	: _parent(parent)
 	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update)) {
+	_context = isTopic ? HistoryView::Context::Replies : HistoryView::Context::AdminLog;
 }
 
 bool MessageShotDelegate::elementAnimationsPaused() {
@@ -255,12 +260,14 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 
 	takingShot = true;
 
-	auto delegate = std::make_unique<MessageShotDelegate>(box,
-														  st.get(),
-														  [=]
-														  {
-															  box->update();
-														  });
+	auto delegate = std::make_unique<MessageShotDelegate>(
+		box,
+		st.get(),
+		[=]
+		{
+			box->update();
+		},
+		messages.front()->history()->asTopic());
 
 	// remove deleted messages
 	messages.erase(
@@ -413,4 +420,5 @@ void Wrapper(not_null<HistoryView::ListWidget*> widget) {
 	auto box = Box<MessageShotBox>(config);
 	Ui::show(std::move(box));
 }
+
 }

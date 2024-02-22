@@ -215,7 +215,7 @@ AyuGramSettings::AyuGramSettings() {
 	simpleQuotesAndReplies = true;
 	deletedMark = "🧹";
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
-	recentStickersCount = 50;
+	recentStickersCount = 100;
 
 	// context menu items
 	// 0 - hide
@@ -227,7 +227,7 @@ AyuGramSettings::AyuGramSettings() {
 	showUserMessagesInContextMenu = 2;
 	showMessageDetailsInContextMenu = 2;
 
-	showLReadToggleInDrawer = true;
+	showLReadToggleInDrawer = false;
 	showSReadToggleInDrawer = true;
 	showGhostToggleInDrawer = true;
 	showStreamerToggleInDrawer = false;
