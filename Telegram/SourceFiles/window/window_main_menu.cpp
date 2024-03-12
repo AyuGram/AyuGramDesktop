@@ -57,7 +57,38 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Window {
 namespace {
 
-constexpr auto kPlayStatusLimit = 2;
+constexpr auto kPlayStatusLimit = 12;
+
+class VersionLabel final
+	: public Ui::FlatLabel
+	, public Ui::AbstractTooltipShower {
+public:
+	using Ui::FlatLabel::FlatLabel;
+
+	void clickHandlerActiveChanged(
+			const ClickHandlerPtr &action,
+			bool active) override {
+		update();
+		if (active && action && !action->dragText().isEmpty()) {
+			Ui::Tooltip::Show(350, this);
+		} else {
+			Ui::Tooltip::Hide();
+		}
+	}
+
+	QString tooltipText() const override {
+		return u"Build date: %1."_q.arg(__DATE__);
+	}
+
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+
+	bool tooltipWindowActive() const override {
+		return Ui::AppInFocus() && Ui::InFocusChain(window());
+	}
+
+};
 
 [[nodiscard]] bool CanCheckSpecialEvent() {
 	static const auto result = [] {

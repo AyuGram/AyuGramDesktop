@@ -98,7 +98,7 @@ namespace {
 
 constexpr auto kSaveDraftTimeout = crl::time(1000);
 constexpr auto kSaveDraftAnywayTimeout = 5 * crl::time(1000);
-constexpr auto kSaveCloudDraftIdleTimeout = 14 * crl::time(1000);
+constexpr auto kSaveCloudDraftIdleTimeout = 12 * crl::time(1000);
 constexpr auto kMouseEvents = {
 	QEvent::MouseMove,
 	QEvent::MouseButtonPress,

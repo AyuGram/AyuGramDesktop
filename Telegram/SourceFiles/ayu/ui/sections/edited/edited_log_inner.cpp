@@ -1528,7 +1528,7 @@ void InnerWidget::updateSelected() {
 	if (dragState.link
 		|| dragState.cursor == CursorState::Date
 		|| dragState.cursor == CursorState::Forwarded) {
-		Ui::Tooltip::Show(1000, this);
+		Ui::Tooltip::Show(350, this);
 	}
 
 	auto cursor = style::cur_default;

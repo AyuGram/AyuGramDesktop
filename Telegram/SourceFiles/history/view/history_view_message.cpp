@@ -61,7 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace HistoryView {
 namespace {
 
-constexpr auto kPlayStatusLimit = 2;
+constexpr auto kPlayStatusLimit = 12;
 const auto kPsaTooltipPrefix = "cloud_lng_tooltip_psa_";
 
 class KeyboardStyle : public ReplyKeyboard::Style {

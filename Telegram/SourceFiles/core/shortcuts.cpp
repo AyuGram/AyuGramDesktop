@@ -26,7 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Shortcuts {
 namespace {
 
-constexpr auto kCountLimit = 256; // How many shortcuts can be in json file.
+constexpr auto kCountLimit = 2048; // How many shortcuts can be in json file.
 
 rpl::event_stream<not_null<Request*>> RequestsStream;
 bool Paused/* = false*/;

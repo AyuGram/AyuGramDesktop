@@ -34,7 +34,7 @@ namespace {
 
 constexpr auto kReadAreaLimit = 12'032 * 9'024;
 constexpr auto kWallPaperThumbnailLimit = 960;
-constexpr auto kGoodThumbQuality = 87;
+constexpr auto kGoodThumbQuality = 95;
 
 enum class FileType {
 	Video,

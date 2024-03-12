@@ -3824,7 +3824,7 @@ void ListWidget::mouseActionUpdate() {
 	if (dragState.link
 		|| dragState.cursor == CursorState::Date
 		|| dragState.cursor == CursorState::Forwarded) {
-		Ui::Tooltip::Show(1000, this);
+		Ui::Tooltip::Show(350, this);
 	}
 
 	if (_mouseAction == MouseAction::None) {

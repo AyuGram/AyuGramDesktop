@@ -724,7 +724,7 @@ void CallMuteButton::init() {
 	) | rpl::start_with_next([=](not_null<QEvent*> e) {
 		if (e->type() == QEvent::MouseMove) {
 			if (!_state.current().tooltip.isEmpty()) {
-				Ui::Tooltip::Show(1000, this);
+				Ui::Tooltip::Show(350, this);
 			}
 		} else if (e->type() == QEvent::Leave) {
 			Ui::Tooltip::Hide();

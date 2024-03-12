@@ -70,7 +70,7 @@ using namespace Ui::Text;
 using EditLinkAction = Ui::InputField::EditLinkAction;
 using EditLinkSelection = Ui::InputField::EditLinkSelection;
 
-constexpr auto kParseLinksTimeout = crl::time(1000);
+constexpr auto kParseLinksTimeout = crl::time(500);
 constexpr auto kTypesDuration = 4 * crl::time(1000);
 constexpr auto kCodeLanguageLimit = 32;
 

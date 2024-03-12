@@ -37,7 +37,7 @@ namespace {
 
 constexpr auto kFirstPageCount = 16;
 constexpr auto kPerPage = 200;
-constexpr auto kServerSearchDelay = crl::time(1000);
+constexpr auto kServerSearchDelay = crl::time(150);
 constexpr auto kAcceptButton = 1;
 constexpr auto kRejectButton = 2;
 

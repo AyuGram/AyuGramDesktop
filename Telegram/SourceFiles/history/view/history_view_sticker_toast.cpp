@@ -28,7 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace HistoryView {
 namespace {
 
-constexpr auto kPremiumToastDuration = 5 * crl::time(1000);
+constexpr auto kPremiumToastDuration = 3 * crl::time(1000);
 
 } // namespace
 

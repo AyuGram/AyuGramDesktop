@@ -70,7 +70,7 @@ namespace Settings {
 namespace {
 
 constexpr auto kSaveBioTimeout = 1000;
-constexpr auto kPlayStatusLimit = 2;
+constexpr auto kPlayStatusLimit = 12;
 
 class ComposedBadge final : public Ui::RpWidget {
 public:

@@ -27,7 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace TTLMenu {
 namespace {
 
-constexpr auto kToastDuration = crl::time(3500);
+constexpr auto kToastDuration = crl::time(3000);
 
 void ShowAutoDeleteToast(
 		std::shared_ptr<Ui::Show> show,

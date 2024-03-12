@@ -17,7 +17,7 @@ namespace Data {
 namespace AutoDownload {
 namespace {
 
-constexpr auto kDefaultMaxSize = 8 * int64(1024 * 1024);
+constexpr auto kDefaultMaxSize = 12 * int64(1024 * 1024);
 constexpr auto kDefaultAutoPlaySize = 50 * int64(1024 * 1024);
 constexpr auto kVersion1 = char(1);
 constexpr auto kVersion = char(2);

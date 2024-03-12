@@ -30,8 +30,8 @@ namespace HistoryView {
 namespace {
 
 constexpr auto kPremiumShift = 21. / 240;
-constexpr auto kMaxPlays = 5;
-constexpr auto kMaxPlaysWithSmallDelay = 3;
+constexpr auto kMaxPlays = 8;
+constexpr auto kMaxPlaysWithSmallDelay = 5;
 constexpr auto kSmallDelay = crl::time(200);
 constexpr auto kDropDelayedAfterDelay = crl::time(2000);
 

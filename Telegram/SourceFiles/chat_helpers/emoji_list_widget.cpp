@@ -2735,7 +2735,7 @@ void EmojiListWidget::setSelected(OverState newSelected) {
 
 	const auto hasSelection = !v::is_null(_selected);
 	if (hasSelection && Core::App().settings().suggestEmoji()) {
-		Ui::Tooltip::Show(1000, this);
+		Ui::Tooltip::Show(350, this);
 	}
 
 	setCursor(hasSelection ? style::cur_pointer : style::cur_default);

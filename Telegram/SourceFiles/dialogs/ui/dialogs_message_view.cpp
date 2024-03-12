@@ -29,7 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
-constexpr auto kEmojiLoopCount = 2;
+constexpr auto kEmojiLoopCount = 12;
 
 template <ushort kTag>
 struct TextWithTagOffset {

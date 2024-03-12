@@ -40,7 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Data {
 namespace {
 
-constexpr auto kPremiumToastDuration = 5 * crl::time(1000);
+constexpr auto kPremiumToastDuration = 3 * crl::time(1000);
 
 using SetFlag = StickersSetFlag;
 

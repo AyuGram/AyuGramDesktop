@@ -25,7 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Calls {
 namespace {
 
-constexpr auto kTooltipShowTimeoutMs = crl::time(1000);
+constexpr auto kTooltipShowTimeoutMs = crl::time(350);
 constexpr auto kCarouselOneDuration = crl::time(100);
 constexpr auto kStartTimeShift = crl::time(50);
 constexpr auto kEmojiInFingerprint = 4;

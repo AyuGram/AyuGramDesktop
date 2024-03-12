@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
-constexpr auto kMinLengthForChangeablePlaybackSpeed = 20 * TimeId(60); // 20 minutes.
+constexpr auto kMinLengthForChangeablePlaybackSpeed = 1 * TimeId(60); // 1 minute.
 
 } // namespace
 

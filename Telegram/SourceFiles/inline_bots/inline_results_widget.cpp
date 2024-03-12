@@ -24,7 +24,7 @@ namespace InlineBots {
 namespace Layout {
 namespace {
 
-constexpr auto kInlineBotRequestDelay = 400;
+constexpr auto kInlineBotRequestDelay = 350;
 
 } // namespace
 

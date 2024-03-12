@@ -1776,7 +1776,7 @@ void ListWidget::mouseActionUpdate(const QPoint &globalPosition) {
 		Ui::Tooltip::Hide();
 	}
 	if (dragState.link) {
-		Ui::Tooltip::Show(1000, this);
+		Ui::Tooltip::Show(350, this);
 	}
 
 	if (_mouseAction == MouseAction::None) {

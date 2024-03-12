@@ -116,7 +116,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
-constexpr auto kScrollDateHideTimeout = 1000;
+constexpr auto kScrollDateHideTimeout = 800;
 constexpr auto kUnloadHeavyPartsPages = 2;
 constexpr auto kClearUserpicsAfter = 50;
 
@@ -4345,7 +4345,7 @@ void HistoryInner::mouseActionUpdate() {
 		|| dragState.cursor == CursorState::Date
 		|| dragState.cursor == CursorState::Forwarded
 		|| dragState.customTooltip) {
-		Ui::Tooltip::Show(1000, this);
+		Ui::Tooltip::Show(350, this);
 	}
 
 	Qt::CursorShape cur = style::cur_default;
