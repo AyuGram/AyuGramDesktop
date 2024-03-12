@@ -3333,11 +3333,14 @@ void HistoryItem::setAyuHint(const QString &hint) {
 				&& this->author()->isMegagroup();
 		} else {
 			const auto data = Get<HistoryServiceData>();
-			auto prepared = PreparedServiceText{
-				.text = _text.append(QString(" (%1)").arg(hint)),
-				.links = data->textLinks
-			};
-			setServiceText(std::move(prepared));
+			const auto postfix = QString(" (%1)").arg(hint);
+			if (!_text.text.endsWith(postfix)) { // fix stacking for TTL messages
+				auto prepared = PreparedServiceText{
+					.text = _text.append(postfix),
+					.links = data->textLinks
+				};
+				setServiceText(std::move(prepared));
+			}
 		}
 
 		history()->owner().requestItemViewRefresh(this);
