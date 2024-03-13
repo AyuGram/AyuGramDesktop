@@ -1347,11 +1347,17 @@ void Widget::setupMainMenuToggle() {
 	Window::OtherAccountsUnreadState(
 		&controller()->session().account()
 	) | rpl::start_with_next([=](const Window::OthersUnreadState &state) {
-		const auto icon = !state.count
+		auto icon = !state.count
 			? nullptr
 			: !state.allMuted
 			? &st::dialogsMenuToggleUnread
 			: &st::dialogsMenuToggleUnreadMuted;
+
+		const auto settings = &AyuSettings::getInstance();
+		if (settings->hideNotificationCounters) {
+			icon = nullptr;
+		}
+
 		_mainMenu.toggle->setIconOverride(icon, icon);
 	}, _mainMenu.toggle->lifetime());
 }
