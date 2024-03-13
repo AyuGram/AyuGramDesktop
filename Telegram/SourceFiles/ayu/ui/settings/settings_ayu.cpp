@@ -26,6 +26,7 @@
 #include "styles/style_widgets.h"
 
 #include "icon_picker.h"
+#include "core/application.h"
 #include "styles/style_ayu_icons.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
@@ -35,6 +36,7 @@
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
@@ -389,6 +391,17 @@ namespace Settings {
 
 rpl::producer<QString> Ayu::title() {
 	return tr::ayu_AyuPreferences();
+}
+
+void Ayu::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
+	addAction(
+		tr::ayu_RegisterURLScheme(tr::now),
+		[=] { Core::Application::RegisterUrlScheme(); },
+		&st::menuIconLinks);
+	addAction(
+		tr::lng_restart_button(tr::now),
+		[=] { Core::Restart(); },
+		&st::menuIconRestore);
 }
 
 Ayu::Ayu(
