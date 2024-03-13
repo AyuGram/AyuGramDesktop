@@ -9165,6 +9165,10 @@ void HistoryWidget::messageShotSelected() {
 		messages
 	};
 	auto box = Box<MessageShotBox>(config);
+	box->boxClosing() | rpl::start_with_next([=]
+	{
+		clearSelected();
+	}, box->lifetime());
 	Ui::show(std::move(box));
 }
 

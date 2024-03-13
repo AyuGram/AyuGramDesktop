@@ -207,7 +207,7 @@ ScheduledWidget::ScheduledWidget(
 	}, _topBar->lifetime());
 	_topBar->messageShotSelectionRequest(
 	) | rpl::start_with_next([=] {
-		AyuFeatures::MessageShot::Wrapper(_inner);
+		AyuFeatures::MessageShot::Wrapper(_inner, [=] { clearSelected(); });
 	}, _topBar->lifetime());
 	_topBar->clearSelectionRequest(
 	) | rpl::start_with_next([=] {

@@ -113,7 +113,7 @@ void MessageShotBox::setupContent() {
 		content,
 		tr::ayu_MessageShotShowBackground(),
 		st::settingsButtonNoIcon
-	)->toggleOn(rpl::single(false)
+	)->toggleOn(rpl::single(_config.showBackground)
 	)->toggledValue(
 	) | start_with_next(
 		[=](bool enabled)
@@ -128,7 +128,7 @@ void MessageShotBox::setupContent() {
 		content,
 		tr::ayu_MessageShotShowDate(),
 		st::settingsButtonNoIcon
-	)->toggleOn(rpl::single(false)
+	)->toggleOn(rpl::single(_config.showDate)
 	)->toggledValue(
 	) | start_with_next(
 		[=](bool enabled)
@@ -143,7 +143,7 @@ void MessageShotBox::setupContent() {
 		content,
 		tr::ayu_MessageShotShowReactions(),
 		st::settingsButtonNoIcon
-	)->toggleOn(rpl::single(false)
+	)->toggleOn(rpl::single(_config.showReactions)
 	)->toggledValue(
 	) | start_with_next(
 		[=](bool enabled)
@@ -154,11 +154,12 @@ void MessageShotBox::setupContent() {
 		},
 		content->lifetime());
 
-	AddButtonWithIcon(
+	const auto latestToggle = AddButtonWithIcon(
 		content,
 		tr::ayu_MessageShotShowColorfulReplies(),
 		st::settingsButtonNoIcon
-	)->toggleOn(rpl::single(savedShowColorfulReplies)
+	);
+	latestToggle->toggleOn(rpl::single(savedShowColorfulReplies)
 	)->toggledValue(
 	) | start_with_next(
 		[=](bool enabled)
@@ -186,11 +187,15 @@ void MessageShotBox::setupContent() {
 				  if (!path.isEmpty()) {
 					  image.save(path);
 				  }
+
+				  closeBox();
 			  });
 	addButton(tr::ayu_MessageShotCopy(),
 			  [=]
 			  {
 				  QGuiApplication::clipboard()->setImage(imageView->getImage());
+
+				  closeBox();
 			  });
 
 	updatePreview();
@@ -210,4 +215,7 @@ void MessageShotBox::setupContent() {
 		content->lifetime());
 
 	setDimensionsToContent(boxWidth, content);
+
+	// scroll to the end
+	scrollToWidget(latestToggle);
 }

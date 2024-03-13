@@ -411,7 +411,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	return newResult;
 }
 
-void Wrapper(not_null<HistoryView::ListWidget*> widget) {
+void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected) {
 	const auto items = widget->getSelectedIds();
 	if (items.empty()) {
 		return;
@@ -436,6 +436,10 @@ void Wrapper(not_null<HistoryView::ListWidget*> widget) {
 		messages,
 	};
 	auto box = Box<MessageShotBox>(config);
+	box->boxClosing() | rpl::start_with_next([=]
+	{
+		clearSelected();
+	}, box->lifetime());
 	Ui::show(std::move(box));
 }
 

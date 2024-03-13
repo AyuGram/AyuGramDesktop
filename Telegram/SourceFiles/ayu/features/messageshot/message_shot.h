@@ -19,7 +19,7 @@ struct ShotConfig
 	std::shared_ptr<Ui::ChatStyle> st;
 	std::vector<not_null<HistoryItem*>> messages;
 
-	bool showBackground;
+	bool showBackground = true;
 	bool showDate;
 	bool showReactions;
 };
@@ -69,6 +69,6 @@ QColor makeDefaultBackgroundColor();
 
 QImage Make(not_null<QWidget*> box, const ShotConfig &config);
 
-void Wrapper(not_null<HistoryView::ListWidget*> widget);
+void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected);
 
 }
