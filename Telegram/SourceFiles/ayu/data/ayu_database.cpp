@@ -153,13 +153,19 @@ void moveCurrentDatabase() {
 }
 
 void initialize() {
-	const auto res = storage.sync_schema_simulate(true);
 	auto movePrevious = false;
-	for (const auto val : res | std::views::values) {
-		if (val == sync_schema_result::dropped_and_recreated) {
-			movePrevious = true;
-			break;
+
+	try {
+		const auto res = storage.sync_schema_simulate(true);
+		for (const auto val : res | std::views::values) {
+			if (val == sync_schema_result::dropped_and_recreated) {
+				movePrevious = true;
+				break;
+			}
 		}
+	} catch (...) {
+		LOG(("Exception during sync simulation; possibly corrupted database"));
+		movePrevious = true;
 	}
 
 	if (movePrevious) {
