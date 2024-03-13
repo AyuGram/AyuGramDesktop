@@ -13,12 +13,14 @@
 #include "ayu/ui/boxes/message_shot_box.h"
 #include "boxes/abstract_box.h"
 #include "data/data_cloud_themes.h"
+#include "data/data_forum.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
+#include "history/history_item_components.h"
 #include "history/view/media/history_view_media.h"
 #include "main/main_session.h"
 #include "styles/style_chat.h"
@@ -152,27 +154,28 @@ public:
 		not_null<QWidget*> parent,
 		not_null<Ui::ChatStyle*> st,
 		Fn<void()> update,
-		bool isTopic);
+		not_null<History*> history);
 
 	bool elementAnimationsPaused() override;
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
 	HistoryView::Context elementContext() override;
+	bool elementHideReply(not_null<const HistoryView::Element*> view) override;
 	bool elementIsChatWide() override;
 
 private:
 	const not_null<QWidget*> _parent;
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
-	HistoryView::Context _context;
+	not_null<History*> _history;
 };
 
 MessageShotDelegate::MessageShotDelegate(
 	not_null<QWidget*> parent,
 	not_null<Ui::ChatStyle*> st,
 	Fn<void()> update,
-	bool isTopic)
+	not_null<History*> history)
 	: _parent(parent)
-	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update)) {
-	_context = isTopic ? HistoryView::Context::Replies : HistoryView::Context::AdminLog;
+	  , _pathGradient(HistoryView::MakePathShiftGradient(st, update))
+	  , _history(history) {
 }
 
 bool MessageShotDelegate::elementAnimationsPaused() {
@@ -186,6 +189,21 @@ auto MessageShotDelegate::elementPathShiftGradient()
 
 HistoryView::Context MessageShotDelegate::elementContext() {
 	return HistoryView::Context::AdminLog;
+}
+
+bool MessageShotDelegate::elementHideReply(not_null<const HistoryView::Element*> view) {
+	if (const auto reply = view->data()->Get<HistoryMessageReply>()) {
+		const auto replyToPeerId = reply->externalPeerId()
+									   ? reply->externalPeerId()
+									   : _history->peer->id;
+
+		if (reply->fields().manualQuote) {
+			return false;
+		} else if (replyToPeerId == _history->peer->id) {
+			return _history->asForum() && _history->asForum()->topicFor(reply->messageId());
+		}
+	}
+	return false;
 }
 
 bool MessageShotDelegate::elementIsChatWide() {
@@ -267,7 +285,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		{
 			box->update();
 		},
-		messages.front()->history()->asTopic());
+		messages.front()->history());
 
 	// remove deleted messages
 	messages.erase(
