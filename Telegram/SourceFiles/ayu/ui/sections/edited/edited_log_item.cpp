@@ -614,8 +614,6 @@ void GenerateItems(
 	not_null<History*> history,
 	EditedMessage message,
 	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback) {
-	const auto session = &history->session();
-	const auto id = message.fakeId;
 	PeerData *from = history->owner().userLoaded(message.fromId);
 	if (!from) {
 		from = history->owner().channelLoaded(message.fromId);
@@ -639,43 +637,14 @@ void GenerateItems(
 	const auto fromLink = from->createOpenLink();
 	const auto fromLinkText = Ui::Text::Link(fromName, QString());
 
-	const auto addSimpleServiceMessage = [&](
-		const TextWithEntities &text,
-		MsgId realId = MsgId(),
-		PhotoData *photo = nullptr)
-	{
-		auto message = PreparedServiceText{text};
-		message.links.push_back(fromLink);
-		addPart(
-			history->makeMessage(
-				history->nextNonHistoryEntryId(),
-				MessageFlag::AdminLogEntry,
-				date,
-				std::move(message),
-				peerToUser(from->id),
-				photo),
-			0,
-			realId);
-	};
-
 	const auto makeSimpleTextMessage = [&](TextWithEntities &&text)
 	{
-		const auto bodyFlags = MessageFlag::HasFromId | MessageFlag::Local;
-		const auto bodyReplyTo = FullReplyTo();
-		const auto bodyViaBotId = UserId();
-		const auto bodyGroupedId = uint64();
-		return history->makeMessage(
-			history->nextNonHistoryEntryId(),
-			bodyFlags,
-			bodyReplyTo,
-			bodyViaBotId,
-			date,
-			peerToUser(from->id),
-			QString(),
-			std::move(text),
-			MTP_messageMediaEmpty(),
-			HistoryMessageMarkupData(),
-			bodyGroupedId);
+		return history->makeMessage({
+			.id = history->nextNonHistoryEntryId(),
+			.flags = MessageFlag::HasFromId | MessageFlag::AdminLogEntry,
+			.from = from->id,
+			.date = date,
+		}, std::move(text), MTP_messageMediaEmpty());
 	};
 
 	const auto addSimpleTextMessage = [&](TextWithEntities &&text)
