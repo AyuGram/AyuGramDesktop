@@ -54,7 +54,7 @@ notifyWidth: 320px;
 notifyMinHeight: 80px;
 notifyDeltaX: 6px;
 notifyDeltaY: 7px;
-notifyActionsDuration: 200;
+notifyActionsDuration: 180;
 
 notifyHideAllHeight: 36px;
 
@@ -188,7 +188,7 @@ connectingRetryLink: LinkButton(defaultLinkButton) {
 }
 connectingProxyOff: icon {{ "proxy_off", menuIconFg }};
 connectingProxyOn: icon {{ "proxy_on", windowBgActive }};
-connectingDuration: 150;
+connectingDuration: 135;
 
 windowOutdatedDetails: FlatLabel(defaultFlatLabel) {
 	align: align(top);

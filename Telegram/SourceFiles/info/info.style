@@ -644,7 +644,7 @@ infoMembersCancelSearch: CrossButton {
 	crossFgOver: menuIconFgOver;
 	crossPosition: point(0px, 0px);
 
-	duration: 150;
+	duration: 135;
 	loadingPeriod: 1000;
 	ripple: defaultRippleAnimationBgOver;
 }

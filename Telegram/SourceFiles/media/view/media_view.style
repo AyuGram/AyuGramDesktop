@@ -218,8 +218,8 @@ mediaviewIconOver: 36px;
 
 mediaviewWaitHide: 2000;
 mediaviewHideDuration: 1000;
-mediaviewShowDuration: 200;
-mediaviewFadeDuration: 150;
+mediaviewShowDuration: 180;
+mediaviewFadeDuration: 135;
 
 mediaviewDeltaFromLastAction: 5px;
 mediaviewSwipeDistance: 80px;

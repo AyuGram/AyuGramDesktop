@@ -380,7 +380,7 @@ botKbTinyButton: BotKeyboardButton {
 botKbScroll: defaultSolidScroll;
 
 historyScrollDateHideTimeout: 1000;
-historyDateFadeDuration: 200;
+historyDateFadeDuration: 180;
 historyDiceToast: Toast(defaultToast) {
 	minWidth: msgMinWidth;
 	maxWidth: 640px;
@@ -512,7 +512,7 @@ attachPreviewThumbLayout: HistoryFileLayout {
 msgFileMinWidth: 268px;
 msgFileTopMinus: 6px;
 
-msgFileOverDuration: 200;
+msgFileOverDuration: 180;
 msgFileRadialLine: 3px;
 
 msgWaveformBar: 2px;
@@ -568,12 +568,12 @@ historyAdminLogCancelSearch: CrossButton {
 	crossFgOver: menuIconFgOver;
 	crossPosition: point(6px, 11px);
 
-	duration: 150;
+	duration: 135;
 	loadingPeriod: 1000;
 	ripple: defaultRippleAnimationBgOver;
 }
 historyAdminLogSearchTop: 11px;
-historyAdminLogSearchSlideDuration: 150;
+historyAdminLogSearchSlideDuration: 135;
 
 historyFastShareSize: 31px;
 historyFastShareLeft: 13px;
@@ -869,7 +869,7 @@ sendAsButton: SendAsButton {
 		stroke: 1.5;
 		minScale: 0.3;
 	}
-	duration: 150;
+	duration: 135;
 }
 
 reactionInlinePadding: margins(5px, 2px, 7px, 2px);

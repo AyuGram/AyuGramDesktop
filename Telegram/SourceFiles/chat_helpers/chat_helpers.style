@@ -393,7 +393,7 @@ stickersScroll: ScrollArea(boxScroll) {
 	deltab: 9px;
 }
 stickersRowDisabledOpacity: 0.4;
-stickersRowDuration: 200;
+stickersRowDuration: 180;
 
 emojiStatusDefault: icon {{ "emoji/stickers_premium", emojiIconFg }};
 
@@ -414,10 +414,10 @@ emojiPanWidth: 345px;
 emojiPanMinHeight: 278px;
 emojiPanMaxHeight: 640px;
 emojiPanHeightRatio: 0.75;
-emojiPanShowDuration: 200;
-emojiPanDuration: 200;
+emojiPanShowDuration: 180;
+emojiPanDuration: 180;
 emojiPanHover: windowBgOver;
-emojiPanSlideDuration: 200;
+emojiPanSlideDuration: 180;
 emojiPanArea: size(34px, 32px);
 emojiPanRadius: 8px;
 
@@ -435,7 +435,7 @@ defaultTabbedSearchCancel: CrossButton {
 	crossFgOver: menuIconFg;
 	crossPosition: point(1px, 3px);
 
-	duration: 150;
+	duration: 135;
 	loadingPeriod: 1000;
 	ripple: emptyRippleAnimation;
 }
@@ -521,7 +521,7 @@ stickerPanRemoveSet: IconButton(hashtagClose) {
 	rippleAreaPosition: point(0px, 0px);
 }
 stickerIconMove: 400;
-stickerPreviewDuration: 150;
+stickerPreviewDuration: 135;
 stickerPreviewMin: 0.1;
 
 emojiPanColorAll: IconButton(stickerPanRemoveSet) {
@@ -839,7 +839,7 @@ defaultMessageBar: MessageBar {
 	text: defaultTextStyle;
 	textFg: historyComposeAreaFg;
 	textPalette: historyComposeAreaPalette;
-	duration: 160;
+	duration: 150;
 }
 
 historyComposeButton: FlatButton {

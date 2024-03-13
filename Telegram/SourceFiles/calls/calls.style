@@ -436,7 +436,7 @@ callDebugPadding: margins(24px, 0px, 24px, 0px);
 callDebugLabel: FlatLabel(defaultFlatLabel) {
 	margin: callDebugPadding;
 }
-callPanelDuration: 150;
+callPanelDuration: 135;
 
 callPanelSignalBars: CallSignalBars {
 	width: 2px;
@@ -1228,7 +1228,7 @@ groupCallSpeakerArcsAnimation: ArcsAnimation {
 	fg: groupCallIconFg;
 	stroke: 2px;
 	space: 4px;
-	duration: 200;
+	duration: 180;
 	deltaAngle: 60;
 	deltaHeight: 6px;
 	deltaWidth: 7px;
