@@ -16,6 +16,7 @@
 #include "data/data_forum.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
+#include "dialogs/ui/dialogs_video_userpic.h"
 #include "history/history.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item.h"
@@ -359,6 +360,9 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 
 	const auto viewport = QRect(0, 0, width, height);
 
+	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> userpics;
+	base::flat_map<MsgId, Ui::PeerUserpicView> hiddenSenderUserpics;
+
 	Painter p(&image);
 
 	// draw the messages
@@ -385,11 +389,36 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 			const auto picX = st::msgMargin.left();
 			const auto picY = y + view->height() - st::msgPhotoSize;
 
-			auto userpicView =
-				message->displayFrom()->hasUserpic()
-					? message->displayFrom()->activeUserpicView()
-					: message->displayFrom()->createUserpicView();
-			message->displayFrom()->paintUserpic(p, userpicView, picX, picY, st::msgPhotoSize);
+			if (const auto from = message->displayFrom()) {
+				Dialogs::Ui::PaintUserpic(
+					p,
+					from,
+					nullptr,
+					userpics[from],
+					picX,
+					picY,
+					width,
+					st::msgPhotoSize,
+					context.paused);
+			} else if (const auto info = message->displayHiddenSenderInfo()) {
+				if (info->customUserpic.empty()) {
+					info->emptyUserpic.paintCircle(
+						p,
+						picX,
+						picY,
+						width,
+						st::msgPhotoSize);
+				} else {
+					auto &userpic = hiddenSenderUserpics[message->id];
+					const auto valid = info->paintCustomUserpic(
+						p,
+						userpic,
+						picX,
+						picY,
+						width,
+						st::msgPhotoSize);
+				}
+			}
 		}
 
 		y += view->height();
