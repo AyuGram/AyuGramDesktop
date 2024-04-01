@@ -20,7 +20,7 @@
 #include "ayu/utils/windows_utils.h"
 #endif
 
-const QVector icons{
+const QVector<QString> icons{
 	AyuAssets::DEFAULT_ICON,
 	AyuAssets::ALT_ICON,
 	AyuAssets::DISCORD_ICON,
