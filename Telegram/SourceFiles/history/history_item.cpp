@@ -3325,10 +3325,10 @@ void HistoryItem::setAyuHint(const QString &hint) {
 			if (!msgsigned) {
 				AddComponents(HistoryMessageSigned::Bit());
 				msgsigned = Get<HistoryMessageSigned>();
-			} else if (msgsigned->postAuthor == hint) {
+			} else if (msgsigned->author == hint) {
 				return;
 			}
-			msgsigned->postAuthor = hint;
+			msgsigned->author = hint;
 			msgsigned->isAnonymousRank = !isDiscussionPost()
 				&& this->author()->isMegagroup();
 		} else {
