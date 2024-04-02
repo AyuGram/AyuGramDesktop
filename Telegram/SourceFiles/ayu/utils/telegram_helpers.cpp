@@ -5,6 +5,7 @@
 //
 // Copyright @Radolyn, 2024
 #include "telegram_helpers.h"
+
 #include <functional>
 #include <QTimer>
 
@@ -32,6 +33,8 @@
 #include "main/main_account.h"
 #include "main/main_session.h"
 #include "ui/text/format_values.h"
+
+#include "ayu/ayu_settings.h"
 
 // https://github.com/AyuGram/AyuGram4AX/blob/rewrite/TMessagesProj/src/main/java/com/radolyn/ayugram/AyuConstants.java
 std::unordered_set<ID> ayugram_channels = {
@@ -490,7 +493,9 @@ QString getMediaDC(not_null<HistoryItem*> message) {
 int getScheduleTime(int64 sumSize) {
 	auto time = 12;
 
-	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * 4.5))) + 1;
+	const auto settings = &AyuSettings::getInstance();
+	const auto multiplier = settings->uploadSpeedBoost ? 0.7 : 4.5;
+	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * multiplier))) + 1;
 
 	return time;
 }
