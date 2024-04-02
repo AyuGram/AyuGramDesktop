@@ -188,9 +188,7 @@ AyuGramSettings::AyuGramSettings() {
 	sendUploadProgress = true;
 	sendOfflinePacketAfterOnline = false;
 
-	markReadAfterSend = true;
-	markReadAfterReaction = true;
-	markReadAfterPoll = true;
+	markReadAfterAction = true;
 	useScheduledMessages = false;
 
 	// ~ Message edits & deletion history
@@ -295,16 +293,8 @@ void AyuGramSettings::set_ghostModeEnabled(bool val) {
 	}
 }
 
-void AyuGramSettings::set_markReadAfterSend(bool val) {
-	markReadAfterSend = val;
-}
-
-void AyuGramSettings::set_markReadAfterReaction(bool val) {
-	markReadAfterReaction = val;
-}
-
-void AyuGramSettings::set_markReadAfterPoll(bool val) {
-	markReadAfterPoll = val;
+void AyuGramSettings::set_markReadAfterAction(bool val) {
+	markReadAfterAction = val;
 }
 
 void AyuGramSettings::set_useScheduledMessages(bool val) {

@@ -3547,7 +3547,7 @@ void ApiWrap::forwardMessages(
 				}
 
 				const auto settings = &AyuSettings::getInstance();
-				if (!settings->sendReadMessages && settings->markReadAfterPoll && history->lastMessage())
+				if (!settings->sendReadMessages && settings->markReadAfterAction && history->lastMessage())
 				{
 					readHistory(history->lastMessage());
 				}

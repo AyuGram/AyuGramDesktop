@@ -179,7 +179,7 @@ void Polls::sendVotes(
 		_session->updates().applyUpdates(result);
 
 		const auto settings = &AyuSettings::getInstance();
-		if (!settings->sendReadMessages && settings->markReadAfterPoll && item)
+		if (!settings->sendReadMessages && settings->markReadAfterAction && item)
 		{
 			readHistory(item);
 		}

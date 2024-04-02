@@ -1279,7 +1279,7 @@ void HistoryWidget::initTabbedSelector() {
 			}
 		} else {
 			const auto settings = &AyuSettings::getInstance();
-			if (!settings->sendReadMessages && settings->markReadAfterSend) {
+			if (!settings->sendReadMessages && settings->markReadAfterAction) {
 				const auto lastMessage = history()->lastMessage();
 
 				if (lastMessage) {
@@ -4714,7 +4714,7 @@ void HistoryWidget::send(Api::SendOptions options) {
 	}
 
 	auto lastMessage = _history->lastMessage();
-	if (!settings->sendReadMessages && settings->markReadAfterSend && lastMessage) {
+	if (!settings->sendReadMessages && settings->markReadAfterAction && lastMessage) {
 		readHistory(lastMessage);
 	}
 

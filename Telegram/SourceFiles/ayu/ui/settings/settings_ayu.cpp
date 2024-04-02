@@ -457,42 +457,33 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 	AddCollapsibleToggle(container, tr::ayu_GhostEssentialsHeader(), checkboxes, true);
 }
 
-void SetupReadAfterActionToggle(not_null<Ui::VerticalLayout*> container) {
-	auto settings = &AyuSettings::getInstance();
-
-	std::vector checkboxes{
-		NestedEntry{
-			tr::ayu_MarkReadAfterSend(tr::now), settings->markReadAfterSend, [=](bool enabled)
-			{
-				settings->set_markReadAfterSend(enabled);
-				AyuSettings::save();
-			}
-		},
-		NestedEntry{
-			tr::ayu_MarkReadAfterReaction(tr::now), settings->markReadAfterReaction, [=](bool enabled)
-			{
-				settings->set_markReadAfterReaction(enabled);
-				AyuSettings::save();
-			}
-		},
-		NestedEntry{
-			tr::ayu_MarkReadAfterPoll(tr::now), settings->markReadAfterPoll, [=](bool enabled)
-			{
-				settings->set_markReadAfterPoll(enabled);
-				AyuSettings::save();
-			}
-		},
-	};
-
-	AddCollapsibleToggle(container, tr::ayu_MarkReadAfterAction(), checkboxes, false);
-}
-
 void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
 	SetupGhostModeToggle(container);
-	SetupReadAfterActionToggle(container);
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MarkReadAfterAction(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->markReadAfterAction)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->markReadAfterAction);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_markReadAfterAction(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+	AddSkip(container);
+	AddDividerText(container, tr::ayu_MarkReadAfterActionDescription());
+
+	AddSkip(container);
 	AddButtonWithIcon(
 		container,
 		tr::ayu_UseScheduledMessages() | rpl::map(
@@ -515,6 +506,8 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 		},
 		container->lifetime());
+	AddSkip(container);
+	AddDividerText(container, tr::ayu_UseScheduledMessagesDescription());
 }
 
 void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
@@ -1335,9 +1328,6 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 						  not_null<Window::SessionController*> controller) {
 	AddSkip(container);
 	SetupGhostEssentials(container);
-	AddSkip(container);
-
-	AddDivider(container);
 
 	AddSkip(container);
 	SetupSpyEssentials(container);

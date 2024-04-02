@@ -63,7 +63,7 @@ void runOnce() {
 				)).send();
 				state[id] = false;
 
-				LOG(("[AyuGram] Sent offline for account with uid %1, invalidate %2").arg(id).arg(invalidateAll));
+				DEBUG_LOG(("[AyuGram] Sent offline for account with uid %1, invalidate %2").arg(id).arg(invalidateAll));
 			}
 		}
 	}
