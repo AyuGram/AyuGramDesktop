@@ -192,7 +192,7 @@ AyuGramSettings::AyuGramSettings() {
 	useScheduledMessages = false;
 
 	// ~ Message edits & deletion history
-	saveDeletedMessages = false;
+	saveDeletedMessages = true;
 	saveMessagesHistory = true;
 
 	// ~ QoL toggles
