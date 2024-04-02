@@ -51,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ui/boxes/confirm_box.h"
 #include "boxes/abstract_box.h"
+#include "base/unixtime.h"
 
 
 namespace ChatHelpers {
@@ -501,6 +502,12 @@ void GifsListWidget::selectInlineResult(
 		return;
 	}
 
+	auto settings = &AyuSettings::getInstance();
+	if (settings->useScheduledMessages) {
+		auto current = base::unixtime::now();
+		options.scheduled = current + 12;
+	}
+
 	const auto messageSendingFrom = [&] {
 		if (options.scheduled) {
 			return Ui::MessageSendingAnimationFrom();
@@ -532,7 +539,6 @@ void GifsListWidget::selectInlineResult(
 		const auto media = document->activeMediaView();
 		const auto preview = Data::VideoPreviewState(media.get());
 		if (forceSend || (media && preview.loaded())) {
-			auto settings = &AyuSettings::getInstance();
 			auto from = messageSendingFrom();
 			auto sendGIFCallback = crl::guard(
 				this,

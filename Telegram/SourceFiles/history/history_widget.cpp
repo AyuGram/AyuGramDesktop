@@ -994,11 +994,15 @@ HistoryWidget::HistoryWidget(
 			action.replyTo.messageId);
 		if (action.replaceMediaOf) {
 		} else if (action.options.scheduled) {
-			cancelReplyOrSuggest(lastKeyboardUsed);
-			crl::on_main(this, [=, history = action.history] {
-				controller->showSection(
-					std::make_shared<HistoryView::ScheduledMemento>(history));
-			});
+			cancelReply(lastKeyboardUsed);
+			const auto settings = &AyuSettings::getInstance();
+			if (!settings->useScheduledMessages) {
+				crl::on_main(this, [=, history = action.history]
+				{
+					controller->showSection(
+						std::make_shared<HistoryView::ScheduledMemento>(history));
+				});
+			}
 		} else {
 			fastShowAtEnd(action.history);
 			if (!_justMarkingAsRead
@@ -4708,7 +4712,6 @@ void HistoryWidget::send(Api::SendOptions options) {
 	// AyuGram useScheduledMessages
 	const auto settings = &AyuSettings::getInstance();
 	if (settings->useScheduledMessages && !options.scheduled) {
-		DEBUG_LOG(("[AyuGram] Scheduling message"));
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
 	}

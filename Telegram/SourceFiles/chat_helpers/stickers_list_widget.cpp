@@ -59,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "boxes/abstract_box.h"
+#include "base/unixtime.h"
 
 
 namespace ChatHelpers {
@@ -1897,12 +1898,18 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 					sticker->index,
 					document
 				);
+				auto options = Api::SendOptions();
+				if (settings->useScheduledMessages) {
+					auto current = base::unixtime::now();
+					options.scheduled = current + 12;
+				}
 				auto sendStickerCallback = crl::guard(
 					this,
 					[=, this]
 					{
 						_chosen.fire({
 							.document = document,
+							.options = options,
 							.messageSendingFrom = from,
 						});
 					});

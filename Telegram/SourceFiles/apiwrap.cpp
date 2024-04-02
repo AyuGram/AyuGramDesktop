@@ -3867,9 +3867,8 @@ void ApiWrap::sendUploadedPhoto(
 		// AyuGram useScheduledMessages
 		const auto settings = &AyuSettings::getInstance();
 		if (settings->useScheduledMessages && !options.scheduled) {
-			DEBUG_LOG(("[AyuGram] Scheduling message"));
 			auto current = base::unixtime::now();
-			options.scheduled = current + 18; // using 18 seconds because photo can be big
+			options.scheduled = current + 12;
 		}
 
 		const auto media = Api::PrepareUploadedPhoto(item, std::move(info));
@@ -3893,9 +3892,8 @@ void ApiWrap::sendUploadedDocument(
 		// AyuGram useScheduledMessages
 		const auto settings = &AyuSettings::getInstance();
 		if (settings->useScheduledMessages && !options.scheduled) {
-			DEBUG_LOG(("[AyuGram] Scheduling message"));
 			auto current = base::unixtime::now();
-			options.scheduled = current + 60; // well, a document can be really big...
+			options.scheduled = current + 12;
 		}
 
 		const auto media = Api::PrepareUploadedDocument(
@@ -4455,7 +4453,6 @@ void ApiWrap::sendMediaWithRandomId(
 	// AyuGram useScheduledMessages
 	const auto settings = &AyuSettings::getInstance();
 	if (settings->useScheduledMessages && !options.scheduled) {
-		DEBUG_LOG(("[AyuGram] Scheduling message"));
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
 	}
@@ -4665,15 +4662,6 @@ void ApiWrap::sendAlbumIfReady(not_null<SendingAlbum*> album) {
 		_sendingAlbums.remove(groupId);
 		return;
 	}
-
-	// AyuGram useScheduledMessages
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !album->options.scheduled) {
-		DEBUG_LOG(("[AyuGram] Scheduling message"));
-		auto current = base::unixtime::now();
-		album->options.scheduled = current + 12;
-	}
-
 	auto sample = (HistoryItem*)nullptr;
 	auto medias = QVector<MTPInputSingleMedia>();
 	medias.reserve(album->items.size());
@@ -4702,6 +4690,14 @@ void ApiWrap::sendAlbumIfReady(not_null<SendingAlbum*> album) {
 		_sendingAlbums.remove(groupId);
 		return;
 	}
+
+	// AyuGram useScheduledMessages
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->useScheduledMessages && !album->options.scheduled) {
+		auto current = base::unixtime::now();
+		album->options.scheduled = current + 12;
+	}
+
 	const auto history = sample->history();
 	const auto replyTo = sample->replyTo();
 	const auto sendAs = album->options.sendAs;

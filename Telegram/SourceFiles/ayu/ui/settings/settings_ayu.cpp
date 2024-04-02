@@ -462,12 +462,15 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 
 	SetupGhostModeToggle(container);
 
+	auto markReadAfterActionVal = container->lifetime().make_state<rpl::variable<bool>>(settings->markReadAfterAction);
+	auto useScheduledMessagesVal = container->lifetime().make_state<rpl::variable<bool>>(settings->useScheduledMessages);
+
 	AddButtonWithIcon(
 		container,
 		tr::ayu_MarkReadAfterAction(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings->markReadAfterAction)
+		markReadAfterActionVal->value()
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
@@ -477,6 +480,11 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			settings->set_markReadAfterAction(enabled);
+			if (enabled) {
+				settings->set_useScheduledMessages(false);
+				useScheduledMessagesVal->force_assign(false);
+			}
+
 			AyuSettings::save();
 		},
 		container->lifetime());
@@ -486,14 +494,10 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	AddSkip(container);
 	AddButtonWithIcon(
 		container,
-		tr::ayu_UseScheduledMessages() | rpl::map(
-			[=](QString val)
-			{
-				return val + " β";
-			}),
+		tr::ayu_UseScheduledMessages(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings->useScheduledMessages)
+		useScheduledMessagesVal->value()
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
@@ -503,6 +507,11 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			settings->set_useScheduledMessages(enabled);
+			if (enabled) {
+				settings->set_markReadAfterAction(false);
+				markReadAfterActionVal->force_assign(false);
+			}
+
 			AyuSettings::save();
 		},
 		container->lifetime());
@@ -517,11 +526,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SaveDeletedMessages() | rpl::map(
-			[=](QString val)
-			{
-				return val + " β";
-			}),
+		tr::ayu_SaveDeletedMessages(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveDeletedMessages)

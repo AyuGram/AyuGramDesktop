@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "base/unixtime.h"
 #include "styles/style_menu_icons.h"
+#include "ayu/utils/telegram_helpers.h"
 #include <QBuffer>
 
 
@@ -1946,8 +1947,14 @@ void SendFilesBox::send(
 	const auto settings = &AyuSettings::getInstance();
 	if (settings->useScheduledMessages && !options.scheduled) {
 		DEBUG_LOG(("[AyuGram] Scheduling files"));
+		const auto sumSize = ranges::accumulate(
+			_list.files,
+			0,
+			[](int sum, const auto &file) {
+				return sum + file.size;
+			});
 		auto current = base::unixtime::now();
-		options.scheduled = current + 60; // well, files can be huge...
+		options.scheduled = current + getScheduleTime(sumSize);
 	}
 
 	if ((_sendType == Api::SendType::Scheduled

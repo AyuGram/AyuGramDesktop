@@ -346,9 +346,9 @@ QString formatDateTime(const QDateTime &date) {
 	return datePart + getLocalizedAt() + timePart;
 }
 
-QString getMediaSize(not_null<HistoryItem*> message) {
+int getMediaSizeBytes(not_null<HistoryItem*> message) {
 	if (!message->media()) {
-		return {};
+		return -1;
 	}
 
 	const auto media = message->media();
@@ -379,6 +379,12 @@ QString getMediaSize(not_null<HistoryItem*> message) {
 			size = photo->imageByteSize(Data::PhotoSize::Thumbnail);
 		}
 	}
+
+	return size;
+}
+
+QString getMediaSize(not_null<HistoryItem*> message) {
+	const auto size = getMediaSizeBytes(message);
 
 	if (size == -1) {
 		return {};
@@ -479,6 +485,14 @@ QString getMediaDC(not_null<HistoryItem*> message) {
 	}
 
 	return {};
+}
+
+int getScheduleTime(int64 sumSize) {
+	auto time = 12;
+
+	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * 4.5))) + 1;
+
+	return time;
 }
 
 void resolveUser(ID userId, const QString &username, Main::Session *session, const Callback &callback) {
