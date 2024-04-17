@@ -243,6 +243,79 @@ void ApiWrap::requestChangelog(
 	//).send();
 }
 
+void ApiWrap::refreshTopPromotion() {
+	const auto now = base::unixtime::now();
+	const auto next = (_topPromotionNextRequestTime != 0)
+		? _topPromotionNextRequestTime
+		: now;
+	if (_topPromotionRequestId) {
+		getTopPromotionDelayed(now, next);
+		return;
+	}
+	const auto key = [&]() -> std::pair<QString, uint32> {
+		if (!Core::App().settings().proxy().isEnabled()) {
+			return {};
+		}
+		const auto &proxy = Core::App().settings().proxy().selected();
+		if (proxy.type != MTP::ProxyData::Type::Mtproto) {
+			return {};
+		}
+		return { proxy.host, proxy.port };
+	}();
+	if (_topPromotionKey == key && now < next) {
+		getTopPromotionDelayed(now, next);
+		return;
+	}
+	_topPromotionKey = key;
+	_topPromotionRequestId = request(MTPhelp_GetPromoData(
+	)).done([=](const MTPhelp_PromoData &result) {
+		_topPromotionRequestId = 0;
+		topPromotionDone(result);
+	}).fail([=] {
+		_topPromotionRequestId = 0;
+		const auto now = base::unixtime::now();
+		const auto next = _topPromotionNextRequestTime = now
+			+ kTopPromotionInterval;
+		if (!_topPromotionTimer.isActive()) {
+			getTopPromotionDelayed(now, next);
+		}
+	}).send();
+}
+
+void ApiWrap::getTopPromotionDelayed(TimeId now, TimeId next) {
+	_topPromotionTimer.callOnce(std::min(
+		std::max(next - now, kTopPromotionMinDelay),
+		kTopPromotionInterval) * crl::time(1000));
+};
+
+void ApiWrap::topPromotionDone(const MTPhelp_PromoData &proxy) {
+	_topPromotionNextRequestTime = proxy.match([&](const auto &data) {
+		return data.vexpires().v;
+	});
+	getTopPromotionDelayed(
+		base::unixtime::now(),
+		_topPromotionNextRequestTime);
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->disableAds) {
+		_session->data().setTopPromoted(nullptr, QString(), QString());
+		return;
+	}
+
+	proxy.match([&](const MTPDhelp_promoDataEmpty &data) {
+		_session->data().setTopPromoted(nullptr, QString(), QString());
+	}, [&](const MTPDhelp_promoData &data) {
+		_session->data().processChats(data.vchats());
+		_session->data().processUsers(data.vusers());
+		const auto peerId = peerFromMTP(data.vpeer());
+		const auto history = _session->data().history(peerId);
+		_session->data().setTopPromoted(
+			history,
+			data.vpsa_type().value_or_empty(),
+			data.vpsa_message().value_or_empty());
+	});
+}
+
 void ApiWrap::requestDeepLinkInfo(
 		const QString &path,
 		Fn<void(TextWithEntities message, bool updateRequired)> callback) {
