@@ -54,6 +54,10 @@ void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		return;
 	}
 
+	if (item->history()->peer->isSelf()) {
+		return;
+	}
+
 	const auto history = item->history();
 	menu->addAction(tr::ayu_ContextHideMessage(tr::now),
 					[=]()
@@ -280,6 +284,10 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (item->isLocal()) {
+		return;
+	}
+
+	if (item->history()->peer->isSelf()) {
 		return;
 	}
 
