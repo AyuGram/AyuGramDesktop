@@ -669,29 +669,6 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_UploadSpeedBoostPC(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->uploadSpeedBoost)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->uploadSpeedBoost);
-		}) | start_with_next(
-		[=](bool enabled)
-		{
-			settings->set_uploadSpeedBoost(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
-
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
-
-	AddButtonWithIcon(
-		container,
 		tr::ayu_DisableNotificationsDelay(),
 		st::settingsButtonNoIcon
 	)->toggleOn(

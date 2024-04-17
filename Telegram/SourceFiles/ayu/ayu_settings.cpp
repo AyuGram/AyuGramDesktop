@@ -202,8 +202,6 @@ AyuGramSettings::AyuGramSettings() {
 	collapseSimilarChannels = true;
 	hideSimilarChannels = false;
 
-	uploadSpeedBoost = false;
-
 	disableNotificationsDelay = false;
 	localPremium = false;
 	copyUsernameAsLink = true;
@@ -327,10 +325,6 @@ void AyuGramSettings::set_collapseSimilarChannels(bool val) {
 
 void AyuGramSettings::set_hideSimilarChannels(bool val) {
 	hideSimilarChannels = val;
-}
-
-void AyuGramSettings::set_uploadSpeedBoost(bool val) {
-	uploadSpeedBoost = val;
 }
 
 void AyuGramSettings::set_disableNotificationsDelay(bool val) {

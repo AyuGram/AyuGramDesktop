@@ -135,7 +135,7 @@ private:
 	void gotPart(int offset, const MTPupload_File &result);
 	Fn<void(const Error &)> failHandler();
 
-	static constexpr auto kRequestsCount = 2;
+	static constexpr auto kRequestsCount = 6;
 	static constexpr auto kNextRequestDelay = crl::time(20);
 
 	std::deque<Request> _requests;

@@ -13,10 +13,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "base/call_delayed.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-
-
 namespace MTP {
 namespace {
 
@@ -82,12 +78,6 @@ std::optional<DedicatedLoader::File> ParseFile(
 		fields.vfile_reference(),
 		MTP_string());
 	return DedicatedLoader::File{ name, size, fields.vdc_id().v, location };
-}
-
-int RequestCount() {
-	const auto settings = &AyuSettings::getInstance();
-	static const auto count = settings->uploadSpeedBoost ? 8 : 2;
-	return count;
 }
 
 } // namespace
@@ -320,7 +310,7 @@ void DedicatedLoader::startLoading() {
 }
 
 void DedicatedLoader::sendRequest() {
-	if (_requests.size() >= RequestCount() || _offset >= _size) {
+	if (_requests.size() >= kRequestsCount || _offset >= _size) {
 		return;
 	}
 	const auto offset = _offset;
@@ -336,7 +326,7 @@ void DedicatedLoader::sendRequest() {
 		MTP::updaterDcId(_dcId));
 	_offset += kChunkSize;
 
-	if (_requests.size() < RequestCount()) {
+	if (_requests.size() < kRequestsCount) {
 		base::call_delayed(kNextRequestDelay, this, [=] { sendRequest(); });
 	}
 }

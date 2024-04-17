@@ -492,11 +492,7 @@ QString getMediaDC(not_null<HistoryItem*> message) {
 
 int getScheduleTime(int64 sumSize) {
 	auto time = 12;
-
-	const auto settings = &AyuSettings::getInstance();
-	const auto multiplier = settings->uploadSpeedBoost ? 0.7 : 4.5;
-	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * multiplier))) + 1;
-
+	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * 0.7))) + 1;
 	return time;
 }
 

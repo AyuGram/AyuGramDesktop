@@ -35,8 +35,6 @@ public:
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
 
-	bool uploadSpeedBoost;
-
 	bool disableNotificationsDelay;
 	bool localPremium;
 	bool copyUsernameAsLink;
@@ -95,8 +93,6 @@ public:
 	void set_collapseSimilarChannels(bool val);
 	void set_hideSimilarChannels(bool val);
 
-	void set_uploadSpeedBoost(bool val);
-
 	void set_disableNotificationsDelay(bool val);
 	void set_localPremium(bool val);
 	void set_copyUsernameAsLink(bool val);
@@ -152,7 +148,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	disableCustomBackgrounds,
 	collapseSimilarChannels,
 	hideSimilarChannels,
-	uploadSpeedBoost,
 	disableNotificationsDelay,
 	localPremium,
 	copyUsernameAsLink,
