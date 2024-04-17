@@ -230,7 +230,7 @@ void FiltersMenu::refresh() {
 	// and there will be an exception in `Window::SessionController::showPeerHistory`
 	// because `SessionController::content()` == nullptr
     if (settings->hideAllChatsFolder && _session->widget()->sessionContent()) {
-        const auto lookupId = filters->lookupId(premium() ? 0 : 1);
+        const auto lookupId = filters->lookupId(0);
         _session->setActiveChatsFilter(lookupId);
     }
 }

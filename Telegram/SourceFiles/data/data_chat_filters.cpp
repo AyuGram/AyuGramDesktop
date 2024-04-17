@@ -915,7 +915,9 @@ FilterId ChatFilters::lookupId(int index) const {
 		return FilterId(); // AyuGram: fix crash when using `hideAllChatsFolder`
 	}
 
-	if (_owner->session().user()->isPremium() || !_list.front().id()) {
+	const auto settings = &AyuSettings::getInstance();
+
+	if (_owner->session().user()->isPremium() || !_list.front().id() || settings->hideAllChatsFolder) {
 		return _list[index].id();
 	}
 	const auto i = ranges::find(_list, FilterId(0), &ChatFilter::id);
