@@ -46,7 +46,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
-#include "ayu/ui/boxes/server_read_confirmation_box.h"
 #include "boxes/abstract_box.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "styles/style_ayu_icons.h"
@@ -752,12 +751,27 @@ void MainMenu::setupMenu() {
 		}
 
 		if (settings->showSReadToggleInDrawer) {
+			auto callback = [=](Fn<void()> &&close) {
+				auto prev = settings->sendReadMessages;
+				settings->set_sendReadMessages(true);
+
+				auto chats = _controller->session().data().chatsList();
+				MarkAsReadChatList(chats);
+
+				settings->set_sendReadMessages(prev);
+				close();
+			};
+
 			addAction(
 				tr::ayu_SReadMessages(),
 				{&st::ayuSReadMenuIcon}
 			)->setClickedCallback([=]
 			{
-				auto box = Box<AyuUi::ServerReadConfirmationBox>(controller);
+				auto box = Ui::MakeConfirmBox({
+					.text = tr::ayu_ReadConfirmationBoxQuestion(),
+					.confirmed = callback,
+					.confirmText = tr::ayu_ReadConfirmationBoxActionText()
+				});
 				Ui::show(std::move(box));
 			});
 		}

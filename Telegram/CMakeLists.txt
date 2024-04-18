@@ -133,8 +133,6 @@ set(ayugram_files
         ayu/ui/sections/edited/edited_log_item.h
         ayu/ui/sections/edited/edited_log_section.cpp
         ayu/ui/sections/edited/edited_log_section.h
-        ayu/ui/boxes/server_read_confirmation_box.cpp
-        ayu/ui/boxes/server_read_confirmation_box.h
         ayu/ui/boxes/edit_deleted_mark.cpp
         ayu/ui/boxes/edit_deleted_mark.h
         ayu/ui/boxes/edit_edited_mark.cpp
