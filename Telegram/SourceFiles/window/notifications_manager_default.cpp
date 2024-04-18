@@ -45,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QScreen>
 
 // AyuGram includes
+#include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
 
@@ -245,6 +246,11 @@ void Manager::showNextFromQueue() {
 	do {
 		auto queued = _queuedNotifications.front();
 		_queuedNotifications.pop_front();
+
+		if (queued.item && isMessageHidden(queued.item)) {
+			--count;
+			continue;
+		}
 
 		subscribeToSession(&queued.history->session());
 		_notifications.push_back(std::make_unique<Notification>(
