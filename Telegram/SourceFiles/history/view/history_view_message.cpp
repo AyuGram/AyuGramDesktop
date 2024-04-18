@@ -590,6 +590,13 @@ void Message::refreshRightBadge() {
 		).append(many ? QString::number(boosts) : QString());
 		badge.append(' ').append(Ui::Text::Colorized(added, 1));
 	}
+	_rightBadgeIsChannel = 0;
+	if (
+		item->isDiscussionPost() && delegate()->elementContext() != Context::Replies ||
+		data()->history()->peer->isMegagroup() && data()->author()->isChannel() && !data()->out()
+	) {
+		_rightBadgeIsChannel = 1;
+	}
 	if (badge.empty()) {
 		_rightBadge.clear();
 	} else {
@@ -1034,7 +1041,7 @@ QSize Message::performCountOptimalSize() {
 					: 0;
 				if (!_rightBadge.isEmpty()) {
 					const auto badgeWidth =
-						_rightBadge.toString() == tr::lng_channel_badge(tr::now) ? st::inChannelBadgeIcon.width() : _rightBadge.maxWidth();
+						_rightBadgeIsChannel ? st::inChannelBadgeIcon.width() : _rightBadge.maxWidth();
 					namew += st::msgPadding.right()
 						+ std::max(badgeWidth, replyWidth);
 				} else if (replyWidth) {
@@ -1862,7 +1869,7 @@ void Message::paintFromName(
 		return;
 	}
 	const auto badgeWidth = _rightBadge.isEmpty() ? 0 :
-		_rightBadge.toString() == tr::lng_channel_badge(tr::now) ? context.messageStyle()->channelBadgeIcon.width() : _rightBadge.maxWidth();
+		_rightBadgeIsChannel ? context.messageStyle()->channelBadgeIcon.width() : _rightBadge.maxWidth();
 	const auto replyWidth = [&] {
 		if (isUnderCursor()) {
 			if (displayFastForward()) {
@@ -1970,7 +1977,7 @@ void Message::paintFromName(
 				trect.top() + st::msgFont->ascent,
 				hasFastForward() ? FastForwardText() : FastReplyText());
 		} else {
-			if (_rightBadge.toString() == tr::lng_channel_badge(tr::now)) {
+			if (_rightBadgeIsChannel) {
 				stm->channelBadgeIcon.paint(
 					p,
 					trect.left() + trect.width() - rightWidth,
