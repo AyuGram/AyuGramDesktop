@@ -185,17 +185,28 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	const auto weak = base::make_weak(controller);
 	return [=](QString link) {
 		auto settings = &AyuSettings::getInstance();
-		if (!settings->copyUsernameAsLink) {
-			link = '@' + link.mid(13);
-		} else {
-			if (!link.startsWith(u"https://"_q)) {
-				link = peer->session().createInternalLinkFull(peer->userName())
-					+ addToLink;
-			}
+
+		if (link.startsWith(u"internal:"_q)) {
+			Core::App().openInternalUrl(link,
+				QVariant::fromValue(ClickHandlerContext{
+					.sessionWindow = weak,
+				}));
+			return;
+		} else if (!link.startsWith(u"https://"_q)) {
+			link = peer->session().createInternalLinkFull(peer->username())
+				+ addToLink;
 		}
 		if (!link.isEmpty()) {
+			if (!settings->copyUsernameAsLink && addToLink.isEmpty()) {
+				link = '@' + link.replace("https://t.me/", "");
+			}
+
 			QGuiApplication::clipboard()->setText(link);
-			show->showToast(tr::lng_username_copied(tr::now));
+			if (const auto window = weak.get()) {
+				window->showToast(settings->copyUsernameAsLink
+									  ? tr::lng_username_copied(tr::now) // "Link copied to clipboard."
+									  : tr::lng_text_copied(tr::now)); // "Text copied to clipboard."
+			}
 		}
 	};
 }

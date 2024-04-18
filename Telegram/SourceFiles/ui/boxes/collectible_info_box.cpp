@@ -27,6 +27,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QRegularExpression>
 #include <QtGui/QGuiApplication>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Ui {
 namespace {
 
@@ -185,16 +189,23 @@ void CollectibleInfoBox(
 			lt_username,
 			Ui::Text::Link(formatted),
 			Ui::Text::WithEntities);
-	const auto copyCallback = [box, type, formatted, text = info.copyText](
-			bool copyLink) {
-		QGuiApplication::clipboard()->setText((text.isEmpty() || !copyLink)
-			? formatted
-			: text);
+	const auto copyCallback = [box, type, formatted, text = info.copyText] {
+		auto toCopy = text.isEmpty() ? formatted : text;
+		const auto settings = &AyuSettings::getInstance();
+		if (type == CollectibleType::Username) {
+			if (settings->copyUsernameAsLink && !text.startsWith("https://")) {
+				toCopy = "https://t.me/" + toCopy.replace("@", "");
+			} else if (!settings->copyUsernameAsLink && !text.startsWith("@")) {
+				toCopy = "@" + toCopy.replace("https://t.me/", "");
+			}
+		}
+
+		QGuiApplication::clipboard()->setText(toCopy);
 		box->uiShow()->showToast((type == CollectibleType::Phone)
-			? tr::lng_collectible_phone_copied(tr::now)
-			: copyLink
-			? tr::lng_username_copied(tr::now)
-			: tr::lng_username_text_copied(tr::now));
+			? tr::lng_text_copied(tr::now)
+			: settings->copyUsernameAsLink
+				  ? tr::lng_username_copied(tr::now) // "Link copied to clipboard."
+				  : tr::lng_text_copied(tr::now)); // "Text copied to clipboard."
 	};
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
