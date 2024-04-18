@@ -635,6 +635,8 @@ void MainMenu::showFinished() {
 void MainMenu::setupMenu() {
 	using namespace Settings;
 
+	const auto settings = &AyuSettings::getInstance();
+
 	const auto controller = _controller;
 	const auto addAction = [&](
 			rpl::producer<QString> text,
@@ -680,6 +682,37 @@ void MainMenu::setupMenu() {
 				controller->showNewChannel();
 			}
 		});
+
+		const auto wrap = _menu->add(
+			object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
+				_menu,
+				CreateButtonWithIcon(
+					_menu,
+					tr::lng_menu_my_stories(),
+					st::mainMenuButton,
+					IconDescriptor{ &st::menuIconStoriesSavedSection })));
+		const auto selfId = controller->session().userPeerId();
+		const auto stories = &controller->session().data().stories();
+		if (stories->archiveCount(selfId) > 0) {
+			wrap->toggle(!settings->disableStories, anim::type::instant);
+		} else {
+			wrap->toggle(false, anim::type::instant);
+			if (!stories->archiveCountKnown(selfId)) {
+				stories->archiveLoadMore(selfId);
+				wrap->toggleOn(stories->archiveChanged(
+				) | rpl::filter(
+					rpl::mappers::_1 == selfId
+				) | rpl::map([=] {
+					return stories->archiveCount(selfId) > 0 && !settings->disableStories;
+				}) | rpl::filter(rpl::mappers::_1) | rpl::take(1));
+			}
+		}
+		wrap->entity()->setClickedCallback([=] {
+			controller->showSection(
+				Info::Stories::Make(controller->session().user()));
+		});
+
+		SetupMenuBots(_menu, controller);
 
 		addAction(
 			tr::lng_menu_contacts(),
@@ -789,7 +822,6 @@ void MainMenu::setupMenu() {
 			toggle);
 	}, _nightThemeToggle->lifetime());
 
-	const auto settings = &AyuSettings::getInstance();
 	if (settings->showGhostToggleInDrawer) {
 		_ghostModeToggle = addAction(
 			tr::ayu_GhostModeToggle(),
