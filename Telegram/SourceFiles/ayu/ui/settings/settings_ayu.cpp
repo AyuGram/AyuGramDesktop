@@ -1008,7 +1008,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 		st::autoDownloadLimitSlider,
 		st::settingsScaleLabel,
 		0,
-		st::settingsScaleLabel.style.font->width("30%"));
+		st::settingsScaleLabel.style.font->width("8%%"));
 	container->add(std::move(recentStickersLimitSlider.widget), st::recentStickersLimitPadding);
 	const auto slider = recentStickersLimitSlider.slider;
 	const auto label = recentStickersLimitSlider.label;
@@ -1331,7 +1331,6 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 	AddSkip(container);
 	SetupSendConfirmations(container);
 	AddSkip(container);
-	AddDivider(container);
 
 	AddDividerText(container, tr::ayu_SettingsWatermark());
 }

@@ -33,18 +33,19 @@ const QVector<QString> icons{
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
 
-void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, bool selected) {
+void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float strokeOpacity) {
 	xOffset += st::cpPadding;
 
-	if (selected) {
-		p.save();
-		p.setPen(QPen(st::iconPreviewStroke, st::cpPenSize));
-		p.drawEllipse(xOffset + st::cpSelectedPadding,
-					  yOffset + st::cpSelectedPadding,
-					  st::cpIconSize + st::cpSelectedPadding * 2,
-					  st::cpIconSize + st::cpSelectedPadding * 2);
-		p.restore();
-	}
+	// stroke
+	p.save();
+	p.setPen(QPen(st::iconPreviewStroke, st::cpPenSize));
+	p.setOpacity(strokeOpacity);
+	p.drawEllipse(xOffset + st::cpSelectedPadding,
+				  yOffset + st::cpSelectedPadding,
+				  st::cpIconSize + st::cpSelectedPadding * 2,
+				  st::cpIconSize + st::cpSelectedPadding * 2);
+	p.restore();
+	// /stroke
 
 	auto rect = QRect(xOffset + st::cpImagePadding, yOffset + st::cpImagePadding, st::cpIconSize, st::cpIconSize);
 	p.drawImage(rect, icon);
@@ -81,11 +82,19 @@ void IconPicker::paintEvent(QPaintEvent *e) {
 			const auto &iconName = icons[idx];
 			auto icon = AyuAssets::loadPreview(iconName)
 				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+			auto opacity = 0.0f;
+		    if (iconName == wasSelected) {
+				opacity = 1.0f - animation.value(1.0f);
+			} else if (iconName == AyuAssets::currentAppLogoName()) {
+				opacity = wasSelected.isEmpty() ? 1.0f : animation.value(1.0f);
+			}
+
 			drawIcon(p,
 					 icon,
 					 (st::cpIconSize + st::cpSpacingX) * i + offset,
 					 row * (st::cpIconSize + st::cpSpacingY),
-					 AyuAssets::currentAppLogoName() == iconName);
+					 opacity);
 		}
 	}
 }
@@ -106,6 +115,17 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 				&& e->pos().y() <= yOffset + st::cpIconSize) {
 				const auto &iconName = icons[idx];
 				if (settings->appIcon != iconName) {
+					wasSelected = settings->appIcon;
+					animation.start(
+						[=]
+						{
+							update();
+						},
+						0.0,
+						1.0,
+						200,
+						anim::easeOutCubic);
+
 					settings->set_appIcon(iconName);
 					changed = true;
 					break;

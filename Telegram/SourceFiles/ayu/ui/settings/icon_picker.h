@@ -7,6 +7,7 @@
 #pragma once
 
 #include "ui/rp_widget.h"
+#include "ui/effects/animations.h"
 
 class IconPicker : public Ui::RpWidget
 {
@@ -16,4 +17,7 @@ public:
 protected:
 	void paintEvent(QPaintEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
+
+	Ui::Animations::Simple animation;
+	QString wasSelected;
 };
