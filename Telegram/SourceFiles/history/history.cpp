@@ -1542,10 +1542,6 @@ void History::viewReplaced(not_null<const Element*> was, Element *now) {
 void History::addItemToBlock(not_null<HistoryItem*> item) {
 	Expects(!item->mainView());
 
-	if (AyuState::isHidden(item)) {
-		return;
-	}
-
 	auto block = prepareBlockForAddingItem();
 
 	block->messages.push_back(item->createView(_delegateMixin->delegate()));

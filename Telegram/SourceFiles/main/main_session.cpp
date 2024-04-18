@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "api/api_blocked_peers.h"
 
 
 namespace Main {
@@ -89,6 +90,43 @@ constexpr auto kTmpPasswordReserveTime = TimeId(10);
 	return MTP::ConfigFields(
 		session->mtp().environment()
 	).internalLinksDomain;
+}
+
+void InitializeBlockedPeers(not_null<Main::Session*> session) {
+	const auto offset = std::make_shared<int>(0);
+	const auto allLoaded = std::make_shared<bool>(false);
+	const auto applySlice = [=](
+			const Api::BlockedPeers::Slice &slice,
+			auto self) -> void {
+		if (slice.list.empty()) {
+			*allLoaded = true;
+		}
+
+		*offset += slice.list.size();
+		for (const auto &item : slice.list) {
+			if (const auto peer = session->data().peerLoaded(item.id)) {
+				peer->setIsBlocked(true);
+			}
+		}
+		if (*offset >= slice.total) {
+			*allLoaded = true;
+		}
+
+		if (!*allLoaded) {
+			session->api().blockedPeers().request(
+				*offset,
+				[=](const Api::BlockedPeers::Slice &slice) {
+					self(slice, self);
+				});
+		}
+	};
+
+	session->api().blockedPeers().slice(
+	) | rpl::take(
+		1
+	) | rpl::start_with_next([=](const Api::BlockedPeers::Slice &result) {
+		applySlice(result, applySlice);
+	}, session->lifetime());
 }
 
 } // namespace
@@ -204,10 +242,7 @@ Session::Session(
 
 	Core::App().downloadManager().trackSession(this);
 
-	appConfig().value(
-	) | rpl::start_with_next([=] {
-		appConfigRefreshed();
-	}, _lifetime);
+    InitializeBlockedPeers(this);
 }
 
 void Session::appConfigRefreshed() {

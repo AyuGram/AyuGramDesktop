@@ -55,6 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/ayu_state.h"
 #include "ayu/features/messageshot/message_shot.h"
 
 
@@ -1031,6 +1033,17 @@ bool Element::isHiddenByGroup() const {
 }
 
 bool Element::isHidden() const {
+	if (AyuState::isHidden(data())) {
+		return true;
+	}
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->hideFromBlocked) {
+		if (data()->from()->isUser() &&
+			data()->from()->asUser()->isBlocked()) {
+			return true;
+		}
+	}
+
 	return isHiddenByGroup();
 }
 

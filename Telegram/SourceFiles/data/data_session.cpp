@@ -2745,10 +2745,6 @@ void Session::registerMessage(not_null<HistoryItem*> item) {
 	const auto list = messagesListForInsert(peerId);
 	const auto itemId = item->id;
 
-	if (AyuState::isHidden(item)) {
-		return;
-	}
-
 	const auto i = list->find(itemId);
 	if (i != list->end()) {
 		LOG(("App Error: Trying to re-registerMessage()."));

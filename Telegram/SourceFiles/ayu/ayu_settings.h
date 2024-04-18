@@ -29,6 +29,8 @@ public:
 	bool saveDeletedMessages;
 	bool saveMessagesHistory;
 
+	bool hideFromBlocked;
+
 	bool disableAds;
 	bool disableStories;
 	bool disableCustomBackgrounds;
@@ -87,6 +89,8 @@ public:
 	void set_saveDeletedMessages(bool val);
 	void set_saveMessagesHistory(bool val);
 
+	void set_hideFromBlocked(bool val);
+
 	void set_disableAds(bool val);
 	void set_disableStories(bool val);
 	void set_disableCustomBackgrounds(bool val);
@@ -143,6 +147,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	useScheduledMessages,
 	saveDeletedMessages,
 	saveMessagesHistory,
+	hideFromBlocked,
 	disableAds,
 	disableStories,
 	disableCustomBackgrounds,

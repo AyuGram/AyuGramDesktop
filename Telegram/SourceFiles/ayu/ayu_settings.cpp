@@ -195,6 +195,9 @@ AyuGramSettings::AyuGramSettings() {
 	saveDeletedMessages = true;
 	saveMessagesHistory = true;
 
+	// ~ Message filters
+	hideFromBlocked = false;
+
 	// ~ QoL toggles
 	disableAds = true;
 	disableStories = false;
@@ -241,7 +244,7 @@ AyuGramSettings::AyuGramSettings() {
 		 * showPeerId = 0 means no ID shown
 		 * showPeerId = 1 means ID shown as for Telegram API devs
 		 * showPeerId = 2 means ID shown as for Bot API devs (-100)
-		 */
+	*/
 	showPeerId = 2;
 	showMessageSeconds = false;
 	showMessageShot = true;
@@ -305,6 +308,10 @@ void AyuGramSettings::set_saveDeletedMessages(bool val) {
 
 void AyuGramSettings::set_saveMessagesHistory(bool val) {
 	saveMessagesHistory = val;
+}
+
+void AyuGramSettings::set_hideFromBlocked(bool val) {
+	hideFromBlocked = val;
 }
 
 void AyuGramSettings::set_disableAds(bool val) {

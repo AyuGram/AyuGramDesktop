@@ -563,6 +563,31 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		container->lifetime());
 }
 
+void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddSubsectionTitle(container, tr::ayu_RegexFilters());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_FiltersHideFromBlocked(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideFromBlocked)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideFromBlocked);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideFromBlocked(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+}
+
 void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1313,6 +1338,12 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 
 	AddSkip(container);
 	SetupSpyEssentials(container);
+	AddSkip(container);
+
+	AddDivider(container);
+
+	AddSkip(container);
+	SetupMessageFilters(container);
 	AddSkip(container);
 
 	AddDivider(container);
