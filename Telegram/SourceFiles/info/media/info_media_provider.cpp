@@ -28,6 +28,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_overview.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+
+
 namespace Info::Media {
 namespace {
 
@@ -411,6 +416,11 @@ std::unique_ptr<BaseLayout> Provider::createLayout(
 	if (!item) {
 		return nullptr;
 	}
+
+	if (isMessageHidden(item)) {
+		return nullptr;
+	}
+
 	const auto getPhoto = [&]() -> PhotoData* {
 		if (const auto media = item->media()) {
 			return media->photo();

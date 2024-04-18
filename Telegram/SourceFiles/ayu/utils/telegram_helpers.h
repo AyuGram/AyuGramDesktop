@@ -25,6 +25,8 @@ ID getBareID(not_null<PeerData*> peer);
 bool isAyuGramRelated(ID peerId);
 bool isExteraRelated(ID peerId);
 
+bool isMessageHidden(not_null<HistoryItem*> item);
+
 void MarkAsReadChatList(not_null<Dialogs::MainList*> list);
 void MarkAsReadThread(not_null<Data::Thread*> thread);
 

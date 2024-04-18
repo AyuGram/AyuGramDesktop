@@ -29,12 +29,14 @@
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "history/history_unread_things.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
 #include "ui/text/format_values.h"
 
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_state.h"
 
 // https://github.com/AyuGram/AyuGram4AX/blob/rewrite/TMessagesProj/src/main/java/com/radolyn/ayugram/AyuConstants.java
 std::unordered_set<ID> ayugram_channels = {
@@ -158,6 +160,30 @@ bool isAyuGramRelated(ID peerId) {
 
 bool isExteraRelated(ID peerId) {
 	return extera_devs.contains(peerId) || extera_channels.contains(peerId);
+}
+
+bool isMessageHidden(const not_null<HistoryItem*> item) {
+	if (AyuState::isHidden(item)) {
+		return true;
+	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->hideFromBlocked) {
+		if (item->from()->isUser() &&
+			item->from()->asUser()->isBlocked()) {
+			return true;
+		}
+
+		if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
+			if (forwarded->originalSender &&
+				forwarded->originalSender->isUser() &&
+				forwarded->originalSender->asUser()->isBlocked()) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 void MarkAsReadChatList(not_null<Dialogs::MainList*> list) {

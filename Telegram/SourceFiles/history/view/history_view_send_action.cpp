@@ -20,6 +20,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "styles/style_dialogs.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -61,6 +65,13 @@ bool SendActionPainter::updateNeedsAnimating(
 	if (action.type() == mtpc_sendMessageCancelAction) {
 		clear(user);
 		return false;
+	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->hideFromBlocked) {
+		if (user->isBlocked()) {
+			return false;
+		}
 	}
 
 	const auto now = crl::now();
