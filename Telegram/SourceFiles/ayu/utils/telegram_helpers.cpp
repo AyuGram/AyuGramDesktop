@@ -171,7 +171,8 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 	if (settings->hideFromBlocked) {
 		if (item->from()->isUser() &&
 			item->from()->asUser()->isBlocked()) {
-			return true;
+			// don't hide messages if it's a dialog with blocked user
+			return item->from()->asUser()->id != item->history()->peer->id;
 		}
 
 		if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
