@@ -111,7 +111,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ui/context_menu/context_menu.h"
-#include "styles/style_ayu_icons.h"
+#include "ayu/utils/telegram_helpers.h"
 
 
 namespace {
@@ -4694,6 +4694,10 @@ bool HistoryInner::goodForSelection(
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item,
 		int &totalCount) const {
+	if (isMessageHidden(item)) {
+		return false;
+	}
+
 	if (!item->isRegular() || item->isService()) {
 		return false;
 	} else if (toItems->find(item) == toItems->end()) {
