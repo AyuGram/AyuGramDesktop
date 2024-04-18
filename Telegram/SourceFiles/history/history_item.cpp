@@ -1314,14 +1314,16 @@ void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	auto text = std::move(prepared.text);
 
 	const auto settings = &AyuSettings::getInstance();
-	const auto timeString = QString(" (%1)").arg(QLocale().toString(
-		base::unixtime::parse(_date),
-		settings->showMessageSeconds
-			? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-			: QLocale::system().timeFormat(QLocale::ShortFormat)
-	));
-	if (!text.text.isEmpty() && !text.text.contains(timeString)) {
-		text = text.append(timeString);
+	if (date() > 0) {
+		const auto timeString = QString(" (%1)").arg(QLocale().toString(
+			base::unixtime::parse(_date),
+			settings->showMessageSeconds
+				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+				: QLocale::system().timeFormat(QLocale::ShortFormat)
+		));
+		if (!text.text.isEmpty() && !text.text.contains(timeString)) {
+			text = text.append(timeString);
+		}
 	}
 
 	AddComponents(HistoryServiceData::Bit());
