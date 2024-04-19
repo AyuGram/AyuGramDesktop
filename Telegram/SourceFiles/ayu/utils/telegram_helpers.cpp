@@ -250,7 +250,7 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 }
 
 void MarkAsReadThread(not_null<Data::Thread*> thread) {
-	const auto readHistory = [&](not_null<History*> history)
+	const auto readHistoryNative = [&](not_null<History*> history)
 	{
 		history->owner().histories().readInbox(history);
 	};
@@ -272,13 +272,13 @@ void MarkAsReadThread(not_null<Data::Thread*> thread) {
 				{
 					MarkAsReadThread(topic);
 				});
-		} else if (const auto history = thread->asHistory()) {
-			readHistory(history);
-			if (const auto migrated = history->migrateSibling()) {
-				readHistory(migrated);
-			}
 		} else if (const auto topic = thread->asTopic()) {
 			topic->readTillEnd();
+		} else if (const auto history = thread->asHistory()) {
+			readHistoryNative(history);
+			if (const auto migrated = history->migrateSibling()) {
+				readHistoryNative(migrated);
+			}
 		}
 	}
 

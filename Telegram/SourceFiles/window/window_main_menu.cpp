@@ -755,10 +755,14 @@ void MainMenu::setupMenu() {
 				auto prev = settings->sendReadMessages;
 				settings->set_sendReadMessages(true);
 
-				auto chats = _controller->session().data().chatsList();
+				auto chats = controller->session().data().chatsList();
 				MarkAsReadChatList(chats);
 
-				settings->set_sendReadMessages(prev);
+				// slight delay for forums to send packets
+				dispatchToMainThread([=]
+				{
+					settings->set_sendReadMessages(prev);
+				}, 200);
 				close();
 			};
 
