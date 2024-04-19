@@ -283,7 +283,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	if (item->isLocal()) {
+	if (item->isLocal() || item->isService()) {
 		return;
 	}
 
