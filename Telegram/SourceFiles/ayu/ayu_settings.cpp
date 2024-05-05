@@ -234,7 +234,6 @@ AyuGramSettings::AyuGramSettings() {
 	showGhostToggleInTray = true;
 	showStreamerToggleInTray = false;
 
-	mainFont = "";
 	monoFont = "";
 
 	hideNotificationCounters = false;
@@ -410,10 +409,6 @@ void AyuGramSettings::set_showGhostToggleInTray(bool val) {
 
 void AyuGramSettings::set_showStreamerToggleInTray(bool val) {
 	showStreamerToggleInTray = val;
-}
-
-void AyuGramSettings::set_mainFont(QString val) {
-	mainFont = val;
 }
 
 void AyuGramSettings::set_monoFont(QString val) {

@@ -665,7 +665,7 @@ void Content::setupContent(
 	const std::vector<Font> &fonts) {
 	using namespace rpl::mappers;
 
-	const auto current = AyuFonts::getMainFont();
+	const auto current = AyuFonts::getMonoFont();
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 	const auto add = [&](const std::vector<Font> &list)
 	{

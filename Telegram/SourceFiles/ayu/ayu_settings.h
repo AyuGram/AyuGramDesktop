@@ -61,7 +61,6 @@ public:
 	bool showGhostToggleInTray;
 	bool showStreamerToggleInTray;
 
-	QString mainFont;
 	QString monoFont;
 
 	bool hideNotificationCounters;
@@ -121,7 +120,6 @@ public:
 	void set_showGhostToggleInTray(bool val);
 	void set_showStreamerToggleInTray(bool val);
 
-	void set_mainFont(QString val);
 	void set_monoFont(QString val);
 
 	void set_hideNotificationCounters(bool val);
@@ -172,7 +170,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showStreamerToggleInDrawer,
 	showGhostToggleInTray,
 	showStreamerToggleInTray,
-	mainFont,
 	monoFont,
 	hideNotificationCounters,
 	hideAllChatsFolder,

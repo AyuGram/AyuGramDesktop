@@ -1068,28 +1068,6 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 void SetupFonts(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	const auto settings = &AyuSettings::getInstance();
 
-	const auto commonButton = AddButtonWithLabel(
-		container,
-		tr::ayu_MainFont(),
-		rpl::single(
-			settings->mainFont.isEmpty() ? tr::ayu_FontDefault(tr::now) : settings->mainFont
-		),
-		st::settingsButtonNoIcon);
-	const auto commonGuard = Ui::CreateChild<base::binary_guard>(commonButton.get());
-
-	commonButton->addClickHandler(
-		[=]
-		{
-			*commonGuard = AyuUi::FontSelectorBox::Show(controller,
-														[=](QString font)
-														{
-															auto ayuSettings = &AyuSettings::getInstance();
-
-															ayuSettings->set_mainFont(std::move(font));
-															AyuSettings::save();
-														});
-		});
-
 	const auto monoButton = AddButtonWithLabel(
 		container,
 		tr::ayu_MonospaceFont(),

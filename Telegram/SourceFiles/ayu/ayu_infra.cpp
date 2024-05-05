@@ -29,7 +29,6 @@ void initLang() {
 void initFonts() {
 	auto settings = &AyuSettings::getInstance();
 
-	AyuFonts::setMainFont(settings->mainFont);
 	AyuFonts::setMonoFont(settings->monoFont);
 }
 
