@@ -729,25 +729,6 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 		},
 		container->lifetime());
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_CopyUsernameAsLink(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->copyUsernameAsLink)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->copyUsernameAsLink);
-		}) | start_with_next(
-		[=](bool enabled)
-		{
-			settings->set_copyUsernameAsLink(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
 }
 
 void SetupAppIcon(not_null<Ui::VerticalLayout*> container) {

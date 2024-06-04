@@ -207,7 +207,6 @@ AyuGramSettings::AyuGramSettings() {
 
 	disableNotificationsDelay = false;
 	localPremium = false;
-	copyUsernameAsLink = true;
 
 	// ~ Customization
 	appIcon = AyuAssets::DEFAULT_ICON;
@@ -339,10 +338,6 @@ void AyuGramSettings::set_disableNotificationsDelay(bool val) {
 
 void AyuGramSettings::set_localPremium(bool val) {
 	localPremium = val;
-}
-
-void AyuGramSettings::set_copyUsernameAsLink(bool val) {
-	copyUsernameAsLink = val;
 }
 
 void AyuGramSettings::set_appIcon(QString val) {

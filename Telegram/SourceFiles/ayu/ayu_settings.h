@@ -39,7 +39,6 @@ public:
 
 	bool disableNotificationsDelay;
 	bool localPremium;
-	bool copyUsernameAsLink;
 
 	QString appIcon;
 	bool simpleQuotesAndReplies;
@@ -98,7 +97,6 @@ public:
 
 	void set_disableNotificationsDelay(bool val);
 	void set_localPremium(bool val);
-	void set_copyUsernameAsLink(bool val);
 
 	void set_appIcon(QString val);
 	void set_simpleQuotesAndReplies(bool val);
@@ -153,7 +151,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	hideSimilarChannels,
 	disableNotificationsDelay,
 	localPremium,
-	copyUsernameAsLink,
 	appIcon,
 	simpleQuotesAndReplies,
 	deletedMark,
