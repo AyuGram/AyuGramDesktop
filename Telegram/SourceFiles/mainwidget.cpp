@@ -767,8 +767,18 @@ void MainWidget::hideSingleUseKeyboard(FullMsgId replyToId) {
 }
 
 void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, UserData *from) {
+	auto tags = Data::SearchTagsFromQuery(query);
 	if (controller()->isPrimary()) {
-		_dialogs->searchMessages(query, inChat, from);
+		auto state = Dialogs::SearchState{
+			.inChat = ((tags.empty() || inChat.sublist())
+				? inChat
+				: session().data().history(session().user())),
+			.fromPeer = from,
+			.tags = tags,
+			.query = tags.empty() ? query : QString(),
+		};
+		state.tab = state.defaultTabForMe();
+		_dialogs->searchMessages(std::move(state));
 		if (isOneColumn()) {
 			_controller->clearSectionStack();
 		} else {

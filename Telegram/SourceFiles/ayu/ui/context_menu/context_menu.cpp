@@ -77,22 +77,23 @@ void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	}
 
 	if (item->history()->peer->isChat() || item->history()->peer->isMegagroup()) {
-		menu->addAction(tr::ayu_UserMessagesMenuText(tr::now),
-						[=]
-						{
-							if (const auto window = item->history()->session().tryResolveWindow()) {
-								if (const auto mainWidget = window->widget()->sessionController()) {
-									const auto peer = item->history()->peer;
-									const auto key = (peer && !peer->isUser())
-														 ? item->topic()
-															   ? Dialogs::Key{item->topic()}
-															   : Dialogs::Key{item->history()}
-														 : Dialogs::Key();
-									mainWidget->content()->searchMessages(QString(), key, item->from()->asUser());
-								}
-							}
-						},
-						&st::menuIconTTL);
+		menu->addAction(
+			tr::ayu_UserMessagesMenuText(tr::now),
+			[=]
+			{
+				if (const auto window = item->history()->session().tryResolveWindow()) {
+					if (const auto mainWidget = window->widget()->sessionController()) {
+						const auto peer = item->history()->peer;
+						const auto key = (peer && !peer->isUser())
+											 ? item->topic()
+												   ? Dialogs::Key{item->topic()}
+												   : Dialogs::Key{item->history()}
+											 : Dialogs::Key();
+						mainWidget->content()->searchMessages(QString(), key, item->from()->asUser());
+					}
+				}
+			},
+			&st::menuIconTTL);
 	}
 }
 

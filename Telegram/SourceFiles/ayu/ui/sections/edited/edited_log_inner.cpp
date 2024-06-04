@@ -610,11 +610,16 @@ void InnerWidget::elementStartInteraction(not_null<const Element*> view) {
 }
 
 void InnerWidget::elementStartPremium(
-	not_null<const Element*> view,
-	Element *replacing) {
+	not_null<const HistoryView::Element*> view,
+		HistoryView::Element *replacing) {
 }
 
 void InnerWidget::elementCancelPremium(not_null<const Element*> view) {
+}
+
+void InnerWidget::elementStartEffect(
+	not_null<const Element*> view,
+	Element *replacing) {
 }
 
 QString InnerWidget::elementAuthorRank(not_null<const Element*> view) {
