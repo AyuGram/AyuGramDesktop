@@ -539,6 +539,22 @@ void Message::initPaidInformation() {
 
 void Message::refreshRightBadge() {
 	const auto item = data();
+	const auto drawChannelBadge = [&]
+	{
+		if (item->isDiscussionPost()) {
+			return (delegate()->elementContext() != Context::Replies);
+		} else if (item->author()->isMegagroup()) {
+			if (const auto msgsigned = item->Get<HistoryMessageSigned>()) {
+				if (!msgsigned->viaBusinessBot) {
+					Assert(msgsigned->isAnonymousRank);
+					return false;
+				}
+			}
+		} else if (data()->history()->peer->isMegagroup() && data()->author()->isChannel() && !data()->out()) {
+			return true;
+		}
+		return false;
+	}();
 	const auto text = [&] {
 		if (item->isDiscussionPost()) {
 			return (delegate()->elementContext() == Context::Replies)
@@ -591,10 +607,7 @@ void Message::refreshRightBadge() {
 		badge.append(' ').append(Ui::Text::Colorized(added, 1));
 	}
 	_rightBadgeIsChannel = 0;
-	if (
-		item->isDiscussionPost() && delegate()->elementContext() != Context::Replies ||
-		data()->history()->peer->isMegagroup() && data()->author()->isChannel() && !data()->out()
-	) {
+	if (drawChannelBadge) {
 		_rightBadgeIsChannel = 1;
 	}
 	if (badge.empty()) {
