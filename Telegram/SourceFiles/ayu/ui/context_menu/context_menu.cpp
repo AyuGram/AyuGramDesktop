@@ -27,6 +27,7 @@
 #include "ayu/ui/sections/edited/edited_log_section.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/unixtime.h"
+#include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
 #include "window/window_session_controller.h"
 
@@ -113,6 +114,22 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto media = item->media();
 
 	const auto isSticker = media && media->document() && media->document()->sticker();
+
+	const auto emojiPacks = HistoryView::CollectEmojiPacks(item, HistoryView::EmojiPacksSource::Message);
+	auto containsSingleCustomEmojiPack = emojiPacks.size() == 1;
+	if (!containsSingleCustomEmojiPack && emojiPacks.size() > 1) {
+		const auto author = emojiPacks.front().id >> 32;
+		auto sameAuthor = true;
+		for (const auto pack : emojiPacks) {
+			if (pack.id >> 32 != author) {
+				sameAuthor = false;
+				break;
+			}
+		}
+
+		containsSingleCustomEmojiPack = sameAuthor;
+	}
+
 	const auto isForwarded = forwarded && !forwarded->story && forwarded->psaType.isEmpty();
 
 	const auto messageId = QString::number(item->id.bare);
@@ -277,6 +294,18 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 							authorId
 						));
 					}
+				}
+			}
+
+			if (containsSingleCustomEmojiPack) {
+				const auto authorId = emojiPacks.front().id >> 32;
+
+				if (authorId != 0) {
+					menu2->addAction(Ui::ContextActionStickerAuthor(
+						menu2->menu(),
+						&item->history()->session(),
+						authorId
+					));
 				}
 			}
 		},

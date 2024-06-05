@@ -729,9 +729,9 @@ void StickerSetBox::updateButtons() {
 					? tr::lng_stickers_copied_emoji(tr::now)
 					: tr::lng_stickers_copied(tr::now));
 		};
-		const auto addAuthorPack = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
+		const auto addPackOwner = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
 		{
-			if (type == Data::StickersType::Stickers) {
+			if (type == Data::StickersType::Stickers || type == Data::StickersType::Emoji) {
 				const auto pointer = Ui::MakeWeak(this);
 				(*menu)->addAction(
 					tr::ayu_MessageDetailsPackOwnerPC(tr::now),
@@ -812,7 +812,7 @@ void StickerSetBox::updateButtons() {
 							: tr::lng_stickers_share_pack)(tr::now),
 						[=] { share(); closeBox(); },
 						&st::menuIconShare);
-					addAuthorPack(menu);
+					addPackOwner(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
@@ -865,7 +865,7 @@ void StickerSetBox::updateButtons() {
 							archive,
 							&st::menuIconArchive);
 					}
-					addAuthorPack(menu);
+					addPackOwner(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
