@@ -132,6 +132,7 @@ public:
 		not_null<const HistoryView::Element*> view,
 		HistoryView::Element *replacing) override;
 	QString elementAuthorRank(not_null<const HistoryView::Element*> view) override;
+	bool InnerWidget::elementHideTopicButton(not_null<const HistoryView::Element*> view) override;
 
 	~InnerWidget();
 
