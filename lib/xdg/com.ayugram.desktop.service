@@ -1,3 +1,3 @@
 [D-BUS Service]
 Name=com.ayugram.desktop
-Exec=@CMAKE_INSTALL_FULL_BINDIR@/com.ayugram.desktop
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/ayugram-desktop
