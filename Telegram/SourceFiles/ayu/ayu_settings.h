@@ -37,6 +37,10 @@ public:
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
 
+	bool spoofWebviewAsAndroid;
+	bool increaseWebviewHeight;
+	bool increaseWebviewWidth;
+
 	bool disableNotificationsDelay;
 	bool localPremium;
 
@@ -95,6 +99,10 @@ public:
 	void set_collapseSimilarChannels(bool val);
 	void set_hideSimilarChannels(bool val);
 
+	void set_spoofWebviewAsAndroid(bool val);
+	void set_increaseWebviewHeight(bool val);
+	void set_increaseWebviewWidth(bool val);
+
 	void set_disableNotificationsDelay(bool val);
 	void set_localPremium(bool val);
 
@@ -149,6 +157,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	disableCustomBackgrounds,
 	collapseSimilarChannels,
 	hideSimilarChannels,
+	spoofWebviewAsAndroid,
+	increaseWebviewHeight,
+	increaseWebviewWidth,
 	disableNotificationsDelay,
 	localPremium,
 	appIcon,

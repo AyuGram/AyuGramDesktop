@@ -1249,6 +1249,50 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window:
 		container->lifetime());
 }
 
+void SetupWebviewSettings(not_null<Ui::VerticalLayout*> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddSubsectionTitle(container, rpl::single(QString("Webview")));
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_SettingsSpoofWebviewAsAndroid(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->spoofWebviewAsAndroid)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->spoofWebviewAsAndroid);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_spoofWebviewAsAndroid(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	std::vector checkboxes = {
+		NestedEntry{
+			tr::ayu_SettingsIncreaseWebviewHeight(tr::now), settings->increaseWebviewHeight, [=](bool enabled)
+			{
+				settings->set_increaseWebviewHeight(enabled);
+				AyuSettings::save();
+			}
+		},
+		NestedEntry{
+			tr::ayu_SettingsIncreaseWebviewWidth(tr::now), settings->increaseWebviewWidth, [=](bool enabled)
+			{
+				settings->set_increaseWebviewWidth(enabled);
+				AyuSettings::save();
+			}
+		}
+	};
+
+	AddCollapsibleToggle(container, tr::ayu_SettingsBiggerWindow(), checkboxes, false);
+}
+
 void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 						not_null<Window::SessionController*> controller) {
 	AddSubsectionTitle(container, tr::ayu_CustomizationHeader());
@@ -1317,6 +1361,12 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 	SetupCustomization(container, controller);
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsCustomizationHint());
+
+	AddSkip(container);
+	SetupWebviewSettings(container);
+	AddSkip(container);
+
+	AddDivider(container);
 
 	AddSkip(container);
 	SetupSendConfirmations(container);

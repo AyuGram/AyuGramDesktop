@@ -45,6 +45,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QScreen>
 #include <QtGui/qpa/qplatformscreen.h>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "styles/style_ayu_styles.h"
+
+
 namespace Ui::BotWebView {
 namespace {
 
@@ -380,34 +385,17 @@ Panel::Panel(Args &&args)
 , _fullscreen(args.fullscreen)
 , _allowClipboardRead(args.allowClipboardRead) {
 	_widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
-	_widget->setInnerSize(st::botWebViewPanelSize, true);
 
-	const auto panel = _widget.get();
-	rpl::duplicate(
-		args.title
-	) | rpl::start_with_next([=](const QString &title) {
-		const auto value = tr::lng_credits_box_history_entry_miniapp(tr::now)
-			+ u": "_q
-			+ title;
-		panel->window()->setWindowTitle(value);
-	}, panel->lifetime());
+	const auto settings = &AyuSettings::getInstance();
+	auto size = QSize(st::botWebViewPanelSize);
+	if (settings->increaseWebviewHeight) {
+		size.setHeight(st::botWebViewPanelHeightIncreased);
+	}
+	if (settings->increaseWebviewWidth) {
+		size.setWidth(st::botWebViewPanelWidthIncreased);
+	}
 
-	const auto params = _delegate->botThemeParams();
-	updateColorOverrides(params);
-
-	_fullscreen.value(
-	) | rpl::start_with_next([=](bool fullscreen) {
-		_widget->toggleFullScreen(fullscreen);
-		layoutButtons();
-		sendFullScreen();
-		sendSafeArea();
-		sendContentSafeArea();
-	}, _widget->lifetime());
-
-	_widget->fullScreenValue(
-	) | rpl::start_with_next([=](bool fullscreen) {
-		_fullscreen = fullscreen;
-	}, _widget->lifetime());
+	_widget->setInnerSize(size);
 
 	_widget->closeRequests(
 	) | rpl::start_with_next([=] {

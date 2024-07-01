@@ -214,6 +214,10 @@ AyuGramSettings::AyuGramSettings() {
 	collapseSimilarChannels = true;
 	hideSimilarChannels = false;
 
+	spoofWebviewAsAndroid = false;
+	increaseWebviewHeight = false;
+	increaseWebviewWidth = false;
+
 	disableNotificationsDelay = false;
 	localPremium = false;
 
@@ -339,6 +343,18 @@ void AyuGramSettings::set_collapseSimilarChannels(bool val) {
 
 void AyuGramSettings::set_hideSimilarChannels(bool val) {
 	hideSimilarChannels = val;
+}
+
+void AyuGramSettings::set_spoofWebviewAsAndroid(bool val) {
+	spoofWebviewAsAndroid = val;
+}
+
+void AyuGramSettings::set_increaseWebviewHeight(bool val) {
+	increaseWebviewHeight = val;
+}
+
+void AyuGramSettings::set_increaseWebviewWidth(bool val) {
+	increaseWebviewWidth = val;
 }
 
 void AyuGramSettings::set_disableNotificationsDelay(bool val) {

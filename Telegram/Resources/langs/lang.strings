@@ -7120,6 +7120,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ContextMenuElementsHeader" = "Context Menu Elements";
 "ayu_DrawerElementsHeader" = "Drawer Elements";
 "ayu_TrayElementsHeader" = "Tray Elements";
+"ayu_SettingsSpoofWebviewAsAndroid" = "Spoof Client as Android";
+"ayu_SettingsBiggerWindow" = "Bigger Window";
+"ayu_SettingsIncreaseWebviewHeight" = "Increase Content Height";
+"ayu_SettingsIncreaseWebviewWidth" = "Increase Content Width";
 "ayu_ExportDataTitle" = "Export AyuGram Database?";
 "ayu_ExportDataDescription" = "It will be exported to the public folder, to Saved Attachments.";
 "ayu_ExportDataConfirm" = "Yes, export";
@@ -7315,10 +7319,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageShotShowReactions" = "Show reactions";
 "ayu_MessageShotShowColorfulReplies" = "Show colorful replies";
 "ayu_SendAsSticker" = "Send as Sticker";
-"ayu_AyuForwardStatusForwarding" = "Forwarding messages…";
-"ayu_AyuForwardStatusLoadingMedia" = "Loading media…";
-"ayu_AyuForwardForwardingDescription" = "Please keep this window open while AyuGram is forwarding your messages.";
-"ayu_AyuForwardLoadingMediaDescription" = "Please keep this window open while AyuGram is downloading media from your messages.";
+"ayu_AyuForwardStatusPreparing" = "Forwarding messages";
+"ayu_AyuForwardStatusLoadingMedia" = "Loading media";
+"ayu_AyuForwardStatusForwarding" = "Forwarding messages";
+"ayu_AyuForwardStatusFinished" = "Done";
+"ayu_AyuForwardStatusSentCount" = "sent %1$d of %2$d";
+"ayu_AyuForwardStatusChunkCount" = "chunk %1$d of %2$d";
 "ayu_ExpireMediaContextMenuText" = "Burn";
 "ayu_ExpiringVoiceMessageNote" = "This voice message can be played as many times as you want.";
 "ayu_ExpiringVideoMessageNote" = "This video message can be played as many times as you want.";
