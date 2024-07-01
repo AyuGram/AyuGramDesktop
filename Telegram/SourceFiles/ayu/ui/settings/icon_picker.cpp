@@ -28,7 +28,9 @@ const QVector<QString> icons{
 	AyuAssets::EXTERA_ICON,
 	AyuAssets::NOTHING_ICON,
 	AyuAssets::BARD_ICON,
-	AyuAssets::YAPLUS_ICON
+	AyuAssets::YAPLUS_ICON,
+	AyuAssets::CHIBI_ICON,
+	AyuAssets::CHIBI2_ICON,
 };
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
@@ -36,18 +38,26 @@ const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<i
 void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float strokeOpacity) {
 	xOffset += st::cpPadding;
 
-	// stroke
 	p.save();
-	p.setPen(QPen(st::iconPreviewStroke, st::cpPenSize));
+	p.setPen(QPen(st::boxDividerBg, 0));
+	p.setBrush(QBrush(st::boxDividerBg));
 	p.setOpacity(strokeOpacity);
-	p.drawEllipse(xOffset + st::cpSelectedPadding,
-				  yOffset + st::cpSelectedPadding,
-				  st::cpIconSize + st::cpSelectedPadding * 2,
-				  st::cpIconSize + st::cpSelectedPadding * 2);
+	p.drawRoundedRect(
+		xOffset + st::cpSelectedPadding,
+		yOffset + st::cpSelectedPadding,
+		st::cpIconSize + st::cpSelectedPadding * 2,
+		st::cpIconSize + st::cpSelectedPadding * 2,
+		st::cpSelectedRounding,
+		st::cpSelectedRounding
+	);
 	p.restore();
-	// /stroke
 
-	auto rect = QRect(xOffset + st::cpImagePadding, yOffset + st::cpImagePadding, st::cpIconSize, st::cpIconSize);
+	auto rect = QRect(
+		xOffset + st::cpImagePadding,
+		yOffset + st::cpImagePadding,
+		st::cpIconSize,
+		st::cpIconSize
+	);
 	p.drawImage(rect, icon);
 }
 
@@ -65,7 +75,7 @@ void applyIcon() {
 
 IconPicker::IconPicker(QWidget *parent)
 	: RpWidget(parent) {
-	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows);
+	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows - st::cpPadding);
 }
 
 void IconPicker::paintEvent(QPaintEvent *e) {
@@ -80,21 +90,27 @@ void IconPicker::paintEvent(QPaintEvent *e) {
 			auto const idx = i + row * 4;
 
 			const auto &iconName = icons[idx];
+			if (iconName.isEmpty()) {
+				continue;
+			}
+
 			auto icon = AyuAssets::loadPreview(iconName)
 				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
 			auto opacity = 0.0f;
-		    if (iconName == wasSelected) {
+			if (iconName == wasSelected) {
 				opacity = 1.0f - animation.value(1.0f);
 			} else if (iconName == AyuAssets::currentAppLogoName()) {
 				opacity = wasSelected.isEmpty() ? 1.0f : animation.value(1.0f);
 			}
 
-			drawIcon(p,
-					 icon,
-					 (st::cpIconSize + st::cpSpacingX) * i + offset,
-					 row * (st::cpIconSize + st::cpSpacingY),
-					 opacity);
+			drawIcon(
+				p,
+				icon,
+				(st::cpIconSize + st::cpSpacingX) * i + offset,
+				row * (st::cpIconSize + st::cpSpacingY),
+				opacity
+			);
 		}
 	}
 }
@@ -114,6 +130,10 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 			if (x >= xOffset && x <= xOffset + st::cpIconSize && e->pos().y() >= yOffset
 				&& e->pos().y() <= yOffset + st::cpIconSize) {
 				const auto &iconName = icons[idx];
+				if (iconName.isEmpty()) {
+					break;
+				}
+
 				if (settings->appIcon != iconName) {
 					wasSelected = settings->appIcon;
 					animation.start(
@@ -124,7 +144,8 @@ void IconPicker::mousePressEvent(QMouseEvent *e) {
 						0.0,
 						1.0,
 						200,
-						anim::easeOutCubic);
+						anim::easeOutCubic
+					);
 
 					settings->set_appIcon(iconName);
 					changed = true;

@@ -12,12 +12,10 @@ using "ui/colors.palette";
 using "ui/widgets/widgets.style";
 using "info/info.style";
 
-iconPreviewStroke: activeButtonBg;
-
 /* Color Picker */
 cpPadding: 14px;
 cpSelectedPadding: 2px;
-cpPenSize: 2px;
+cpSelectedRounding: 12px;
 cpImagePadding: 4px;
 cpSpacingX: 16px;
 cpSpacingY: 8px;

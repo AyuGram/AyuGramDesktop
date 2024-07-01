@@ -6,6 +6,12 @@
         <file alias="art/ayu/bard/app.png">../../art/ayu/bard/app.png</file>
         <file alias="art/ayu/bard/app_preview.png">../../art/ayu/bard/app_preview.png</file>
         <file alias="art/ayu/bard/app_icon.ico">../../art/ayu/bard/app_icon.ico</file>
+        <file alias="art/ayu/chibi/app.png">../../art/ayu/chibi/app.png</file>
+        <file alias="art/ayu/chibi/app_preview.png">../../art/ayu/chibi/app_preview.png</file>
+        <file alias="art/ayu/chibi/app_icon.ico">../../art/ayu/chibi/app_icon.ico</file>
+        <file alias="art/ayu/chibi2/app.png">../../art/ayu/chibi2/app.png</file>
+        <file alias="art/ayu/chibi2/app_preview.png">../../art/ayu/chibi2/app_preview.png</file>
+        <file alias="art/ayu/chibi2/app_icon.ico">../../art/ayu/chibi2/app_icon.ico</file>
         <file alias="art/ayu/default/app.png">../../art/ayu/default/app.png</file>
         <file alias="art/ayu/default/app_preview.png">../../art/ayu/default/app_preview.png</file>
         <file alias="art/ayu/default/app_icon.ico">../../art/ayu/default/app_icon.ico</file>
