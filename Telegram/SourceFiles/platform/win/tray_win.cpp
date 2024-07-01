@@ -30,7 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ui/ayu_logo.h"
-#include "ui/painter.h"
+#include "styles/style_ayu_icons.h"
 
 
 namespace Platform {
@@ -449,6 +449,26 @@ QString Tray::QuitJumpListIconPath() {
 		st::winQuitIcon.instance(color, 100, true),
 		st::winQuitIcon.instance(color, 200, true),
 		st::winQuitIcon.instance(color, 300, true),
+	});
+	return path;
+}
+
+QString Tray::GhostJumpListIconPath() {
+	const auto dark = IsDarkTaskbar();
+	const auto key = !dark ? 0 : *dark ? 1 : 2;
+	const auto path = cWorkingDir() + u"tdata/temp/ghost_%1.ico"_q.arg(key);
+	if (QFile::exists(path)) {
+		return path;
+	}
+	const auto color = !dark
+		? st::trayCounterBg->c
+		: *dark
+		? QColor(255, 255, 255)
+		: QColor(0, 0, 0, 228);
+	WriteIco(path, {
+		st::winEnterWithGuestIcon.instance(color, 100, true),
+		st::winEnterWithGuestIcon.instance(color, 200, true),
+		st::winEnterWithGuestIcon.instance(color, 300, true),
 	});
 	return path;
 }

@@ -164,6 +164,15 @@ void load() {
 	} catch (...) {
 		LOG(("AyuGramSettings: failed to read settings file (not json-like)"));
 	}
+
+	if (cGhost()) {
+		settings->sendReadMessages = false;
+		settings->sendReadStories = false;
+		settings->sendOnlinePackets = false;
+		settings->sendUploadProgress = false;
+		settings->sendOfflinePacketAfterOnline = true;
+	}
+
 	postinitialize();
 }
 

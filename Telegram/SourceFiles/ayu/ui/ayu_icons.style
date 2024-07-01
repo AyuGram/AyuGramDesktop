@@ -23,3 +23,5 @@ outChannelBadgeIcon: icon {{ "ayu/channel", msgOutDateFg }};
 outChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgOutDateFgSelected }};
 
 infoExteraBadge: icon {{ "ayu/exterabadge", profileVerifiedCheckBg }};
+
+winEnterWithGuestIcon: icon {{ "ayu/ghost_tray", windowFg }};
