@@ -18,6 +18,7 @@ ICON(EXTERA, "extera");
 ICON(NOTHING, "nothing");
 ICON(BARD, "bard");
 ICON(YAPLUS, "yaplus");
+ICON(WIN95, "win95");
 ICON(CHIBI, "chibi");
 ICON(CHIBI2, "chibi2");
 

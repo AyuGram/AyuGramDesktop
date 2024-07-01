@@ -27,6 +27,9 @@
         <file alias="art/ayu/spotify/app.png">../../art/ayu/spotify/app.png</file>
         <file alias="art/ayu/spotify/app_preview.png">../../art/ayu/spotify/app_preview.png</file>
         <file alias="art/ayu/spotify/app_icon.ico">../../art/ayu/spotify/app_icon.ico</file>
+        <file alias="art/ayu/win95/app.png">../../art/ayu/win95/app.png</file>
+        <file alias="art/ayu/win95/app_preview.png">../../art/ayu/win95/app_preview.png</file>
+        <file alias="art/ayu/win95/app_icon.ico">../../art/ayu/win95/app_icon.ico</file>
         <file alias="art/ayu/yaplus/app.png">../../art/ayu/yaplus/app.png</file>
         <file alias="art/ayu/yaplus/app_preview.png">../../art/ayu/yaplus/app_preview.png</file>
         <file alias="art/ayu/yaplus/app_icon.ico">../../art/ayu/yaplus/app_icon.ico</file>

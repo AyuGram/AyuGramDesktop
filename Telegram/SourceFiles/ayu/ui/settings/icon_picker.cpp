@@ -29,6 +29,7 @@ const QVector<QString> icons{
 	AyuAssets::NOTHING_ICON,
 	AyuAssets::BARD_ICON,
 	AyuAssets::YAPLUS_ICON,
+	AyuAssets::WIN95_ICON,
 	AyuAssets::CHIBI_ICON,
 	AyuAssets::CHIBI2_ICON,
 };
