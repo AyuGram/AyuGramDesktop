@@ -517,6 +517,50 @@ QString getMediaDC(not_null<HistoryItem*> message) {
 	return {};
 }
 
+QString getUserDC(not_null<UserData*> user) {
+	if (user->hasUserpic()) {
+		const auto dc = v::match(
+			user->userpicLocation().file().data,
+			[&](const StorageFileLocation &data)
+			{
+				return data.dcId();
+			},
+			[&](const WebFileLocation &)
+			{
+				// should't happen, but still
+				// all webpages are on DC4
+				return 4;
+			},
+			[&](const GeoPointLocation &)
+			{
+				// shouldn't happen naturally
+				return 0;
+			},
+			[&](const AudioAlbumThumbLocation &)
+			{
+				// shouldn't happen naturally
+				return 0;
+			},
+			[&](const PlainUrlLocation &)
+			{
+				// should't happen, but still
+				// all webpages are on DC4
+				return 4;
+			},
+			[&](const InMemoryLocation &)
+			{
+				// shouldn't happen naturally
+				return 0;
+			});
+
+		if (dc > 0) {
+			return getDCName(dc);
+		}
+	}
+
+	return {};
+}
+
 int getScheduleTime(int64 sumSize) {
 	auto time = 12;
 	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * 0.7))) + 1;
