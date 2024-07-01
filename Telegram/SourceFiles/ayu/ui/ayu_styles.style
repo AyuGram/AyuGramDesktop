@@ -27,6 +27,8 @@ recentStickersLimitPadding: margins(22px, 4px, 22px, 8px);
 imageViewPadding: margins(22px, 10px, 22px, 10px);
 imageViewInnerPadding: margins(16px, 16px, 16px, 16px);
 
+stickerRoundingSize: 5px;
+
 messageShotPadding: 4px;
 
 topBarAdmins: IconButton {

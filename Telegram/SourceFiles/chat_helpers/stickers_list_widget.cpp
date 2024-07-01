@@ -58,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "styles/style_ayu_styles.h"
 #include "boxes/abstract_box.h"
 #include "base/unixtime.h"
 
@@ -1479,6 +1480,16 @@ void StickersListWidget::paintSticker(
 		(_singleSize.height() - size.height()) / 2);
 
 	auto lottieFrame = QImage();
+
+	QPainterPath path;
+	path.addRoundedRect(QRectF(ppos, size), st::stickerRoundingSize, st::stickerRoundingSize);
+
+	p.save();
+
+	p.setRenderHint(QPainter::Antialiasing, true);
+	p.setClipPath(path);
+	p.setRenderHint(QPainter::Antialiasing, false);
+
 	if (sticker.lottie && sticker.lottie->ready()) {
 		auto request = Lottie::FrameRequest();
 		request.box = boundingBoxSize() * style::DevicePixelRatio();
@@ -1532,6 +1543,8 @@ void StickersListWidget::paintSticker(
 				_pathGradient.get());
 		}
 	}
+
+	p.restore();
 
 	if (selected && stickerHasDeleteButton(set, index)) {
 		auto xPos = pos + QPoint(_singleSize.width() - st::stickerPanDeleteIconBg.width(), 0);
