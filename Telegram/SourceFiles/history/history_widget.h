@@ -451,6 +451,9 @@ private:
 	void unblockUser();
 	void sendBotStartCommand();
 	void joinChannel();
+	void goToDiscussionGroup();
+
+	[[nodiscard]] bool hasDiscussionGroup() const;
 
 	void supportInitAutocomplete();
 	void supportInsertText(const QString &text);
@@ -821,6 +824,7 @@ private:
 	QPointer<Ui::IconButton> _giftToChannel;
 	QPointer<Ui::IconButton> _directMessage;
 	rpl::lifetime _directMessageLifetime;
+	object_ptr<Ui::FlatButton> _discuss;
 	object_ptr<Ui::FlatButton> _reportMessages;
 	struct {
 		object_ptr<Ui::RoundButton> button = { nullptr };

@@ -69,6 +69,8 @@ public:
 	bool hideNotificationCounters;
 	bool hideAllChatsFolder;
 
+	int channelBottomButton;
+
 	int showPeerId;
 	bool showMessageSeconds;
 	bool showMessageShot;
@@ -131,6 +133,8 @@ public:
 	void set_hideNotificationCounters(bool val);
 	void set_hideAllChatsFolder(bool val);
 
+	void set_channelBottomButton(int val);
+
 	void set_showPeerId(int val);
 	void set_showMessageSeconds(bool val);
 	void set_showMessageShot(bool val);
@@ -181,6 +185,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	monoFont,
 	hideNotificationCounters,
 	hideAllChatsFolder,
+	channelBottomButton,
 	showPeerId,
 	showMessageSeconds,
 	showMessageShot,

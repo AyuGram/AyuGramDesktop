@@ -343,13 +343,14 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 						raw->lifetime());
 }
 
-void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container,
+void AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> container,
 										 not_null<Window::SessionController*> controller,
 										 int initialState,
 										 std::vector<QString> options,
 										 rpl::producer<QString> text,
 										 rpl::producer<QString> boxTitle,
-										 const style::icon &icon,
+										 const style::SettingsButton & st,
+										 Settings::IconDescriptor && descriptor,
 										 const Fn<void(int)> &setter) {
 	auto reactiveVal = container->lifetime().make_state<rpl::variable<int>>(initialState);
 
@@ -363,8 +364,8 @@ void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container
 		container,
 		std::move(text),
 		rightTextReactive,
-		st::settingsButton,
-		{&icon})->addClickHandler(
+		st,
+		std::move(descriptor))->addClickHandler(
 		[=]
 		{
 			controller->show(Box(
@@ -385,6 +386,45 @@ void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container
 									});
 				}));
 		});
+}
+
+void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container,
+										 not_null<Window::SessionController*> controller,
+										 int initialState,
+										 std::vector<QString> options,
+										 rpl::producer<QString> text,
+										 rpl::producer<QString> boxTitle,
+										 const style::icon &icon,
+										 const Fn<void(int)> &setter) {
+	AddChooseButtonWithIconAndRightTextInner(
+		container,
+		controller,
+		initialState,
+		options,
+		std::move(text),
+		std::move(boxTitle),
+		st::settingsButton,
+		{&icon},
+		setter);
+}
+
+void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container,
+										 not_null<Window::SessionController*> controller,
+										 int initialState,
+										 std::vector<QString> options,
+										 rpl::producer<QString> text,
+										 rpl::producer<QString> boxTitle,
+										 const Fn<void(int)> &setter) {
+	AddChooseButtonWithIconAndRightTextInner(
+		container,
+		controller,
+		initialState,
+		options,
+		std::move(text),
+		std::move(boxTitle),
+		st::settingsButtonNoIcon,
+		{},
+		setter);
 }
 
 namespace Settings {
@@ -1205,6 +1245,29 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container) {
 		container->lifetime());
 }
 
+void SetupChannelSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
+	auto settings = &AyuSettings::getInstance();
+
+	const auto options = std::vector{
+		tr::ayu_ChannelBottomButtonHide(tr::now),
+		tr::ayu_ChannelBottomButtonMute(tr::now),
+		tr::ayu_ChannelBottomButtonDiscuss(tr::now),
+	};
+
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->channelBottomButton,
+		options,
+		tr::ayu_ChannelBottomButton(),
+		tr::ayu_ChannelBottomButton(),
+		[=](int index)
+		{
+			settings->set_channelBottomButton(index);
+			AyuSettings::save();
+		});
+}
+
 void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1315,6 +1378,11 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	AddSkip(container);
 
 	SetupFolderSettings(container);
+	AddSkip(container);
+	AddDivider(container);
+
+	AddSkip(container);
+	SetupChannelSettings(container, controller);
 	AddSkip(container);
 	AddDivider(container);
 

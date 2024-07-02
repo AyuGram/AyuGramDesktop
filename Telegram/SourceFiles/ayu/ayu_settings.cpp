@@ -252,6 +252,13 @@ AyuGramSettings::AyuGramSettings() {
 	hideAllChatsFolder = false;
 
 	/*
+		 * channelBottomButton = 0 means "Hide"
+		 * channelBottomButton = 1 means "Mute"/"Unmute"
+		 * channelBottomButton = 2 means "Discuss" + fallback to "Mute"/"Unmute"
+	*/
+	channelBottomButton = 2;
+
+	/*
 		 * showPeerId = 0 means no ID shown
 		 * showPeerId = 1 means ID shown as for Telegram API devs
 		 * showPeerId = 2 means ID shown as for Bot API devs (-100)
@@ -446,6 +453,10 @@ void AyuGramSettings::set_hideNotificationCounters(bool val) {
 
 void AyuGramSettings::set_hideAllChatsFolder(bool val) {
 	hideAllChatsFolder = val;
+}
+
+void AyuGramSettings::set_channelBottomButton(int val) {
+	channelBottomButton = val;
 }
 
 void AyuGramSettings::set_showMessageSeconds(bool val) {

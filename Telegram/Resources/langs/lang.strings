@@ -7105,6 +7105,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SemiTransparentDeletedMessages" = "Translucent Deleted Messages";
 "ayu_HideNotificationCounters" = "Hide Notification Counters";
 "ayu_HideAllChats" = "Hide \"All Chats\" Tab";
+"ayu_ChannelBottomButton" = "Channel Bottom Button";
+"ayu_ChannelBottomButtonHide" = "Hide";
+"ayu_ChannelBottomButtonMute" = "Mute";
+"ayu_ChannelBottomButtonDiscuss" = "Discuss";
 "ayu_SettingsShowID" = "Show Peer ID";
 "ayu_SettingsShowID_Hide" = "Hide";
 "ayu_SettingsShowMessageShot" = "Show Message Shot";
