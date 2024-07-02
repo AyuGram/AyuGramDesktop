@@ -7329,6 +7329,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AyuForwardStatusFinished" = "Done";
 "ayu_AyuForwardStatusSentCount" = "sent %1$d of %2$d";
 "ayu_AyuForwardStatusChunkCount" = "chunk %1$d of %2$d";
+"ayu_JumpToBeginning" = "To Beginning";
 "ayu_ExpireMediaContextMenuText" = "Burn";
 "ayu_ExpiringVoiceMessageNote" = "This voice message can be played as many times as you want.";
 "ayu_ExpiringVideoMessageNote" = "This video message can be played as many times as you want.";
