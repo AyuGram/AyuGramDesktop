@@ -249,6 +249,7 @@ AyuGramSettings::AyuGramSettings() {
 	monoFont = "";
 
 	hideNotificationCounters = false;
+	hideNotificationBadge = false;
 	hideAllChatsFolder = false;
 
 	/*
@@ -449,6 +450,10 @@ void AyuGramSettings::set_showPeerId(int val) {
 
 void AyuGramSettings::set_hideNotificationCounters(bool val) {
 	hideNotificationCounters = val;
+}
+
+void AyuGramSettings::set_hideNotificationBadge(bool val) {
+	hideNotificationBadge = val;
 }
 
 void AyuGramSettings::set_hideAllChatsFolder(bool val) {

@@ -47,6 +47,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <Windowsx.h>
 #include <VersionHelpers.h>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 // Taken from qtbase/src/gui/image/qpixmap_win.cpp
 HICON qt_pixmapToWinHICON(const QPixmap &);
 HBITMAP qt_imageToWinHBITMAP(const QImage &, int hbitmapFormat);
@@ -508,8 +512,10 @@ void MainWindow::unreadCounterChangedHook() {
 }
 
 void MainWindow::updateTaskbarAndIconCounters() {
-	const auto counter = Core::App().unreadBadge();
-	const auto muted = Core::App().unreadBadgeMuted();
+	const auto settings = &AyuSettings::getInstance();
+
+	const auto counter = settings->hideNotificationBadge ? 0 : Core::App().unreadBadge();
+	const auto muted = settings->hideNotificationBadge ? 0 : Core::App().unreadBadgeMuted();
 	const auto controller = sessionController();
 	const auto session = controller ? &controller->session() : nullptr;
 

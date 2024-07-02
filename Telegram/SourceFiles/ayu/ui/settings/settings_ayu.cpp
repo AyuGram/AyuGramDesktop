@@ -26,7 +26,9 @@
 #include "styles/style_widgets.h"
 
 #include "icon_picker.h"
+#include "tray.h"
 #include "core/application.h"
+#include "main/main_domain.h"
 #include "styles/style_ayu_icons.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
@@ -1203,7 +1205,7 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 		});
 }
 
-void SetupFolderSettings(not_null<Ui::VerticalLayout*> container) {
+void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	auto settings = &AyuSettings::getInstance();
 
 	AddButtonWithIcon(
@@ -1224,6 +1226,32 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 		},
 		container->lifetime());
+
+	// not about folders, but it's a good place for it
+#ifdef Q_OS_WIN
+	AddButtonWithIcon(
+	container,
+	tr::ayu_HideNotificationBadge(),
+	st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideNotificationBadge)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideNotificationBadge);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideNotificationBadge(enabled);
+			AyuSettings::save();
+
+			Core::App().refreshApplicationIcon();
+			Core::App().tray().updateIconCounters();
+			Core::App().domain().notifyUnreadBadgeChanged();
+		},
+		container->lifetime());
+#endif
 
 	AddButtonWithIcon(
 		container,
@@ -1377,7 +1405,7 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	AddDivider(container);
 	AddSkip(container);
 
-	SetupFolderSettings(container);
+	SetupFolderSettings(container, controller);
 	AddSkip(container);
 	AddDivider(container);
 

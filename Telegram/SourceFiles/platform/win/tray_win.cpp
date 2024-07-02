@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QBuffer>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_logo.h"
 #include "styles/style_ayu_icons.h"
 
@@ -139,6 +140,11 @@ bool DarkTasbarValueValid/* = false*/;
 		ScaledLogoNoMargin = base::flat_map<int, QImage>();
 		ScaledLogoDark = base::flat_map<int, QImage>();
 		ScaledLogoLight = base::flat_map<int, QImage>();
+	}
+
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->hideNotificationBadge) {
+		args.count = 0;
 	}
 
 	const auto darkMode = IsDarkTaskbar();

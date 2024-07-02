@@ -67,6 +67,7 @@ public:
 	QString monoFont;
 
 	bool hideNotificationCounters;
+	bool hideNotificationBadge;
 	bool hideAllChatsFolder;
 
 	int channelBottomButton;
@@ -131,6 +132,7 @@ public:
 	void set_monoFont(QString val);
 
 	void set_hideNotificationCounters(bool val);
+	void set_hideNotificationBadge(bool val);
 	void set_hideAllChatsFolder(bool val);
 
 	void set_channelBottomButton(int val);
@@ -184,6 +186,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showStreamerToggleInTray,
 	monoFont,
 	hideNotificationCounters,
+	hideNotificationBadge,
 	hideAllChatsFolder,
 	channelBottomButton,
 	showPeerId,
