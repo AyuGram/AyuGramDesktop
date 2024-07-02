@@ -1,6 +1,6 @@
 # AyuGram
 
-![AyuGram Logo](.github/AyuGram.png)
+![AyuGram Logo](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
 ## Features
 
