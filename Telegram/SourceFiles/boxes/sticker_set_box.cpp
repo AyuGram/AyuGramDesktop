@@ -68,6 +68,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/utils/telegram_helpers.h"
+#include "styles/style_ayu_styles.h"
 #include "window/window_session_controller.h"
 #include "data/data_user.h"
 
@@ -2024,6 +2025,18 @@ void StickerSetBox::Inner::paintSticker(
 		(_singleSize.width() - size.width()) / 2,
 		(_singleSize.height() - size.height()) / 2);
 	auto lottieFrame = QImage();
+
+	if (sticker->setType == Data::StickersType::Stickers) {
+		QPainterPath path;
+		path.addRoundedRect(QRectF(ppos, size), st::stickerRoundingSize, st::stickerRoundingSize);
+
+		p.save();
+
+		p.setRenderHint(QPainter::Antialiasing, true);
+		p.setClipPath(path);
+		p.setRenderHint(QPainter::Antialiasing, false);
+	}
+
 	if (element.emoji) {
 		element.emoji->paint(p, {
 			.textColor = st::windowFg->c,
@@ -2057,6 +2070,11 @@ void StickerSetBox::Inner::paintSticker(
 			QRect(ppos, size),
 			_pathGradient.get());
 	}
+
+	if (sticker->setType == Data::StickersType::Stickers) {
+		p.restore();
+	}
+
 	if (premium) {
 		_premiumMark.paint(
 			p,

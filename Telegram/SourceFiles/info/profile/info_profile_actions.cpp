@@ -1555,7 +1555,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		}
 
 		if (settings->showPeerId != 0) {
-			const auto dataCenter = getUserDC(user);
+			const auto dataCenter = getPeerDC(_peer);
 			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
 
 			auto idDrawableText = IDValue(
@@ -1691,6 +1691,9 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		}
 
 		if (settings->showPeerId != 0 && !_topic) {
+			const auto dataCenter = getPeerDC(_peer);
+			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
+
 			auto idDrawableText = IDValue(
 				_peer
 			) | rpl::map([](TextWithEntities &&text)
@@ -1698,7 +1701,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				return Ui::Text::Code(text.text);
 			});
 			auto idInfo = addInfoOneLine(
-				rpl::single(QString("ID")),
+				idLabel,
 				std::move(idDrawableText),
 				tr::ayu_ContextCopyID(tr::now)
 			);

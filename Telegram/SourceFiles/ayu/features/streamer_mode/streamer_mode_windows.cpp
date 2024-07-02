@@ -24,12 +24,20 @@ void enable() {
 	auto handle = Core::App().activeWindow()->widget()->psHwnd();
 	SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
 
+	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
+		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_EXCLUDEFROMCAPTURE);
+	});
+
 	isEnabledVal = true;
 }
 
 void disable() {
 	auto handle = Core::App().activeWindow()->widget()->psHwnd();
 	SetWindowDisplayAffinity(handle, WDA_NONE);
+
+	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
+		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_NONE);
+	});
 
 	isEnabledVal = false;
 }

@@ -536,7 +536,7 @@ void Launcher::processArguments() {
 		{ "-tosettings"     , KeyFormat::NoValues },
 		{ "-startintray"    , KeyFormat::NoValues },
 		{ "-quit"           , KeyFormat::NoValues },
-		{ "-ghost"           , KeyFormat::NoValues },
+		{ "-ghost"          , KeyFormat::NoValues },
 		{ "-sendpath"       , KeyFormat::AllLeftValues },
 		{ "-workdir"        , KeyFormat::OneValue },
 		{ "--"              , KeyFormat::OneValue },

@@ -1381,27 +1381,30 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
+	const auto settings = &AyuSettings::getInstance();
+
 	auto markedIds = QVector<MTPint>();
 	auto channelMarkedIds = base::flat_map<
 		not_null<ChannelData*>,
 		QVector<MTPint>>();
 	markedIds.reserve(items.size());
 	for (const auto &item : items) {
+		const auto passthrough = (item->isUnreadMention() || item->hasUnreadReaction()) && !item->isUnreadMedia();
+
 		if (!item->markContentsRead(true) || !item->isRegular()) {
 			continue;
 		}
+
+		if (!settings->sendReadMessages && !passthrough) {
+			continue;
+		}
+
 		if (const auto channel = item->history()->peer->asChannel()) {
 			channelMarkedIds[channel].push_back(MTP_int(item->id));
 		} else {
 			markedIds.push_back(MTP_int(item->id));
 		}
 	}
-
-	const auto settings = &AyuSettings::getInstance();
-	if (!settings->sendReadMessages) {
-		return;
-	}
-
 	if (!markedIds.isEmpty()) {
 		request(MTPmessages_ReadMessageContents(
 			MTP_vector<MTPint>(markedIds)
@@ -1418,12 +1421,14 @@ void ApiWrap::markContentsRead(
 }
 
 void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
+	const auto passthrough = (item->isUnreadMention() || item->hasUnreadReaction()) && !item->isUnreadMedia();
+
 	if (!item->markContentsRead(true) || !item->isRegular()) {
 		return;
 	}
 
 	const auto settings = &AyuSettings::getInstance();
-	if (!settings->sendReadMessages) {
+	if (!settings->sendReadMessages && !passthrough) {
 		return;
 	}
 

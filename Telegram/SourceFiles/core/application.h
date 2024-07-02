@@ -336,6 +336,9 @@ public:
 
 	void preventOrInvoke(Fn<void()> &&callback);
 
+	void enumerateWindows(
+		Fn<void(not_null<Window::Controller*>)> callback) const;
+
 	// Global runtime variables.
 	void setScreenIsLocked(bool locked);
 	bool screenIsLocked() const;
@@ -367,8 +370,6 @@ private:
 	void updateWindowTitles();
 	void setLastActiveWindow(Window::Controller *window);
 	void showAccount(not_null<Main::Account*> account);
-	void enumerateWindows(
-		Fn<void(not_null<Window::Controller*>)> callback) const;
 	void processCreatedWindow(not_null<Window::Controller*> window);
 	void refreshApplicationIcon(Main::Session *session);
 

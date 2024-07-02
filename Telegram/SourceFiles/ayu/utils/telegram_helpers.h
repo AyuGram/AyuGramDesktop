@@ -43,7 +43,7 @@ QString getMediaName(not_null<HistoryItem*> message);
 QString getMediaResolution(not_null<HistoryItem*> message);
 QString getMediaDC(not_null<HistoryItem*> message);
 
-QString getUserDC(not_null<UserData*> user);
+QString getPeerDC(not_null<PeerData*> peer);
 
 int getScheduleTime(int64 sumSize);
 

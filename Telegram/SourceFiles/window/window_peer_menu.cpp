@@ -1175,7 +1175,7 @@ void Filler::addJumpToBeginning() {
 			} else if (group && !chat) {
 				jumpToDate(controller->session().data().history(group), showPeerHistory);
 			} else if (chat && !topic) {
-				if (!chat->migrateFrom()) {
+				if (!chat->migrateFrom() && chat->availableMinId() == 1) {
 					showPeerHistory(chat, 1);
 				} else {
 					jumpToDate(controller->session().data().history(chat), showPeerHistory);
