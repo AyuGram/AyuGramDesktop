@@ -30,6 +30,12 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 You can download prebuilt Windows binary from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases) or from
 the [Telegram topic](https://t.me/ayugramchat/12788).
 
+#### Winget
+
+```bash
+winget install RadolynLabs.AyuGramDesktop
+```
+
 #### Scoop
 
 ```bash
