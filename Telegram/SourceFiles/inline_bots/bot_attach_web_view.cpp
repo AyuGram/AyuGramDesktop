@@ -1155,7 +1155,7 @@ void WebViewInstance::requestButton() {
 		MTP_bytes(_button.url),
 		MTP_string(_button.startCommand),
 		MTP_dataJSON(MTP_bytes(botThemeParams().json)),
-		MTP_string("tdesktop"),
+		MTP_string(WebviewPlatform()),
 		action.mtpReplyTo(),
 		(action.options.sendAs
 			? action.options.sendAs->input
@@ -1193,7 +1193,7 @@ void WebViewInstance::requestSimple() {
 		MTP_bytes(_button.url),
 		MTP_string(_button.startCommand),
 		MTP_dataJSON(MTP_bytes(botThemeParams().json)),
-		MTP_string("tdesktop")
+		MTP_string(WebviewPlatform())
 	)).done([=](const MTPWebViewResult &result) {
 		const auto &data = result.data();
 		show({
@@ -1223,7 +1223,7 @@ void WebViewInstance::requestMain() {
 		_bot->inputUser,
 		MTP_string(_button.startCommand),
 		MTP_dataJSON(MTP_bytes(botThemeParams().json)),
-		MTP_string("tdesktop")
+		MTP_string(WebviewPlatform())
 	)).done([=](const MTPWebViewResult &result) {
 		const auto &data = result.data();
 		show({
@@ -1253,7 +1253,7 @@ void WebViewInstance::requestApp(bool allowWrite) {
 		MTP_inputBotAppID(MTP_long(app->id), MTP_long(app->accessHash)),
 		MTP_string(_appStartParam),
 		MTP_dataJSON(MTP_bytes(botThemeParams().json)),
-		MTP_string("tdesktop")
+		MTP_string(WebviewPlatform())
 	)).done([=](const MTPWebViewResult &result) {
 		_requestId = 0;
 		const auto &data = result.data();
