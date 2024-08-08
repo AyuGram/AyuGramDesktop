@@ -52,6 +52,10 @@ build by yourself.
 
 You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
+### NixOS
+
+Use [this](https://github.com/kaeeraa/ayugram-desktop) flake.
+
 ### Any other Linux distro
 
 Follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
