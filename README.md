@@ -52,16 +52,9 @@ build by yourself.
 
 You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
-### NixOS (Ayugram v5.2.2)
+### NixOS
 
-#### Nix profile
-Use this command as non-root:
-
-```bash
-nix profile install https://github.com/kaeeraa/ayugram-desktop/archive/refs/tags/ayugram-v5.5.2-v0.0.2.tar.gz
-```
-#### Nix flake
-See [the repo](https://github.com/kaeeraa/ayugram-desktop) for more
+See [this repository](https://github.com/kaeeraa/ayugram-desktop) for installation manual.
 
 ### Any other Linux distro
 
