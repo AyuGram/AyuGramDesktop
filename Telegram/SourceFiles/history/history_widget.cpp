@@ -635,6 +635,30 @@ HistoryWidget::HistoryWidget(
 		item->mainView()->itemDataChanged();
 	}, lifetime());
 
+	rpl::merge(
+		AyuSettings::get_hideFromBlockedReactive() | rpl::to_empty,
+		session().changes().peerUpdates(
+			Data::PeerUpdate::Flag::IsBlocked
+		) | rpl::to_empty
+	) | rpl::start_with_next(
+		[=]
+		{
+			crl::on_main(
+				this,
+				[=]
+				{
+					if (_history) {
+						_history->forceFullResize();
+						if (_migrated) {
+							_migrated->forceFullResize();
+						}
+						updateHistoryGeometry();
+						update();
+					}
+				});
+		},
+		lifetime());
+
 	Core::App().settings().largeEmojiChanges(
 	) | rpl::start_with_next([=] {
 		crl::on_main(this, [=] {
