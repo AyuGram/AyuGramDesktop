@@ -518,6 +518,10 @@ QString getMediaDC(not_null<HistoryItem*> message) {
 }
 
 QString getPeerDC(not_null<PeerData*> peer) {
+	if (const auto statsDcId = peer->owner().statsDcId(peer)) {
+		return getDCName(statsDcId);
+	}
+
 	if (peer->hasUserpic()) {
 		const auto dc = v::match(
 			peer->userpicLocation().file().data,
