@@ -394,7 +394,20 @@ HistoryWidget::HistoryWidget(
 			sendAction);
 	}
 	_unblock->addClickHandler([=] { unblockUser(); });
-	_botStart->addClickHandler([=] { sendBotStartCommand(); });
+	_botStart->setAcceptBoth(true);
+	_botStart->clicks() | rpl::start_with_next(
+		[=](Qt::MouseButton button)
+		{
+			if (button == Qt::LeftButton) {
+				sendBotStartCommand();
+			} else if (button == Qt::RightButton && isBotStart() && !_peer->asUser()->botInfo->startToken.isEmpty()) {
+				_peer->asUser()->botInfo->startToken = QString();
+				session().changes().peerUpdated(
+					_peer,
+					Data::PeerUpdate::Flag::BotStartToken);
+			}
+		},
+		_botStart->lifetime());
 	_joinChannel->addClickHandler([=] { joinChannel(); });
 	_muteUnmute->addClickHandler([=] { toggleMuteUnmute(); });
 	setupGiftToChannelButton();
@@ -3455,7 +3468,8 @@ void HistoryWidget::updateControlsVisibility() {
 
 			const auto startToken = _peer->asUser()->botInfo->startToken;
 			if (!startToken.isEmpty()) {
-				const auto s = QString("%1 (%2)").arg(tr::lng_bot_start(tr::now).toUpper()).arg(startToken);
+				const auto shortened = startToken.left(20);
+				const auto s = QString("%1 (%2)").arg(tr::lng_bot_start(tr::now).toUpper()).arg(shortened);
 				_botStart->setText(s);
 			} else {
 				_botStart->setText(tr::lng_bot_start(tr::now).toUpper());
