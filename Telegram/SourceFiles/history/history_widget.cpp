@@ -3452,6 +3452,14 @@ void HistoryWidget::updateControlsVisibility() {
 		} else if (isBotStart()) {
 			toggle(_botStart);
 			_discuss->hide();
+
+			const auto startToken = _peer->asUser()->botInfo->startToken;
+			if (!startToken.isEmpty()) {
+				const auto s = QString("%1 (%2)").arg(tr::lng_bot_start(tr::now).toUpper()).arg(startToken);
+				_botStart->setText(s);
+			} else {
+				_botStart->setText(tr::lng_bot_start(tr::now).toUpper());
+			}
 		}
 		_kbShown = false;
 		if (_autocomplete) {
