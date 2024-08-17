@@ -2991,7 +2991,7 @@ const std::vector<Data::MessageReaction> &HistoryItem::reactions() const {
 }
 
 std::vector<Data::MessageReaction> HistoryItem::reactionsWithLocal() const {
-	if (!_reactions) {
+	if (!_reactions || AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Reactions)) {
 		return {};
 	}
 	auto result = _reactions->list();
