@@ -11,6 +11,7 @@
 namespace AyuAssets {
 
 ICON(DEFAULT, "default");
+ICON(DEFAULT_MACOS, "macos");
 ICON(ALT, "alt");
 ICON(DISCORD, "discord");
 ICON(SPOTIFY, "spotify");

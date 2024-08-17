@@ -150,8 +150,13 @@ set(ayugram_files
         ayu/libs/sqlite/sqlite3.c
         ayu/libs/sqlite/sqlite3.h
         ayu/libs/sqlite/sqlite_orm.h
-        ayu/features/streamer_mode/streamer_mode_windows.cpp
-        ayu/features/streamer_mode/streamer_mode_linux.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_win.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_win.h
+        ayu/features/streamer_mode/platform/streamer_mode_linux.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_linux.h
+        ayu/features/streamer_mode/platform/streamer_mode_mac.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_mac.h
+        ayu/features/streamer_mode/streamer_mode.cpp
         ayu/features/streamer_mode/streamer_mode.h
         ayu/features/messageshot/message_shot.cpp
         ayu/features/messageshot/message_shot.h

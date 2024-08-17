@@ -4,7 +4,7 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2024
-#include "ayu_database.h"
+#include "ayu/data/ayu_database.h"
 
 #include <ranges>
 
@@ -137,18 +137,16 @@ namespace AyuDatabase {
 void moveCurrentDatabase() {
 	auto time = base::unixtime::now();
 
-	if (std::filesystem::exists("./tdata/ayudata.db")) {
-		std::filesystem::rename("./tdata/ayudata.db", QString("./tdata/ayudata_%1.db").arg(time).toStdString());
+	if (QFile::exists("./tdata/ayudata.db")) {
+		QFile::rename("./tdata/ayudata.db", QString("./tdata/ayudata_%1.db").arg(time));
 	}
 
-	if (std::filesystem::exists("./tdata/ayudata.db-shm")) {
-		std::filesystem::rename("./tdata/ayudata.db-shm",
-								QString("./tdata/ayudata_%1.db-shm").arg(time).toStdString());
+	if (QFile::exists("./tdata/ayudata.db-shm")) {
+		QFile::rename("./tdata/ayudata.db-shm", QString("./tdata/ayudata_%1.db-shm").arg(time));
 	}
 
-	if (std::filesystem::exists("./tdata/ayudata.db-wal")) {
-		std::filesystem::rename("./tdata/ayudata.db-wal",
-								QString("./tdata/ayudata_%1.db-wal").arg(time).toStdString());
+	if (QFile::exists("./tdata/ayudata.db-wal")) {
+		QFile::rename("./tdata/ayudata.db-wal", QString("./tdata/ayudata_%1.db-wal").arg(time));
 	}
 }
 

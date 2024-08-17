@@ -226,7 +226,13 @@ AyuGramSettings::AyuGramSettings() {
 	localPremium = false;
 
 	// ~ Customization
-	appIcon = AyuAssets::DEFAULT_ICON;
+	appIcon =
+#ifdef Q_OS_DARWIN
+		AyuAssets::DEFAULT_MACOS_ICON
+#else
+		AyuAssets::DEFAULT_ICON
+#endif
+	;
 	simpleQuotesAndReplies = true;
 	deletedMark = "🧹";
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
