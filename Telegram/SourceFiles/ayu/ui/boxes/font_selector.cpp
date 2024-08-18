@@ -170,7 +170,6 @@ private:
 	QString _chosen;
 	QStringList _query;
 
-	bool _areOfficial = false;
 	bool _mouseSelection = false;
 	QPoint _globalMousePosition;
 

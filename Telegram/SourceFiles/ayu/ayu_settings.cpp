@@ -227,7 +227,7 @@ AyuGramSettings::AyuGramSettings() {
 
 	// ~ Customization
 	appIcon =
-#ifdef Q_OS_DARWIN
+#ifdef Q_OS_MAC
 		AyuAssets::DEFAULT_MACOS_ICON
 #else
 		AyuAssets::DEFAULT_ICON

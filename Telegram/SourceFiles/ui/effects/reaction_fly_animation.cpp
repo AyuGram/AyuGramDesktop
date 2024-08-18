@@ -17,6 +17,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "styles/style_chat.h"
 
+// AyuGram includes
+#include "ayu/utils/taptic_engine/taptic_engine.h"
+
+
 namespace Ui {
 namespace {
 
@@ -55,6 +59,11 @@ auto ReactionFlyAnimation::callback() {
 	return [=] {
 		if (_repaint) {
 			_repaint();
+
+			if (_minis.animating() && !_hapticExecuted) {
+				TapticEngine::generateGeneric();
+				_hapticExecuted = true;
+			}
 		}
 	};
 }

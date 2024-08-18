@@ -34,7 +34,7 @@
 namespace AyuUi {
 
 bool needToShowItem(int state) {
-	return state == 1 || state == 2 && base::IsExtendedContextMenuModifierPressed();
+	return state == 1 || (state == 2 && base::IsExtendedContextMenuModifierPressed());
 }
 
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
@@ -120,7 +120,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (!containsSingleCustomEmojiPack && emojiPacks.size() > 1) {
 		const auto author = emojiPacks.front().id >> 32;
 		auto sameAuthor = true;
-		for (const auto pack : emojiPacks) {
+        for (const auto &pack : emojiPacks) {
 			if (pack.id >> 32 != author) {
 				sameAuthor = false;
 				break;

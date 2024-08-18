@@ -575,6 +575,8 @@ private:
 	ClickHandlerPtr _scrollDateLink;
 	ClickHandlerPtr _forumThreadBarLink;
 
+	bool _wasForceClickPreview = false;
+
 };
 
 [[nodiscard]] bool CanSendReply(not_null<const HistoryItem*> item);

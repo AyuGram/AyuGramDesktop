@@ -34,7 +34,7 @@ void loadIcons() {
 	if (LAST_LOADED_NAME != settings->appIcon) {
 		LAST_LOADED_NAME = settings->appIcon;
 
-#ifdef Q_OS_DARWIN
+#ifdef Q_OS_MAC
 		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app_macos.png").arg(settings->appIcon));
 #else
 		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app.png").arg(settings->appIcon));

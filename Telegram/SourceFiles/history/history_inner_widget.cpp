@@ -112,6 +112,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "data/data_document_media.h"
 
 
 namespace {
@@ -453,6 +454,51 @@ HistoryInner::HistoryInner(
 	) | rpl::start_with_next([=](int d) {
 		_scroll->scrollToY(_scroll->scrollTop() + d);
 	}, _scroll->lifetime());
+
+	_controller->window().widget()->globalForceClicks() |
+		rpl::start_with_next(
+			[=](QPoint globalPosition)
+			{
+				auto mousePos = mapFromGlobal(globalPosition);
+				auto point = _widget->clampMousePosition(mousePos);
+
+				if (!inSelectionMode() && !_emptyPainter && rect().contains(mousePos)) {
+					if (const auto view = Element::Moused()) {
+						mouseActionCancel();
+
+						const auto m = mapPointToItem(point, view);
+						const auto inside = view->pointState(m) != PointState::Outside;
+						const auto media = view->data()->media();
+						if (inside && media) {
+							if (const auto preview = media->document()) {
+								if (!preview->sticker()) {
+									if (const auto mediaView = preview->activeMediaView()) {
+										const auto previewState = Data::VideoPreviewState(mediaView.get());
+										if (!previewState.loaded()) {
+											preview->loadVideoThumbnail(view->data()->fullId());
+											preview->loadThumbnail(view->data()->fullId());
+											return;
+										}
+									}
+								}
+
+								_wasForceClickPreview = _controller->uiShow()->showMediaPreview(
+									preview->sticker() ? preview->stickerSetOrigin() : view->data()->fullId(), preview);
+							} else if (const auto previewPhoto = media->photo()) {
+								_wasForceClickPreview =
+									_controller->uiShow()->showMediaPreview(Data::FileOrigin(), previewPhoto);
+							}
+
+							if (!_wasForceClickPreview) {
+								toggleFavoriteReaction(view);
+							}
+						} else {
+							toggleFavoriteReaction(view);
+						}
+					}
+				}
+			},
+			lifetime());
 
 	setupSharingDisallowed();
 	setupSwipeReplyAndBack();
@@ -2185,6 +2231,11 @@ void HistoryInner::mouseActionFinish(
 }
 
 void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
+	if (_wasForceClickPreview) {
+		_wasForceClickPreview = false;
+		return;
+	}
+
 	mouseActionFinish(e->globalPos(), e->button());
 	if (!rect().contains(e->pos())) {
 		leaveEvent(e);

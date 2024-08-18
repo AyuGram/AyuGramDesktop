@@ -115,6 +115,12 @@ set(ayugram_files
         ayu/utils/telegram_helpers.h
         ayu/utils/windows_utils.cpp
         ayu/utils/windows_utils.h
+        ayu/utils/taptic_engine/taptic_engine.cpp
+        ayu/utils/taptic_engine/taptic_engine.h
+        ayu/utils/taptic_engine/platform/taptic_engine_dummy.cpp
+        ayu/utils/taptic_engine/platform/taptic_engine_dummy.h
+        ayu/utils/taptic_engine/platform/taptic_engine_mac.mm
+        ayu/utils/taptic_engine/platform/taptic_engine_mac.h
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/utils/ayu_profile_values.cpp
