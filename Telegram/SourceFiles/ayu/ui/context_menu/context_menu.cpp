@@ -136,13 +136,10 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto messageDate = base::unixtime::parse(item->date());
 	const auto messageEditDate = base::unixtime::parse(view ? view->displayedEditDate() : TimeId(0));
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "NullDereference"
 	const auto messageForwardedDate =
-		isForwarded
+		isForwarded && forwarded
 			? base::unixtime::parse(forwarded->originalDate)
 			: QDateTime();
-#pragma clang diagnostic pop
 
 	const auto
 		messageViews = item->hasViews() && item->viewsCount() > 0 ? QString::number(item->viewsCount()) : QString();

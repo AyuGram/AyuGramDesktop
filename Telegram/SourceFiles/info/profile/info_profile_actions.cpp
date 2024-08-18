@@ -196,13 +196,14 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 				+ addToLink;
 		}
 		if (!link.isEmpty()) {
-			if (!settings->copyUsernameAsLink && addToLink.isEmpty()) {
+			if (addToLink.isEmpty()) {
 				link = '@' + link.replace("https://t.me/", "");
 			}
 
 			QGuiApplication::clipboard()->setText(link);
+			const auto isLink = link.startsWith(u"https://t.me/"_q);
 			if (const auto window = weak.get()) {
-				window->showToast(settings->copyUsernameAsLink
+				window->showToast(isLink
 									  ? tr::lng_username_copied(tr::now) // "Link copied to clipboard."
 									  : tr::lng_text_copied(tr::now)); // "Text copied to clipboard."
 			}
