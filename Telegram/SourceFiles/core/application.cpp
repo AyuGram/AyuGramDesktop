@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum.h"
 #include "data/data_photo.h"
 #include "data/data_document.h"
+#include "data/data_message_reactions.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"
@@ -48,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "countries/countries_manager.h"
 #include "iv/iv_delegate_impl.h"
 #include "iv/iv_instance.h"
+#include "iv/iv_data.h"
 #include "lang/lang_file_parser.h"
 #include "lang/lang_translator.h"
 #include "lang/lang_cloud_manager.h"
@@ -339,6 +341,9 @@ void Application::run() {
 
 	// Create mime database, so it won't be slow later.
 	QMimeDatabase().mimeTypeForName(u"text/plain"_q);
+
+	// Check now to avoid re-entrance later.
+	[[maybe_unused]] const auto ivSupported = Iv::ShowButton();
 
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_windows.front().second.get());
@@ -745,14 +750,12 @@ void Application::saveSettings() {
 	Local::writeSettings();
 }
 
-bool Application::canReadDefaultDownloadPath(bool always) const {
-	if (KSandbox::isInside()
-		&& (always || settings().downloadPath().isEmpty())) {
-		const auto path = QStandardPaths::writableLocation(
-			QStandardPaths::DownloadLocation);
-		return base::CanReadDirectory(path);
-	}
-	return true;
+bool Application::canReadDefaultDownloadPath() const {
+	return KSandbox::isInside()
+		? base::CanReadDirectory(
+			QStandardPaths::writableLocation(
+				QStandardPaths::DownloadLocation))
+		: true;
 }
 
 bool Application::canSaveFileWithoutAskingForPath() const {
@@ -1744,6 +1747,9 @@ bool Application::readyToQuit() {
 					prevented = true;
 				}
 				if (session->data().stories().isQuitPrevent()) {
+					prevented = true;
+				}
+				if (session->data().reactions().isQuitPrevent()) {
 					prevented = true;
 				}
 			}

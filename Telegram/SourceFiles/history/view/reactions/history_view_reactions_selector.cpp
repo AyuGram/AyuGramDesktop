@@ -1365,7 +1365,7 @@ AttachSelectorResult AttachSelectorToMenu(
 		desiredPosition,
 		st::reactPanelEmojiPan,
 		controller->uiShow(),
-		Data::LookupPossibleReactions(item),
+		Data::LookupPossibleReactions(item, true),
 		std::move(about),
 		std::move(iconFactory));
 	if (!result) {

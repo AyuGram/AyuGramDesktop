@@ -114,6 +114,12 @@ set(ayugram_files
         ayu/utils/telegram_helpers.h
         ayu/utils/windows_utils.cpp
         ayu/utils/windows_utils.h
+        ayu/utils/taptic_engine/taptic_engine.cpp
+        ayu/utils/taptic_engine/taptic_engine.h
+        ayu/utils/taptic_engine/platform/taptic_engine_dummy.cpp
+        ayu/utils/taptic_engine/platform/taptic_engine_dummy.h
+        ayu/utils/taptic_engine/platform/taptic_engine_mac.mm
+        ayu/utils/taptic_engine/platform/taptic_engine_mac.h
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/utils/ayu_profile_values.cpp
@@ -149,8 +155,13 @@ set(ayugram_files
         ayu/libs/sqlite/sqlite3.c
         ayu/libs/sqlite/sqlite3.h
         ayu/libs/sqlite/sqlite_orm.h
-        ayu/features/streamer_mode/streamer_mode_windows.cpp
-        ayu/features/streamer_mode/streamer_mode_linux.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_win.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_win.h
+        ayu/features/streamer_mode/platform/streamer_mode_linux.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_linux.h
+        ayu/features/streamer_mode/platform/streamer_mode_mac.cpp
+        ayu/features/streamer_mode/platform/streamer_mode_mac.h
+        ayu/features/streamer_mode/streamer_mode.cpp
         ayu/features/streamer_mode/streamer_mode.h
         ayu/features/messageshot/message_shot.cpp
         ayu/features/messageshot/message_shot.h
@@ -544,6 +555,8 @@ PRIVATE
     data/business/data_business_info.h
     data/business/data_shortcut_messages.cpp
     data/business/data_shortcut_messages.h
+    data/components/credits.cpp
+    data/components/credits.h
     data/components/factchecks.cpp
     data/components/factchecks.h
     data/components/location_pickers.cpp
@@ -893,6 +906,8 @@ PRIVATE
     history/view/history_view_message.cpp
     history/view/history_view_message.h
     history/view/history_view_object.h
+    history/view/history_view_paid_reaction_toast.cpp
+    history/view/history_view_paid_reaction_toast.h
     history/view/history_view_pinned_bar.cpp
     history/view/history_view_pinned_bar.h
     history/view/history_view_pinned_section.cpp
@@ -1305,6 +1320,8 @@ PRIVATE
     payments/payments_form.h
     payments/payments_non_panel_process.cpp
     payments/payments_non_panel_process.h
+    payments/payments_reaction_process.cpp
+    payments/payments_reaction_process.h
     platform/linux/file_utilities_linux.cpp
     platform/linux/file_utilities_linux.h
     platform/linux/launcher_linux.cpp
@@ -1537,6 +1554,8 @@ PRIVATE
     support/support_preload.h
     support/support_templates.cpp
     support/support_templates.h
+    ui/boxes/edit_invite_link_session.cpp
+    ui/boxes/edit_invite_link_session.h
     ui/chat/attach/attach_item_single_file_preview.cpp
     ui/chat/attach/attach_item_single_file_preview.h
     ui/chat/attach/attach_item_single_media_preview.cpp
@@ -1891,7 +1910,7 @@ endif()
 
 set_target_properties(Telegram PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
-if (WIN32)
+if (WIN32 AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_link_libraries(Telegram
     PRIVATE
         delayimp
@@ -1988,7 +2007,7 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
             base/platform/win/base_windows_safe_library.h
         )
         target_include_directories(Updater PRIVATE ${lib_base_loc})
-        if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
             target_link_libraries(Updater
             PRIVATE
                 delayimp

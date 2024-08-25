@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "base/call_delayed.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/credits.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/notify/data_notify_settings.h"
@@ -103,6 +104,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_top_bar_widget.h"
 #include "history/view/history_view_contact_status.h"
 #include "history/view/history_view_context_menu.h"
+#include "history/view/history_view_paid_reaction_toast.h"
 #include "history/view/history_view_pinned_tracker.h"
 #include "history/view/history_view_pinned_section.h"
 #include "history/view/history_view_pinned_bar.h"
@@ -295,6 +297,13 @@ HistoryWidget::HistoryWidget(
 	})
 , _saveDraftTimer([=] { saveDraft(); })
 , _saveCloudDraftTimer([=] { saveCloudDraft(); })
+, _paidReactionToast(std::make_unique<HistoryView::PaidReactionToast>(
+	this,
+	&session().data(),
+	rpl::single(st::topBarHeight),
+	[=](not_null<const HistoryView::Element*> view) {
+		return _list && _list->itemTop(view) >= 0;
+	}))
 , _topShadow(this) {
 	setAcceptDrops(true);
 
@@ -353,7 +362,20 @@ HistoryWidget::HistoryWidget(
 			sendAction);
 	}
 	_unblock->addClickHandler([=] { unblockUser(); });
-	_botStart->addClickHandler([=] { sendBotStartCommand(); });
+	_botStart->setAcceptBoth(true);
+	_botStart->clicks() | rpl::start_with_next(
+		[=](Qt::MouseButton button)
+		{
+			if (button == Qt::LeftButton) {
+				sendBotStartCommand();
+			} else if (button == Qt::RightButton && isBotStart() && !_peer->asUser()->botInfo->startToken.isEmpty()) {
+				_peer->asUser()->botInfo->startToken = QString();
+				session().changes().peerUpdated(
+					_peer,
+					Data::PeerUpdate::Flag::BotStartToken);
+			}
+		},
+		_botStart->lifetime());
 	_joinChannel->addClickHandler([=] { joinChannel(); });
 	_muteUnmute->addClickHandler([=] { toggleMuteUnmute(); });
 	_discuss->addClickHandler([=] { goToDiscussionGroup(); });
@@ -655,6 +677,30 @@ HistoryWidget::HistoryWidget(
 		item->mainView()->itemDataChanged();
 	}, lifetime());
 
+	rpl::merge(
+		AyuSettings::get_hideFromBlockedReactive() | rpl::to_empty,
+		session().changes().peerUpdates(
+			Data::PeerUpdate::Flag::IsBlocked
+		) | rpl::to_empty
+	) | rpl::start_with_next(
+		[=]
+		{
+			crl::on_main(
+				this,
+				[=]
+				{
+					if (_history) {
+						_history->forceFullResize();
+						if (_migrated) {
+							_migrated->forceFullResize();
+						}
+						updateHistoryGeometry();
+						update();
+					}
+				});
+		},
+		lifetime());
+
 	Core::App().settings().largeEmojiChanges(
 	) | rpl::start_with_next([=] {
 		crl::on_main(this, [=] {
@@ -826,6 +872,14 @@ HistoryWidget::HistoryWidget(
 			updateStickersByEmoji();
 			updateFieldPlaceholder();
 			_preview->checkNow(false);
+
+			const auto was = (_sendAs != nullptr);
+			refreshSendAsToggle();
+			if (was != (_sendAs != nullptr)) {
+				updateControlsVisibility();
+				updateControlsGeometry();
+				orderWidgets();
+			}
 		}
 		if (flags & PeerUpdateFlag::Migration) {
 			handlePeerMigration();
@@ -882,6 +936,11 @@ HistoryWidget::HistoryWidget(
 		}
 		if (flags & PeerUpdateFlag::FullInfo) {
 			fullInfoUpdated();
+			if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
+				if (channel->allowedReactions().paidEnabled) {
+					session().credits().load();
+				}
+			}
 		}
 	}, lifetime());
 
@@ -3000,6 +3059,15 @@ void HistoryWidget::updateControlsVisibility() {
 		} else if (isBotStart()) {
 			toggle(_botStart);
 			_discuss->hide();
+
+			const auto startToken = _peer->asUser()->botInfo->startToken;
+			if (!startToken.isEmpty()) {
+				const auto shortened = startToken.left(20);
+				const auto s = QString("%1 (%2)").arg(tr::lng_bot_start(tr::now).toUpper()).arg(shortened);
+				_botStart->setText(s);
+			} else {
+				_botStart->setText(tr::lng_bot_start(tr::now).toUpper());
+			}
 		}
 		_kbShown = false;
 		_fieldAutocomplete->hide();

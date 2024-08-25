@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_who_reacted.h"
 #include "api/api_views.h"
 #include "layout/layout_selection.h"
+#include "payments/payments_reaction_process.h"
 #include "window/section_widget.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
@@ -2658,7 +2659,7 @@ void ListWidget::toggleFavoriteReaction(not_null<Element*> view) const {
 			view->animateReaction({ .id = favorite });
 		}
 	}
-	item->toggleReaction(favorite, HistoryItem::ReactionSource::Quick);
+	item->toggleReaction(favorite, HistoryReactionSource::Quick);
 }
 
 void ListWidget::trySwitchToWordSelection() {
@@ -2809,15 +2810,20 @@ void ListWidget::reactionChosen(ChosenReaction reaction) {
 	const auto item = session().data().message(reaction.context);
 	if (!item) {
 		return;
+	} else if (reaction.id.paid()) {
+		Payments::ShowPaidReactionDetails(
+			controller(),
+			item,
+			viewForItem(item),
+			HistoryReactionSource::Selector);
+		return;
 	} else if (_delegate->listShowReactPremiumError(item, reaction.id)) {
 		if (_menu) {
 			_menu->hideMenu();
 		}
 		return;
 	}
-	item->toggleReaction(
-		reaction.id,
-		HistoryItem::ReactionSource::Selector);
+	item->toggleReaction(reaction.id, HistoryReactionSource::Selector);
 	if (!ranges::contains(item->chosenReactions(), reaction.id)) {
 		return;
 	} else if (const auto view = viewForItem(item)) {

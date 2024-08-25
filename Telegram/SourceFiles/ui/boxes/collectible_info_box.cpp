@@ -188,11 +188,13 @@ void CollectibleInfoBox(
 			Ui::Text::Link(formatted),
 			Ui::Text::WithEntities);
 	const auto copyCallback = [box, type, formatted, text = info.copyText] {
-		QGuiApplication::clipboard()->setText(
-			text.isEmpty() ? formatted : text);
-		box->uiShow()->showToast((type == CollectibleType::Phone)
-			? tr::lng_text_copied(tr::now)
-			: tr::lng_username_copied(tr::now));
+		auto toCopy = text.isEmpty() ? formatted : text;
+		if (type == CollectibleType::Username) {
+			toCopy = "@" + toCopy.replace("https://t.me/", "");
+		}
+
+		QGuiApplication::clipboard()->setText(toCopy);
+		box->uiShow()->showToast(tr::lng_text_copied(tr::now));
 	};
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(

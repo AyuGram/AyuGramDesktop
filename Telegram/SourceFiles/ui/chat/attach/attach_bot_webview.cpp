@@ -553,12 +553,15 @@ bool Panel::showWebview(
 		}, &st::menuIconRestore);
 		if (_menuButtons & MenuButton::ShareGame) {
 			callback(tr::lng_iv_share(tr::now), [=] {
-				_delegate->botShareGameScore();
+				_delegate->botHandleMenuButton(MenuButton::ShareGame);
 			}, &st::menuIconShare);
 		} else {
 			callback(tr::lng_bot_terms(tr::now), [=] {
 				File::OpenUrl(tr::lng_mini_apps_tos_url(tr::now));
 			}, &st::menuIconGroupLog);
+			callback(tr::lng_profile_bot_privacy(tr::now), [=] {
+				_delegate->botOpenPrivacyPolicy();
+			}, &st::menuIconAntispam);
 		}
 		const auto main = (_menuButtons & MenuButton::RemoveFromMainMenu);
 		if (main || (_menuButtons & MenuButton::RemoveFromMenu)) {
@@ -711,6 +714,8 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 			openPopup(arguments);
 		} else if (command == "web_app_open_scan_qr_popup") {
 			openScanQrPopup(arguments);
+		} else if (command == "web_app_share_to_story") {
+			openShareStory(arguments);
 		} else if (command == "web_app_request_write_access") {
 			requestWriteAccess();
 		} else if (command == "web_app_request_phone") {
@@ -724,7 +729,7 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 		} else if (command == "web_app_set_header_color") {
 			processHeaderColor(arguments);
 		} else if (command == "share_score") {
-			_delegate->botShareGameScore();
+			_delegate->botHandleMenuButton(MenuButton::ShareGame);
 		}
 	});
 
@@ -940,6 +945,19 @@ void Panel::openScanQrPopup(const QJsonObject &args) {
 	[[maybe_unused]] const auto ok = Webview::ShowBlockingPopup({
 		.parent = widget ? widget->window() : nullptr,
 		.text = tr::lng_bot_no_scan_qr(tr::now),
+		.buttons = { {
+			.id = "ok",
+			.text = tr::lng_box_ok(tr::now),
+			.type = Webview::PopupArgs::Button::Type::Ok,
+		}},
+	});
+}
+
+void Panel::openShareStory(const QJsonObject &args) {
+	const auto widget = _webview->window.widget();
+	[[maybe_unused]] const auto ok = Webview::ShowBlockingPopup({
+		.parent = widget ? widget->window() : nullptr,
+		.text = tr::lng_bot_no_share_story(tr::now),
 		.buttons = { {
 			.id = "ok",
 			.text = tr::lng_box_ok(tr::now),

@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/invite_link_label.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/empty_userpic.h"
+#include "ui/layers/generic_box.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
@@ -273,6 +274,7 @@ void InnerWidget::load() {
 
 	Info::Statistics::FillLoading(
 		this,
+		Info::Statistics::LoadingType::Boosts,
 		_loaded.events_starting_with(false) | rpl::map(!rpl::mappers::_1),
 		_showFinished.events());
 

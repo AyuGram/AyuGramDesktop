@@ -7,7 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_chat.h"
 
+#include "base/timer_rpl.h"
 #include "settings/settings_advanced.h"
+#include "settings/settings_privacy_security.h"
 #include "settings/settings_experimental.h"
 #include "boxes/abstract_box.h"
 #include "boxes/peers/edit_peer_color_box.h"
@@ -1028,7 +1030,6 @@ void SetupMessages(
 void SetupArchive(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
-	Ui::AddDivider(container);
 	Ui::AddSkip(container);
 
 	PreloadArchiveSettings(&controller->session());
@@ -1112,7 +1113,7 @@ void SetupDataStorage(
 	auto pathtext = Core::App().settings().downloadPathValue(
 	) | rpl::map([](const QString &text) {
 		if (text.isEmpty()) {
-			return Core::App().canReadDefaultDownloadPath(true)
+			return Core::App().canReadDefaultDownloadPath()
 				? tr::lng_download_path_default(tr::now)
 				: tr::lng_download_path_temp(tr::now);
 		} else if (text == FileDialog::Tmp()) {
@@ -1879,12 +1880,17 @@ void Chat::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 void Chat::setupContent(not_null<Window::SessionController*> controller) {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
+	auto updateOnTick = rpl::single(
+	) | rpl::then(base::timer_each(60 * crl::time(1000)));
+
 	SetupThemeOptions(controller, content);
 	SetupThemeSettings(controller, content);
 	SetupCloudThemes(controller, content);
 	SetupChatBackground(controller, content);
 	SetupStickersEmoji(controller, content);
 	SetupMessages(controller, content);
+	Ui::AddDivider(content);
+	SetupSensitiveContent(controller, content, std::move(updateOnTick));
 	SetupArchive(controller, content);
 
 	Ui::ResizeFitChild(this, content);

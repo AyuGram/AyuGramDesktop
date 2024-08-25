@@ -87,6 +87,7 @@ void InnerWidget::load() {
 
 	Info::Statistics::FillLoading(
 		this,
+		Info::Statistics::LoadingType::Earn,
 		_loaded.events_starting_with(false) | rpl::map(!rpl::mappers::_1),
 		_showFinished.events());
 
@@ -352,16 +353,15 @@ void InnerWidget::fillHistory() {
 		}, inner->lifetime());
 
 		const auto controller = _controller->parentController();
-		const auto entryClicked = [=](const Data::CreditsHistoryEntry &e) {
+		const auto entryClicked = [=](
+				const Data::CreditsHistoryEntry &e,
+				const Data::SubscriptionEntry &s) {
 			controller->uiShow()->show(Box(
 				::Settings::ReceiptCreditsBox,
 				controller,
-				premiumBot.get(),
-				e));
+				e,
+				s));
 		};
-
-		const auto star = lifetime().make_state<QImage>(
-			Ui::GenerateStars(st::creditsTopupButton.height, 1));
 
 		Info::Statistics::AddCreditsHistoryList(
 			controller->uiShow(),
@@ -369,7 +369,6 @@ void InnerWidget::fillHistory() {
 			fullWrap->entity(),
 			entryClicked,
 			peer,
-			star,
 			true,
 			true);
 		Info::Statistics::AddCreditsHistoryList(
@@ -378,7 +377,6 @@ void InnerWidget::fillHistory() {
 			inWrap->entity(),
 			entryClicked,
 			peer,
-			star,
 			true,
 			false);
 		Info::Statistics::AddCreditsHistoryList(
@@ -387,7 +385,6 @@ void InnerWidget::fillHistory() {
 			outWrap->entity(),
 			std::move(entryClicked),
 			peer,
-			star,
 			false,
 			true);
 

@@ -71,8 +71,8 @@ namespace {
 
 using SectionCustomTopBarData = Info::Settings::SectionCustomTopBarData;
 
-[[nodiscard]] Data::SubscriptionOptions SubscriptionOptionsForRows(
-		Data::SubscriptionOptions result) {
+[[nodiscard]] Data::PremiumSubscriptionOptions SubscriptionOptionsForRows(
+		Data::PremiumSubscriptionOptions result) {
 	for (auto &option : result) {
 		const auto total = option.costTotal;
 		const auto perMonth = option.costPerMonth;
@@ -1405,10 +1405,6 @@ void ShowPremiumPromoToast(
 	const auto toast = std::make_shared<WeakToast>();
 	(*toast) = show->showToast({
 		.text = std::move(textWithLink),
-		.st = &st::defaultMultilineToast,
-		.duration = Ui::Toast::kDefaultDuration * 2,
-		.adaptive = true,
-		.multiline = true,
 		.filter = crl::guard(&show->session(), [=](
 				const ClickHandlerPtr &,
 				Qt::MouseButton button) {
@@ -1426,6 +1422,8 @@ void ShowPremiumPromoToast(
 			}
 			return false;
 		}),
+		.adaptive = true,
+		.duration = Ui::Toast::kDefaultDuration * 2,
 	});
 }
 

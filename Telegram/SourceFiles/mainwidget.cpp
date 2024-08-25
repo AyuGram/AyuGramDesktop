@@ -1186,23 +1186,32 @@ Image *MainWidget::newBackgroundThumb() {
 }
 
 void MainWidget::setInnerFocus() {
+	const auto setTo = [&](auto &&widget) {
+		if (widget->isHidden()) {
+			// If we try setting focus inside a hidden widget, we may
+			// end up focusing search field in dialogs on window activation.
+			setFocus();
+		} else {
+			widget->setInnerFocus();
+		}
+	};
 	if (_dialogs && _dialogs->searchHasFocus()) {
-		_dialogs->setInnerFocus();
+		setTo(_dialogs);
 	} else if (_hider || !_history->peer()) {
 		if (!_hider && _mainSection) {
-			_mainSection->setInnerFocus();
+			setTo(_mainSection);
 		} else if (!_hider && _thirdSection) {
-			_thirdSection->setInnerFocus();
+			setTo(_thirdSection);
 		} else if (_dialogs) {
-			_dialogs->setInnerFocus();
+			setTo(_dialogs);
 		} else {
 			// Maybe we're just closing a child window, content is destroyed.
 			_history->setFocus();
 		}
 	} else if (_mainSection) {
-		_mainSection->setInnerFocus();
+		setTo(_mainSection);
 	} else {
-		_history->setInnerFocus();
+		setTo(_history);
 	}
 }
 
@@ -1287,6 +1296,9 @@ void MainWidget::showHistory(
 		const SectionShow &params,
 		MsgId showAtMsgId) {
 	if (peerId && _controller->window().locked()) {
+		if (params.activation != anim::activation::background) {
+			_controller->window().activate();
+		}
 		return;
 	} else if (auto peer = session().data().peerLoaded(peerId)) {
 		if (peer->migrateTo()) {
@@ -1309,6 +1321,9 @@ void MainWidget::showHistory(
 		&& _mainSection
 		&& _mainSection->showMessage(peerId, params, showAtMsgId)) {
 		session().data().hideShownSpoilers();
+		if (params.activation != anim::activation::background) {
+			_controller->window().activate();
+		}
 		return;
 	} else if (showHistoryInDifferentWindow(peerId, params, showAtMsgId)) {
 		return;
@@ -1494,16 +1509,26 @@ void MainWidget::showMessage(
 	if (!v::is_null(params.origin)) {
 		if (_mainSection) {
 			if (_mainSection->showMessage(peerId, params, itemId)) {
+				if (params.activation != anim::activation::background) {
+					_controller->window().activate();
+				}
 				return;
 			}
 		} else if (_history->peer() == item->history()->peer) {
+			// showHistory may be redirected to different window,
+			// so we don't call activate() on current controller's window.
 			showHistory(peerId, params, itemId);
 			return;
 		}
 	}
 	if (const auto topic = item->topic()) {
 		_controller->showTopic(topic, item->id, params);
+		if (params.activation != anim::activation::background) {
+			_controller->window().activate();
+		}
 	} else {
+		// showPeerHistory may be redirected to different window,
+		// so we don't call activate() on current controller's window.
 		_controller->showPeerHistory(
 			item->history(),
 			params,
@@ -1948,9 +1973,9 @@ void MainWidget::showNonPremiumLimitToast(bool download) {
 			? tr::lng_limit_download_title
 			: tr::lng_limit_upload_title)(tr::now),
 		.text = std::move(text),
-		.duration = 5 * crl::time(1000),
-		.slideSide = RectPart::Top,
 		.filter = std::move(filter),
+		.attach = RectPart::Top,
+		.duration = 5 * crl::time(1000),
 	});
 }
 

@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_emoji_interactions.h"
 #include "history/history_item_components.h"
 #include "history/history_item_text.h"
+#include "payments/payments_reaction_process.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/popup_menu.h"
@@ -35,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/reaction_fly_animation.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_isolated_emoji.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/edit_factcheck_box.h"
 #include "ui/boxes/report_box.h"
 #include "ui/layers/generic_box.h"
@@ -97,6 +99,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "data/data_document_media.h"
 
 
 namespace {
@@ -486,12 +489,64 @@ HistoryInner::HistoryInner(
 		_scroll->scrollToY(_scroll->scrollTop() + d);
 	}, _scroll->lifetime());
 
+	_controller->window().widget()->globalForceClicks() |
+		rpl::start_with_next(
+			[=](QPoint globalPosition)
+			{
+				auto mousePos = mapFromGlobal(globalPosition);
+				auto point = _widget->clampMousePosition(mousePos);
+
+				if (!inSelectionMode() && !_emptyPainter && rect().contains(mousePos)) {
+					if (const auto view = Element::Moused()) {
+						mouseActionCancel();
+
+						const auto m = mapPointToItem(point, view);
+						const auto inside = view->pointState(m) != PointState::Outside;
+						const auto media = view->data()->media();
+						if (inside && media) {
+							if (const auto preview = media->document()) {
+								if (!preview->sticker()) {
+									if (const auto mediaView = preview->activeMediaView()) {
+										const auto previewState = Data::VideoPreviewState(mediaView.get());
+										if (!previewState.loaded()) {
+											preview->loadVideoThumbnail(view->data()->fullId());
+											preview->loadThumbnail(view->data()->fullId());
+											return;
+										}
+									}
+								}
+
+								_wasForceClickPreview = _controller->uiShow()->showMediaPreview(
+									preview->sticker() ? preview->stickerSetOrigin() : view->data()->fullId(), preview);
+							} else if (const auto previewPhoto = media->photo()) {
+								_wasForceClickPreview =
+									_controller->uiShow()->showMediaPreview(Data::FileOrigin(), previewPhoto);
+							}
+
+							if (!_wasForceClickPreview) {
+								toggleFavoriteReaction(view);
+							}
+						} else {
+							toggleFavoriteReaction(view);
+						}
+					}
+				}
+			},
+			lifetime());
+
 	setupSharingDisallowed();
 }
 
 void HistoryInner::reactionChosen(const ChosenReaction &reaction) {
 	const auto item = session().data().message(reaction.context);
 	if (!item) {
+		return;
+	} else if (reaction.id.paid()) {
+		Payments::ShowPaidReactionDetails(
+			_controller,
+			item,
+			viewByItem(item),
+			HistoryReactionSource::Selector);
 		return;
 	} else if (Window::ShowReactPremiumError(
 			_controller,
@@ -502,7 +557,7 @@ void HistoryInner::reactionChosen(const ChosenReaction &reaction) {
 		}
 		return;
 	}
-	item->toggleReaction(reaction.id, HistoryItem::ReactionSource::Selector);
+	item->toggleReaction(reaction.id, HistoryReactionSource::Selector);
 	if (!ranges::contains(item->chosenReactions(), reaction.id)) {
 		return;
 	} else if (const auto view = viewByItem(item)) {
@@ -726,8 +781,8 @@ bool HistoryInner::canHaveFromUserpics() const {
 		&& !_peer->isRepliesChat()
 		&& !_isChatWide) {
 		return false;
-	} else if (_peer->isChannel() && !_peer->isMegagroup()) {
-		return false;
+	} else if (const auto channel = _peer->asBroadcast()) {
+		return channel->signatureProfiles();
 	}
 	return true;
 }
@@ -1967,6 +2022,11 @@ void HistoryInner::mouseActionFinish(
 }
 
 void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
+	if (_wasForceClickPreview) {
+		_wasForceClickPreview = false;
+		return;
+	}
+
 	mouseActionFinish(e->globalPos(), e->button());
 	if (!rect().contains(e->pos())) {
 		leaveEvent(e);
@@ -2042,7 +2102,7 @@ void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 			view->animateReaction({ .id = favorite });
 		}
 	}
-	item->toggleReaction(favorite, HistoryItem::ReactionSource::Quick);
+	item->toggleReaction(favorite, HistoryReactionSource::Quick);
 }
 
 HistoryView::SelectedQuote HistoryInner::selectedQuote(

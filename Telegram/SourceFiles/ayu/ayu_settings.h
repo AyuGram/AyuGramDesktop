@@ -210,4 +210,6 @@ rpl::producer<int> get_showPeerIdReactive();
 bool get_ghostModeEnabled();
 rpl::producer<bool> get_ghostModeEnabledReactive();
 
+rpl::producer<bool> get_hideFromBlockedReactive();
+
 }

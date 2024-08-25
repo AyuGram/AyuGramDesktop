@@ -5,41 +5,25 @@
 //
 // Copyright @Radolyn, 2024
 
-#ifdef WIN32
-
-#include "streamer_mode.h"
+#include "ayu/features/streamer_mode/platform/streamer_mode_win.h"
 
 #include "core/application.h"
 #include "window/window_controller.h"
 
-namespace AyuFeatures::StreamerMode {
+namespace AyuFeatures::StreamerMode::Impl {
 
-bool isEnabledVal;
-
-bool isEnabled() {
-	return isEnabledVal;
-}
-
-void enable() {
+void enableHook() {
 	auto handle = Core::App().activeWindow()->widget()->psHwnd();
-	SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
-
 	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
 		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_EXCLUDEFROMCAPTURE);
 	});
-
-	isEnabledVal = true;
 }
 
-void disable() {
+void disableHook() {
 	auto handle = Core::App().activeWindow()->widget()->psHwnd();
-	SetWindowDisplayAffinity(handle, WDA_NONE);
-
 	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
 		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_NONE);
 	});
-
-	isEnabledVal = false;
 }
 
 void hideWidgetWindow(QWidget *widget) {
@@ -53,5 +37,3 @@ void showWidgetWindow(QWidget *widget) {
 }
 
 }
-
-#endif

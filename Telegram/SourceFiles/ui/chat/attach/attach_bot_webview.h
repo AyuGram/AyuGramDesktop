@@ -72,7 +72,7 @@ public:
 	virtual void botAllowWriteAccess(Fn<void(bool allowed)> callback) = 0;
 	virtual void botSharePhone(Fn<void(bool shared)> callback) = 0;
 	virtual void botInvokeCustomMethod(CustomMethodRequest request) = 0;
-	virtual void botShareGameScore() = 0;
+	virtual void botOpenPrivacyPolicy() = 0;
 	virtual void botClose() = 0;
 };
 
@@ -135,6 +135,7 @@ private:
 	void openInvoice(const QJsonObject &args);
 	void openPopup(const QJsonObject &args);
 	void openScanQrPopup(const QJsonObject &args);
+	void openShareStory(const QJsonObject &args);
 	void requestWriteAccess();
 	void replyRequestWriteAccess(bool allowed);
 	void requestPhone();

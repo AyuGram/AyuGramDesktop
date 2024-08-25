@@ -7,8 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_credits_graphics.h"
 
+#include "api/api_chat_invite.h"
 #include "api/api_credits.h"
 #include "api/api_earn.h"
+#include "apiwrap.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
 #include "boxes/gift_premium_box.h"
@@ -17,16 +19,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/click_handler_types.h"
 #include "core/click_handler_types.h" // UrlClickHandler
 #include "core/ui_integration.h"
+#include "data/components/credits.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
+#include "data/data_subscriptions.h"
 #include "data/data_user.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h" // HistoryServicePaymentRefund.
+#include "info/channel_statistics/boosts/giveaway/boost_badge.h" // InfiniteRadialAnimationWidget.
 #include "info/settings/info_settings_widget.h" // SectionCustomTopBarData.
 #include "info/statistics/info_statistics_list_controllers.h"
 #include "lang/lang_keys.h"
@@ -77,6 +82,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Settings {
 namespace {
 
+const auto kTopUpPrefix = "cloud_lng_topup_purpose_";
+
 [[nodiscard]] uint64 UniqueIdFromOption(
 		const Data::CreditTopupOption &d) {
 	const auto string = QString::number(d.credits)
@@ -90,6 +97,15 @@ namespace {
 [[nodiscard]] int WithdrawalMin(not_null<Main::Session*> session) {
 	const auto key = u"stars_revenue_withdrawal_min"_q;
 	return session->appConfig().get<int>(key, 1000);
+}
+
+[[nodiscard]] rpl::producer<TextWithEntities> DeepLinkBalanceAbout(
+		const QString &purpose) {
+	const auto phrase = Lang::GetNonDefaultValue(
+		kTopUpPrefix + purpose.toUtf8());
+	return phrase.isEmpty()
+		? tr::lng_credits_small_balance_fallback(Ui::Text::RichLangValue)
+		: rpl::single(Ui::Text::RichLangValue(phrase));
 }
 
 class Balance final
@@ -228,6 +244,51 @@ void AddViewMediaHandler(
 
 } // namespace
 
+SubscriptionRightLabel PaintSubscriptionRightLabelCallback(
+		not_null<Main::Session*> session,
+		const style::PeerListItem &st,
+		int amount) {
+	const auto text = std::make_shared<Ui::Text::String>();
+	text->setMarkedText(
+		st::semiboldTextStyle,
+		TextWithEntities()
+			.append(session->data().customEmojiManager().creditsEmoji())
+			.append(QChar::Space)
+			.append(Lang::FormatCountDecimal(amount)),
+		kMarkupTextOptions,
+		Core::MarkedTextContext{
+			.session = session,
+			.customEmojiRepaint = [] {},
+		});
+	const auto &font = text->style()->font;
+	const auto &statusFont = st::contactsStatusFont;
+	const auto status = tr::lng_group_invite_joined_right(tr::now);
+	const auto rightSkip = st::boxRowPadding.right();
+	const auto statusWidth = statusFont->width(status);
+	const auto size = QSize(
+		std::max(text->maxWidth(), statusWidth) + rightSkip,
+		font->height + statusFont->height);
+	const auto statusX = size.width() - statusWidth;
+	auto draw = [=](QPainter &p, int x, int y, int h) {
+		p.setPen(st.statusFg);
+		p.setFont(statusFont);
+		const auto skip = y + (h - size.height()) / 2;
+		p.drawText(
+			x + statusX,
+			font->height + statusFont->ascent + skip,
+			status);
+
+		p.setPen(st.nameFg);
+		const auto textWidth = text->maxWidth();
+		text->draw(p, Ui::Text::PaintContext{
+			.position = QPoint(x + size.width() - textWidth, skip),
+			.outerWidth = textWidth,
+			.availableWidth = textWidth,
+		});
+	};
+	return { std::move(draw), size };
+}
+
 void FillCreditOptions(
 		std::shared_ptr<Main::SessionShow> show,
 		not_null<Ui::VerticalLayout*> container,
@@ -256,7 +317,7 @@ void FillCreditOptions(
 		const auto &st = st::creditsTopupButton;
 		const auto diffBetweenTextAndStar = st.padding.left()
 			- st.iconLeft
-			- singleStarWidth;
+			- int(singleStarWidth * 1.5);
 		const auto buttonHeight = st.height + rect::m::sum::v(st.padding);
 		const auto minCredits = (!options.empty()
 				&& (minimumCredits > options.back().credits))
@@ -283,26 +344,25 @@ void FillCreditOptions(
 				st::creditsTopupPrice);
 			const auto inner = Ui::CreateChild<Ui::RpWidget>(button);
 			const auto stars = Ui::GenerateStars(st.height, (i + 1));
+			const auto textLeft = diffBetweenTextAndStar
+				+ stars.width() / style::DevicePixelRatio();
 			inner->paintRequest(
 			) | rpl::start_with_next([=](const QRect &rect) {
 				auto p = QPainter(inner);
 				p.drawImage(0, 0, stars);
-				const auto textLeft = diffBetweenTextAndStar
-					+ stars.width() / style::DevicePixelRatio();
 				p.setPen(st.textFg);
 				text->draw(p, {
 					.position = QPoint(textLeft, 0),
 					.availableWidth = inner->width() - textLeft,
+					.elisionLines = 1,
 				});
 			}, inner->lifetime());
-			button->sizeValue(
-			) | rpl::start_with_next([=](const QSize &size) {
+			button->widthValue(
+			) | rpl::start_with_next([=](int width) {
 				price->moveToRight(st.padding.right(), st.padding.top());
 				inner->moveToLeft(st.iconLeft, st.padding.top());
 				inner->resize(
-					size.width()
-						- rect::m::sum::h(st.padding)
-						- price->width(),
+					width - price->width() - st.padding.left(),
 					buttonHeight);
 			}, button->lifetime());
 			button->setClickedCallback([=] {
@@ -417,16 +477,20 @@ not_null<Ui::RpWidget*> AddBalanceWidget(
 		});
 		count->draw(p, {
 			.position = QPoint(
-				balance->width() - count->maxWidth(),
+				(rightAlign
+					? (balance->width() - count->maxWidth())
+					: (starSize.width() + diffBetweenStarAndCount)),
 				label->minHeight()
 					+ (starSize.height() - count->minHeight()) / 2),
 			.availableWidth = balance->width(),
 		});
 		p.drawImage(
-			balance->width()
-				- count->maxWidth()
-				- starSize.width()
-				- diffBetweenStarAndCount,
+			(rightAlign
+				? (balance->width()
+					- count->maxWidth()
+					- starSize.width()
+					- diffBetweenStarAndCount)
+				: 0),
 			label->minHeight(),
 			*balanceStar);
 	}, balance->lifetime());
@@ -436,12 +500,10 @@ not_null<Ui::RpWidget*> AddBalanceWidget(
 void ReceiptCreditsBox(
 		not_null<Ui::GenericBox*> box,
 		not_null<Window::SessionController*> controller,
-		PeerData *premiumBot,
-		const Data::CreditsHistoryEntry &e) {
+		const Data::CreditsHistoryEntry &e,
+		const Data::SubscriptionEntry &s) {
 	box->setStyle(st::giveawayGiftCodeBox);
 	box->setNoContentMargin(true);
-
-	const auto star = Ui::GenerateStars(st::creditsTopupButton.height, 1);
 
 	const auto content = box->verticalLayout();
 	Ui::AddSkip(content);
@@ -452,7 +514,9 @@ void ReceiptCreditsBox(
 
 	const auto &stUser = st::boostReplaceUserpic;
 	const auto session = &controller->session();
-	const auto peer = (e.peerType == Type::PremiumBot)
+	const auto peer = (s.barePeerId)
+		? session->data().peer(PeerId(s.barePeerId)).get()
+		: (e.peerType == Type::PremiumBot)
 		? nullptr
 		: e.barePeerId
 		? session->data().peer(PeerId(e.barePeerId)).get()
@@ -545,12 +609,15 @@ void ReceiptCreditsBox(
 		box,
 		object_ptr<Ui::FlatLabel>(
 			box,
-			rpl::single(
-				!e.title.isEmpty()
+			rpl::single(!s.until.isNull()
+				? tr::lng_credits_box_subscription_title(tr::now)
+				: !e.subscriptionUntil.isNull()
+				? tr::lng_credits_box_history_entry_subscription(tr::now)
+				: !e.title.isEmpty()
 				? e.title
 				: e.gift
 				? tr::lng_credits_box_history_entry_gift_name(tr::now)
-				: peer
+				: (peer && !e.reaction)
 				? peer->name()
 				: Ui::GenerateEntryName(e).text),
 			st::creditsBoxAboutTitle)));
@@ -560,10 +627,7 @@ void ReceiptCreditsBox(
 	{
 		constexpr auto kMinus = QChar(0x2212);
 		auto &lifetime = content->lifetime();
-		const auto text = lifetime.make_state<Ui::Text::String>(
-			st::semiboldTextStyle,
-			(e.in ? u"+"_q : e.gift ? QString() : QString(kMinus))
-				+ Lang::FormatCountDecimal(std::abs(int64(e.credits))));
+		const auto text = lifetime.make_state<Ui::Text::String>();
 		const auto roundedText = e.refunded
 			? tr::lng_channel_earn_history_return(tr::now)
 			: e.pending
@@ -580,25 +644,50 @@ void ReceiptCreditsBox(
 		const auto amount = content->add(
 			object_ptr<Ui::FixedHeightWidget>(
 				content,
-				star.height() / style::DevicePixelRatio()));
+				st::defaultTextStyle.font->height));
+		const auto context = Core::MarkedTextContext{
+			.session = session,
+			.customEmojiRepaint = [=] { amount->update(); },
+		};
+		if (s) {
+			text->setMarkedText(
+				st::defaultTextStyle,
+				tr::lng_credits_subscription_subtitle(
+					tr::now,
+					lt_emoji,
+					session->data().customEmojiManager().creditsEmoji(),
+					lt_cost,
+					{ QString::number(s.subscription.credits) },
+					Ui::Text::WithEntities),
+				kMarkupTextOptions,
+				context);
+		} else {
+			auto t = TextWithEntities()
+				.append(e.in ? u"+"_q : e.gift ? QString() : QString(kMinus))
+				.append(Lang::FormatCountDecimal(std::abs(int64(e.credits))))
+				.append(QChar(' '))
+				.append(session->data().customEmojiManager().creditsEmoji());
+			text->setMarkedText(
+				st::semiboldTextStyle,
+				std::move(t),
+				kMarkupTextOptions,
+				context);
+		}
 		const auto font = text->style()->font;
 		const auto roundedFont = st::defaultTextStyle.font;
-		const auto starWidth = star.width()
-			/ style::DevicePixelRatio();
 		const auto roundedSkip = roundedFont->spacew * 2;
 		const auto roundedWidth = rounded
 			? roundedFont->width(roundedText)
 				+ roundedSkip
 				+ roundedFont->height
 			: 0;
-		const auto fullWidth = text->maxWidth()
-			+ font->spacew * 1
-			+ starWidth
-			+ roundedWidth;
+		const auto fullWidth = text->maxWidth() + roundedWidth;
 		amount->paintRequest(
 		) | rpl::start_with_next([=] {
 			auto p = Painter(amount);
-			p.setPen(e.pending
+			p.setPen(s
+				? st::windowSubTextFg
+				: e.pending
 				? st::creditsStroke
 				: e.in
 				? st::boxTextFgGood
@@ -613,10 +702,6 @@ void ReceiptCreditsBox(
 				.outerWidth = amount->width(),
 				.availableWidth = amount->width(),
 			});
-			p.drawImage(
-				x + fullWidth - starWidth - roundedWidth,
-				0,
-				star);
 
 			if (rounded) {
 				const auto roundedLeft = fullWidth
@@ -698,6 +783,7 @@ void ReceiptCreditsBox(
 	Ui::AddSkip(content);
 
 	AddCreditsHistoryEntryTable(controller, content, e);
+	AddSubscriptionEntryTable(controller, content, s);
 
 	Ui::AddSkip(content);
 
@@ -709,10 +795,23 @@ void ReceiptCreditsBox(
 				lt_link,
 				tr::lng_payments_terms_link(
 				) | Ui::Text::ToLink(
-					tr::lng_credits_box_out_about_link(tr::now)
-				),
+					tr::lng_credits_box_out_about_link(tr::now)),
 				Ui::Text::WithEntities),
 			st::creditsBoxAboutDivider)));
+
+	if (s) {
+		Ui::AddSkip(content);
+		box->addRow(object_ptr<Ui::CenterWrap<>>(
+			box,
+			object_ptr<Ui::FlatLabel>(
+				box,
+				s.cancelled
+					? tr::lng_credits_subscription_off_about()
+					: tr::lng_credits_subscription_on_about(
+						lt_date,
+						rpl::single(langDayOfMonthFull(s.until.date()))),
+				st::creditsBoxAboutDivider)));
+	}
 
 	Ui::AddSkip(content);
 
@@ -743,9 +842,67 @@ void ReceiptCreditsBox(
 		}, widget->lifetime());
 	}
 
-	const auto button = box->addButton(tr::lng_box_ok(), [=] {
-		box->closeBox();
+	const auto toRenew = (s.cancelled || s.expired)
+		&& !s.inviteHash.isEmpty();
+	const auto toCancel = !toRenew && s;
+	struct State final {
+		rpl::variable<bool> confirmButtonBusy;
+	};
+	const auto state = box->lifetime().make_state<State>();
+	auto confirmText = rpl::conditional(
+		state->confirmButtonBusy.value(),
+		rpl::single(QString()),
+		toRenew
+			? tr::lng_credits_subscription_off_button()
+			: toCancel
+			? tr::lng_credits_subscription_on_button()
+			: tr::lng_box_ok());
+	using Flag = MTPpayments_ChangeStarsSubscription::Flag;
+	const auto send = [=, weak = Ui::MakeWeak(box)] {
+		if (toRenew && s.expired) {
+			Api::CheckChatInvite(controller, s.inviteHash, nullptr, [=] {
+				if (const auto strong = weak.data()) {
+					strong->closeBox();
+				}
+			});
+		} else {
+			session->api().request(
+				MTPpayments_ChangeStarsSubscription(
+					MTP_flags(Flag::f_canceled),
+					MTP_inputPeerSelf(),
+					MTP_string(s.id),
+					MTP_bool(toCancel)
+			)).done([=] {
+				state->confirmButtonBusy = false;
+				if (const auto strong = weak.data()) {
+					strong->closeBox();
+				}
+			}).fail([=, show = box->uiShow()](const MTP::Error &error) {
+				state->confirmButtonBusy = false;
+				show->showToast(error.type());
+			}).send();
+		}
+	};
+
+	const auto button = box->addButton(std::move(confirmText), [=] {
+		if (state->confirmButtonBusy.current()) {
+			return;
+		}
+		state->confirmButtonBusy = true;
+		if ((toRenew || toCancel) && peer) {
+			send();
+		} else {
+			box->closeBox();
+		}
 	});
+	{
+		using namespace Info::Statistics;
+		const auto loadingAnimation = InfiniteRadialAnimationWidget(
+			button,
+			button->height() / 2);
+		AddChildToWidgetCenter(button, loadingAnimation);
+		loadingAnimation->showOn(state->confirmButtonBusy.value());
+	}
 	const auto buttonWidth = st::boxWidth
 		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
 	button->widthValue() | rpl::filter([=] {
@@ -766,7 +923,7 @@ void GiftedCreditsBox(
 	const auto anonymous = from->isServiceUser();
 	const auto peer = received ? from : to;
 	using PeerType = Data::CreditsHistoryEntry::PeerType;
-	Settings::ReceiptCreditsBox(box, controller, nullptr, {
+	Settings::ReceiptCreditsBox(box, controller, {
 		.id = QString(),
 		.title = (received
 			? tr::lng_credits_box_history_entry_gift_name
@@ -778,7 +935,7 @@ void GiftedCreditsBox(
 		.peerType = (anonymous ? PeerType::Fragment : PeerType::Peer),
 		.in = received,
 		.gift = true,
-	});
+	}, {});
 }
 
 void ShowRefundInfoBox(
@@ -804,8 +961,8 @@ void ShowRefundInfoBox(
 	controller->show(Box(
 		::Settings::ReceiptCreditsBox,
 		controller,
-		nullptr, // premiumBot
-		info));
+		info,
+		Data::SubscriptionEntry{}));
 }
 
 object_ptr<Ui::RpWidget> GenericEntryPhoto(
@@ -860,9 +1017,11 @@ object_ptr<Ui::RpWidget> PaidMediaThumbnail(
 void SmallBalanceBox(
 		not_null<Ui::GenericBox*> box,
 		std::shared_ptr<Main::SessionShow> show,
-		int creditsNeeded,
-		UserId botId,
+		uint64 credits,
+		SmallBalanceSource source,
 		Fn<void()> paid) {
+	Expects(show->session().credits().loaded());
+
 	box->setWidth(st::boxWideWidth);
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	const auto done = [=] {
@@ -870,8 +1029,21 @@ void SmallBalanceBox(
 		paid();
 	};
 
-	const auto bot = show->session().data().user(botId).get();
+	const auto owner = &show->session().data();
+	const auto name = v::match(source, [&](SmallBalanceBot value) {
+		return owner->peer(peerFromUser(value.botId))->name();
+	}, [&](SmallBalanceReaction value) {
+		return owner->peer(peerFromChannel(value.channelId))->name();
+	}, [](SmallBalanceSubscription value) {
+		return value.name;
+	}, [](SmallBalanceDeepLink value) {
+		return QString();
+	});
 
+	auto needed = show->session().credits().balanceValue(
+	) | rpl::map([=](uint64 balance) {
+		return (balance < credits) ? (credits - balance) : 0;
+	});
 	const auto content = [&]() -> Ui::Premium::TopBarAbstract* {
 		return box->setPinnedToTopContent(object_ptr<Ui::Premium::TopBar>(
 			box,
@@ -879,11 +1051,26 @@ void SmallBalanceBox(
 			Ui::Premium::TopBarDescriptor{
 				.title = tr::lng_credits_small_balance_title(
 					lt_count,
-					rpl::single(creditsNeeded) | tr::to_count()),
-				.about = tr::lng_credits_small_balance_about(
-					lt_bot,
-					rpl::single(TextWithEntities{ bot->name() }),
-					Ui::Text::RichLangValue),
+					rpl::duplicate(
+						needed
+					) | rpl::filter(rpl::mappers::_1 > 0) | tr::to_count()),
+				.about = (v::is<SmallBalanceSubscription>(source)
+					? tr::lng_credits_small_balance_subscribe(
+						lt_channel,
+						rpl::single(Ui::Text::Bold(name)),
+						Ui::Text::RichLangValue)
+					: v::is<SmallBalanceReaction>(source)
+					? tr::lng_credits_small_balance_reaction(
+						lt_channel,
+						rpl::single(Ui::Text::Bold(name)),
+						Ui::Text::RichLangValue)
+					: v::is<SmallBalanceDeepLink>(source)
+					? DeepLinkBalanceAbout(
+						v::get<SmallBalanceDeepLink>(source).purpose)
+					: tr::lng_credits_small_balance_about(
+						lt_bot,
+						rpl::single(TextWithEntities{ name }),
+						Ui::Text::RichLangValue)),
 				.light = true,
 				.gradientStops = Ui::Premium::CreditsIconGradientStops(),
 			}));
@@ -893,8 +1080,8 @@ void SmallBalanceBox(
 		show,
 		box->verticalLayout(),
 		show->session().user(),
-		creditsNeeded,
-		done);
+		credits - show->session().credits().balance(),
+		[=] { show->session().credits().load(true); });
 
 	content->setMaximumHeight(st::creditsLowBalancePremiumCoverHeight);
 	content->setMinimumHeight(st::infoLayerTopBarHeight);
@@ -913,13 +1100,10 @@ void SmallBalanceBox(
 	{
 		const auto balance = AddBalanceWidget(
 			content,
-			show->session().creditsValue(),
+			show->session().credits().balanceValue(),
 			true);
-		const auto api = balance->lifetime().make_state<Api::CreditsStatus>(
-			show->session().user());
-		api->request({}, [=](Data::CreditsStatusSlice slice) {
-			show->session().setCredits(slice.balance);
-		});
+		show->session().credits().load(true);
+
 		rpl::combine(
 			balance->sizeValue(),
 			content->sizeValue()
@@ -930,6 +1114,12 @@ void SmallBalanceBox(
 			balance->update();
 		}, balance->lifetime());
 	}
+
+	std::move(
+		needed
+	) | rpl::filter(
+		!rpl::mappers::_1
+	) | rpl::start_with_next(done, content->lifetime());
 }
 
 void AddWithdrawalWidget(
@@ -1228,6 +1418,60 @@ void AddWithdrawalWidget(
 		RectPart::Top | RectPart::Bottom));
 
 	Ui::AddSkip(container);
+}
+
+void MaybeRequestBalanceIncrease(
+		std::shared_ptr<Main::SessionShow> show,
+		uint64 credits,
+		SmallBalanceSource source,
+		Fn<void(SmallBalanceResult)> done) {
+	struct State {
+		rpl::lifetime lifetime;
+		bool success = false;
+	};
+	const auto state = std::make_shared<State>();
+
+	const auto session = &show->session();
+	session->credits().load();
+	session->credits().loadedValue(
+	) | rpl::filter(rpl::mappers::_1) | rpl::start_with_next([=] {
+		state->lifetime.destroy();
+
+		const auto balance = session->credits().balance();
+		if (credits <= balance) {
+			if (const auto onstack = done) {
+				onstack(SmallBalanceResult::Already);
+			}
+		} else if (show->session().premiumPossible()) {
+			const auto success = [=] {
+				state->success = true;
+				if (const auto onstack = done) {
+					onstack(SmallBalanceResult::Success);
+				}
+			};
+			const auto box = show->show(Box(
+				Settings::SmallBalanceBox,
+				show,
+				credits,
+				source,
+				success));
+			box->boxClosing() | rpl::start_with_next([=] {
+				crl::on_main([=] {
+					if (!state->success) {
+						if (const auto onstack = done) {
+							onstack(SmallBalanceResult::Cancelled);
+						}
+					}
+				});
+			}, box->lifetime());
+		} else {
+			show->showToast(
+				tr::lng_credits_purchase_blocked(tr::now));
+			if (const auto onstack = done) {
+				onstack(SmallBalanceResult::Blocked);
+			}
+		}
+	}, state->lifetime);
 }
 
 } // namespace Settings

@@ -21,6 +21,9 @@
 #endif
 
 const QVector<QString> icons{
+#ifdef Q_OS_MAC
+	AyuAssets::DEFAULT_MACOS_ICON,
+#endif
 	AyuAssets::DEFAULT_ICON,
 	AyuAssets::ALT_ICON,
 	AyuAssets::DISCORD_ICON,

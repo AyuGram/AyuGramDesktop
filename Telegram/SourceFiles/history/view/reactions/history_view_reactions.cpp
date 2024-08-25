@@ -59,6 +59,7 @@ struct InlineList::Button {
 	int textWidth = 0;
 	int count = 0;
 	bool chosen = false;
+	bool paid = false;
 	bool tag = false;
 };
 
@@ -144,7 +145,11 @@ void InlineList::layoutButtons() {
 				not_null<const MessageReaction*> b) {
 			const auto acount = a->count - (a->my ? 1 : 0);
 			const auto bcount = b->count - (b->my ? 1 : 0);
-			if (acount > bcount) {
+			if (b->id.paid()) {
+				return false;
+			} else if (a->id.paid()) {
+				return true;
+			} else if (acount > bcount) {
 				return true;
 			} else if (acount < bcount) {
 				return false;
@@ -180,7 +185,7 @@ void InlineList::layoutButtons() {
 }
 
 InlineList::Button InlineList::prepareButtonWithId(const ReactionId &id) {
-	auto result = Button{ .id = id };
+	auto result = Button{ .id = id, .paid = id.paid()};
 	if (const auto customId = id.custom()) {
 		result.custom = _owner->owner().customEmojiManager().create(
 			customId,
@@ -421,14 +426,18 @@ void InlineList::paint(
 				} else if (!bubbleReady) {
 					opacity = bubbleProgress;
 				}
-				color = stm->msgFileBg->c;
+				color = button.paid
+					? st->creditsBg3()->c
+					: stm->msgFileBg->c;
 			} else {
 				if (!bubbleReady) {
 					opacity = bubbleProgress;
 				}
-				color = (chosen
-					? st->msgServiceFg()
-					: st->msgServiceBg())->c;
+				color = (!chosen
+					? st->msgServiceBg()
+					: button.paid
+					? st->creditsBg2()
+					: st->msgServiceFg())->c;
 			}
 
 			const auto fill = geometry.marginsAdded({
@@ -451,7 +460,7 @@ void InlineList::paint(
 				? QPen(AdaptChosenServiceFg(st->msgServiceBg()->c))
 				: st->msgServiceFg())
 			: !chosen
-			? stm->msgServiceFg
+			? (button.paid ? st->creditsFg() : stm->msgServiceFg)
 			: context.outbg
 			? (context.selected()
 				? st->historyFileOutIconFgSelected()
@@ -791,7 +800,7 @@ InlineListData InlineListDataFromMessage(not_null<Message*> message) {
 	using Flag = InlineListData::Flag;
 	const auto item = message->data();
 	auto result = InlineListData();
-	result.reactions = item->reactions();
+	result.reactions = item->reactionsWithLocal();
 	if (const auto user = item->history()->peer->asUser()) {
 		// Always show userpics, we have all information.
 		result.recent.reserve(result.reactions.size());

@@ -31,6 +31,7 @@ struct BotInfo {
 
 	QString botMenuButtonText;
 	QString botMenuButtonUrl;
+	QString privacyPolicyUrl;
 
 	QString startToken;
 	Dialogs::EntryState inlineReturnTo;
@@ -184,9 +185,6 @@ public:
 	void setBirthday(Data::Birthday value);
 	void setBirthday(const tl::conditional<MTPBirthday> &value);
 
-	void setUnavailableReasons(
-		std::vector<Data::UnavailableReason> &&reasons);
-
 	int commonChatsCount() const;
 	void setCommonChatsCount(int count);
 
@@ -216,6 +214,9 @@ public:
 private:
 	auto unavailableReasons() const
 		-> const std::vector<Data::UnavailableReason> & override;
+
+	void setUnavailableReasonsList(
+		std::vector<Data::UnavailableReason> &&reasons) override;
 
 	Flags _flags;
 	Data::LastseenStatus _lastseen;

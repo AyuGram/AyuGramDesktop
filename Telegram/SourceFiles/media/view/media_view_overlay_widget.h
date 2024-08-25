@@ -20,6 +20,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/view/media_view_open_common.h"
 #include "media/stories/media_stories_delegate.h"
 
+class QGraphicsOpacityEffect;
+
 class History;
 
 namespace anim {
@@ -46,6 +48,10 @@ class Window;
 struct ChosenRenderer;
 enum class Backend;
 } // namespace Ui::GL
+
+namespace Ui::Menu {
+struct MenuCallback;
+} // namespace Ui::Menu
 
 namespace Platform {
 class OverlayWidgetHelper;
@@ -145,6 +151,7 @@ private:
 		Right,
 		LeftStories,
 		RightStories,
+		SponsoredButton,
 		Header,
 		Name,
 		Date,
@@ -364,11 +371,7 @@ private:
 	void updateControlsGeometry();
 	void updateNavigationControlsGeometry();
 
-	using MenuCallback = Fn<void(
-		const QString &,
-		Fn<void()>,
-		const style::icon *)>;
-	void fillContextMenuActions(const MenuCallback &addAction);
+	void fillContextMenuActions(const Ui::Menu::MenuCallback &addAction);
 
 	void resizeCenteredControls();
 	void resizeContentByScreenSize();
@@ -410,6 +413,10 @@ private:
 	void initThemePreview();
 	void destroyThemePreview();
 	void updateThemePreviewGeometry();
+
+	void initSponsoredButton();
+	void refreshSponsoredButtonGeometry();
+	void refreshSponsoredButtonWidth();
 
 	void documentUpdated(not_null<DocumentData*> document);
 	void changingMsgId(FullMsgId newId, MsgId oldId);
@@ -692,6 +699,9 @@ private:
 	base::unique_qptr<Ui::PopupMenu> _menu;
 	object_ptr<Ui::DropdownMenu> _dropdown;
 	base::Timer _dropdownShowTimer;
+
+	base::unique_qptr<Ui::RoundButton> _sponsoredButton;
+	base::unique_qptr<QGraphicsOpacityEffect> _sponsoredButtonOpacity;
 
 	bool _receiveMouse = true;
 	bool _processingKeyPress = false;

@@ -89,19 +89,28 @@ struct UnavailableReason {
 	QString reason;
 	QString text;
 
-	bool operator==(const UnavailableReason &other) const {
-		return (reason == other.reason) && (text == other.text);
-	}
-	bool operator!=(const UnavailableReason &other) const {
-		return !(*this == other);
-	}
+	friend inline bool operator==(
+		const UnavailableReason &,
+		const UnavailableReason &) = default;
+
+	[[nodiscard]] bool sensitive() const;
+	[[nodiscard]] static UnavailableReason Sensitive();
+
+	[[nodiscard]] static QString Compute(
+		not_null<Main::Session*> session,
+		const std::vector<UnavailableReason> &list);
+	[[nodiscard]] static bool IgnoreSensitiveMark(
+		not_null<Main::Session*> session);
+
+	[[nodiscard]] static std::vector<UnavailableReason> Extract(
+		const MTPvector<MTPRestrictionReason> *list);
 };
 
 bool ApplyBotMenuButton(
 	not_null<BotInfo*> info,
 	const MTPBotMenuButton *button);
 
-enum class AllowedReactionsType {
+enum class AllowedReactionsType : uchar {
 	All,
 	Default,
 	Some,
@@ -109,14 +118,19 @@ enum class AllowedReactionsType {
 
 struct AllowedReactions {
 	std::vector<ReactionId> some;
-	AllowedReactionsType type = AllowedReactionsType::Some;
 	int maxCount = 0;
+	AllowedReactionsType type = AllowedReactionsType::Some;
+	bool paidEnabled = false;
+
+	friend inline bool operator==(
+		const AllowedReactions &,
+		const AllowedReactions &) = default;
 };
 
-bool operator<(const AllowedReactions &a, const AllowedReactions &b);
-bool operator==(const AllowedReactions &a, const AllowedReactions &b);
-
-[[nodiscard]] AllowedReactions Parse(const MTPChatReactions &value);
+[[nodiscard]] AllowedReactions Parse(
+	const MTPChatReactions &value,
+	int maxCount,
+	bool paidEnabled);
 [[nodiscard]] PeerData *PeerFromInputMTP(
 	not_null<Session*> owner,
 	const MTPInputPeer &input);
@@ -335,6 +349,9 @@ public:
 	// If this string is not empty we must not allow to open the
 	// conversation and we must show this string instead.
 	[[nodiscard]] QString computeUnavailableReason() const;
+	[[nodiscard]] bool hasSensitiveContent() const;
+	void setUnavailableReasons(
+		std::vector<Data::UnavailableReason> &&reason);
 
 	[[nodiscard]] ClickHandlerPtr createOpenLink();
 	[[nodiscard]] const ClickHandlerPtr &openLink() {
@@ -476,6 +493,10 @@ private:
 		const ImageLocation &location,
 		bool hasVideo);
 
+	virtual void setUnavailableReasonsList(
+		std::vector<Data::UnavailableReason> &&reasons);
+	void setHasSensitiveContent(bool has);
+
 	const not_null<Data::Session*> _owner;
 
 	mutable Data::CloudImage _userpic;
@@ -494,7 +515,8 @@ private:
 	crl::time _lastFullUpdate = 0;
 
 	QString _name;
-	uint32 _nameVersion : 31 = 1;
+	uint32 _nameVersion : 30 = 1;
+	uint32 _sensitiveContent : 1 = 0;
 	uint32 _wallPaperOverriden : 1 = 0;
 
 	TimeId _ttlPeriod = 0;

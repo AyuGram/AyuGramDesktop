@@ -37,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "mainwidget.h"
 #include "main/main_session.h"
+#include "payments/payments_reaction_process.h" // TryAddingPaidReaction.
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
@@ -412,6 +413,7 @@ Message::Message(
 	Element *replacing)
 : Element(delegate, data, replacing, Flag(0))
 , _hideReply(delegate->elementHideReply(this))
+, _postShowingAuthor(data->isPostShowingAuthor() ? 1 : 0)
 , _bottomInfo(
 		&data->history()->owner().reactions(),
 		BottomInfoDataFromMessage(this)) {
@@ -835,11 +837,7 @@ QSize Message::performCountOptimalSize() {
 
 	const auto markup = item->inlineReplyMarkup();
 	const auto reactionsKey = [&] {
-		return embedReactionsInBottomInfo()
-			? 0
-			: embedReactionsInBubble()
-			? 1
-			: 2;
+		return embedReactionsInBubble() ? 0 : 1;
 	};
 	const auto oldKey = reactionsKey();
 	validateText();
@@ -860,7 +858,7 @@ QSize Message::performCountOptimalSize() {
 		refreshReactions();
 	}
 	refreshRightBadge();
-	refreshInfoSkipBlock();
+	refreshInfoSkipBlock(textItem);
 
 	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
@@ -920,12 +918,13 @@ QSize Message::performCountOptimalSize() {
 			accumulate_max(
 				maxWidth,
 				std::min(st::msgMaxWidth, reactionsMaxWidth));
-			if (!mediaDisplayed || _viewButton) {
-				minHeight += st::mediaInBubbleSkip;
-			} else if (!media->additionalInfoString().isEmpty()) {
+			if (mediaDisplayed
+				&& !media->additionalInfoString().isEmpty()) {
 				// In round videos in a web page status text is painted
 				// in the bottom left corner, reactions should be below.
 				minHeight += st::msgDateFont->height;
+			} else {
+				minHeight += st::mediaInBubbleSkip;
 			}
 			if (maxWidth >= reactionsMaxWidth) {
 				minHeight += _reactions->minHeight();
@@ -2319,10 +2318,11 @@ bool Message::hasFromPhoto() const {
 	case Context::SavedSublist:
 	case Context::ScheduledTopic: {
 		const auto item = data();
-		if (item->isPost()) {
+		if (item->isPostHidingAuthor()) {
 			return false;
-		}
-		if (item->isEmpty()
+		} else if (item->isPost()) {
+			return true;
+		} else if (item->isEmpty()
 			|| (context() == Context::Replies && item->isDiscussionPost())) {
 			return false;
 		} else if (delegate()->elementIsChatWide()) {
@@ -3293,92 +3293,63 @@ bool Message::isSignedAuthorElided() const {
 	return _bottomInfo.isSignedAuthorElided();
 }
 
-bool Message::embedReactionsInBottomInfo() const {
-	return false;
-#if 0 // legacy
-	const auto item = data();
-	const auto user = item->history()->peer->asUser();
-	if (!user
-		|| user->isPremium()
-		|| user->isSelf()
-		|| user->session().premium()) {
-		// Only in messages of a non premium user with a non premium user.
-		// In saved messages we use reactions for tags, we don't embed them.
-		return false;
-	}
-	auto seenMy = false;
-	auto seenHis = false;
-	for (const auto &reaction : item->reactions()) {
-		if (reaction.id.custom()) {
-			// Only in messages without any custom emoji reactions.
-			return false;
-		}
-		// Only in messages without two reactions from the same person.
-		if (reaction.my) {
-			if (seenMy) {
-				return false;
-			}
-			seenMy = true;
-		}
-		if (!reaction.my || (reaction.count > 1)) {
-			if (seenHis) {
-				return false;
-			}
-			seenHis = true;
-		}
-	}
-	return true;
-#endif
-}
-
 bool Message::embedReactionsInBubble() const {
 	return needInfoDisplay();
 }
 
 void Message::refreshReactions() {
-	const auto item = data();
-	const auto &list = item->reactions();
-	if (list.empty() || embedReactionsInBottomInfo()) {
+	using namespace Reactions;
+	auto reactionsData = InlineListDataFromMessage(this);
+	if (reactionsData.reactions.empty()) {
 		setReactions(nullptr);
 		return;
 	}
-	using namespace Reactions;
-	auto reactionsData = InlineListDataFromMessage(this);
 	if (!_reactions) {
 		const auto handlerFactory = [=](ReactionId id) {
 			const auto weak = base::make_weak(this);
 			return std::make_shared<LambdaClickHandler>([=](
 					ClickContext context) {
-				if (const auto strong = weak.get()) {
-					const auto item = strong->data();
-					if (item->reactionsAreTags()) {
-						if (item->history()->session().premium()) {
-							const auto tag = Data::SearchTagToQuery(id);
-							HashtagClickHandler(tag).onClick(context);
-						} else if (const auto controller
-							= ExtractController(context)) {
-							ShowPremiumPreviewBox(
-								controller,
-								PremiumFeature::TagsForMessages);
-						}
-						return;
+				const auto strong = weak.get();
+				if (!strong) {
+					return;
+				}
+				const auto item = strong->data();
+				const auto controller = ExtractController(context);
+				if (item->reactionsAreTags()) {
+					if (item->history()->session().premium()) {
+						const auto tag = Data::SearchTagToQuery(id);
+						HashtagClickHandler(tag).onClick(context);
+					} else if (controller) {
+						ShowPremiumPreviewBox(
+							controller,
+							PremiumFeature::TagsForMessages);
 					}
-					item->toggleReaction(
-						id,
-						HistoryItem::ReactionSource::Existing);
-					if (const auto now = weak.get()) {
-						const auto chosen = now->data()->chosenReactions();
-						if (ranges::contains(chosen, id)) {
-							now->animateReaction({
-								.id = id,
-							});
-						}
+					return;
+				}
+				if (id.paid()) {
+					Payments::TryAddingPaidReaction(
+						item,
+						weak.get(),
+						1,
+						Payments::LookupMyPaidAnonymous(item),
+						controller->uiShow());
+					return;
+				} else {
+					const auto source = HistoryReactionSource::Existing;
+					item->toggleReaction(id, source);
+				}
+				if (const auto now = weak.get()) {
+					const auto chosen = now->data()->chosenReactions();
+					if (id.paid() || ranges::contains(chosen, id)) {
+						now->animateReaction({
+							.id = id,
+						});
 					}
 				}
 			});
 		};
 		setReactions(std::make_unique<InlineList>(
-			&item->history()->owner().reactions(),
+			&history()->owner().reactions(),
 			handlerFactory,
 			[=] { customEmojiRepaint(); },
 			std::move(reactionsData)));
@@ -4308,13 +4279,28 @@ int Message::resizeContentGetHeight(int newWidth) {
 		return height();
 	}
 
+	const auto item = data();
+	const auto postShowingAuthor = item->isPostShowingAuthor() ? 1 : 0;
+	if (_postShowingAuthor != postShowingAuthor) {
+		_postShowingAuthor = postShowingAuthor;
+		_fromNameVersion = -1;
+		previousInBlocksChanged();
+
+		const auto size = _bottomInfo.currentSize();
+		_bottomInfo.update(BottomInfoDataFromMessage(this), newWidth);
+		if (size != _bottomInfo.currentSize()) {
+			// maxWidth may have changed, full recount required.
+			setPendingResize();
+			return resizeGetHeight(newWidth);
+		}
+	}
+
 	auto newHeight = minHeight();
 
 	if (const auto service = Get<ServicePreMessage>()) {
 		service->resizeToWidth(newWidth, delegate()->elementIsChatWide());
 	}
 
-	const auto item = data();
 	const auto botTop = item->isFakeAboutView()
 		? Get<FakeBotAboutTop>()
 		: nullptr;
@@ -4418,12 +4404,13 @@ int Message::resizeContentGetHeight(int newWidth) {
 				newHeight += entry->resizeGetHeight(contentWidth);
 			}
 			if (reactionsInBubble) {
-				if (!mediaDisplayed || _viewButton) {
-					newHeight += st::mediaInBubbleSkip;
-				} else if (!media->additionalInfoString().isEmpty()) {
+				if (mediaDisplayed
+					&& !media->additionalInfoString().isEmpty()) {
 					// In round videos in a web page status text is painted
 					// in the bottom left corner, reactions should be below.
 					newHeight += st::msgDateFont->height;
+				} else {
+					newHeight += st::mediaInBubbleSkip;
 				}
 				newHeight += _reactions->height();
 			}
@@ -4547,17 +4534,16 @@ QSize Message::performCountCurrentSize(int newWidth) {
 	return { newWidth, newHeight };
 }
 
-void Message::refreshInfoSkipBlock() {
-	const auto item = data();
+void Message::refreshInfoSkipBlock(HistoryItem *textItem) {
 	const auto media = this->media();
 	const auto hasTextSkipBlock = [&] {
-		if (item->_text.empty()) {
+		if (!textItem || textItem->_text.empty()) {
 			if (const auto media = data()->media()) {
 				return media->storyExpired();
 			}
 			return false;
-		} else if (item->Has<HistoryMessageLogEntryOriginal>()
-			|| factcheckBlock()) {
+		} else if (factcheckBlock()
+			|| data()->Has<HistoryMessageLogEntryOriginal>()) {
 			return false;
 		} else if (media && media->isDisplayed() && !_invertMedia) {
 			return false;

@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/boxes/calendar_box.h"
 #include "platform/platform_specific.h"
+#include "core/application.h"
 #include "core/file_utilities.h"
 #include "base/unixtime.h"
 #include "main/main_session.h"
@@ -294,7 +295,9 @@ void SettingsWidget::addLocationLabel(
 	}) | rpl::distinct_until_changed(
 	) | rpl::map([=](const QString &path) {
 		const auto text = IsDefaultPath(_session, path)
+			? Core::App().canReadDefaultDownloadPath()
 			? u"Downloads/"_q + File::DefaultDownloadPathFolder(_session)
+			: tr::lng_download_path_temp(tr::now)
 			: path;
 		return Ui::Text::Link(
 			QDir::toNativeSeparators(text),
@@ -341,7 +344,9 @@ void SettingsWidget::addFormatAndLocationLabel(
 	}) | rpl::distinct_until_changed(
 	) | rpl::map([=](const QString &path) {
 		const auto text = IsDefaultPath(_session, path)
+			? Core::App().canReadDefaultDownloadPath()
 			? u"Downloads/"_q + File::DefaultDownloadPathFolder(_session)
+			: tr::lng_download_path_temp(tr::now)
 			: path;
 		return Ui::Text::Link(
 			QDir::toNativeSeparators(text),

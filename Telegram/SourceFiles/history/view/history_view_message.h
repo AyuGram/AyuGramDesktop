@@ -77,7 +77,6 @@ public:
 	[[nodiscard]] const HistoryMessageEdited *displayedEditBadge() const;
 	[[nodiscard]] HistoryMessageEdited *displayedEditBadge();
 
-	[[nodiscard]] bool embedReactionsInBottomInfo() const;
 	[[nodiscard]] bool embedReactionsInBubble() const;
 
 	int marginTop() const override;
@@ -286,7 +285,7 @@ private:
 
 	void ensureRightAction() const;
 	void refreshTopicButton();
-	void refreshInfoSkipBlock();
+	void refreshInfoSkipBlock(HistoryItem *textItem);
 	[[nodiscard]] int monospaceMaxWidth() const;
 
 	void validateInlineKeyboard(HistoryMessageReplyMarkup *markup);
@@ -316,10 +315,11 @@ private:
 	mutable std::unique_ptr<FromNameStatus> _fromNameStatus;
 	Ui::Text::String _rightBadge;
 	mutable int _fromNameVersion = 0;
-	uint32 _bubbleWidthLimit : 29 = 0;
+	uint32 _bubbleWidthLimit : 28 = 0;
 	uint32 _invertMedia : 1 = 0;
 	uint32 _hideReply : 1 = 0;
 	uint32 _rightBadgeHasBoosts : 1 = 0;
+	uint32 _postShowingAuthor : 1 = 0;
 	uint32 _rightBadgeIsChannel : 1 = 0;
 
 	BottomInfo _bottomInfo;

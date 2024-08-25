@@ -69,6 +69,7 @@ class SavedMessages;
 class Chatbots;
 class BusinessInfo;
 struct ReactionId;
+struct UnavailableReason;
 
 struct RepliesReadTillUpdate {
 	FullMsgId id;
@@ -288,8 +289,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemResizeRequest() const;
 	void requestViewResize(not_null<ViewElement*> view);
 	[[nodiscard]] rpl::producer<not_null<ViewElement*>> viewResizeRequest() const;
-	void requestItemViewRefresh(not_null<HistoryItem*> item);
-	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> itemViewRefreshRequest() const;
+	void requestItemViewRefresh(not_null<const HistoryItem*> item);
+	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemViewRefreshRequest() const;
 	void requestItemTextRefresh(not_null<HistoryItem*> item);
 	void requestUnreadReactionsAnimation(not_null<HistoryItem*> item);
 	void notifyHistoryUnloaded(not_null<const History*> history);
@@ -306,10 +307,19 @@ public:
 	[[nodiscard]] rpl::producer<not_null<const History*>> historyCleared() const;
 	void notifyHistoryChangeDelayed(not_null<History*> history);
 	[[nodiscard]] rpl::producer<not_null<History*>> historyChanged() const;
+	void notifyViewPaidReactionSent(not_null<const ViewElement*> view);
+	[[nodiscard]] rpl::producer<not_null<const ViewElement*>> viewPaidReactionSent() const;
 	void sendHistoryChangeNotifications();
 
 	void notifyPinnedDialogsOrderUpdated();
 	[[nodiscard]] rpl::producer<> pinnedDialogsOrderUpdated() const;
+
+	void registerRestricted(
+		not_null<const HistoryItem*> item,
+		const QString &reason);
+	void registerRestricted(
+		not_null<const HistoryItem*> item,
+		const std::vector<UnavailableReason> &reasons);
 
 	void registerHighlightProcess(
 		uint64 processId,
@@ -918,11 +928,12 @@ private:
 	rpl::event_stream<not_null<const ViewElement*>> _viewRepaintRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemResizeRequest;
 	rpl::event_stream<not_null<ViewElement*>> _viewResizeRequest;
-	rpl::event_stream<not_null<HistoryItem*>> _itemViewRefreshRequest;
+	rpl::event_stream<not_null<const HistoryItem*>> _itemViewRefreshRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemTextRefreshRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemDataChanges;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRemoved;
+	rpl::event_stream<not_null<const ViewElement*>> _viewPaidReactionSent;
 	rpl::event_stream<not_null<const History*>> _historyUnloaded;
 	rpl::event_stream<not_null<const History*>> _historyCleared;
 	base::flat_set<not_null<History*>> _historiesChanged;
@@ -1017,6 +1028,10 @@ private:
 
 	base::flat_multi_map<TimeId, not_null<PollData*>> _pollsClosings;
 	base::Timer _pollsClosingTimer;
+
+	base::flat_map<
+		not_null<const HistoryItem*>,
+		base::flat_set<QString>> _possiblyRestricted;
 
 	base::flat_map<FolderId, std::unique_ptr<Folder>> _folders;
 

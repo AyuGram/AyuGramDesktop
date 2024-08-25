@@ -287,6 +287,7 @@ void InnerWidget::load() {
 
 	Info::Statistics::FillLoading(
 		this,
+		Info::Statistics::LoadingType::Earn,
 		_loaded.events_starting_with(false) | rpl::map(!rpl::mappers::_1),
 		_showFinished.events());
 
@@ -385,7 +386,13 @@ void InnerWidget::load() {
 
 void InnerWidget::fill() {
 	const auto container = this;
-	const auto &data = _state.currencyEarn;
+	const auto channel = _peer->asChannel();
+	const auto canViewCurrencyEarn = channel
+		? (channel->flags() & ChannelDataFlag::CanViewRevenue)
+		: true;
+	const auto &data = canViewCurrencyEarn
+		? _state.currencyEarn
+		: Data::EarnStatistics();
 	const auto &creditsData = _state.creditsEarn;
 
 	auto currencyStateValue = rpl::single(
@@ -416,7 +423,6 @@ void InnerWidget::fill() {
 	const auto nonInteractive = base::unixtime::now() < kNonInteractivePeriod;
 
 	const auto session = &_peer->session();
-	const auto channel = _peer->asChannel();
 	const auto withdrawalEnabled = WithdrawalEnabled(session)
 		&& !nonInteractive;
 	const auto makeContext = [=](not_null<Ui::FlatLabel*> l) {
@@ -1401,18 +1407,15 @@ void InnerWidget::fill() {
 		if (hasCreditsTab) {
 			const auto controller = _controller->parentController();
 			const auto show = controller->uiShow();
-			const auto premiumBot = _peer->owner().peer(data.premiumBotId);
 			const auto entryClicked = [=](
-					const Data::CreditsHistoryEntry &e) {
+					const Data::CreditsHistoryEntry &e,
+					const Data::SubscriptionEntry &s) {
 				show->show(Box(
 					::Settings::ReceiptCreditsBox,
 					controller,
-					premiumBot.get(),
-					e));
+					e,
+					s));
 			};
-
-			const auto star = tabCreditsList->lifetime().make_state<QImage>(
-				Ui::GenerateStars(st::creditsTopupButton.height, 1));
 
 			Info::Statistics::AddCreditsHistoryList(
 				show,
@@ -1420,7 +1423,6 @@ void InnerWidget::fill() {
 				tabCreditsList->entity(),
 				entryClicked,
 				_peer,
-				star,
 				true,
 				true);
 		}
@@ -1489,10 +1491,15 @@ void InnerWidget::fill() {
 					[] {});
 			}
 			if (!isLocked) {
-				Api::RestrictSponsored(channel, value, [=](const QString &e) {
-					toggled->fire(false);
-					_controller->uiShow()->showToast(e);
-				});
+				const auto weak = Ui::MakeWeak(this);
+				const auto show = _controller->uiShow();
+				const auto failed = [=](const QString &e) {
+					if (weak.data()) {
+						toggled->fire(false);
+						show->showToast(e);
+					}
+				};
+				Api::RestrictSponsored(channel, value, failed);
 			}
 		}, button->lifetime());
 

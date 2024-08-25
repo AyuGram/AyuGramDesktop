@@ -41,6 +41,8 @@ rpl::variable<QString> editedMarkReactive;
 
 rpl::variable<int> showPeerIdReactive;
 
+rpl::variable<bool> hideFromBlockedReactive;
+
 rpl::lifetime lifetime = rpl::lifetime();
 
 bool ghostModeEnabled_util(const AyuGramSettings &settingsUtil) {
@@ -135,6 +137,8 @@ void postinitialize() {
 	editedMarkReactive = settings->editedMark;
 	showPeerIdReactive = settings->showPeerId;
 
+	hideFromBlockedReactive = settings->hideFromBlocked;
+
 	ghostModeEnabled = ghostModeEnabled_util(settings.value());
 }
 
@@ -222,7 +226,13 @@ AyuGramSettings::AyuGramSettings() {
 	localPremium = false;
 
 	// ~ Customization
-	appIcon = AyuAssets::DEFAULT_ICON;
+	appIcon =
+#ifdef Q_OS_MAC
+		AyuAssets::DEFAULT_MACOS_ICON
+#else
+		AyuAssets::DEFAULT_ICON
+#endif
+	;
 	simpleQuotesAndReplies = true;
 	deletedMark = "🧹";
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
@@ -331,6 +341,7 @@ void AyuGramSettings::set_saveMessagesHistory(bool val) {
 
 void AyuGramSettings::set_hideFromBlocked(bool val) {
 	hideFromBlocked = val;
+	hideFromBlockedReactive = val;
 }
 
 void AyuGramSettings::set_disableAds(bool val) {
@@ -502,6 +513,10 @@ rpl::producer<int> get_showPeerIdReactive() {
 
 rpl::producer<bool> get_ghostModeEnabledReactive() {
 	return ghostModeEnabled.value();
+}
+
+rpl::producer<bool> get_hideFromBlockedReactive() {
+	return hideFromBlockedReactive.value();
 }
 
 }

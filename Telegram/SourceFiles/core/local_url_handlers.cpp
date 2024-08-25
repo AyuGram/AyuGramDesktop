@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "passport/passport_form_controller.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "data/components/credits.h"
 #include "data/data_birthday.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
@@ -46,6 +47,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_peer_menu.h"
 #include "window/themes/window_theme_editor_box.h" // GenerateSlug.
 #include "payments/payments_checkout_process.h"
+#include "settings/settings_credits.h"
+#include "settings/settings_credits_graphics.h"
 #include "settings/settings_information.h"
 #include "settings/settings_global_ttl.h"
 #include "settings/settings_folders.h"
@@ -1174,6 +1177,52 @@ bool ResolveBoost(
 	return true;
 }
 
+bool ResolveTopUp(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto amount = std::clamp(
+		params.value(u"balance"_q).toULongLong(),
+		qulonglong(1),
+		qulonglong(1'000'000));
+	const auto purpose = params.value(u"purpose"_q);
+	const auto weak = base::make_weak(controller);
+	const auto done = [=](::Settings::SmallBalanceResult result) {
+		if (result == ::Settings::SmallBalanceResult::Already) {
+			if (const auto strong = weak.get()) {
+				const auto filter = [=](const auto &...) {
+					strong->showSettings(::Settings::CreditsId());
+					return false;
+				};
+				strong->showToast(Ui::Toast::Config{
+					.text = tr::lng_credits_enough(
+						tr::now,
+						lt_link,
+						Ui::Text::Link(
+							Ui::Text::Bold(
+								tr::lng_credits_enough_link(tr::now))),
+						Ui::Text::RichLangValue),
+					.filter = filter,
+					.duration = 4 * crl::time(1000),
+				});
+			}
+		}
+	};
+	::Settings::MaybeRequestBalanceIncrease(
+		controller->uiShow(),
+		amount,
+		::Settings::SmallBalanceDeepLink{ .purpose = purpose },
+		done);
+	return true;
+}
+
+
 bool ResolveChatLink(
 		Window::SessionController *controller,
 		const Match &match,
@@ -1279,6 +1328,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		{
 			u"^message/?\\?slug=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
 			ResolveChatLink
+		},
+		{
+			u"^stars_topup/?\\?(.+)(#|$)"_q,
+			ResolveTopUp
 		},
 		{
 			u"^user\\?(.+)(#|$)"_q,

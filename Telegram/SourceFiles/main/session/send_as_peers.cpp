@@ -29,25 +29,32 @@ SendAsPeers::SendAsPeers(not_null<Session*> session)
 	) | rpl::map([=](const Data::PeerUpdate &update) {
 		const auto peer = update.peer;
 		const auto channel = peer->asChannel();
-		return std::tuple(
-			peer,
-			peer->amAnonymous(),
-			channel ? channel->isPublic() : false);
+		const auto bits = 0
+			| (peer->amAnonymous() ? (1 << 0) : 0)
+			| ((channel && channel->isPublic()) ? (1 << 1) : 0)
+			| ((channel && channel->addsSignature()) ? (1 << 2) : 0)
+			| ((channel && channel->signatureProfiles()) ? (1 << 3) : 0);
+		return std::tuple(peer, bits);
 	}) | rpl::distinct_until_changed(
-	) | rpl::filter([=](not_null<PeerData*> peer, bool, bool) {
-		return _lists.contains(peer);
-	}) | rpl::start_with_next([=](not_null<PeerData*> peer, bool, bool) {
+	) | rpl::filter([=](not_null<PeerData*> peer, int) {
+		return _lists.contains(peer) || _lastRequestTime.contains(peer);
+	}) | rpl::start_with_next([=](not_null<PeerData*> peer, int) {
 		refresh(peer, true);
 	}, _lifetime);
 }
 
 bool SendAsPeers::shouldChoose(not_null<PeerData*> peer) {
 	refresh(peer);
-	return Data::CanSendAnything(peer, false) && (list(peer).size() > 1);
+	const auto channel = peer->asBroadcast();
+	return Data::CanSendAnything(peer, false)
+		&& (list(peer).size() > 1)
+		&& (!channel
+			|| channel->addsSignature()
+			|| channel->signatureProfiles());
 }
 
 void SendAsPeers::refresh(not_null<PeerData*> peer, bool force) {
-	if (!peer->isMegagroup()) {
+	if (!peer->isChannel()) {
 		return;
 	}
 	const auto now = crl::now();
@@ -110,6 +117,12 @@ not_null<PeerData*> SendAsPeers::ResolveChosen(
 		not_null<PeerData*> peer,
 		const std::vector<SendAsPeer> &list,
 		PeerId chosen) {
+	const auto fallback = peer->amAnonymous()
+		? peer
+		: peer->session().user();
+	if (!chosen) {
+		chosen = fallback->id;
+	}
 	const auto i = ranges::find(list, chosen, [](const SendAsPeer &as) {
 		return as.peer->id;
 	});
@@ -117,9 +130,7 @@ not_null<PeerData*> SendAsPeers::ResolveChosen(
 		? i->peer
 		: !list.empty()
 		? list.front().peer
-		: (peer->isMegagroup() && peer->amAnonymous())
-		? peer
-		: peer->session().user();
+		: fallback;
 }
 
 void SendAsPeers::request(not_null<PeerData*> peer) {

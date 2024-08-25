@@ -59,12 +59,19 @@ struct PossibleItemReactions {
 };
 
 [[nodiscard]] PossibleItemReactionsRef LookupPossibleReactions(
-	not_null<HistoryItem*> item);
+	not_null<HistoryItem*> item,
+	bool paidInFront = false);
 
 struct MyTagInfo {
 	ReactionId id;
 	QString title;
 	int count = 0;
+};
+
+struct PaidReactionSend {
+	int count = 0;
+	bool valid = false;
+	bool anonymous = false;
 };
 
 class Reactions final : private CustomEmojiManager::Listener {
@@ -106,6 +113,7 @@ public:
 	void renameTag(const ReactionId &id, const QString &name);
 	[[nodiscard]] DocumentData *chooseGenericAnimation(
 		not_null<DocumentData*> custom) const;
+	[[nodiscard]] DocumentData *choosePaidReactionAnimation() const;
 
 	[[nodiscard]] rpl::producer<> topUpdates() const;
 	[[nodiscard]] rpl::producer<> recentUpdates() const;
@@ -137,9 +145,18 @@ public:
 
 	void clearTemporary();
 	[[nodiscard]] Reaction *lookupTemporary(const ReactionId &id);
+	[[nodiscard]] not_null<Reaction*> lookupPaid();
+	[[nodiscard]] not_null<DocumentData*> paidToastAnimation();
 
 	[[nodiscard]] rpl::producer<std::vector<Reaction>> myTagsValue(
 		SavedSublist *sublist = nullptr);
+
+	[[nodiscard]] bool isQuitPrevent();
+	void schedulePaid(not_null<HistoryItem*> item);
+	void undoScheduledPaid(not_null<HistoryItem*> item);
+	[[nodiscard]] crl::time sendingScheduledPaidAt(
+		not_null<HistoryItem*> item) const;
+	[[nodiscard]] static crl::time ScheduledPaidDelay();
 
 	[[nodiscard]] static bool HasUnread(const MTPMessageReactions &data);
 	static void CheckUnknownForUnread(
@@ -231,8 +248,26 @@ private:
 	void resolveEffectImages();
 	void downloadTaskFinished();
 
+	void fillPaidReactionAnimations() const;
+	[[nodiscard]] DocumentData *randomLoadedFrom(
+		std::vector<not_null<DocumentData*>> list) const;
+
 	void repaintCollected();
 	void pollCollected();
+
+	void sendPaid();
+	bool sendPaid(not_null<HistoryItem*> item);
+	void sendPaidRequest(
+		not_null<HistoryItem*> item,
+		PaidReactionSend send);
+	void sendPaidPrivacyRequest(
+		not_null<HistoryItem*> item,
+		PaidReactionSend send);
+	void sendPaidFinish(
+		not_null<HistoryItem*> item,
+		PaidReactionSend send,
+		bool success);
+	void checkQuitPreventFinished();
 
 	const not_null<Session*> _owner;
 
@@ -252,6 +287,7 @@ private:
 	std::vector<ReactionId> _topIds;
 	base::flat_set<ReactionId> _unresolvedTop;
 	std::vector<not_null<DocumentData*>> _genericAnimations;
+	mutable std::vector<not_null<DocumentData*>> _paidReactionAnimations;
 	std::vector<Reaction> _effects;
 	ReactionId _favoriteId;
 	ReactionId _unresolvedFavoriteId;
@@ -262,6 +298,9 @@ private:
 	base::flat_map<
 		not_null<DocumentData*>,
 		std::shared_ptr<DocumentMedia>> _genericCache;
+	mutable base::flat_map<
+		not_null<DocumentData*>,
+		std::shared_ptr<DocumentMedia>> _paidReactionCache;
 	rpl::event_stream<> _topUpdated;
 	rpl::event_stream<> _recentUpdated;
 	rpl::event_stream<> _defaultUpdated;
@@ -275,6 +314,8 @@ private:
 	// So we use std::map instead of base::flat_map here.
 	// Otherwise we could use flat_map<DocumentId, unique_ptr<Reaction>>.
 	std::map<DocumentId, Reaction> _temporary;
+	std::optional<Reaction> _paid;
+	DocumentData *_paidToastAnimation = nullptr;
 
 	base::Timer _topRefreshTimer;
 	mtpRequestId _topRequestId = 0;
@@ -308,6 +349,10 @@ private:
 	base::flat_set<not_null<HistoryItem*>> _pollingItems;
 	mtpRequestId _pollRequestId = 0;
 
+	base::flat_map<not_null<HistoryItem*>, crl::time> _sendPaidItems;
+	base::flat_map<not_null<HistoryItem*>, mtpRequestId> _sendingPaid;
+	base::Timer _sendPaidTimer;
+
 	mtpRequestId _saveFaveRequestId = 0;
 
 	rpl::lifetime _lifetime;
@@ -320,42 +365,77 @@ struct RecentReaction {
 	bool big = false;
 	bool my = false;
 
-	friend inline auto operator<=>(
-		const RecentReaction &a,
-		const RecentReaction &b) = default;
 	friend inline bool operator==(
 		const RecentReaction &a,
 		const RecentReaction &b) = default;
 };
 
+struct MessageReactionsTopPaid {
+	PeerData *peer = nullptr;
+	uint32 count : 30 = 0;
+	uint32 top : 1 = 0;
+	uint32 my : 1 = 0;
+
+	friend inline bool operator==(
+		const MessageReactionsTopPaid &a,
+		const MessageReactionsTopPaid &b) = default;
+};
+
 class MessageReactions final {
 public:
 	explicit MessageReactions(not_null<HistoryItem*> item);
+	~MessageReactions();
+
+	using TopPaid = MessageReactionsTopPaid;
 
 	void add(const ReactionId &id, bool addToRecent);
 	void remove(const ReactionId &id);
 	bool change(
 		const QVector<MTPReactionCount> &list,
 		const QVector<MTPMessagePeerReaction> &recent,
-		bool ignoreChosen);
+		const QVector<MTPMessageReactor> &top,
+		bool min);
 	[[nodiscard]] bool checkIfChanged(
 		const QVector<MTPReactionCount> &list,
 		const QVector<MTPMessagePeerReaction> &recent,
-		bool ignoreChosen) const;
+		bool min) const;
 	[[nodiscard]] const std::vector<MessageReaction> &list() const;
 	[[nodiscard]] auto recent() const
 		-> const base::flat_map<ReactionId, std::vector<RecentReaction>> &;
+	[[nodiscard]] const std::vector<TopPaid> &topPaid() const;
 	[[nodiscard]] std::vector<ReactionId> chosen() const;
 	[[nodiscard]] bool empty() const;
 
 	[[nodiscard]] bool hasUnread() const;
 	void markRead();
 
+	void scheduleSendPaid(int count, bool anonymous);
+	[[nodiscard]] int scheduledPaid() const;
+	void cancelScheduledPaid();
+
+	[[nodiscard]] PaidReactionSend startPaidSending();
+	void finishPaidSending(PaidReactionSend send, bool success);
+
+	[[nodiscard]] bool localPaidData() const;
+	[[nodiscard]] int localPaidCount() const;
+	[[nodiscard]] bool localPaidAnonymous() const;
+	bool clearCloudData();
+
 private:
+	struct Paid {
+		std::vector<TopPaid> top;
+		uint32 scheduled: 30 = 0;
+		uint32 scheduledFlag : 1 = 0;
+		uint32 scheduledAnonymous : 1 = 0;
+		uint32 sending : 30 = 0;
+		uint32 sendingFlag : 1 = 0;
+		uint32 sendingAnonymous : 1 = 0;
+	};
 	const not_null<HistoryItem*> _item;
 
 	std::vector<MessageReaction> _list;
 	base::flat_map<ReactionId, std::vector<RecentReaction>> _recent;
+	std::unique_ptr<Paid> _paid;
 
 };
 

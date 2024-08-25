@@ -282,6 +282,9 @@ void SetupOnlyCustomEmojiField(
 		const auto offset = size();
 		if (unifiedId) {
 			result.text.append('@');
+		} else if (id.paid()) {
+			result.text.append(QChar(0x2B50));
+			unifiedId = reactions->lookupPaid()->selectAnimation->id;
 		} else {
 			result.text.append(id.emoji());
 			const auto i = ranges::find(all, id, &Data::Reaction::id);
@@ -312,6 +315,7 @@ struct ReactionsSelectorArgs {
 	rpl::producer<QString> title;
 	std::vector<Data::Reaction> list;
 	std::vector<Data::ReactionId> selected;
+	rpl::producer<bool> paid;
 	Fn<void(std::vector<Data::ReactionId>, bool)> callback;
 	rpl::producer<ReactionsSelectorState> stateValue;
 	int customAllowed = 0;
@@ -341,13 +345,18 @@ object_ptr<Ui::RpWidget> AddReactionsSelector(
 		std::unique_ptr<UnifiedFactoryOwner> unifiedFactoryOwner;
 		UnifiedFactoryOwner::RecentFactory factory;
 		base::flat_set<DocumentId> allowed;
+		std::vector<Data::ReactionId> reactions;
 		rpl::lifetime focusLifetime;
 	};
+	const auto paid = reactions->lookupPaid();
+	auto normal = reactions->list(Data::Reactions::Type::Active);
+	normal.push_back(*paid);
 	const auto state = raw->lifetime().make_state<State>();
 	state->unifiedFactoryOwner = std::make_unique<UnifiedFactoryOwner>(
 		session,
-		reactions->list(Data::Reactions::Type::Active));
+		normal);
 	state->factory = state->unifiedFactoryOwner->factory();
+	state->reactions = std::move(args.selected);
 
 	const auto customEmojiPaused = [controller = args.controller] {
 		return controller->isGifPausedAtLeastFor(PauseReason::Layer);
@@ -396,9 +405,32 @@ object_ptr<Ui::RpWidget> AddReactionsSelector(
 			state->allowed = std::move(allowed);
 			raw->rawTextEdit()->update();
 		}
+		state->reactions = reactions;
 		callback(std::move(reactions), hardLimitHit);
 	}, isCustom, args.customHardLimit);
-	raw->setTextWithTags(ComposeEmojiList(reactions, args.selected));
+	const auto applyFromState = [=] {
+		raw->setTextWithTags(ComposeEmojiList(reactions, state->reactions));
+	};
+
+	applyFromState();
+	std::move(
+		args.paid
+	) | rpl::start_with_next([=](bool paid) {
+		const auto id = Data::ReactionId::Paid();
+		if (paid && !ranges::contains(state->reactions, id)) {
+			state->reactions.insert(begin(state->reactions), id);
+			applyFromState();
+		} else if (!paid && ranges::contains(state->reactions, id)) {
+			state->reactions.erase(
+				ranges::remove(state->reactions, id),
+				end(state->reactions));
+			applyFromState();
+		}
+	}, raw->lifetime());
+
+	const auto toggle = Ui::CreateChild<Ui::IconButton>(
+		parent.get(),
+		st::manageGroupReactions);
 
 	using SelectorState = ReactionsSelectorState;
 	std::move(
@@ -444,10 +476,6 @@ object_ptr<Ui::RpWidget> AddReactionsSelector(
 		}
 	}, raw->lifetime());
 
-	const auto toggle = Ui::CreateChild<Ui::IconButton>(
-		parent.get(),
-		st::manageGroupReactions);
-
 	const auto panel = Ui::CreateChild<TabbedPanel>(
 		args.outer.get(),
 		args.controller,
@@ -458,8 +486,11 @@ object_ptr<Ui::RpWidget> AddReactionsSelector(
 			(args.all
 				? TabbedSelector::Mode::FullReactions
 				: TabbedSelector::Mode::RecentReactions)));
-	panel->selector()->provideRecentEmoji(
-		state->unifiedFactoryOwner->unifiedIdsList());
+	auto panelList = state->unifiedFactoryOwner->unifiedIdsList();
+	panelList.erase(
+		ranges::remove(panelList, paid->selectAnimation->id),
+		end(panelList));
+	panel->selector()->provideRecentEmoji(panelList);
 	panel->setDesiredHeightValues(
 		1.,
 		st::emojiPanMinHeight / 2,
@@ -608,15 +639,17 @@ void EditAllowedReactionsBox(
 		rpl::variable<SelectorState> selectorState;
 		std::vector<Data::ReactionId> selected;
 		rpl::variable<int> customCount;
+		rpl::variable<bool> paidEnabled;
 	};
 	const auto allowed = args.allowed;
 	const auto optionInitial = (allowed.type != AllowedReactionsType::Some)
 		? Option::All
-		: allowed.some.empty()
+		: (allowed.some.empty() && !allowed.paidEnabled)
 		? Option::None
 		: Option::Some;
 	const auto state = box->lifetime().make_state<State>(State{
 		.option = optionInitial,
+		.paidEnabled = allowed.paidEnabled,
 	});
 
 	const auto container = box->verticalLayout();
@@ -702,13 +735,19 @@ void EditAllowedReactionsBox(
 			| ranges::views::transform(&Data::Reaction::id)
 			| ranges::to_vector)
 		: allowed.some;
+	if (allowed.paidEnabled) {
+		selected.insert(begin(selected), Data::ReactionId::Paid());
+	}
 	const auto changed = [=](
-		std::vector<Data::ReactionId> chosen,
-		bool hardLimitHit) {
+			std::vector<Data::ReactionId> chosen,
+			bool hardLimitHit) {
 		state->selected = std::move(chosen);
 		state->customCount = ranges::count_if(
 			state->selected,
 			&Data::ReactionId::custom);
+		state->paidEnabled = ranges::contains(
+			state->selected,
+			Data::ReactionId::Paid());
 		if (hardLimitHit) {
 			box->uiShow()->showToast(
 				tr::lng_manage_peer_reactions_limit(tr::now));
@@ -727,6 +766,7 @@ void EditAllowedReactionsBox(
 		.title = tr::lng_manage_peer_reactions_available_ph(),
 		.list = all,
 		.selected = state->selected,
+		.paid = state->paidEnabled.value(),
 		.callback = changed,
 		.stateValue = state->selectorState.value(),
 		.customAllowed = args.allowedCustomReactions,
@@ -735,7 +775,7 @@ void EditAllowedReactionsBox(
 	}), st::boxRowPadding);
 
 	box->setFocusCallback([=] {
-		if (!wrap || state->option.current() == Option::Some) {
+		if (state->option.current() == Option::Some) {
 			state->selectorState.force_assign(SelectorState::Active);
 		}
 	});
@@ -847,6 +887,29 @@ void EditAllowedReactionsBox(
 			) | rpl::map(rpl::mappers::_1 == SelectorState::Active)));
 
 		Ui::AddDividerText(inner, tr::lng_manage_peer_reactions_max_about());
+
+		Ui::AddSkip(inner);
+		const auto paid = inner->add(object_ptr<Ui::SettingsButton>(
+			inner,
+			tr::lng_manage_peer_reactions_paid(),
+			st::manageGroupNoIconButton.button));
+		paid->toggleOn(state->paidEnabled.value());
+		paid->toggledValue(
+		) | rpl::start_with_next([=](bool value) {
+			state->paidEnabled = value;
+		}, paid->lifetime());
+		Ui::AddSkip(inner);
+
+		Ui::AddDividerText(
+			inner,
+			tr::lng_manage_peer_reactions_paid_about(
+				lt_link,
+				tr::lng_manage_peer_reactions_paid_link([=](QString text) {
+					return Ui::Text::Link(
+						text,
+						u"https://telegram.org/tos/stars"_q);
+				}),
+				Ui::Text::WithEntities));
 	}
 	const auto collect = [=] {
 		auto result = AllowedReactions();
@@ -855,6 +918,9 @@ void EditAllowedReactionsBox(
 			? (state->option.current() == Option::Some)
 			: (enabled->toggled())) {
 			result.some = state->selected;
+		}
+		if (!isGroup && enabled->toggled())	{
+			result.paidEnabled = state->paidEnabled.current();
 		}
 		auto some = result.some;
 		auto simple = all | ranges::views::transform(
@@ -907,15 +973,20 @@ void SaveAllowedReactions(
 		: allowed.some.empty()
 		? MTP_chatReactionsNone()
 		: MTP_chatReactionsSome(MTP_vector<MTPReaction>(ids));
+	const auto editPaidEnabled = peer->isBroadcast();
+	const auto paidEnabled = editPaidEnabled && allowed.paidEnabled;
+	const auto maxCount = allowed.maxCount;
 	peer->session().api().request(MTPmessages_SetChatAvailableReactions(
-		allowed.maxCount ? MTP_flags(Flag::f_reactions_limit) : MTP_flags(0),
+		MTP_flags(Flag()
+			| (maxCount ? Flag::f_reactions_limit : Flag())
+			| (editPaidEnabled ? Flag::f_paid_enabled : Flag())),
 		peer->input,
 		updated,
-		MTP_int(allowed.maxCount)
+		MTP_int(maxCount),
+		MTP_bool(paidEnabled)
 	)).done([=](const MTPUpdates &result) {
 		peer->session().api().applyUpdates(result);
-		auto parsed = Data::Parse(updated);
-		parsed.maxCount = allowed.maxCount;
+		auto parsed = Data::Parse(updated, maxCount, paidEnabled);
 		if (const auto chat = peer->asChat()) {
 			chat->setAllowedReactions(parsed);
 		} else if (const auto channel = peer->asChannel()) {

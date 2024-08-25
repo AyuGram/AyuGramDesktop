@@ -90,9 +90,10 @@ PRIVATE
     data/data_channel_earn.h
     data/data_credits.h
     data/data_credits_earn.h
+    data/data_premium_subscription_option.h
     data/data_statistics_chart.cpp
     data/data_statistics_chart.h
-    data/data_subscription_option.h
+    data/data_subscriptions.h
 
     dialogs/dialogs_three_state_icon.h
     dialogs/ui/chat_search_empty.cpp
@@ -200,6 +201,8 @@ PRIVATE
     payments/ui/payments_panel.h
     payments/ui/payments_panel_data.h
     payments/ui/payments_panel_delegate.h
+    payments/ui/payments_reaction_box.cpp
+    payments/ui/payments_reaction_box.h
 
     platform/linux/current_geo_location_linux.cpp
     platform/linux/current_geo_location_linux.h
@@ -379,6 +382,8 @@ PRIVATE
     ui/effects/loading_element.h
     ui/effects/outline_segments.cpp
     ui/effects/outline_segments.h
+    ui/effects/premium_bubble.cpp
+    ui/effects/premium_bubble.h
     ui/effects/premium_graphics.cpp
     ui/effects/premium_graphics.h
     ui/effects/premium_stars.cpp

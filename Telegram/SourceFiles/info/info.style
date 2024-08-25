@@ -986,11 +986,51 @@ inviteLinkRevokedIcon: icon {{ "info/edit/links_revoked", mediaviewFileExtFg }};
 inviteLinkThreeDotsSkip: 12px;
 inviteLinkRevokedTitlePadding: margins(22px, 16px, 10px, 4px);
 inviteLinkLimitMargin: margins(22px, 8px, 22px, 8px);
+inviteLinkSubscriptionSize: 18px;
 
 inviteLinkQrPixel: 8px;
 inviteLinkQrSkip: 24px;
 inviteLinkQrMargin: margins(0px, 0px, 0px, 13px);
 inviteLinkQrValuePadding: margins(22px, 0px, 22px, 12px);
+
+inviteLinkCreditsField: InputField(defaultInputField) {
+	textMargins: margins(23px, 10px, 0px, 0px);
+	textAlign: align(left);
+	textFg: historyComposeAreaFg;
+	textBg: historyComposeAreaBg;
+	heightMin: 36px;
+	heightMax: 36px;
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(0px, 0px, 2px, 0px);
+	placeholderAlign: align(left);
+	placeholderScale: 0.;
+	placeholderFont: normalFont;
+	placeholderShift: -50px;
+	duration: 100;
+}
+
+inviteLinkSubscribeBoxTitle: FlatLabel(defaultFlatLabel) {
+	minWidth: 300px;
+	textFg: windowBoldFg;
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(17px semibold);
+	}
+}
+inviteLinkSubscribeBoxAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 300px;
+	align: align(top);
+}
+inviteLinkSubscribeBoxTerms: FlatLabel(defaultFlatLabel) {
+	minWidth: 300px;
+	align: align(top);
+	textFg: windowSubTextFg;
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px);
+	}
+}
 
 usernamesReorderIcon: icon {{ "stickers_reorder", dialogsMenuIconFg }};
 

@@ -6,12 +6,13 @@
 // Copyright @Radolyn, 2024
 #include "ayu_infra.h"
 
-#include "ayu_lang.h"
-#include "ayu_worker.h"
+#include "ayu/ayu_lang.h"
+#include "ayu/ayu_worker.h"
 #include "ayu/ayu_fonts.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/data/ayu_database.h"
 #include "lang/lang_instance.h"
+#include "utils/taptic_engine/taptic_engine.h"
 
 namespace AyuInfra {
 
@@ -45,6 +46,8 @@ void init() {
 	initDatabase();
 	initFonts();
 	initWorker();
+
+	TapticEngine::init();
 }
 
 }

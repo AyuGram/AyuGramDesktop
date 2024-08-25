@@ -68,6 +68,7 @@ enum class ChannelDataFlag : uint64 {
 	CanViewRevenue = (1ULL << 32),
 	PaidMediaAllowed = (1ULL << 33),
 	CanViewCreditsRevenue = (1ULL << 34),
+	SignatureProfiles = (1ULL << 35),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
 using ChannelDataFlags = base::flags<ChannelDataFlag>;
@@ -230,6 +231,9 @@ public:
 	}
 	[[nodiscard]] bool addsSignature() const {
 		return flags() & Flag::Signatures;
+	}
+	[[nodiscard]] bool signatureProfiles() const {
+		return flags() & Flag::SignatureProfiles;
 	}
 	[[nodiscard]] bool isForbidden() const {
 		return flags() & Flag::Forbidden;
@@ -429,9 +433,6 @@ public:
 		return _ptsWaiter.waitingForShortPoll();
 	}
 
-	void setUnavailableReasons(
-		std::vector<Data::UnavailableReason> &&reason);
-
 	[[nodiscard]] MsgId availableMinId() const {
 		return _availableMinId;
 	}
@@ -485,6 +486,9 @@ public:
 	[[nodiscard]] int levelHint() const;
 	void updateLevelHint(int levelHint);
 
+	[[nodiscard]] TimeId subscriptionUntilDate() const;
+	void updateSubscriptionUntilDate(TimeId subscriptionUntilDate);
+
 	// Still public data members.
 	uint64 access = 0;
 
@@ -508,6 +512,9 @@ private:
 		-> const std::vector<Data::UnavailableReason> & override;
 	bool canEditLastAdmin(not_null<UserData*> user) const;
 
+	void setUnavailableReasonsList(
+		std::vector<Data::UnavailableReason> &&reasons) override;
+
 	Flags _flags = ChannelDataFlags(Flag::Forbidden);
 
 	PtsWaiter _ptsWaiter;
@@ -527,6 +534,7 @@ private:
 	AdminRightFlags _adminRights;
 	RestrictionFlags _restrictions;
 	TimeId _restrictedUntil;
+	TimeId _subscriptionUntilDate;
 
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	std::unique_ptr<InvitePeek> _invitePeek;

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_user.h"
 
+#include "api/api_sensitive_content.h"
 #include "storage/localstorage.h"
 #include "storage/storage_user_photos.h"
 #include "main/main_session.h"
@@ -122,14 +123,9 @@ auto UserData::unavailableReasons() const
 	return _unavailableReasons;
 }
 
-void UserData::setUnavailableReasons(
+void UserData::setUnavailableReasonsList(
 		std::vector<Data::UnavailableReason> &&reasons) {
-	if (_unavailableReasons != reasons) {
-		_unavailableReasons = std::move(reasons);
-		session().changes().peerUpdated(
-			this,
-			UpdateFlag::UnavailableReason);
-	}
+	_unavailableReasons = std::move(reasons);
 }
 
 void UserData::setCommonChatsCount(int count) {
@@ -336,7 +332,11 @@ void UserData::setBotInfo(const MTPBotInfo &info) {
 			d.vmenu_button());
 		botInfo->inited = true;
 
-		if (changedCommands || changedButton) {
+		const auto privacy = qs(d.vprivacy_policy_url().value_or_empty());
+		const auto privacyChanged = (botInfo->privacyPolicyUrl != privacy);
+		botInfo->privacyPolicyUrl = privacy;
+
+		if (changedCommands || changedButton || privacyChanged) {
 			owner().botCommandsChanged(this);
 		}
 	} break;
@@ -526,6 +526,10 @@ void UserData::setBirthday(Data::Birthday value) {
 	if (_birthday != value) {
 		_birthday = value;
 		session().changes().peerUpdated(this, UpdateFlag::Birthday);
+
+		if (isSelf()) {
+			session().api().sensitiveContent().reload(true);
+		}
 	}
 }
 

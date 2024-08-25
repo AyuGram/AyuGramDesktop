@@ -57,6 +57,7 @@ struct RippleAnimation;
 namespace Data {
 struct MessagePosition;
 struct RecentReaction;
+struct MessageReactionsTopPaid;
 struct ReactionId;
 class Media;
 struct MessageReaction;
@@ -66,6 +67,7 @@ class Thread;
 struct SponsoredFrom;
 class Story;
 class SavedSublist;
+struct PaidReactionSend;
 } // namespace Data
 
 namespace Main {
@@ -105,6 +107,12 @@ struct HistoryItemCommonFields {
 	uint64 groupedId = 0;
 	EffectId effectId = 0;
 	HistoryMessageMarkupData markup;
+};
+
+enum class HistoryReactionSource : char {
+	Selector,
+	Quick,
+	Existing,
 };
 
 class HistoryItem final : public RuntimeComposer<HistoryItem> {
@@ -319,6 +327,9 @@ public:
 	[[nodiscard]] bool showSimilarChannels() const {
 		return _flags & MessageFlag::ShowSimilarChannels;
 	}
+	[[nodiscard]] bool hasRealFromId() const;
+	[[nodiscard]] bool isPostHidingAuthor() const;
+	[[nodiscard]] bool isPostShowingAuthor() const;
 	[[nodiscard]] bool isRegular() const;
 	[[nodiscard]] bool isUploading() const;
 	void sendFailed();
@@ -436,21 +447,27 @@ public:
 	void translationDone(LanguageId to, TextWithEntities result);
 
 	[[nodiscard]] bool canReact() const;
-	enum class ReactionSource {
-		Selector,
-		Quick,
-		Existing,
-	};
 	void toggleReaction(
 		const Data::ReactionId &reaction,
-		ReactionSource source);
+		HistoryReactionSource source);
+	void addPaidReaction(int count, bool anonymous);
+	void cancelScheduledPaidReaction();
+	[[nodiscard]] Data::PaidReactionSend startPaidReactionSending();
+	void finishPaidReactionSending(
+		Data::PaidReactionSend send,
+		bool success);
 	void updateReactionsUnknown();
 	[[nodiscard]] auto reactions() const
 		-> const std::vector<Data::MessageReaction> &;
+	[[nodiscard]] auto reactionsWithLocal() const
+		-> std::vector<Data::MessageReaction>;
 	[[nodiscard]] auto recentReactions() const
 		-> const base::flat_map<
 			Data::ReactionId,
 			std::vector<Data::RecentReaction>> &;
+	[[nodiscard]] auto topPaidReactionsWithLocal() const
+		-> std::vector<Data::MessageReactionsTopPaid>;
+	[[nodiscard]] int reactionsPaidScheduled() const;
 	[[nodiscard]] bool canViewReactions() const;
 	[[nodiscard]] std::vector<Data::ReactionId> chosenReactions() const;
 	[[nodiscard]] Data::ReactionId lookupUnreadReaction(
@@ -465,10 +482,6 @@ public:
 	[[nodiscard]] GlobalMsgId globalId() const;
 	[[nodiscard]] Data::MessagePosition position() const;
 	[[nodiscard]] TimeId date() const;
-
-	[[nodiscard]] static TimeId NewMessageDate(TimeId scheduled);
-	[[nodiscard]] static TimeId NewMessageDate(
-		const Api::SendOptions &options);
 
 	[[nodiscard]] Data::Media *media() const {
 		return _media.get();
@@ -506,6 +519,9 @@ public:
 	[[nodiscard]] bool isEmpty() const;
 	[[nodiscard]] MessageGroupId groupId() const;
 	[[nodiscard]] EffectId effectId() const;
+	[[nodiscard]] bool hasPossibleRestrictions() const;
+	[[nodiscard]] QString computeUnavailableReason() const;
+	[[nodiscard]] bool isMediaSensitive() const;
 
 	[[nodiscard]] const HistoryMessageReplyMarkup *inlineReplyMarkup() const {
 		return const_cast<HistoryItem*>(this)->inlineReplyMarkup();
@@ -641,6 +657,7 @@ private:
 	[[nodiscard]] PreparedServiceText prepareCallScheduledText(
 		TimeId scheduleDate);
 
+	void flagSensitiveContent();
 	[[nodiscard]] PeerData *computeDisplayFrom() const;
 
 	const not_null<History*> _history;

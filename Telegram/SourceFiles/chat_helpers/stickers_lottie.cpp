@@ -15,11 +15,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
 #include "storage/cache/storage_cache_database.h"
+#include "storage/localimageloader.h"
 #include "history/view/media/history_view_media_common.h"
 #include "media/clip/media_clip_reader.h"
+#include "ui/chat/attach/attach_prepare.h"
 #include "ui/effects/path_shift_gradient.h"
+#include "ui/image/image_location_factory.h"
 #include "ui/painter.h"
 #include "main/main_session.h"
+
+#include <xxhash.h>
 
 namespace ChatHelpers {
 namespace {
@@ -310,6 +315,43 @@ QSize ComputeStickerSize(not_null<DocumentData*> document, QSize box) {
 	const auto ratio = style::DevicePixelRatio();
 	const auto request = Lottie::FrameRequest{ box * ratio };
 	return HistoryView::NonEmptySize(request.size(dimensions, 8) / ratio);
+}
+
+[[nodiscard]] uint64 LocalTgsStickerId(QStringView name) {
+	auto full = u"local_tgs_sticker:"_q;
+	full.append(name);
+	return XXH64(full.data(), full.size() * sizeof(QChar), 0);
+}
+
+not_null<DocumentData*> GenerateLocalTgsSticker(
+		not_null<Main::Session*> session,
+		const QString &name) {
+	const auto path = u":/animations/"_q + name + u".tgs"_q;
+	auto task = FileLoadTask(
+		session,
+		path,
+		QByteArray(),
+		nullptr,
+		SendMediaType::File,
+		FileLoadTo(0, {}, {}, 0),
+		{},
+		false,
+		nullptr,
+		LocalTgsStickerId(name));
+	task.process({ .generateGoodThumbnail = false });
+	const auto result = task.peekResult();
+	Assert(result != nullptr);
+	const auto document = session->data().processDocument(
+		result->document,
+		Images::FromImageInMemory(
+			result->thumb,
+			"WEBP",
+			result->thumbbytes));
+	document->setLocation(Core::FileLocation(path));
+
+	Ensures(document->sticker());
+	Ensures(document->sticker()->isLottie());
+	return document;
 }
 
 } // namespace ChatHelpers

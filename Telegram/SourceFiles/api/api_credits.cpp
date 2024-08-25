@@ -94,32 +94,70 @@ constexpr auto kTransactionsLimit = 100;
 		}, [](const MTPDstarsTransactionPeerAds &) {
 			return Data::CreditsHistoryEntry::PeerType::Ads;
 		}),
-		.refunded = tl.data().is_refund(),
-		.pending = tl.data().is_pending(),
-		.failed = tl.data().is_failed(),
+		.subscriptionUntil = tl.data().vsubscription_period()
+			? base::unixtime::parse(base::unixtime::now()
+				+ tl.data().vsubscription_period()->v)
+			: QDateTime(),
 		.successDate = tl.data().vtransaction_date()
 			? base::unixtime::parse(tl.data().vtransaction_date()->v)
 			: QDateTime(),
 		.successLink = qs(tl.data().vtransaction_url().value_or_empty()),
+		.reaction = tl.data().is_reaction(),
+		.refunded = tl.data().is_refund(),
+		.pending = tl.data().is_pending(),
+		.failed = tl.data().is_failed(),
 		.in = (int64(tl.data().vstars().v) >= 0),
 		.gift = tl.data().is_gift(),
+	};
+}
+
+[[nodiscard]] Data::SubscriptionEntry SubscriptionFromTL(
+		const MTPStarsSubscription &tl) {
+	return Data::SubscriptionEntry{
+		.id = qs(tl.data().vid()),
+		.inviteHash = qs(tl.data().vchat_invite_hash().value_or_empty()),
+		.until = base::unixtime::parse(tl.data().vuntil_date().v),
+		.subscription = Data::PeerSubscription{
+			.credits = tl.data().vpricing().data().vamount().v,
+			.period = tl.data().vpricing().data().vperiod().v,
+		},
+		.barePeerId = peerFromMTP(tl.data().vpeer()).value,
+		.cancelled = tl.data().is_canceled(),
+		.expired = (base::unixtime::now() > tl.data().vuntil_date().v),
+		.canRefulfill = tl.data().is_can_refulfill(),
 	};
 }
 
 [[nodiscard]] Data::CreditsStatusSlice StatusFromTL(
 		const MTPpayments_StarsStatus &status,
 		not_null<PeerData*> peer) {
-	peer->owner().processUsers(status.data().vusers());
-	peer->owner().processChats(status.data().vchats());
+	const auto &data = status.data();
+	peer->owner().processUsers(data.vusers());
+	peer->owner().processChats(data.vchats());
+	auto entries = std::vector<Data::CreditsHistoryEntry>();
+	if (const auto history = data.vhistory()) {
+		entries.reserve(history->v.size());
+		for (const auto &tl : history->v) {
+			entries.push_back(HistoryFromTL(tl, peer));
+		}
+	}
+	auto subscriptions = std::vector<Data::SubscriptionEntry>();
+	if (const auto history = data.vsubscriptions()) {
+		subscriptions.reserve(history->v.size());
+		for (const auto &tl : history->v) {
+			subscriptions.push_back(SubscriptionFromTL(tl));
+		}
+	}
 	return Data::CreditsStatusSlice{
-		.list = ranges::views::all(
-			status.data().vhistory().v
-		) | ranges::views::transform([&](const MTPStarsTransaction &tl) {
-			return HistoryFromTL(tl, peer);
-		}) | ranges::to_vector,
+		.list = std::move(entries),
+		.subscriptions = std::move(subscriptions),
 		.balance = status.data().vbalance().v,
+		.subscriptionsMissingBalance
+			= status.data().vsubscriptions_missing_balance().value_or_empty(),
 		.allLoaded = !status.data().vnext_offset().has_value(),
 		.token = qs(status.data().vnext_offset().value_or_empty()),
+		.tokenSubscriptions = qs(
+			status.data().vsubscriptions_next_offset().value_or_empty()),
 	};
 }
 
@@ -195,10 +233,14 @@ void CreditsStatus::request(
 		_peer->isSelf() ? MTP_inputPeerSelf() : _peer->input
 	)).done([=](const TLResult &result) {
 		_requestId = 0;
-		done(StatusFromTL(result, _peer));
+		if (const auto onstack = done) {
+			onstack(StatusFromTL(result, _peer));
+		}
 	}).fail([=] {
 		_requestId = 0;
-		done({});
+		if (const auto onstack = done) {
+			onstack({});
+		}
 	}).send();
 }
 
@@ -220,9 +262,29 @@ void CreditsHistory::request(
 	}
 	_requestId = _api.request(MTPpayments_GetStarsTransactions(
 		MTP_flags(_flags),
+		MTPstring(), // subscription_id
 		_peer->isSelf() ? MTP_inputPeerSelf() : _peer->input,
 		MTP_string(token),
 		MTP_int(kTransactionsLimit)
+	)).done([=](const MTPpayments_StarsStatus &result) {
+		_requestId = 0;
+		done(StatusFromTL(result, _peer));
+	}).fail([=] {
+		_requestId = 0;
+		done({});
+	}).send();
+}
+
+void CreditsHistory::requestSubscriptions(
+		const Data::CreditsStatusSlice::OffsetToken &token,
+		Fn<void(Data::CreditsStatusSlice)> done) {
+	if (_requestId) {
+		return;
+	}
+	_requestId = _api.request(MTPpayments_GetStarsSubscriptions(
+		MTP_flags(0),
+		_peer->isSelf() ? MTP_inputPeerSelf() : _peer->input,
+		MTP_string(token)
 	)).done([=](const MTPpayments_StarsStatus &result) {
 		_requestId = 0;
 		done(StatusFromTL(result, _peer));

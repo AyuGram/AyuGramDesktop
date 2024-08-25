@@ -1570,9 +1570,7 @@ void ShowTagMenu(
 		if (const auto item = owner->message(itemId)) {
 			const auto &list = item->reactions();
 			if (ranges::contains(list, id, &MessageReaction::id)) {
-				item->toggleReaction(
-					id,
-					HistoryItem::ReactionSource::Quick);
+				item->toggleReaction(id, HistoryReactionSource::Quick);
 			}
 		}
 	};
@@ -1666,7 +1664,8 @@ void ShowWhoReactedMenu(
 	const auto reactions = &owner->reactions();
 	const auto &list = reactions->list(
 		Data::Reactions::Type::Active);
-	const auto activeNonQuick = (id != reactions->favoriteId())
+	const auto activeNonQuick = !id.paid()
+		&& (id != reactions->favoriteId())
 		&& (ranges::contains(list, id, &Data::Reaction::id)
 			|| (controller->session().premium() && id.custom()));
 	const auto filler = lifetime.make_state<Ui::WhoReactedListMenu>(

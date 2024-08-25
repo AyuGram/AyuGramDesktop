@@ -17,6 +17,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "styles/style_chat.h"
 
+// AyuGram includes
+#include "ayu/utils/taptic_engine/taptic_engine.h"
+
+
 namespace Ui {
 namespace {
 
@@ -55,6 +59,11 @@ auto ReactionFlyAnimation::callback() {
 	return [=] {
 		if (_repaint) {
 			_repaint();
+
+			if (_minis.animating() && !_hapticExecuted) {
+				TapticEngine::generateGeneric();
+				_hapticExecuted = true;
+			}
 		}
 	};
 }
@@ -86,6 +95,11 @@ ReactionFlyAnimation::ReactionFlyAnimation(
 		_customSize = esize;
 		_centerSizeMultiplier = _customSize / float64(size);
 		aroundAnimation = owner->chooseGenericAnimation(document);
+	} else if (args.id.paid()) {
+		const auto fake = owner->lookupPaid();
+		centerIcon = fake->centerIcon;
+		aroundAnimation = owner->choosePaidReactionAnimation();
+		_centerSizeMultiplier = 0.5;
 	} else {
 		const auto i = ranges::find(list, args.id, &::Data::Reaction::id);
 		if (i == end(list)/* || !i->centerIcon*/) {

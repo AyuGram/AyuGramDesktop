@@ -191,6 +191,32 @@ MessageFlags NewMessageFlags(not_null<PeerData*> peer) {
 		| (peer->isSelf() ? MessageFlag() : MessageFlag::Outgoing);
 }
 
+TimeId NewMessageDate(TimeId scheduled) {
+	return scheduled ? scheduled : base::unixtime::now();
+}
+
+TimeId NewMessageDate(const Api::SendOptions &options) {
+	return options.shortcutId ? 1 : NewMessageDate(options.scheduled);
+}
+
+PeerId NewMessageFromId(const Api::SendAction &action) {
+	return action.options.sendAs
+		? action.options.sendAs->id
+		: action.history->peer->amAnonymous()
+		? PeerId()
+		: action.history->session().userPeerId();
+}
+
+QString NewMessagePostAuthor(const Api::SendAction &action) {
+	return !action.history->peer->isBroadcast()
+		? QString()
+		: (action.options.sendAs == action.history->peer)
+		? QString()
+		: action.options.sendAs
+		? action.options.sendAs->name()
+		: action.history->session().user()->name();
+}
+
 bool ShouldSendSilent(
 		not_null<PeerData*> peer,
 		const Api::SendOptions &options) {
@@ -324,7 +350,7 @@ ClickHandlerPtr JumpToMessageClickHandler(
 		const auto separate = Core::App().separateWindowFor(peer);
 		const auto controller = separate
 			? separate->sessionController()
-			: peer->session().tryResolveWindow();
+			: peer->session().tryResolveWindow(peer);
 		if (controller) {
 			auto params = Window::SectionShow{
 				Window::SectionShow::Way::Forward
@@ -845,8 +871,8 @@ void ShowTrialTranscribesToast(int left, TimeId until) {
 			Ui::Text::WithEntities);
 	window->uiShow()->showToast(Ui::Toast::Config{
 		.text = text,
-		.duration = kToastDuration,
 		.filter = filter,
+		.duration = kToastDuration,
 	});
 }
 

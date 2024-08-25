@@ -132,30 +132,6 @@ void CheckForSwitchInlineButton(not_null<HistoryItem*> item) {
 	}
 }
 
-// We should get a full restriction in "{full}: {reason}" format and we
-// need to find an "-all" tag in {full}, otherwise ignore this restriction.
-std::vector<UnavailableReason> ExtractUnavailableReasons(
-		const QVector<MTPRestrictionReason> &restrictions) {
-	return ranges::views::all(
-		restrictions
-	) | ranges::views::filter([](const MTPRestrictionReason &restriction) {
-		return restriction.match([&](const MTPDrestrictionReason &data) {
-			const auto platform = qs(data.vplatform());
-			return false
-#ifdef OS_MAC_STORE
-				|| (platform == u"ios"_q)
-#elif defined OS_WIN_STORE // OS_MAC_STORE
-				|| (platform == u"ms"_q)
-#endif // OS_MAC_STORE || OS_WIN_STORE
-				|| (platform == u"all"_q);
-		});
-	}) | ranges::views::transform([](const MTPRestrictionReason &restriction) {
-		return restriction.match([&](const MTPDrestrictionReason &data) {
-			return UnavailableReason{ qs(data.vreason()), qs(data.vtext()) };
-		});
-	}) | ranges::to_vector;
-}
-
 [[nodiscard]] InlineImageLocation FindInlineThumbnail(
 		const QVector<MTPPhotoSize> &sizes) {
 	const auto i = ranges::find(
@@ -345,6 +321,22 @@ Session::Session(not_null<Main::Session*> session)
 			_stories->loadMore(Data::StorySourcesList::NotHidden);
 		}
 	});
+
+	session->appConfig().ignoredRestrictionReasonsChanges(
+	) | rpl::start_with_next([=](std::vector<QString> &&changed) {
+		auto refresh = std::vector<not_null<const HistoryItem*>>();
+		for (const auto &[item, reasons] : _possiblyRestricted) {
+			for (const auto &reason : changed) {
+				if (reasons.contains(reason)) {
+					refresh.push_back(item);
+					break;
+				}
+			}
+		}
+		for (const auto &item : refresh) {
+			requestItemViewRefresh(item);
+		}
+	}, _lifetime);
 }
 
 void Session::subscribeForTopicRepliesLists() {
@@ -616,12 +608,8 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				result->input = MTP_inputPeerUser(data.vid(), MTP_long(result->accessHash()));
 				result->inputUser = MTP_inputUser(data.vid(), MTP_long(result->accessHash()));
 			}
-			if (const auto restriction = data.vrestriction_reason()) {
-				result->setUnavailableReasons(
-					ExtractUnavailableReasons(restriction->v));
-			} else {
-				result->setUnavailableReasons({});
-			}
+			result->setUnavailableReasons(Data::UnavailableReason::Extract(
+				data.vrestriction_reason()));
 		}
 		if (data.is_deleted()) {
 			if (!result->phone().isEmpty()) {
@@ -890,6 +878,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		const auto wasCallNotEmpty = Data::ChannelHasActiveCall(channel);
 
 		channel->updateLevelHint(data.vlevel().value_or_empty());
+		channel->updateSubscriptionUntilDate(
+			data.vsubscription_until_date().value_or_empty());
 		if (const auto count = data.vparticipants_count()) {
 			channel->setMembersCount(count->v);
 		}
@@ -923,12 +913,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			channel->setAccessHash(
 				data.vaccess_hash().value_or(channel->access));
 			channel->date = data.vdate().v;
-			if (const auto restriction = data.vrestriction_reason()) {
-				channel->setUnavailableReasons(
-					ExtractUnavailableReasons(restriction->v));
-			} else {
-				channel->setUnavailableReasons({});
-			}
+			channel->setUnavailableReasons(Data::UnavailableReason::Extract(
+				data.vrestriction_reason()));
 		}
 
 		{
@@ -954,6 +940,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			| Flag::Gigagroup
 			| Flag::Username
 			| Flag::Signatures
+			| Flag::SignatureProfiles
 			| Flag::HasLink
 			| Flag::SlowmodeEnabled
 			| Flag::CallActive
@@ -982,6 +969,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			| (data.is_gigagroup() ? Flag::Gigagroup : Flag())
 			| (hasUsername ? Flag::Username : Flag())
 			| (data.is_signatures() ? Flag::Signatures : Flag())
+			| (data.is_signature_profiles() ? Flag::SignatureProfiles : Flag())
 			| (data.is_has_link() ? Flag::HasLink : Flag())
 			| (data.is_slowmode_enabled() ? Flag::SlowmodeEnabled : Flag())
 			| (data.is_call_active() ? Flag::CallActive : Flag())
@@ -1293,24 +1281,31 @@ History *Session::historyLoaded(const PeerData *peer) {
 }
 
 void Session::deleteConversationLocally(not_null<PeerData*> peer) {
-	const auto history = historyLoaded(peer);
-	if (history) {
+	const auto markLeft = [&] {
+		if (const auto channel = peer->asMegagroup()) {
+			channel->addFlags(ChannelDataFlag::Left);
+			if (const auto from = channel->getMigrateFromChat()) {
+				if (const auto migrated = historyLoaded(from)) {
+					migrated->updateChatListExistence();
+				}
+			}
+		}
+	};
+	if (const auto history = historyLoaded(peer)) {
 		if (history->folderKnown()) {
 			setChatPinned(history, FilterId(), false);
 		}
 		removeChatListEntry(history);
 		history->clearFolder();
+
+		// We want to mark the channel as left before unloading the history,
+		// otherwise some parts of updating may return us to the chats list.
+		markLeft();
 		history->clear(peer->isChannel()
 			? History::ClearType::Unload
 			: History::ClearType::DeleteChat);
-	}
-	if (const auto channel = peer->asMegagroup()) {
-		channel->addFlags(ChannelDataFlag::Left);
-		if (const auto from = channel->getMigrateFromChat()) {
-			if (const auto migrated = historyLoaded(from)) {
-				migrated->updateChatListExistence();
-			}
-		}
+	} else {
+		markLeft();
 	}
 }
 
@@ -1811,7 +1806,7 @@ rpl::producer<not_null<ViewElement*>> Session::viewResizeRequest() const {
 	return _viewResizeRequest.events();
 }
 
-void Session::requestItemViewRefresh(not_null<HistoryItem*> item) {
+void Session::requestItemViewRefresh(not_null<const HistoryItem*> item) {
 	if (const auto view = item->mainView()) {
 		notifyHistoryChangeDelayed(item->history());
 		view->refreshInBlock();
@@ -1819,7 +1814,7 @@ void Session::requestItemViewRefresh(not_null<HistoryItem*> item) {
 	_itemViewRefreshRequest.fire_copy(item);
 }
 
-rpl::producer<not_null<HistoryItem*>> Session::itemViewRefreshRequest() const {
+rpl::producer<not_null<const HistoryItem*>> Session::itemViewRefreshRequest() const {
 	return _itemViewRefreshRequest.events();
 }
 
@@ -1842,6 +1837,31 @@ void Session::requestItemTextRefresh(not_null<HistoryItem*> item) {
 		call(group->items.front());
 	} else {
 		call(item);
+	}
+}
+
+void Session::registerRestricted(
+		not_null<const HistoryItem*> item,
+		const QString &reason) {
+	Expects(item->hasPossibleRestrictions());
+
+	_possiblyRestricted[item].emplace(reason);
+}
+
+void Session::registerRestricted(
+		not_null<const HistoryItem*> item,
+		const std::vector<UnavailableReason> &reasons) {
+	Expects(item->hasPossibleRestrictions());
+
+	auto &list = _possiblyRestricted[item];
+	if (list.empty()) {
+		auto &&simple = reasons
+			| ranges::views::transform(&UnavailableReason::reason);
+		list = { begin(simple), end(simple) };
+	} else {
+		for (const auto &reason : reasons) {
+			list.emplace(reason.reason);
+		}
 	}
 }
 
@@ -1890,6 +1910,14 @@ void Session::notifyViewRemoved(not_null<const ViewElement*> view) {
 
 rpl::producer<not_null<const ViewElement*>> Session::viewRemoved() const {
 	return _viewRemoved.events();
+}
+
+void Session::notifyViewPaidReactionSent(not_null<const ViewElement*> view) {
+	_viewPaidReactionSent.fire_copy(view);
+}
+
+rpl::producer<not_null<const ViewElement*>> Session::viewPaidReactionSent() const {
+	return _viewPaidReactionSent.events();
 }
 
 void Session::notifyHistoryUnloaded(not_null<const History*> history) {
@@ -2592,6 +2620,9 @@ void Session::unregisterMessage(not_null<HistoryItem*> item) {
 	const auto peerId = item->history()->peer->id;
 	const auto itemId = item->id;
 	_itemRemoved.fire_copy(item);
+	if (item->hasPossibleRestrictions()) {
+		_possiblyRestricted.remove(item);
+	}
 	session().changes().messageUpdated(
 		item,
 		Data::MessageUpdate::Flag::Destroyed);
