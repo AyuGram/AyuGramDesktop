@@ -10,10 +10,10 @@
 
 namespace AyuDatabase {
 
-void initialize();
+	void initialize();
 
-void addEditedMessage(const EditedMessage &message);
-std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId);
-bool hasRevisions(ID userId, ID dialogId, ID messageId);
+	void addEditedMessage(const EditedMessage& message);
+	std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId);
+	bool hasRevisions(ID userId, ID dialogId, ID messageId);
 
-}
+} // namespace AyuDatabase

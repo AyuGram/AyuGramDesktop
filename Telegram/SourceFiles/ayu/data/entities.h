@@ -10,9 +10,8 @@
 
 #define ID long long
 
-template<typename TableName>
-class AyuMessageBase
-{
+template <typename TableName>
+class AyuMessageBase {
 public:
 	ID fakeId;
 	ID userId;
@@ -53,8 +52,7 @@ using DeletedMessage = AyuMessageBase<struct DeletedMessageTag>;
 
 using EditedMessage = AyuMessageBase<struct EditedMessageTag>;
 
-class DeletedDialog
-{
+class DeletedDialog {
 public:
 	ID fakeId;
 	ID userId;
@@ -67,8 +65,7 @@ public:
 	int entityCreateDate;
 };
 
-class RegexFilter
-{
+class RegexFilter {
 public:
 	std::vector<char> id;
 	std::string text;
@@ -77,16 +74,14 @@ public:
 	std::unique_ptr<ID> dialogId; // nullable
 };
 
-class RegexFilterGlobalExclusion
-{
+class RegexFilterGlobalExclusion {
 public:
 	ID fakeId;
 	ID dialogId;
 	std::vector<char> filterId;
 };
 
-class SpyMessageRead
-{
+class SpyMessageRead {
 public:
 	ID fakeId;
 	ID userId;
@@ -95,8 +90,7 @@ public:
 	int entityCreateDate;
 };
 
-class SpyMessageContentsRead
-{
+class SpyMessageContentsRead {
 public:
 	ID fakeId;
 	ID userId;

@@ -12,8 +12,8 @@
 
 namespace AyuMessages {
 
-void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem*> item);
-std::vector<EditedMessage> getEditedMessages(not_null<HistoryItem*> item);
-bool hasRevisions(not_null<HistoryItem*> item);
+	void addEditedMessage(HistoryMessageEdition& edition, not_null<HistoryItem*> item);
+	std::vector<EditedMessage> getEditedMessages(not_null<HistoryItem*> item);
+	bool hasRevisions(not_null<HistoryItem*> item);
 
-}
+} // namespace AyuMessages
