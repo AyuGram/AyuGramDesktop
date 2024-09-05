@@ -8,67 +8,65 @@
 
 #include "history/view/history_view_list_widget.h"
 #include "ui/chat/chat_style.h"
-#include "window/window_session_controller.h"
 #include "window/themes/window_themes_embedded.h"
+#include "window/window_session_controller.h"
 
 namespace AyuFeatures::MessageShot {
 
-struct ShotConfig
-{
-	not_null<Window::SessionController*> controller;
-	std::shared_ptr<Ui::ChatStyle> st;
-	std::vector<not_null<HistoryItem*>> messages;
+	struct ShotConfig {
+		not_null<Window::SessionController*> controller;
+		std::shared_ptr<Ui::ChatStyle> st;
+		std::vector<not_null<HistoryItem*>> messages;
 
-	bool showBackground = true;
-	bool showDate;
-	bool showReactions;
-};
+		bool showBackground = true;
+		bool showDate;
+		bool showReactions;
+	};
 
-enum RenderPart
-{
-	Date,
-	Reactions,
-};
+	enum RenderPart {
+		Date,
+		Reactions,
+	};
 
-void setShotConfig(ShotConfig &config);
-void resetShotConfig();
-ShotConfig getShotConfig();
+	void setShotConfig(ShotConfig& config);
+	void resetShotConfig();
+	ShotConfig getShotConfig();
 
-// for default themes
-void setDefaultSelected(Window::Theme::EmbeddedType type);
-Window::Theme::EmbeddedType getSelectedFromDefault();
+	// for default themes
+	void setDefaultSelected(Window::Theme::EmbeddedType type);
+	Window::Theme::EmbeddedType getSelectedFromDefault();
 
-void setDefaultSelectedColor(QColor color);
-std::optional<QColor> getSelectedColorFromDefault();
+	void setDefaultSelectedColor(QColor color);
+	std::optional<QColor> getSelectedColorFromDefault();
 
-// for custom themes
-void setCustomSelected(Data::CloudTheme theme);
-std::optional<Data::CloudTheme> getSelectedFromCustom();
+	// for custom themes
+	void setCustomSelected(Data::CloudTheme theme);
+	std::optional<Data::CloudTheme> getSelectedFromCustom();
 
-// resets
-void resetDefaultSelected();
-void resetCustomSelected();
+	// resets
+	void resetDefaultSelected();
+	void resetCustomSelected();
 
-rpl::producer<> resetDefaultSelectedEvents();
-rpl::producer<> resetCustomSelectedEvents();
+	rpl::producer<> resetDefaultSelectedEvents();
+	rpl::producer<> resetCustomSelectedEvents();
 
-bool ignoreRender(RenderPart part);
-bool isTakingShot();
+	bool ignoreRender(RenderPart part);
+	bool isTakingShot();
 
-bool isChoosingTheme();
-bool setChoosingTheme(bool val);
+	bool isChoosingTheme();
+	bool setChoosingTheme(bool val);
 
-void setTheme(Data::CloudTheme theme);
-rpl::producer<Data::CloudTheme> themeChosen();
+	void setTheme(Data::CloudTheme theme);
+	rpl::producer<Data::CloudTheme> themeChosen();
 
-void setPalette(style::palette &palette);
-rpl::producer<style::palette> paletteChosen();
+	void setPalette(style::palette& palette);
+	rpl::producer<style::palette> paletteChosen();
 
-// util
-QColor makeDefaultBackgroundColor();
+	// util
+	QColor makeDefaultBackgroundColor();
 
-QImage Make(not_null<QWidget*> box, const ShotConfig &config);
+	QImage Make(not_null<QWidget*> box, const ShotConfig& config);
 
-void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected);
+	void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected);
 
-}
+} // namespace AyuFeatures::MessageShot

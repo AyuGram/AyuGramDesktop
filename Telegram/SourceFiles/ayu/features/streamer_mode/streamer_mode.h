@@ -8,10 +8,10 @@
 
 namespace AyuFeatures::StreamerMode {
 
-bool isEnabled();
-void enable();
-void disable();
-void hideWidgetWindow(QWidget *widget);
-void showWidgetWindow(QWidget *widget);
+	bool isEnabled();
+	void enable();
+	void disable();
+	void hideWidgetWindow(QWidget* widget);
+	void showWidgetWindow(QWidget* widget);
 
-}
+} // namespace AyuFeatures::StreamerMode

@@ -12,28 +12,27 @@
 
 namespace AyuFeatures::StreamerMode::Impl {
 
-void enableHook() {
-	auto handle = Core::App().activeWindow()->widget()->psHwnd();
-	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
-		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_EXCLUDEFROMCAPTURE);
-	});
-}
+	void enableHook() {
+		auto handle = Core::App().activeWindow()->widget()->psHwnd();
+		Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
+			SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_EXCLUDEFROMCAPTURE);
+		});
+	}
 
-void disableHook() {
-	auto handle = Core::App().activeWindow()->widget()->psHwnd();
-	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
-		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_NONE);
-	});
-}
+	void disableHook() {
+		auto handle = Core::App().activeWindow()->widget()->psHwnd();
+		Core::App().enumerateWindows(
+			[&](not_null<Window::Controller*> w) { SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_NONE); });
+	}
 
-void hideWidgetWindow(QWidget *widget) {
-	auto handle = reinterpret_cast<HWND>(widget->window()->winId());
-	SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
-}
+	void hideWidgetWindow(QWidget* widget) {
+		auto handle = reinterpret_cast<HWND>(widget->window()->winId());
+		SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
+	}
 
-void showWidgetWindow(QWidget *widget) {
-	auto handle = reinterpret_cast<HWND>(widget->window()->winId());
-	SetWindowDisplayAffinity(handle, WDA_NONE);
-}
+	void showWidgetWindow(QWidget* widget) {
+		auto handle = reinterpret_cast<HWND>(widget->window()->winId());
+		SetWindowDisplayAffinity(handle, WDA_NONE);
+	}
 
-}
+} // namespace AyuFeatures::StreamerMode::Impl
