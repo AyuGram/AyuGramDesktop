@@ -11,21 +11,17 @@
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_widgets.h"
-#include "ui/widgets/popup_menu.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/special_fields.h"
+#include "ui/widgets/popup_menu.h"
 
 #include "ayu/ayu_settings.h"
 
-EditDeletedMarkBox::EditDeletedMarkBox(QWidget *)
-	: _text(
-		this,
-		st::defaultInputField,
-		tr::ayu_DeletedMarkText(),
-		AyuSettings::getInstance().deletedMark) {
-}
+EditDeletedMarkBox::EditDeletedMarkBox(QWidget*) :
+	_text(this, st::defaultInputField, tr::ayu_DeletedMarkText(), AyuSettings::getInstance().deletedMark) {}
 
-void EditDeletedMarkBox::prepare() {
+void
+EditDeletedMarkBox::prepare() {
 	const auto defaultDeletedMark = "🧹";
 	auto newHeight = st::contactPadding.top() + _text->height();
 
@@ -34,36 +30,22 @@ void EditDeletedMarkBox::prepare() {
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
 
-	addLeftButton(tr::ayu_BoxActionReset(),
-				  [=]
-				  {
-					  _text->setText(defaultDeletedMark);
-				  });
+	addLeftButton(tr::ayu_BoxActionReset(), [=] { _text->setText(defaultDeletedMark); });
 
-	addButton(tr::lng_settings_save(),
-			  [=]
-			  {
-				  save();
-			  });
-	addButton(tr::lng_cancel(),
-			  [=]
-			  {
-				  closeBox();
-			  });
+	addButton(tr::lng_settings_save(), [=] { save(); });
+	addButton(tr::lng_cancel(), [=] { closeBox(); });
 
-	const auto submitted = [=]
-	{
-		submit();
-	};
-	_text->submits(
-	) | rpl::start_with_next(submitted, _text->lifetime());
+	const auto submitted = [=] { submit(); };
+	_text->submits() | rpl::start_with_next(submitted, _text->lifetime());
 }
 
-void EditDeletedMarkBox::setInnerFocus() {
+void
+EditDeletedMarkBox::setInnerFocus() {
 	_text->setFocusFast();
 }
 
-void EditDeletedMarkBox::submit() {
+void
+EditDeletedMarkBox::submit() {
 	if (_text->getLastText().trimmed().isEmpty()) {
 		_text->setFocus();
 		_text->showError();
@@ -72,21 +54,19 @@ void EditDeletedMarkBox::submit() {
 	}
 }
 
-void EditDeletedMarkBox::resizeEvent(QResizeEvent *e) {
+void
+EditDeletedMarkBox::resizeEvent(QResizeEvent* e) {
 	BoxContent::resizeEvent(e);
 
-	_text->resize(
-		width()
-		- st::boxPadding.left()
-		- st::newGroupInfoPadding.left()
-		- st::boxPadding.right(),
-		_text->height());
+	_text->resize(width() - st::boxPadding.left() - st::newGroupInfoPadding.left() - st::boxPadding.right(),
+				  _text->height());
 
 	const auto left = st::boxPadding.left() + st::newGroupInfoPadding.left();
 	_text->moveToLeft(left, st::contactPadding.top());
 }
 
-void EditDeletedMarkBox::save() {
+void
+EditDeletedMarkBox::save() {
 	const auto settings = &AyuSettings::getInstance();
 	settings->set_deletedMark(_text->getLastText());
 	AyuSettings::save();

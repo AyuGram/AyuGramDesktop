@@ -9,15 +9,14 @@
 #include "base/timer.h"
 #include "boxes/abstract_box.h"
 
-class EditDeletedMarkBox : public Ui::BoxContent
-{
+class EditDeletedMarkBox : public Ui::BoxContent {
 public:
-	EditDeletedMarkBox(QWidget *);
+	EditDeletedMarkBox(QWidget*);
 
 protected:
 	void setInnerFocus() override;
 	void prepare() override;
-	void resizeEvent(QResizeEvent *e) override;
+	void resizeEvent(QResizeEvent* e) override;
 
 private:
 	void submit();

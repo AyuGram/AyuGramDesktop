@@ -10,15 +10,14 @@
 #include "boxes/abstract_box.h"
 #include "mtproto/sender.h"
 
-class EditEditedMarkBox : public Ui::BoxContent
-{
+class EditEditedMarkBox : public Ui::BoxContent {
 public:
-	EditEditedMarkBox(QWidget *);
+	EditEditedMarkBox(QWidget*);
 
 protected:
 	void setInnerFocus() override;
 	void prepare() override;
-	void resizeEvent(QResizeEvent *e) override;
+	void resizeEvent(QResizeEvent* e) override;
 
 private:
 	void submit();

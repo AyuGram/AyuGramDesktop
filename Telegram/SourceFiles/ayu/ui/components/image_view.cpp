@@ -13,17 +13,15 @@
 #include "styles/style_chat.h"
 #include "ui/painter.h"
 
-ImageView::ImageView(QWidget *parent)
-	: RpWidget(parent) {
-}
+ImageView::ImageView(QWidget* parent) : RpWidget(parent) {}
 
-void ImageView::setImage(const QImage &image) {
+void
+ImageView::setImage(const QImage& image) {
 	if (this->image == image) {
 		return;
 	}
 
-	const auto set = [=]
-	{
+	const auto set = [=] {
 		this->prevImage = this->image;
 		this->image = image;
 
@@ -38,15 +36,7 @@ void ImageView::setImage(const QImage &image) {
 			return;
 		}
 
-		this->animation.start(
-			[=]
-			{
-				update();
-			},
-			0.0,
-			1.0,
-			300,
-			anim::easeInCubic);
+		this->animation.start([=] { update(); }, 0.0, 1.0, 300, anim::easeInCubic);
 	};
 
 	if (this->image.isNull()) {
@@ -57,11 +47,13 @@ void ImageView::setImage(const QImage &image) {
 	dispatchToMainThread(set, 100);
 }
 
-QImage ImageView::getImage() const {
+QImage
+ImageView::getImage() const {
 	return image;
 }
 
-void ImageView::paintEvent(QPaintEvent *e) {
+void
+ImageView::paintEvent(QPaintEvent* e) {
 	Painter p(this);
 
 	const auto brush = QBrush(AyuFeatures::MessageShot::makeDefaultBackgroundColor());
@@ -74,11 +66,10 @@ void ImageView::paintEvent(QPaintEvent *e) {
 	if (!prevImage.isNull()) {
 		const auto realRect = rect().marginsRemoved(st::imageViewInnerPadding);
 
-		const auto resizedRect = QRect(
-			(realRect.width() - prevImage.width()) / 2 + st::imageViewInnerPadding.left(),
-			(realRect.height() - prevImage.height()) / 2 + st::imageViewInnerPadding.top(),
-			prevImage.width(),
-			prevImage.height());
+		const auto resizedRect = QRect((realRect.width() - prevImage.width()) / 2 + st::imageViewInnerPadding.left(),
+									   (realRect.height() - prevImage.height()) / 2 + st::imageViewInnerPadding.top(),
+									   prevImage.width(),
+									   prevImage.height());
 
 		const auto opacity = 1.0 - animation.value(1.0);
 		p.setOpacity(opacity);
@@ -89,11 +80,10 @@ void ImageView::paintEvent(QPaintEvent *e) {
 	if (!image.isNull()) {
 		const auto realRect = rect().marginsRemoved(st::imageViewInnerPadding);
 
-		const auto resizedRect = QRect(
-			(realRect.width() - image.width()) / 2 + st::imageViewInnerPadding.left(),
-			(realRect.height() - image.height()) / 2 + st::imageViewInnerPadding.top(),
-			image.width(),
-			image.height());
+		const auto resizedRect = QRect((realRect.width() - image.width()) / 2 + st::imageViewInnerPadding.left(),
+									   (realRect.height() - image.height()) / 2 + st::imageViewInnerPadding.top(),
+									   image.width(),
+									   image.height());
 
 		const auto opacity = animation.value(1.0);
 		p.setOpacity(opacity);
@@ -102,5 +92,5 @@ void ImageView::paintEvent(QPaintEvent *e) {
 	}
 }
 
-void ImageView::mousePressEvent(QMouseEvent *e) {
-}
+void
+ImageView::mousePressEvent(QMouseEvent* e) {}

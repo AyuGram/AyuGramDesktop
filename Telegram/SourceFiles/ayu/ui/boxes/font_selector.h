@@ -6,53 +6,51 @@
 // Copyright @Radolyn, 2024
 #pragma once
 
-#include "boxes/abstract_box.h"
 #include "base/binary_guard.h"
+#include "boxes/abstract_box.h"
 
 struct LanguageId;
 struct Font;
 
 namespace Ui {
 
-class MultiSelect;
-struct ScrollToRequest;
-class VerticalLayout;
+	class MultiSelect;
+	struct ScrollToRequest;
+	class VerticalLayout;
 
 } // namespace Ui
 
 namespace Window {
 
-class SessionController;
+	class SessionController;
 
 } // namespace Window
 
 namespace AyuUi {
 
-class FontSelectorBox : public Ui::BoxContent
-{
-public:
-	FontSelectorBox(QWidget *, Window::SessionController *controller, Fn<void(QString font)> hook);
+	class FontSelectorBox : public Ui::BoxContent {
+	public:
+		FontSelectorBox(QWidget*, Window::SessionController* controller, Fn<void(QString font)> hook);
 
-	void setInnerFocus() override;
-	static base::binary_guard Show(Window::SessionController *controller, const Fn<void(QString font)> hook);
+		void setInnerFocus() override;
+		static base::binary_guard Show(Window::SessionController* controller, const Fn<void(QString font)> hook);
 
-private:
-	QString _selectedFont;
+	private:
+		QString _selectedFont;
 
-protected:
-	void prepare() override;
-	void keyPressEvent(QKeyEvent *e) override;
+	protected:
+		void prepare() override;
+		void keyPressEvent(QKeyEvent* e) override;
 
-private:
-	void setupTop(not_null<Ui::VerticalLayout*> container);
-	[[nodiscard]] int rowsInPage() const;
+	private:
+		void setupTop(not_null<Ui::VerticalLayout*> container);
+		[[nodiscard]] int rowsInPage() const;
 
-	Window::SessionController *_controller = nullptr;
-	rpl::event_stream<bool> _translateChatTurnOff;
-	Fn<void()> _setInnerFocus;
-	Fn<Ui::ScrollToRequest(int rows)> _jump;
-	Fn<void(QString font)> _hook;
+		Window::SessionController* _controller = nullptr;
+		rpl::event_stream<bool> _translateChatTurnOff;
+		Fn<void()> _setInnerFocus;
+		Fn<Ui::ScrollToRequest(int rows)> _jump;
+		Fn<void(QString font)> _hook;
+	};
 
-};
-
-}
+} // namespace AyuUi

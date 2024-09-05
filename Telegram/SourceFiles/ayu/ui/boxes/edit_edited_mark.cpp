@@ -11,21 +11,17 @@
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_widgets.h"
-#include "ui/widgets/popup_menu.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/special_fields.h"
+#include "ui/widgets/popup_menu.h"
 
 #include "ayu/ayu_settings.h"
 
-EditEditedMarkBox::EditEditedMarkBox(QWidget *)
-	: _text(
-		this,
-		st::defaultInputField,
-		tr::ayu_EditedMarkText(),
-		AyuSettings::getInstance().editedMark) {
-}
+EditEditedMarkBox::EditEditedMarkBox(QWidget*) :
+	_text(this, st::defaultInputField, tr::ayu_EditedMarkText(), AyuSettings::getInstance().editedMark) {}
 
-void EditEditedMarkBox::prepare() {
+void
+EditEditedMarkBox::prepare() {
 	const auto defaultEditedMark = tr::lng_edited(tr::now);
 	auto newHeight = st::contactPadding.top() + _text->height();
 
@@ -34,35 +30,21 @@ void EditEditedMarkBox::prepare() {
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
 
-	addLeftButton(tr::ayu_BoxActionReset(),
-				  [=]
-				  {
-					  _text->setText(defaultEditedMark);
-				  });
-	addButton(tr::lng_settings_save(),
-			  [=]
-			  {
-				  save();
-			  });
-	addButton(tr::lng_cancel(),
-			  [=]
-			  {
-				  closeBox();
-			  });
+	addLeftButton(tr::ayu_BoxActionReset(), [=] { _text->setText(defaultEditedMark); });
+	addButton(tr::lng_settings_save(), [=] { save(); });
+	addButton(tr::lng_cancel(), [=] { closeBox(); });
 
-	const auto submitted = [=]
-	{
-		submit();
-	};
-	_text->submits(
-	) | rpl::start_with_next(submitted, _text->lifetime());
+	const auto submitted = [=] { submit(); };
+	_text->submits() | rpl::start_with_next(submitted, _text->lifetime());
 }
 
-void EditEditedMarkBox::setInnerFocus() {
+void
+EditEditedMarkBox::setInnerFocus() {
 	_text->setFocusFast();
 }
 
-void EditEditedMarkBox::submit() {
+void
+EditEditedMarkBox::submit() {
 	if (_text->getLastText().trimmed().isEmpty()) {
 		_text->setFocus();
 		_text->showError();
@@ -71,21 +53,19 @@ void EditEditedMarkBox::submit() {
 	}
 }
 
-void EditEditedMarkBox::resizeEvent(QResizeEvent *e) {
+void
+EditEditedMarkBox::resizeEvent(QResizeEvent* e) {
 	BoxContent::resizeEvent(e);
 
-	_text->resize(
-		width()
-		- st::boxPadding.left()
-		- st::newGroupInfoPadding.left()
-		- st::boxPadding.right(),
-		_text->height());
+	_text->resize(width() - st::boxPadding.left() - st::newGroupInfoPadding.left() - st::boxPadding.right(),
+				  _text->height());
 
 	const auto left = st::boxPadding.left() + st::newGroupInfoPadding.left();
 	_text->moveToLeft(left, st::contactPadding.top());
 }
 
-void EditEditedMarkBox::save() {
+void
+EditEditedMarkBox::save() {
 	const auto settings = &AyuSettings::getInstance();
 	settings->set_editedMark(_text->getLastText());
 	AyuSettings::save();

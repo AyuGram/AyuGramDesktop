@@ -11,12 +11,12 @@
 
 namespace AyuUi {
 
-bool needToShowItem(int state);
+	bool needToShowItem(int state);
 
-void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
-void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
-void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
-void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
-void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
+	void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem* item);
+	void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem* item);
+	void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem* item);
+	void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem* item);
+	void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem* item);
 
-}
+} // namespace AyuUi

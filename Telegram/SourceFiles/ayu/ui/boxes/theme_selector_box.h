@@ -10,12 +10,11 @@
 #include "ui/style/style_core_palette.h"
 #include "window/window_session_controller.h"
 
-using Callback = Fn<void(style::palette &)>;
+using Callback = Fn<void(style::palette&)>;
 
-class ThemeSelectorBox : public Ui::BoxContent
-{
+class ThemeSelectorBox : public Ui::BoxContent {
 public:
-	ThemeSelectorBox(QWidget *parent, not_null<Window::SessionController*> controller);
+	ThemeSelectorBox(QWidget* parent, not_null<Window::SessionController*> controller);
 
 	rpl::producer<style::palette> paletteSelected();
 	rpl::producer<QString> themeNameChanged();

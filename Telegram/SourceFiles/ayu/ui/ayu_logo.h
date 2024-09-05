@@ -10,25 +10,25 @@
 
 namespace AyuAssets {
 
-ICON(DEFAULT, "default");
-ICON(DEFAULT_MACOS, "macos");
-ICON(ALT, "alt");
-ICON(DISCORD, "discord");
-ICON(SPOTIFY, "spotify");
-ICON(EXTERA, "extera");
-ICON(NOTHING, "nothing");
-ICON(BARD, "bard");
-ICON(YAPLUS, "yaplus");
-ICON(WIN95, "win95");
-ICON(CHIBI, "chibi");
-ICON(CHIBI2, "chibi2");
+	ICON(DEFAULT, "default");
+	ICON(DEFAULT_MACOS, "macos");
+	ICON(ALT, "alt");
+	ICON(DISCORD, "discord");
+	ICON(SPOTIFY, "spotify");
+	ICON(EXTERA, "extera");
+	ICON(NOTHING, "nothing");
+	ICON(BARD, "bard");
+	ICON(YAPLUS, "yaplus");
+	ICON(WIN95, "win95");
+	ICON(CHIBI, "chibi");
+	ICON(CHIBI2, "chibi2");
 
-void loadAppIco();
+	void loadAppIco();
 
-QImage loadPreview(QString name);
+	QImage loadPreview(QString name);
 
-QString currentAppLogoName();
-QImage currentAppLogo();
-QImage currentAppLogoNoMargin();
+	QString currentAppLogoName();
+	QImage currentAppLogo();
+	QImage currentAppLogoNoMargin();
 
-}
+} // namespace AyuAssets
