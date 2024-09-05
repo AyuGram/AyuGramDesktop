@@ -1,3 +1,6 @@
+##### Available on other languages! 
+[ English  |   [Русский](README-ru.MD) ]
+
 # AyuGram
 
 ![AyuGram Logo](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
