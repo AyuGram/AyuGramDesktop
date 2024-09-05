@@ -1,5 +1,5 @@
 ##### Available on other languages! 
-[ English  |   [Русский](README-ru.MD) ]
+[ English  |   [Русский](README-ru.md) ]
 
 # AyuGram
 
