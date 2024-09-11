@@ -251,6 +251,7 @@ QImage addPadding(const QImage &original) {
 		original.height() + 2 * st::messageShotPadding,
 		QImage::Format_ARGB32_Premultiplied
 	);
+	paddedImage.setDevicePixelRatio(style::DevicePixelRatio());
 	paddedImage.fill(Qt::transparent);
 
 	Painter painter(&paddedImage);
@@ -351,11 +352,11 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		height += view->resizeGetHeight(width);
 	}
 
-	// width *= style::DevicePixelRatio();
 	height *= style::DevicePixelRatio();
 
 	// create the image
 	QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
+	image.setDevicePixelRatio(style::DevicePixelRatio());
 	image.fill(Qt::transparent);
 
 	const auto viewport = QRect(0, 0, width, height);
@@ -408,15 +409,6 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 						picY,
 						width,
 						st::msgPhotoSize);
-				} else {
-					auto &userpic = hiddenSenderUserpics[message->id];
-					const auto valid = info->paintCustomUserpic(
-						p,
-						userpic,
-						picX,
-						picY,
-						width,
-						st::msgPhotoSize);
 				}
 			}
 		}
@@ -432,6 +424,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	}
 
 	auto newResult = QImage(result.size(), QImage::Format_ARGB32_Premultiplied);
+	newResult.setDevicePixelRatio(style::DevicePixelRatio());
 	newResult.fill(makeDefaultBackgroundColor());
 
 	Painter painter(&newResult);
