@@ -164,7 +164,7 @@ public:
 	void sendBotCommand(Bot::SendCommandRequest request);
 	void hideSingleUseKeyboard(FullMsgId replyToId);
 
-	void searchMessages(const QString &query, Dialogs::Key inChat, UserData *from = nullptr);
+	void searchMessages(const QString &query, Dialogs::Key inChat, PeerData *from = nullptr);
 
 	void setChatBackground(
 		const Data::WallPaper &background,

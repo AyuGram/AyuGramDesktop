@@ -766,7 +766,7 @@ void MainWidget::hideSingleUseKeyboard(FullMsgId replyToId) {
 	_history->hideSingleUseKeyboard(replyToId);
 }
 
-void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, UserData *from) {
+void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, PeerData *from) {
 	auto tags = Data::SearchTagsFromQuery(query);
 	if (controller()->isPrimary()) {
 		auto state = Dialogs::SearchState{
