@@ -4282,6 +4282,13 @@ void ApiWrap::sendBotStart(
 		if (chat) {
 			message.textWithTags.text += '@' + bot->username();
 		}
+
+		const auto settings = &AyuSettings::getInstance();
+		if (settings->useScheduledMessages) {
+			auto current = base::unixtime::now();
+			message.action.options.scheduled = current + 12;
+		}
+
 		sendMessage(std::move(message));
 		return;
 	}
