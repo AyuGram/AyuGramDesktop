@@ -559,6 +559,28 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 		container->lifetime());
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_UseScheduledMessagesDescription());
+
+	AddSkip(container);
+	AddButtonWithIcon(
+		container,
+		tr::ayu_SendWithoutSoundByDefault(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->sendWithoutSound)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->sendWithoutSound);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_sendWithoutSound(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+	AddSkip(container);
+	AddDividerText(container, tr::ayu_SendWithoutSoundByDefaultDescription());
 }
 
 void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {

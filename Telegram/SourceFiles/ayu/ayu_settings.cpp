@@ -203,6 +203,7 @@ AyuGramSettings::AyuGramSettings() {
 
 	markReadAfterAction = true;
 	useScheduledMessages = false;
+	sendWithoutSound = false;
 
 	// ~ Message edits & deletion history
 	saveDeletedMessages = true;
@@ -329,6 +330,10 @@ void AyuGramSettings::set_markReadAfterAction(bool val) {
 
 void AyuGramSettings::set_useScheduledMessages(bool val) {
 	useScheduledMessages = val;
+}
+
+void AyuGramSettings::set_sendWithoutSound(bool val) {
+	sendWithoutSound = val;
 }
 
 void AyuGramSettings::set_saveDeletedMessages(bool val) {

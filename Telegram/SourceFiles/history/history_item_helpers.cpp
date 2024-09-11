@@ -607,6 +607,11 @@ QString NewMessagePostAuthor(const Api::SendAction &action) {
 bool ShouldSendSilent(
 		not_null<PeerData*> peer,
 		const Api::SendOptions &options) {
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->sendWithoutSound) {
+		return true;
+	}
+
 	return options.silent
 		|| (peer->isBroadcast()
 			&& peer->owner().notifySettings().silentPosts(peer))

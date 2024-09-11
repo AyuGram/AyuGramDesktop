@@ -25,6 +25,7 @@ public:
 
 	bool markReadAfterAction;
 	bool useScheduledMessages;
+	bool sendWithoutSound;
 
 	bool saveDeletedMessages;
 	bool saveMessagesHistory;
@@ -90,6 +91,7 @@ public:
 
 	void set_markReadAfterAction(bool val);
 	void set_useScheduledMessages(bool val);
+	void set_sendWithoutSound(bool val);
 
 	void set_saveDeletedMessages(bool val);
 	void set_saveMessagesHistory(bool val);
@@ -155,6 +157,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	sendOfflinePacketAfterOnline,
 	markReadAfterAction,
 	useScheduledMessages,
+	sendWithoutSound,
 	saveDeletedMessages,
 	saveMessagesHistory,
 	hideFromBlocked,
