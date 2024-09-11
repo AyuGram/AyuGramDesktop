@@ -1178,8 +1178,6 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupMarks(not_null<Ui::VerticalLayout*> container) {
-	auto settings = &AyuSettings::getInstance();
-
 	AddButtonWithLabel(
 		container,
 		tr::ayu_DeletedMarkText(),

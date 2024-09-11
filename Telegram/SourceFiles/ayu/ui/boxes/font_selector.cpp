@@ -45,6 +45,7 @@
 #include <ayu/ayu_settings.h>
 
 #include "ayu/ayu_fonts.h"
+#include "ui/ui_utility.h"
 
 struct Font
 {

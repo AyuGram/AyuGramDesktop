@@ -650,9 +650,7 @@ void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cac
 		session->data().processUsers(d.vusers());
 
 		auto &v = d.vresults().v;
-		auto queryId = d.vquery_id().v;
 
-		auto added = 0;
 		for (const auto &res : v) {
 			const auto message = res.match(
 				[&](const MTPDbotInlineResult &data)

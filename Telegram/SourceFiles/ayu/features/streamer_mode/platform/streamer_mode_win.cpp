@@ -13,14 +13,12 @@
 namespace AyuFeatures::StreamerMode::Impl {
 
 void enableHook() {
-	auto handle = Core::App().activeWindow()->widget()->psHwnd();
 	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
 		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_EXCLUDEFROMCAPTURE);
 	});
 }
 
 void disableHook() {
-	auto handle = Core::App().activeWindow()->widget()->psHwnd();
 	Core::App().enumerateWindows([&](not_null<Window::Controller*> w) {
 		SetWindowDisplayAffinity(w->widget()->psHwnd(), WDA_NONE);
 	});

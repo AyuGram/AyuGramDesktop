@@ -57,6 +57,8 @@
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 
+#include "ui/ui_utility.h"
+
 namespace EditedLog {
 namespace {
 
