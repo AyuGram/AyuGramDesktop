@@ -42,6 +42,7 @@ rpl::variable<QString> editedMarkReactive;
 rpl::variable<int> showPeerIdReactive;
 
 rpl::variable<bool> hideFromBlockedReactive;
+rpl::event_stream<> historyUpdateReactive;
 
 rpl::lifetime lifetime = rpl::lifetime();
 
@@ -249,6 +250,15 @@ AyuGramSettings::AyuGramSettings() {
 	showUserMessagesInContextMenu = 2;
 	showMessageDetailsInContextMenu = 2;
 
+	showAttachButtonInMessageField = true;
+	showCommandsButtonInMessageField = true;
+	showEmojiButtonInMessageField = true;
+	showMicrophoneButtonInMessageField = true;
+	showAutoDeleteButtonInMessageField = true;
+
+	showAttachPopup = true;
+	showEmojiPopup = true;
+
 	showLReadToggleInDrawer = false;
 	showSReadToggleInDrawer = true;
 	showGhostToggleInDrawer = true;
@@ -431,6 +441,41 @@ void AyuGramSettings::set_showMessageDetailsInContextMenu(int val) {
 	showMessageDetailsInContextMenu = val;
 }
 
+void AyuGramSettings::set_showAttachButtonInMessageField(bool val) {
+	showAttachButtonInMessageField = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showCommandsButtonInMessageField(bool val) {
+	showCommandsButtonInMessageField = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showEmojiButtonInMessageField(bool val) {
+	showEmojiButtonInMessageField = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showMicrophoneButtonInMessageField(bool val) {
+	showMicrophoneButtonInMessageField = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showAutoDeleteButtonInMessageField(bool val) {
+	showAutoDeleteButtonInMessageField = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showAttachPopup(bool val) {
+	showAttachPopup = val;
+	triggerHistoryUpdate();
+}
+
+void AyuGramSettings::set_showEmojiPopup(bool val) {
+	showEmojiPopup = val;
+	triggerHistoryUpdate();
+}
+
 void AyuGramSettings::set_showLReadToggleInDrawer(bool val) {
 	showLReadToggleInDrawer = val;
 }
@@ -522,6 +567,14 @@ rpl::producer<bool> get_ghostModeEnabledReactive() {
 
 rpl::producer<bool> get_hideFromBlockedReactive() {
 	return hideFromBlockedReactive.value();
+}
+
+void triggerHistoryUpdate() {
+	historyUpdateReactive.fire({});
+}
+
+rpl::producer<> get_historyUpdateReactive() {
+	return historyUpdateReactive.events();
 }
 
 }

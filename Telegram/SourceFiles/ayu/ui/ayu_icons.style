@@ -19,6 +19,12 @@ ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};
 
 ayuMenuIconToBeginning: icon {{ "ayu/to_beginning", menuIconColor }};
 
+messageFieldAttachIcon: icon {{ "ayu/message_field/attach", menuIconColor }};
+messageFieldCommandsIcon: icon {{ "ayu/message_field/commands", menuIconColor }};
+messageFieldEmojiIcon: icon {{ "ayu/message_field/emoji", menuIconColor }};
+messageFieldVoiceIcon: icon {{ "ayu/message_field/voice", menuIconColor }};
+messageFieldTTLIcon: icon {{ "ayu/message_field/ttl", menuIconColor }};
+
 inChannelBadgeIcon: icon {{ "ayu/channel", msgInDateFg }};
 inChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgInDateFgSelected }};
 outChannelBadgeIcon: icon {{ "ayu/channel", msgOutDateFg }};

@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_selector.h"
 #include "window/window_session_controller.h"
 #include "mainwindow.h"
+#include "ayu/ayu_settings.h"
 #include "core/application.h"
 #include "base/options.h"
 #include "styles/style_chat_helpers.h"
@@ -27,6 +28,7 @@ base::options::toggle TabbedPanelShowOnClick({
 	.id = kOptionTabbedPanelShowOnClick,
 	.name = "Show tabbed panel by click",
 	.description = "Show Emoji / Stickers / GIFs panel only after a click.",
+	.scope = static_cast<base::options::details::ScopeFlag>(0),
 });
 
 } // namespace
@@ -472,7 +474,9 @@ void TabbedPanel::showStarted() {
 }
 
 bool TabbedPanel::eventFilter(QObject *obj, QEvent *e) {
-	if (TabbedPanelShowOnClick.value()) {
+	const auto settings = &AyuSettings::getInstance();
+
+	if (TabbedPanelShowOnClick.value() || !settings->showEmojiPopup) {
 		return false;
 	} else if (e->type() == QEvent::Enter) {
 		otherEnter();

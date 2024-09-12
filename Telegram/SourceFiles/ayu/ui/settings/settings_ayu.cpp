@@ -5,6 +5,8 @@
 //
 // Copyright @Radolyn, 2024
 #include "settings_ayu.h"
+
+
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/edit_deleted_mark.h"
 #include "ayu/ui/boxes/edit_edited_mark.h"
@@ -17,6 +19,7 @@
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "storage/localstorage.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_basic.h"
 #include "styles/style_boxes.h"
@@ -346,14 +349,14 @@ void AddCollapsibleToggle(not_null<Ui::VerticalLayout*> container,
 }
 
 void AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> container,
-										 not_null<Window::SessionController*> controller,
-										 int initialState,
-										 std::vector<QString> options,
-										 rpl::producer<QString> text,
-										 rpl::producer<QString> boxTitle,
-										 const style::SettingsButton & st,
-										 Settings::IconDescriptor && descriptor,
-										 const Fn<void(int)> &setter) {
+											  not_null<Window::SessionController*> controller,
+											  int initialState,
+											  std::vector<QString> options,
+											  rpl::producer<QString> text,
+											  rpl::producer<QString> boxTitle,
+											  const style::SettingsButton &st,
+											  Settings::IconDescriptor &&descriptor,
+											  const Fn<void(int)> &setter) {
 	auto reactiveVal = container->lifetime().make_state<rpl::variable<int>>(initialState);
 
 	rpl::producer<QString> rightTextReactive = reactiveVal->value() | rpl::map(
@@ -885,6 +888,166 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());
 }
 
+void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddSkip(container);
+	AddSubsectionTitle(container, tr::ayu_MessageFieldElementsHeader());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementAttach(),
+		st::settingsButton,
+		{&st::messageFieldAttachIcon}
+	)->toggleOn(
+		rpl::single(settings->showAttachButtonInMessageField)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showAttachButtonInMessageField);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showAttachButtonInMessageField(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementCommands(),
+		st::settingsButton,
+		{&st::messageFieldCommandsIcon}
+	)->toggleOn(
+		rpl::single(settings->showCommandsButtonInMessageField)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showCommandsButtonInMessageField);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showCommandsButtonInMessageField(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementTTL(),
+		st::settingsButton,
+		{&st::messageFieldTTLIcon}
+	)->toggleOn(
+		rpl::single(settings->showAutoDeleteButtonInMessageField)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showAutoDeleteButtonInMessageField);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showAutoDeleteButtonInMessageField(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementEmoji(),
+		st::settingsButton,
+		{&st::messageFieldEmojiIcon}
+	)->toggleOn(
+		rpl::single(settings->showEmojiButtonInMessageField)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showEmojiButtonInMessageField);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showEmojiButtonInMessageField(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementVoice(),
+		st::settingsButton,
+		{&st::messageFieldVoiceIcon}
+	)->toggleOn(
+		rpl::single(settings->showMicrophoneButtonInMessageField)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showMicrophoneButtonInMessageField);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showMicrophoneButtonInMessageField(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddSkip(container);
+	AddDivider(container);
+}
+
+void SetupMessageFieldPopups(not_null<Ui::VerticalLayout*> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddSkip(container);
+	AddSubsectionTitle(container, tr::ayu_MessageFieldPopupsHeader());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementAttach(),
+		st::settingsButton,
+		{&st::messageFieldAttachIcon}
+	)->toggleOn(
+		rpl::single(settings->showAttachPopup)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showAttachPopup);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showAttachPopup(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageFieldElementEmoji(),
+		st::settingsButton,
+		{&st::messageFieldEmojiIcon}
+	)->toggleOn(
+		rpl::single(settings->showEmojiPopup)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showEmojiPopup);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showEmojiPopup(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddSkip(container);
+	AddDivider(container);
+}
+
 void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 	auto settings = &AyuSettings::getInstance();
 
@@ -1250,9 +1413,9 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Windo
 	// not about folders, but it's a good place for it
 #ifdef Q_OS_WIN
 	AddButtonWithIcon(
-	container,
-	tr::ayu_HideNotificationBadge(),
-	st::settingsButtonNoIcon
+		container,
+		tr::ayu_HideNotificationBadge(),
+		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->hideNotificationBadge)
 	)->toggledValue(
@@ -1440,6 +1603,8 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	AddSkip(container);
 	AddDivider(container);
 	SetupContextMenuElements(container, controller);
+	SetupMessageFieldElements(container);
+	SetupMessageFieldPopups(container);
 	SetupDrawerElements(container);
 	AddSkip(container);
 	AddDivider(container);

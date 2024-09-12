@@ -235,6 +235,13 @@ const auto kPsaAboutPrefix = "cloud_lng_about_psa_";
 	return QString();
 }
 
+#define SWITCH_BUTTON(button, show_v) \
+	if (show_v) { \
+		(button)->show(); \
+	} else { \
+		(button)->hide(); \
+	}
+
 } // namespace
 
 HistoryWidget::HistoryWidget(
@@ -508,12 +515,13 @@ HistoryWidget::HistoryWidget(
 
 	_fieldCharsCountManager.limitExceeds(
 	) | rpl::start_with_next([=] {
+		const auto settings = &AyuSettings::getInstance();
 		const auto hide = _fieldCharsCountManager.isLimitExceeded();
 		if (_silent) {
 			_silent->setVisible(!hide);
 		}
 		if (_ttlInfo) {
-			_ttlInfo->setVisible(!hide);
+			_ttlInfo->setVisible(!hide && settings->showAutoDeleteButtonInMessageField);
 		}
 		if (_giftToUser) {
 			_giftToUser->setVisible(!hide);
@@ -768,6 +776,15 @@ HistoryWidget::HistoryWidget(
 			updateControlsGeometry();
 			this->update();
 		}
+	}, lifetime());
+
+	AyuSettings::get_historyUpdateReactive() | rpl::start_with_next([=]
+	{
+		refreshAttachBotsMenu();
+		updateHistoryGeometry();
+		updateControlsVisibility();
+		updateControlsGeometry();
+		this->update();
 	}, lifetime());
 
 	using MessageUpdateFlag = Data::MessageUpdate::Flag;
@@ -2917,8 +2934,10 @@ void HistoryWidget::setHistory(History *history) {
 		return;
 	}
 
+	const auto settings = &AyuSettings::getInstance();
+
 	const auto was = _attachBotsMenu && _history && _history->peer->isUser();
-	const auto now = _attachBotsMenu && history && history->peer->isUser();
+	const auto now = _attachBotsMenu && history && history->peer->isUser() && settings->showAttachPopup;
 	if (was && !now) {
 		_attachToggle->removeEventFilter(_attachBotsMenu.get());
 		_attachBotsMenu->hideFast();
@@ -3000,6 +3019,9 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	if (!_history) {
 		return;
 	}
+
+	const auto settings = &AyuSettings::getInstance();
+
 	_attachBotsMenu = InlineBots::MakeAttachBotsMenu(
 		this,
 		controller(),
@@ -3011,7 +3033,7 @@ void HistoryWidget::refreshAttachBotsMenu() {
 	}
 	_attachBotsMenu->setOrigin(
 		Ui::PanelAnimation::Origin::BottomLeft);
-	if (!ChatHelpers::ShowPanelOnClick()) {
+	if (settings->showAttachPopup) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 	_attachBotsMenu->heightValue(
@@ -3373,6 +3395,8 @@ bool HistoryWidget::canWriteMessage() const {
 }
 
 void HistoryWidget::updateControlsVisibility() {
+	const auto settings = &AyuSettings::getInstance();
+
 	auto fieldDisabledRemoved = (_fieldDisabled != nullptr);
 	const auto hideExtraButtons = _fieldCharsCountManager.isLimitExceeded();
 	const auto guard = gsl::finally([&] {
@@ -3561,27 +3585,27 @@ void HistoryWidget::updateControlsVisibility() {
 			_botCommandStart->hide();
 		} else if (_kbReplyTo) {
 			_kbScroll->hide();
-			_tabbedSelectorToggle->show();
+			SWITCH_BUTTON(_tabbedSelectorToggle, settings->showEmojiButtonInMessageField);
 			_botKeyboardHide->hide();
 			_botKeyboardShow->hide();
 			_botCommandStart->hide();
 		} else {
 			_kbScroll->hide();
-			_tabbedSelectorToggle->show();
+			SWITCH_BUTTON(_tabbedSelectorToggle, settings->showEmojiButtonInMessageField);
 			_botKeyboardHide->hide();
 			if (_keyboard->hasMarkup()) {
 				_botKeyboardShow->show();
 				_botCommandStart->hide();
 			} else {
 				_botKeyboardShow->hide();
-				_botCommandStart->setVisible(_cmdStartShown);
+				_botCommandStart->setVisible(_cmdStartShown && settings->showCommandsButtonInMessageField);
 			}
 		}
 		if (_replaceMedia) {
 			_replaceMedia->show();
 			_attachToggle->hide();
 		} else {
-			_attachToggle->show();
+			SWITCH_BUTTON(_attachToggle, settings->showAttachButtonInMessageField);
 		}
 		if (_botMenu.button) {
 			_botMenu.button->show();
@@ -3625,7 +3649,7 @@ void HistoryWidget::updateControlsVisibility() {
 			}
 			if (_ttlInfo) {
 				const auto was = _ttlInfo->isVisible();
-				const auto now = (!_editMsgId) && (!hideExtraButtons);
+				const auto now = (!_editMsgId) && (!hideExtraButtons) && settings->showAutoDeleteButtonInMessageField;
 				if (was != now) {
 					_ttlInfo->setVisible(now);
 					rightButtonsChanged = true;
@@ -5603,7 +5627,12 @@ bool HistoryWidget::isSearching() const {
 }
 
 bool HistoryWidget::showRecordButton() const {
-	return (_recordAvailability != Webrtc::RecordAvailability::None)
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->showMicrophoneButtonInMessageField) {
+		return false;
+	}
+
+	return Media::Capture::instance()->available()
 		&& !_voiceRecordBar->isListenState()
 		&& !_voiceRecordBar->isRecordingByAnotherBar()
 		&& !HasSendText(_field)
@@ -5840,7 +5869,9 @@ void HistoryWidget::showKeyboardHideButton() {
 }
 
 void HistoryWidget::toggleKeyboard(bool manual) {
-	const auto fieldEnabled = canWriteMessage() && !_showAnimation;
+	const auto settings = &AyuSettings::getInstance();
+
+	auto fieldEnabled = canWriteMessage() && !_showAnimation;
 	if (_kbShown || _kbReplyTo) {
 		_botKeyboardHide->hide();
 		if (_kbShown) {
@@ -5876,7 +5907,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 		_botKeyboardHide->hide();
 		_botKeyboardShow->hide();
 		if (fieldEnabled) {
-			_botCommandStart->show();
+			SWITCH_BUTTON(_botCommandStart, settings->showCommandsButtonInMessageField);
 		}
 		_kbScroll->hide();
 		_kbShown = false;
@@ -5924,13 +5955,7 @@ void HistoryWidget::toggleKeyboard(bool manual) {
 	}
 	updateControlsGeometry();
 	updateFieldPlaceholder();
-	if (_botKeyboardHide->isHidden()
-		&& canWriteMessage()
-		&& !_showAnimation) {
-		_tabbedSelectorToggle->show();
-	} else {
-		_tabbedSelectorToggle->hide();
-	}
+	SWITCH_BUTTON(_tabbedSelectorToggle, _botKeyboardHide->isHidden() && canWriteMessage() && !_showAnimation && settings->showEmojiButtonInMessageField);
 	updateField();
 }
 
@@ -6067,6 +6092,8 @@ bool HistoryWidget::fieldOrDisabledShown() const {
 }
 
 void HistoryWidget::moveFieldControls() {
+	const auto settings = &AyuSettings::getInstance();
+
 	auto keyboardHeight = 0;
 	auto bottom = height();
 	auto maxKeyboardHeight = computeMaxFieldHeight() - fieldHeight();
@@ -6091,8 +6118,9 @@ void HistoryWidget::moveFieldControls() {
 	if (_replaceMedia) {
 		_replaceMedia->moveToLeft(left, buttonsBottom);
 	}
-	_attachToggle->moveToLeft(left, buttonsBottom);
-	left += _attachToggle->width();
+	if (settings->showAttachButtonInMessageField) {
+		_attachToggle->moveToLeft(left, buttonsBottom); left += _attachToggle->width();
+	}
 	if (_sendAs) {
 		_sendAs->moveToLeft(left, buttonsBottom);
 		left += _sendAs->width();
@@ -6109,15 +6137,14 @@ void HistoryWidget::moveFieldControls() {
 	_send->moveToRight(right, buttonsBottom); right += _send->width();
 	_voiceRecordBar->moveToLeft(0, bottom - _voiceRecordBar->height());
 	_tabbedSelectorToggle->moveToRight(right, buttonsBottom);
-	_botKeyboardHide->moveToRight(right, buttonsBottom);
-	right += _botKeyboardHide->width();
+	_botKeyboardHide->moveToRight(right, buttonsBottom); right += settings->showEmojiButtonInMessageField || !_botKeyboardHide->isHidden() ? _botKeyboardHide->width() : 0;
 	_botKeyboardShow->moveToRight(right, buttonsBottom);
 	_botCommandStart->moveToRight(right, buttonsBottom);
 	if (_silent) {
 		_silent->moveToRight(right, buttonsBottom);
 	}
 	const auto kbShowShown = _history && !_kbShown && _keyboard->hasMarkup();
-	if (kbShowShown || _cmdStartShown || _silent) {
+	if (kbShowShown || (_cmdStartShown && settings->showCommandsButtonInMessageField) || _silent) {
 		right += _botCommandStart->width();
 	}
 	if (_toggleSuggestPost) {
@@ -6168,12 +6195,14 @@ void HistoryWidget::moveFieldControls() {
 }
 
 void HistoryWidget::updateFieldSize() {
+	const auto settings = &AyuSettings::getInstance();
+
 	const auto kbShowShown = _history && !_kbShown && _keyboard->hasMarkup();
 	auto fieldWidth = width()
-		- _attachToggle->width()
+		- (settings->showAttachButtonInMessageField ? _attachToggle->width() : 0)
 		- st::historySendRight
 		- _send->width()
-		- _tabbedSelectorToggle->width();
+		- (settings->showEmojiButtonInMessageField ? _tabbedSelectorToggle->width() : 0);
 	if (_botMenu.button) {
 		fieldWidth -= st::historyBotMenuSkip + _botMenu.button->width();
 	}
@@ -6183,7 +6212,7 @@ void HistoryWidget::updateFieldSize() {
 	if (kbShowShown) {
 		fieldWidth -= _botKeyboardShow->width();
 	}
-	if (_cmdStartShown) {
+	if (_cmdStartShown && settings->showCommandsButtonInMessageField) {
 		fieldWidth -= _botCommandStart->width();
 	}
 	if (_silent && !_silent->isHidden()) {
@@ -6198,7 +6227,7 @@ void HistoryWidget::updateFieldSize() {
 	if (_scheduled && !_scheduled->isHidden()) {
 		fieldWidth -= _scheduled->width();
 	}
-	if (_ttlInfo && _ttlInfo->isVisible()) {
+	if (_ttlInfo && _ttlInfo->isVisible() && settings->showAutoDeleteButtonInMessageField) {
 		fieldWidth -= _ttlInfo->width();
 	}
 
@@ -7349,6 +7378,8 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		return;
 	}
 
+	const auto settings = &AyuSettings::getInstance();
+
 	const auto wasVisible = _kbShown || _kbReplyTo;
 	const auto wasMsgId = _keyboard->forMsgId();
 	auto changed = false;
@@ -7399,7 +7430,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 					showKeyboardHideButton();
 				} else {
 					_kbScroll->hide();
-					_tabbedSelectorToggle->show();
+					SWITCH_BUTTON(_tabbedSelectorToggle, settings->showEmojiButtonInMessageField);
 					_botKeyboardHide->hide();
 				}
 				_botKeyboardShow->hide();
@@ -7423,7 +7454,7 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 		} else {
 			if (!_showAnimation) {
 				_kbScroll->hide();
-				_tabbedSelectorToggle->show();
+				SWITCH_BUTTON(_tabbedSelectorToggle, settings->showEmojiButtonInMessageField);
 				_botKeyboardHide->hide();
 				_botKeyboardShow->show();
 				_botCommandStart->hide();
@@ -7442,10 +7473,11 @@ void HistoryWidget::updateBotKeyboard(History *h, bool force) {
 	} else {
 		if (!_scroll->isHidden()) {
 			_kbScroll->hide();
+			//SWITCH_BUTTON(_tabbedSelectorToggle, settings->showEmojiButtonInMessageField);
 			_tabbedSelectorToggle->show();
 			_botKeyboardHide->hide();
 			_botKeyboardShow->hide();
-			_botCommandStart->setVisible(!_editMsgId);
+			_botCommandStart->setVisible(!_editMsgId && settings->showCommandsButtonInMessageField);
 		}
 		_field->setMaxHeight(computeMaxFieldHeight());
 		_kbShown = false;

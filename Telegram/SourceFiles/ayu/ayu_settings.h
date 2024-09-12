@@ -57,6 +57,15 @@ public:
 	int showUserMessagesInContextMenu;
 	int showMessageDetailsInContextMenu;
 
+	bool showAttachButtonInMessageField;
+	bool showCommandsButtonInMessageField;
+	bool showEmojiButtonInMessageField;
+	bool showMicrophoneButtonInMessageField;
+	bool showAutoDeleteButtonInMessageField;
+
+	bool showAttachPopup;
+	bool showEmojiPopup;
+
 	bool showLReadToggleInDrawer;
 	bool showSReadToggleInDrawer;
 	bool showGhostToggleInDrawer;
@@ -123,6 +132,15 @@ public:
 	void set_showUserMessagesInContextMenu(int val);
 	void set_showMessageDetailsInContextMenu(int val);
 
+	void set_showAttachButtonInMessageField(bool val);
+	void set_showCommandsButtonInMessageField(bool val);
+	void set_showEmojiButtonInMessageField(bool val);
+	void set_showMicrophoneButtonInMessageField(bool val);
+	void set_showAutoDeleteButtonInMessageField(bool val);
+
+	void set_showAttachPopup(bool val);
+	void set_showEmojiPopup(bool val);
+
 	void set_showLReadToggleInDrawer(bool val);
 	void set_showSReadToggleInDrawer(bool val);
 	void set_showGhostToggleInDrawer(bool val);
@@ -181,6 +199,13 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showHideMessageInContextMenu,
 	showUserMessagesInContextMenu,
 	showMessageDetailsInContextMenu,
+	showAttachButtonInMessageField,
+	showCommandsButtonInMessageField,
+	showEmojiButtonInMessageField,
+	showMicrophoneButtonInMessageField,
+	showAutoDeleteButtonInMessageField,
+	showAttachPopup,
+	showEmojiPopup,
 	showLReadToggleInDrawer,
 	showSReadToggleInDrawer,
 	showGhostToggleInDrawer,
@@ -214,5 +239,8 @@ bool get_ghostModeEnabled();
 rpl::producer<bool> get_ghostModeEnabledReactive();
 
 rpl::producer<bool> get_hideFromBlockedReactive();
+
+void triggerHistoryUpdate();
+rpl::producer<> get_historyUpdateReactive();
 
 }

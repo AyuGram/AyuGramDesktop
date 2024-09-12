@@ -7123,6 +7123,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SettingsContextMenuReactionsPanel" = "Reactions Panel";
 "ayu_SettingsContextMenuViewsPanel" = "Views Panel";
 "ayu_ContextMenuElementsHeader" = "Context Menu Elements";
+"ayu_MessageFieldElementsHeader" = "Message Field Elements";
+"ayu_MessageFieldPopupsHeader" = "Message Field Popups";
+"ayu_MessageFieldElementAttach" = "Attach";
+"ayu_MessageFieldElementCommands" = "Commands";
+"ayu_MessageFieldElementTTL" = "TTL";
+"ayu_MessageFieldElementEmoji" = "Emoji";
+"ayu_MessageFieldElementVoice" = "Voice";
 "ayu_DrawerElementsHeader" = "Drawer Elements";
 "ayu_TrayElementsHeader" = "Tray Elements";
 "ayu_SettingsSpoofWebviewAsAndroid" = "Spoof Client as Android";
@@ -7165,8 +7172,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFiltersAdd" = "Add Filter";
 "ayu_RegexFiltersEdit" = "Edit Filter";
 "ayu_RegexFiltersPlaceholder" = "Expression";
-"ayu_EnableExpression" = "Enable expression";
-"ayu_CaseInsensitiveExpression" = "Case insensitive expression";
+"ayu_EnableExpression" = "Enable Filter";
+"ayu_CaseInsensitiveExpression" = "Case Insensitive";
+"ayu_ReversedExpression" = "Reversed";
 "ayu_RegexFiltersAddError" = "Regex syntax error";
 "ayu_RegexFilterQuickAdd" = "Add Filter";
 "ayu_RegexFilterBulletinText" = "Filter added to the **Shared filters**.";
