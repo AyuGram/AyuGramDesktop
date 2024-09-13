@@ -1,4 +1,3 @@
-
 ##### Доступно на другом языке! 
 [ [English](README.MD)  |   Русский ]
 
@@ -28,7 +27,7 @@
 
 ### Windows
 
-#### Оффициальный вариант
+#### Официальный вариант
 
 Вы можете скачать готовый бинарный файл с [вкладки Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
 [Телеграм чата](https://t.me/ayugramchat/12788).
@@ -46,9 +45,9 @@ scoop bucket add extras
 scoop install ayugram
 ```
 
-#### Само-сборка
+#### Сборка вручную
 
-Следуйте [оффициальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) если вы хотите
+Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) если вы хотите
 собрать AyuGram сами.
 
 ### Arch Linux
@@ -60,7 +59,7 @@ scoop install ayugram
 Проверьте [этот репозиторий](https://github.com/kaeeraa/ayugram-desktop) для руководства по установке.
 
 ### Любой другой Линукс дистрибутив
-Следуйте [оффициальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ### Примечания для Windows
 
