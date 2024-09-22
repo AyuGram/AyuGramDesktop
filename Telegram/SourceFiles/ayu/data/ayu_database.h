@@ -13,7 +13,11 @@ namespace AyuDatabase {
 void initialize();
 
 void addEditedMessage(const EditedMessage &message);
-std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId);
+std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId, ID minId, ID maxId, int totalLimit);
 bool hasRevisions(ID userId, ID dialogId, ID messageId);
+
+void addDeletedMessage(const DeletedMessage &message);
+std::vector<DeletedMessage> getDeletedMessages(ID dialogId, ID minId, ID maxId, int totalLimit);
+bool hasDeletedMessages(ID dialogId);
 
 }

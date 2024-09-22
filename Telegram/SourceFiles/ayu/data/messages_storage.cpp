@@ -24,7 +24,17 @@
 
 namespace AyuMessages {
 
-void map(HistoryMessageEdition &edition, not_null<HistoryItem*> item, EditedMessage &message) {
+template<typename DerivedMessage>
+std::vector<AyuMessageBase> convertToBase(const std::vector<DerivedMessage> &messages) {
+	std::vector<AyuMessageBase> based;
+	based.reserve(messages.size());
+	for (const auto &msg : messages) {
+		based.push_back(static_cast<AyuMessageBase>(msg));
+	}
+	return based;
+}
+
+void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	message.userId = item->history()->owner().session().userId().bare;
 	message.dialogId = getDialogIdFromPeer(item->history()->peer);
 	message.groupedId = item->groupId().value;
@@ -62,17 +72,21 @@ void map(HistoryMessageEdition &edition, not_null<HistoryItem*> item, EditedMess
 
 void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem*> item) {
 	EditedMessage message;
-	map(edition, item, message);
+	map(item, message);
+
+	if (message.text.empty()) {
+		return;
+	}
 
 	AyuDatabase::addEditedMessage(message);
 }
 
-std::vector<EditedMessage> getEditedMessages(not_null<HistoryItem*> item) {
+std::vector<AyuMessageBase> getEditedMessages(not_null<HistoryItem*> item, ID minId, ID maxId, int totalLimit) {
 	auto userId = item->history()->owner().session().userId().bare;
 	auto dialogId = getDialogIdFromPeer(item->history()->peer);
 	auto msgId = item->id.bare;
 
-	return AyuDatabase::getEditedMessages(userId, dialogId, msgId);
+	return convertToBase(AyuDatabase::getEditedMessages(userId, dialogId, msgId, minId, maxId, totalLimit));
 }
 
 bool hasRevisions(not_null<HistoryItem*> item) {
@@ -81,6 +95,25 @@ bool hasRevisions(not_null<HistoryItem*> item) {
 	auto msgId = item->id.bare;
 
 	return AyuDatabase::hasRevisions(userId, dialogId, msgId);
+}
+
+void addDeletedMessage(not_null<HistoryItem*> item) {
+	DeletedMessage message;
+	map(item, message);
+
+	if (message.text.empty()) {
+		return;
+	}
+
+	AyuDatabase::addDeletedMessage(message);
+}
+
+std::vector<AyuMessageBase> getDeletedMessages(not_null<PeerData*> peer, ID minId, ID maxId, int totalLimit) {
+	return convertToBase(AyuDatabase::getDeletedMessages(getDialogIdFromPeer(peer), minId, maxId, totalLimit));
+}
+
+bool hasDeletedMessages(not_null<PeerData*> peer) {
+	return AyuDatabase::hasDeletedMessages(getDialogIdFromPeer(peer));
 }
 
 }

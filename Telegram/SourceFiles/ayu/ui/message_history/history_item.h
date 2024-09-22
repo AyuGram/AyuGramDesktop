@@ -15,14 +15,14 @@ class ElementDelegate;
 class Element;
 } // namespace HistoryView
 
-namespace EditedLog {
+namespace MessageHistory {
 
 class OwnedItem;
 
 void GenerateItems(
 	not_null<HistoryView::ElementDelegate*> delegate,
 	not_null<History*> history,
-	EditedMessage message,
+	AyuMessageBase message,
 	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback);
 
 // Smart pointer wrapper for HistoryItem* that destroys the owned item.
@@ -60,4 +60,4 @@ private:
 
 };
 
-} // namespace EditedLog
+} // namespace MessageHistory

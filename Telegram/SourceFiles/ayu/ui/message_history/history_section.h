@@ -8,7 +8,7 @@
 
 #include "window/section_widget.h"
 #include "window/section_memento.h"
-#include "ayu/ui/sections/edited/edited_log_item.h"
+#include "ayu/ui/message_history/history_item.h"
 #include "mtproto/sender.h"
 // don't reformat includes above
 
@@ -22,7 +22,7 @@ namespace Profile {
 class BackButton;
 } // namespace Profile
 
-namespace EditedLog {
+namespace MessageHistory {
 
 class FixedBar;
 class InnerWidget;
@@ -35,7 +35,7 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		not_null<HistoryItem*> item);
+		HistoryItem *item);
 
 	not_null<PeerData*> channel() const;
 	Dialogs::RowDescriptor activeChat() const override;
@@ -77,7 +77,7 @@ private:
 	QPointer<InnerWidget> _inner;
 	object_ptr<FixedBar> _fixedBar;
 	object_ptr<Ui::PlainShadow> _fixedBarShadow;
-	not_null<HistoryItem*> _item;
+	HistoryItem *_item;
 
 };
 
@@ -89,6 +89,11 @@ public:
 	SectionMemento(not_null<PeerData*> peer, not_null<HistoryItem*> item)
 		: _peer(peer),
 		  _item(item) {
+	}
+
+	SectionMemento(not_null<PeerData*> peer)
+		: _peer(peer),
+		  _item(nullptr) {
 	}
 
 	object_ptr<Window::SectionWidget> createWidget(
@@ -124,7 +129,7 @@ public:
 		return std::move(_items);
 	}
 
-	std::set<uint64> takeEventIds() {
+	std::set<uint64> takeMessageIds() {
 		return std::move(_eventIds);
 	}
 
@@ -138,14 +143,12 @@ public:
 
 private:
 	not_null<PeerData*> _peer;
-	not_null<HistoryItem*> _item;
+	HistoryItem *_item;
 	int _scrollTop = 0;
-	std::vector<not_null<UserData*>> _admins;
-	std::vector<not_null<UserData*>> _adminsCanEdit;
 	std::vector<OwnedItem> _items;
 	std::set<uint64> _eventIds;
 	bool _upLoaded = false;
 	bool _downLoaded = true;
 };
 
-} // namespace EditedLog
+} // namespace MessageHistory

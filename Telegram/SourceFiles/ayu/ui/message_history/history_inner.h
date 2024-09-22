@@ -6,8 +6,8 @@
 // Copyright @Radolyn, 2024
 #pragma once
 
-#include "ayu/ui/sections/edited/edited_log_item.h"
-#include "ayu/ui/sections/edited/edited_log_section.h"
+#include "ayu/ui/message_history/history_item.h"
+#include "ayu/ui/message_history/history_section.h"
 #include "base/timer.h"
 #include "history/view/history_view_element.h"
 #include "menu/menu_antispam_validator.h"
@@ -40,7 +40,7 @@ namespace Window {
 class SessionController;
 } // namespace Window
 
-namespace EditedLog {
+namespace MessageHistory {
 
 class SectionMemento;
 
@@ -52,7 +52,7 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		not_null<HistoryItem*> item);
+		HistoryItem *item);
 
 	[[nodiscard]] Main::Session &session() const;
 
@@ -62,7 +62,7 @@ public:
 
 	[[nodiscard]] rpl::producer<int> scrollToSignal() const;
 
-	[[nodiscard]] not_null<PeerData*> channel() const {
+	[[nodiscard]] not_null<PeerData*> peer() const {
 		return _peer;
 	}
 
@@ -207,15 +207,18 @@ private:
 	TextForMimeData getSelectedText() const;
 
 	void updateVisibleTopItem();
+	void preloadMore(Direction direction);
 	void itemsAdded(Direction direction, int addedCount);
 	void updateSize();
+	void updateMinMaxIds();
 	void updateEmptyText();
 	void paintEmpty(Painter &p, not_null<const Ui::ChatStyle*> st);
-	void addEvents(Direction direction);
+	void addMessages(Direction direction, const std::vector<AyuMessageBase> &messages);
 	Element *viewForItem(const HistoryItem *item);
 
 	void toggleScrollDateShown();
 	void repaintScrollDateCallback();
+	void checkPreloadMore();
 	bool displayScrollDate() const;
 	void scrollDateHide();
 	void scrollDateCheck();
@@ -247,7 +250,7 @@ private:
 
 	const not_null<Window::SessionController*> _controller;
 	const not_null<PeerData*> _peer;
-	const not_null<HistoryItem*> _item;
+	HistoryItem *_item;
 	const not_null<History*> _history;
 	MTP::Sender _api;
 
@@ -255,7 +258,7 @@ private:
 	std::shared_ptr<Ui::ChatTheme> _theme;
 
 	std::vector<OwnedItem> _items;
-	std::set<uint64> _eventIds;
+	std::set<uint64> _messageIds;
 	std::map<not_null<const HistoryItem*>, not_null<Element*>> _itemsByData;
 	base::flat_map<not_null<const HistoryItem*>, TimeId> _itemDates;
 	base::flat_set<FullMsgId> _animatedStickersPlayed;
@@ -279,10 +282,13 @@ private:
 	Element *_scrollDateLastItem = nullptr;
 	int _scrollDateLastItemTop = 0;
 
+	// Up - max, Down - min.
+	uint64 _maxId = 0;
+	uint64 _minId = 0;
+
 	// Don't load anything until the memento was read.
 	bool _upLoaded = true;
 	bool _downLoaded = true;
-	bool _filterChanged = false;
 	Ui::Text::String _emptyText;
 
 	MouseAction _mouseAction = MouseAction::None;
@@ -308,4 +314,4 @@ private:
 
 };
 
-} // namespace EditedLog
+} // namespace MessageHistory

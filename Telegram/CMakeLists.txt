@@ -133,12 +133,12 @@ set(ayugram_files
         ayu/ui/context_menu/context_menu.h
         ayu/ui/context_menu/menu_item_subtext.cpp
         ayu/ui/context_menu/menu_item_subtext.h
-        ayu/ui/sections/edited/edited_log_inner.cpp
-        ayu/ui/sections/edited/edited_log_inner.h
-        ayu/ui/sections/edited/edited_log_item.cpp
-        ayu/ui/sections/edited/edited_log_item.h
-        ayu/ui/sections/edited/edited_log_section.cpp
-        ayu/ui/sections/edited/edited_log_section.h
+        ayu/ui/message_history/history_inner.cpp
+        ayu/ui/message_history/history_inner.h
+        ayu/ui/message_history/history_item.cpp
+        ayu/ui/message_history/history_item.h
+        ayu/ui/message_history/history_section.cpp
+        ayu/ui/message_history/history_section.h
         ayu/ui/boxes/edit_deleted_mark.cpp
         ayu/ui/boxes/edit_deleted_mark.h
         ayu/ui/boxes/edit_edited_mark.cpp

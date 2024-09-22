@@ -16,7 +16,7 @@
 using namespace sqlite_orm;
 auto storage = make_storage(
 	"./tdata/ayudata.db",
-	make_table(
+	make_table<DeletedMessage>(
 		"DeletedMessage",
 		make_column("fakeId", &DeletedMessage::fakeId, primary_key().autoincrement()),
 		make_column("userId", &DeletedMessage::userId),
@@ -52,7 +52,7 @@ auto storage = make_storage(
 		make_column("documentAttributesSerialized", &DeletedMessage::documentAttributesSerialized),
 		make_column("mimeType", &DeletedMessage::mimeType)
 	),
-	make_table(
+	make_table<EditedMessage>(
 		"EditedMessage",
 		make_column("fakeId", &EditedMessage::fakeId, primary_key().autoincrement()),
 		make_column("userId", &EditedMessage::userId),
@@ -88,7 +88,7 @@ auto storage = make_storage(
 		make_column("documentAttributesSerialized", &EditedMessage::documentAttributesSerialized),
 		make_column("mimeType", &EditedMessage::mimeType)
 	),
-	make_table(
+	make_table<DeletedDialog>(
 		"DeletedDialog",
 		make_column("fakeId", &DeletedDialog::fakeId, primary_key().autoincrement()),
 		make_column("userId", &DeletedDialog::userId),
@@ -100,7 +100,7 @@ auto storage = make_storage(
 		make_column("flags", &DeletedDialog::flags),
 		make_column("entityCreateDate", &DeletedDialog::entityCreateDate)
 	),
-	make_table(
+	make_table<RegexFilter>(
 		"RegexFilter",
 		make_column("id", &RegexFilter::id),
 		make_column("text", &RegexFilter::text),
@@ -108,13 +108,13 @@ auto storage = make_storage(
 		make_column("caseInsensitive", &RegexFilter::caseInsensitive),
 		make_column("dialogId", &RegexFilter::dialogId)
 	),
-	make_table(
+	make_table<RegexFilterGlobalExclusion>(
 		"RegexFilterGlobalExclusion",
 		make_column("fakeId", &RegexFilterGlobalExclusion::fakeId, primary_key().autoincrement()),
 		make_column("dialogId", &RegexFilterGlobalExclusion::dialogId),
 		make_column("filterId", &RegexFilterGlobalExclusion::filterId)
 	),
-	make_table(
+	make_table<SpyMessageRead>(
 		"SpyMessageRead",
 		make_column("fakeId", &SpyMessageRead::fakeId, primary_key().autoincrement()),
 		make_column("userId", &SpyMessageRead::userId),
@@ -122,7 +122,7 @@ auto storage = make_storage(
 		make_column("messageId", &SpyMessageRead::messageId),
 		make_column("entityCreateDate", &SpyMessageRead::entityCreateDate)
 	),
-	make_table(
+	make_table<SpyMessageContentsRead>(
 		"SpyMessageContentsRead",
 		make_column("fakeId", &SpyMessageContentsRead::fakeId, primary_key().autoincrement()),
 		make_column("userId", &SpyMessageContentsRead::userId),
@@ -135,7 +135,7 @@ auto storage = make_storage(
 namespace AyuDatabase {
 
 void moveCurrentDatabase() {
-	auto time = base::unixtime::now();
+	const auto time = base::unixtime::now();
 
 	if (QFile::exists("./tdata/ayudata.db")) {
 		QFile::rename("./tdata/ayudata.db", QString("./tdata/ayudata_%1.db").arg(time));
@@ -190,18 +190,22 @@ void addEditedMessage(const EditedMessage &message) {
 		storage.begin_transaction();
 		storage.insert(message);
 		storage.commit();
-	} catch (std::exception& ex) {
+	} catch (std::exception &ex) {
 		LOG(("Failed to save edited message for some reason: %1").arg(ex.what()));
 	}
 }
 
-std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId) {
+std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId, ID minId, ID maxId, int totalLimit) {
 	return storage.get_all<EditedMessage>(
 		where(
-			c(&EditedMessage::userId) == userId and
-			c(&EditedMessage::dialogId) == dialogId and
-			c(&EditedMessage::messageId) == messageId
-		)
+			column<EditedMessage>(&EditedMessage::userId) == userId and
+			column<EditedMessage>(&EditedMessage::dialogId) == dialogId and
+			column<EditedMessage>(&EditedMessage::messageId) == messageId and
+			(column<EditedMessage>(&EditedMessage::fakeId) > minId or minId == 0) and
+			(column<EditedMessage>(&EditedMessage::fakeId) < maxId or maxId == 0)
+		),
+		order_by(column<EditedMessage>(&EditedMessage::fakeId)).desc(),
+		limit(totalLimit)
 	);
 }
 
@@ -209,13 +213,48 @@ bool hasRevisions(ID userId, ID dialogId, ID messageId) {
 	try {
 		return storage.count<EditedMessage>(
 			where(
-				c(&EditedMessage::userId) == userId and
-				c(&EditedMessage::dialogId) == dialogId and
-				c(&EditedMessage::messageId) == messageId
+				column<EditedMessage>(&EditedMessage::userId) == userId and
+				column<EditedMessage>(&EditedMessage::dialogId) == dialogId and
+				column<EditedMessage>(&EditedMessage::messageId) == messageId
 			)
 		) > 0;
-	} catch (std::exception& ex) {
+	} catch (std::exception &ex) {
 		LOG(("Failed to check if message has revisions: %1").arg(ex.what()));
+		return false;
+	}
+}
+
+void addDeletedMessage(const DeletedMessage &message) {
+	try {
+		storage.begin_transaction();
+		storage.insert(message);
+		storage.commit();
+	} catch (std::exception &ex) {
+		LOG(("Failed to save edited message for some reason: %1").arg(ex.what()));
+	}
+}
+
+std::vector<DeletedMessage> getDeletedMessages(ID dialogId, ID minId, ID maxId, int totalLimit) {
+	return storage.get_all<DeletedMessage>(
+		where(
+			column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
+			(column<DeletedMessage>(&DeletedMessage::messageId) > minId or minId == 0) and
+			(column<DeletedMessage>(&DeletedMessage::messageId) < maxId or maxId == 0)
+		),
+		order_by(column<DeletedMessage>(&DeletedMessage::messageId)).desc(),
+		limit(totalLimit)
+	);
+}
+
+bool hasDeletedMessages(ID dialogId) {
+	try {
+		return storage.count<DeletedMessage>(
+			where(
+				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId
+			)
+		) > 0;
+	} catch (std::exception &ex) {
+		LOG(("Failed to check if dialog has deleted message: %1").arg(ex.what()));
 		return false;
 	}
 }

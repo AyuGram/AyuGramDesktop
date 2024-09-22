@@ -4,14 +4,14 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2024
-#include "ayu/ui/sections/edited/edited_log_inner.h"
+#include "ayu/ui/message_history/history_inner.h"
 
 #include "apiwrap.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "api/api_attached_stickers.h"
 #include "ayu/data/messages_storage.h"
-#include "ayu/ui/sections/edited/edited_log_section.h"
+#include "ayu/ui/message_history/history_section.h"
 #include "base/call_delayed.h"
 #include "base/unixtime.h"
 #include "base/platform/base_platform_info.h"
@@ -59,17 +59,14 @@
 
 #include "ui/ui_utility.h"
 
-namespace EditedLog {
+namespace MessageHistory {
 namespace {
-
-// If we require to support more admins we'll have to rewrite this anyway.
-constexpr auto kMaxChannelAdmins = 200;
 
 constexpr auto kScrollDateHideTimeout = 1000;
 
-constexpr auto kEventsFirstPage = 20;
+constexpr auto kMessagesFirstPage = 20;
 
-constexpr auto kEventsPerPage = 50;
+constexpr auto kMessagesPerPage = 30;
 
 constexpr auto kClearUserpicsAfter = 50;
 
@@ -249,7 +246,7 @@ InnerWidget::InnerWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
-	not_null<HistoryItem*> item)
+	HistoryItem *item)
 	: RpWidget(parent),
 	  _controller(controller),
 	  _peer(peer),
@@ -380,9 +377,7 @@ void InnerWidget::visibleTopBottomUpdated(
 	}
 
 	updateVisibleTopItem();
-	if (_items.size() == 0) {
-		addEvents(Direction::Up);
-	}
+	checkPreloadMore();
 	if (scrolledUp) {
 		_scrollDateCheck.call();
 	} else {
@@ -465,17 +460,17 @@ void InnerWidget::repaintScrollDateCallback() {
 	update(0, updateTop, width(), updateHeight);
 }
 
+void InnerWidget::checkPreloadMore() {
+	if (_visibleTop + PreloadHeightsCount * (_visibleBottom - _visibleTop) > height()) {
+		preloadMore(Direction::Down);
+	}
+	if (_visibleTop < PreloadHeightsCount * (_visibleBottom - _visibleTop)) {
+		preloadMore(Direction::Up);
+	}
+}
+
 void InnerWidget::updateEmptyText() {
-	auto hasSearch = false;
-	auto hasFilter = false;
-	auto text = Ui::Text::Semibold((hasSearch || hasFilter)
-									   ? tr::lng_admin_log_no_results_title(tr::now)
-									   : tr::lng_admin_log_no_events_title(tr::now));
-	auto description = _peer->isMegagroup()
-						   ? tr::lng_admin_log_no_events_text(tr::now)
-						   : tr::lng_admin_log_no_events_text_channel(tr::now);
-	text.text.append(u"\n\n"_q + description);
-	_emptyText.setMarkedText(st::defaultTextStyle, text);
+	_emptyText.setMarkedText(st::defaultTextStyle, Ui::Text::Semibold(tr::lng_search_messages_none(tr::now)));
 }
 
 QString InnerWidget::tooltipText() const {
@@ -613,7 +608,7 @@ void InnerWidget::elementStartInteraction(not_null<const Element*> view) {
 
 void InnerWidget::elementStartPremium(
 	not_null<const HistoryView::Element*> view,
-		HistoryView::Element *replacing) {
+	HistoryView::Element *replacing) {
 }
 
 void InnerWidget::elementCancelPremium(not_null<const Element*> view) {
@@ -633,17 +628,15 @@ bool InnerWidget::elementHideTopicButton(not_null<const Element*> view) {
 }
 
 void InnerWidget::saveState(not_null<SectionMemento*> memento) {
-	if (!_filterChanged) {
-		for (auto &item : _items) {
-			item.clearView();
-		}
-		memento->setItems(
-			base::take(_items),
-			base::take(_eventIds),
-			_upLoaded,
-			_downLoaded);
-		base::take(_itemsByData);
+	for (auto &item : _items) {
+		item.clearView();
 	}
+	memento->setItems(
+		base::take(_items),
+		base::take(_messageIds),
+		_upLoaded,
+		_downLoaded);
+	base::take(_itemsByData);
 	_upLoaded = _downLoaded = true; // Don't load or handle anything anymore.
 }
 
@@ -653,23 +646,62 @@ void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 		item.refreshView(this);
 		_itemsByData.emplace(item->data(), item.get());
 	}
-	_eventIds = memento->takeEventIds();
+	_messageIds = memento->takeMessageIds();
 	_upLoaded = memento->upLoaded();
 	_downLoaded = memento->downLoaded();
-	_filterChanged = false;
 	updateSize();
 }
 
-void InnerWidget::addEvents(Direction direction) {
-	auto messages = AyuMessages::getEditedMessages(_item);
-	if (messages.empty()) {
+void InnerWidget::preloadMore(Direction direction) {
+	auto &loadedFlag = (direction == Direction::Up) ? _upLoaded : _downLoaded;
+	if (loadedFlag) {
 		return;
 	}
 
-	const auto size = messages.size();
-	auto &container = _items;
+	auto maxId = (direction == Direction::Up) ? _minId : 0;
+	auto minId = (direction == Direction::Up) ? 0 : _maxId;
+	auto perPage = _items.empty() ? kMessagesFirstPage : kMessagesPerPage;
+
+	std::vector<AyuMessageBase> messages;
+	if (_item) {
+		// viewing edited history
+		messages = AyuMessages::getEditedMessages(_item, minId, maxId, perPage);
+	} else {
+		// viewing deleted messages
+		messages = AyuMessages::getDeletedMessages(_peer, minId, maxId, perPage);
+	}
+
+	crl::on_main([=]
+	{
+		addMessages(direction, messages);
+	});
+}
+
+void InnerWidget::addMessages(Direction direction, const std::vector<AyuMessageBase> &messages) {
+	auto up = (direction == Direction::Up);
+	if (messages.empty()) {
+		(up ? _upLoaded : _downLoaded) = true;
+		update();
+		return;
+	}
+
+	// When loading items up we just add them to the back of the _items vector.
+	// When loading items down we add them to a new vector and copy _items after them.
+	auto newItemsForDownDirection = std::vector<OwnedItem>();
+	auto oldItemsCount = _items.size();
+	auto &addToItems = (direction == Direction::Up)
+						   ? _items
+						   : newItemsForDownDirection;
+	addToItems.reserve(oldItemsCount + messages.size() * 2);
 
 	for (const auto &message : messages) {
+		const auto id = _item
+							? message.fakeId // viewing edited history
+							: message.messageId; // viewing deleted messages
+		if (_messageIds.find(id) != _messageIds.end()) {
+			return;
+		}
+		auto count = 0;
 		const auto addOne = [&](
 			OwnedItem item,
 			TimeId sentDate,
@@ -678,19 +710,50 @@ void InnerWidget::addEvents(Direction direction) {
 			if (sentDate) {
 				_itemDates.emplace(item->data(), sentDate);
 			}
+			_messageIds.emplace(id);
 			_itemsByData.emplace(item->data(), item.get());
-			container.push_back(std::move(item));
+			addToItems.push_back(std::move(item));
+			++count;
 		};
 		GenerateItems(
 			this,
 			_history,
 			message,
 			addOne);
+		if (count > 1) {
+			// Reverse the inner order of the added messages, because we load messages
+			// from bottom to top but inside one message they go from top to bottom.
+			auto full = addToItems.size();
+			auto from = full - count;
+			for (auto i = 0, toReverse = count / 2; i != toReverse; ++i) {
+				std::swap(addToItems[from + i], addToItems[full - i - 1]);
+			}
+		}
 	}
-
-	itemsAdded(direction, size);
+	auto newItemsCount = _items.size() + ((direction == Direction::Up) ? 0 : newItemsForDownDirection.size());
+	if (newItemsCount != oldItemsCount) {
+		if (direction == Direction::Down) {
+			for (auto &item : _items) {
+				newItemsForDownDirection.push_back(std::move(item));
+			}
+			_items = std::move(newItemsForDownDirection);
+		}
+		updateMinMaxIds();
+		itemsAdded(direction, newItemsCount - oldItemsCount);
+	}
 	update();
-	repaint();
+}
+
+void InnerWidget::updateMinMaxIds() {
+	if (_messageIds.empty()) {
+		_maxId = _minId = 0;
+	} else {
+		_maxId = *_messageIds.rbegin();
+		_minId = *_messageIds.begin();
+		if (_minId == 1) {
+			_upLoaded = true;
+		}
+	}
 }
 
 void InnerWidget::itemsAdded(Direction direction, int addedCount) {
@@ -720,6 +783,7 @@ void InnerWidget::updateSize() {
 	TWidget::resizeToWidth(width());
 	restoreScrollPosition();
 	updateVisibleTopItem();
+	checkPreloadMore();
 }
 
 int InnerWidget::resizeGetHeight(int newWidth) {
@@ -1636,4 +1700,4 @@ QPoint InnerWidget::mapPointToItem(QPoint point, const Element *view) const {
 
 InnerWidget::~InnerWidget() = default;
 
-} // namespace EditedLog
+} // namespace MessageHistory

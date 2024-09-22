@@ -10,7 +10,6 @@
 
 #define ID long long
 
-template<typename TableName>
 class AyuMessageBase
 {
 public:
@@ -49,9 +48,13 @@ public:
 	std::string mimeType;
 };
 
-using DeletedMessage = AyuMessageBase<struct DeletedMessageTag>;
+class DeletedMessage : public AyuMessageBase
+{
+};
 
-using EditedMessage = AyuMessageBase<struct EditedMessageTag>;
+class EditedMessage : public AyuMessageBase
+{
+};
 
 class DeletedDialog
 {

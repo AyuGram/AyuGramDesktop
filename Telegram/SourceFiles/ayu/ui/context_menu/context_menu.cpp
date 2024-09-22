@@ -6,25 +6,24 @@
 // Copyright @Radolyn, 2024
 #include "ayu/ui/context_menu/context_menu.h"
 
-#include <styles/style_menu_icons.h>
-
 #include "lang_auto.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
-#include "../../data/messages_storage.h"
+#include "ayu/data/messages_storage.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
 
 #include "core/mime_type.h"
 #include "styles/style_ayu_icons.h"
+#include "styles/style_menu_icons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "window/window_peer_menu.h"
 
-#include "ayu/ui/sections/edited/edited_log_section.h"
+#include "ayu/ui/message_history/history_section.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/unixtime.h"
 #include "history/view/history_view_context_menu.h"
@@ -37,13 +36,36 @@ bool needToShowItem(int state) {
 	return state == 1 || (state == 2 && base::IsExtendedContextMenuModifierPressed());
 }
 
+void AddDeletedMessagesActions(PeerData *peerData,
+							   not_null<Window::SessionController*> sessionController,
+							   const Dialogs::EntryState &entryState,
+							   const Window::PeerMenuCallback &addCallback) {
+	if (!peerData) {
+		return;
+	}
+
+	const auto has = AyuMessages::hasDeletedMessages(peerData);
+	if (!has) {
+		return;
+	}
+
+	addCallback(tr::ayu_ViewDeletedMenuText(tr::now),
+				[=]
+				{
+					sessionController->session().tryResolveWindow()
+						->showSection(std::make_shared<MessageHistory::SectionMemento>(peerData));
+				},
+				&st::menuIconArchive);
+}
+
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (AyuMessages::hasRevisions(item)) {
 		menu->addAction(tr::ayu_EditsHistoryMenuText(tr::now),
 						[=]
 						{
 							item->history()->session().tryResolveWindow()
-								->showSection(std::make_shared<EditedLog::SectionMemento>(item->history()->peer, item));
+								->showSection(
+									std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item));
 						},
 						&st::ayuEditsHistoryIcon);
 	}
@@ -120,7 +142,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (!containsSingleCustomEmojiPack && emojiPacks.size() > 1) {
 		const auto author = emojiPacks.front().id >> 32;
 		auto sameAuthor = true;
-        for (const auto &pack : emojiPacks) {
+		for (const auto &pack : emojiPacks) {
 			if (pack.id >> 32 != author) {
 				sameAuthor = false;
 				break;

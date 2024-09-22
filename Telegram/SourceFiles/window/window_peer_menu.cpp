@@ -120,6 +120,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "styles/style_ayu_icons.h"
+#include "ayu/ui/context_menu/context_menu.h"
 
 
 namespace Window {
@@ -1609,6 +1610,7 @@ void Filler::fillHistoryActions() {
 	addExportChat();
 	addTranslate();
 	addReport();
+	AyuUi::AddDeletedMessagesActions(_peer, _controller, _request, _addAction);
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
