@@ -634,6 +634,7 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 				.mode = (_mode == Mode::ChatIntro
 					? StickersMode::ChatIntro
 					: StickersMode::Full),
+				.requireConfirmation = _mode != Mode::MediaEditor,
 				.paused = paused,
 				.st = &_st,
 				.features = _features,

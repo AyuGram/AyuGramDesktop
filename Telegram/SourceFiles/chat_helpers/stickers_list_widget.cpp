@@ -192,6 +192,7 @@ StickersListWidget::StickersListWidget(
 	descriptor.show,
 	descriptor.paused)
 , _mode(descriptor.mode)
+, _requireConfirmation(descriptor.requireConfirmation)
 , _show(std::move(descriptor.show))
 , _features(descriptor.features)
 , _overBg(st::roundRadiusLarge, st().overBg)
@@ -1927,7 +1928,7 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 						});
 					});
 
-				if (settings->stickerConfirmation) {
+				if (settings->stickerConfirmation && (_mode == Mode::Full || _mode == Mode::ChatIntro) && _requireConfirmation) {
 					Ui::show(Ui::MakeConfirmBox({
 						.text = tr::ayu_ConfirmationSticker(),
 						.confirmed = sendStickerCallback,
