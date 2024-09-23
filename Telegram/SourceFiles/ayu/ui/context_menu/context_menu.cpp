@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2024
 #include "ayu/ui/context_menu/context_menu.h"
 
+#include "apiwrap.h"
 #include "lang_auto.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
@@ -26,6 +27,11 @@
 #include "ayu/ui/message_history/history_section.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/unixtime.h"
+#include "data/data_channel.h"
+#include "data/data_user.h"
+#include "data/data_chat.h"
+#include "data/data_forum_topic.h"
+#include "data/data_session.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
 #include "window/window_session_controller.h"
@@ -37,14 +43,17 @@ bool needToShowItem(int state) {
 }
 
 void AddDeletedMessagesActions(PeerData *peerData,
+							   Data::Thread *thread,
 							   not_null<Window::SessionController*> sessionController,
-							   const Dialogs::EntryState &entryState,
 							   const Window::PeerMenuCallback &addCallback) {
 	if (!peerData) {
 		return;
 	}
 
-	const auto has = AyuMessages::hasDeletedMessages(peerData);
+	const auto topic = peerData->isForum() ? thread->asTopic() : nullptr;
+	const auto topicId = topic ? topic->rootId().bare : 0;
+
+	const auto has = AyuMessages::hasDeletedMessages(peerData, topicId);
 	if (!has) {
 		return;
 	}
@@ -53,9 +62,89 @@ void AddDeletedMessagesActions(PeerData *peerData,
 				[=]
 				{
 					sessionController->session().tryResolveWindow()
-						->showSection(std::make_shared<MessageHistory::SectionMemento>(peerData));
+						->showSection(std::make_shared<MessageHistory::SectionMemento>(peerData, nullptr, topicId));
 				},
 				&st::menuIconArchive);
+}
+
+void AddJumpToBeginningAction(PeerData *peerData,
+							  Data::Thread *thread,
+							  not_null<Window::SessionController*> sessionController,
+							  const Window::PeerMenuCallback &addCallback) {
+	const auto user = peerData->asUser();
+	const auto group = peerData->isChat() ? peerData->asChat() : nullptr;
+	const auto chat = peerData->isMegagroup()
+						  ? peerData->asMegagroup()
+						  : peerData->isChannel()
+								? peerData->asChannel()
+								: nullptr;
+	const auto topic = peerData->isForum() ? thread->asTopic() : nullptr;
+	if (!user && !group && !chat && !topic) {
+		return;
+	}
+	if (topic && topic->creating()) {
+		return;
+	}
+
+	const auto controller = sessionController;
+	const auto jumpToDate = [=](auto history, auto callback)
+	{
+		const auto weak = base::make_weak(controller);
+		controller->session().api().resolveJumpToDate(
+			history,
+			QDate(2013, 8, 1),
+			[=](not_null<PeerData*> peer, MsgId id)
+			{
+				if (const auto strong = weak.get()) {
+					callback(peer, id);
+				}
+			});
+	};
+
+	const auto showPeerHistory = [=](auto peer, MsgId id)
+	{
+		controller->showPeerHistory(
+			peer,
+			Window::SectionShow::Way::Forward,
+			id);
+	};
+
+	const auto showTopic = [=](auto topic, MsgId id)
+	{
+		controller->showTopic(
+			topic,
+			id,
+			Window::SectionShow::Way::Forward);
+	};
+
+	addCallback(
+		tr::ayu_JumpToBeginning(tr::now),
+		[=]
+		{
+			if (user) {
+				jumpToDate(controller->session().data().history(user), showPeerHistory);
+			} else if (group && !chat) {
+				jumpToDate(controller->session().data().history(group), showPeerHistory);
+			} else if (chat && !topic) {
+				if (!chat->migrateFrom() && chat->availableMinId() == 1) {
+					showPeerHistory(chat, 1);
+				} else {
+					jumpToDate(controller->session().data().history(chat), showPeerHistory);
+				}
+			} else if (topic) {
+				if (topic->isGeneral()) {
+					showTopic(topic, 1);
+				} else {
+					jumpToDate(
+						topic,
+						[=](not_null<PeerData*>, MsgId id)
+						{
+							showTopic(topic, id);
+						});
+				}
+			}
+		},
+		&st::ayuMenuIconToBeginning);
 }
 
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
@@ -65,7 +154,7 @@ void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 						{
 							item->history()->session().tryResolveWindow()
 								->showSection(
-									std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item));
+									std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item, 0));
 						},
 						&st::ayuEditsHistoryIcon);
 	}
@@ -332,7 +421,7 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	if (item->isLocal() || item->isService() || item->out()) {
+	if (item->isLocal() || item->isService() || item->out() || item->isDeleted()) {
 		return;
 	}
 

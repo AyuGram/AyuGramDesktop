@@ -394,6 +394,10 @@ bool AddForwardMessageAction(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	const auto item = request.item;
+	if (item->isDeleted()) {
+		return false;
+	}
+
 	if (!request.selectedItems.empty()) {
 		return false;
 	} else if (!item || !item->allowsForward()) {
@@ -620,7 +624,7 @@ bool AddReplyToMessageAction(
 		? Data::CanSendAnything(topic)
 		: Data::CanSendAnything(peer);
 	const auto canReply = canSendReply || item->allowsForward();
-	if (!canReply) {
+	if (!canReply || item->isDeleted()) {
 		return false;
 	}
 

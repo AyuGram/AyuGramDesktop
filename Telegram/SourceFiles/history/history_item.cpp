@@ -2557,6 +2557,10 @@ void HistoryItem::setRealId(MsgId newId) {
 }
 
 bool HistoryItem::canPin() const {
+	if (_deleted) {
+		return false;
+	}
+
 	if (!isRegular() || isService()) {
 		return false;
 	} else if (const auto m = media(); m && m->call()) {
@@ -2593,6 +2597,10 @@ bool HistoryItem::isTooOldForEdit(TimeId now) const {
 }
 
 bool HistoryItem::allowsEdit(TimeId now) const {
+	if (_deleted) {
+		return false;
+	}
+
 	return !isService()
 		&& canBeEdited()
 		&& !isTooOldForEdit(now)
@@ -2608,6 +2616,10 @@ bool HistoryItem::allowsEditMedia() const {
 }
 
 bool HistoryItem::canBeEdited() const {
+	if (_deleted) {
+		return false;
+	}
+
 	if ((!isRegular() && !isScheduled() && !isBusinessShortcut())
 		|| Has<HistoryMessageVia>()
 		|| Has<HistoryMessageForwarded>()) {
@@ -2724,6 +2736,10 @@ bool HistoryItem::canDeleteForEveryone(TimeId now) const {
 }
 
 bool HistoryItem::suggestReport() const {
+	if (_deleted) {
+		return false;
+	}
+
 	if (out() || isService() || !isRegular()) {
 		return false;
 	} else if (_history->peer->isChannel()) {
@@ -2735,6 +2751,10 @@ bool HistoryItem::suggestReport() const {
 }
 
 bool HistoryItem::suggestBanReport() const {
+	if (_deleted) {
+		return false;
+	}
+
 	const auto channel = _history->peer->asChannel();
 	if (!channel || !channel->canRestrictParticipant(from())) {
 		return false;
@@ -2743,6 +2763,10 @@ bool HistoryItem::suggestBanReport() const {
 }
 
 bool HistoryItem::suggestDeleteAllReport() const {
+	if (_deleted) {
+		return false;
+	}
+
 	auto channel = _history->peer->asChannel();
 	if (!channel || !channel->canDeleteMessages()) {
 		return false;
@@ -2906,7 +2930,11 @@ void HistoryItem::translationDone(LanguageId to, TextWithEntities result) {
 }
 
 bool HistoryItem::canReact() const {
-	if (!isRegular()) {
+	if (_deleted) {
+		return false;
+	}
+
+	if (!isRegular() || isService()) {
 		return false;
 	} else if (isService()) {
 		return (_flags & MessageFlag::ReactionsAllowed);
@@ -3306,6 +3334,17 @@ void HistoryItem::setPostAuthor(const QString &author) {
 	msgsigned->isAnonymousRank = !isDiscussionPost()
 		&& this->author()->isMegagroup();
 	history()->owner().requestItemResize(this);
+}
+
+void HistoryItem::setDeleted() {
+	_deleted = true;
+
+	const auto settings = &AyuSettings::getInstance();
+	setAyuHint(settings->deletedMark);
+}
+
+bool HistoryItem::isDeleted() const {
+	return _deleted;
 }
 
 void HistoryItem::setAyuHint(const QString &hint) {

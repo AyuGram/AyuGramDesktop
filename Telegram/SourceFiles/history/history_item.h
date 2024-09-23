@@ -415,6 +415,8 @@ public:
 		MsgId replyToTop,
 		bool isForumPost);
 	void setPostAuthor(const QString &author);
+	void setDeleted();
+	bool isDeleted() const;
 	void setAyuHint(const QString &hint);
 	void setRealId(MsgId newId);
 	void incrementReplyToTopCounter();
@@ -700,6 +702,8 @@ private:
 	std::unique_ptr<Data::Media> _media;
 	std::unique_ptr<Data::MessageReactions> _reactions;
 	crl::time _reactionsLastRefreshed = 0;
+
+	bool _deleted = false;
 
 	TimeId _date = 0;
 	TimeId _ttlDestroyAt = 0;

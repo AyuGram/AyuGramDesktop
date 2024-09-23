@@ -15,9 +15,7 @@
 using Callback = Fn<void(const QString &, UserData *)>;
 
 Main::Session *getSession(ID userId);
-bool accountExists(ID userId);
 void dispatchToMainThread(std::function<void()> callback, int delay = 0);
-not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session *session);
 ID getDialogIdFromPeer(not_null<PeerData*> peer);
 
 ID getBareID(not_null<PeerData*> peer);

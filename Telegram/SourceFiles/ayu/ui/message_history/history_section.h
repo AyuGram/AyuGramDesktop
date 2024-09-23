@@ -35,7 +35,8 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		HistoryItem *item);
+		HistoryItem *item,
+		ID topicId);
 
 	not_null<PeerData*> channel() const;
 	Dialogs::RowDescriptor activeChat() const override;
@@ -78,6 +79,7 @@ private:
 	object_ptr<FixedBar> _fixedBar;
 	object_ptr<Ui::PlainShadow> _fixedBarShadow;
 	HistoryItem *_item;
+	ID _topicId;
 
 };
 
@@ -86,14 +88,10 @@ class SectionMemento : public Window::SectionMemento
 public:
 	using Element = HistoryView::Element;
 
-	SectionMemento(not_null<PeerData*> peer, not_null<HistoryItem*> item)
+	SectionMemento(not_null<PeerData*> peer, HistoryItem *item, ID topicId)
 		: _peer(peer),
-		  _item(item) {
-	}
-
-	SectionMemento(not_null<PeerData*> peer)
-		: _peer(peer),
-		  _item(nullptr) {
+		  _item(item),
+		  _topicId(topicId) {
 	}
 
 	object_ptr<Window::SectionWidget> createWidget(
@@ -120,7 +118,7 @@ public:
 		bool upLoaded,
 		bool downLoaded) {
 		_items = std::move(items);
-		_eventIds = std::move(eventIds);
+		_messageIds = std::move(eventIds);
 		_upLoaded = upLoaded;
 		_downLoaded = downLoaded;
 	}
@@ -130,7 +128,7 @@ public:
 	}
 
 	std::set<uint64> takeMessageIds() {
-		return std::move(_eventIds);
+		return std::move(_messageIds);
 	}
 
 	bool upLoaded() const {
@@ -144,9 +142,10 @@ public:
 private:
 	not_null<PeerData*> _peer;
 	HistoryItem *_item;
+	ID _topicId;
 	int _scrollTop = 0;
 	std::vector<OwnedItem> _items;
-	std::set<uint64> _eventIds;
+	std::set<uint64> _messageIds;
 	bool _upLoaded = false;
 	bool _downLoaded = true;
 };

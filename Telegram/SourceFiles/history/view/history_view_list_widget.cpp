@@ -1363,7 +1363,7 @@ bool ListWidget::addToSelection(
 		return false;
 	}
 	iterator->second.canDelete = item->canDelete();
-	iterator->second.canForward = item->allowsForward();
+	iterator->second.canForward = item->allowsForward() && !item->isDeleted();
 	iterator->second.canSendNow = item->allowsSendNow();
 	iterator->second.canReschedule = item->allowsReschedule();
 	return true;
@@ -2744,7 +2744,9 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		mouseActionCancel();
 		switch (CurrentQuickAction()) {
 		case DoubleClickQuickAction::Reply: {
-			replyToMessageRequestNotify({ _overElement->data()->fullId() });
+			if (!_overElement->data()->isDeleted()) {
+				replyToMessageRequestNotify({ _overElement->data()->fullId() });
+			}
 		} break;
 		case DoubleClickQuickAction::React: {
 			toggleFavoriteReaction(_overElement);

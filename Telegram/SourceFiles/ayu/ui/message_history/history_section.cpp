@@ -63,7 +63,7 @@ object_ptr<Window::SectionWidget> SectionMemento::createWidget(
 	if (column == Window::Column::Third) {
 		return nullptr;
 	}
-	auto result = object_ptr<Widget>(parent, controller, _peer, _item);
+	auto result = object_ptr<Widget>(parent, controller, _peer, _item, _topicId);
 	result->setInternalState(geometry, this);
 	return result;
 }
@@ -142,12 +142,14 @@ Widget::Widget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
-	HistoryItem *item)
+	HistoryItem *item,
+	ID topicId)
 	: Window::SectionWidget(parent, controller, rpl::single<PeerData*>(peer)),
 	  _scroll(this, st::historyScroll, false),
 	  _fixedBar(this, controller, peer),
 	  _fixedBarShadow(this),
-	  _item(item) {
+	  _item(item),
+	  _topicId(topicId) {
 	_fixedBar->move(0, 0);
 	_fixedBar->resizeToWidth(width());
 	_fixedBar->show();
@@ -161,7 +163,7 @@ Widget::Widget(
 							 },
 							 lifetime());
 
-	_inner = _scroll->setOwnedWidget(object_ptr<InnerWidget>(this, controller, peer, item));
+	_inner = _scroll->setOwnedWidget(object_ptr<InnerWidget>(this, controller, peer, item, topicId));
 	_inner->scrollToSignal(
 	) | rpl::start_with_next([=](int top)
 							 {
@@ -234,7 +236,7 @@ void Widget::setupShortcuts() {
 }
 
 std::shared_ptr<Window::SectionMemento> Widget::createMemento() {
-	auto result = std::make_shared<SectionMemento>(channel(), _item);
+	auto result = std::make_shared<SectionMemento>(channel(), _item, _topicId);
 	saveState(result.get());
 	return result;
 }

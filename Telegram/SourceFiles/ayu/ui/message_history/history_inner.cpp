@@ -246,11 +246,13 @@ InnerWidget::InnerWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
-	HistoryItem *item)
+	HistoryItem *item,
+	ID topicId)
 	: RpWidget(parent),
 	  _controller(controller),
 	  _peer(peer),
 	  _item(item),
+	  _topicId(topicId),
 	  _history(peer->owner().history(peer)),
 	  _api(&_peer->session().mtp()),
 	  _pathGradient(
@@ -668,7 +670,7 @@ void InnerWidget::preloadMore(Direction direction) {
 		messages = AyuMessages::getEditedMessages(_item, minId, maxId, perPage);
 	} else {
 		// viewing deleted messages
-		messages = AyuMessages::getDeletedMessages(_peer, minId, maxId, perPage);
+		messages = AyuMessages::getDeletedMessages(_peer, _topicId, minId, maxId, perPage);
 	}
 
 	crl::on_main([=]

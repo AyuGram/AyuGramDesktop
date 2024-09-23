@@ -17,7 +17,7 @@ std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageI
 bool hasRevisions(ID userId, ID dialogId, ID messageId);
 
 void addDeletedMessage(const DeletedMessage &message);
-std::vector<DeletedMessage> getDeletedMessages(ID dialogId, ID minId, ID maxId, int totalLimit);
-bool hasDeletedMessages(ID dialogId);
+std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit);
+bool hasDeletedMessages(ID userId, ID dialogId, ID topicId);
 
 }

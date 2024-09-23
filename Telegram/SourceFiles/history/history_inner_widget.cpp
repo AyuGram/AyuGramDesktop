@@ -141,6 +141,73 @@ int BinarySearchBlocksOrItems(const T &list, int edge) {
 	return start;
 }
 
+[[nodiscard]] bool CanSendReply(not_null<const HistoryItem*> item) {
+	if (item->isDeleted()) {
+		return false;
+	}
+
+	const auto peer = item->history()->peer;
+	const auto topic = item->topic();
+	return topic
+		? Data::CanSendAnything(topic)
+		: (Data::CanSendAnything(peer)
+			&& (!peer->isChannel() || peer->asChannel()->amIn()));
+}
+
+void FillSponsoredMessagesMenu(
+		not_null<Window::SessionController*> controller,
+		FullMsgId itemId,
+		not_null<Ui::PopupMenu*> menu) {
+	const auto &data = controller->session().sponsoredMessages();
+	const auto info = data.lookupDetails(itemId).info;
+	const auto show = controller->uiShow();
+	if (!info.empty()) {
+		auto fillSubmenu = [&](not_null<Ui::PopupMenu*> menu) {
+			const auto allText = ranges::accumulate(
+				info,
+				TextWithEntities(),
+				[](TextWithEntities a, TextWithEntities b) {
+					return a.text.isEmpty() ? b : a.append('\n').append(b);
+				}).text;
+			const auto callback = [=] {
+				QGuiApplication::clipboard()->setText(allText);
+				show->showToast(tr::lng_text_copied(tr::now));
+			};
+			for (const auto &i : info) {
+				auto item = base::make_unique_q<Ui::Menu::MultilineAction>(
+					menu,
+					st::defaultMenu,
+					st::historySponsorInfoItem,
+					st::historyHasCustomEmojiPosition,
+					base::duplicate(i));
+				item->clicks(
+				) | rpl::start_with_next(callback, menu->lifetime());
+				menu->addAction(std::move(item));
+				if (i != info.back()) {
+					menu->addSeparator();
+				}
+			}
+		};
+		using namespace Ui::Menu;
+		CreateAddActionCallback(menu)(MenuCallback::Args{
+			.text = tr::lng_sponsored_info_menu(tr::now),
+			.handler = nullptr,
+			.icon = &st::menuIconChannel,
+			.fillSubmenu = std::move(fillSubmenu),
+		});
+		menu->addSeparator(&st::expandedMenuSeparator);
+	}
+	menu->addAction(tr::lng_sponsored_hide_ads(tr::now), [=] {
+		if (controller->session().premium()) {
+			using Result = Data::SponsoredReportResult;
+			controller->session().sponsoredMessages().createReportCallback(
+				itemId)(Result::Id("-1"), [](const auto &) {});
+		} else {
+			ShowPremiumPreviewBox(controller, PremiumFeature::NoAds);
+		}
+	}, &st::menuIconCancel);
+}
+
 } // namespace
 
 // flick scroll taken from http://qt-project.org/doc/qt-4.8/demos-embedded-anomaly-src-flickcharm-cpp.html
@@ -664,7 +731,7 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			}
 			const auto item = view->data();
 			const auto canSendReply = CanSendReply(item);
-			const auto canReply = (canSendReply || item->allowsForward());
+			const auto canReply = (canSendReply || item->allowsForward() && !item->isDeleted());
 			if (!canReply) {
 				return true;
 			}
@@ -2286,7 +2353,9 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 			mouseActionCancel();
 			switch (HistoryView::CurrentQuickAction()) {
 			case HistoryView::DoubleClickQuickAction::Reply: {
-				_widget->replyToMessage(view->data());
+				if (!view->data()->isDeleted()) {
+					_widget->replyToMessage(view->data());
+				}
 			} break;
 			case HistoryView::DoubleClickQuickAction::React: {
 				toggleFavoriteReaction(view);
@@ -2751,7 +2820,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			return;
 		}
 		const auto canSendReply = CanSendReply(item);
-		const auto canReply = canSendReply || item->allowsForward();
+		const auto canReply = canSendReply || item->allowsForward() && !item->isDeleted();
 		if (canReply) {
 			const auto selected = selectedQuote(item);
 			auto text = (selected
@@ -2861,7 +2930,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			const auto itemId = item->fullId();
 			const auto blockSender = item->history()->peer->isRepliesChat();
 			if (isUponSelected != -2) {
-				if (item->allowsForward()) {
+				if (item->allowsForward() && !item->isDeleted()) {
 					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardItem(itemId);
 					}, &st::menuIconForward);
@@ -3120,7 +3189,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			}, &st::menuIconSelect);
 		} else if (item && ((isUponSelected != -2 && (canForward || canDelete)) || item->isRegular())) {
 			if (isUponSelected != -2) {
-				if (canForward) {
+				if (canForward && !item->isDeleted()) {
 					_menu->addAction(tr::lng_context_forward_msg(tr::now), [=] {
 						forwardAsGroup(itemId);
 					}, &st::menuIconForward);
@@ -4085,7 +4154,7 @@ auto HistoryInner::getSelectionState() const
 			if (selected.first->canDelete()) {
 				++result.canDeleteCount;
 			}
-			if (selected.first->allowsForward()) {
+			if (selected.first->allowsForward() && !selected.first->isDeleted()) {
 				++result.canForwardCount;
 			}
 		} else if (selected.second.from != selected.second.to) {

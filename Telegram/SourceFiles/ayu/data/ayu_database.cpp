@@ -234,10 +234,12 @@ void addDeletedMessage(const DeletedMessage &message) {
 	}
 }
 
-std::vector<DeletedMessage> getDeletedMessages(ID dialogId, ID minId, ID maxId, int totalLimit) {
+std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit) {
 	return storage.get_all<DeletedMessage>(
 		where(
+			column<DeletedMessage>(&DeletedMessage::userId) == userId and
 			column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
+			(column<DeletedMessage>(&DeletedMessage::topicId) == topicId or topicId == 0) and
 			(column<DeletedMessage>(&DeletedMessage::messageId) > minId or minId == 0) and
 			(column<DeletedMessage>(&DeletedMessage::messageId) < maxId or maxId == 0)
 		),
@@ -246,11 +248,13 @@ std::vector<DeletedMessage> getDeletedMessages(ID dialogId, ID minId, ID maxId, 
 	);
 }
 
-bool hasDeletedMessages(ID dialogId) {
+bool hasDeletedMessages(ID userId, ID dialogId, ID topicId) {
 	try {
 		return storage.count<DeletedMessage>(
 			where(
-				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId
+				column<DeletedMessage>(&DeletedMessage::userId) == userId and
+				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
+				(column<DeletedMessage>(&DeletedMessage::topicId) == topicId or topicId == 0)
 			)
 		) > 0;
 	} catch (std::exception &ex) {

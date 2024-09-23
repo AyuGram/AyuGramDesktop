@@ -30,12 +30,14 @@ public:
 	std::string fwdName;
 	int fwdDate;
 	std::string fwdPostAuthor;
+	std::string postAuthor;
 	int replyFlags;
 	int replyMessageId;
 	ID replyPeerId;
 	int replyTopId;
 	bool replyForumTopic;
 	std::vector<char> replySerialized;
+	std::vector<char> replyMarkupSerialized;
 	int entityCreateDate;
 	std::string text;
 	std::vector<char> textEntities;

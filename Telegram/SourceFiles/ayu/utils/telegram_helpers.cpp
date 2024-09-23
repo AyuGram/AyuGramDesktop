@@ -53,6 +53,7 @@ std::unordered_set<ID> ayugram_devs = {
 	778327202, // @sharapagorg
 	238292700, // @MaxPlays
 	1795176335, // @radolyn_services
+	1752394339, // mouse
 };
 
 // https://github.com/AyuGram/AyuGram4AX/blob/rewrite/TMessagesProj/src/main/java/com/exteragram/messenger/ExteraConfig.java
@@ -97,10 +98,6 @@ Main::Session *getSession(ID userId) {
 	return nullptr;
 }
 
-bool accountExists(ID userId) {
-	return userId == 0 || getSession(userId) != nullptr;
-}
-
 void dispatchToMainThread(std::function<void()> callback, int delay) {
 	auto timer = new QTimer();
 	timer->moveToThread(qApp->thread());
@@ -115,28 +112,8 @@ void dispatchToMainThread(std::function<void()> callback, int delay) {
 	QMetaObject::invokeMethod(timer, "start", Qt::QueuedConnection, Q_ARG(int, delay));
 }
 
-not_null<History*> getHistoryFromDialogId(ID dialogId, Main::Session *session) {
-	if (dialogId > 0) {
-		return session->data().history(peerFromUser(dialogId));
-	}
-
-	auto history = session->data().history(peerFromChannel(abs(dialogId)));
-	if (history->folderKnown()) {
-		return history;
-	}
-
-	return session->data().history(peerFromChat(abs(dialogId)));
-}
-
 ID getDialogIdFromPeer(not_null<PeerData*> peer) {
-	auto peerId = peerIsUser(peer->id)
-					  ? peerToUser(peer->id).bare
-					  : peerIsChat(peer->id)
-							? peerToChat(peer->id).bare
-							: peerIsChannel(peer->id)
-								  ? peerToChannel(peer->id).bare
-								  : peer->id.value;
-
+	ID peerId = peer->id.value & PeerId::kChatTypeMask;
 	if (peer->isChannel() || peer->isChat()) {
 		peerId = -peerId;
 	}
@@ -145,13 +122,7 @@ ID getDialogIdFromPeer(not_null<PeerData*> peer) {
 }
 
 ID getBareID(not_null<PeerData*> peer) {
-	return peerIsUser(peer->id)
-			   ? peerToUser(peer->id).bare
-			   : peerIsChat(peer->id)
-					 ? peerToChat(peer->id).bare
-					 : peerIsChannel(peer->id)
-						   ? peerToChannel(peer->id).bare
-						   : peer->id.value;
+	return peer->id.value & PeerId::kChatTypeMask;
 }
 
 bool isAyuGramRelated(ID peerId) {
@@ -596,7 +567,7 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 		const auto peer = session->data().peerLoaded(
 			peerFromMTP(data.vpeer()));
 		if (const auto user = peer ? peer->asUser() : nullptr) {
-			if (user->id.value == userId) {
+			if ((user->id.value & PeerId::kChatTypeMask) == userId) {
 				callback(normalized, user);
 				return;
 			}
@@ -609,13 +580,13 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 	}).send();
 }
 
-void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cache, const Callback &callback) {
+void searchUser(long long userId, Main::Session *session, bool searchUserFlag, const Callback &callback) {
 	if (!session) {
 		callback(QString(), nullptr);
 		return;
 	}
 
-	const auto botId = 1696868284;
+	constexpr auto botId = 1696868284;
 	const auto bot = session->data().userLoaded(botId);
 
 	if (!bot) {
@@ -625,7 +596,7 @@ void searchUser(ID userId, Main::Session *session, bool searchUserFlag, bool cac
 						session,
 						[=](const QString &title, UserData *data)
 						{
-							searchUser(userId, session, false, false, callback);
+							searchUser(userId, session, false, callback);
 						});
 		} else {
 			callback(QString(), nullptr);
@@ -751,15 +722,13 @@ void searchById(ID userId, Main::Session *session, bool retry, const Callback &c
 		return;
 	}
 
-	const auto dataLoaded = session->data().userLoaded(userId);
-	if (dataLoaded) {
+	if (const auto dataLoaded = session->data().userLoaded(userId)) {
 		callback(dataLoaded->username(), dataLoaded);
 		return;
 	}
 
 	searchUser(userId,
 			   session,
-			   true,
 			   true,
 			   [=](const QString &title, UserData *data)
 			   {
