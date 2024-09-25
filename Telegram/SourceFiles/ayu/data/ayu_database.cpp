@@ -105,6 +105,7 @@ auto storage = make_storage(
 		make_column("id", &RegexFilter::id),
 		make_column("text", &RegexFilter::text),
 		make_column("enabled", &RegexFilter::enabled),
+		make_column("reversed", &RegexFilter::reversed),
 		make_column("caseInsensitive", &RegexFilter::caseInsensitive),
 		make_column("dialogId", &RegexFilter::dialogId)
 	),

@@ -9,27 +9,26 @@
 #include <QtNetwork/QNetworkReply>
 #include <QtXml/QDomDocument>
 
-class CustomLangPack : public QObject
+class AyuLanguage : public QObject
 {
 	Q_OBJECT
-	Q_DISABLE_COPY(CustomLangPack)
+	Q_DISABLE_COPY(AyuLanguage)
 
 public:
-	static CustomLangPack *currentInstance();
-	static void initInstance();
-	static CustomLangPack *instance;
+	static AyuLanguage *currentInstance();
+	static void init();
+	static AyuLanguage *instance;
 
-	void fetchCustomLangPack(const QString &langPackId, const QString &langPackBaseId);
-	void loadDefaultLangFile();
-	void parseLangFile(QJsonDocument str);
+	void fetchLanguage(const QString &id, const QString &baseId);
+	void applyLanguageJson(QJsonDocument doc);
 
 public Q_SLOTS:
 	void fetchFinished();
 	void fetchError(QNetworkReply::NetworkError e);
 
 private:
-	CustomLangPack();
-	~CustomLangPack() override = default;
+	AyuLanguage();
+	~AyuLanguage() override = default;
 
 	QNetworkAccessManager networkManager;
 	QNetworkReply *_chkReply = nullptr;

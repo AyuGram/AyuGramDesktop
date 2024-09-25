@@ -17,14 +17,14 @@
 namespace AyuInfra {
 
 void initLang() {
-	QString langPackBaseId = Lang::GetInstance().baseId();
-	QString langPackId = Lang::GetInstance().id();
-	if (langPackId.isEmpty()) {
-		LOG(("Lang ID not found! Re-use old language pack..."));
+	QString id = Lang::GetInstance().id();
+	QString baseId = Lang::GetInstance().baseId();
+	if (id.isEmpty()) {
+		LOG(("Language ID not found!"));
 		return;
 	}
-	CustomLangPack::initInstance();
-	CustomLangPack::currentInstance()->fetchCustomLangPack(langPackId, langPackBaseId);
+	AyuLanguage::init();
+	AyuLanguage::currentInstance()->fetchLanguage(id, baseId);
 }
 
 void initFonts() {

@@ -78,6 +78,7 @@ public:
 	std::vector<char> id;
 	std::string text;
 	bool enabled;
+	bool reversed;
 	bool caseInsensitive;
 	std::unique_ptr<ID> dialogId; // nullable
 };

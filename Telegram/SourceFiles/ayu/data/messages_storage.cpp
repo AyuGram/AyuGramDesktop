@@ -86,7 +86,7 @@ void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	// message.mimeType
 }
 
-void addEditedMessage(HistoryMessageEdition &edition, not_null<HistoryItem*> item) {
+void addEditedMessage(not_null<HistoryItem *> item) {
 	EditedMessage message;
 	map(item, message);
 
