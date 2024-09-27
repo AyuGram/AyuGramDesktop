@@ -6,7 +6,6 @@
 // Copyright @Radolyn, 2024
 #include "settings_ayu.h"
 
-
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/edit_deleted_mark.h"
 #include "ayu/ui/boxes/edit_edited_mark.h"
@@ -508,7 +507,8 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	SetupGhostModeToggle(container);
 
 	auto markReadAfterActionVal = container->lifetime().make_state<rpl::variable<bool>>(settings->markReadAfterAction);
-	auto useScheduledMessagesVal = container->lifetime().make_state<rpl::variable<bool>>(settings->useScheduledMessages);
+	auto useScheduledMessagesVal = container->lifetime().make_state<rpl::variable<
+		bool>>(settings->useScheduledMessages);
 
 	AddButtonWithIcon(
 		container,
@@ -625,6 +625,29 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			settings->set_saveMessagesHistory(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageSavingSaveForBots(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->saveForBots)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->saveForBots);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_saveForBots(enabled);
 			AyuSettings::save();
 		},
 		container->lifetime());

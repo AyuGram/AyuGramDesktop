@@ -76,9 +76,6 @@ void GenerateItems(
 	if (!from) {
 		from = reinterpret_cast<PeerData*>(history->owner().chatLoaded(message.fromId));
 	}
-	if (!from) {
-		return;
-	}
 	const auto date = message.entityCreateDate;
 	const auto addPart = [&](
 		not_null<HistoryItem*> item,
@@ -88,17 +85,28 @@ void GenerateItems(
 		return callback(OwnedItem(delegate, item), sentDate, realId);
 	};
 
-	const auto fromName = from->name();
-	const auto fromLink = from->createOpenLink();
-	const auto fromLinkText = Ui::Text::Link(fromName, QString());
-
 	const auto makeSimpleTextMessage = [&](TextWithEntities &&text)
 	{
+		base::flags<MessageFlag> flags = MessageFlag::AdminLogEntry;
+		if (from) {
+			flags |= MessageFlag::HasFromId;
+		} else {
+			flags |= MessageFlag::HasPostAuthor;
+		}
+		if (!message.postAuthor.empty()) {
+			flags |= MessageFlag::HasPostAuthor;
+		}
+
 		return history->makeMessage({
 										.id = history->nextNonHistoryEntryId(),
-										.flags = MessageFlag::HasFromId | MessageFlag::AdminLogEntry,
-										.from = from->id,
+										.flags = flags,
+										.from = from ? from->id : 0,
 										.date = date,
+										.postAuthor = !message.postAuthor.empty()
+														  ? QString::fromStdString(message.postAuthor)
+														  : from
+																? QString()
+																: QString("unknown user: %1").arg(message.fromId),
 									},
 									std::move(text),
 									MTP_messageMediaEmpty());

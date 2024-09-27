@@ -59,6 +59,7 @@ void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	message.fwdFlags = 0;
 	message.fwdFromId = 0;
 	// message.fwdName
+	message.fwdDate = 0;
 	// message.fwdPostAuthor
 	if (const auto msgsigned = item->Get<HistoryMessageSigned>()) {
 		message.postAuthor = msgsigned->author.toStdString();
@@ -67,7 +68,7 @@ void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	message.replyMessageId = 0;
 	message.replyPeerId = 0;
 	message.replyTopId = 0;
-	message.replyForumTopic = 0;
+	message.replyForumTopic = false;
 	// message.replySerialized
 	// message.replyMarkupSerialized
 	message.entityCreateDate = base::unixtime::now();

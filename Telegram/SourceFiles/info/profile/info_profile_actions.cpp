@@ -1734,7 +1734,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 
 			idInfo.text->setClickHandlerFilter([=, peer = _peer](auto &&...)
 			{
-				const auto idText = IDString(peer);
+				const auto idText = IDString(peer->forumTopicFor(topicRootId)->topicRootId());
 				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
 					const auto msg = tr::ayu_IDCopiedToast(tr::now);

@@ -1532,7 +1532,7 @@ void Filler::fillHistoryActions() {
 	addExportChat();
 	addTranslate();
 	addReport();
-	AyuUi::AddDeletedMessagesActions(_peer, _topic ? _topic : _thread, _controller, _addAction);
+	AyuUi::AddDeletedMessagesActions(_peer, _thread, _controller, _addAction);
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
@@ -1575,7 +1575,7 @@ void Filler::fillRepliesActions() {
 	addCreateTodoList();
 	addToggleTopicClosed();
 	addDeleteTopic();
-	AyuUi::AddDeletedMessagesActions(_peer, _topic ? _topic : _thread, _controller, _addAction);
+	AyuUi::AddDeletedMessagesActions(_peer, _thread, _controller, _addAction);
 }
 
 void Filler::fillScheduledActions() {

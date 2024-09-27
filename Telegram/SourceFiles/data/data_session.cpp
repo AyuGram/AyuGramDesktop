@@ -219,6 +219,19 @@ void CheckForSwitchInlineButton(not_null<HistoryItem*> item) {
 			double(std::numeric_limits<int>::max())));
 }
 
+bool NeedSaveMessage(not_null<HistoryItem *> item) {
+	const auto settings = &AyuSettings::getInstance();
+
+	if (!settings->saveDeletedMessages) {
+		return false;
+	}
+
+	if (const auto possiblyBot = item->history()->peer->asUser()) {
+		return !possiblyBot->isBot() || settings->saveForBots && possiblyBot->isBot();
+	}
+	return true;
+}
+
 } // namespace
 
 Session::Session(not_null<Main::Session*> session)
@@ -2833,25 +2846,23 @@ void Session::processMessagesDeleted(
 		return;
 	}
 
-	const auto settings = &AyuSettings::getInstance();
-
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		const auto i = list ? list->find(messageId.v) : Messages::iterator();
 		if (list && i != list->end()) {
 			const auto history = i->second->history();
 
-			if (!settings->saveDeletedMessages) {
+			if (!NeedSaveMessage(i->second)) {
 				i->second->destroy();
 			} else {
 				i->second->setDeleted();
 				AyuMessages::addDeletedMessage(i->second);
 			}
 
-			if (!history->chatListMessageKnown() && !settings->saveDeletedMessages) {
+			if (!history->chatListMessageKnown()) {
 				historiesToCheck.emplace(history);
 			}
-		} else if (affected && !settings->saveDeletedMessages) {
+		} else if (affected) {
 			affected->unknownMessageDeleted(messageId.v);
 		}
 	}
@@ -2861,21 +2872,19 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
-	const auto settings = &AyuSettings::getInstance();
-
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
 		if (const auto item = nonChannelMessage(messageId.v)) {
 			const auto history = item->history();
 
-			if (!settings->saveDeletedMessages) {
+			if (!NeedSaveMessage(item)) {
 				item->destroy();
 			} else {
 				item->setDeleted();
 				AyuMessages::addDeletedMessage(item);
 			}
 
-			if (!history->chatListMessageKnown() && !settings->saveDeletedMessages) {
+			if (!history->chatListMessageKnown()) {
 				historiesToCheck.emplace(history);
 			}
 		}

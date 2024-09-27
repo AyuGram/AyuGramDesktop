@@ -210,6 +210,8 @@ AyuGramSettings::AyuGramSettings() {
 	saveDeletedMessages = true;
 	saveMessagesHistory = true;
 
+	saveForBots = false;
+
 	// ~ Message filters
 	hideFromBlocked = false;
 
@@ -352,6 +354,10 @@ void AyuGramSettings::set_saveDeletedMessages(bool val) {
 
 void AyuGramSettings::set_saveMessagesHistory(bool val) {
 	saveMessagesHistory = val;
+}
+
+void AyuGramSettings::set_saveForBots(bool val) {
+	saveForBots = val;
 }
 
 void AyuGramSettings::set_hideFromBlocked(bool val) {

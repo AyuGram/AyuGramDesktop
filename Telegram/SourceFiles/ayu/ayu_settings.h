@@ -30,6 +30,8 @@ public:
 	bool saveDeletedMessages;
 	bool saveMessagesHistory;
 
+	bool saveForBots;
+
 	bool hideFromBlocked;
 
 	bool disableAds;
@@ -105,6 +107,8 @@ public:
 	void set_saveDeletedMessages(bool val);
 	void set_saveMessagesHistory(bool val);
 
+	void set_saveForBots(bool val);
+
 	void set_hideFromBlocked(bool val);
 
 	void set_disableAds(bool val);
@@ -178,6 +182,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	sendWithoutSound,
 	saveDeletedMessages,
 	saveMessagesHistory,
+	saveForBots,
 	hideFromBlocked,
 	disableAds,
 	disableStories,
