@@ -438,6 +438,25 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 					[=]()
 					{
 						readHistory(item);
+						if (item->media() && !item->media()->ttlSeconds()) {
+							const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
+							if (const auto channel = item->history()->peer->asChannel()) {
+								item->history()->session().api().request(MTPchannels_ReadMessageContents(
+									channel->inputChannel,
+									ids
+								)).send();
+							} else {
+								item->history()->session().api().request(MTPmessages_ReadMessageContents(
+									ids
+								)).done([=](const MTPmessages_AffectedMessages &result)
+								{
+									item->history()->session().api().applyAffectedMessages(
+										item->history()->peer,
+										result);
+								}).send();
+							}
+							item->markContentsRead();
+						}
 					},
 					&st::menuIconShowInChat);
 }
