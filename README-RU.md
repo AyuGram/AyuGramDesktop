@@ -1,9 +1,8 @@
-##### Доступно на другом языке! 
-[ [English](README.MD)  |   Русский ]
-
 # AyuGram
 
 ![AyuGram Лого](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
+
+[ [English](README.md)  | Русский ]
 
 ## Функции и Фишки
 
@@ -12,6 +11,7 @@
 - Кастомизация шрифта
 - Режим Стримера
 - Локальный телеграм премиум
+- Превью медиа и быстрая реакция при сильном нажатии на тачпад (macOS)
 - Улучшенный вид
 
 И многое другое. Посмотрите нашу [Документацию](https://docs.ayugram.one/desktop/) для более подробной информации.
@@ -29,7 +29,7 @@
 
 #### Официальный вариант
 
-Вы можете скачать готовый бинарный файл с [вкладки Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
+Вы можете скачать готовый бинарный файл со [вкладки Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
 [Телеграм чата](https://t.me/ayugramchat/12788).
 
 #### Winget
@@ -47,18 +47,20 @@ scoop install ayugram
 
 #### Сборка вручную
 
-Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) если вы хотите
-собрать AyuGram сами.
+Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md), если
+вы хотите собрать AyuGram сами.
 
 ### Arch Linux
 
-Вы можете установить `ayugram-desktop` или `ayugram-desktop-git` из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+Вы можете установить `ayugram-desktop` или `ayugram-desktop-git`
+из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### NixOS
 
-Проверьте [этот репозиторий](https://github.com/kaeeraa/ayugram-desktop) для руководства по установке.
+Попробуйте [этот репозиторий](https://github.com/kaeeraa/ayugram-desktop).
 
 ### Любой другой Линукс дистрибутив
+
 Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ### Примечания для Windows

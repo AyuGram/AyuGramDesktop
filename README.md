@@ -1,9 +1,8 @@
-##### Available on other languages! 
-[ English  |   [Русский](README-ru.md) ]
-
 # AyuGram
 
 ![AyuGram Logo](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
+
+[ English  |   [Русский](README-RU.md) ]
 
 ## Features
 
@@ -13,6 +12,7 @@
 - Font customization
 - Streamer mode
 - Local Telegram Premium
+- Media preview & quick reaction on force click (macOS)
 - Enhanced appearance
 
 And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
