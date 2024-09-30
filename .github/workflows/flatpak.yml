@@ -1,0 +1,42 @@
+name: Flatpak Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Flatpak
+        run: |
+          sudo apt update
+          sudo apt install flatpak-builder flatpak -y
+          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install flathub org.kde.Platform//5.15 org.kde.Sdk//5.15 -y
+
+      - name: Build Ayugram
+        run: |
+          flatpak-builder --user --install --force-clean build com.ayugram.AyuGramDesktop.json
+
+      - name: Export build
+        run: flatpak-builder --repo=repo --force-clean build com.ayugram.AyuGramDesktop.json
+
+      - name: Upload Flatpak repository to GitHub Pages
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions@github.com"
+          mkdir -p repo/refs/heads
+          touch repo/refs/heads/master
+          git add -A
+          git commit -m "Publish Flatpak repo"
+          git push
+
+

@@ -1,0 +1,20 @@
+{
+  "app-id": "com.ayugram.AyuGramDesktop",
+  "runtime": "org.kde.Platform",
+  "runtime-version": "5.15",
+  "sdk": "org.kde.Sdk",
+  "command": "ayugram",
+  "modules": [
+    {
+      "name": "ayugram",
+      "buildsystem": "cmake",
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/AyuGram/AyuGramDesktop.git",
+          "branch": "dev"
+        }
+      ]
+    }
+  ]
+}
