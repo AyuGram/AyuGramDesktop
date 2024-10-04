@@ -64,3 +64,5 @@ settings.local.json
 # Cursor IDE local settings (but keep .cursor/rules/)
 .cursor/*
 !.cursor/rules/
+# Project specific
+Telegram/SourceFiles/_other/packer_private.h
