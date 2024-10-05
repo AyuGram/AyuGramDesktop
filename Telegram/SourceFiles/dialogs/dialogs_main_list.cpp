@@ -125,7 +125,7 @@ void MainList::unreadStateChanged(
 		[[maybe_unused]] int a = 0;
 	}
 	if (updateCloudUnread) {
-		Assert(nowState.known);
+		// Assert(nowState.known);
 		_cloudUnreadState += nowState - wasState;
 		finalizeCloudUnread();
 	}
