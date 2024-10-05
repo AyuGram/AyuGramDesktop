@@ -551,7 +551,12 @@ void AyuGramSettings::set_voiceConfirmation(bool val) {
 	voiceConfirmation = val;
 }
 
-bool get_ghostModeEnabled() {
+bool isUseScheduledMessages() {
+	const auto settings = &getInstance();
+	return isGhostModeActive() && settings->useScheduledMessages;
+}
+
+bool isGhostModeActive() {
 	return ghostModeEnabled.current();
 }
 

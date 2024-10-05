@@ -57,6 +57,7 @@
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 
+#include "history/view/history_view_context_menu.h"
 #include "ui/ui_utility.h"
 
 namespace MessageHistory {
@@ -332,7 +333,6 @@ InnerWidget::InnerWidget(
 		const Data::Session::ItemVisibilityQuery &query)
 		{
 			return (_history == query.item->history())
-				&& query.item->isAdminLogEntry()
 				&& isVisible();
 		}) | rpl::start_with_next([=](
 								  const Data::Session::ItemVisibilityQuery &query)
@@ -651,6 +651,7 @@ void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 	_messageIds = memento->takeMessageIds();
 	_upLoaded = memento->upLoaded();
 	_downLoaded = memento->downLoaded();
+	updateMinMaxIds();
 	updateSize();
 }
 
@@ -1171,6 +1172,13 @@ void InnerWidget::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 													  saveDocumentToFile(lnkDocument);
 												  }),
 								 &st::menuIconDownload);
+
+				HistoryView::AddCopyFilename(
+					_menu,
+					lnkDocument,
+					[] { return false; });
+
+
 				if (lnkDocument->hasAttachedStickers()) {
 					const auto controller = _controller;
 					auto callback = [=]

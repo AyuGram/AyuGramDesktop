@@ -1054,8 +1054,7 @@ HistoryWidget::HistoryWidget(
 		if (action.replaceMediaOf) {
 		} else if (action.options.scheduled) {
 			cancelReply(lastKeyboardUsed);
-			const auto settings = &AyuSettings::getInstance();
-			if (!settings->useScheduledMessages) {
+			if (!AyuSettings::isUseScheduledMessages()) {
 				crl::on_main(this, [=, history = action.history]
 				{
 					controller->showSection(
@@ -4797,9 +4796,8 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 }
 
 void HistoryWidget::send(Api::SendOptions options) {
-	// AyuGram useScheduledMessages
 	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !options.scheduled) {
+	if (AyuSettings::isUseScheduledMessages() && !options.scheduled) {
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
 	}

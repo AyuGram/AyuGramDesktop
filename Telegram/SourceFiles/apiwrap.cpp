@@ -3942,9 +3942,7 @@ void ApiWrap::sendUploadedPhoto(
 		Api::RemoteFileInfo info,
 		Api::SendOptions options) {
 	if (const auto item = _session->data().message(localId)) {
-		// AyuGram useScheduledMessages
-		const auto settings = &AyuSettings::getInstance();
-		if (settings->useScheduledMessages && !options.scheduled) {
+		if (AyuSettings::isUseScheduledMessages() && !options.scheduled) {
 			auto current = base::unixtime::now();
 			options.scheduled = current + 12;
 		}
@@ -3967,9 +3965,7 @@ void ApiWrap::sendUploadedDocument(
 			return;
 		}
 
-		// AyuGram useScheduledMessages
-		const auto settings = &AyuSettings::getInstance();
-		if (settings->useScheduledMessages && !options.scheduled) {
+		if (AyuSettings::isUseScheduledMessages() && !options.scheduled) {
 			auto current = base::unixtime::now();
 			options.scheduled = current + 12;
 		}
@@ -4283,8 +4279,7 @@ void ApiWrap::sendBotStart(
 			message.textWithTags.text += '@' + bot->username();
 		}
 
-		const auto settings = &AyuSettings::getInstance();
-		if (settings->useScheduledMessages) {
+		if (AyuSettings::isUseScheduledMessages()) {
 			auto current = base::unixtime::now();
 			message.action.options.scheduled = current + 12;
 		}
@@ -4535,9 +4530,7 @@ void ApiWrap::sendMediaWithRandomId(
 		Api::SendOptions options,
 		uint64 randomId,
 		Fn<void(bool)> done) {
-	// AyuGram useScheduledMessages
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !options.scheduled) {
+	if (AyuSettings::isUseScheduledMessages() && !options.scheduled) {
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
 	}
@@ -4776,9 +4769,7 @@ void ApiWrap::sendAlbumIfReady(not_null<SendingAlbum*> album) {
 		return;
 	}
 
-	// AyuGram useScheduledMessages
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->useScheduledMessages && !album->options.scheduled) {
+	if (AyuSettings::isUseScheduledMessages() && !album->options.scheduled) {
 		auto current = base::unixtime::now();
 		album->options.scheduled = current + 12;
 	}

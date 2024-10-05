@@ -240,7 +240,9 @@ rpl::producer<QString> get_editedMarkReactive();
 
 rpl::producer<int> get_showPeerIdReactive();
 
-bool get_ghostModeEnabled();
+bool isGhostModeActive();
+bool isUseScheduledMessages();
+
 rpl::producer<bool> get_ghostModeEnabledReactive();
 
 rpl::producer<bool> get_hideFromBlockedReactive();

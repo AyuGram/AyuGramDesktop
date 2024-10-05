@@ -2207,7 +2207,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 
 		if (type == StopType::Send) {
 			auto settings = &AyuSettings::getInstance();
-			if (settings->useScheduledMessages) {
+			if (AyuSettings::isUseScheduledMessages()) {
 				auto current = base::unixtime::now();
 				options.scheduled = current + 12 + 5;
 			}
@@ -2305,7 +2305,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 	if (isListenState()) {
 		const auto data = _listen->data();
 		auto settings = &AyuSettings::getInstance();
-		if (settings->useScheduledMessages) {
+		if (AyuSettings::isUseScheduledMessages()) {
 			auto current = base::unixtime::now();
 			options.scheduled = current + 12 + 5;
 		}
