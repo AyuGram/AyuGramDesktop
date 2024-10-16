@@ -529,7 +529,7 @@ HistoryInner::HistoryInner(
 				auto mousePos = mapFromGlobal(globalPosition);
 				auto point = _widget->clampMousePosition(mousePos);
 
-				if (!inSelectionMode() && !_emptyPainter && rect().contains(mousePos)) {
+				if (!inSelectionMode().inSelectionMode && !_emptyPainter && rect().contains(mousePos)) {
 					if (const auto view = Element::Moused()) {
 						mouseActionCancel();
 

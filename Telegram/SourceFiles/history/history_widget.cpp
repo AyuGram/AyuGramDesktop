@@ -2042,7 +2042,14 @@ void HistoryWidget::fileChosen(ChatHelpers::FileChosen &&data) {
 		} else if (!_field->isHidden()) {
 			Data::InsertCustomEmoji(_field.data(), data.document);
 		}
-	} else if (_history) {
+	} else {
+		const auto settings = &AyuSettings::getInstance();
+		if (!settings->sendReadMessages && settings->markReadAfterAction) {
+			if (const auto lastMessage = history()->lastMessage()) {
+				readHistory(lastMessage);
+			}
+		}
+
 		controller()->sendingAnimation().appendSending(
 			data.messageSendingFrom);
 		const auto localId = data.messageSendingFrom.localId;
