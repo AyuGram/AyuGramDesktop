@@ -39,7 +39,7 @@ namespace Payments {
 namespace {
 
 constexpr auto kMaxPerReactionFallback = 2'500;
-constexpr auto kDefaultPerReaction = 50;
+constexpr auto kDefaultPerReaction = 1;
 
 void TryAddingPaidReaction(
 		not_null<Main::Session*> session,

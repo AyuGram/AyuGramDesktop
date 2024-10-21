@@ -67,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtSvg/QSvgRenderer>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_styles.h"
 #include "window/window_session_controller.h"
@@ -1376,6 +1377,12 @@ void StickerSetBox::Inner::chosen(
 	const auto animation = options.scheduled
 		? Ui::MessageSendingAnimationFrom()
 		: messageSentAnimationInfo(index, sticker);
+
+	if (AyuSettings::isUseScheduledMessages() && !options.scheduled) {
+		auto current = base::unixtime::now();
+		options.scheduled = current + 12;
+	}
+
 	_show->processChosenSticker({
 		.document = sticker,
 		.options = options,
