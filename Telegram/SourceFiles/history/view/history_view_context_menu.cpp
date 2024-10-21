@@ -1404,7 +1404,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	}
 	AddMessageActions(result, request, list);
 
-	const auto wasAmount = result->actions().size();
+	/*const auto wasAmount = result->actions().size();*/
 	if (const auto textItem = view ? view->textItem() : item) {
 		AddEmojiPacksAction(
 			result,
@@ -1412,10 +1412,10 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 			HistoryView::EmojiPacksSource::Message,
 			list->controller());
 	}
-	if (item) {
+	/*{
 		const auto added = (result->actions().size() > wasAmount);
 		AddSelectRestrictionAction(result, item, !added);
-	}
+	}*/
 	if (hasWhoReactedItem) {
 		AddWhoReactedAction(result, list, item, list->controller());
 	} else if (item) {
