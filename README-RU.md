@@ -57,7 +57,7 @@ scoop install ayugram
 
 ### NixOS
 
-Попробуйте [этот репозиторий](https://github.com/kaeeraa/ayugram-desktop).
+Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
 
 ### Любой другой Линукс дистрибутив
 
