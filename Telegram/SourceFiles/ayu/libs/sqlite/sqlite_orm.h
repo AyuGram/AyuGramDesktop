@@ -21710,7 +21710,7 @@ namespace sqlite_orm {
         // F O::*
         template<typename F, typename ColRef, satisfies<std::is_member_pointer, ColRef> = true>
         static auto make_cte_column(std::string name, const ColRef& finalColRef) {
-            using object_type = table_type_of_t<ColRef>;
+            // using object_type = table_type_of_t<ColRef>;
             using column_type = column_t<ColRef, empty_setter>;
 
             return column_type{std::move(name), finalColRef, empty_setter{}};
@@ -22027,7 +22027,7 @@ namespace sqlite_orm {
 
             template<class Table>
             void create_table(sqlite3* db, const std::string& tableName, const Table& table) {
-                using table_type = std::decay_t<decltype(table)>;
+                // using table_type = std::decay_t<decltype(table)>;
                 using context_t = serializer_context<db_objects_type>;
 
                 context_t context{this->db_objects};

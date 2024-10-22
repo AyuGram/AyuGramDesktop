@@ -731,7 +731,7 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			}
 			const auto item = view->data();
 			const auto canSendReply = CanSendReply(item);
-			const auto canReply = (canSendReply || item->allowsForward() && !item->isDeleted());
+			const auto canReply = canSendReply || (item->allowsForward() && !item->isDeleted());
 			if (!canReply) {
 				return true;
 			}
@@ -2820,7 +2820,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			return;
 		}
 		const auto canSendReply = CanSendReply(item);
-		const auto canReply = canSendReply || item->allowsForward() && !item->isDeleted();
+		const auto canReply = canSendReply || (item->allowsForward() && !item->isDeleted());
 		if (canReply) {
 			const auto selected = selectedQuote(item);
 			auto text = (selected

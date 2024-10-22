@@ -7,20 +7,10 @@
 namespace TapticEngine {
 namespace Impl {
 
-NSHapticFeedbackManager *hapticFeedbackManager = nil;
-
-void init() {
-    if (@available(macOS 10.11, *)) {
-        hapticFeedbackManager = [NSHapticFeedbackManager defaultPerformer];
-    }
-}
-
 void performHapticFeedback(NSHapticFeedbackPattern pattern) {
-    if (@available(macOS 10.11, *)) {
-        if (hapticFeedbackManager) {
-            [hapticFeedbackManager performFeedbackPattern:pattern performanceTime:NSHapticFeedbackPerformanceTimeNow];
-        }
-    }
+    [[NSHapticFeedbackManager defaultPerformer]
+	    performFeedbackPattern:pattern
+	    performanceTime:NSHapticFeedbackPerformanceTimeDrawCompleted];
 }
 
 void generateGeneric() {

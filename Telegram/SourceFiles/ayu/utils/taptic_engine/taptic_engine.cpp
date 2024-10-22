@@ -8,10 +8,6 @@
 
 namespace TapticEngine {
 
-void init() {
-	Impl::init();
-}
-
 void generateGeneric() {
 	Impl::generateGeneric();
 }

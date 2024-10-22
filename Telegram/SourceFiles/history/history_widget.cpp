@@ -9186,9 +9186,10 @@ void HistoryWidget::handlePeerUpdate() {
 		}
 	}
 	if (!_showAnimation) {
-		if (_unblock->isHidden() == isBlocked()
-			|| (!isBlocked() && _joinChannel->isHidden() == isJoinChannel())
-			|| (isMuteUnmute() && _discuss->isHidden() == hasDiscussionGroup())) {
+		const auto blockChanged = (_unblock->isHidden() == isBlocked());
+		if (blockChanged
+			|| ((!isBlocked() && _joinChannel->isHidden() == isJoinChannel())
+				|| (isMuteUnmute() && _discuss->isHidden() == hasDiscussionGroup()))) {
 			resize = true;
 		}
 		if (updateCanSendMessage()) {

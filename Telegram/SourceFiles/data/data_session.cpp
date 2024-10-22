@@ -227,7 +227,7 @@ bool NeedSaveMessage(not_null<HistoryItem *> item) {
 	}
 
 	if (const auto possiblyBot = item->history()->peer->asUser()) {
-		return !possiblyBot->isBot() || settings->saveForBots && possiblyBot->isBot();
+		return !possiblyBot->isBot() || (settings->saveForBots && possiblyBot->isBot());
 	}
 	return true;
 }
