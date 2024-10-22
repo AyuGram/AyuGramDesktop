@@ -17,12 +17,15 @@
 
 And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 
-## Preferences screenshots
-
-<img src='.github/demos/demo1.png' width='268'>
-<img src='.github/demos/demo2.png' width='268'>
-<img src='.github/demos/demo3.png' width='268'>
-<img src='.github/demos/demo4.png' width='268'>
+<h3>
+  <details>
+    <summary>Preferences screenshots</summary>
+    <img src='.github/demos/demo1.png' width='268'>
+    <img src='.github/demos/demo2.png' width='268'>
+    <img src='.github/demos/demo3.png' width='268'>
+    <img src='.github/demos/demo4.png' width='268'>
+  </details>
+</h3>
 
 ## Downloads
 
@@ -57,7 +60,7 @@ You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://au
 
 ### NixOS
 
-See [this repository](https://github.com/kaeeraa/ayugram-desktop) for installation manual.
+See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
 
 ### Any other Linux distro
 
