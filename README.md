@@ -57,7 +57,7 @@ You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://au
 
 ### NixOS
 
-See [this repository](https://github.com/kaeeraa/ayugram-desktop) for installation manual.
+See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
 
 ### Any other Linux distro
 
