@@ -160,14 +160,19 @@ void Badge::setContent(Content content) {
 					: st::attentionButtonFg));
 			}, _view->lifetime());
 	} break;
-	case BadgeType::AyuGram:
-	case BadgeType::Extera: {
-		const auto icon = &st::infoExteraBadge;
-		_view->resize(icon->size());
+	case BadgeType::Extera:
+	case BadgeType::ExteraSupporter: {
+		const auto icon = (_content.badge == BadgeType::Extera
+							   ? &st::infoExteraOfficialBadge
+							   : &st::infoExteraSupporterBadge);
+		const auto skip = st::infoVerifiedCheckPosition.x();
+		_view->resize(
+			icon->width() + skip,
+			icon->height());
 		_view->paintRequest(
 		) | rpl::start_with_next([=, check = _view.data()]{
 			Painter p(check);
-			icon->paint(p, 0, 0, check->width());
+			icon->paint(p, skip, 0, check->width());
 		}, _view->lifetime());
 	} break;
 	}

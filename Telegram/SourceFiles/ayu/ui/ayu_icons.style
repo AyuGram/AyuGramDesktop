@@ -30,6 +30,7 @@ inChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgInDateFgSelected }};
 outChannelBadgeIcon: icon {{ "ayu/channel", msgOutDateFg }};
 outChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgOutDateFgSelected }};
 
-infoExteraBadge: icon {{ "ayu/exterabadge", profileVerifiedCheckBg }};
+infoExteraOfficialBadge: icon {{ "ayu/extera_official", profileVerifiedCheckBg }};
+infoExteraSupporterBadge: icon {{ "ayu/extera_badge", profileVerifiedCheckBg }};
 
 winEnterWithGuestIcon: icon {{ "ayu/ghost_tray", windowFg }};
