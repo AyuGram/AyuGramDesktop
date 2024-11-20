@@ -51,19 +51,21 @@ void runOnce() {
 	const auto invalidateAll = cOtherOnline() >= t;
 
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
-		if (const auto session = account->maybeSession()) {
-			const auto id = session->userId().bare;
-			if (!state.contains(id)) {
-				state[id] = true; // newly added account, I suppose
-			}
+		if (account) {
+			if (const auto session = account->maybeSession()) {
+				const auto id = session->userId().bare;
+				if (!state.contains(id)) {
+					state[id] = true; // newly added account, I suppose
+				}
 
-			if (invalidateAll || state[id] || session->user()->lastseen().isOnline(t)) {
-				session->api().request(MTPaccount_UpdateStatus(
-					MTP_bool(true)
-				)).send();
-				state[id] = false;
+				if (invalidateAll || state[id] || session->user()->lastseen().isOnline(t)) {
+					session->api().request(MTPaccount_UpdateStatus(
+						MTP_bool(true)
+					)).send();
+					state[id] = false;
 
-				DEBUG_LOG(("[AyuGram] Sent offline for account with uid %1, invalidate %2").arg(id).arg(invalidateAll));
+					DEBUG_LOG(("[AyuGram] Sent offline for account with uid %1, invalidate %2").arg(id).arg(invalidateAll));
+				}
 			}
 		}
 	}

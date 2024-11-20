@@ -394,7 +394,7 @@ bool AddForwardMessageAction(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	const auto item = request.item;
-	if (item->isDeleted()) {
+	if (item && item->isDeleted()) {
 		return false;
 	}
 
