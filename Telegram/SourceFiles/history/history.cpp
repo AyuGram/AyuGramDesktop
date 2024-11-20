@@ -623,8 +623,10 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 	const auto i = _items.find(hack);
 	hack.release();
 
-	Assert(i != end(_items));
-	_items.erase(i);
+	// hack for Hide message
+	if (i != end(_items)) {
+		_items.erase(i);
+	}
 
 	if (documentToCancel) {
 		session().data().documentMessageRemoved(documentToCancel);

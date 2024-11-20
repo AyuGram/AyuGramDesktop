@@ -395,7 +395,7 @@ Panel::Panel(Args &&args)
 		size.setWidth(st::botWebViewPanelWidthIncreased);
 	}
 
-	_widget->setInnerSize(size);
+	_widget->setInnerSize(size, true);
 
 	_widget->closeRequests(
 	) | rpl::start_with_next([=] {
