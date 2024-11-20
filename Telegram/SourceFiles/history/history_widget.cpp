@@ -2947,7 +2947,7 @@ void HistoryWidget::setHistory(History *history) {
 	if (was && !now) {
 		_attachToggle->removeEventFilter(_attachBotsMenu.get());
 		_attachBotsMenu->hideFast();
-	} else if (now && !was && !ChatHelpers::ShowPanelOnClick()) {
+	} else if (now && !was) {
 		_attachToggle->installEventFilter(_attachBotsMenu.get());
 	}
 
