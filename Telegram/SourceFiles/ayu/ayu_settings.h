@@ -40,6 +40,8 @@ public:
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
 
+	double wideMultiplier;
+
 	bool spoofWebviewAsAndroid;
 	bool increaseWebviewHeight;
 	bool increaseWebviewWidth;
@@ -117,6 +119,8 @@ public:
 	void set_collapseSimilarChannels(bool val);
 	void set_hideSimilarChannels(bool val);
 
+	void set_wideMultiplier(double val);
+
 	void set_spoofWebviewAsAndroid(bool val);
 	void set_increaseWebviewHeight(bool val);
 	void set_increaseWebviewWidth(bool val);
@@ -189,6 +193,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	disableCustomBackgrounds,
 	collapseSimilarChannels,
 	hideSimilarChannels,
+	wideMultiplier,
 	spoofWebviewAsAndroid,
 	increaseWebviewHeight,
 	increaseWebviewWidth,

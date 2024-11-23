@@ -44,7 +44,7 @@
 
 #include <ayu/ayu_settings.h>
 
-#include "ayu/ayu_fonts.h"
+#include "ayu/ayu_ui_settings.h"
 #include "ui/ui_utility.h"
 
 struct Font
@@ -665,7 +665,7 @@ void Content::setupContent(
 	const std::vector<Font> &fonts) {
 	using namespace rpl::mappers;
 
-	const auto current = AyuFonts::getMonoFont();
+	const auto current = AyuUiSettings::getMonoFont();
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 	const auto add = [&](const std::vector<Font> &list)
 	{

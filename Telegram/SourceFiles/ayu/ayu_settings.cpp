@@ -222,6 +222,8 @@ AyuGramSettings::AyuGramSettings() {
 	collapseSimilarChannels = true;
 	hideSimilarChannels = false;
 
+	wideMultiplier = 1.0;
+
 	spoofWebviewAsAndroid = false;
 	increaseWebviewHeight = false;
 	increaseWebviewWidth = false;
@@ -383,6 +385,10 @@ void AyuGramSettings::set_collapseSimilarChannels(bool val) {
 
 void AyuGramSettings::set_hideSimilarChannels(bool val) {
 	hideSimilarChannels = val;
+}
+
+void AyuGramSettings::set_wideMultiplier(double val) {
+	wideMultiplier = val;
 }
 
 void AyuGramSettings::set_spoofWebviewAsAndroid(bool val) {

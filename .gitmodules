@@ -21,7 +21,7 @@
 	url = https://github.com/desktop-app/lib_base.git
 [submodule "Telegram/codegen"]
 	path = Telegram/codegen
-	url = https://github.com/desktop-app/codegen.git
+	url = https://github.com/AyuGram/codegen.git
 [submodule "Telegram/lib_ui"]
 	path = Telegram/lib_ui
 	url = https://github.com/AyuGram/lib_ui.git

@@ -8,8 +8,8 @@
 
 #include "ayu/ayu_lang.h"
 #include "ayu/ayu_worker.h"
-#include "ayu/ayu_fonts.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/ayu_ui_settings.h"
 #include "ayu/data/ayu_database.h"
 #include "lang/lang_instance.h"
 
@@ -29,7 +29,8 @@ void initLang() {
 void initFonts() {
 	auto settings = &AyuSettings::getInstance();
 
-	AyuFonts::setMonoFont(settings->monoFont);
+	AyuUiSettings::setMonoFont(settings->monoFont);
+	AyuUiSettings::setWideMultiplier(settings->wideMultiplier);
 }
 
 void initDatabase() {

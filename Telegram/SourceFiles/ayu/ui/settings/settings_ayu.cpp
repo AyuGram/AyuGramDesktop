@@ -34,6 +34,7 @@
 #include "styles/style_ayu_icons.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -1296,6 +1297,75 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 		});
 }
 
+void SetupWideMultiplierSlider(not_null<Ui::VerticalLayout*> container,
+							   not_null<Window::SessionController*> controller) {
+	auto settings = &AyuSettings::getInstance();
+
+	container->add(
+		object_ptr<Button>(container,
+						   tr::ayu_SettingsWideMultiplier(),
+						   st::settingsButtonNoIcon)
+	)->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	auto wideMultiplierSlider = MakeSliderWithLabel(
+		container,
+		st::autoDownloadLimitSlider,
+		st::settingsScaleLabel,
+		0,
+		st::settingsScaleLabel.style.font->width("8%%%"));
+	container->add(std::move(wideMultiplierSlider.widget), st::recentStickersLimitPadding);
+	const auto slider = wideMultiplierSlider.slider;
+	const auto label = wideMultiplierSlider.label;
+	const auto updateLabel = [=](double val)
+	{
+		label->setText(QString::number(val, 'f', 2));
+	};
+
+	constexpr auto kSizeAmount = 61; // (4.00 - 1.00) / 0.05 + 1
+	constexpr auto kMinSize = 1.00;
+	// const auto kMaxSize = 4.00;
+	constexpr auto kStep = 0.05;
+	const auto valueToIndex = [=](double value) {
+		return static_cast<int>(std::round((value - kMinSize) / kStep));
+	};
+	const auto indexToValue = [=](int index)
+	{
+		return kMinSize + index * kStep;
+	};
+
+	updateLabel(settings->wideMultiplier);
+
+	slider->setPseudoDiscrete(
+		kSizeAmount,
+		[=](int index) { return index; },
+		valueToIndex(settings->wideMultiplier),
+		[=](int index)
+		{
+			updateLabel(indexToValue(index));
+		},
+		[=](int index)
+		{
+			updateLabel(indexToValue(index));
+
+			settings->set_wideMultiplier(indexToValue(index));
+			AyuSettings::save();
+
+			// fix slider
+			crl::on_main([=]
+			{
+				controller->show(Ui::MakeConfirmBox({
+					.text = tr::lng_settings_need_restart(),
+					.confirmed = []
+					{
+						Core::Restart();
+					},
+					.confirmText = tr::lng_settings_restart_now(),
+					.cancelText = tr::lng_settings_restart_later(),
+				}));
+			});
+		});
+}
+
 void SetupFonts(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	const auto settings = &AyuSettings::getInstance();
 
@@ -1606,6 +1676,10 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	AddSkip(container);
 
 	SetupRecentStickersLimitSlider(container);
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+	SetupWideMultiplierSlider(container, controller);
 
 	AddSkip(container);
 	AddDivider(container);

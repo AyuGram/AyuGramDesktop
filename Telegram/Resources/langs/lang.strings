@@ -7132,6 +7132,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageFieldElementVoice" = "Voice";
 "ayu_DrawerElementsHeader" = "Drawer Elements";
 "ayu_TrayElementsHeader" = "Tray Elements";
+"ayu_SettingsWideMultiplier" = "Wide Messages Multiplier";
 "ayu_SettingsSpoofWebviewAsAndroid" = "Spoof Client as Android";
 "ayu_SettingsBiggerWindow" = "Bigger Window";
 "ayu_SettingsIncreaseWebviewHeight" = "Increase Content Height";
