@@ -2216,10 +2216,10 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 				[=, this](Fn<void()> &&close)
 				{
 					_sendVoiceRequests.fire({
-						_data.bytes,
-						_data.waveform,
-						Duration(_data.samples),
-						options,
+						.bytes = _data.content,
+						.waveform = _data.waveform,
+						.duration = _data.duration,
+						.options = options,
 					});
 					close();
 				});
@@ -2314,10 +2314,11 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			[=, this](Fn<void()> &&close)
 			{
 				_sendVoiceRequests.fire({
-					_data.bytes,
-					_data.waveform,
-					Duration(_data.samples),
-					options,
+					.bytes = _data.content,
+					.waveform = _data.waveform,
+					.duration = _data.duration,
+					.options = options,
+					.video = !_data.minithumbs.isNull(),
 				});
 				close();
 			});
