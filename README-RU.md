@@ -16,12 +16,15 @@
 
 И многое другое. Посмотрите нашу [Документацию](https://docs.ayugram.one/desktop/) для более подробной информации.
 
-## Скриншоты настроек
-
-<img src='.github/demos/demo1.png' width='268'>
-<img src='.github/demos/demo3.png' width='268'>
-<img src='.github/demos/demo2.png' width='268'>
-<img src='.github/demos/demo4.png' width='268'>
+<h3>
+  <details>
+    <summary>Скриншоты настроек</summary>
+    <img src='.github/demos/demo1.png' width='268'>
+    <img src='.github/demos/demo2.png' width='268'>
+    <img src='.github/demos/demo3.png' width='268'>
+    <img src='.github/demos/demo4.png' width='268'>
+  </details>
+</h3>
 
 ## Установка
 
@@ -57,7 +60,7 @@ scoop install ayugram
 
 ### NixOS
 
-Попробуйте [этот репозиторий](https://github.com/kaeeraa/ayugram-desktop).
+Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
 
 ### Любой другой Линукс дистрибутив
 
