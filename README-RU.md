@@ -55,7 +55,7 @@ scoop install ayugram
 
 ### Arch Linux
 
-Вы можете установить `ayugram-desktop` или `ayugram-desktop-git`
+Вы можете установить `ayugram-desktop` или `ayugram-desktop-bin`
 из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### NixOS
