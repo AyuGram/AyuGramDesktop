@@ -57,7 +57,7 @@ build by yourself.
 
 ### Arch Linux
 
-You can install `ayugram-desktop` or `ayugram-desktop-git` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+You can install `ayugram-desktop` or `ayugram-desktop-bin` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### NixOS
 
