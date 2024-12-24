@@ -32,7 +32,7 @@
 
 #### Официальный вариант
 
-Вы можете скачать готовый бинарный файл со [вкладки Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
+Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
 [Телеграм чата](https://t.me/ayugramchat/12788).
 
 #### Winget
@@ -53,10 +53,13 @@ scoop install ayugram
 Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md), если
 вы хотите собрать AyuGram сами.
 
+### macOS
+
+Вы можете скачать подписанный пакет со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases).
+
 ### Arch Linux
 
-Вы можете установить `ayugram-desktop` или `ayugram-desktop-bin`
-из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+Вы можете установить `ayugram-desktop` из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### NixOS
 

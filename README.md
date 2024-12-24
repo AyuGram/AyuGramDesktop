@@ -55,9 +55,13 @@ Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/
 build by yourself.
 >>>>>>> 59e44d4e96 (feat: add scoop note)
 
+### macOS
+
+You can download prebuilt macOS package from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases).
+
 ### Arch Linux
 
-You can install `ayugram-desktop` or `ayugram-desktop-bin` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+You can install `ayugram-desktop` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
 
 ### NixOS
 
