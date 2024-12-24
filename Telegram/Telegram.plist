@@ -5,7 +5,7 @@
 	<key>CFBundleExecutable</key>
 	<string>@output_name@</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Telegram Desktop messaging app</string>
+	<string>Unofficial Telegram Desktop app</string>
 	<key>CFBundleIconFile</key>
 	<string>Icon.icns</string>
 	<key>CFBundleIconName</key>
