@@ -240,6 +240,7 @@ AyuGramSettings::AyuGramSettings() {
 #endif
 	;
 	simpleQuotesAndReplies = true;
+	replaceBottomInfoWithIcons = true;
 	deletedMark = "🧹";
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
 	recentStickersCount = 100;
@@ -417,6 +418,10 @@ void AyuGramSettings::set_appIcon(QString val) {
 
 void AyuGramSettings::set_simpleQuotesAndReplies(bool val) {
 	simpleQuotesAndReplies = val;
+}
+
+void AyuGramSettings::set_replaceBottomInfoWithIcons(bool val) {
+	replaceBottomInfoWithIcons = val;
 }
 
 void AyuGramSettings::set_deletedMark(QString val) {

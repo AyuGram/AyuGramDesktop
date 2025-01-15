@@ -1456,6 +1456,27 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupMarks(not_null<Ui::VerticalLayout*> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddButtonWithIcon(
+		container,
+		rpl::single(QString("Replace with Icons")),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->replaceBottomInfoWithIcons)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->replaceBottomInfoWithIcons);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_replaceBottomInfoWithIcons(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
 	AddButtonWithLabel(
 		container,
 		tr::ayu_DeletedMarkText(),

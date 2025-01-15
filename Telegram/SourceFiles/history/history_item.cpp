@@ -3349,31 +3349,7 @@ bool HistoryItem::isDeleted() const {
 
 void HistoryItem::setAyuHint(const QString &hint) {
 	try {
-		if (!(_flags & MessageFlag::HasPostAuthor)) {
-			_flags |= MessageFlag::HasPostAuthor;
-		}
-
-		auto msgsigned = Get<HistoryMessageSigned>();
-		if (hint.isEmpty()) {
-			if (!msgsigned) {
-				return;
-			}
-			RemoveComponents(HistoryMessageSigned::Bit());
-			history()->owner().requestItemResize(this);
-			return;
-		}
-
-		if (!isService()) {
-			if (!msgsigned) {
-				AddComponents(HistoryMessageSigned::Bit());
-				msgsigned = Get<HistoryMessageSigned>();
-			} else if (msgsigned->author == hint) {
-				return;
-			}
-			msgsigned->author = hint;
-			msgsigned->isAnonymousRank = !isDiscussionPost()
-				&& this->author()->isMegagroup();
-		} else {
+		if (isService()) {
 			const auto data = Get<HistoryServiceData>();
 			const auto postfix = QString(" (%1)").arg(hint);
 			if (!_text.text.endsWith(postfix)) { // fix stacking for TTL messages
@@ -3385,6 +3361,7 @@ void HistoryItem::setAyuHint(const QString &hint) {
 			}
 		}
 
+		// update bottom info
 		history()->owner().requestItemViewRefresh(this);
 		history()->owner().requestItemResize(this);
 	} catch (...) {

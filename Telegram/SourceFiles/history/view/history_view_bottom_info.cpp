@@ -36,6 +36,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/messageshot/message_shot.h"
+#include "core/ui_integration.h"
+#include "styles/style_ayu_icons.h"
 
 
 namespace HistoryView {
@@ -415,45 +417,111 @@ void BottomInfo::layout() {
 void BottomInfo::layoutDateText() {
 	const auto settings = &AyuSettings::getInstance();
 
-	const auto edited = (_data.flags & Data::Flag::Edited)
-							? (settings->editedMark + ' ')
-							: QString();
-	const auto author = _data.author;
-	const auto prefix = !author.isEmpty() ? (author == settings->deletedMark ? u" "_q : u", "_q) : QString();
-	const auto date = edited + QLocale().toString(
-		_data.date.time(),
-		settings->showMessageSeconds
-			? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-			: QLocale::system().timeFormat(QLocale::ShortFormat)
-	);
-	const auto afterAuthor = prefix + date;
-	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
-	const auto authorWidth = st::msgDateFont->width(author);
-	const auto maxWidth = st::maxSignatureSize;
-	_authorElided = !author.isEmpty()
-		&& (authorWidth + afterAuthorWidth > maxWidth);
-	const auto name = _authorElided
-		? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
-		: author;
-	const auto full = (_data.flags & Data::Flag::Sponsored)
-		? QString()
-		: (_data.flags & Data::Flag::Imported)
-		? (date + ' ' + tr::lng_imported(tr::now))
-		: name.isEmpty()
-		? date
-		: (name + afterAuthor);
-	auto marked = TextWithEntities();
-	if (const auto count = _data.stars) {
-		marked.append(
-			Ui::Text::IconEmoji(&st::starIconEmojiSmall)
-		).append(Lang::FormatCountToShort(count).string).append(u", "_q);
+	if (!settings->replaceBottomInfoWithIcons) {
+		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
+								? (settings->deletedMark + ' ')
+								: QString();
+		const auto edited = (_data.flags & Data::Flag::Edited)
+								? (settings->editedMark + ' ')
+								: (_data.flags & Data::Flag::EstimateDate)
+			? (tr::lng_approximate(tr::now) + ' ')
+			: QString();
+		const auto author = _data.author;
+		const auto prefix = !author.isEmpty() ? u", "_q : QString();
+		const auto date = edited + QLocale().toString(
+			_data.date.time(),
+			settings->showMessageSeconds
+				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+				: QLocale::system().timeFormat(QLocale::ShortFormat)
+		);
+		const auto afterAuthor = prefix + date;
+		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
+		const auto authorWidth = st::msgDateFont->width(author);
+		const auto maxWidth = st::maxSignatureSize;
+		_authorElided = !author.isEmpty()
+			&& (authorWidth + afterAuthorWidth > maxWidth);
+		const auto name = _authorElided
+			? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
+			: author;
+		const auto full = (_data.flags & Data::Flag::Sponsored)
+			? QString()
+			: (_data.flags & Data::Flag::Imported)
+			? (deleted + date + ' ' + tr::lng_imported(tr::now))
+			: name.isEmpty()
+			? (deleted + date)
+			: (deleted + name + afterAuthor);
+		_authorEditedDate.setText(
+			st::msgDateTextStyle,
+			full,
+			Ui::NameTextOptions());
+	} else {
+		TextWithEntities deleted;
+		if (_data.flags & Data::Flag::AyuDeleted) {
+			const auto &icon = st::deletedIcon;
+			const auto padding = st::deletedIconPadding;
+			const auto owner = &_reactionsOwner->owner();
+			auto added = Ui::Text::SingleCustomEmoji(
+				owner->customEmojiManager().registerInternalEmoji(icon, padding)
+			);
+			deleted = Ui::Text::Colorized(added, 1);
+		}
+
+		TextWithEntities edited;
+		if (_data.flags & Data::Flag::Edited) {
+			const auto &icon = st::editedIcon;
+			const auto padding = st::editedIconPadding;
+			const auto owner = &_reactionsOwner->owner();
+			auto added = Ui::Text::SingleCustomEmoji(
+				owner->customEmojiManager().registerInternalEmoji(icon, padding)
+			);
+			edited = Ui::Text::Colorized(added, 1);
+		} else if (_data.flags & Data::Flag::EstimateDate) {
+		    edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
+		}
+
+		const auto author = _data.author;
+		const auto prefix = !author.isEmpty() ? u", "_q : QString();
+
+		const auto date = TextWithEntities{}.append(edited).append(QLocale().toString(
+			_data.date.time(),
+			settings->showMessageSeconds
+				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
+				: QLocale::system().timeFormat(QLocale::ShortFormat)
+		));
+
+		const auto afterAuthor = TextWithEntities{}.append(prefix).append(date);
+		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor.text);
+		const auto authorWidth = st::msgDateFont->width(author);
+		const auto maxWidth = st::maxSignatureSize;
+		_authorElided = !author.isEmpty()
+			&& (authorWidth + afterAuthorWidth > maxWidth);
+		const auto name = _authorElided
+			? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
+			: author;
+
+		auto full = TextWithEntities{};
+		if (_data.flags & Data::Flag::Sponsored) {
+			// ...
+		} else if (_data.flags & Data::Flag::Imported) {
+			full.append(deleted).append(date).append(' ').append(tr::lng_imported(tr::now));
+		} else if (name.isEmpty()) {
+			full.append(deleted).append(date);
+		} else {
+			full.append(deleted).append(name).append(afterAuthor);
+		}
+
+		const auto context = Core::MarkedTextContext{
+			.session = &_reactionsOwner->session(),
+			.customEmojiRepaint = [] {},
+			.customEmojiLoopLimit = 0,
+		};
+
+		_authorEditedDate.setMarkedText(
+			st::msgDateTextStyle,
+			full,
+			Ui::NameTextOptions(),
+			context);
 	}
-	marked.append(full);
-	_authorEditedDate.setMarkedText(
-		st::msgDateTextStyle,
-		marked,
-		Ui::NameTextOptions(),
-		Core::TextContext({ .session = &_reactionsOwner->session() }));
 }
 
 void BottomInfo::layoutViewsText() {
@@ -635,6 +703,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->awaitingVideoProcessing()) {
 		result.flags |= Flag::EstimateDate;
+	}
+	if (item->isDeleted()) {
+		result.flags |= Flag::AyuDeleted;
 	}
 	// We don't want to pass and update it in Data for now.
 	//if (item->unread()) {

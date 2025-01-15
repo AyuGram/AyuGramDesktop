@@ -51,6 +51,7 @@ public:
 
 	QString appIcon;
 	bool simpleQuotesAndReplies;
+	bool replaceBottomInfoWithIcons;
 	QString deletedMark;
 	QString editedMark;
 	int recentStickersCount;
@@ -130,6 +131,7 @@ public:
 
 	void set_appIcon(QString val);
 	void set_simpleQuotesAndReplies(bool val);
+	void set_replaceBottomInfoWithIcons(bool val);
 	void set_deletedMark(QString val);
 	void set_editedMark(QString val);
 	void set_recentStickersCount(int val);
@@ -201,6 +203,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	localPremium,
 	appIcon,
 	simpleQuotesAndReplies,
+	replaceBottomInfoWithIcons,
 	deletedMark,
 	editedMark,
 	recentStickersCount,
