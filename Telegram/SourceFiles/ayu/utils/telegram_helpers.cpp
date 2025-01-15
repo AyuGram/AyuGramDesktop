@@ -556,7 +556,9 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 	}
 
 	session->api().request(MTPcontacts_ResolveUsername(
-		MTP_string(normalized)
+		MTP_flags(0),
+		MTP_string(normalized),
+		MTP_string()
 	)).done([=](const MTPcontacts_ResolvedPeer &result)
 	{
 		Expects(result.type() == mtpc_contacts_resolvedPeer);

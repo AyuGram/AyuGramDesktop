@@ -7,9 +7,9 @@
 #include "ayu_infra.h"
 
 #include "ayu/ayu_lang.h"
-#include "ayu/ayu_worker.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_ui_settings.h"
+#include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
 #include "lang/lang_instance.h"
 
@@ -26,7 +26,7 @@ void initLang() {
 	AyuLanguage::currentInstance()->fetchLanguage(id, baseId);
 }
 
-void initFonts() {
+void initUiSettings() {
 	auto settings = &AyuSettings::getInstance();
 
 	AyuUiSettings::setMonoFont(settings->monoFont);
@@ -44,7 +44,7 @@ void initWorker() {
 void init() {
 	initLang();
 	initDatabase();
-	initFonts();
+	initUiSettings();
 	initWorker();
 }
 
