@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mainwidget.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "mtproto/sender.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/painter.h"
@@ -118,8 +119,24 @@ ResolvePhoneAction::ResolvePhoneAction(
 			});
 		}).fail([=](const MTP::Error &error) {
 			if (error.code() == 400) {
-				_peer.force_assign(nullptr);
-				_loaded.force_assign(true);
+				bool ok = false;
+				const auto possibleId = formattedPhone.toLongLong(&ok);
+				if (!ok) {
+					_peer.force_assign(nullptr);
+					_loaded.force_assign(true);
+					return;
+				}
+
+				searchById(possibleId,
+						   &controller->session(),
+						   [=](const QString &username, UserData *user)
+						   {
+							   if (user) {
+								   _peer = user;
+							   }
+
+							   _loaded.force_assign(true);
+						   });
 			}
 		}).send();
 	}
