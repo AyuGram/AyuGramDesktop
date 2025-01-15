@@ -718,7 +718,7 @@ void searchUser(long long userId, Main::Session *session, bool searchUserFlag, c
 	}).handleAllErrors().send();
 }
 
-void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback) {
+void searchById(ID userId, Main::Session *session, const Callback &callback) {
 	if (userId == 0 || !session) {
 		callback(QString(), nullptr);
 		return;
@@ -737,15 +737,20 @@ void searchById(ID userId, Main::Session *session, bool retry, const Callback &c
 				   if (data && data->accessHash()) {
 					   callback(title, data);
 				   } else {
-					   if (retry) {
-						   searchById(0x100000000 + userId, session, false, callback);
-					   } else {
-						   callback(QString(), nullptr);
-					   }
+					   callback(QString(), nullptr);
 				   }
 			   });
 }
 
-void searchById(ID userId, Main::Session *session, const Callback &callback) {
-	searchById(userId, session, true, callback);
+ID getUserIdFromPackId(uint64 id) {
+	// https://github.com/TDesktop-x64/tdesktop/pull/218/commits/844e5f0ab116e7639cfc79633a68afe8fdcbc463
+	auto ownerId = id >> 32;
+	if ((id >> 16 & 0xff) == 0x3f) {
+		ownerId |= 0x80000000;
+	}
+	if (id >> 24 & 0xff) {
+		ownerId += 0x100000000;
+	}
+
+	return ownerId;
 }

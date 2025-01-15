@@ -232,9 +232,12 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 					   setClickedCallback(
 						   [=]
 						   {
-							   const auto text =
-								   QString("int32: %1\nint64: %2").arg(authorId).arg(0x100000000L + authorId);
-							   QGuiApplication::clipboard()->setText(text);
+							   QGuiApplication::clipboard()->setText(QString::number(authorId));
+							   if (const auto window = _session->tryResolveWindow()) {
+								   if (const auto mainWidget = window->widget()->sessionController()) {
+									   mainWidget->showToast(tr::ayu_IDCopiedToast(tr::now));
+								   }
+							   }
 						   });
 
 					   crl::on_main(

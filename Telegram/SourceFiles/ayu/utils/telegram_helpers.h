@@ -47,3 +47,5 @@ int getScheduleTime(int64 sumSize);
 
 void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback);
 void searchById(ID userId, Main::Session *session, const Callback &callback);
+
+ID getUserIdFromPackId(uint64 id);

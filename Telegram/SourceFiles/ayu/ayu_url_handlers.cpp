@@ -45,7 +45,6 @@ bool ResolveUser(
 
 	searchById(userId,
 			   &controller->session(),
-			   false,
 			   [=](const QString &title, UserData *data)
 			   {
 				   if (data) {
