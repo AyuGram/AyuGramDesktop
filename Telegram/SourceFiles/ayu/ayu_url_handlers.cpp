@@ -79,7 +79,7 @@ bool TryHandleSpotify(const QString &url) {
 	// https://www.iana.org/assignments/uri-schemes/prov/spotify
 
 	using namespace qthelp;
-	const auto matchOptions = RegExOption::CaseInsensitive;
+	constexpr auto matchOptions = RegExOption::CaseInsensitive;
 	// https://regex101.com/r/l4Ogzf/2
 	const auto match = regex_match(
 		u"^(https?:\\/\\/)?([a-zA-Z0-9_]+)\\.spotify\\.com\\/(?<type>track|album|artist|user|playlist)\\/(?<identifier>[a-zA-Z0-9_\\/]+?)((\\?si=.+)?)$"_q,

@@ -106,7 +106,7 @@ private:
 	void initViewers();
 	void refreshStatusText();
 	void refreshNameGeometry(int newWidth);
-	void refreshPhoneGeometry(int newWidth);
+	void refreshIdGeometry(int newWidth);
 	void refreshUsernameGeometry(int newWidth);
 
 	const not_null<Window::SessionController*> _controller;
@@ -116,7 +116,7 @@ private:
 
 	object_ptr<Ui::UserpicButton> _userpic;
 	object_ptr<Ui::FlatLabel> _name = { nullptr };
-	object_ptr<Ui::FlatLabel> _phone = { nullptr };
+	object_ptr<Ui::FlatLabel> _id = { nullptr };
 	object_ptr<Ui::FlatLabel> _username = { nullptr };
 
 };
@@ -152,15 +152,27 @@ Cover::Cover(
 	Ui::UserpicButton::Source::PeerPhoto,
 	st::infoProfileCover.photo)
 , _name(this, st::infoProfileCover.name)
-, _phone(this, st::defaultFlatLabel)
+, _id(this, st::defaultFlatLabel)
 , _username(this, st::infoProfileMegagroupCover.status) {
 	_user->updateFull();
 
 	_name->setSelectable(true);
 	_name->setContextCopyText(tr::lng_profile_copy_fullname(tr::now));
 
-	_phone->setSelectable(true);
-	_phone->setContextCopyText(tr::ayu_ContextCopyID(tr::now));
+	_id->setSelectable(true);
+	_id->setContextCopyText(tr::ayu_ContextCopyID(tr::now));
+	const auto hook = [=](Ui::FlatLabel::ContextMenuRequest request) {
+		if (request.selection.empty()) {
+			const auto c = [=] {
+				auto id = IDString(_user);
+				TextUtilities::SetClipboardText({ id });
+			};
+			request.menu->addAction(tr::ayu_ContextCopyID(tr::now), c);
+		} else {
+			_id->fillContextMenu(request);
+		}
+	};
+	_id->setContextMenuHook(hook);
 
 	initViewers();
 	setupChildGeometry();
@@ -200,7 +212,7 @@ void Cover::setupChildGeometry() {
 			st::settingsPhotoTop,
 			newWidth);
 		refreshNameGeometry(newWidth);
-		refreshPhoneGeometry(newWidth);
+		refreshIdGeometry(newWidth);
 		refreshUsernameGeometry(newWidth);
 	}, lifetime());
 }
@@ -216,8 +228,8 @@ void Cover::initViewers() {
 	IDValue(
 		_user
 	) | rpl::start_with_next([=](const TextWithEntities &value) {
-		_phone->setText(value.text);
-		refreshPhoneGeometry(width());
+		_id->setText(value.text);
+		refreshIdGeometry(width());
 	}, lifetime());
 
 	Info::Profile::UsernameValue(
@@ -261,14 +273,14 @@ void Cover::refreshNameGeometry(int newWidth) {
 	_badge.move(badgeLeft, badgeTop, badgeBottom);
 }
 
-void Cover::refreshPhoneGeometry(int newWidth) {
-	const auto phoneLeft = st::settingsPhoneLeft;
-	const auto phoneTop = st::settingsPhoneTop;
-	const auto phoneWidth = newWidth
-		- phoneLeft
+void Cover::refreshIdGeometry(int newWidth) {
+	const auto idLeft = st::settingsPhoneLeft;
+	const auto idTop = st::settingsPhoneTop;
+	const auto idWidth = newWidth
+		- idLeft
 		- st::infoProfileCover.rightSkip;
-	_phone->resizeToWidth(phoneWidth);
-	_phone->moveToLeft(phoneLeft, phoneTop, newWidth);
+	_id->resizeToWidth(idWidth);
+	_id->moveToLeft(idLeft, idTop, newWidth);
 }
 
 void Cover::refreshUsernameGeometry(int newWidth) {
