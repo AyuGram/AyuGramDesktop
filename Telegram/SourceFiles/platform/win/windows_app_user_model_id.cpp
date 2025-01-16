@@ -31,7 +31,9 @@ const WCHAR AppUserModelIdBase[] = L"AyuGram.AyuGramDesktop.Store";
 const WCHAR AppUserModelIdBase[] = L"AyuGram.AyuGramDesktop";
 #endif // OS_WIN_STORE
 
-[[nodiscard]] QString PinnedIconsPath() {
+} // namespace
+
+QString PinnedIconsPath() {
 	WCHAR wstrPath[kMaxFileLen] = {};
 	if (GetEnvironmentVariable(L"APPDATA", wstrPath, kMaxFileLen)) {
 		auto appData = QDir(QString::fromStdWString(std::wstring(wstrPath)));
@@ -40,8 +42,6 @@ const WCHAR AppUserModelIdBase[] = L"AyuGram.AyuGramDesktop";
 	}
 	return QString();
 }
-
-} // namespace
 
 const std::wstring &MyExecutablePath() {
 	static const auto Path = [&] {

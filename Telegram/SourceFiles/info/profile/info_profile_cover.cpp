@@ -640,7 +640,7 @@ Cover::Cover(
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
 		}))
-, _devBadge(
+, _exteraBadge(
 	std::make_unique<Badge>(
 		this,
 		st::infoPeerBadge,
@@ -724,14 +724,14 @@ Cover::Cover(
 	}, _name->lifetime());
 
 	if (isExteraPeer(getBareID(_peer))) {
-		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
+		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
 	} else if (isSupporterPeer(getBareID(_peer))) {
-		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::ExteraSupporter});
+		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::ExteraSupporter});
 	} else {
-		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
+		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
 	}
 
-	_devBadge->updated() | rpl::start_with_next(
+	_exteraBadge->updated() | rpl::start_with_next(
 		[=]
 		{
 			refreshNameGeometry(width());
@@ -1124,8 +1124,7 @@ void Cover::refreshNameGeometry(int newWidth) {
 	if (verifiedWidget) {
 		nameWidth -= verifiedWidget->width();
 	}
-
-	if (const auto widget = _devBadge->widget()) {
+	if (const auto widget = _exteraBadge->widget()) {
 		nameWidth -= st::infoVerifiedCheckPosition.x()
 			+ widget->width()
 			+ (_badge->widget()
@@ -1158,7 +1157,7 @@ void Cover::refreshNameGeometry(int newWidth) {
 			   : 0);
 	const auto devBadgeTop = _st.nameTop;
 	const auto devBadgeBottom = _st.nameTop + _name->height();
-	_devBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
+	_exteraBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {

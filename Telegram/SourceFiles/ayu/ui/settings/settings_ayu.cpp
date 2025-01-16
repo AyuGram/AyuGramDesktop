@@ -1460,7 +1460,7 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		rpl::single(QString("Replace with Icons")),
+		tr::ayu_ReplaceMarksWithIcons(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->replaceBottomInfoWithIcons)
