@@ -70,7 +70,6 @@ void RCManager::gotResponse() {
 		return;
 	}
 
-	cSetLastUpdateCheck(base::unixtime::now());
 	const auto response = _reply->readAll();
 	clearSentRequest();
 
@@ -81,7 +80,12 @@ void RCManager::gotResponse() {
 }
 
 bool RCManager::handleResponse(const QByteArray &response) {
-	return applyResponse(response);
+	try {
+		return applyResponse(response);
+	} catch (...) {
+		LOG(("RCManager: Failed to apply response"));
+		return false;
+	}
 }
 
 bool RCManager::applyResponse(const QByteArray &response) {
