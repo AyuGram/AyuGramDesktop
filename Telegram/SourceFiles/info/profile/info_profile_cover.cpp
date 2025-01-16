@@ -723,9 +723,9 @@ Cover::Cover(
 		refreshNameGeometry(width());
 	}, _name->lifetime());
 
-	if (isExteraRelated(getBareID(_peer)) || isAyuGramRelated(getBareID(_peer))) {
+	if (isExteraPeer(getBareID(_peer))) {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
-	} else if (false) {
+	} else if (isSupporterPeer(getBareID(_peer))) {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::ExteraSupporter});
 	} else {
 		_devBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});

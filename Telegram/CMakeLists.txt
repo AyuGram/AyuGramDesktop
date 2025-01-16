@@ -115,6 +115,8 @@ set(ayugram_files
         ayu/utils/telegram_helpers.h
         ayu/utils/windows_utils.cpp
         ayu/utils/windows_utils.h
+        ayu/utils/rc_manager.cpp
+        ayu/utils/rc_manager.h
         ayu/utils/taptic_engine/taptic_engine.cpp
         ayu/utils/taptic_engine/taptic_engine.h
         ayu/utils/taptic_engine/platform/taptic_engine_dummy.cpp

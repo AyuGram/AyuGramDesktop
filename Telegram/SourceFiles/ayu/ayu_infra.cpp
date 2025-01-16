@@ -12,6 +12,7 @@
 #include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
 #include "lang/lang_instance.h"
+#include "utils/rc_manager.h"
 
 namespace AyuInfra {
 
@@ -19,7 +20,7 @@ void initLang() {
 	QString id = Lang::GetInstance().id();
 	QString baseId = Lang::GetInstance().baseId();
 	if (id.isEmpty()) {
-		LOG(("Language ID not found!"));
+		LOG(("Language is not loaded"));
 		return;
 	}
 	AyuLanguage::init();
@@ -41,11 +42,16 @@ void initWorker() {
 	AyuWorker::initialize();
 }
 
+void initRCManager() {
+	RCManager::getInstance().start();
+}
+
 void init() {
 	initLang();
 	initDatabase();
 	initUiSettings();
 	initWorker();
+	initRCManager();
 }
 
 }

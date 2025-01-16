@@ -20,8 +20,8 @@ ID getDialogIdFromPeer(not_null<PeerData*> peer);
 
 ID getBareID(not_null<PeerData*> peer);
 
-bool isAyuGramRelated(ID peerId);
-bool isExteraRelated(ID peerId);
+bool isExteraPeer(ID peerId);
+bool isSupporterPeer(ID peerId);
 
 bool isMessageHidden(not_null<HistoryItem*> item);
 
