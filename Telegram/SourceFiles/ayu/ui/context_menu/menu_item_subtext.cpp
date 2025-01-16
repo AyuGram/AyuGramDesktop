@@ -3,7 +3,7 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2024
+// Copyright @Radolyn, 2025
 #include <utility>
 
 #include "ayu/ui/context_menu/menu_item_subtext.h"

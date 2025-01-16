@@ -3,7 +3,7 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2024
+// Copyright @Radolyn, 2025
 #include "ayu/ui/message_history/history_section.h"
 
 #include "apiwrap.h"
