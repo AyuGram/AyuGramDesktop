@@ -1325,7 +1325,8 @@ void SetupWideMultiplierSlider(not_null<Ui::VerticalLayout*> container,
 	constexpr auto kMinSize = 1.00;
 	// const auto kMaxSize = 4.00;
 	constexpr auto kStep = 0.05;
-	const auto valueToIndex = [=](double value) {
+	const auto valueToIndex = [=](double value)
+	{
 		return static_cast<int>(std::round((value - kMinSize) / kStep));
 	};
 	const auto indexToValue = [=](int index)
@@ -1460,7 +1461,10 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_ReplaceMarksWithIcons(),
+		tr::ayu_ReplaceMarksWithIcons() | rpl::map([=](QString val)
+		{
+			return val + " β";
+		}),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->replaceBottomInfoWithIcons)
