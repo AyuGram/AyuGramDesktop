@@ -18,7 +18,7 @@ Go to ***BuildPath*/tdesktop** and run
     docker run --rm -it \
         -u $(id -u) \
         -v "$PWD:/usr/src/tdesktop" \
-        tdesktop:centos_env \
+        ghcr.io/telegramdesktop/tdesktop/centos_env:latest \
         /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
         -D TDESKTOP_API_ID=2040 \
         -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
@@ -29,7 +29,7 @@ Or, to create a debug build, run
         -u $(id -u) \
         -v "$PWD:/usr/src/tdesktop" \
         -e CONFIG=Debug \
-        tdesktop:centos_env \
+        ghcr.io/telegramdesktop/tdesktop/centos_env:latest \
         /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
         -D TDESKTOP_API_ID=2040 \
         -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
