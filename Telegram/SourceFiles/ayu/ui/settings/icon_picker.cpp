@@ -35,6 +35,7 @@ const QVector<QString> icons{
 	AyuAssets::WIN95_ICON,
 	AyuAssets::CHIBI_ICON,
 	AyuAssets::CHIBI2_ICON,
+	AyuAssets::EXTERA2_ICON,
 };
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);

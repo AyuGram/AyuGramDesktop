@@ -28,6 +28,10 @@
         <file alias="art/ayu/extera/app_preview.png">../../art/ayu/extera/app_preview.png</file>
         <file alias="art/ayu/extera/app_macos.png">../../art/ayu/extera/app_macos.png</file>
         <file alias="art/ayu/extera/app_icon.ico">../../art/ayu/extera/app_icon.ico</file>
+        <file alias="art/ayu/extera2/app.png">../../art/ayu/extera2/app.png</file>
+        <file alias="art/ayu/extera2/app_preview.png">../../art/ayu/extera2/app_preview.png</file>
+        <file alias="art/ayu/extera2/app_macos.png">../../art/ayu/extera2/app_macos.png</file>
+        <file alias="art/ayu/extera2/app_icon.ico">../../art/ayu/extera2/app_icon.ico</file>
         <file alias="art/ayu/macos/app.png">../../art/ayu/macos/app.png</file>
         <file alias="art/ayu/macos/app_preview.png">../../art/ayu/macos/app_preview.png</file>
         <file alias="art/ayu/macos/app_macos.png">../../art/ayu/macos/app_macos.png</file>
