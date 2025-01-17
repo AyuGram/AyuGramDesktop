@@ -60,6 +60,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/utils/telegram_helpers.h"
+#include "styles/style_ayu_styles.h"
+#include "ui/toast/toast.h"
 
 
 namespace Info::Profile {
@@ -715,10 +717,38 @@ Cover::Cover(
 			::Settings::ShowEmojiStatusPremium(_controller, _peer);
 		}
 	});
+	if (_peer->isUser()) {
+		_exteraBadge->setPremiumClickCallback([=]
+		{
+			TextWithEntities text;
+			if (isExteraPeer(getBareID(_peer))) {
+				text = tr::ayu_DeveloperPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{_peer->name()},
+					Ui::Text::RichLangValue);
+			} else if (isSupporterPeer(getBareID(_peer))) {
+				text = tr::ayu_SupporterPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{_peer->name()},
+					Ui::Text::RichLangValue);
+			} else {
+				return;
+			}
+
+			Ui::Toast::Show({
+				.text = text,
+				.st = &st::exteraBadgeToast,
+				.adaptive = true,
+				.duration = 3 * crl::time(1000),
+			});
+		});
+	}
 	rpl::merge(
-		_botVerify->updated(),
+		_verify->updated(),
 		_badge->updated(),
-		_verified->updated()
+		_exteraBadge->updated()
 	) | rpl::start_with_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
@@ -730,13 +760,6 @@ Cover::Cover(
 	} else {
 		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
 	}
-
-	_exteraBadge->updated() | rpl::start_with_next(
-		[=]
-		{
-			refreshNameGeometry(width());
-		},
-		_name->lifetime());
 
 	initViewers(std::move(title));
 	setupChildGeometry();

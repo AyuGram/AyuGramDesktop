@@ -30,7 +30,9 @@ namespace {
 
 [[nodiscard]] bool HasPremiumClick(const Badge::Content &content) {
 	return content.badge == BadgeType::Premium
-		|| (content.badge == BadgeType::Verified && content.emojiStatusId);
+		|| (content.badge == BadgeType::Verified && content.emojiStatusId)
+		|| (content.badge == BadgeType::Extera)
+		|| (content.badge == BadgeType::ExteraSupporter);
 }
 
 } // namespace
