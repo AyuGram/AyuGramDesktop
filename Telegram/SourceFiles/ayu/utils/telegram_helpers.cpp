@@ -85,6 +85,15 @@ bool isSupporterPeer(ID peerId) {
 	return RCManager::getInstance().supporters().contains(peerId);
 }
 
+rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
+	if (isExteraPeer(getBareID(peer))) {
+		return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::Extera });
+	} else if (isSupporterPeer(getBareID(peer))) {
+		return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::ExteraSupporter });
+	}
+	return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::None });
+}
+
 bool isMessageHidden(const not_null<HistoryItem*> item) {
 	if (AyuState::isHidden(item)) {
 		return true;

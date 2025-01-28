@@ -10,6 +10,7 @@
 
 #include "core/application.h"
 #include "dialogs/dialogs_main_list.h"
+#include "info/profile/info_profile_badge.h"
 #include "main/main_domain.h"
 
 using Callback = Fn<void(const QString &, UserData *)>;
@@ -22,6 +23,8 @@ ID getBareID(not_null<PeerData*> peer);
 
 bool isExteraPeer(ID peerId);
 bool isSupporterPeer(ID peerId);
+
+rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer);
 
 bool isMessageHidden(not_null<HistoryItem*> item);
 

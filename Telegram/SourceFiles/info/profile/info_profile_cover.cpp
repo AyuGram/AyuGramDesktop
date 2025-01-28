@@ -642,19 +642,31 @@ Cover::Cover(
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
 		}))
+, _verified(
+	std::make_unique<Badge>(
+		this,
+		st::infoPeerBadge,
+		&peer->session(),
+		VerifiedContentForPeer(peer),
+		_emojiStatusPanel.get(),
+		[=] {
+			return controller->isGifPausedAtLeastFor(
+				Window::GifPauseReason::Layer);
+		}))
 , _exteraBadge(
 	std::make_unique<Badge>(
 		this,
 		st::infoPeerBadge,
-		peer,
+		&peer->session(),
+		ExteraBadgeTypeFromPeer(peer),
 		_emojiStatusPanel.get(),
 		[=]
 		{
 			return controller->isGifPausedAtLeastFor(
 				Window::GifPauseReason::Layer);
-		},
-		0,
-		BadgeType::None | BadgeType::Extera | BadgeType::ExteraSupporter))
+		}))
+, _parentForTooltip(std::move(parentForTooltip))
+, _badgeTooltipHide([=] { hideBadgeTooltip(); })
 , _userpic(topic
 	? nullptr
 	: object_ptr<Ui::UserpicButton>(
@@ -717,7 +729,7 @@ Cover::Cover(
 			::Settings::ShowEmojiStatusPremium(_controller, _peer);
 		}
 	});
-	if (_peer->isUser()) {
+	if (_peer->isUser() && (isExteraPeer(getBareID(_peer)) || isSupporterPeer(getBareID(_peer)))) {
 		_exteraBadge->setPremiumClickCallback([=]
 		{
 			TextWithEntities text;
@@ -752,14 +764,6 @@ Cover::Cover(
 	) | rpl::start_with_next([=] {
 		refreshNameGeometry(width());
 	}, _name->lifetime());
-
-	if (isExteraPeer(getBareID(_peer))) {
-		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::Extera});
-	} else if (isSupporterPeer(getBareID(_peer))) {
-		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::ExteraSupporter});
-	} else {
-		_exteraBadge->setContent(Info::Profile::Badge::Content{BadgeType::None});
-	}
 
 	initViewers(std::move(title));
 	setupChildGeometry();
@@ -1144,20 +1148,21 @@ void Cover::refreshNameGeometry(int newWidth) {
 	auto nameWidth = newWidth - _st.nameLeft - _st.rightSkip;
 	const auto verifiedWidget = _verified->widget();
 	const auto badgeWidget = _badge->widget();
+	const auto exteraWidget = _exteraBadge->widget();
 	if (verifiedWidget) {
 		nameWidth -= verifiedWidget->width();
 	}
-	if (const auto widget = _exteraBadge->widget()) {
-		nameWidth -= st::infoVerifiedCheckPosition.x()
-			+ widget->width()
-			+ (_badge->widget()
-				   ? (_badge->widget()->width() +
-					   st::infoVerifiedCheckPosition.x())
-				   : 0);
+	if (badgeWidget) {
+		nameWidth -= badgeWidget->width();
 	}
-	_name->resizeToNaturalWidth(nameWidth);
-	_name->moveToLeft(_st.nameLeft, _st.nameTop, newWidth);
-	const auto badgeLeft = _st.nameLeft + _name->width();
+	if (verifiedWidget || badgeWidget) {
+		nameWidth -= st::infoVerifiedCheckPosition.x();
+	}
+	if (exteraWidget) {
+		nameWidth -= exteraWidget->width();
+		nameWidth -= st::infoVerifiedCheckPosition.x();
+	}
+	auto nameLeft = _st.nameLeft;
 	const auto badgeTop = _st.nameTop;
 	const auto badgeBottom = _st.nameTop + _name->height();
 	const auto margins = LargeCustomEmojiMargins();
@@ -1174,13 +1179,16 @@ void Cover::refreshNameGeometry(int newWidth) {
 	const auto badgeLeft = nameLeft + _name->width();
 	_badge->move(badgeLeft, badgeTop, badgeBottom);
 
-	const auto devBadgeLeft = badgeLeft
-		+ (_badge->widget()
-			   ? (_badge->widget()->width() + st::infoVerifiedCheckPosition.x())
+	const auto exteraBadgeLeft = badgeLeft
+		+ (badgeWidget
+			   ? (badgeWidget->width() + st::infoVerifiedCheckPosition.x())
+			   : 0)
+		+ (verifiedWidget
+			   ? (verifiedWidget->width() + st::infoVerifiedCheckPosition.x())
 			   : 0);
-	const auto devBadgeTop = _st.nameTop;
-	const auto devBadgeBottom = _st.nameTop + _name->height();
-	_exteraBadge->move(devBadgeLeft, devBadgeTop, devBadgeBottom);
+	const auto exteraBadgeTop = _st.nameTop;
+	const auto exteraBadgeBottom = _st.nameTop + _name->height();
+	_exteraBadge->move(exteraBadgeLeft, exteraBadgeTop, exteraBadgeBottom);
 }
 
 void Cover::refreshStatusGeometry(int newWidth) {
