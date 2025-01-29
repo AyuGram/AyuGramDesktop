@@ -353,6 +353,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	}
 
 	height *= style::DevicePixelRatio();
+        width *= style::DevicePixelRatio();
 
 	// create the image
 	QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
