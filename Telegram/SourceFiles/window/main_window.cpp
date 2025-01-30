@@ -127,6 +127,11 @@ QImage LogoNoMargin() {
 	return AyuAssets::currentAppLogoNoMargin();
 }
 
+const QImage &LogoTelegramDefault() {
+	static const auto result = QImage(u":/gui/art/logo_256_no_margin.png"_q);
+	return result;
+}
+
 void ConvertIconToBlack(QImage &image) {
 	if (image.format() != QImage::Format_ARGB32_Premultiplied) {
 		image = std::move(image).convertToFormat(
