@@ -48,6 +48,13 @@
 
 class PainterHighQualityEnabler;
 
+rpl::producer<QString> asBeta(rpl::producer<QString> text) {
+	return std::move(text) | rpl::map([=](const QString &val)
+	{
+		return val + " β";
+	});
+}
+
 not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
 									   const style::SettingsButton &st,
 									   std::vector<not_null<Ui::AbstractCheckView*>> innerCheckViews,
@@ -1461,10 +1468,7 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_ReplaceMarksWithIcons() | rpl::map([=](QString val)
-		{
-			return val + " β";
-		}),
+		tr::ayu_ReplaceMarksWithIcons(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->replaceBottomInfoWithIcons)
