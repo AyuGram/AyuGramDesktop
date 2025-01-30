@@ -200,7 +200,7 @@ void MessageShotBox::setupContent() {
 
 	updatePreview();
 
-	const auto boxWidth = imageView->getImage().width() + (st::boxPadding.left() + st::boxPadding.right()) * 4;
+	const auto boxWidth = imageView->getImage().width() / style::DevicePixelRatio() + (st::boxPadding.left() + st::boxPadding.right()) * 4;
 
 	boxClosing() | rpl::start_with_next(
 		[=]

@@ -27,7 +27,8 @@ void ImageView::setImage(const QImage &image) {
 		this->prevImage = this->image;
 		this->image = image;
 
-		setMinimumSize(image.size().grownBy(st::imageViewInnerPadding));
+		const auto size = image.size() / style::DevicePixelRatio();
+		setMinimumSize(size.grownBy(st::imageViewInnerPadding));
 
 		if (this->animation.animating()) {
 			this->animation.stop();
@@ -67,7 +68,7 @@ void ImageView::paintEvent(QPaintEvent *e) {
 	const auto brush = QBrush(AyuFeatures::MessageShot::makeDefaultBackgroundColor());
 
 	QPainterPath path;
-	path.addRoundedRect(rect(), st::bubbleRadiusLarge, st::bubbleRadiusLarge);
+	path.addRoundedRect(rect(), st::roundRadiusLarge, st::roundRadiusLarge);
 
 	p.fillPath(path, brush);
 
@@ -75,10 +76,10 @@ void ImageView::paintEvent(QPaintEvent *e) {
 		const auto realRect = rect().marginsRemoved(st::imageViewInnerPadding);
 
 		const auto resizedRect = QRect(
-			(realRect.width() - prevImage.width()) / 2 + st::imageViewInnerPadding.left(),
-			(realRect.height() - prevImage.height()) / 2 + st::imageViewInnerPadding.top(),
-			prevImage.width(),
-			prevImage.height());
+			(realRect.width() - prevImage.width() / style::DevicePixelRatio()) / 2 + st::imageViewInnerPadding.left(),
+			(realRect.height() - prevImage.height() / style::DevicePixelRatio()) / 2 + st::imageViewInnerPadding.top(),
+			prevImage.width() / style::DevicePixelRatio(),
+			prevImage.height() / style::DevicePixelRatio());
 
 		const auto opacity = 1.0 - animation.value(1.0);
 		p.setOpacity(opacity);
@@ -90,10 +91,10 @@ void ImageView::paintEvent(QPaintEvent *e) {
 		const auto realRect = rect().marginsRemoved(st::imageViewInnerPadding);
 
 		const auto resizedRect = QRect(
-			(realRect.width() - image.width()) / 2 + st::imageViewInnerPadding.left(),
-			(realRect.height() - image.height()) / 2 + st::imageViewInnerPadding.top(),
-			image.width(),
-			image.height());
+			(realRect.width() - image.width() / style::DevicePixelRatio()) / 2 + st::imageViewInnerPadding.left(),
+			(realRect.height() - image.height() / style::DevicePixelRatio()) / 2 + st::imageViewInnerPadding.top(),
+			image.width() / style::DevicePixelRatio(),
+			image.height() / style::DevicePixelRatio());
 
 		const auto opacity = animation.value(1.0);
 		p.setOpacity(opacity);
