@@ -75,6 +75,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_chat_filters.h"
 #include "history/admin_log/history_admin_log_section.h"
 #include "styles/style_ayu_styles.h"
+#include "styles/style_ayu_icons.h"
 
 namespace HistoryView {
 namespace {
@@ -632,6 +633,8 @@ void TopBarWidget::paintTopBar(Painter &p) {
 			.nameWidth = _title.maxWidth(),
 			.outerWidth = width(),
 			.verified = &st::dialogsVerifiedIcon,
+			.exteraOfficial = &st::dialogsExteraOfficialIcon.icon,
+			.exteraSupporter = &st::dialogsExteraSupporterIcon.icon,
 			.premium = &st::dialogsPremiumIcon.icon,
 			.scam = &st::attentionButtonFg,
 			.direct = &st::windowSubTextFg,

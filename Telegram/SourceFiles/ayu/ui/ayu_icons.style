@@ -9,6 +9,7 @@
 
 using "ui/colors.palette";
 using "ui/widgets/widgets.style";
+using "dialogs/dialogs.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
 ayuMenuIcon: icon {{ "ayu/ayu_menu", menuIconColor }};
@@ -40,3 +41,14 @@ editedIconPadding: margins(0px, 0px, 0px, 0px);
 
 deletedIcon: icon {{ "ayu/trash_bin", windowFg }};
 deletedIconPadding: margins(0px, 0px, 0px, 0px);
+
+dialogsExteraOfficialIcon: ThreeStateIcon {
+	icon: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBg }};
+	over: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBgOver }};
+	active: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBgActive }};
+}
+dialogsExteraSupporterIcon: ThreeStateIcon {
+	icon: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBg }};
+	over: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
+	active: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
+}
