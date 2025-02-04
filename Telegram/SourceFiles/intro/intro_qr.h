@@ -28,7 +28,7 @@ public:
 	rpl::producer<QString> nextButtonText() const override;
 
 	bool hasBack() const override {
-		return true;
+		return false;
 	}
 
 private:

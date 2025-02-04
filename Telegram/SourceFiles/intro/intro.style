@@ -59,6 +59,14 @@ introDescription: FlatLabel(defaultFlatLabel) {
 		lineHeight: 20px;
 	}
 }
+introFooter: FlatLabel(defaultFlatLabel) {
+    align: align(center);
+	textFg: introDescriptionFg;
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px);
+		lineHeight: 24px;
+	}
+}
 introDescriptionTop: 34px;
 
 introLink: defaultLinkButton;
@@ -173,7 +181,7 @@ introQrPixel: 50px; // large enough
 introQrMaxSize: 180px;
 introQrBackgroundSkip: 12px;
 introQrBackgroundRadius: 8px;
-introQrLabelsWidth: 292px;
+introQrLabelsWidth: 300px;
 introQrTitleWidth: 320px;
 introQrTitle: FlatLabel(defaultFlatLabel) {
 	textFg: introTitleFg;

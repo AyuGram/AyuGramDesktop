@@ -1224,8 +1224,6 @@ PRIVATE
     intro/intro_qr.h
     intro/intro_signup.cpp
     intro/intro_signup.h
-    intro/intro_start.cpp
-    intro/intro_start.h
     intro/intro_step.cpp
     intro/intro_step.h
     intro/intro_widget.cpp
