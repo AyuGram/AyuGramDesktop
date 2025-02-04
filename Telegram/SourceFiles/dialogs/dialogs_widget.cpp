@@ -1375,24 +1375,6 @@ void Widget::setupStories() {
 		_scroll->viewportEvent(e);
 	}, _stories->lifetime());
 
-	if (!Core::App().settings().storiesClickTooltipHidden()) {
-		// Don't create tooltip
-		// until storiesClickTooltipHidden can be returned to false.
-		const auto hideTooltip = [=] {
-			Core::App().settings().setStoriesClickTooltipHidden(true);
-			Core::App().saveSettingsDelayed();
-		};
-		InvokeQueued(_stories.get(), [=] {
-			_stories->setShowTooltip(
-				controller()->content(),
-				rpl::combine(
-					Core::App().settings().storiesClickTooltipHiddenValue(),
-					shownValue(),
-					!rpl::mappers::_1 && rpl::mappers::_2),
-				hideTooltip);
-		});
-	}
-
 	_storiesContents.fire(Stories::ContentForSession(
 		&controller()->session(),
 		Data::StorySourcesList::NotHidden));
