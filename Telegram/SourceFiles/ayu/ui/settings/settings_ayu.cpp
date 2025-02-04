@@ -1284,7 +1284,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 	updateLabel(settings->recentStickersCount);
 
 	slider->setPseudoDiscrete(
-		100 + 1,
+		200 + 1,
 		// thx tg
 		[=](int amount)
 		{

@@ -115,49 +115,19 @@ UnavailableReason UnavailableReason::Sensitive() {
 QString UnavailableReason::Compute(
 		not_null<Main::Session*> session,
 		const std::vector<UnavailableReason> &list) {
-	const auto &skip = IgnoredReasons(session);
-	auto &&filtered = ranges::views::all(
-		list
-	) | ranges::views::filter([&](const Data::UnavailableReason &reason) {
-		return !reason.sensitive()
-			&& !ranges::contains(skip, reason.reason);
-	});
-	const auto first = filtered.begin();
-	return (first != filtered.end()) ? first->text : QString();
+	return {};
 }
 
 bool UnavailableReason::IgnoreSensitiveMark(
 		not_null<Main::Session*> session) {
-	return ranges::contains(
-			IgnoredReasons(session),
-			UnavailableReason::Sensitive().reason);
+	return true;
 }
 
 // We should get a full restriction in "{full}: {reason}" format and we
 // need to find an "-all" tag in {full}, otherwise ignore this restriction.
 std::vector<UnavailableReason> UnavailableReason::Extract(
 		const MTPvector<MTPRestrictionReason> *list) {
-	if (!list) {
-		return {};
-	}
-	return ranges::views::all(
-		list->v
-	) | ranges::views::filter([](const MTPRestrictionReason &restriction) {
-		return restriction.match([&](const MTPDrestrictionReason &data) {
-			const auto platform = data.vplatform().v;
-			return false
-#ifdef OS_MAC_STORE
-				|| (platform == "ios"_q)
-#elif defined OS_WIN_STORE // OS_MAC_STORE
-				|| (platform == "ms"_q)
-#endif // OS_MAC_STORE || OS_WIN_STORE
-				|| (platform == "all"_q);
-		});
-	}) | ranges::views::transform([](const MTPRestrictionReason &restriction) {
-		return restriction.match([&](const MTPDrestrictionReason &data) {
-			return UnavailableReason{ qs(data.vreason()), qs(data.vtext()) };
-		});
-	}) | ranges::to_vector;
+	return {};
 }
 
 bool ApplyBotMenuButton(

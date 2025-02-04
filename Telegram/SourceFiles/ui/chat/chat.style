@@ -181,7 +181,7 @@ maxMediaSize: 430px;
 maxStickerSize: 224px;
 maxAnimatedEmojiSize: 112px;
 maxGifSize: 320px;
-maxVideoMessageSize: 320px;
+maxVideoMessageSize: 360px;
 maxSignatureSize: 144px;
 maxWallPaperWidth: 160px;
 maxWallPaperHeight: 240px;
