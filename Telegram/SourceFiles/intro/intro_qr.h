@@ -27,9 +27,7 @@ public:
 	void submit() override;
 	rpl::producer<QString> nextButtonText() const override;
 
-	bool hasBack() const override {
-		return false;
-	}
+	bool hasBack() const override;
 
 private:
 	int errorTop() const override;
