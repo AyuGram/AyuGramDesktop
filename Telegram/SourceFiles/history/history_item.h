@@ -417,6 +417,7 @@ public:
 	void setPostAuthor(const QString &author);
 	void setDeleted();
 	bool isDeleted() const;
+	void applyTTL(TimeId destroyAt);
 	void setAyuHint(const QString &hint);
 	void setRealId(MsgId newId);
 	void incrementReplyToTopCounter();
@@ -661,8 +662,6 @@ private:
 	void createServiceFromMtp(const MTPDmessageService &message);
 	void applyTTL(const MTPDmessage &data);
 	void applyTTL(const MTPDmessageService &data);
-
-	void applyTTL(TimeId destroyAt);
 
 	// For an invoice button we replace the button text with a "Receipt" key.
 	// It should show the receipt for the payed invoice. Still let mobile apps do that.

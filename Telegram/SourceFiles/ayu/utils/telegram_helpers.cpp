@@ -36,6 +36,7 @@
 
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
+#include "ayu/data/messages_storage.h"
 
 Main::Session *getSession(ID userId) {
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
@@ -501,6 +502,28 @@ int getScheduleTime(int64 sumSize) {
 	auto time = 12;
 	time += (int) std::ceil(std::max(6.0, std::ceil(sumSize / 1024.0 / 1024.0 * 0.7))) + 1;
 	return time;
+}
+
+bool isMessageSavable(const not_null<HistoryItem *> item) {
+	const auto settings = &AyuSettings::getInstance();
+
+	if (!settings->saveDeletedMessages) {
+		return false;
+	}
+
+	if (const auto possiblyBot = item->history()->peer->asUser()) {
+		return !possiblyBot->isBot() || (settings->saveForBots && possiblyBot->isBot());
+	}
+	return true;
+}
+
+void processMessageDelete(not_null<HistoryItem*> item) {
+	if (!isMessageSavable(item)) {
+		item->destroy();
+	} else {
+		item->setDeleted();
+		AyuMessages::addDeletedMessage(item);
+	}
 }
 
 void resolveUser(ID userId, const QString &username, Main::Session *session, const Callback &callback) {

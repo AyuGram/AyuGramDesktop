@@ -702,7 +702,7 @@ void InnerWidget::addMessages(Direction direction, const std::vector<AyuMessageB
 							? message.fakeId // viewing edited history
 							: message.messageId; // viewing deleted messages
 		if (_messageIds.find(id) != _messageIds.end()) {
-			return;
+			continue;
 		}
 		auto count = 0;
 		const auto addOne = [&](

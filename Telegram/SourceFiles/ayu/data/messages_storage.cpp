@@ -44,6 +44,8 @@ void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	message.fromId = item->from()->id.value & PeerId::kChatTypeMask;
 	if (item->topic()) {
 		message.topicId = item->topicRootId().bare;
+	} else {
+		message.topicId = 0;
 	}
 	message.messageId = item->id.bare;
 	message.date = item->date();

@@ -3349,7 +3349,7 @@ bool HistoryItem::isDeleted() const {
 
 void HistoryItem::setAyuHint(const QString &hint) {
 	try {
-		if (isService()) {
+		if (isService() && !_text.empty()) {
 			const auto data = Get<HistoryServiceData>();
 			const auto postfix = QString(" (%1)").arg(hint);
 			if (!_text.text.endsWith(postfix)) { // fix stacking for TTL messages
