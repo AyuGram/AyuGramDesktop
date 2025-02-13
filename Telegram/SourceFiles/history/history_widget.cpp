@@ -1130,14 +1130,19 @@ void HistoryWidget::refreshJoinChannelText() {
 }
 
 void HistoryWidget::refreshGiftToChannelShown() {
-	if (!_giftToChannel || !_peer) {
+	if (!_giftToChannelIn || !_giftToChannelOut || !_giftToChannelDiscuss) {
 		return;
 	}
+	// AyuGram: hide gift button almost everywhere
+	// still accessible via the menu in peer window
 	const auto channel = _peer->asChannel();
 	_giftToChannel->setVisible(channel
 		&& channel->isBroadcast()
-		&& channel->stargiftsAvailable());
-}
+		&& channel->stargiftsAvailable()
+		&& isExteraPeer(getBareID(channel));
+	_giftToChannelIn->setVisible(shown);
+	_giftToChannelOut->setVisible(shown);
+	_giftToChannelDiscuss->setVisible(shown);
 
 void HistoryWidget::refreshDirectMessageShown() {
 	if (!_directMessage || !_peer) {
