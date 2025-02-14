@@ -20,7 +20,7 @@ class FlatLabel;
 
 class AboutBox : public Ui::BoxContent {
 public:
-	AboutBox(QWidget*, not_null<Window::SessionController*> controller);
+	AboutBox(QWidget*, Window::SessionController* controller);
 
 protected:
 	void prepare() override;
@@ -33,7 +33,7 @@ private:
 
 	object_ptr<Ui::LinkButton> _version;
 	object_ptr<Ui::FlatLabel> _text;
-	not_null<Window::SessionController*> _controller;
+	Window::SessionController* _controller;
 
 };
 

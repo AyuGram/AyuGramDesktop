@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
 
@@ -52,7 +53,7 @@ rpl::producer<TextWithEntities> Text() {
 
 } // namespace
 
-AboutBox::AboutBox(QWidget *parent, not_null<Window::SessionController*> controller)
+AboutBox::AboutBox(QWidget *parent, Window::SessionController* controller)
 : _version(this, tr::lng_about_version(tr::now, lt_version, currentVersionText()), st::aboutVersionLink)
 , _text(this, Text(), st::aboutLabel)
 , _controller(controller) {
@@ -64,12 +65,12 @@ void AboutBox::prepare() {
 	addButton(tr::lng_close(), [this] { closeBox(); });
 	addLeftButton(
 		rpl::single(QString("@ayugramchat")),
-		[=]
+		[this, controller = _controller]
 		{
-			_controller->showPeerByLink(Window::PeerByLinkInfo{
+			closeBox();
+			controller->showPeerByLink(Window::PeerByLinkInfo{
 				.usernameOrId = QString("ayugramchat"),
 			});
-			closeBox();
 		});
 
 	_text->setLinksTrusted();
