@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <gio/gio.h>
 
+#include <QGuiApplication>
+
 namespace Platform {
 namespace {
 
