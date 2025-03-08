@@ -3340,7 +3340,12 @@ void HistoryItem::setDeleted() {
 	_deleted = true;
 
 	const auto settings = &AyuSettings::getInstance();
-	setAyuHint(settings->deletedMark);
+	if (settings->replaceBottomInfoWithIcons) {
+		history()->owner().requestItemViewRefresh(this);
+		history()->owner().requestItemResize(this);
+	} else {
+		setAyuHint(settings->deletedMark);
+	}
 }
 
 bool HistoryItem::isDeleted() const {
@@ -3349,7 +3354,32 @@ bool HistoryItem::isDeleted() const {
 
 void HistoryItem::setAyuHint(const QString &hint) {
 	try {
-		if (isService() && !_text.empty()) {
+		auto msgsigned = Get<HistoryMessageSigned>();
+		if (hint.isEmpty()) {
+			if (!msgsigned) {
+				return;
+			}
+			RemoveComponents(HistoryMessageSigned::Bit());
+			history()->owner().requestItemViewRefresh(this);
+			history()->owner().requestItemResize(this);
+			return;
+		}
+
+		if (!isService()) {
+			if (!(_flags & MessageFlag::HasPostAuthor)) {
+				_flags |= MessageFlag::HasPostAuthor;
+			}
+
+			if (!msgsigned) {
+				AddComponents(HistoryMessageSigned::Bit());
+				msgsigned = Get<HistoryMessageSigned>();
+			} else if (msgsigned->author == hint) {
+				return;
+			}
+			msgsigned->author = hint;
+			msgsigned->isAnonymousRank = !isDiscussionPost()
+				&& this->author()->isMegagroup();
+		} else if (/* isService() && */!_text.empty()) {
 			const auto data = Get<HistoryServiceData>();
 			const auto postfix = QString(" (%1)").arg(hint);
 			if (!_text.text.endsWith(postfix)) { // fix stacking for TTL messages
@@ -3359,6 +3389,8 @@ void HistoryItem::setAyuHint(const QString &hint) {
 				};
 				setServiceText(std::move(prepared));
 			}
+		} else {
+			return;
 		}
 
 		// update bottom info
