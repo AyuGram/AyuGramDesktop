@@ -1206,16 +1206,8 @@ void Stories::markAsRead(FullStoryId id, bool viewed) {
 		return;
 	}
 
-	// AyuGram sendReadStories
 	const auto settings = &AyuSettings::getInstance();
-
 	if (!settings->sendReadStories) {
-		_markReadRequests.clear();
-		_markReadPending.clear();
-
-		_incrementViewsRequests.clear();
-		_incrementViewsPending.clear();
-
 		return;
 	}
 
@@ -1373,18 +1365,8 @@ void Stories::toggleHidden(
 void Stories::sendMarkAsReadRequest(
 		not_null<PeerData*> peer,
 		StoryId tillId) {
-	Expects(peer->isUser());
-
-	// AyuGram sendReadStories
 	const auto settings = &AyuSettings::getInstance();
-
 	if (!settings->sendReadStories) {
-		_markReadRequests.clear();
-		_markReadPending.clear();
-
-		_incrementViewsRequests.clear();
-		_incrementViewsPending.clear();
-
 		return;
 	}
 
@@ -1417,6 +1399,12 @@ void Stories::checkQuitPreventFinished() {
 
 void Stories::sendMarkAsReadRequests() {
 	_markReadTimer.cancel();
+
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->sendReadStories) {
+		return;
+	}
+
 	for (auto i = begin(_markReadPending); i != end(_markReadPending);) {
 		const auto peerId = *i;
 		if (_markReadRequests.contains(peerId)) {
@@ -1436,11 +1424,8 @@ void Stories::sendIncrementViewsRequests() {
 		return;
 	}
 
-	// AyuGram sendReadStories
 	const auto settings = &AyuSettings::getInstance();
 	if (!settings->sendReadStories) {
-		_incrementViewsPending.clear();
-		_incrementViewsRequests.clear();
 		return;
 	}
 
@@ -2248,17 +2233,14 @@ void Stories::togglePinnedList(
 
 bool Stories::isQuitPrevent() {
 	if (!_markReadPending.empty()) {
-		// AyuGram sendReadStories
-		const auto settings = &AyuSettings::getInstance();
-
-		if (settings->sendReadStories) {
-			sendMarkAsReadRequests();
-		}
+		sendMarkAsReadRequests();
 	}
 	if (!_incrementViewsPending.empty()) {
 		sendIncrementViewsRequests();
 	}
-	if (_markReadRequests.empty() && _incrementViewsRequests.empty()) {
+
+	const auto settings = &AyuSettings::getInstance();
+	if (!settings->sendReadStories || _markReadRequests.empty() && _incrementViewsRequests.empty()) {
 		return false;
 	}
 	LOG(("Stories prevents quit, marking as read..."));
