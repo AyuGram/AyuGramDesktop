@@ -149,6 +149,27 @@ void AddJumpToBeginningAction(PeerData *peerData,
 		&st::ayuMenuIconToBeginning);
 }
 
+void AddOpenChannelAction(PeerData *peerData,
+						  not_null<Window::SessionController*> sessionController,
+						  const Window::PeerMenuCallback &addCallback) {
+	if (!peerData || !peerData->isMegagroup()) {
+		return;
+	}
+
+	const auto chat = peerData->asMegagroup()->linkedChat();
+	if (!chat) {
+		return;
+	}
+
+	addCallback(
+		tr::lng_context_open_channel(tr::now),
+		[=]
+		{
+			sessionController->showPeerHistory(chat, Window::SectionShow::Way::Forward);
+		},
+		&st::menuIconChannel);
+}
+
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	if (AyuMessages::hasRevisions(item)) {
 		menu->addAction(

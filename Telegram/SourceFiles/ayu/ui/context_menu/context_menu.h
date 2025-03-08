@@ -25,6 +25,10 @@ void AddJumpToBeginningAction(PeerData *peerData,
 							  not_null<Window::SessionController*> sessionController,
 							  const Window::PeerMenuCallback &addCallback);
 
+void AddOpenChannelAction(PeerData *peerData,
+							  not_null<Window::SessionController*> sessionController,
+							  const Window::PeerMenuCallback &addCallback);
+
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
