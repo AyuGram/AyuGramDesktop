@@ -514,11 +514,11 @@ void BottomInfo::layoutDateText() {
 			full.append(deleted).append(name).append(afterAuthor);
 		}
 
-		const auto context = Core::MarkedTextContext{
+		const auto context = Core::TextContext({
 			.session = &_reactionsOwner->session(),
-			.customEmojiRepaint = [] {},
+			.repaint = [] {},
 			.customEmojiLoopLimit = 0,
-		};
+		});
 
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
