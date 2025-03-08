@@ -43,18 +43,20 @@ bool ResolveUser(
 		return true;
 	}
 
-	searchById(userId,
-			   &controller->session(),
-			   [=](const QString &title, UserData *data)
-			   {
-				   if (data) {
-					   controller->showPeerInfo(data);
-					   return;
-				   }
+	searchById(
+		userId,
+		&controller->session(),
+		[=](const QString &title, UserData *data)
+		{
+			if (data) {
+				controller->showPeerInfo(data);
+				return;
+			}
 
-				   Core::App().hideMediaView();
-				   Ui::show(Ui::MakeInformBox(tr::ayu_UserNotFoundMessage()));
-			   });
+			Core::App().hideMediaView();
+			Ui::show(Ui::MakeInformBox(tr::ayu_UserNotFoundMessage()));
+		}
+	);
 
 	return true;
 }

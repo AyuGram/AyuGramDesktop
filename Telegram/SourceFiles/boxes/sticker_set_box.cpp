@@ -734,30 +734,43 @@ void StickerSetBox::updateButtons() {
 		const auto addPackOwner = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
 		{
 			if (type == Data::StickersType::Stickers || type == Data::StickersType::Emoji) {
-				const auto pointer = Ui::MakeWeak(this);
+				const auto weak = Ui::MakeWeak(this);
+				const auto session = _session;
+				const auto innerId = _inner->setId() >> 32;
+
 				(*menu)->addAction(
 					tr::ayu_MessageDetailsPackOwnerPC(tr::now),
-					[=]
+					[weak, session, innerId]
 					{
-						if (!pointer) {
+						if (!weak) {
+							return;
+						}
+
+						const auto strong = weak.data();
+						if (!strong) {
 							return;
 						}
 
 						searchById(
-							_inner->setId() >> 32,
-							_session,
-							[=](const QString &username, UserData *user)
+							innerId,
+							session,
+							[session, weak](const QString &username, UserData *user)
 							{
-								if (!pointer) {
+								if (!weak) {
+									return;
+								}
+
+								const auto strongInner = weak.data();
+								if (!strongInner) {
 									return;
 								}
 
 								if (!user) {
-									showToast(tr::ayu_UserNotFoundMessage(tr::now));
+									strongInner->showToast(tr::ayu_UserNotFoundMessage(tr::now));
 									return;
 								}
 
-								if (const auto window = _session->tryResolveWindow()) {
+								if (const auto window = session->tryResolveWindow()) {
 									if (const auto mainWidget = window->widget()->sessionController()) {
 										mainWidget->showPeer(user);
 									}

@@ -127,16 +127,30 @@ ResolvePhoneAction::ResolvePhoneAction(
 					return;
 				}
 
-				searchById(possibleId,
-						   &controller->session(),
-						   [=](const QString &username, UserData *user)
-						   {
-							   if (user) {
-								   _peer = user;
-							   }
+				const auto weak = Ui::MakeWeak(this);
+				const auto session = &controller->session();
 
-							   _loaded.force_assign(true);
-						   });
+				searchById(
+					possibleId,
+					session,
+					[session, weak, possibleId](const QString &username, UserData *user)
+					{
+						if (!weak) {
+							return;
+						}
+
+						const auto strong = weak.data();
+						if (!strong) {
+							return;
+						}
+
+						if (user) {
+							strong->_peer = user;
+						}
+
+						strong->_loaded.force_assign(true);
+					}
+				);
 			}
 		}).send();
 	}

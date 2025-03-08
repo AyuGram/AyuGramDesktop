@@ -218,59 +218,73 @@ ActionStickerPackAuthor::ActionStickerPackAuthor(not_null<Menu::Menu*> menu,
 }
 
 void ActionStickerPackAuthor::searchAuthor(ID authorId) {
-	const auto pointer = Ui::MakeWeak(this);
-	searchById(authorId,
-			   _session,
-			   [=](const QString &username, UserData *user)
-			   {
-				   if (!pointer) {
-					   LOG(("ContextActionStickerAuthor: searchById callback after destruction"));
-					   return;
-				   }
-				   if (username.isEmpty() && !user) {
-					   _subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
-					   setClickedCallback(
-						   [=]
-						   {
-							   QGuiApplication::clipboard()->setText(QString::number(authorId));
-							   if (const auto window = _session->tryResolveWindow()) {
-								   if (const auto mainWidget = window->widget()->sessionController()) {
-									   mainWidget->showToast(tr::ayu_IDCopiedToast(tr::now));
-								   }
-							   }
-						   });
+	const auto session = _session;
+	const auto weak = Ui::MakeWeak(this);
 
-					   crl::on_main(
-						   [=]
-						   {
-							   update();
-						   });
-					   return;
-				   }
+	searchById(
+		authorId,
+		session,
+		[session, weak, authorId](const QString &username, UserData *user)
+		{
+			if (!weak) {
+				LOG(("ContextActionStickerAuthor: searchById callback after destruction"));
+				return;
+			}
 
-				   const auto title = username.isEmpty() ? user ? user->name() : QString() : username;
-				   const auto callback = [=]
-				   {
-					   if (user) {
-						   if (const auto window = _session->tryResolveWindow()) {
-							   if (const auto mainWidget = window->widget()->sessionController()) {
-								   mainWidget->showPeer(user);
-							   }
-						   }
-					   } else {
-						   QGuiApplication::clipboard()->setText(title);
-					   }
-				   };
+			const auto strong = weak.data();
+			if (!strong) {
+				LOG(("ContextActionStickerAuthor: weak.data() returned null"));
+				return;
+			}
 
-				   setClickedCallback(callback);
+			if (username.isEmpty() && !user) {
+				strong->_subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
+				strong->setClickedCallback(
+					[authorId, session]
+					{
+						QGuiApplication::clipboard()->setText(QString::number(authorId));
+						if (const auto window = session->tryResolveWindow()) {
+							if (const auto mainWidget = window->widget()->sessionController()) {
+								mainWidget->showToast(tr::ayu_IDCopiedToast(tr::now));
+							}
+						}
+					});
 
-				   _subText = QString(title);
-				   crl::on_main(
-					   [=]
-					   {
-						   update();
-					   });
-			   });
+				crl::on_main(
+					[weak]
+					{
+						if (const auto strongInner = weak.data()) {
+							strongInner->update();
+						}
+					});
+				return;
+			}
+
+			const auto title = username.isEmpty() ? (user ? user->name() : QString()) : username;
+			const auto callback = [user, title, session]
+			{
+				if (user) {
+					if (const auto window = session->tryResolveWindow()) {
+						if (const auto mainWidget = window->widget()->sessionController()) {
+							mainWidget->showPeer(user);
+						}
+					}
+				} else {
+					QGuiApplication::clipboard()->setText(title);
+				}
+			};
+
+			strong->setClickedCallback(callback);
+			strong->_subText = QString(title);
+			crl::on_main(
+				[weak]
+				{
+					if (const auto strongInner = weak.data()) {
+						strongInner->update();
+					}
+				});
+		}
+	);
 }
 
 } // namespace
