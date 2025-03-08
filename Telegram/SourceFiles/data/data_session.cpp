@@ -2813,7 +2813,9 @@ void Session::checkTTLs() {
 			}) | ranges::views::transform([](const auto &pair) {
 				return pair.second;
 			}) | ranges::views::join;
-		for (auto &item : toBeRemoved) {
+
+		auto itemsToProcess = toBeRemoved | ranges::to_vector;
+		for (const auto &item : itemsToProcess) {
 			// remove message from `_ttlMessages` to avoid calling this method infinitely
 			item->applyTTL(0);
 
