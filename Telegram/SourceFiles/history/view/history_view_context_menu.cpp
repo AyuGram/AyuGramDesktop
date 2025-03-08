@@ -1061,6 +1061,7 @@ void AddMessageActions(
 
 	if (request.item) {
 		AyuUi::AddReadUntilAction(menu, request.item);
+		AyuUi::AddBurnAction(menu, request.item);
 	}
 }
 

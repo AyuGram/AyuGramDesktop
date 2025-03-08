@@ -567,6 +567,9 @@ public:
 	[[nodiscard]] SuggestionActions computeSuggestionActions(
 		bool accepted,
 		bool rejected) const;
+	[[nodiscard]] int unsupportedTTL() const {
+		return _unsupportedTTL;
+	}
 
 	[[nodiscard]] bool needsUpdateForVideoQualities(const MTPMessage &data);
 
@@ -703,6 +706,7 @@ private:
 	crl::time _reactionsLastRefreshed = 0;
 
 	bool _deleted = false;
+	int _unsupportedTTL = 0;
 
 	TimeId _date = 0;
 	TimeId _ttlDestroyAt = 0;
