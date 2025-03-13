@@ -174,6 +174,9 @@ public:
 	void set_stickerConfirmation(bool val);
 	void set_gifConfirmation(bool val);
 	void set_voiceConfirmation(bool val);
+
+	bool saveToFoldersByChat;
+	void set_saveToFoldersByChat(bool val);
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
@@ -235,7 +238,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showMessageShot,
 	stickerConfirmation,
 	gifConfirmation,
-	voiceConfirmation
+	voiceConfirmation,
+	saveToFoldersByChat
 );
 
 AyuGramSettings &getInstance();
@@ -258,4 +262,6 @@ rpl::producer<bool> get_hideFromBlockedReactive();
 void triggerHistoryUpdate();
 rpl::producer<> get_historyUpdateReactive();
 
+bool SaveToFoldersByChat();
+void SetSaveToFoldersByChat(bool val);
 }

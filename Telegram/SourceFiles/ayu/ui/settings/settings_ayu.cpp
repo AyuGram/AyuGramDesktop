@@ -1741,6 +1741,27 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 	SetupFonts(container, controller);
 }
 
+void SetupDownloads(not_null<Ui::VerticalLayout *> container) {
+	auto settings = &AyuSettings::getInstance();
+
+	AddSubsectionTitle(container, tr::ayu_downloads_category());
+
+	AddButtonWithIcon(container, tr::ayu_downloads_settings_save_to_chat_folders(), st::settingsButtonNoIcon)
+			->toggleOn(rpl::single(settings->saveToFoldersByChat))
+			->toggledValue() |
+		rpl::filter([=](bool enabled) { return (enabled != settings->saveToFoldersByChat); }) |
+		start_with_next(
+			[=](bool enabled)
+			{
+				settings->set_saveToFoldersByChat(enabled);
+				AyuSettings::save();
+			},
+			container->lifetime());
+
+	AddSkip(container);
+	AddDividerText(container, tr::ayu_downloads_settings_save_to_chat_folders_about());
+}
+
 void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 						  not_null<Window::SessionController*> controller) {
 	AddSkip(container);
@@ -1766,8 +1787,12 @@ void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
 
 	AddSkip(container);
 	SetupCustomization(container, controller);
+
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsCustomizationHint());
+
+	AddSkip(container);
+	SetupDownloads(container);
 
 	AddSkip(container);
 	SetupWebviewSettings(container);

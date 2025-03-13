@@ -245,6 +245,9 @@ AyuGramSettings::AyuGramSettings() {
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
 	recentStickersCount = 100;
 
+	// ~ Downloads
+	saveToFoldersByChat = false;
+
 	// context menu items
 	// 0 - hide
 	// 1 - show normally
@@ -597,6 +600,19 @@ void triggerHistoryUpdate() {
 
 rpl::producer<> get_historyUpdateReactive() {
 	return historyUpdateReactive.events();
+}
+
+void AyuGramSettings::set_saveToFoldersByChat(bool val) {
+	saveToFoldersByChat = val;
+}
+
+bool SaveToFoldersByChat() {
+	return getInstance().saveToFoldersByChat;
+}
+
+void SetSaveToFoldersByChat(bool val) {
+	getInstance().set_saveToFoldersByChat(val);
+	save();
 }
 
 }

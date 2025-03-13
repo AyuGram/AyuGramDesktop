@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "lottie/lottie_animation.h"
 #include "boxes/abstract_box.h" // Ui::hideLayer().
+#include "ayu/ayu_settings.h"
 
 #include <QtCore/QBuffer>
 #include <QtCore/QMimeType>
@@ -286,7 +287,7 @@ QString DocumentFileNameForSave(not_null<const DocumentData *> data,
 	}();
 
 	// Create chat subfolder if we have a chat name and setting is enabled
-	if (!chatFolder.isEmpty() && !path.isEmpty() && !forceSavingAs && Core::App().settings().saveToFoldersByChat()) {
+	if (!chatFolder.isEmpty() && !path.isEmpty() && !forceSavingAs && AyuSettings::SaveToFoldersByChat()) {
 		// Create full path with chat subfolder
 		QDir baseDir(path);
 		if (!baseDir.exists(chatFolder)) {
