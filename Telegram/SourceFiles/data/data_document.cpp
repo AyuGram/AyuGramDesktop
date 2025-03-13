@@ -210,11 +210,10 @@ QString FileNameForSave(
 	return result;
 }
 
-QString DocumentFileNameForSave(
-		not_null<const DocumentData*> data,
-		bool forceSavingAs,
-		const QString &already,
-		const QDir &dir) {
+QString DocumentFileNameForSave(not_null<const DocumentData *> data,
+								bool forceSavingAs,
+								const QString &already,
+								const QDir &dir) {
 	auto alreadySavingFilename = data->loadingFilePath();
 	if (!alreadySavingFilename.isEmpty()) {
 		return alreadySavingFilename;
@@ -253,20 +252,53 @@ QString DocumentFileNameForSave(
 		} else {
 			filter = mimeType.filterString() + u";;"_q + FileDialog::AllFilesFilter();
 		}
-		caption = data->isAudioFile()
-			? tr::lng_save_audio_file(tr::now)
-			: tr::lng_save_file(tr::now);
+		caption = data->isAudioFile() ? tr::lng_save_audio_file(tr::now) : tr::lng_save_file(tr::now);
 		prefix = u"doc"_q;
 	}
 
-	return FileNameForSave(
-		&data->session(),
-		caption,
-		filter,
-		prefix,
-		name,
-		forceSavingAs,
-		dir);
+	// Try to get chat information
+	QString chatFolder;
+
+	// Get window controller
+	if (const auto controller = data->session().windows().empty() ? nullptr : data->session().windows().front().get()) {
+
+		// Get the active chat history
+		if (const auto history = controller->activeChatCurrent().history()) {
+			if (const auto peer = history->peer) {
+				chatFolder = peer->name();
+				// Sanitize folder name
+				chatFolder.replace(QRegularExpression("[\\\\/:*?\"<>|]"), "_");
+			}
+		}
+	}
+
+	// Get base download path
+	auto path = [&]
+	{
+		const auto path = Core::App().settings().downloadPath();
+		if (path.isEmpty()) {
+			return File::DefaultDownloadPath(&data->session());
+		} else if (path == FileDialog::Tmp()) {
+			return data->session().local().tempDirectory();
+		} else {
+			return path;
+		}
+	}();
+
+	// Create chat subfolder if we have a chat name and setting is enabled
+	if (!chatFolder.isEmpty() && !path.isEmpty() && !forceSavingAs && Core::App().settings().saveToFoldersByChat()) {
+		// Create full path with chat subfolder
+		QDir baseDir(path);
+		if (!baseDir.exists(chatFolder)) {
+			baseDir.mkdir(chatFolder);
+		}
+		QDir chatDir(path + "/" + chatFolder);
+
+		// Use the chat directory instead of the base directory
+		return FileNameForSave(&data->session(), caption, filter, prefix, name, forceSavingAs, chatDir);
+	}
+
+	return FileNameForSave(&data->session(), caption, filter, prefix, name, forceSavingAs, dir);
 }
 
 Data::FileOrigin StickerData::setOrigin() const {
