@@ -1097,11 +1097,11 @@ void SetupDataStorage(
 	).make_state<rpl::event_stream<bool>>();
 
 	container
-			->add(object_ptr<Ui::Checkbox>(container,
-										   tr::lng_downloads_settings_save_to_chat_folders(),
-										   Core::App().settings().saveToFoldersByChat(),
-										   st::settingsCheckbox),
-				  st::settingsCheckboxPadding)
+	->add(object_ptr<Ui::Checkbox>(container,
+		tr::lng_downloads_settings_save_to_chat_folders(),
+		Core::App().settings().saveToFoldersByChat(),
+		st::settingsCheckbox),
+			st::settingsCheckboxPadding)
 			->checkedChanges() |
 		rpl::start_with_next(
 			[=](bool checked)
