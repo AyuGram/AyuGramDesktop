@@ -954,6 +954,9 @@ public:
 
 	void resetOnLastLogout();
 
+	[[nodiscard]] bool saveToFoldersByChat() const { return _saveToFoldersByChat; }
+	void setSaveToFoldersByChat(bool value) { _saveToFoldersByChat = value; }
+
 private:
 	void resolveRecentEmoji() const;
 
@@ -1094,7 +1097,7 @@ private:
 
 	QByteArray _photoEditorBrush;
 
+	bool _saveToFoldersByChat = false; // Default to disabled
 };
 
 } // namespace Core
-
