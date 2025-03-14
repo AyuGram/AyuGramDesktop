@@ -1744,9 +1744,9 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 void SetupDownloads(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_downloads_category());
+	AddSubsectionTitle(container, tr::ayu_Downloads_Category());
 
-	AddButtonWithIcon(container, tr::ayu_downloads_settings_save_to_chat_folders(), st::settingsButtonNoIcon)
+	AddButtonWithIcon(container, tr::ayu_DownloadsSettingsSavetoChatFolders(), st::settingsButtonNoIcon)
 			->toggleOn(rpl::single(settings->saveToFoldersByChat))
 			->toggledValue() |
 		rpl::filter([=](bool enabled) { return (enabled != settings->saveToFoldersByChat); }) |
@@ -1759,7 +1759,7 @@ void SetupDownloads(not_null<Ui::VerticalLayout *> container) {
 			container->lifetime());
 
 	AddSkip(container);
-	AddDividerText(container, tr::ayu_downloads_settings_save_to_chat_folders_about());
+	AddDividerText(container, tr::ayu_DownloadsSettingsSavetoChatFoldersAbout());
 }
 
 void SetupAyuGramSettings(not_null<Ui::VerticalLayout*> container,
