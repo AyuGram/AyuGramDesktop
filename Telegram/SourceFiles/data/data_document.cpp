@@ -287,6 +287,7 @@ QString DocumentFileNameForSave(not_null<const DocumentData *> data,
 	}();
 
 	// Create chat subfolder if we have a chat name and setting is enabled
+	const auto settings = &AyuSettings::getInstance();
 	if (!chatFolder.isEmpty() && !path.isEmpty() && !forceSavingAs && AyuSettings::SaveToFoldersByChat()) {
 		// Create full path with chat subfolder
 		QDir baseDir(path);
