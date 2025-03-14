@@ -6624,6 +6624,5 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "App will close in 5 seconds.";
-"ayu_DownloadsCategory" = "Downloads";
 "ayu_DownloadsSettingsSavetoChatFolders" = "Save files to chat folders";
 "ayu_DownloadsSettingsSavetoChatFoldersAbout" = "When enabled, files will be saved to separate folders named after their source chat.";

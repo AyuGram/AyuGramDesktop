@@ -1744,7 +1744,7 @@ void SetupCustomization(not_null<Ui::VerticalLayout*> container,
 void SetupDownloads(not_null<Ui::VerticalLayout *> container) {
 	auto settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_Downloads_Category());
+	AddSubsectionTitle(container, tr::lng_downloads_section());
 
 	AddButtonWithIcon(container, tr::ayu_DownloadsSettingsSavetoChatFolders(), st::settingsButtonNoIcon)
 			->toggleOn(rpl::single(settings->saveToFoldersByChat))
