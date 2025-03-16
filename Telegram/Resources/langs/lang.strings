@@ -6615,7 +6615,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits.\n**Enjoy the star near your nickname!**";
 "ayu_DeveloperPopup" = "**{item}** is a member of the **exteraGram** development team.";
 "ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **AyuGram** and received an exclusive badge.";
-"ayu_SettingsWatermark" = "AyuGram developed and maintained by Radolyn Labs.";
+"ayu_SettingsWatermark" = "AyuGram is developed and maintained by Radolyn Labs.";
 "ayu_ConfirmationSticker" = "Do you want to send this sticker?";
 "ayu_ConfirmationGIF" = "Do you want to send this GIF?";
 "ayu_ConfirmationVoice" = "Do you want to send this voice message?";
