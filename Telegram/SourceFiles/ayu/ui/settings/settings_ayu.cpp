@@ -767,6 +767,25 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_HideNotAddedEmojiAndStickerPacks(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideNotAddedEmojiAndStickerPacks)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideNotAddedEmojiAndStickerPacks);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_hideNotAddedEmojiAndStickerPacks(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
 	std::vector checkboxes = {
 		NestedEntry{
 			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)

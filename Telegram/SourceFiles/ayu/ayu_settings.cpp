@@ -380,6 +380,10 @@ void AyuGramSettings::set_disableCustomBackgrounds(bool val) {
 	disableCustomBackgrounds = val;
 }
 
+void AyuGramSettings::set_hideNotAddedEmojiAndStickerPacks(bool val) {
+	hideNotAddedEmojiAndStickerPacks = val;
+}
+
 void AyuGramSettings::set_collapseSimilarChannels(bool val) {
 	collapseSimilarChannels = val;
 }
