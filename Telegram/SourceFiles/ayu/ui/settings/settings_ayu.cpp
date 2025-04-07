@@ -769,19 +769,19 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_HideNotAddedEmojiAndStickerPacks(),
+		tr::ayu_ShowOnlyAddedEmojisAndStickers(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings->hideNotAddedEmojiAndStickerPacks)
+		rpl::single(settings->showOnlyAddedEmojisAndStickers)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings->hideNotAddedEmojiAndStickerPacks);
+			return (enabled != settings->showOnlyAddedEmojisAndStickers);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
-			settings->set_hideNotAddedEmojiAndStickerPacks(enabled);
+			settings->set_showOnlyAddedEmojisAndStickers(enabled);
 			AyuSettings::save();
 		},
 		container->lifetime());

@@ -411,7 +411,7 @@ FieldAutocomplete::StickerRows FieldAutocomplete::getStickerSuggestions() {
 	auto result = ranges::views::all(
 		list
 	) | ranges::views::filter([&](not_null<DocumentData*> sticker) {
-		return !settings->hideNotAddedEmojiAndStickerPacks
+		return !settings->showOnlyAddedEmojisAndStickers
 			|| sticker->isStickerSetInstalled();
 	}) | ranges::views::transform([](not_null<DocumentData*> sticker) {
 		return StickerSuggestion{
