@@ -624,6 +624,10 @@ bool ChannelData::allowsForwarding() const {
 	return !(flags() & Flag::NoForwards);
 }
 
+bool ChannelData::allowsAyuForwarding() const {
+	return !(flags() & Flag::AyuNoForwards);
+}
+
 bool ChannelData::canViewMembers() const {
 	return (flags() & Flag::CanViewParticipants)
 		&& (!(flags() & Flag::ParticipantsHidden)

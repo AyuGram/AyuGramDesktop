@@ -68,6 +68,10 @@ bool ChatData::allowsForwarding() const {
 	return !(flags() & Flag::NoForwards);
 }
 
+bool ChatData::allowsAyuForwarding() const {
+	return !(flags() & Flag::AyuNoForwards);
+}
+
 bool ChatData::canEditInformation() const {
 	return amIn() && !amRestricted(ChatRestriction::ChangeInfo);
 }

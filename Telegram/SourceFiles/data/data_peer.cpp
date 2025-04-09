@@ -1397,6 +1397,17 @@ bool PeerData::allowsForwarding() const {
 	return false;
 }
 
+bool PeerData::allowsAyuForwarding() const {
+	if (const auto user = asUser()) {
+		return true;
+	} else if (const auto channel = asChannel()) {
+		return channel->allowsAyuForwarding();
+	} else if (const auto chat = asChat()) {
+		return chat->allowsAyuForwarding();
+	}
+	return false;
+}
+
 Data::RestrictionCheckResult PeerData::amRestricted(
 		ChatRestriction right) const {
 	using Result = Data::RestrictionCheckResult;
