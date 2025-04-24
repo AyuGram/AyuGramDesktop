@@ -767,25 +767,6 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 
-	AddButtonWithIcon(
-		container,
-		tr::ayu_ShowOnlyAddedEmojisAndStickers(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->showOnlyAddedEmojisAndStickers)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->showOnlyAddedEmojisAndStickers);
-		}) | start_with_next(
-		[=](bool enabled)
-		{
-			settings->set_showOnlyAddedEmojisAndStickers(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
-
 	std::vector checkboxes = {
 		NestedEntry{
 			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)
@@ -824,6 +805,25 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		[=](bool enabled)
 		{
 			settings->set_disableNotificationsDelay(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_ShowOnlyAddedEmojisAndStickers(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->showOnlyAddedEmojisAndStickers)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->showOnlyAddedEmojisAndStickers);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			settings->set_showOnlyAddedEmojisAndStickers(enabled);
 			AyuSettings::save();
 		},
 		container->lifetime());
