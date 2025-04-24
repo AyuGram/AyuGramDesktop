@@ -37,6 +37,7 @@ public:
 	bool disableAds;
 	bool disableStories;
 	bool disableCustomBackgrounds;
+	bool showOnlyAddedEmojisAndStickers;
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
 
@@ -117,6 +118,7 @@ public:
 	void set_disableAds(bool val);
 	void set_disableStories(bool val);
 	void set_disableCustomBackgrounds(bool val);
+	void set_showOnlyAddedEmojisAndStickers(bool val);
 	void set_collapseSimilarChannels(bool val);
 	void set_hideSimilarChannels(bool val);
 

@@ -763,6 +763,10 @@ void StickersListWidget::fillFilteredStickersRow() {
 }
 
 void StickersListWidget::addSearchRow(not_null<StickersSet*> set) {
+	const auto settings = &AyuSettings::getInstance();
+	if (settings->showOnlyAddedEmojisAndStickers && !SetInMyList(set->flags)) {
+		return;
+	}
 	const auto skipPremium = !session().premiumPossible();
 	auto elements = PrepareStickers(
 		set->stickers.empty() ? set->covers : set->stickers,

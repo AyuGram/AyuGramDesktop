@@ -56,8 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 
 // AyuGram includes
-#include "data/data_file_origin.h"
-#include "qapplication.h"
+#include "ayu/ayu_settings.h"
 
 namespace ChatHelpers {
 namespace {
@@ -2266,9 +2265,13 @@ void EmojiListWidget::refreshCustom() {
 		&& !_allowWithoutPremium;
 	const auto owner = &session->data();
 	const auto &sets = owner->stickers().sets();
+	auto settings = &AyuSettings::getInstance();
 	const auto push = [&](uint64 setId, bool installed) {
 		const auto megagroup = _megagroupSet
 			&& (setId == Data::Stickers::MegagroupSetId);
+		if (settings->showOnlyAddedEmojisAndStickers && !installed && !megagroup) {
+			return;
+		}
 		const auto lookupId = megagroup
 			? _megagroupSet->mgInfo->emojiSet.id
 			: setId;

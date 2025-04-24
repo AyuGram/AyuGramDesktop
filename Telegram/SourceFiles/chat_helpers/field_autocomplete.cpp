@@ -54,6 +54,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
 namespace ChatHelpers {
 namespace {
 
@@ -404,9 +407,13 @@ bool FieldAutocomplete::clearFilteredBotCommands() {
 FieldAutocomplete::StickerRows FieldAutocomplete::getStickerSuggestions() {
 	const auto data = &_session->data().stickers();
 	const auto list = data->getListByEmoji({ _emoji }, _stickersSeed);
+	const auto settings = &AyuSettings::getInstance();
 	auto result = ranges::views::all(
 		list
-	) | ranges::views::transform([](not_null<DocumentData*> sticker) {
+	) | ranges::views::filter([&](not_null<DocumentData*> sticker) {
+		return !settings->showOnlyAddedEmojisAndStickers
+			|| sticker->isStickerSetInstalled();
+	}) | ranges::views::transform([](not_null<DocumentData*> sticker) {
 		return StickerSuggestion{
 			sticker,
 			sticker->createMediaView()
