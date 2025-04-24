@@ -16,6 +16,15 @@
 using namespace sqlite_orm;
 auto storage = make_storage(
 	"./tdata/ayudata.db",
+	make_index("idx_deleted_message_userId_dialogId_topicId_messageId",
+			   column<DeletedMessage>(&DeletedMessage::userId),
+			   column<DeletedMessage>(&DeletedMessage::dialogId),
+			   column<DeletedMessage>(&DeletedMessage::topicId),
+			   column<DeletedMessage>(&DeletedMessage::messageId)),
+	make_index("idx_edited_message_userId_dialogId_messageId",
+			   column<EditedMessage>(&EditedMessage::userId),
+			   column<EditedMessage>(&EditedMessage::dialogId),
+			   column<EditedMessage>(&EditedMessage::messageId)),
 	make_table<DeletedMessage>(
 		"DeletedMessage",
 		make_column("fakeId", &DeletedMessage::fakeId, primary_key().autoincrement()),
@@ -212,13 +221,15 @@ std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageI
 
 bool hasRevisions(ID userId, ID dialogId, ID messageId) {
 	try {
-		return storage.count<EditedMessage>(
+		return !storage.select(
+			columns(column<EditedMessage>(&EditedMessage::messageId)),
 			where(
 				column<EditedMessage>(&EditedMessage::userId) == userId and
 				column<EditedMessage>(&EditedMessage::dialogId) == dialogId and
 				column<EditedMessage>(&EditedMessage::messageId) == messageId
-			)
-		) > 0;
+			),
+			limit(1)
+		).empty();
 	} catch (std::exception &ex) {
 		LOG(("Failed to check if message has revisions: %1").arg(ex.what()));
 		return false;
@@ -251,13 +262,15 @@ std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicI
 
 bool hasDeletedMessages(ID userId, ID dialogId, ID topicId) {
 	try {
-		return storage.count<DeletedMessage>(
+		return !storage.select(
+			columns(column<DeletedMessage>(&DeletedMessage::dialogId)),
 			where(
 				column<DeletedMessage>(&DeletedMessage::userId) == userId and
 				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
 				(column<DeletedMessage>(&DeletedMessage::topicId) == topicId or topicId == 0)
-			)
-		) > 0;
+			),
+			limit(1)
+		).empty();
 	} catch (std::exception &ex) {
 		LOG(("Failed to check if dialog has deleted message: %1").arg(ex.what()));
 		return false;
