@@ -609,7 +609,7 @@ bool ShouldSendSilent(
 		const Api::SendOptions &options) {
 	const auto& settings = AyuSettings::getInstance();
 	if (settings.sendWithoutSound) {
-		return true;
+		return !options.silent;
 	}
 
 	return options.silent

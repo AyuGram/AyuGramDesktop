@@ -59,6 +59,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace SendMenu {
 namespace {
 
@@ -691,10 +695,11 @@ FillMenuResult FillSendMenu(
 		: st::defaultComposeIcons;
 
 	if (sending && type != Type::Reminder) {
+		const auto& settings = AyuSettings::getInstance();
 		menu->addAction(
-			tr::lng_send_silent_message(tr::now),
+			settings.sendWithoutSound ? tr::ayu_SendWithSound(tr::now) : tr::lng_send_silent_message(tr::now),
 			[=] { action({ Api::SendOptions{ .silent = true } }, details); },
-			&icons.menuMute);
+			settings.sendWithoutSound ? &icons.menuUnmute : &icons.menuMute);
 	}
 	if (sending && type != Type::SilentOnly) {
 		menu->addAction(
