@@ -2194,19 +2194,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		}));
 	}
 
-	instance()->stop(crl::guard(this, [=](Result &&data) {
-		if (data.bytes.isEmpty()) {
-			// Close everything.
-			stop(false);
-			return;
-		}
-
-		window()->raise();
-		window()->activateWindow();
-		const auto duration = Duration(data.samples);
-
-		if (type == StopType::Send) {
-			auto settings = &AyuSettings::getInstance();
+			const auto& settings = AyuSettings::getInstance();
 			if (AyuSettings::isUseScheduledMessages()) {
 				auto current = base::unixtime::now();
 				options.scheduled = current + 12 + 5;
@@ -2224,7 +2212,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 					close();
 				});
 
-			if (settings->voiceConfirmation) {
+			if (settings.voiceConfirmation) {
 				_show->showBox(Ui::MakeConfirmBox(
 					{
 						.text = tr::ayu_ConfirmationVoice(),
@@ -2303,8 +2291,11 @@ void VoiceRecordBar::drawMessage(QPainter &p, float64 recordActive) {
 
 void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 	if (isListenState()) {
-		const auto data = _listen->data();
-		auto settings = &AyuSettings::getInstance();
+		if (takeTTLState()) {
+			options.ttlSeconds = std::numeric_limits<int>::max();
+		}
+
+		const auto& settings = AyuSettings::getInstance();
 		if (AyuSettings::isUseScheduledMessages()) {
 			auto current = base::unixtime::now();
 			options.scheduled = current + 12 + 5;
@@ -2323,7 +2314,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 				close();
 			});
 
-		if (settings->voiceConfirmation) {
+		if (settings.voiceConfirmation) {
 			_show->showBox(Ui::MakeConfirmBox(
 				{
 					.text = tr::ayu_ConfirmationVoice(),

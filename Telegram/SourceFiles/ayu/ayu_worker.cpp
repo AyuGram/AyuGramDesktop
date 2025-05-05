@@ -42,8 +42,8 @@ void runOnce() {
 		lateInit();
 	}
 
-	const auto settings = &AyuSettings::getInstance();
-	if (!settings->sendOfflinePacketAfterOnline) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!settings.sendOfflinePacketAfterOnline) {
 		return;
 	}
 

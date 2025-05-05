@@ -14,7 +14,7 @@ static QImage LAST_LOADED_NO_MARGIN;
 namespace AyuAssets {
 
 void loadAppIco() {
-	auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	QString tempIconPath = appDataPath + "/AyuGram.ico";
@@ -26,20 +26,20 @@ void loadAppIco() {
 		f.remove();
 	}
 	f.close();
-	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings->appIcon), tempIconPath);
+	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings.appIcon), tempIconPath);
 }
 
 void loadIcons() {
-	auto settings = &AyuSettings::getInstance();
-	if (LAST_LOADED_NAME != settings->appIcon) {
-		LAST_LOADED_NAME = settings->appIcon;
+	const auto& settings = AyuSettings::getInstance();
+	if (LAST_LOADED_NAME != settings.appIcon) {
+		LAST_LOADED_NAME = settings.appIcon;
 
 #ifdef Q_OS_MAC
-		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app_macos.png").arg(settings->appIcon));
+		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app_macos.png").arg(settings.appIcon));
 #else
-		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app.png").arg(settings->appIcon));
+		LAST_LOADED = QImage(qsl(":/gui/art/ayu/%1/app.png").arg(settings.appIcon));
 #endif
-		LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(settings->appIcon));
+		LAST_LOADED_NO_MARGIN = QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(settings.appIcon));
 	}
 }
 

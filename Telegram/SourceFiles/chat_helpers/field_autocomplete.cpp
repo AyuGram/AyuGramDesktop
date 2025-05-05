@@ -408,11 +408,11 @@ bool FieldAutocomplete::clearFilteredBotCommands() {
 FieldAutocomplete::StickerRows FieldAutocomplete::getStickerSuggestions() {
 	const auto data = &_session->data().stickers();
 	const auto list = data->getListByEmoji({ _emoji }, _stickersSeed);
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 	auto result = ranges::views::all(
 		list
 	) | ranges::views::filter([&](not_null<DocumentData*> sticker) {
-		return !settings->showOnlyAddedEmojisAndStickers
+		return !settings.showOnlyAddedEmojisAndStickers
 			|| sticker->isStickerSetInstalled();
 	}) | ranges::views::transform([](not_null<DocumentData*> sticker) {
 		return StickerSuggestion{

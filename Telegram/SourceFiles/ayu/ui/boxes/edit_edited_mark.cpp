@@ -86,8 +86,7 @@ void EditEditedMarkBox::resizeEvent(QResizeEvent *e) {
 }
 
 void EditEditedMarkBox::save() {
-	const auto settings = &AyuSettings::getInstance();
-	settings->set_editedMark(_text->getLastText());
+	AyuSettings::set_editedMark(_text->getLastText());
 	AyuSettings::save();
 
 	closeBox();

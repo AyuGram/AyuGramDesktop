@@ -474,9 +474,9 @@ void TabbedPanel::showStarted() {
 }
 
 bool TabbedPanel::eventFilter(QObject *obj, QEvent *e) {
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
-	if (TabbedPanelShowOnClick.value() || !settings->showEmojiPopup) {
+	if (TabbedPanelShowOnClick.value() || !settings.showEmojiPopup) {
 		return false;
 	} else if (e->type() == QEvent::Enter) {
 		otherEnter();

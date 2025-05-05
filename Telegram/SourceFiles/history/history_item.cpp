@@ -1328,11 +1328,11 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	auto text = std::move(prepared.text);
 
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 	if (date() > 0) {
 		const auto timeString = QString(" (%1)").arg(QLocale().toString(
 			base::unixtime::parse(_date),
-			settings->showMessageSeconds
+			settings.showMessageSeconds
 				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 				: QLocale::system().timeFormat(QLocale::ShortFormat)
 		));
@@ -3360,8 +3360,8 @@ void HistoryItem::setDeleted() {
 	_deleted = true;
 
 	if (isService()) {
-		const auto settings = &AyuSettings::getInstance();
-		setAyuHint(settings->deletedMark);
+		const auto& settings = AyuSettings::getInstance();
+		setAyuHint(settings.deletedMark);
 	} else {
 		history()->owner().requestItemViewRefresh(this);
 		history()->owner().requestItemResize(this);

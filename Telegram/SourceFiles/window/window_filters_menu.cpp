@@ -140,8 +140,8 @@ void FiltersMenu::setupMainMenuIcon() {
 			? &st::windowFiltersMainMenuUnread
 			: &st::windowFiltersMainMenuUnreadMuted;
 
-		const auto settings = &AyuSettings::getInstance();
-		if (settings->hideNotificationCounters) {
+		const auto& settings = AyuSettings::getInstance();
+		if (settings.hideNotificationCounters) {
 			icon = nullptr;
 		}
 
@@ -177,7 +177,7 @@ void FiltersMenu::scrollToButton(not_null<Ui::RpWidget*> widget) {
 
 void FiltersMenu::refresh() {
 	// AyuGram hideAllChatsFolder
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	const auto filters = &_session->session().data().chatsFilters();
 	if (!filters->has() || _ignoreRefresh) {
@@ -194,7 +194,7 @@ void FiltersMenu::refresh() {
 	const auto maxLimit = (reorderAll ? 1 : 0)
 		+ Data::PremiumLimits(&_session->session()).dialogFiltersCurrent();
 	const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
-	if (!reorderAll && !settings->hideAllChatsFolder) {
+	if (!reorderAll && !settings.hideAllChatsFolder) {
 		_reorder->addPinnedInterval(0, 1);
 	}
 	_reorder->addPinnedInterval(
@@ -229,7 +229,7 @@ void FiltersMenu::refresh() {
 	// Also check for session content existance, because it may be null
 	// and there will be an exception in `Window::SessionController::showPeerHistory`
 	// because `SessionController::content()` == nullptr
-    if (settings->hideAllChatsFolder && _session->widget()->sessionContent()) {
+    if (settings.hideAllChatsFolder && _session->widget()->sessionContent()) {
         const auto lookupId = filters->lookupId(0);
         _session->setActiveChatsFilter(lookupId);
     }
@@ -305,8 +305,8 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 			auto count = (state.chats + state.marks);
 			auto muted = (state.chatsMuted + state.marksMuted);
 
-			const auto settings = &AyuSettings::getInstance();
-			if (settings->hideNotificationCounters) {
+			const auto& settings = AyuSettings::getInstance();
+			if (settings.hideNotificationCounters) {
 				count = 0;
 				muted = 0;
 			}
@@ -452,11 +452,11 @@ void FiltersMenu::applyReorder(
 	}
 
 	// AyuGram hideAllChatsFolder
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	const auto filters = &_session->session().data().chatsFilters();
 	const auto &list = filters->list();
-	if (!settings->hideAllChatsFolder && !premium()) {
+	if (!settings.hideAllChatsFolder && !premium()) {
 		if (list[0].id() != FilterId()) {
 			filters->moveAllToFront();
 		}

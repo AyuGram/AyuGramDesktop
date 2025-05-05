@@ -1242,7 +1242,7 @@ bool SetClickContext(
 }
 
 object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
-	auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	auto result = object_ptr<Ui::VerticalLayout>(_wrap);
 	auto tracker = Ui::MultiSlideTracker();
@@ -1555,7 +1555,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			).text->setLinksTrusted();
 		}
 
-		if (settings->showPeerId != 0) {
+		if (settings.showPeerId != 0) {
 			const auto dataCenter = getPeerDC(_peer);
 			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
 
@@ -1691,7 +1691,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 
-		if (settings->showPeerId != 0 && !_topic) {
+		if (settings.showPeerId != 0 && !_topic) {
 			const auto dataCenter = getPeerDC(_peer);
 			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
 
@@ -1719,7 +1719,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			});
 		}
 
-		if (settings->showPeerId != 0 && _topic) {
+		if (settings.showPeerId != 0 && _topic) {
 			auto idDrawableText = IDValue(
 				_peer->forumTopicFor(topicRootId)->topicRootId()
 			) | rpl::map([](TextWithEntities &&text)

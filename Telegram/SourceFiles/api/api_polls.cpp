@@ -178,8 +178,8 @@ void Polls::sendVotes(
 		hideSending();
 		_session->updates().applyUpdates(result);
 
-		const auto settings = &AyuSettings::getInstance();
-		if (!settings->sendReadMessages && settings->markReadAfterAction && item)
+		const auto& settings = AyuSettings::getInstance();
+		if (!settings.sendReadMessages && settings.markReadAfterAction && item)
 		{
 			readHistory(item);
 		}

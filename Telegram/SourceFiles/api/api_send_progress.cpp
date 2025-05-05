@@ -118,8 +118,8 @@ void SendProgressManager::send(const Key &key, int progress) {
 	}
 
 	// AyuGram sendUploadProgress
-	const auto settings = &AyuSettings::getInstance();
-	if (!settings->sendUploadProgress)
+	const auto& settings = AyuSettings::getInstance();
+	if (!settings.sendUploadProgress)
 	{
 		DEBUG_LOG(("[AyuGram] Don't send upload progress"));
 		return;

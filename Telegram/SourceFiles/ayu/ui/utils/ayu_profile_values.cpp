@@ -15,8 +15,8 @@ constexpr auto kMaxChannelId = -1000000000000;
 QString IDString(not_null<PeerData*> peer) {
 	auto resultId = QString::number(getBareID(peer));
 
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->showPeerId == 2) {
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.showPeerId == 2) {
 		if (peer->isChannel()) {
 			resultId = QString::number(peerToChannel(peer->id).bare - kMaxChannelId).prepend("-");
 		} else if (peer->isChat()) {

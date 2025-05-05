@@ -28,10 +28,10 @@ void initLang() {
 }
 
 void initUiSettings() {
-	auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
-	AyuUiSettings::setMonoFont(settings->monoFont);
-	AyuUiSettings::setWideMultiplier(settings->wideMultiplier);
+	AyuUiSettings::setMonoFont(settings.monoFont);
+	AyuUiSettings::setWideMultiplier(settings.wideMultiplier);
 }
 
 void initDatabase() {

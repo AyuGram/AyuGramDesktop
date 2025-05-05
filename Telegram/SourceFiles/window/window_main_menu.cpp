@@ -634,7 +634,7 @@ void MainMenu::showFinished() {
 void MainMenu::setupMenu() {
 	using namespace Settings;
 
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	const auto controller = _controller;
 	const auto addAction = [&](
@@ -732,28 +732,28 @@ void MainMenu::setupMenu() {
 			controller->showPeerHistory(controller->session().user());
 		});
 
-		const auto settings = &AyuSettings::getInstance();
+		const auto& settings = AyuSettings::getInstance();
 
-		if (settings->showLReadToggleInDrawer) {
+		if (settings.showLReadToggleInDrawer) {
 			addAction(
 				tr::ayu_LReadMessages(),
 				{&st::ayuLReadMenuIcon}
 			)->setClickedCallback([=]
 			{
-				auto prev = settings->sendReadMessages;
-				settings->set_sendReadMessages(false);
+				auto prev = settings.sendReadMessages;
+				AyuSettings::set_sendReadMessages(false);
 
 				auto chats = controller->session().data().chatsList();
 				MarkAsReadChatList(chats);
 
-				settings->set_sendReadMessages(prev);
+				AyuSettings::set_sendReadMessages(prev);
 			});
 		}
 
-		if (settings->showSReadToggleInDrawer) {
+		if (settings.showSReadToggleInDrawer) {
 			auto callback = [=](Fn<void()> &&close) {
-				auto prev = settings->sendReadMessages;
-				settings->set_sendReadMessages(true);
+				auto prev = settings.sendReadMessages;
+				AyuSettings::set_sendReadMessages(true);
 
 				auto chats = controller->session().data().chatsList();
 				MarkAsReadChatList(chats);
@@ -761,7 +761,7 @@ void MainMenu::setupMenu() {
 				// slight delay for forums to send packets
 				dispatchToMainThread([=]
 				{
-					settings->set_sendReadMessages(prev);
+					AyuSettings::set_sendReadMessages(prev);
 				}, 200);
 				close();
 			};
@@ -840,7 +840,7 @@ void MainMenu::setupMenu() {
 			toggle);
 	}, _nightThemeToggle->lifetime());
 
-	if (settings->showGhostToggleInDrawer) {
+	if (settings.showGhostToggleInDrawer) {
 		_ghostModeToggle = addAction(
 			tr::ayu_GhostModeToggle(),
 			{&st::ayuGhostIcon}
@@ -850,13 +850,13 @@ void MainMenu::setupMenu() {
 		) | rpl::start_with_next(
 			[=](bool ghostMode)
 			{
-				settings->set_ghostModeEnabled(ghostMode);
+				AyuSettings::set_ghostModeEnabled(ghostMode);
 				AyuSettings::save();
 			},
 			_ghostModeToggle->lifetime());
 	}
 
-	if (settings->showStreamerToggleInDrawer) {
+	if (settings.showStreamerToggleInDrawer) {
 		_streamerModeToggle = addAction(
 			tr::ayu_StreamerModeToggle(),
 			{&st::ayuStreamerModeMenuIcon}

@@ -327,8 +327,8 @@ Document::Document(
 			const auto &data = &_parent->data()->history()->owner();
 			_parent->data()->removeFromSharedMediaIndex();
 			setDocumentLinks(_data, realParent, [=] {
-				const auto settings = &AyuSettings::getInstance();
-				if (!settings->saveDeletedMessages) {
+				const auto& settings = AyuSettings::getInstance();
+				if (!settings.saveDeletedMessages) {
 					_openl = nullptr;
 				}
 

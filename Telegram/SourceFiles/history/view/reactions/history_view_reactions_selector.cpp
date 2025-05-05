@@ -1189,8 +1189,8 @@ bool AdjustMenuGeometryForSelector(
 		not_null<Ui::PopupMenu*> menu,
 		QPoint desiredPosition,
 		not_null<Selector*> selector) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings->showReactionsPanelInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
 		return false;
 	}
 
@@ -1357,8 +1357,8 @@ AttachSelectorResult AttachSelectorToMenu(
 		Fn<void(ChosenReaction)> chosen,
 		TextWithEntities about,
 		IconFactory iconFactory) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings->showReactionsPanelInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
 		return AttachSelectorResult::Skipped;
 	}
 
@@ -1409,8 +1409,8 @@ auto AttachSelectorToMenu(
 	IconFactory iconFactory,
 	Fn<bool()> paused)
 -> base::expected<not_null<Selector*>, AttachSelectorResult> {
-	const auto settings = &AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings->showReactionsPanelInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
 		return base::make_unexpected(AttachSelectorResult::Skipped);
 	}
 

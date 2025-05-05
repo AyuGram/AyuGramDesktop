@@ -738,8 +738,8 @@ void Reply::paint(
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
 
-	const auto settings = &AyuSettings::getInstance();
-	if (!settings->simpleQuotesAndReplies && backgroundEmoji) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!settings.simpleQuotesAndReplies && backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
 			backgroundEmoji,

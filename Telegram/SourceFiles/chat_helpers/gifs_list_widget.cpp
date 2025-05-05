@@ -502,7 +502,7 @@ void GifsListWidget::selectInlineResult(
 		return;
 	}
 
-	auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 	if (AyuSettings::isUseScheduledMessages()) {
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
@@ -552,7 +552,7 @@ void GifsListWidget::selectInlineResult(
 					});
 				});
 
-			if (settings->gifConfirmation) {
+			if (settings.gifConfirmation) {
 				Ui::show(Ui::MakeConfirmBox({
 					.text = tr::ayu_ConfirmationGIF(),
 					.confirmed = sendGIFCallback,

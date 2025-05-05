@@ -100,8 +100,8 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 		return true;
 	}
 
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->hideFromBlocked) {
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.hideFromBlocked) {
 		if (item->from()->isUser() &&
 			item->from()->asUser()->isBlocked()) {
 			// don't hide messages if it's a dialog with blocked user
@@ -505,14 +505,14 @@ int getScheduleTime(int64 sumSize) {
 }
 
 bool isMessageSavable(const not_null<HistoryItem *> item) {
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
-	if (!settings->saveDeletedMessages) {
+	if (!settings.saveDeletedMessages) {
 		return false;
 	}
 
 	if (const auto possiblyBot = item->history()->peer->asUser()) {
-		return !possiblyBot->isBot() || (settings->saveForBots && possiblyBot->isBot());
+		return !possiblyBot->isBot() || (settings.saveForBots && possiblyBot->isBot());
 	}
 	return true;
 }

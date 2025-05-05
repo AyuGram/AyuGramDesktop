@@ -197,8 +197,8 @@ void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 }
 
 void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!needToShowItem(settings->showHideMessageInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showHideMessageInContextMenu)) {
 		return;
 	}
 
@@ -220,8 +220,8 @@ void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 }
 
 void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!needToShowItem(settings->showUserMessagesInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showUserMessagesInContextMenu)) {
 		return;
 	}
 
@@ -245,8 +245,8 @@ void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 }
 
 void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	const auto settings = &AyuSettings::getInstance();
-	if (!needToShowItem(settings->showMessageDetailsInContextMenu)) {
+	const auto& settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showMessageDetailsInContextMenu)) {
 		return;
 	}
 
@@ -464,8 +464,8 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		return;
 	}
 
-	const auto settings = &AyuSettings::getInstance();
-	if (settings->sendReadMessages) {
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.sendReadMessages) {
 		return;
 	}
 

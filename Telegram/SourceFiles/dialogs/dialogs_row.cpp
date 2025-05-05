@@ -555,13 +555,13 @@ void Row::paintUserpic(
 		updateCornerBadgeShown(peer, nullptr, hasUnreadBadgesAbove);
 	}
 
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
 	const auto cornerBadgeShown = !_cornerBadgeUserpic
 		? _cornerBadgeShown
 		: !_cornerBadgeUserpic->layersManager.isDisplayedNone();
-	const auto storiesPeer = settings->disableStories ? nullptr : peer
-		? ((peer->isUser() || peer->isBroadcast()) ? peer : nullptr)
+	const auto storiesPeer = settings.disableStories ? nullptr : peer
+		? ((peer->isUser() || peer->isChannel()) ? peer : nullptr)
 		: nullptr;
 	const auto storiesFolder = peer ? nullptr : _id.folder();
 	const auto storiesHas = storiesPeer

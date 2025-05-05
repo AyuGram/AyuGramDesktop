@@ -415,14 +415,14 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 
-	if (!settings->replaceBottomInfoWithIcons) {
+	if (!settings.replaceBottomInfoWithIcons) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
-								? (settings->deletedMark + ' ')
+								? (settings.deletedMark + ' ')
 								: QString();
 		const auto edited = (_data.flags & Data::Flag::Edited)
-								? (settings->editedMark + ' ')
+								? (settings.editedMark + ' ')
 								: (_data.flags & Data::Flag::EstimateDate)
 			? (tr::lng_approximate(tr::now) + ' ')
 			: QString();
@@ -430,7 +430,7 @@ void BottomInfo::layoutDateText() {
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
 		const auto date = edited + QLocale().toString(
 			_data.date.time(),
-			settings->showMessageSeconds
+			settings.showMessageSeconds
 				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 				: QLocale::system().timeFormat(QLocale::ShortFormat)
 		);
@@ -488,7 +488,7 @@ void BottomInfo::layoutDateText() {
 
 		const auto date = TextWithEntities{}.append(edited).append(QLocale().toString(
 			_data.date.time(),
-			settings->showMessageSeconds
+			settings.showMessageSeconds
 				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
 				: QLocale::system().timeFormat(QLocale::ShortFormat)
 		));

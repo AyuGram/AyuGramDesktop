@@ -386,12 +386,12 @@ Panel::Panel(Args &&args)
 , _allowClipboardRead(args.allowClipboardRead) {
 	_widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
 
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 	auto size = QSize(st::botWebViewPanelSize);
-	if (settings->increaseWebviewHeight) {
+	if (settings.increaseWebviewHeight) {
 		size.setHeight(st::botWebViewPanelHeightIncreased);
 	}
-	if (settings->increaseWebviewWidth) {
+	if (settings.increaseWebviewWidth) {
 		size.setWidth(st::botWebViewPanelWidthIncreased);
 	}
 

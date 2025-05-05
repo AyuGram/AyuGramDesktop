@@ -95,88 +95,88 @@ public:
 	bool stickerConfirmation;
 	bool gifConfirmation;
 	bool voiceConfirmation;
-
-	void set_sendReadMessages(bool val);
-	void set_sendReadStories(bool val);
-	void set_sendOnlinePackets(bool val);
-	void set_sendUploadProgress(bool val);
-	void set_sendOfflinePacketAfterOnline(bool val);
-
-	void set_ghostModeEnabled(bool val);
-
-	void set_markReadAfterAction(bool val);
-	void set_useScheduledMessages(bool val);
-	void set_sendWithoutSound(bool val);
-
-	void set_saveDeletedMessages(bool val);
-	void set_saveMessagesHistory(bool val);
-
-	void set_saveForBots(bool val);
-
-	void set_hideFromBlocked(bool val);
-
-	void set_disableAds(bool val);
-	void set_disableStories(bool val);
-	void set_disableCustomBackgrounds(bool val);
-	void set_showOnlyAddedEmojisAndStickers(bool val);
-	void set_collapseSimilarChannels(bool val);
-	void set_hideSimilarChannels(bool val);
-
-	void set_wideMultiplier(double val);
-
-	void set_spoofWebviewAsAndroid(bool val);
-	void set_increaseWebviewHeight(bool val);
-	void set_increaseWebviewWidth(bool val);
-
-	void set_disableNotificationsDelay(bool val);
-	void set_localPremium(bool val);
-
-	void set_appIcon(QString val);
-	void set_simpleQuotesAndReplies(bool val);
-	void set_replaceBottomInfoWithIcons(bool val);
-	void set_deletedMark(QString val);
-	void set_editedMark(QString val);
-	void set_recentStickersCount(int val);
-
-	void set_showReactionsPanelInContextMenu(int val);
-	void set_showViewsPanelInContextMenu(int val);
-	void set_showHideMessageInContextMenu(int val);
-	void set_showUserMessagesInContextMenu(int val);
-	void set_showMessageDetailsInContextMenu(int val);
-
-	void set_showAttachButtonInMessageField(bool val);
-	void set_showCommandsButtonInMessageField(bool val);
-	void set_showEmojiButtonInMessageField(bool val);
-	void set_showMicrophoneButtonInMessageField(bool val);
-	void set_showAutoDeleteButtonInMessageField(bool val);
-
-	void set_showAttachPopup(bool val);
-	void set_showEmojiPopup(bool val);
-
-	void set_showLReadToggleInDrawer(bool val);
-	void set_showSReadToggleInDrawer(bool val);
-	void set_showGhostToggleInDrawer(bool val);
-	void set_showStreamerToggleInDrawer(bool val);
-
-	void set_showGhostToggleInTray(bool val);
-	void set_showStreamerToggleInTray(bool val);
-
-	void set_monoFont(QString val);
-
-	void set_hideNotificationCounters(bool val);
-	void set_hideNotificationBadge(bool val);
-	void set_hideAllChatsFolder(bool val);
-
-	void set_channelBottomButton(int val);
-
-	void set_showPeerId(int val);
-	void set_showMessageSeconds(bool val);
-	void set_showMessageShot(bool val);
-
-	void set_stickerConfirmation(bool val);
-	void set_gifConfirmation(bool val);
-	void set_voiceConfirmation(bool val);
 };
+
+void set_sendReadMessages(bool val);
+void set_sendReadStories(bool val);
+void set_sendOnlinePackets(bool val);
+void set_sendUploadProgress(bool val);
+void set_sendOfflinePacketAfterOnline(bool val);
+
+void set_ghostModeEnabled(bool val);
+
+void set_markReadAfterAction(bool val);
+void set_useScheduledMessages(bool val);
+void set_sendWithoutSound(bool val);
+
+void set_saveDeletedMessages(bool val);
+void set_saveMessagesHistory(bool val);
+
+void set_saveForBots(bool val);
+
+void set_hideFromBlocked(bool val);
+
+void set_disableAds(bool val);
+void set_disableStories(bool val);
+void set_disableCustomBackgrounds(bool val);
+void set_showOnlyAddedEmojisAndStickers(bool val);
+void set_collapseSimilarChannels(bool val);
+void set_hideSimilarChannels(bool val);
+
+void set_wideMultiplier(double val);
+
+void set_spoofWebviewAsAndroid(bool val);
+void set_increaseWebviewHeight(bool val);
+void set_increaseWebviewWidth(bool val);
+
+void set_disableNotificationsDelay(bool val);
+void set_localPremium(bool val);
+
+void set_appIcon(QString val);
+void set_simpleQuotesAndReplies(bool val);
+void set_replaceBottomInfoWithIcons(bool val);
+void set_deletedMark(QString val);
+void set_editedMark(QString val);
+void set_recentStickersCount(int val);
+
+void set_showReactionsPanelInContextMenu(int val);
+void set_showViewsPanelInContextMenu(int val);
+void set_showHideMessageInContextMenu(int val);
+void set_showUserMessagesInContextMenu(int val);
+void set_showMessageDetailsInContextMenu(int val);
+
+void set_showAttachButtonInMessageField(bool val);
+void set_showCommandsButtonInMessageField(bool val);
+void set_showEmojiButtonInMessageField(bool val);
+void set_showMicrophoneButtonInMessageField(bool val);
+void set_showAutoDeleteButtonInMessageField(bool val);
+
+void set_showAttachPopup(bool val);
+void set_showEmojiPopup(bool val);
+
+void set_showLReadToggleInDrawer(bool val);
+void set_showSReadToggleInDrawer(bool val);
+void set_showGhostToggleInDrawer(bool val);
+void set_showStreamerToggleInDrawer(bool val);
+
+void set_showGhostToggleInTray(bool val);
+void set_showStreamerToggleInTray(bool val);
+
+void set_monoFont(QString val);
+
+void set_hideNotificationCounters(bool val);
+void set_hideNotificationBadge(bool val);
+void set_hideAllChatsFolder(bool val);
+
+void set_channelBottomButton(int val);
+
+void set_showPeerId(int val);
+void set_showMessageSeconds(bool val);
+void set_showMessageShot(bool val);
+
+void set_stickerConfirmation(bool val);
+void set_gifConfirmation(bool val);
+void set_voiceConfirmation(bool val);
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	AyuGramSettings,
@@ -195,6 +195,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	disableAds,
 	disableStories,
 	disableCustomBackgrounds,
+	showOnlyAddedEmojisAndStickers,
 	collapseSimilarChannels,
 	hideSimilarChannels,
 	wideMultiplier,

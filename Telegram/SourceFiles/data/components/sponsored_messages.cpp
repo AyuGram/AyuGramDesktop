@@ -231,6 +231,11 @@ void SponsoredMessages::inject(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.disableAds) {
+		return false;
+	}
+
 	if (history->peer->isChannel()) {
 		return true;
 	} else if (const auto user = history->peer->asUser()) {
@@ -243,14 +248,11 @@ bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
 	return item->history()->peer->isBroadcast()
 		&& item->isRegular();
 }
-
 bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
-	if (peerIsUser(history->peer->id)) {
-		if (const auto user = history->peer->asUser()) {
-			return user->isBot();
-		}
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.disableAds) {
+		return false;
 	}
-	return false;
 }
 
 void SponsoredMessages::request(not_null<History*> history, Fn<void()> done) {

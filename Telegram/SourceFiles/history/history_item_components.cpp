@@ -526,13 +526,13 @@ void HistoryMessageReply::updateData(
 		&& (asExternal || _fields.manualQuote);
 	_multiline = !_fields.storyId && (asExternal || nonEmptyQuote);
 
-	const auto settings = &AyuSettings::getInstance();
+	const auto& settings = AyuSettings::getInstance();
 	const auto author = resolvedMessage
 							? resolvedMessage->from().get()
 							: resolvedStory
 								  ? resolvedStory->peer().get()
 								  : nullptr;
-	const auto blocked = settings->hideFromBlocked
+	const auto blocked = settings.hideFromBlocked
 		&& author
 		&& author->isUser()
 		&& author->asUser()->isBlocked();
