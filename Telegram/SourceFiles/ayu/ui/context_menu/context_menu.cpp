@@ -54,10 +54,10 @@ void AddDeletedMessagesActions(PeerData *peerData,
 	const auto topic = peerData->isForum() ? thread->asTopic() : nullptr;
 	const auto topicId = topic ? topic->rootId().bare : 0;
 
-	const auto has = AyuMessages::hasDeletedMessages(peerData, topicId);
-	if (!has) {
-		return;
-	}
+	// const auto has = AyuMessages::hasDeletedMessages(peerData, topicId);
+	// if (!has) {
+	// 	return;
+	// }
 
 	addCallback(
 		tr::ayu_ViewDeletedMenuText(tr::now),
@@ -171,17 +171,29 @@ void AddOpenChannelAction(PeerData *peerData,
 }
 
 void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	if (AyuMessages::hasRevisions(item)) {
-		menu->addAction(
-			tr::ayu_EditsHistoryMenuText(tr::now),
-			[=]
-			{
-				item->history()->session().tryResolveWindow()
-					->showSection(
-						std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item, 0));
-			},
-			&st::ayuEditsHistoryIcon);
+	if (item->hideEditedBadge()) {
+		return;
 	}
+
+	const auto edited = item->Get<HistoryMessageEdited>();
+	if (!edited) {
+		return;
+	}
+
+	const auto has = AyuMessages::hasRevisions(item);
+	if (!has) {
+		return;
+	}
+
+	menu->addAction(
+		tr::ayu_EditsHistoryMenuText(tr::now),
+		[=]
+		{
+			item->history()->session().tryResolveWindow()
+				->showSection(
+					std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item, 0));
+		},
+		&st::ayuEditsHistoryIcon);
 }
 
 void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
