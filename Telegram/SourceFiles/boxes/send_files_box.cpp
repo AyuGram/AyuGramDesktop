@@ -482,7 +482,8 @@ SendFilesBox::SendFilesBox(
 	const TextWithTags &caption,
 	not_null<PeerData*> toPeer,
 	Api::SendType sendType,
-	SendMenu::Details sendMenuDetails)
+	SendMenu::Details sendMenuDetails,
+	Fn<void(const TextWithTags &text)> cancelled2)
 : SendFilesBox(nullptr, {
 	.show = controller->uiShow(),
 	.list = std::move(list),
@@ -492,6 +493,7 @@ SendFilesBox::SendFilesBox(
 	.check = DefaultCheckForPeer(controller, toPeer),
 	.sendType = sendType,
 	.sendMenuDetails = [=] { return sendMenuDetails; },
+	.cancelled2 = cancelled2,
 }) {
 }
 
@@ -510,6 +512,7 @@ SendFilesBox::SendFilesBox(QWidget*, SendFilesBoxDescriptor &&descriptor)
 , _check(std::move(descriptor.check))
 , _confirmedCallback(std::move(descriptor.confirmed))
 , _cancelledCallback(std::move(descriptor.cancelled))
+, _cancelled2Callback(std::move(descriptor.cancelled2))
 , _caption(this, _st.files.caption, Ui::InputField::Mode::MultiLine)
 , _prefilledCaptionText(std::move(descriptor.caption))
 , _scroll(this, st::boxScroll)
@@ -630,6 +633,10 @@ void SendFilesBox::prepare() {
 	boxClosing() | rpl::start_with_next([=] {
 		if (!_confirmed && _cancelledCallback) {
 			_cancelledCallback();
+		}
+		auto text = _caption->getTextWithAppliedMarkdown();
+		if (!_confirmed && _cancelled2Callback && !text.empty()) {
+			_cancelled2Callback(std::move(text));
 		}
 	}, lifetime());
 

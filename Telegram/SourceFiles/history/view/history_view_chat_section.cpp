@@ -1154,7 +1154,8 @@ bool ChatWidget::confirmSendingFiles(
 		_composeControls->getTextWithAppliedMarkdown(),
 		_peer,
 		Api::SendType::Normal,
-		sendMenuDetails());
+		sendMenuDetails(),
+		[=](const TextWithTags &text) { _composeControls->setText(text); });
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			Ui::PreparedList &&list,

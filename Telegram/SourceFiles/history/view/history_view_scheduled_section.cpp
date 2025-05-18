@@ -570,7 +570,8 @@ bool ScheduledWidget::confirmSendingFiles(
 		(CanScheduleUntilOnline(_history->peer)
 			? Api::SendType::ScheduledToUser
 			: Api::SendType::Scheduled),
-		SendMenu::Details());
+		SendMenu::Details(),
+		[=](const TextWithTags &text) { _composeControls->setText(text); });
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 		Ui::PreparedList &&list,
