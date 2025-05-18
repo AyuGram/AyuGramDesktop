@@ -156,7 +156,7 @@ void AddOpenChannelAction(PeerData *peerData,
 		return;
 	}
 
-	const auto chat = peerData->asMegagroup()->linkedChat();
+	const auto chat = peerData->asMegagroup()->discussionLink();
 	if (!chat) {
 		return;
 	}
