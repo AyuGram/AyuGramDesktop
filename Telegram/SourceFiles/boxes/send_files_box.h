@@ -310,4 +310,10 @@ private:
 	QPointer<Ui::RoundButton> _send;
 	QPointer<Ui::RoundButton> _addFile;
 
+	// AyuGram files reordering
+
+	[[nodiscard]] bool isFileBlock(int i) const;
+	void moveFile(int from, int to);
+	void setupDragForBlock(not_null<Ui::RpWidget*> w, int index);
+
 };
