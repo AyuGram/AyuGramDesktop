@@ -33,7 +33,7 @@
 #### Официальный вариант
 
 Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
-[Телеграм чата](https://t.me/ayugramchat/12788).
+[Телеграм канала](https://t.me/AyuGramReleases).
 
 #### Winget
 
