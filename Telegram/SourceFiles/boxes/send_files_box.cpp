@@ -2050,9 +2050,7 @@ void SendFilesBox::moveFile(int from, int to) {
 
 	if (from == to) return;
 
-	std::swap(_list.files[from], _list.files[to]);
-
-	refreshAllAfterChanges(std::min(from, to));
+	refreshAllAfterChanges(std::min(from, to), [=] { std::swap(_list.files[from], _list.files[to]); });
 }
 
 void SendFilesBox::setupDragForBlock(not_null<Ui::RpWidget*> w, int index) {
@@ -2061,74 +2059,64 @@ void SendFilesBox::setupDragForBlock(not_null<Ui::RpWidget*> w, int index) {
 	const auto pressed = w->lifetime().make_state<rpl::variable<bool>>(false);
 	const auto pressPos = w->lifetime().make_state<rpl::variable<QPoint>>();
 
-	base::install_event_filter(
-		w,
-		[=](not_null<QEvent*> e)
-		{
-			switch (e->type()) {
-				case QEvent::MouseButtonPress: {
-					const auto ev = static_cast<QMouseEvent*>(e.get());
-					if (ev->button() == Qt::LeftButton) {
-						pressed->force_assign(true);
-						pressPos->force_assign(ev->pos());
-					}
-					break;
-				}
-				case QEvent::MouseMove: {
-					if (pressed->current()) {
-						const auto ev = static_cast<QMouseEvent*>(e.get());
-						if ((ev->pos() - pressPos->current()).manhattanLength()
-							>= QApplication::startDragDistance()) {
-							pressed->force_assign(false);
-
-							const auto drag = std::make_unique<QDrag>(w);
-							auto mime = std::make_unique<QMimeData>();
-							mime->setData(kDragMime, QByteArray::number(index));
-							drag->setMimeData(mime.release());
-							drag->setPixmap(w->grab());
-							drag->setHotSpot(ev->pos());
-							drag->exec(Qt::MoveAction);
+	w->events(
+	) | rpl::start_with_next(
+			[=](not_null<QEvent *> e)
+			{
+				switch (e->type()) {
+					case QEvent::MouseButtonPress: {
+						const auto ev = static_cast<QMouseEvent *>(e.get());
+						if (ev->button() == Qt::LeftButton) {
+							pressed->force_assign(true);
+							pressPos->force_assign(ev->pos());
 						}
+						break;
 					}
-					break;
-				}
-				case QEvent::MouseButtonRelease: pressed->force_assign(false);
-					break;
+					case QEvent::MouseMove: {
+						if (pressed->current()) {
+							const auto ev = static_cast<QMouseEvent *>(e.get());
+							if ((ev->pos() - pressPos->current()).manhattanLength() >=
+								QApplication::startDragDistance()) {
+								pressed->force_assign(false);
 
-				case QEvent::DragEnter:
-				case QEvent::DragMove: {
-					const auto ev = static_cast<QDragMoveEvent*>(e.get());
-					if (ev->mimeData()->hasFormat(kDragMime)) {
-						const auto from = ev->mimeData()
-							->data(kDragMime).toInt();
-						if (isFileBlock(from) && isFileBlock(index)) {
-							ev->acceptProposedAction();
+								const auto drag = new QDrag(w);
+								auto mime = std::make_unique<QMimeData>();
+								mime->setData(kDragMime, QByteArray::number(index));
+								drag->setMimeData(mime.release());
+								drag->setPixmap(w->grab());
+								drag->setHotSpot(ev->pos());
+								drag->exec(Qt::MoveAction);
+							}
 						}
+						break;
 					}
-					break;
-				}
-				case QEvent::Drop: {
-					const auto ev = static_cast<QDropEvent*>(e.get());
-					if (ev->mimeData()->hasFormat(kDragMime)) {
-						const auto from = ev->mimeData()
-							->data(kDragMime).toInt();
-						if (isFileBlock(from) && isFileBlock(index)) {
-							const auto dest = index;
-							QMetaObject::invokeMethod(
-								this,
-								[this, from, dest]
-								{
-									moveFile(from, dest);
-								},
-								Qt::QueuedConnection);
+					case QEvent::MouseButtonRelease: pressed->force_assign(false); break;
 
-							ev->acceptProposedAction();
+					case QEvent::DragEnter:
+					case QEvent::DragMove: {
+						const auto ev = static_cast<QDragMoveEvent *>(e.get());
+						if (ev->mimeData()->hasFormat(kDragMime)) {
+							const auto from = ev->mimeData()->data(kDragMime).toInt();
+							if (isFileBlock(from) && isFileBlock(index)) {
+								ev->acceptProposedAction();
+							}
 						}
+						break;
 					}
-					break;
+					case QEvent::Drop: {
+						const auto ev = static_cast<QDropEvent *>(e.get());
+						if (ev->mimeData()->hasFormat(kDragMime)) {
+							const auto from = ev->mimeData()->data(kDragMime).toInt();
+							if (isFileBlock(from) && isFileBlock(index)) {
+								crl::on_main(this, [=] { moveFile(from, index); });
+								ev->acceptProposedAction();
+							}
+						}
+						break;
+					}
+					default: break;
 				}
-				default: break;
-			}
-			return base::EventFilterResult::Continue;
-		});
+				return base::EventFilterResult::Continue;
+			},
+			w->lifetime());
 }
