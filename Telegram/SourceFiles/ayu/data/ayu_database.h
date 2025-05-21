@@ -20,4 +20,8 @@ void addDeletedMessage(const DeletedMessage &message);
 std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit);
 bool hasDeletedMessages(ID userId, ID dialogId, ID topicId);
 
+void addLocalMessage(const LocalMessage &message);
+std::vector<LocalMessage> getLocalMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit);
+bool hasLocalMessages(ID userId, ID dialogId, ID topicId);
+
 }

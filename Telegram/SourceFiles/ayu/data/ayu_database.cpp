@@ -25,6 +25,11 @@ auto storage = make_storage(
 			   column<EditedMessage>(&EditedMessage::userId),
 			   column<EditedMessage>(&EditedMessage::dialogId),
 			   column<EditedMessage>(&EditedMessage::messageId)),
+	make_index("idx_local_message_userId_dialogId_topicId_messageId",
+			   column<LocalMessage>(&LocalMessage::userId),
+			   column<LocalMessage>(&LocalMessage::dialogId),
+			   column<LocalMessage>(&LocalMessage::topicId),
+			   column<LocalMessage>(&LocalMessage::messageId)),
 	make_table<DeletedMessage>(
 		"DeletedMessage",
 		make_column("fakeId", &DeletedMessage::fakeId, primary_key().autoincrement()),
@@ -97,6 +102,42 @@ auto storage = make_storage(
 		make_column("documentAttributesSerialized", &EditedMessage::documentAttributesSerialized),
 		make_column("mimeType", &EditedMessage::mimeType)
 	),
+	make_table<LocalMessage>(
+		"LocalMessage",
+		make_column("fakeId", &LocalMessage::fakeId, primary_key().autoincrement()),
+		make_column("userId", &LocalMessage::userId),
+		make_column("dialogId", &LocalMessage::dialogId),
+		make_column("groupedId", &LocalMessage::groupedId),
+		make_column("peerId", &LocalMessage::peerId),
+		make_column("fromId", &LocalMessage::fromId),
+		make_column("topicId", &LocalMessage::topicId),
+		make_column("messageId", &LocalMessage::messageId),
+		make_column("date", &LocalMessage::date),
+		make_column("flags", &LocalMessage::flags),
+		make_column("editDate", &LocalMessage::editDate),
+		make_column("views", &LocalMessage::views),
+		make_column("fwdFlags", &LocalMessage::fwdFlags),
+		make_column("fwdFromId", &LocalMessage::fwdFromId),
+		make_column("fwdName", &LocalMessage::fwdName),
+		make_column("fwdDate", &LocalMessage::fwdDate),
+		make_column("fwdPostAuthor", &LocalMessage::fwdPostAuthor),
+		make_column("replyFlags", &LocalMessage::replyFlags),
+		make_column("replyMessageId", &LocalMessage::replyMessageId),
+		make_column("replyPeerId", &LocalMessage::replyPeerId),
+		make_column("replyTopId", &LocalMessage::replyTopId),
+		make_column("replyForumTopic", &LocalMessage::replyForumTopic),
+		make_column("replySerialized", &LocalMessage::replySerialized),
+		make_column("entityCreateDate", &LocalMessage::entityCreateDate),
+		make_column("text", &LocalMessage::text),
+		make_column("textEntities", &LocalMessage::textEntities),
+		make_column("mediaPath", &LocalMessage::mediaPath),
+		make_column("hqThumbPath", &LocalMessage::hqThumbPath),
+		make_column("documentType", &LocalMessage::documentType),
+		make_column("documentSerialized", &LocalMessage::documentSerialized),
+		make_column("thumbsSerialized", &LocalMessage::thumbsSerialized),
+		make_column("documentAttributesSerialized", &LocalMessage::documentAttributesSerialized),
+		make_column("mimeType", &LocalMessage::mimeType)
+	),
 	make_table<DeletedDialog>(
 		"DeletedDialog",
 		make_column("fakeId", &DeletedDialog::fakeId, primary_key().autoincrement()),
@@ -157,6 +198,47 @@ void moveCurrentDatabase() {
 
 	if (QFile::exists("./tdata/ayudata.db-wal")) {
 		QFile::rename("./tdata/ayudata.db-wal", QString("./tdata/ayudata_%1.db-wal").arg(time));
+	}
+}
+
+void addLocalMessage(const LocalMessage &message) {
+	try {
+		storage.begin_transaction();
+		storage.insert(message);
+		storage.commit();
+	} catch (std::exception &ex) {
+		LOG(("Failed to save local message for some reason: %1").arg(ex.what()));
+	}
+}
+
+std::vector<LocalMessage> getLocalMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit) {
+	return storage.get_all<LocalMessage>(
+		where(
+			column<LocalMessage>(&LocalMessage::userId) == userId and
+			column<LocalMessage>(&LocalMessage::dialogId) == dialogId and
+			(column<LocalMessage>(&LocalMessage::topicId) == topicId or topicId == 0) and
+			(column<LocalMessage>(&LocalMessage::messageId) > minId or minId == 0) and
+			(column<LocalMessage>(&LocalMessage::messageId) < maxId or maxId == 0)
+		),
+		order_by(column<LocalMessage>(&LocalMessage::messageId)).desc(),
+		limit(totalLimit)
+	);
+}
+
+bool hasLocalMessages(ID userId, ID dialogId, ID topicId) {
+	try {
+		return !storage.select(
+			columns(column<LocalMessage>(&LocalMessage::dialogId)),
+			where(
+				column<LocalMessage>(&LocalMessage::userId) == userId and
+				column<LocalMessage>(&LocalMessage::dialogId) == dialogId and
+				(column<LocalMessage>(&LocalMessage::topicId) == topicId or topicId == 0)
+			),
+			limit(1)
+		).empty();
+	} catch (std::exception &ex) {
+		LOG(("Failed to check if dialog has local message: %1").arg(ex.what()));
+		return false;
 	}
 }
 

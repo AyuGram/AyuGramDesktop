@@ -58,6 +58,10 @@ class EditedMessage : public AyuMessageBase
 {
 };
 
+class LocalMessage : public AyuMessageBase
+{
+};
+
 class DeletedDialog
 {
 public:

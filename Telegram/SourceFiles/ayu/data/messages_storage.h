@@ -20,4 +20,8 @@ void addDeletedMessage(not_null<HistoryItem*> item);
 std::vector<AyuMessageBase> getDeletedMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit);
 bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId);
 
+void addLocalMessage(not_null<HistoryItem*> item);
+std::vector<AyuMessageBase> getLocalMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit);
+bool hasLocalMessages(not_null<PeerData*> peer, ID topicId);
+
 }

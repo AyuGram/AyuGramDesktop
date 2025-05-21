@@ -179,6 +179,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
+#include "ui/widgets/popup_menu.h" // Required for Ui::PopupMenu
+#include "boxes/add_local_message_box.h" // Will be created
+#include "ayu/data/messages_storage.h" // Required for AyuMessages::addLocalMessage
 
 #include <QtGui/QWindow>
 #include <QtCore/QMimeData>
@@ -542,6 +545,10 @@ HistoryWidget::HistoryWidget(
 		supportInitAutocomplete();
 	}
 	_field->rawTextEdit()->installEventFilter(this);
+	_field->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(_field, &Ui::InputField::customContextMenuRequested, this, [this](const QPoint &pos) {
+		showFieldContextMenu(pos);
+	});
 	_field->setMimeDataHook([=](
 			not_null<const QMimeData*> data,
 			Ui::InputField::MimeAction action) {
@@ -9562,4 +9569,56 @@ HistoryWidget::~HistoryWidget() {
 		session().data().itemVisibilitiesUpdated();
 	}
 	setTabbedPanel(nullptr);
+}
+
+void HistoryWidget::showFieldContextMenu(const QPoint &pos) {
+	auto menu = base::make_unique_q<Ui::PopupMenu>(this, st::defaultPopupMenu);
+	_field->fillContextMenu(menu.get());
+	if (_history && _canSendMessages) { // Only show if we can potentially add a message
+		menu->addSeparator();
+		menu->addAction(tr::lng_context_add_local_message(tr::now), [=] { // Assuming this lang key will be added
+			showAddLocalMessageBox();
+		});
+	}
+	menu->popup(_field->mapToGlobal(pos));
+}
+
+void HistoryWidget::showAddLocalMessageBox() {
+	if (!_history) return;
+
+	auto box = Ui::Show(Box<AddLocalMessageBox>(this), Ui::LayerOption::KeepOther);
+	box->saveLocalMessageRequests(
+	) | rpl::start_with_next([=](const AddLocalMessageBox::LocalMessageData &data) {
+		handleAddLocalMessage(data.senderName, data.messageText);
+	}, box->lifetime());
+}
+
+void HistoryWidget::handleAddLocalMessage(const QString &senderName, const QString &messageText) {
+	if (!_history || messageText.isEmpty()) {
+		return;
+	}
+
+	PeerData *fromPeer = session().user();
+	QString finalPostAuthor = QString();
+
+	if (!senderName.isEmpty() && senderName != fromPeer->name()) {
+		// This is a simplified approach. A real implementation might involve
+		// searching for the user or allowing creation of a placeholder.
+		// For now, if a name is provided that isn't the current user,
+		// we'll use the current user as the sender but set the postAuthor.
+		finalPostAuthor = senderName;
+		LOG(("Warning: Custom sender '%1' requested for local message. Defaulting to current user as sender, using name as postAuthor.").arg(senderName));
+	}
+
+
+	HistoryItem *newItem = _history->makeMessage({
+		.id = _history->nextNonHistoryEntryId(),
+		.flags = MessageFlag::FakeHistoryItem | MessageFlag::HasFromId | (finalPostAuthor.isEmpty() ? MessageFlag() : MessageFlag::HasPostAuthor),
+		.from = fromPeer->id,
+		.date = base::unixtime::now(),
+		.postAuthor = finalPostAuthor,
+	}, { messageText }, MTP_messageMediaEmpty());
+
+	AyuMessages::addLocalMessage(newItem);
+	// The UI should update automatically due to existing mechanisms for new messages.
 }

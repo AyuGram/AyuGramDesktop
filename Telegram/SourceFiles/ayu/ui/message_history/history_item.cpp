@@ -117,8 +117,11 @@ void GenerateItems(
 		addPart(makeSimpleTextMessage(std::move(text)));
 	};
 
-	const auto text = QString::fromStdString(message.text);
-	addSimpleTextMessage(Ui::Text::WithEntities(text));
+	QString textString = QString::fromStdString(message.text);
+	if (dynamic_cast<const LocalMessage*>(&message)) {
+		textString = QStringLiteral("[Local] ") + textString;
+	}
+	addSimpleTextMessage(Ui::Text::WithEntities(textString));
 }
 
 } // namespace MessageHistory

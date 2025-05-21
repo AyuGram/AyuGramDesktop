@@ -139,4 +139,28 @@ bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId) {
 	return AyuDatabase::hasDeletedMessages(userId, getDialogIdFromPeer(peer), topicId);
 }
 
+void addLocalMessage(not_null<HistoryItem*> item) {
+	LocalMessage message;
+	map(item, message);
+
+	// Optionally, add checks similar to addEditedMessage or addDeletedMessage
+	// if (message.text.empty()) {
+	// 	return;
+	// }
+
+	AyuDatabase::addLocalMessage(message);
+}
+
+std::vector<AyuMessageBase>
+getLocalMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit) {
+	const ID userId = peer->session().userId().bare & PeerId::kChatTypeMask;
+	return convertToBase(
+		AyuDatabase::getLocalMessages(userId, getDialogIdFromPeer(peer), topicId, minId, maxId, totalLimit));
+}
+
+bool hasLocalMessages(not_null<PeerData*> peer, ID topicId) {
+	const ID userId = peer->session().userId().bare & PeerId::kChatTypeMask;
+	return AyuDatabase::hasLocalMessages(userId, getDialogIdFromPeer(peer), topicId);
+}
+
 }
