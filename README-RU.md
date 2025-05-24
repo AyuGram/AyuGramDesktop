@@ -1,4 +1,4 @@
-sisyphus# AyuGram
+# AyuGram
 
 ![AyuGram Лого](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
