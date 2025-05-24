@@ -2,8 +2,9 @@
 
 ![AyuGram Logo](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
-[ English  |   [Русский](README-RU.md) ]
+[ English  |   [Русский](README-RU.md) ] 
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
 ## Features
 
 - Full ghost mode (flexible)
@@ -60,11 +61,17 @@ You can download prebuilt macOS package from [Releases tab](https://github.com/A
 
 ### Arch Linux
 
-You can install `ayugram-desktop` from [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+You can build from source `ayugram-desktop` from [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
+
+You can install [*binary version*](https://github.com/rsg245/ayugram-desktop-bin-arch/releases) `ayugram-desktop-bin` from [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
 
 ### NixOS
 
 See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
+
+### ALT linux
+
+You can install _.rpm_ package from [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
 ### Any other Linux distro
 
