@@ -1,8 +1,10 @@
-# AyuGram
+sisyphus# AyuGram
 
 ![AyuGram Лого](.github/AyuGram.png) ![AyuChan](.github/AyuChan.png)
 
 [ [English](README.md)  | Русский ]
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
 
 ## Функции и Фишки
 
@@ -59,11 +61,17 @@ scoop install ayugram
 
 ### Arch Linux
 
-Вы можете установить `ayugram-desktop` из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+Присутствует возможность сборки из исходных кодов `ayugram-desktop` [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
+
+Готовые [*бинарные файлы*](https://github.com/rsg245/ayugram-desktop-bin-arch/releases) расположены  `ayugram-desktop-bin` в [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
 
 ### NixOS
 
 Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
+
+### ALT linux
+
+Установка _.rpm_ пакета из репозитория [Сизиф](https://packages.altlinux.org/ru/sisyphus/srpms/ayugram-desktop/)
 
 ### Любой другой Линукс дистрибутив
 
