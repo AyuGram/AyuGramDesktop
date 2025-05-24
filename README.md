@@ -4,7 +4,6 @@
 
 [ English  |   [Русский](README-RU.md) ] 
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
 ## Features
 
 - Full ghost mode (flexible)
@@ -29,6 +28,7 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 </h3>
 
 ## Downloads
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
 
 ### Windows
 
