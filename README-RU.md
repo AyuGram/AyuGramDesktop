@@ -4,8 +4,6 @@ sisyphus# AyuGram
 
 [ [English](README.md)  | Русский ]
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
-
 ## Функции и Фишки
 
 - Полный режим призрака (настраиваемый)
@@ -29,6 +27,8 @@ sisyphus# AyuGram
 </h3>
 
 ## Установка
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/ayugram-desktop.svg)](https://repology.org/project/ayugram-desktop/versions)
 
 ### Windows
 
