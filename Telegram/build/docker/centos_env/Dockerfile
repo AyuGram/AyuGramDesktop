@@ -19,7 +19,7 @@ ENV PKG_CONFIG_PATH /opt/rh/{{ TOOLSET }}/root/usr/lib64/pkgconfig:/opt/rh/{{ TO
 RUN dnf -y install epel-release \
 	&& dnf config-manager --set-enabled powertools \
 	&& dnf -y install cmake autoconf automake libtool pkgconfig make patch git \
-		python3.12-pip python3.12-devel gperf flex bison clang clang-tools-extra \
+		python3.11-pip python3.11-devel gperf flex bison clang clang-tools-extra \
 		lld nasm yasm file which perl-open perl-XML-Parser perl-IPC-Cmd \
 		xorg-x11-util-macros {{ TOOLSET }}-gcc {{ TOOLSET }}-gcc-c++ \
 		{{ TOOLSET }}-binutils {{ TOOLSET }}-gdb {{ TOOLSET }}-libasan-devel \
@@ -29,6 +29,7 @@ RUN dnf -y install epel-release \
 		glib2-devel at-spi2-core-devel gtk3-devel boost1.78-devel fmt-devel \
 	&& dnf clean all
 
+RUN alternatives --set python3 /usr/bin/python3.11
 RUN python3 -m pip install meson ninja
 RUN sed -i '/Requires.private: valgrind/d' /usr/lib64/pkgconfig/libdrm.pc
 RUN echo set debuginfod enabled on > /opt/rh/{{ TOOLSET }}/root/etc/gdbinit.d/00-debuginfod.gdb
