@@ -56,7 +56,15 @@ build by yourself.
 
 ### macOS
 
+#### Official
+
 You can download prebuilt macOS package from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases).
+
+#### Homebrew
+
+```bash
+brew install --cask ayugram
+```
 
 ### Arch Linux
 
