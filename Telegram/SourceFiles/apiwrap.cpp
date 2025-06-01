@@ -3339,6 +3339,22 @@ void ApiWrap::forwardMessages(
 	}
 
 	auto forwardFrom = draft.items.front()->history()->peer;
+	if (!forwardFrom->allowsAyuForwarding()) {
+		history->setForwardDraft(topicRootId, {});
+		for (const auto item : draft.items) {
+			const auto messageText = item->originalText();
+			if (!messageText.text.isEmpty()) {
+				auto messageToSend = Api::MessageToSend(action);
+				messageToSend.textWithTags =
+					TextWithTags{messageText.text, TextUtilities::ConvertEntitiesToTextTags(messageText.entities)};
+				sendMessage(std::move(messageToSend));
+			}
+		}
+		if (shared) {
+			shared->callback();
+		}
+		return;
+	}
 	auto ids = QVector<MTPint>();
 	auto randomIds = QVector<MTPlong>();
 	auto localIds = std::shared_ptr<base::flat_map<uint64, FullMsgId>>();
