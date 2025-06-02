@@ -155,3 +155,8 @@ Enjoy using **AyuGram**? Consider sending us a tip!
 ### Icons
 
 - [Solar Icon Set](https://www.figma.com/community/file/1166831539721848736)
+
+### Bots
+
+- [TelegramDB](https://t.me/tgdatabase) for username lookup by ID (until closing free inline mode at 25 May 2025)
+- [usinfobot](https://t.me/usinfobot) for username lookup by ID

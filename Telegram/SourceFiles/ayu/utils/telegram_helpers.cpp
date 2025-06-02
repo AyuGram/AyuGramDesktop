@@ -38,6 +38,14 @@
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
 
+namespace {
+
+constexpr auto usernameResolverBotId = 189165596L;
+const auto usernameResolverBotUsername = QString("usinfobot");
+const auto usernameResolverEmpty = QString("¯\\_(ツ)_/¯");
+
+}
+
 Main::Session *getSession(ID userId) {
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
 		if (const auto session = account->maybeSession()) {
@@ -526,7 +534,7 @@ void processMessageDelete(not_null<HistoryItem*> item) {
 	}
 }
 
-void resolveUser(ID userId, const QString &username, Main::Session *session, const Callback &callback) {
+void resolveUser(ID userId, const QString &username, Main::Session *session, const UsernameResolverCallback &callback) {
 	auto normalized = username.trimmed().toLower();
 	if (normalized.isEmpty()) {
 		callback(QString(), nullptr);
@@ -566,19 +574,18 @@ void resolveUser(ID userId, const QString &username, Main::Session *session, con
 	}).send();
 }
 
-void searchUser(long long userId, Main::Session *session, bool searchUserFlag, const Callback &callback) {
+void searchUser(long long userId, Main::Session *session, bool searchUserFlag, const UsernameResolverCallback &callback) {
 	if (!session) {
 		callback(QString(), nullptr);
 		return;
 	}
 
-	constexpr auto botId = 1696868284;
-	const auto bot = session->data().userLoaded(botId);
+	const auto bot = session->data().userLoaded(usernameResolverBotId);
 
 	if (!bot) {
 		if (searchUserFlag) {
-			resolveUser(botId,
-						"tgdb_bot",
+			resolveUser(usernameResolverBotId,
+						usernameResolverBotUsername,
 						session,
 						[=](const QString &title, UserData *data)
 						{
@@ -649,29 +656,26 @@ void searchUser(long long userId, Main::Session *session, bool searchUserFlag, c
 					return QString();
 				});
 
-			if (text.isEmpty()) {
+			if (text.isEmpty() || text.startsWith(usernameResolverEmpty)) {
 				continue;
 			}
 
-			ID id = 0; // 🆔
-			QString title; // 🏷
-			QString username; // 📧
+			ID id = 0; // 👤
+			QString title; // 👦🏻
+			QString username; // 🌐
 
-			for (const auto &line : text.split('\n')) {
-				if (line.startsWith("🆔")) {
-					id = line.mid(line.indexOf(':') + 1).toLongLong();
-				} else if (line.startsWith("🏷")) {
-					title = line.mid(line.indexOf(':') + 1);
-				} else if (line.startsWith("📧")) {
-					username = line.mid(line.indexOf(':') + 1);
+			for (auto &line : text.split('\n')) {
+				line = line.replace("⁣", "");
+				if (line.startsWith("👤")) {
+					id = line.mid(line.indexOf(' ') + 1).toLongLong();
+				} else if (line.startsWith("👦🏻")) {
+					title = line.mid(line.indexOf(' ') + 1);
+				} else if (line.startsWith("🌐")) {
+					username = line.mid(line.indexOf(' ') + 1);
 				}
 			}
 
-			if (id == 0) {
-				continue;
-			}
-
-			if (id != userId) {
+			if (id == 0 || id != userId) {
 				continue;
 			}
 
@@ -702,7 +706,7 @@ void searchUser(long long userId, Main::Session *session, bool searchUserFlag, c
 	}).handleAllErrors().send();
 }
 
-void searchById(ID userId, Main::Session *session, const Callback &callback) {
+void searchById(ID userId, Main::Session *session, const UsernameResolverCallback &callback) {
 	if (userId == 0 || !session) {
 		callback(QString(), nullptr);
 		return;

@@ -13,7 +13,7 @@
 #include "info/profile/info_profile_badge.h"
 #include "main/main_domain.h"
 
-using Callback = Fn<void(const QString &, UserData *)>;
+using UsernameResolverCallback = Fn<void(const QString &, UserData *)>;
 
 Main::Session *getSession(ID userId);
 void dispatchToMainThread(std::function<void()> callback, int delay = 0);
@@ -51,7 +51,7 @@ int getScheduleTime(int64 sumSize);
 bool isMessageSavable(not_null<HistoryItem *> item);
 void processMessageDelete(not_null<HistoryItem *> item);
 
-void searchById(ID userId, Main::Session *session, bool retry, const Callback &callback);
-void searchById(ID userId, Main::Session *session, const Callback &callback);
+void searchById(ID userId, Main::Session *session, bool retry, const UsernameResolverCallback &callback);
+void searchById(ID userId, Main::Session *session, const UsernameResolverCallback &callback);
 
 ID getUserIdFromPackId(uint64 id);

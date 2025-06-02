@@ -30,7 +30,7 @@
 
 ### Windows
 
-#### Официальный вариант
+#### Официальная версия
 
 Вы можете скачать готовый бинарный файл со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases) или из
 [Телеграм канала](https://t.me/AyuGramReleases).
@@ -55,7 +55,15 @@ scoop install ayugram
 
 ### macOS
 
+#### Официальная версия
+
 Вы можете скачать подписанный пакет со вкладки [Releases](https://github.com/AyuGram/AyuGramDesktop/releases).
+
+#### Homebrew
+
+```bash
+brew install --cask ayugram
+```
 
 ### Arch Linux
 
@@ -101,3 +109,8 @@ scoop install ayugram
 ### Иконки
 
 - [Solar Icon Set](https://www.figma.com/community/file/1166831539721848736)
+
+### Боты
+
+- [TelegramDB](https://t.me/tgdatabase) для получения юзернейма по ID (до закрытия бесплатной версии 25 мая 2025)
+- [usinfobot](https://t.me/usinfobot) для получения юзернейма по ID
