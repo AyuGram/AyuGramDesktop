@@ -1576,8 +1576,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				const auto idText = IDString(user);
 				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
-					const auto msg = tr::ayu_IDCopiedToast(tr::now);
-					controller->showToast(msg);
+					controller->showToast(tr::ayu_IDCopiedToast(tr::now));
 				}
 				return false;
 			});
@@ -1712,8 +1711,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				const auto idText = IDString(peer);
 				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
-					const auto msg = tr::ayu_IDCopiedToast(tr::now);
-					controller->showToast(msg);
+					controller->showToast(tr::ayu_IDCopiedToast(tr::now));
 				}
 				return false;
 			});
@@ -1737,8 +1735,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 				const auto idText = IDString(peer->forumTopicFor(topicRootId)->topicRootId());
 				if (!idText.isEmpty()) {
 					QGuiApplication::clipboard()->setText(idText);
-					const auto msg = tr::ayu_IDCopiedToast(tr::now);
-					controller->showToast(msg);
+					controller->showToast(tr::ayu_IDCopiedToast(tr::now));
 				}
 				return false;
 			});

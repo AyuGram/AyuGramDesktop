@@ -754,7 +754,7 @@ void StickerSetBox::updateButtons() {
 						searchById(
 							innerId,
 							session,
-							[session, weak](const QString &username, UserData *user)
+							[session, weak, innerId](const QString &username, UserData *user)
 							{
 								if (!weak) {
 									return;
@@ -766,7 +766,8 @@ void StickerSetBox::updateButtons() {
 								}
 
 								if (!user) {
-									strongInner->showToast(tr::ayu_UserNotFoundMessage(tr::now));
+									QGuiApplication::clipboard()->setText(QString::number(innerId));
+									strongInner->showToast(tr::ayu_IDCopiedToast(tr::now));
 									return;
 								}
 
