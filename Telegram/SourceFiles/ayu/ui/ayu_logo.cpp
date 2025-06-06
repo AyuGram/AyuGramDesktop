@@ -43,7 +43,7 @@ void loadIcons() {
 	}
 }
 
-QImage loadPreview(QString name) {
+QImage loadPreview(const QString& name) {
 	return QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(name));
 }
 
