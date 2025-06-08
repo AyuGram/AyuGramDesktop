@@ -7,8 +7,7 @@
 #include "settings_ayu.h"
 
 #include "ayu/ayu_settings.h"
-#include "ayu/ui/boxes/edit_deleted_mark.h"
-#include "ayu/ui/boxes/edit_edited_mark.h"
+#include "ayu/ui/boxes/edit_mark_box.h"
 #include "ayu/ui/boxes/font_selector.h"
 
 #include "lang_auto.h"
@@ -27,7 +26,7 @@
 #include "styles/style_settings.h"
 #include "styles/style_widgets.h"
 
-#include "icon_picker.h"
+#include "../components/icon_picker.h"
 #include "tray.h"
 #include "core/application.h"
 #include "main/main_domain.h"
@@ -37,7 +36,6 @@
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
@@ -464,41 +462,41 @@ Ayu::Ayu(
 }
 
 void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
 
 	std::vector checkboxes{
 		NestedEntry{
-			tr::ayu_DontReadMessages(tr::now), !settings.sendReadMessages, [=](bool enabled)
+			tr::ayu_DontReadMessages(tr::now), !settings->sendReadMessages, [=](bool enabled)
 			{
 				AyuSettings::set_sendReadMessages(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontReadStories(tr::now), !settings.sendReadStories, [=](bool enabled)
+			tr::ayu_DontReadStories(tr::now), !settings->sendReadStories, [=](bool enabled)
 			{
 				AyuSettings::set_sendReadStories(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontSendOnlinePackets(tr::now), !settings.sendOnlinePackets, [=](bool enabled)
+			tr::ayu_DontSendOnlinePackets(tr::now), !settings->sendOnlinePackets, [=](bool enabled)
 			{
 				AyuSettings::set_sendOnlinePackets(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontSendUploadProgress(tr::now), !settings.sendUploadProgress, [=](bool enabled)
+			tr::ayu_DontSendUploadProgress(tr::now), !settings->sendUploadProgress, [=](bool enabled)
 			{
 				AyuSettings::set_sendUploadProgress(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_SendOfflinePacketAfterOnline(tr::now), settings.sendOfflinePacketAfterOnline, [=](bool enabled)
+			tr::ayu_SendOfflinePacketAfterOnline(tr::now), settings->sendOfflinePacketAfterOnline, [=](bool enabled)
 			{
 				AyuSettings::set_sendOfflinePacketAfterOnline(enabled);
 				AyuSettings::save();
@@ -510,13 +508,14 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	SetupGhostModeToggle(container);
 
-	auto markReadAfterActionVal = container->lifetime().make_state<rpl::variable<bool>>(settings.sendOfflinePacketAfterOnline);
+	auto markReadAfterActionVal = container->lifetime().make_state<rpl::variable<bool>>(
+		settings->markReadAfterAction);
 	auto useScheduledMessagesVal = container->lifetime().make_state<rpl::variable<
-		bool>>(settings.useScheduledMessages);
+		bool>>(settings->useScheduledMessages);
 
 	AddButtonWithIcon(
 		container,
@@ -528,7 +527,7 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.sendOfflinePacketAfterOnline);
+			return (enabled != settings->markReadAfterAction);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -555,7 +554,7 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.useScheduledMessages);
+			return (enabled != settings->useScheduledMessages);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -577,12 +576,12 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_SendWithoutSoundByDefault(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.sendWithoutSound)
+		rpl::single(settings->sendWithoutSound)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.sendWithoutSound);
+			return (enabled != settings->sendWithoutSound);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -595,7 +594,7 @@ void SetupGhostEssentials(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
 
@@ -604,12 +603,12 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_SaveDeletedMessages(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.saveDeletedMessages)
+		rpl::single(settings->saveDeletedMessages)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.saveDeletedMessages);
+			return (enabled != settings->saveDeletedMessages);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -623,12 +622,12 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_SaveMessagesHistory(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.saveMessagesHistory)
+		rpl::single(settings->saveMessagesHistory)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.saveMessagesHistory);
+			return (enabled != settings->saveMessagesHistory);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -646,12 +645,12 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_MessageSavingSaveForBots(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.saveForBots)
+		rpl::single(settings->saveForBots)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.saveForBots);
+			return (enabled != settings->saveForBots);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -662,7 +661,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
-	auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_RegexFilters());
 
@@ -671,12 +670,12 @@ void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_FiltersHideFromBlocked(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.hideFromBlocked)
+		rpl::single(settings->hideFromBlocked)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.hideFromBlocked);
+			return (enabled != settings->hideFromBlocked);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -687,7 +686,7 @@ void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_QoLTogglesHeader());
 
@@ -696,12 +695,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_DisableAds(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.disableAds)
+		rpl::single(settings->disableAds)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.disableAds);
+			return (enabled != settings->disableAds);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -715,12 +714,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_DisableStories(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.disableStories)
+		rpl::single(settings->disableStories)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.disableStories);
+			return (enabled != settings->disableStories);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -734,12 +733,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_DisableCustomBackgrounds(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.disableCustomBackgrounds)
+		rpl::single(settings->disableCustomBackgrounds)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.disableCustomBackgrounds);
+			return (enabled != settings->disableCustomBackgrounds);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -753,12 +752,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_SimpleQuotesAndReplies(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.simpleQuotesAndReplies)
+		rpl::single(settings->simpleQuotesAndReplies)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.simpleQuotesAndReplies);
+			return (enabled != settings->simpleQuotesAndReplies);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -769,14 +768,14 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 
 	std::vector checkboxes = {
 		NestedEntry{
-			tr::ayu_CollapseSimilarChannels(tr::now), settings.collapseSimilarChannels, [=](bool enabled)
+			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)
 			{
 				AyuSettings::set_collapseSimilarChannels(enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_HideSimilarChannelsTab(tr::now), settings.hideSimilarChannels, [=](bool enabled)
+			tr::ayu_HideSimilarChannelsTab(tr::now), settings->hideSimilarChannels, [=](bool enabled)
 			{
 				AyuSettings::set_hideSimilarChannels(enabled);
 				AyuSettings::save();
@@ -795,12 +794,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_DisableNotificationsDelay(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.disableNotificationsDelay)
+		rpl::single(settings->disableNotificationsDelay)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.disableNotificationsDelay);
+			return (enabled != settings->disableNotificationsDelay);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -814,12 +813,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_ShowOnlyAddedEmojisAndStickers(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.showOnlyAddedEmojisAndStickers)
+		rpl::single(settings->showOnlyAddedEmojisAndStickers)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showOnlyAddedEmojisAndStickers);
+			return (enabled != settings->showOnlyAddedEmojisAndStickers);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -833,12 +832,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_LocalPremium(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.localPremium)
+		rpl::single(settings->localPremium)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.localPremium);
+			return (enabled != settings->localPremium);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -856,7 +855,7 @@ void SetupAppIcon(not_null<Ui::VerticalLayout*> container) {
 
 void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 							  not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_ContextMenuElementsHeader());
@@ -870,7 +869,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.showReactionsPanelInContextMenu,
+		settings->showReactionsPanelInContextMenu,
 		options,
 		tr::ayu_SettingsContextMenuReactionsPanel(),
 		tr::ayu_SettingsContextMenuTitle(),
@@ -883,7 +882,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.showViewsPanelInContextMenu,
+		settings->showViewsPanelInContextMenu,
 		options,
 		tr::ayu_SettingsContextMenuViewsPanel(),
 		tr::ayu_SettingsContextMenuTitle(),
@@ -897,7 +896,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.showHideMessageInContextMenu,
+		settings->showHideMessageInContextMenu,
 		options,
 		tr::ayu_ContextHideMessage(),
 		tr::ayu_SettingsContextMenuTitle(),
@@ -910,7 +909,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.showUserMessagesInContextMenu,
+		settings->showUserMessagesInContextMenu,
 		options,
 		tr::ayu_UserMessagesMenuText(),
 		tr::ayu_SettingsContextMenuTitle(),
@@ -923,7 +922,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.showMessageDetailsInContextMenu,
+		settings->showMessageDetailsInContextMenu,
 		options,
 		tr::ayu_MessageDetailsPC(),
 		tr::ayu_SettingsContextMenuTitle(),
@@ -939,7 +938,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 }
 
 void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_MessageFieldElementsHeader());
@@ -950,12 +949,12 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldAttachIcon}
 	)->toggleOn(
-		rpl::single(settings.showAttachButtonInMessageField)
+		rpl::single(settings->showAttachButtonInMessageField)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showAttachButtonInMessageField);
+			return (enabled != settings->showAttachButtonInMessageField);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -970,12 +969,12 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldCommandsIcon}
 	)->toggleOn(
-		rpl::single(settings.showCommandsButtonInMessageField)
+		rpl::single(settings->showCommandsButtonInMessageField)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showCommandsButtonInMessageField);
+			return (enabled != settings->showCommandsButtonInMessageField);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -990,12 +989,12 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldTTLIcon}
 	)->toggleOn(
-		rpl::single(settings.showAutoDeleteButtonInMessageField)
+		rpl::single(settings->showAutoDeleteButtonInMessageField)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showAutoDeleteButtonInMessageField);
+			return (enabled != settings->showAutoDeleteButtonInMessageField);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1010,12 +1009,12 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldEmojiIcon}
 	)->toggleOn(
-		rpl::single(settings.showEmojiButtonInMessageField)
+		rpl::single(settings->showEmojiButtonInMessageField)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showEmojiButtonInMessageField);
+			return (enabled != settings->showEmojiButtonInMessageField);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1030,12 +1029,12 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldVoiceIcon}
 	)->toggleOn(
-		rpl::single(settings.showMicrophoneButtonInMessageField)
+		rpl::single(settings->showMicrophoneButtonInMessageField)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showMicrophoneButtonInMessageField);
+			return (enabled != settings->showMicrophoneButtonInMessageField);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1049,7 +1048,7 @@ void SetupMessageFieldElements(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupMessageFieldPopups(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_MessageFieldPopupsHeader());
@@ -1060,12 +1059,12 @@ void SetupMessageFieldPopups(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldAttachIcon}
 	)->toggleOn(
-		rpl::single(settings.showAttachPopup)
+		rpl::single(settings->showAttachPopup)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showAttachPopup);
+			return (enabled != settings->showAttachPopup);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1080,12 +1079,12 @@ void SetupMessageFieldPopups(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::messageFieldEmojiIcon}
 	)->toggleOn(
-		rpl::single(settings.showEmojiPopup)
+		rpl::single(settings->showEmojiPopup)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showEmojiPopup);
+			return (enabled != settings->showEmojiPopup);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1099,7 +1098,7 @@ void SetupMessageFieldPopups(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_DrawerElementsHeader());
@@ -1110,12 +1109,12 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::ayuLReadMenuIcon}
 	)->toggleOn(
-		rpl::single(settings.showLReadToggleInDrawer)
+		rpl::single(settings->showLReadToggleInDrawer)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showLReadToggleInDrawer);
+			return (enabled != settings->showLReadToggleInDrawer);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1130,12 +1129,12 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::ayuSReadMenuIcon}
 	)->toggleOn(
-		rpl::single(settings.showSReadToggleInDrawer)
+		rpl::single(settings->showSReadToggleInDrawer)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showSReadToggleInDrawer);
+			return (enabled != settings->showSReadToggleInDrawer);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1150,12 +1149,12 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::ayuGhostIcon}
 	)->toggleOn(
-		rpl::single(settings.showGhostToggleInDrawer)
+		rpl::single(settings->showGhostToggleInDrawer)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showGhostToggleInDrawer);
+			return (enabled != settings->showGhostToggleInDrawer);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1171,12 +1170,12 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 		st::settingsButton,
 		{&st::ayuStreamerModeMenuIcon}
 	)->toggleOn(
-		rpl::single(settings.showStreamerToggleInDrawer)
+		rpl::single(settings->showStreamerToggleInDrawer)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showStreamerToggleInDrawer);
+			return (enabled != settings->showStreamerToggleInDrawer);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1188,7 +1187,7 @@ void SetupDrawerElements(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
 	AddSubsectionTitle(container, tr::ayu_TrayElementsHeader());
@@ -1198,12 +1197,12 @@ void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_EnableGhostModeTray(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.showGhostToggleInTray)
+		rpl::single(settings->showGhostToggleInTray)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showGhostToggleInTray);
+			return (enabled != settings->showGhostToggleInTray);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1218,12 +1217,12 @@ void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_EnableStreamerModeTray(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.showStreamerToggleInTray)
+		rpl::single(settings->showStreamerToggleInTray)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showStreamerToggleInTray);
+			return (enabled != settings->showStreamerToggleInTray);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1236,7 +1235,7 @@ void SetupTrayElements(not_null<Ui::VerticalLayout*> container) {
 
 void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 					 not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
 		QString(tr::ayu_SettingsShowID_Hide(tr::now)),
@@ -1270,7 +1269,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 									{
 										.title = tr::ayu_SettingsShowID(),
 										.options = options,
-										.initialSelection = settings.showPeerId,
+										.initialSelection = settings->showPeerId,
 										.callback = save,
 									});
 				}));
@@ -1278,7 +1277,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 }
 
 void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	container->add(
 		object_ptr<Button>(container,
@@ -1300,7 +1299,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 	{
 		label->setText(QString::number(amount));
 	};
-	updateLabel(settings.recentStickersCount);
+	updateLabel(settings->recentStickersCount);
 
 	slider->setPseudoDiscrete(
 		200 + 1,
@@ -1309,7 +1308,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 		{
 			return amount;
 		},
-		settings.recentStickersCount,
+		settings->recentStickersCount,
 		[=](int amount)
 		{
 			updateLabel(amount);
@@ -1325,7 +1324,7 @@ void SetupRecentStickersLimitSlider(not_null<Ui::VerticalLayout*> container) {
 
 void SetupWideMultiplierSlider(not_null<Ui::VerticalLayout*> container,
 							   not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	container->add(
 		object_ptr<Button>(container,
@@ -1360,12 +1359,12 @@ void SetupWideMultiplierSlider(not_null<Ui::VerticalLayout*> container,
 		return kMinSize + index * kStep;
 	};
 
-	updateLabel(settings.wideMultiplier);
+	updateLabel(settings->wideMultiplier);
 
 	slider->setPseudoDiscrete(
 		kSizeAmount,
 		[=](int index) { return index; },
-		valueToIndex(settings.wideMultiplier),
+		valueToIndex(settings->wideMultiplier),
 		[=](int index)
 		{
 			updateLabel(indexToValue(index));
@@ -1394,13 +1393,13 @@ void SetupWideMultiplierSlider(not_null<Ui::VerticalLayout*> container,
 }
 
 void SetupFonts(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	const auto monoButton = AddButtonWithLabel(
 		container,
 		tr::ayu_MonospaceFont(),
 		rpl::single(
-			settings.monoFont.isEmpty() ? tr::ayu_FontDefault(tr::now) : settings.monoFont
+			settings->monoFont.isEmpty() ? tr::ayu_FontDefault(tr::now) : settings->monoFont
 		),
 		st::settingsButtonNoIcon);
 	const auto monoGuard = Ui::CreateChild<base::binary_guard>(monoButton.get());
@@ -1419,7 +1418,7 @@ void SetupFonts(not_null<Ui::VerticalLayout*> container, not_null<Window::Sessio
 }
 
 void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
 
@@ -1428,12 +1427,12 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_StickerConfirmation(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.stickerConfirmation)
+		rpl::single(settings->stickerConfirmation)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.stickerConfirmation);
+			return (enabled != settings->stickerConfirmation);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1447,12 +1446,12 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_GIFConfirmation(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.gifConfirmation)
+		rpl::single(settings->gifConfirmation)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.gifConfirmation);
+			return (enabled != settings->gifConfirmation);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1466,12 +1465,12 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_VoiceConfirmation(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.voiceConfirmation)
+		rpl::single(settings->voiceConfirmation)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.voiceConfirmation);
+			return (enabled != settings->voiceConfirmation);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1482,19 +1481,19 @@ void SetupSendConfirmations(not_null<Ui::VerticalLayout*> container) {
 }
 
 void SetupMarks(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddButtonWithIcon(
 		container,
 		tr::ayu_ReplaceMarksWithIcons(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.replaceBottomInfoWithIcons)
+		rpl::single(settings->replaceBottomInfoWithIcons)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.replaceBottomInfoWithIcons);
+			return (enabled != settings->replaceBottomInfoWithIcons);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1511,7 +1510,16 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 	)->addClickHandler(
 		[=]()
 		{
-			auto box = Box<EditDeletedMarkBox>();
+			auto box = Box<EditMarkBox>(
+				tr::ayu_DeletedMarkText(),
+				settings->deletedMark,
+				QString("🧹"),
+				[=](const QString &value)
+				{
+					AyuSettings::set_deletedMark(value);
+					AyuSettings::save();
+				}
+			);
 			Ui::show(std::move(box));
 		});
 
@@ -1523,25 +1531,34 @@ void SetupMarks(not_null<Ui::VerticalLayout*> container) {
 	)->addClickHandler(
 		[=]()
 		{
-			auto box = Box<EditEditedMarkBox>();
+			auto box = Box<EditMarkBox>(
+				tr::ayu_EditedMarkText(),
+				settings->editedMark,
+				tr::lng_edited(tr::now),
+				[=](const QString &value)
+				{
+					AyuSettings::set_editedMark(value);
+					AyuSettings::save();
+				}
+			);
 			Ui::show(std::move(box));
 		});
 }
 
 void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddButtonWithIcon(
 		container,
 		tr::ayu_HideNotificationCounters(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.hideNotificationCounters)
+		rpl::single(settings->hideNotificationCounters)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.hideNotificationCounters);
+			return (enabled != settings->hideNotificationCounters);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1557,12 +1574,12 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		tr::ayu_HideNotificationBadge(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.hideNotificationBadge)
+		rpl::single(settings->hideNotificationBadge)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.hideNotificationBadge);
+			return (enabled != settings->hideNotificationBadge);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1581,12 +1598,12 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Windo
 		tr::ayu_HideAllChats(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.hideAllChatsFolder)
+		rpl::single(settings->hideAllChatsFolder)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.hideAllChatsFolder);
+			return (enabled != settings->hideAllChatsFolder);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1597,7 +1614,7 @@ void SetupFolderSettings(not_null<Ui::VerticalLayout*> container, not_null<Windo
 }
 
 void SetupChannelSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
 		tr::ayu_ChannelBottomButtonHide(tr::now),
@@ -1608,7 +1625,7 @@ void SetupChannelSettings(not_null<Ui::VerticalLayout*> container, not_null<Wind
 	AddChooseButtonWithIconAndRightText(
 		container,
 		controller,
-		settings.channelBottomButton,
+		settings->channelBottomButton,
 		options,
 		tr::ayu_ChannelBottomButton(),
 		tr::ayu_ChannelBottomButton(),
@@ -1620,7 +1637,7 @@ void SetupChannelSettings(not_null<Ui::VerticalLayout*> container, not_null<Wind
 }
 
 void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	SetupShowPeerId(container, controller);
 
@@ -1629,12 +1646,12 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window:
 		tr::ayu_SettingsShowMessageSeconds(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.showMessageSeconds)
+		rpl::single(settings->showMessageSeconds)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showMessageSeconds);
+			return (enabled != settings->showMessageSeconds);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1648,12 +1665,12 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window:
 		tr::ayu_SettingsShowMessageShot(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.showMessageShot)
+		rpl::single(settings->showMessageShot)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.showMessageShot);
+			return (enabled != settings->showMessageShot);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1664,7 +1681,7 @@ void SetupNerdSettings(not_null<Ui::VerticalLayout*> container, not_null<Window:
 }
 
 void SetupWebviewSettings(not_null<Ui::VerticalLayout*> container) {
-	const auto& settings = AyuSettings::getInstance();
+	auto *settings = &AyuSettings::getInstance();
 
 	AddSubsectionTitle(container, rpl::single(QString("Webview")));
 
@@ -1673,12 +1690,12 @@ void SetupWebviewSettings(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_SettingsSpoofWebviewAsAndroid(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(settings.spoofWebviewAsAndroid)
+		rpl::single(settings->spoofWebviewAsAndroid)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (enabled != settings.spoofWebviewAsAndroid);
+			return (enabled != settings->spoofWebviewAsAndroid);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -1689,14 +1706,14 @@ void SetupWebviewSettings(not_null<Ui::VerticalLayout*> container) {
 
 	std::vector checkboxes = {
 		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewHeight(tr::now), settings.increaseWebviewHeight, [=](bool enabled)
+			tr::ayu_SettingsIncreaseWebviewHeight(tr::now), settings->increaseWebviewHeight, [=](bool enabled)
 			{
 				AyuSettings::set_increaseWebviewHeight(enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewWidth(tr::now), settings.increaseWebviewWidth, [=](bool enabled)
+			tr::ayu_SettingsIncreaseWebviewWidth(tr::now), settings->increaseWebviewWidth, [=](bool enabled)
 			{
 				AyuSettings::set_increaseWebviewWidth(enabled);
 				AyuSettings::save();

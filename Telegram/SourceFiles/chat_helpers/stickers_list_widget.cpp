@@ -763,7 +763,7 @@ void StickersListWidget::fillFilteredStickersRow() {
 }
 
 void StickersListWidget::addSearchRow(not_null<StickersSet*> set) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.showOnlyAddedEmojisAndStickers && !SetInMyList(set->flags)) {
 		return;
 	}
@@ -1910,7 +1910,7 @@ void StickersListWidget::mouseReleaseEvent(QMouseEvent *e) {
 				&& (e->modifiers() & Qt::ControlModifier)) {
 				showStickerSetBox(document, set.id);
 			} else {
-				const auto& settings = AyuSettings::getInstance();
+				const auto &settings = AyuSettings::getInstance();
 				auto from = messageSentAnimationInfo(
 					sticker->section,
 					sticker->index,
@@ -2339,7 +2339,7 @@ auto StickersListWidget::collectRecentStickers() -> std::vector<Sticker> {
 	result.reserve(cloudCount + recent.size() + customCount);
 	_custom.reserve(cloudCount + recent.size() + customCount);
 
-    const auto& settings = AyuSettings::getInstance();
+    const auto &settings = AyuSettings::getInstance();
 
 	auto add = [&](not_null<DocumentData*> document, bool custom) {
 		if (result.size() >= settings.recentStickersCount) {

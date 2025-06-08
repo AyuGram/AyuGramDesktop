@@ -132,11 +132,11 @@ void set_increaseWebviewWidth(bool val);
 void set_disableNotificationsDelay(bool val);
 void set_localPremium(bool val);
 
-void set_appIcon(QString val);
+void set_appIcon(const QString &val);
 void set_simpleQuotesAndReplies(bool val);
 void set_replaceBottomInfoWithIcons(bool val);
-void set_deletedMark(QString val);
-void set_editedMark(QString val);
+void set_deletedMark(const QString &val);
+void set_editedMark(const QString &val);
 void set_recentStickersCount(int val);
 
 void set_showReactionsPanelInContextMenu(int val);
@@ -162,7 +162,7 @@ void set_showStreamerToggleInDrawer(bool val);
 void set_showGhostToggleInTray(bool val);
 void set_showStreamerToggleInTray(bool val);
 
-void set_monoFont(QString val);
+void set_monoFont(const QString &val);
 
 void set_hideNotificationCounters(bool val);
 void set_hideNotificationBadge(bool val);

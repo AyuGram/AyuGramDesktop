@@ -1206,7 +1206,7 @@ void Stories::markAsRead(FullStoryId id, bool viewed) {
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadStories) {
 		return;
 	}
@@ -1365,7 +1365,7 @@ void Stories::toggleHidden(
 void Stories::sendMarkAsReadRequest(
 		not_null<PeerData*> peer,
 		StoryId tillId) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadStories) {
 		return;
 	}
@@ -1400,7 +1400,7 @@ void Stories::checkQuitPreventFinished() {
 void Stories::sendMarkAsReadRequests() {
 	_markReadTimer.cancel();
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadStories) {
 		return;
 	}
@@ -1424,7 +1424,7 @@ void Stories::sendIncrementViewsRequests() {
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadStories) {
 		return;
 	}
@@ -2239,7 +2239,7 @@ bool Stories::isQuitPrevent() {
 		sendIncrementViewsRequests();
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadStories || _markReadRequests.empty() && _incrementViewsRequests.empty()) {
 		return false;
 	}

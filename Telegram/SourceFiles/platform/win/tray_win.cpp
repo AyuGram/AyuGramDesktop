@@ -142,7 +142,7 @@ bool DarkTasbarValueValid/* = false*/;
 		ScaledLogoLight = base::flat_map<int, QImage>();
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.hideNotificationBadge) {
 		args.count = 0;
 	}

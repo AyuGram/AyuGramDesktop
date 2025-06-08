@@ -1354,7 +1354,7 @@ void Widget::setupMainMenuToggle() {
 			? &st::dialogsMenuToggleUnread
 			: &st::dialogsMenuToggleUnreadMuted;
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (settings.hideNotificationCounters) {
 			icon = nullptr;
 		}
@@ -1365,7 +1365,7 @@ void Widget::setupMainMenuToggle() {
 
 void Widget::setupStories() {
 	// AyuGram disableStories
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.disableStories) {
 		return;
 	}
@@ -2328,7 +2328,7 @@ void Widget::updateStoriesVisibility() {
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.disableStories) {
 		_stories->setVisible(false);
 		return;

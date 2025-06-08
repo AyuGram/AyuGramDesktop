@@ -2194,7 +2194,7 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 		}));
 	}
 
-			const auto& settings = AyuSettings::getInstance();
+			const auto &settings = AyuSettings::getInstance();
 			if (AyuSettings::isUseScheduledMessages()) {
 				auto current = base::unixtime::now();
 				options.scheduled = current + 12 + 5;
@@ -2295,7 +2295,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			options.ttlSeconds = std::numeric_limits<int>::max();
 		}
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (AyuSettings::isUseScheduledMessages()) {
 			auto current = base::unixtime::now();
 			options.scheduled = current + 12 + 5;

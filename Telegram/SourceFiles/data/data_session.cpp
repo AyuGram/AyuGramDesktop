@@ -323,7 +323,7 @@ Session::Session(not_null<Main::Session*> session)
 		}, _lifetime);
 
 		// AyuGram disableStories
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (!settings.disableStories) {
 			_stories->loadMore(Data::StorySourcesList::NotHidden);
 		}
@@ -2648,7 +2648,7 @@ void Session::updateEditedMessage(const MTPMessage &data) {
 	}
 
 	// AyuGram saveMessagesHistory
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	HistoryMessageEdition edit;
 
 	if (data.type() != mtpc_message) {
@@ -2800,7 +2800,7 @@ void Session::unregisterMessageTTL(
 }
 
 void Session::checkTTLs() {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	_ttlCheckTimer.cancel();
 	const auto now = base::unixtime::now();

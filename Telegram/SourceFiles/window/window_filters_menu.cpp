@@ -140,7 +140,7 @@ void FiltersMenu::setupMainMenuIcon() {
 			? &st::windowFiltersMainMenuUnread
 			: &st::windowFiltersMainMenuUnreadMuted;
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (settings.hideNotificationCounters) {
 			icon = nullptr;
 		}
@@ -177,7 +177,7 @@ void FiltersMenu::scrollToButton(not_null<Ui::RpWidget*> widget) {
 
 void FiltersMenu::refresh() {
 	// AyuGram hideAllChatsFolder
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	const auto filters = &_session->session().data().chatsFilters();
 	if (!filters->has() || _ignoreRefresh) {
@@ -305,7 +305,7 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 			auto count = (state.chats + state.marks);
 			auto muted = (state.chatsMuted + state.marksMuted);
 
-			const auto& settings = AyuSettings::getInstance();
+			const auto &settings = AyuSettings::getInstance();
 			if (settings.hideNotificationCounters) {
 				count = 0;
 				muted = 0;
@@ -452,7 +452,7 @@ void FiltersMenu::applyReorder(
 	}
 
 	// AyuGram hideAllChatsFolder
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	const auto filters = &_session->session().data().chatsFilters();
 	const auto &list = filters->list();

@@ -415,7 +415,7 @@ void BottomInfo::layout() {
 }
 
 void BottomInfo::layoutDateText() {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (!settings.replaceBottomInfoWithIcons) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)

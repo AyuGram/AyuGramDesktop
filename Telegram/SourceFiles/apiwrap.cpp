@@ -504,7 +504,7 @@ void ApiWrap::toggleHistoryArchived(
 		if (archived) {
 			history->setFolder(_session->data().folder(archiveId));
 		} else {
-			const auto& settings = AyuSettings::getInstance();
+			const auto &settings = AyuSettings::getInstance();
 			if (settings.hideAllChatsFolder) {
 				if (const auto window = Core::App().activeWindow()) {
 					if (const auto controller = window->sessionController()) {
@@ -1381,7 +1381,7 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	auto markedIds = QVector<MTPint>();
 	auto channelMarkedIds = base::flat_map<
@@ -1427,7 +1427,7 @@ void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadMessages && !passthrough) {
 		return;
 	}
@@ -1856,7 +1856,7 @@ void ApiWrap::joinChannel(not_null<ChannelData*> channel) {
 		using Flag = ChannelDataFlag;
 		chatParticipants().loadSimilarChannels(channel);
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (!settings.collapseSimilarChannels) {
 			channel->setFlags(channel->flags() | Flag::SimilarExpanded);
 		}
@@ -3624,7 +3624,7 @@ void ApiWrap::forwardMessages(
 					shared->callback();
 				}
 
-				const auto& settings = AyuSettings::getInstance();
+				const auto &settings = AyuSettings::getInstance();
 				if (!settings.sendReadMessages && settings.markReadAfterAction && history->lastMessage())
 				{
 					readHistory(history->lastMessage());
