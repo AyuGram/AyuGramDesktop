@@ -49,6 +49,8 @@ public:
 
 	bool disableNotificationsDelay;
 	bool localPremium;
+	bool hideChannelReactions;
+	bool hideGroupReactions;
 
 	QString appIcon;
 	bool simpleQuotesAndReplies;
@@ -131,6 +133,8 @@ void set_increaseWebviewWidth(bool val);
 
 void set_disableNotificationsDelay(bool val);
 void set_localPremium(bool val);
+void set_hideChannelReactions(bool val);
+void set_hideGroupReactions(bool val);
 
 void set_appIcon(QString val);
 void set_simpleQuotesAndReplies(bool val);
@@ -205,6 +209,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	disableNotificationsDelay,
 	localPremium,
 	appIcon,
+        hideChannelReactions,
+	hideGroupReactions,
 	simpleQuotesAndReplies,
 	replaceBottomInfoWithIcons,
 	deletedMark,

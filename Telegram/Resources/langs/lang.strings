@@ -6643,6 +6643,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableAds" = "Disable Ads";
 "ayu_DisableStories" = "Disable Stories";
 "ayu_DisableCustomBackgrounds" = "Disable Custom Backgrounds";
+"ayu_HideChannelReactions" = "Hide Reactions in Channels";
+"ayu_HideGroupReactions" = "Hide Reactions in Groups";
 "ayu_DisableNotificationsDelay" = "Disable Notify Delay";
 "ayu_LocalPremium" = "Local Telegram Premium";
 "ayu_DisplayGhostStatus" = "Display Ghost Mode Status";
