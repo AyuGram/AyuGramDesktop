@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_about_view.h"
 #include "history/view/history_view_message.h"
+#include "ayu/ayu_settings.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_context_menu.h"
@@ -4208,7 +4209,8 @@ void HistoryInner::mouseActionUpdate() {
 		|| dragState.cursor == CursorState::Date
 		|| dragState.cursor == CursorState::Forwarded
 		|| dragState.customTooltip) {
-		Ui::Tooltip::Show(350, this);
+		const auto delay = AyuSettings::getInstance().disableTooltipDelay ? 0 : crl::time(350);
+		Ui::Tooltip::Show(delay, this);
 	}
 
 	Qt::CursorShape cur = style::cur_default;

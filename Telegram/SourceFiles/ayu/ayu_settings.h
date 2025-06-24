@@ -48,6 +48,7 @@ public:
 	bool increaseWebviewWidth;
 
 	bool disableNotificationsDelay;
+	bool disableTooltipDelay;
 	bool localPremium;
 
 	QString appIcon;
@@ -130,6 +131,7 @@ void set_increaseWebviewHeight(bool val);
 void set_increaseWebviewWidth(bool val);
 
 void set_disableNotificationsDelay(bool val);
+void set_disableTooltipDelay(bool val);
 void set_localPremium(bool val);
 
 void set_appIcon(QString val);
@@ -203,6 +205,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	increaseWebviewHeight,
 	increaseWebviewWidth,
 	disableNotificationsDelay,
+	disableTooltipDelay,
 	localPremium,
 	appIcon,
 	simpleQuotesAndReplies,

@@ -230,6 +230,7 @@ AyuGramSettings::AyuGramSettings() {
 	increaseWebviewWidth = false;
 
 	disableNotificationsDelay = false;
+	disableTooltipDelay = false;
 	localPremium = false;
 
 	// ~ Customization
@@ -411,6 +412,10 @@ void set_increaseWebviewWidth(bool val) {
 
 void set_disableNotificationsDelay(bool val) {
 	settings->disableNotificationsDelay = val;
+}
+
+void set_disableTooltipDelay(bool val) {
+	settings->disableTooltipDelay = val;
 }
 
 void set_localPremium(bool val) {

@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "ayu/ayu_settings.h"
 #include "history/view/history_view_emoji_interactions.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
@@ -3829,7 +3830,8 @@ void ListWidget::mouseActionUpdate() {
 	if (dragState.link
 		|| dragState.cursor == CursorState::Date
 		|| dragState.cursor == CursorState::Forwarded) {
-		Ui::Tooltip::Show(350, this);
+		const auto delay = AyuSettings::getInstance().disableTooltipDelay ? 0 : crl::time(350);
+		Ui::Tooltip::Show(delay, this);
 	}
 
 	if (_mouseAction == MouseAction::None) {
