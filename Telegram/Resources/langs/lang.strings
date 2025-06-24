@@ -1625,6 +1625,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_info_delete_contact" = "Delete contact";
 "lng_info_share_contact" = "Share this contact";
 "lng_profile_clear_history" = "Clear history";
+"lng_profile_delete_my_messages" = "Delete all my messages";
 "lng_profile_delete_conversation" = "Delete chat";
 "lng_profile_block_user" = "Block user";
 "lng_profile_unblock_user" = "Unblock user";
@@ -2011,6 +2012,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_sure_leave_group" = "Are you sure you want to leave this group?";
 "lng_sure_delete_group" = "Are you sure you want to delete this group? All members will be removed, and all messages will be lost.";
 "lng_sure_delete_saved_messages" = "Are you sure you want to delete all your saved messages?\n\nThis action cannot be undone.";
+"lng_sure_delete_my_messages" = "Are you sure you want to delete all your messages from this group?";
 "lng_no_clear_history_channel" = "In channels you can enable auto-delete for messages.";
 "lng_no_clear_history_group" = "In public groups you can enable auto-delete for messages.";
 "lng_sure_delete_by_date_one" = "Are you sure you want to delete all messages for **{date}**?\n\nThis action cannot be undone.";
