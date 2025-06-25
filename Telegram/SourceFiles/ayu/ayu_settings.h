@@ -91,6 +91,8 @@ public:
 	int showPeerId;
 	bool showMessageSeconds;
 	bool showMessageShot;
+	bool showForwards;
+	bool showForwardsRatio;
 
 	bool stickerConfirmation;
 	bool gifConfirmation;
@@ -173,6 +175,8 @@ void set_channelBottomButton(int val);
 void set_showPeerId(int val);
 void set_showMessageSeconds(bool val);
 void set_showMessageShot(bool val);
+void set_showForwards(bool val);
+void set_showForwardsRatio(bool val);
 
 void set_stickerConfirmation(bool val);
 void set_gifConfirmation(bool val);
@@ -236,6 +240,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showPeerId,
 	showMessageSeconds,
 	showMessageShot,
+	showForwards,
+	showForwardsRatio,
 	stickerConfirmation,
 	gifConfirmation,
 	voiceConfirmation

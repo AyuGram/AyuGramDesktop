@@ -6666,6 +6666,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SettingsShowID" = "Show Peer ID";
 "ayu_SettingsShowID_Hide" = "Hide";
 "ayu_SettingsShowMessageShot" = "Show Message Shot";
+"ayu_ShowForwardsCount" = "Show Forwards";
+"ayu_ShowForwardsRatio" = "Show Forward Ratio";
 "ayu_SettingsRecentStickersCount" = "Recent Stickers Count";
 "ayu_SettingsCustomizationHint" = "You must restart the application after making changes in the \"Customization\" section.";
 "ayu_SettingsContextMenuTitle" = "Choose when to show the item";

@@ -294,6 +294,8 @@ AyuGramSettings::AyuGramSettings() {
 	showPeerId = 2;
 	showMessageSeconds = false;
 	showMessageShot = true;
+	showForwards = true;
+	showForwardsRatio = false;
 
 	// ~ Confirmations
 	stickerConfirmation = false;
@@ -553,6 +555,14 @@ void set_showMessageSeconds(bool val) {
 
 void set_showMessageShot(bool val) {
 	settings->showMessageShot = val;
+}
+
+void set_showForwards(bool val) {
+        settings->showForwards = val;
+}
+
+void set_showForwardsRatio(bool val) {
+        settings->showForwardsRatio = val;
 }
 
 void set_stickerConfirmation(bool val) {

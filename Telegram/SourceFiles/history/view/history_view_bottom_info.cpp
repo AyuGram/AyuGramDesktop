@@ -111,6 +111,7 @@ bool BottomInfo::isWide() const {
 	return (_data.flags & Data::Flag::Edited)
 		|| !_data.author.isEmpty()
 		|| !_views.isEmpty()
+		|| !_forwards.isEmpty()
 		|| !_replies.isEmpty()
 		|| _effect;
 }
@@ -158,6 +159,38 @@ TextState BottomInfo::textState(
 			result.customTooltipText = fullViews + fullForwards;
 		}
 	}
+        if (!_forwards.isEmpty()) {
+                const auto forwardsWidth = _forwards.maxWidth();
+                auto right = width()
+                        - withTicksWidth
+                        - ((_data.flags & Data::Flag::Pinned) ? st::historyPinWidth : 0);
+                if (!_views.isEmpty()) {
+                        right -= st::historyViewsSpace + st::historyViewsWidth + _views.maxWidth();
+                }
+                right -= st::historyViewsSpace + st::historyViewsWidth + forwardsWidth;
+                const auto inForwards = QRect(
+                        right,
+                        0,
+                        withTicksWidth + st::historyViewsWidth,
+                        st::msgDateFont->height
+                ).contains(position);
+                if (inForwards) {
+                        result.customTooltip = true;
+                        const auto fullViews = _data.views
+                                ? tr::lng_views_tooltip(
+                                        tr::now,
+                                        lt_count_decimal,
+                                        *_data.views)
+                                : QString();
+                        const auto fullForwards = _data.forwardsCount
+                                ? ('\n' + tr::lng_forwards_tooltip(
+                                        tr::now,
+                                        lt_count_decimal,
+                                        *_data.forwardsCount))
+                                : QString();
+                        result.customTooltipText = fullViews + fullForwards;
+                }
+        }
 	const auto inTime = QRect(
 		width() - withTicksWidth,
 		0,
@@ -283,6 +316,21 @@ void BottomInfo::paint(
 			firstLineBottom + st::historyViewsTop,
 			outerWidth);
 	}
+        if (!_forwards.isEmpty()) {
+                const auto forwardsWidth = _forwards.maxWidth();
+                right -= st::historyViewsSpace + forwardsWidth;
+                _forwards.drawLeft(p, right, position.y(), forwardsWidth, outerWidth);
+
+                const auto &icon = inverted
+                        ? st->historyForwardsInvertedIcon()
+                        : stm->historyForwardsIcon;
+                right -= st::historyViewsWidth;
+                icon.paint(
+                        p,
+                        right,
+                        firstLineBottom + st::historyViewsTop,
+                        outerWidth);
+        }
 	if (!_replies.isEmpty()) {
 		const auto repliesWidth = _replies.maxWidth();
 		right -= st::historyViewsSpace + repliesWidth;
@@ -409,6 +457,7 @@ QSize BottomInfo::countCurrentSize(int newWidth) {
 void BottomInfo::layout() {
 	layoutDateText();
 	layoutViewsText();
+	layoutForwardsText();
 	layoutRepliesText();
 	layoutEffectText();
 	initDimensions();
@@ -547,6 +596,28 @@ void BottomInfo::layoutViewsText() {
 		Ui::NameTextOptions());
 }
 
+void BottomInfo::layoutForwardsText() {
+        const auto& settings = AyuSettings::getInstance();
+        if (!settings.showForwards
+                || !_data.forwardsCount
+                || !_data.forwardsCount.value()
+                || (_data.flags & Data::Flag::Sending)) {
+                _forwards.clear();
+                return;
+        }
+        auto text = Lang::FormatCountToShort(*_data.forwardsCount).string;
+        if (settings.showForwardsRatio && _data.views && *_data.views > 0) {
+                const auto percent = (*_data.forwardsCount * 100)
+                        / std::max(*_data.views, 1);
+                text += " (" + QString::number(percent) + '%';
+                text += ')';
+        }
+        _forwards.setText(
+                st::msgDateTextStyle,
+                text,
+                Ui::NameTextOptions());
+}
+
 void BottomInfo::layoutRepliesText() {
 	if (!_data.replies
 		|| !*_data.replies
@@ -584,6 +655,11 @@ QSize BottomInfo::countOptimalSize() {
 			+ _views.maxWidth()
 			+ st::historyViewsWidth;
 	}
+        if (!_forwards.isEmpty()) {
+                width += st::historyViewsSpace
+                        + _forwards.maxWidth()
+                        + st::historyViewsWidth;
+        }
 	if (!_replies.isEmpty()) {
 		width += st::historyViewsSpace
 			+ _replies.maxWidth()
