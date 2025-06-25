@@ -1385,6 +1385,17 @@ Data::ForumTopic *PeerData::forumTopicFor(MsgId rootId) const {
 	}
 	return nullptr;
 }
+bool PeerData::isAyuNoForwards() const {
+	if (const auto user = asUser()) {
+		return false;
+	} else if (const auto channel = asChannel()) {
+		return channel->isAyuNoForwards();
+	} else if (const auto chat = asChat()) {
+		return chat->isAyuNoForwards();
+	}
+	return true;
+}
+
 
 bool PeerData::allowsForwarding() const {
 	if (isUser()) {

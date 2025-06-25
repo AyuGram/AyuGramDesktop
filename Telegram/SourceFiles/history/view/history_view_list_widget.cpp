@@ -1358,7 +1358,7 @@ bool ListWidget::addToSelection(
 		return false;
 	}
 	iterator->second.canDelete = item->canDelete();
-	iterator->second.canForward = item->allowsForward() && !item->isDeleted();
+	iterator->second.canForward = item->allowsForward();
 	iterator->second.canSendNow = item->allowsSendNow();
 	iterator->second.canReschedule = item->allowsReschedule();
 	return true;

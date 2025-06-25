@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_chat_participant_status.h"
 
+#include "ayu/features/forward/ayu_forward.h"
 #include "base/unixtime.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -118,6 +119,9 @@ bool CanSendAnyOf(
 		not_null<const PeerData*> peer,
 		ChatRestrictions rights,
 		bool forbidInForums) {
+	if (AyuForward::isForwarding(peer->id)) {
+		return false;
+	}
 	if (peer->session().frozen()
 		&& !peer->isFreezeAppealChat()) {
 		return false;
@@ -180,6 +184,11 @@ bool CanSendAnyOf(
 SendError RestrictionError(
 		not_null<PeerData*> peer,
 		ChatRestriction restriction) {
+	if (AyuForward::isForwarding(peer->id)) {
+		return SendError({
+			.text = AyuForward::stateName(peer->id)
+		});
+	}
 	using Flag = ChatRestriction;
 	if (peer->session().frozen()
 		&& !peer->isFreezeAppealChat()) {

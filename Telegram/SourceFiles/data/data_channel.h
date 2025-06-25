@@ -74,6 +74,8 @@ enum class ChannelDataFlag : uint64 {
 	StargiftsAvailable = (1ULL << 36),
 	PaidMessagesAvailable = (1ULL << 37),
 	AutoTranslation = (1ULL << 38),
+
+	AyuNoForwards = (1ULL << 60),
 };
 inline constexpr bool is_flag_type(ChannelDataFlag) { return true; };
 using ChannelDataFlags = base::flags<ChannelDataFlag>;
@@ -365,6 +367,7 @@ public:
 
 	// Like in ChatData.
 	[[nodiscard]] bool allowsForwarding() const;
+	[[nodiscard]] bool isAyuNoForwards() const;
 	[[nodiscard]] bool canEditInformation() const;
 	[[nodiscard]] bool canEditPermissions() const;
 	[[nodiscard]] bool canEditUsername() const;

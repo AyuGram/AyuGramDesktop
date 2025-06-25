@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/sender.h"
 #include "data/stickers/data_stickers_set.h"
 #include "data/data_messages.h"
+#include "ayu/features/forward/ayu_forward.h"
 
 class TaskQueue;
 struct MessageGroupId;
