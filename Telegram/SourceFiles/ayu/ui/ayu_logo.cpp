@@ -14,7 +14,7 @@ static QImage LAST_LOADED_NO_MARGIN;
 namespace AyuAssets {
 
 void loadAppIco() {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	QString appDataPath = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	QString tempIconPath = appDataPath + "/AyuGram.ico";
@@ -30,7 +30,7 @@ void loadAppIco() {
 }
 
 void loadIcons() {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (LAST_LOADED_NAME != settings.appIcon) {
 		LAST_LOADED_NAME = settings.appIcon;
 
@@ -43,7 +43,7 @@ void loadIcons() {
 	}
 }
 
-QImage loadPreview(QString name) {
+QImage loadPreview(const QString& name) {
 	return QImage(qsl(":/gui/art/ayu/%1/app_preview.png").arg(name));
 }
 

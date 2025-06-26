@@ -788,7 +788,7 @@ void TopBarWidget::infoClicked() {
 
 void TopBarWidget::backClicked() {
 	if (_activeChat.key.folder()) {
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (settings.hideAllChatsFolder) {
 			const auto filters = &_controller->session().data().chatsFilters();
 			const auto lookupId = filters->lookupId(_controller->session().premium() ? 0 : 1);
@@ -1156,7 +1156,7 @@ void TopBarWidget::updateControlsVisibility() {
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	_clear->show();
 	_delete->setVisible(_canDelete);
@@ -1337,14 +1337,14 @@ void TopBarWidget::updateMembersShowArea() {
 }
 
 bool TopBarWidget::showSelectedState() const {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	return (_selectedCount > 0)
 		&& (_canDelete || _canForward || _canSendNow || settings.showMessageShot);
 }
 
 void TopBarWidget::showSelected(SelectedState state) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	auto canDelete = (state.count > 0 && state.count == state.canDeleteCount);
 	auto canForward = (state.count > 0 && state.count == state.canForwardCount);

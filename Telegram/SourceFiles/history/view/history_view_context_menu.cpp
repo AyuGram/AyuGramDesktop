@@ -1513,7 +1513,7 @@ void AddWhoReactedAction(
 		not_null<QWidget*> context,
 		not_null<HistoryItem*> item,
 		not_null<Window::SessionController*> controller) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!AyuUi::needToShowItem(settings.showViewsPanelInContextMenu)) {
 		return;
 	}

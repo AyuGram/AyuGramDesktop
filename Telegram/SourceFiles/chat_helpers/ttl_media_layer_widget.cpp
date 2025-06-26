@@ -195,7 +195,7 @@ PreviewWrap::PreviewWrap(
 		}
 	}, lifetime());
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	{
 		const auto close = Ui::CreateChild<Ui::RoundButton>(

@@ -4,7 +4,9 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2025
-#include "edit_edited_mark.h"
+#include "edit_mark_box.h"
+
+#include <utility>
 
 #include "boxes/peer_list_controllers.h"
 #include "lang/lang_keys.h"
@@ -17,19 +19,25 @@
 
 #include "ayu/ayu_settings.h"
 
-EditEditedMarkBox::EditEditedMarkBox(QWidget *)
-	: _text(
-		this,
-		st::defaultInputField,
-		tr::ayu_EditedMarkText(),
-		AyuSettings::getInstance().editedMark) {
+EditMarkBox::EditMarkBox(QWidget *,
+						 rpl::producer<QString> title,
+						 const QString &currentValue,
+						 QString defaultValue,
+						 const Fn<void(const QString &)> &saveCallback)
+	: _title(title)
+	  , _defaultValue(std::move(defaultValue))
+	  , _saveCallback(saveCallback)
+	  , _text(
+		  this,
+		  st::defaultInputField,
+		  title,
+		  currentValue) {
 }
 
-void EditEditedMarkBox::prepare() {
-	const auto defaultEditedMark = tr::lng_edited(tr::now);
+void EditMarkBox::prepare() {
 	auto newHeight = st::contactPadding.top() + _text->height();
 
-	setTitle(tr::ayu_EditedMarkText());
+	setTitle(_title);
 
 	newHeight += st::boxPadding.bottom() + st::contactPadding.bottom();
 	setDimensions(st::boxWidth, newHeight);
@@ -37,8 +45,9 @@ void EditEditedMarkBox::prepare() {
 	addLeftButton(tr::ayu_BoxActionReset(),
 				  [=]
 				  {
-					  _text->setText(defaultEditedMark);
+					  _text->setText(_defaultValue);
 				  });
+
 	addButton(tr::lng_settings_save(),
 			  [=]
 			  {
@@ -58,11 +67,11 @@ void EditEditedMarkBox::prepare() {
 	) | rpl::start_with_next(submitted, _text->lifetime());
 }
 
-void EditEditedMarkBox::setInnerFocus() {
+void EditMarkBox::setInnerFocus() {
 	_text->setFocusFast();
 }
 
-void EditEditedMarkBox::submit() {
+void EditMarkBox::submit() {
 	if (_text->getLastText().trimmed().isEmpty()) {
 		_text->setFocus();
 		_text->showError();
@@ -71,7 +80,7 @@ void EditEditedMarkBox::submit() {
 	}
 }
 
-void EditEditedMarkBox::resizeEvent(QResizeEvent *e) {
+void EditMarkBox::resizeEvent(QResizeEvent *e) {
 	BoxContent::resizeEvent(e);
 
 	_text->resize(
@@ -85,9 +94,7 @@ void EditEditedMarkBox::resizeEvent(QResizeEvent *e) {
 	_text->moveToLeft(left, st::contactPadding.top());
 }
 
-void EditEditedMarkBox::save() {
-	AyuSettings::set_editedMark(_text->getLastText());
-	AyuSettings::save();
-
+void EditMarkBox::save() {
+	_saveCallback(_text->getLastText());
 	closeBox();
 }
