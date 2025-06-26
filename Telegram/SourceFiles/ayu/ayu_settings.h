@@ -267,8 +267,8 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(showMessageSeconds)
 	NLOHMANN_JSON_TO(showMessageShot)
 	NLOHMANN_JSON_TO(stickerConfirmation)
-  NLOHMANN_JSON_TO(showForwards)
-  NLOHMANN_JSON_TO(showForwardsRatio)
+  	NLOHMANN_JSON_TO(showForwards)
+  	NLOHMANN_JSON_TO(showForwardsRatio)
 	NLOHMANN_JSON_TO(gifConfirmation)
 	NLOHMANN_JSON_TO(voiceConfirmation)
 }
@@ -332,8 +332,8 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageSeconds)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageShot)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(stickerConfirmation)
-  NLOHMANN_JSON_FROM_WITH_DEFAULT(showForwards)
-  NLOHMANN_JSON_FROM_WITH_DEFAULT(showForwardsRatio)
+  	NLOHMANN_JSON_FROM_WITH_DEFAULT(showForwards)
+  	NLOHMANN_JSON_FROM_WITH_DEFAULT(showForwardsRatio)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(gifConfirmation)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(voiceConfirmation)
 }
