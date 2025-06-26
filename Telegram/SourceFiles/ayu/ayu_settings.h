@@ -8,6 +8,33 @@
 
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
+
+// json.hpp in some build environments may not provide helper macros.
+//  To ensure successful compilation, define them here when missing.
+#ifndef NLOHMANN_JSON_TO
+#define NLOHMANN_JSON_TO(v1) nlohmann_json_j[#v1] = nlohmann_json_t.v1;
+#endif
+#ifndef NLOHMANN_JSON_FROM
+#define NLOHMANN_JSON_FROM(v1) nlohmann_json_j.at(#v1).get_to(nlohmann_json_t.v1);
+#endif
+#ifndef NLOHMANN_JSON_FROM_WITH_DEFAULT
+#define NLOHMANN_JSON_FROM_WITH_DEFAULT(v1) \
+    nlohmann_json_t.v1 = nlohmann_json_j.value(#v1, nlohmann_json_default_obj.v1);
+#endif
+#ifndef NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT
+#define NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Type, ...)               \
+    inline void to_json(nlohmann::json& nlohmann_json_j,                       \
+                        const Type& nlohmann_json_t) {                          \
+        NLOHMANN_JSON_EXPAND(                                                   \
+            NLOHMANN_JSON_PASTE(NLOHMANN_JSON_TO, __VA_ARGS__))                 \
+    }                                                                           \
+    inline void from_json(const nlohmann::json& nlohmann_json_j,                \
+                          Type& nlohmann_json_t) {                              \
+        const Type nlohmann_json_default_obj{};                                 \
+        NLOHMANN_JSON_EXPAND(                                                   \
+            NLOHMANN_JSON_PASTE(NLOHMANN_JSON_FROM_WITH_DEFAULT, __VA_ARGS__))   \
+    }
+#endif
 #include "rpl/producer.h"
 
 namespace AyuSettings {
@@ -178,68 +205,130 @@ void set_stickerConfirmation(bool val);
 void set_gifConfirmation(bool val);
 void set_voiceConfirmation(bool val);
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
-	AyuGramSettings,
-	sendReadMessages,
-	sendReadStories,
-	sendOnlinePackets,
-	sendUploadProgress,
-	sendOfflinePacketAfterOnline,
-	markReadAfterAction,
-	useScheduledMessages,
-	sendWithoutSound,
-	saveDeletedMessages,
-	saveMessagesHistory,
-	saveForBots,
-	hideFromBlocked,
-	disableAds,
-	disableStories,
-	disableCustomBackgrounds,
-	showOnlyAddedEmojisAndStickers,
-	collapseSimilarChannels,
-	hideSimilarChannels,
-	wideMultiplier,
-	spoofWebviewAsAndroid,
-	increaseWebviewHeight,
-	increaseWebviewWidth,
-	disableNotificationsDelay,
-	localPremium,
-	appIcon,
-	simpleQuotesAndReplies,
-	replaceBottomInfoWithIcons,
-	deletedMark,
-	editedMark,
-	recentStickersCount,
-	showReactionsPanelInContextMenu,
-	showViewsPanelInContextMenu,
-	showHideMessageInContextMenu,
-	showUserMessagesInContextMenu,
-	showMessageDetailsInContextMenu,
-	showAttachButtonInMessageField,
-	showCommandsButtonInMessageField,
-	showEmojiButtonInMessageField,
-	showMicrophoneButtonInMessageField,
-	showAutoDeleteButtonInMessageField,
-	showAttachPopup,
-	showEmojiPopup,
-	showLReadToggleInDrawer,
-	showSReadToggleInDrawer,
-	showGhostToggleInDrawer,
-	showStreamerToggleInDrawer,
-	showGhostToggleInTray,
-	showStreamerToggleInTray,
-	monoFont,
-	hideNotificationCounters,
-	hideNotificationBadge,
-	hideAllChatsFolder,
-	channelBottomButton,
-	showPeerId,
-	showMessageSeconds,
-	showMessageShot,
-	stickerConfirmation,
-	gifConfirmation,
-	voiceConfirmation
-);
+inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nlohmann_json_t) {
+	NLOHMANN_JSON_TO(sendReadMessages)
+	NLOHMANN_JSON_TO(sendReadStories)
+	NLOHMANN_JSON_TO(sendOnlinePackets)
+	NLOHMANN_JSON_TO(sendUploadProgress)
+	NLOHMANN_JSON_TO(sendOfflinePacketAfterOnline)
+	NLOHMANN_JSON_TO(markReadAfterAction)
+	NLOHMANN_JSON_TO(useScheduledMessages)
+	NLOHMANN_JSON_TO(sendWithoutSound)
+	NLOHMANN_JSON_TO(saveDeletedMessages)
+	NLOHMANN_JSON_TO(saveMessagesHistory)
+	NLOHMANN_JSON_TO(saveForBots)
+	NLOHMANN_JSON_TO(hideFromBlocked)
+	NLOHMANN_JSON_TO(disableAds)
+	NLOHMANN_JSON_TO(disableStories)
+	NLOHMANN_JSON_TO(disableCustomBackgrounds)
+	NLOHMANN_JSON_TO(showOnlyAddedEmojisAndStickers)
+	NLOHMANN_JSON_TO(collapseSimilarChannels)
+	NLOHMANN_JSON_TO(hideSimilarChannels)
+	NLOHMANN_JSON_TO(wideMultiplier)
+	NLOHMANN_JSON_TO(spoofWebviewAsAndroid)
+	NLOHMANN_JSON_TO(increaseWebviewHeight)
+	NLOHMANN_JSON_TO(increaseWebviewWidth)
+	NLOHMANN_JSON_TO(disableNotificationsDelay)
+	NLOHMANN_JSON_TO(localPremium)
+	NLOHMANN_JSON_TO(appIcon)
+	NLOHMANN_JSON_TO(simpleQuotesAndReplies)
+	NLOHMANN_JSON_TO(replaceBottomInfoWithIcons)
+	NLOHMANN_JSON_TO(deletedMark)
+	NLOHMANN_JSON_TO(editedMark)
+	NLOHMANN_JSON_TO(recentStickersCount)
+	NLOHMANN_JSON_TO(showReactionsPanelInContextMenu)
+	NLOHMANN_JSON_TO(showViewsPanelInContextMenu)
+	NLOHMANN_JSON_TO(showHideMessageInContextMenu)
+	NLOHMANN_JSON_TO(showUserMessagesInContextMenu)
+	NLOHMANN_JSON_TO(showMessageDetailsInContextMenu)
+	NLOHMANN_JSON_TO(showAttachButtonInMessageField)
+	NLOHMANN_JSON_TO(showCommandsButtonInMessageField)
+	NLOHMANN_JSON_TO(showEmojiButtonInMessageField)
+	NLOHMANN_JSON_TO(showMicrophoneButtonInMessageField)
+	NLOHMANN_JSON_TO(showAutoDeleteButtonInMessageField)
+	NLOHMANN_JSON_TO(showAttachPopup)
+	NLOHMANN_JSON_TO(showEmojiPopup)
+	NLOHMANN_JSON_TO(showLReadToggleInDrawer)
+	NLOHMANN_JSON_TO(showSReadToggleInDrawer)
+	NLOHMANN_JSON_TO(showGhostToggleInDrawer)
+	NLOHMANN_JSON_TO(showStreamerToggleInDrawer)
+	NLOHMANN_JSON_TO(showGhostToggleInTray)
+	NLOHMANN_JSON_TO(showStreamerToggleInTray)
+	NLOHMANN_JSON_TO(monoFont)
+	NLOHMANN_JSON_TO(hideNotificationCounters)
+	NLOHMANN_JSON_TO(hideNotificationBadge)
+	NLOHMANN_JSON_TO(hideAllChatsFolder)
+	NLOHMANN_JSON_TO(channelBottomButton)
+	NLOHMANN_JSON_TO(showPeerId)
+	NLOHMANN_JSON_TO(showMessageSeconds)
+	NLOHMANN_JSON_TO(showMessageShot)
+	NLOHMANN_JSON_TO(stickerConfirmation)
+	NLOHMANN_JSON_TO(gifConfirmation)
+	NLOHMANN_JSON_TO(voiceConfirmation)
+}
+
+inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nlohmann_json_t) {
+	const AyuGramSettings nlohmann_json_default_obj{};
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendReadMessages)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendReadStories)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendOnlinePackets)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendUploadProgress)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendOfflinePacketAfterOnline)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(markReadAfterAction)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(useScheduledMessages)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(sendWithoutSound)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveDeletedMessages)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveMessagesHistory)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveForBots)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideFromBlocked)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableAds)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableStories)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableCustomBackgrounds)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showOnlyAddedEmojisAndStickers)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(collapseSimilarChannels)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideSimilarChannels)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(wideMultiplier)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(spoofWebviewAsAndroid)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(increaseWebviewHeight)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(increaseWebviewWidth)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableNotificationsDelay)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(localPremium)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(appIcon)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(simpleQuotesAndReplies)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(replaceBottomInfoWithIcons)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(deletedMark)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(editedMark)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(recentStickersCount)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showReactionsPanelInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showViewsPanelInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showHideMessageInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showUserMessagesInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageDetailsInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAttachButtonInMessageField)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showCommandsButtonInMessageField)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showEmojiButtonInMessageField)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMicrophoneButtonInMessageField)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAutoDeleteButtonInMessageField)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAttachPopup)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showEmojiPopup)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showLReadToggleInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showSReadToggleInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGhostToggleInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showStreamerToggleInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGhostToggleInTray)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showStreamerToggleInTray)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(monoFont)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideNotificationCounters)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideNotificationBadge)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideAllChatsFolder)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(channelBottomButton)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showPeerId)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageSeconds)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageShot)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(stickerConfirmation)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(gifConfirmation)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(voiceConfirmation)
+}
 
 AyuGramSettings &getInstance();
 
