@@ -100,7 +100,7 @@ void RepostView::draw(Painter &p, int x, int y, int availableWidth) {
 	Ui::Text::ValidateQuotePaintCache(*cache, quoteSt);
 	Ui::Text::FillQuotePaint(p, rect, *cache, quoteSt);
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.simpleQuotesAndReplies && backgroundEmoji) {
 		using namespace HistoryView;
 		if (backgroundEmoji->firstFrameMask.isNull()

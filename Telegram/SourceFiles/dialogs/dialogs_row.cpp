@@ -553,7 +553,7 @@ void Row::paintUserpic(
 		updateCornerBadgeShown(peer, nullptr, hasUnreadBadgesAbove);
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	const auto cornerBadgeShown = !_cornerBadgeUserpic
 		? _cornerBadgeShown

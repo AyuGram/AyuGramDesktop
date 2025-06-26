@@ -1491,7 +1491,7 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 		_sentRequests.remove(id);
 		_owner->session().api().applyUpdates(result);
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (!settings.sendReadMessages && settings.markReadAfterAction && item) {
 			readHistory(item);
 		}

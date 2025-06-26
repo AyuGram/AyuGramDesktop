@@ -484,7 +484,7 @@ void HistoryMessageReply::updateData(
 		&& (asExternal || _fields.manualQuote);
 	_multiline = !_fields.storyId && (asExternal || nonEmptyQuote);
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	const auto author = resolvedMessage
 							? resolvedMessage->from().get()
 							: resolvedStory

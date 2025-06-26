@@ -1042,7 +1042,7 @@ QPointer<Ui::RpWidget> Premium::createPinnedToTop(
 			}
 		}
 
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		if (settings.localPremium) {
 			return tr::ayu_LocalPremiumNotice(Ui::Text::RichLangValue);
 		}

@@ -936,7 +936,7 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 	Ui::Text::ValidateQuotePaintCache(*cache, _st);
 	Ui::Text::FillQuotePaint(p, outer, *cache, _st);
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.simpleQuotesAndReplies && backgroundEmoji) {
 		ValidateBackgroundEmoji(
 			backgroundEmojiId,
