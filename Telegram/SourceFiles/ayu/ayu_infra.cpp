@@ -28,7 +28,7 @@ void initLang() {
 }
 
 void initUiSettings() {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	AyuUiSettings::setMonoFont(settings.monoFont);
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier);

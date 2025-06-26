@@ -502,7 +502,7 @@ void GifsListWidget::selectInlineResult(
 		return;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (AyuSettings::isUseScheduledMessages()) {
 		auto current = base::unixtime::now();
 		options.scheduled = current + 12;
