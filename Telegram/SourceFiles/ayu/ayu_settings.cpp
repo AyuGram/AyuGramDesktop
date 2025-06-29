@@ -222,6 +222,7 @@ AyuGramSettings::AyuGramSettings() {
 	showOnlyAddedEmojisAndStickers = false;
 	collapseSimilarChannels = true;
 	hideSimilarChannels = false;
+	disableOpenLinkWarning = false;
 
 	wideMultiplier = 1.0;
 
@@ -391,6 +392,10 @@ void set_collapseSimilarChannels(bool val) {
 
 void set_hideSimilarChannels(bool val) {
 	settings->hideSimilarChannels = val;
+}
+
+void set_disableOpenLinkWarning(bool val) {
+	settings->disableOpenLinkWarning = val;
 }
 
 void set_wideMultiplier(double val) {
