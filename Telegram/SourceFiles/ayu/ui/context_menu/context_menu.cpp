@@ -206,15 +206,20 @@ void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		return;
 	}
 
-	const auto history = item->history();
+        const auto history = item->history();
+	const auto owner = &history->owner();
 	menu->addAction(
 		tr::ayu_ContextHideMessage(tr::now),
 		[=]()
 		{
-			item->destroy();
+			const auto ids = owner->itemOrItsGroup(item);
+			for (const auto &fullId : ids) {
+				if (const auto current = owner->message(fullId)) {
+					current->destroy();
+					AyuState::hide(current);
+				}
+			}
 			history->requestChatListMessage();
-
-			AyuState::hide(item);
 		},
 		&st::menuIconClear);
 }
