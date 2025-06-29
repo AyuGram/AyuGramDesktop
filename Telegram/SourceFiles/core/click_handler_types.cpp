@@ -31,6 +31,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_calls.h" // groupCallBoxLabel
 #include "styles/style_layers.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
 namespace {
 
 // Possible context owners: media viewer, profile, history widget.
@@ -126,7 +129,7 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		const auto parsedUrl = url.startsWith(u"tonsite://"_q)
 			? QUrl(url)
 			: QUrl::fromUserInput(url);
-		if (UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
+		if (!AyuSettings::getInstance().disableOpenLinkWarning && UrlRequiresConfirmation(parsedUrl) && !base::IsCtrlPressed()) {
 			const auto my = context.value<ClickHandlerContext>();
 			if (!my.show) {
 				Core::App().hideMediaView();
