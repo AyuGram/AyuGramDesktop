@@ -1,0 +1,101 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: windows-2019 # Using windows-2019 for VS 2019, adjust if VS 2022 (windows-2022) is needed
+    env:
+      # Variables needed by prepare.py and build scripts
+      # Platform: x86, x64, arm64. This is usually set by the VS Native Tools Command Prompt.
+      # We'll use setup-msvc to achieve a similar environment.
+      # QT: As seen in prepare.py, this might be needed.
+      CHOCOLATEY_VERBOSITY: "fatal" # Make choco less noisy
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # prepare.py uses python
+
+    - name: Set up MSVC developer environment
+      uses: microsoft/setup-msvc-dev@v1
+      with:
+        arch: 'x64' # Or 'x86', 'arm64'. This sets up the %Platform% env var.
+        # vs-version: '16.0' # For VS 2019. For VS 2022 use '17.0' and windows-2022 runner.
+
+    - name: Install Inno Setup (if tsetup*.exe packaging is strictly part of compilation)
+      run: choco install innosetup --no-progress
+      # This is from build.bat, may not be needed if we only compile Telegram.exe and Updater.exe
+
+    - name: Install 7-Zip (if tportable*.zip packaging is strictly part of compilation)
+      run: choco install 7zip.install --no-progress
+      # This is from build.bat, may not be needed
+
+    - name: Cache Dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ github.workspace }}/Libraries
+          ${{ github.workspace }}/ThirdParty
+        key: ${{ runner.os }}-${{ env.Platform }}-deps-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ env.Platform }}-deps-
+
+    - name: Run prepare.py for dependencies
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      shell: cmd # prepare.py and its stages might use cmd-specific commands or rely on VS env
+      run: |
+        cd Telegram\build\prepare
+        python prepare.py skip-release
+        # prepare.py will build into Libraries and ThirdParty folders at the repo root.
+      env:
+        QT: '5.15.2' # Example, adjust as needed or determine from qt_version.py
+
+    - name: Configure build (emulating build.bat steps)
+      shell: cmd
+      run: |
+        cd Telegram
+        call configure.bat
+        # configure.bat should set up the 'out' directory.
+        # It uses %Platform% which is set by setup-msvc-dev.
+
+    - name: Build Telegram
+      shell: cmd
+      run: |
+        cd out
+        call cmake --build . --config Release --target Telegram -- /m:%NUMBER_OF_PROCESSORS%
+        # Using /m for parallel build with MSBuild (which CMake generates for VS)
+
+    - name: Upload Telegram.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: Telegram-windows-${{ env.Platform }}.exe
+        path: ${{ github.workspace }}/out/Release/Telegram.exe
+        if-no-files-found: error
+
+    - name: Upload Updater.exe
+      uses: actions/upload-artifact@v4
+      with:
+        name: Updater-windows-${{ env.Platform }}.exe
+        path: ${{ github.workspace }}/out/Release/Updater.exe
+        if-no-files-found: error
+
+    - name: Upload PDBs (optional)
+      uses: actions/upload-artifact@v4
+      with:
+        name: Symbols-windows-${{ env.Platform }}
+        path: |
+          ${{ github.workspace }}/out/Release/Telegram.pdb
+          ${{ github.workspace }}/out/Release/Updater.pdb
+        if-no-files-found: warn

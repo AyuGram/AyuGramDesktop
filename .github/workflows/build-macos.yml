@@ -1,0 +1,74 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: macos-12 # Using macos-12 for now, might need adjustment based on Xcode/SDK requirements
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "10.13" # As seen in prepare.py
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Select Xcode version (if specific version needed)
+      run: sudo xcode-select -s /Applications/Xcode_13.4.1.app/Contents/Developer # Example, adjust as needed
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # prepare.py uses python3
+
+    - name: Cache Dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ github.workspace }}/Libraries
+          ${{ github.workspace }}/ThirdParty
+        key: ${{ runner.os }}-deps-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+    - name: Install Python dependencies for prepare.py (if any)
+      run: |
+        # Assuming prepare.py and its direct imports don't have external pip dependencies
+        # If they do, they should be installed here.
+        echo "No Python dependencies to install for prepare.py itself for now."
+
+    - name: Run prepare.py for dependencies
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      run: |
+        cd Telegram/build/prepare
+        python3 prepare.py skip-release # Adding skip-release as we only want to compile
+        # prepare.py will build into Libraries and ThirdParty folders at the repo root.
+      env:
+        QT: '5.15.2' # Example, this should ideally be determined by qt_version.py logic if possible
+                     # or made a matrix variable if multiple Qt versions need support.
+
+    - name: Configure build (emulating build.sh steps)
+      run: |
+        cd Telegram # build.sh runs configure.sh from Telegram directory
+        # Forcing specific architectures for CI; can be parameterized or matrix later
+        # Using x86_64 for macos-12 runner for broader compatibility for now
+        ./configure.sh -D DESKTOP_APP_MAC_ARCH="x86_64" -D DESKTOP_APP_DISABLE_JEMALLOC=ON
+        # DESKTOP_APP_DISABLE_JEMALLOC=ON is often useful for CI/dev builds
+
+    - name: Build Telegram
+      run: |
+        cd out # configure.sh creates an 'out' directory at the repo root
+        cmake --build . --config Release --target Telegram -j $(sysctl -n hw.ncpu)
+
+    - name: Upload Telegram.app
+      uses: actions/upload-artifact@v4
+      with:
+        name: Telegram-macOS-x86_64.app
+        path: ${{ github.workspace }}/out/Release/Telegram.app
+        if-no-files-found: error
