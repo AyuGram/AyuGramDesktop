@@ -6758,7 +6758,9 @@ void HistoryWidget::updateSendRestriction() {
 		return;
 	}
 	_sendRestrictionKey = restriction.text;
-	if (!restriction) {
+	if (AyuForward::isForwarding(_peer->id)) {
+		_sendRestriction = AyuForwardWriteRestriction(this, _peer->id, session());
+	} else if (!restriction) {
 		_sendRestriction = nullptr;
 	} else if (restriction.frozen) {
 		const auto show = controller()->uiShow();

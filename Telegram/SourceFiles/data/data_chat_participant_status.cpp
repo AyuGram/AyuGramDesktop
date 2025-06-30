@@ -186,7 +186,7 @@ SendError RestrictionError(
 		ChatRestriction restriction) {
 	if (AyuForward::isForwarding(peer->id)) {
 		return SendError({
-			.text = AyuForward::stateName(peer->id)
+			.text = AyuForward::stateName(peer->id).first + "\n" + AyuForward::stateName(peer->id).second,
 		});
 	}
 	using Flag = ChatRestriction;

@@ -3279,6 +3279,21 @@ void ApiWrap::forwardMessages(
 		FnMut<void()> &&successCallback) {
 	Expects(!draft.items.empty());
 
+	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front());
+	if (fullAyuForward) {
+		crl::async([=] {
+			AyuForward::forwardMessages(_session, action, false, draft);
+		});
+		return;
+	}
+	const auto ayuIntelligentForwardNeeded = AyuForward::isAyuForwardNeeded(draft.items);
+	if (ayuIntelligentForwardNeeded) {
+		crl::async([=] {
+			AyuForward::intelligentForward(_session, action, draft);
+		});
+		return;
+	}
+
 	auto &histories = _session->data().histories();
 
 	struct SharedCallback {
@@ -3338,20 +3353,6 @@ void ApiWrap::forwardMessages(
 		sendFlags |= SendFlag::f_top_msg_id;
 	}
 
-	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front()->from(), draft.items.front()->history());
-	if (fullAyuForward) {
-		crl::async([=] {
-			AyuForward::forwardMessages(peer, draft.items, _session, history, action, false);
-		});
-		return;
-	}
-	const auto ayuIntelligentForwardNeeded = AyuForward::isAyuForwardNeeded(draft.items);
-	if (ayuIntelligentForwardNeeded) {
-		crl::async([=] {
-			AyuForward::intelligentForward(peer, draft.items, _session, history, action);
-		});
-		return;
-	}
 	auto forwardFrom = draft.items.front()->history()->peer;
 	auto ids = QVector<MTPint>();
 	auto randomIds = QVector<MTPlong>();
@@ -3780,11 +3781,12 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 		? replyTo->topicRootId()
 		: Data::ForumTopic::kGeneralId;
 	const auto topic = peer->forumTopicFor(topicRootId);
-	if (!(topic
-			? Data::CanSendTexts(topic)
-			: Data::CanSendTexts(peer) || AyuForward::isForwarding(peer->id)
-		)
 
+	const bool canTexts = topic
+		? Data::CanSendTexts(topic)
+		: Data::CanSendTexts(peer);
+
+	if (!(canTexts || AyuForward::isForwarding((peer->id)))
 		|| Api::SendDice(message)) {
 		return;
 	}

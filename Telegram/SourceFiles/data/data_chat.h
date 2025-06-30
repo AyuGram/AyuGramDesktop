@@ -24,7 +24,7 @@ enum class ChatDataFlag {
 	CanSetUsername = (1 << 7),
 	NoForwards = (1 << 8),
 
-	AyuNoForwards = (1 << 20),
+	AyuNoForwards = (1 << 31),
 };
 inline constexpr bool is_flag_type(ChatDataFlag) { return true; };
 using ChatDataFlags = base::flags<ChatDataFlag>;
