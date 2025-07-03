@@ -17,6 +17,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/userpic_button.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/text/text_entity.h"
+#include "data/data_peer_id.h"
+#include "data/data_web_page.h"
+#include <QtCore/QRegularExpression>
 #include "api/api_chat_participants.h"
 #include "lang/lang_keys.h"
 #include "ui/boxes/confirm_box.h"
@@ -287,6 +291,7 @@ private:
 	void addToggleUnreadMark();
 	void addToggleArchive();
 	void addClearHistory();
+	void addDeleteByKeyword();
 	void addDeleteChat();
 	void addLeaveChat();
 	void addJoinChat();
@@ -743,6 +748,28 @@ void Filler::addClearHistory() {
 		tr::lng_profile_clear_history(tr::now),
 		ClearHistoryHandler(_controller, _peer),
 		&st::menuIconClear);
+}
+
+void Filler::addDeleteByKeyword() {
+	if (_topic) {
+		return;
+	}
+	if (const auto channel = _peer->asChannel()) {
+		if (!channel->amIn()) {
+			return;
+		}
+		if (channel->isBroadcast() && !channel->canDeleteMessages()) {
+			return;
+		}
+	} else if (const auto chat = _peer->asChat()) {
+		if (!chat->amIn()) {
+			return;
+		}
+	} else if (!_peer->isUser()) {
+		return;
+	}
+	_addAction(
+		tr::lng_profile_delete_by_keyword(tr::now), DeleteByKeywordHandler(_controller, _peer), &st::menuIconDelete);
 }
 
 void Filler::addDeleteChat() {
@@ -1425,6 +1452,7 @@ void Filler::fillContextMenuActions() {
 		}
 	}
 	addClearHistory();
+	addDeleteByKeyword();
 	addDeleteChat();
 	addLeaveChat();
 	addDeleteTopic();
@@ -1448,6 +1476,7 @@ void Filler::fillHistoryActions() {
 	addReport();
 	AyuUi::AddDeletedMessagesActions(_peer, _thread, _controller, _addAction);
 	addClearHistory();
+	addDeleteByKeyword();
 	addDeleteChat();
 	addLeaveChat();
 }
@@ -3179,6 +3208,227 @@ Fn<void()> ClearHistoryHandler(
 	};
 }
 
+void DeleteByKeywordAfterInput(not_null<Window::SessionController *> controller,
+							   not_null<PeerData *> peer,
+							   QString keyword) {
+	const auto confirmKeyword = keyword;
+	keyword = keyword.toCaseFolded();
+	const auto session = &peer->session();
+
+	auto collected = std::make_shared<std::vector<MsgId>>();
+	const auto showLinks = !peer->isUser();
+	std::shared_ptr<std::vector<QString>> links;
+	if (showLinks) {
+		links = std::make_shared<std::vector<QString>>();
+	}
+
+	auto removeNext = std::make_shared<Fn<void(int)>>();
+	*removeNext = [=](int index)
+	{
+		if (index >= int(collected->size())) {
+			DEBUG_LOG(("Deleted all %1 messages by keyword").arg(collected->size()));
+			return;
+		}
+
+		QVector<MTPint> ids;
+		ids.reserve(std::min<int>(100, collected->size() - index));
+		for (auto i = 0; i < 100 && (index + i) < int(collected->size()); ++i) {
+			ids.push_back(MTP_int((*collected)[index + i].bare));
+		}
+
+		const auto batch = index / 100 + 1;
+		const auto done = [=](const MTPmessages_AffectedMessages &result)
+		{
+			session->api().applyAffectedMessages(peer, result);
+			if (peer->isChannel()) {
+				session->data().processMessagesDeleted(peer->id, ids);
+			} else {
+				session->data().processNonChannelMessagesDeleted(ids);
+			}
+			const auto deleted = index + ids.size();
+			DEBUG_LOG(("Deleted batch %1, total deleted %2/%3").arg(batch).arg(deleted).arg(collected->size()));
+			const auto delay = crl::time(500 + base::RandomValue<int>() % 500);
+			base::call_delayed(delay, [=] { (*removeNext)(deleted); });
+		};
+		const auto fail = [=](const MTP::Error &error)
+		{
+			DEBUG_LOG(("Delete batch failed: %1").arg(error.type()));
+			const auto delay = crl::time(1000);
+			base::call_delayed(delay, [=] { (*removeNext)(index); });
+		};
+
+		if (const auto channel = peer->asChannel()) {
+			session->api()
+				.request(MTPchannels_DeleteMessages(channel->inputChannel, MTP_vector<MTPint>(ids)))
+				.done(done)
+				.fail(fail)
+				.handleFloodErrors()
+				.send();
+		} else {
+			using Flag = MTPmessages_DeleteMessages::Flag;
+			session->api()
+				.request(MTPmessages_DeleteMessages(MTP_flags(Flag::f_revoke), MTP_vector<MTPint>(ids)))
+				.done(done)
+				.fail(fail)
+				.handleFloodErrors()
+				.send();
+		}
+	};
+
+	auto requestNext = std::make_shared<Fn<void(MsgId)>>();
+	*requestNext = [=](MsgId from)
+	{
+		using Flag = MTPmessages_Search::Flag;
+		auto req = MTPmessages_Search(MTP_flags(Flag(0)),
+									  peer->input,
+									  MTP_string(keyword),
+									  MTP_inputPeerEmpty(),
+									  MTPInputPeer(),
+									  MTPVector<MTPReaction>(),
+									  MTP_int(0),
+									  MTP_inputMessagesFilterEmpty(),
+									  MTP_int(0),
+									  MTP_int(0),
+									  MTP_int(from.bare),
+									  MTP_int(0),
+									  MTP_int(100),
+									  MTP_int(0),
+									  MTP_int(0),
+									  MTP_long(0));
+
+		QRegularExpression re("\\b" + QRegularExpression::escape(keyword) + "\\b",
+							  QRegularExpression::UseUnicodePropertiesOption);
+
+		session->api()
+			.request(std::move(req))
+			.handleFloodErrors()
+			.done(
+				[=](const Api::HistoryRequestResult &result)
+				{
+					auto parsed = Api::ParseHistoryResult(peer, from, Data::LoadDirection::Before, result);
+					MsgId minId;
+					int batchCount = 0;
+					for (const auto &id : parsed.messageIds) {
+						if (!minId || id < minId) minId = id;
+						if (const auto item = session->data().message(peer->id, id)) {
+							auto match = re.match(item->originalText().text.toCaseFolded()).hasMatch();
+							if (!match) {
+								if (const auto media = item->media()) {
+									if (const auto poll = media->poll()) {
+										if (re.match(poll->question.text.toCaseFolded()).hasMatch()) {
+											match = true;
+										} else {
+											for (const auto &answer : poll->answers) {
+												if (re.match(answer.text.text.toCaseFolded()).hasMatch()) {
+													match = true;
+													break;
+												}
+											}
+										}
+									}
+									if (!match) {
+										if (const auto webpage = media->webpage()) {
+											if (re.match(webpage->title.toCaseFolded()).hasMatch() ||
+												re.match(webpage->description.text.toCaseFolded()).hasMatch()) {
+												match = true;
+											}
+										}
+									}
+								}
+							}
+							if (match && item->canDelete()) {
+								collected->push_back(id);
+								if (showLinks && (peer->isChannel() || peer->isChat() || peer->isMegagroup())) {
+									const auto channel = peer->asChannel();
+									const auto base = (channel && channel->hasUsername())
+										? channel->username()
+										: u"c/"_q + QString::number(peerToChannel(peer->id).bare);
+									links->push_back(
+										session->createInternalLinkFull(base + u"/"_q + QString::number(id.bare)));
+								}
+							}
+						}
+						++batchCount;
+					}
+					DEBUG_LOG(("Batch found %1 messages, total %2").arg(batchCount).arg(collected->size()));
+					if (parsed.messageIds.size() == 100 && minId) {
+						(*requestNext)(minId - MsgId(1));
+					} else {
+						DEBUG_LOG(("Found %1 messages for keyword").arg(collected->size()));
+						const auto count = int(collected->size());
+						controller->show(Box(
+							[=](not_null<Ui::GenericBox *> box)
+							{
+								Ui::ConfirmBox(box,
+											   {
+												   .text = tr::lng_sure_delete_by_keyword(
+													   tr::now, lt_count, count, lt_keyword, confirmKeyword),
+												   .confirmed =
+													   [=](Fn<void()> close)
+												   {
+													   (*removeNext)(0);
+													   close();
+												   },
+												   .confirmText = tr::lng_box_delete(),
+												   .cancelText = tr::lng_cancel(),
+												   .confirmStyle = &st::attentionBoxButton,
+											   });
+								if (showLinks && links && !links->empty()) {
+									const auto &stLabel = st::boxLabel;
+									box->addSkip(st::boxRowPadding.bottom());
+									QString text;
+									for (const auto &link : *links) {
+										text += link + u"\n"_q;
+									}
+									if (!text.isEmpty()) {
+										text.chop(1);
+									}
+									auto label =
+										box->addRow(object_ptr<Ui::FlatLabel>(box, rpl::single(text), stLabel));
+									label->setSelectable(true);
+									label->setContextCopyText(tr::lng_context_copy_link(tr::now));
+								}
+							}));
+					}
+				})
+			.fail([=](const MTP::Error &error) { DEBUG_LOG(("History fetch failed: %1").arg(error.type())); })
+			.send();
+	};
+
+	(*requestNext)(MsgId(0));
+}
+
+Fn<void()> DeleteByKeywordHandler(not_null<Window::SessionController *> controller, not_null<PeerData *> peer) {
+	return [=]
+	{
+		if (controller->showFrozenError()) {
+			return;
+		}
+		controller->show(Box(
+			[=](not_null<Ui::GenericBox *> box)
+			{
+				box->setTitle(tr::lng_profile_delete_by_keyword());
+				const auto field = box->addRow(object_ptr<Ui::InputField>(box,
+																		  st::defaultInputField,
+																		  Ui::InputField::Mode::NoNewlines,
+																		  tr::lng_delete_by_keyword_placeholder()));
+				box->setFocusCallback([=] { field->setFocusFast(); });
+				const auto submit = [=]
+				{
+					const auto keyword = field->getLastText().trimmed();
+					if (keyword.isEmpty()) {
+						field->showError();
+						return;
+					}
+					DeleteByKeywordAfterInput(controller, peer, keyword);
+					box->closeBox();
+				};
+				field->submits() | rpl::start_with_next(submit, field->lifetime());
+				box->addButton(tr::lng_continue(), submit);
+				box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+			}));
+	};
+}
 Fn<void()> DeleteAndLeaveHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {

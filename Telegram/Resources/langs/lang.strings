@@ -6905,3 +6905,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+"lng_profile_delete_by_keyword" = "Delete messages by keyword";
+"lng_sure_delete_by_keyword#one" = "Are you sure you want to delete {count} message containing \"{keyword}\"?";
+"lng_sure_delete_by_keyword#other" = "Are you sure you want to delete {count} messages containing \"{keyword}\"?";
+"lng_delete_by_keyword_placeholder" = "Enter keyword";
