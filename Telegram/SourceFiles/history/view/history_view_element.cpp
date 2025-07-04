@@ -61,6 +61,9 @@ namespace {
 
 // A new message from the same sender is attached to previous within 15 minutes.
 constexpr int kAttachMessageToPreviousSecondsDelta = 900;
+// Отступ между правыми кнопками и краем
+constexpr auto kRightActionsMargin = 10;
+constexpr auto kRightActionsMarginWide = 1;
 
 Element *HoveredElement/* = nullptr*/;
 Element *PressedElement/* = nullptr*/;
@@ -1590,6 +1593,11 @@ ClickHandlerPtr Element::rightActionLink(
 	return ClickHandlerPtr();
 }
 
+// Заглушка для дополнительной кнопки "глазик"
+ClickHandlerPtr Element::viewActionLink(
+		std::optional<QPoint> pressPoint) const {
+	return ClickHandlerPtr();
+}
 TimeId Element::displayedEditDate() const {
 	return TimeId(0);
 }

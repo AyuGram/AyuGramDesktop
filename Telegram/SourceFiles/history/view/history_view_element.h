@@ -493,6 +493,9 @@ public:
 		int outerWidth) const;
 	[[nodiscard]] virtual ClickHandlerPtr rightActionLink(
 		std::optional<QPoint> pressPoint) const;
+	// Возвращает ссылку для дополнительной кнопки "глазик"
+	[[nodiscard]] virtual ClickHandlerPtr viewActionLink(
+		std::optional<QPoint> pressPoint) const;
 	[[nodiscard]] virtual TimeId displayedEditDate() const;
 	[[nodiscard]] virtual bool hasVisibleText() const;
 	[[nodiscard]] int textualMaxWidth() const;

@@ -139,6 +139,8 @@ public:
 		int outerWidth) const override;
 	[[nodiscard]] ClickHandlerPtr rightActionLink(
 		std::optional<QPoint> pressPoint) const override;
+	[[nodiscard]] ClickHandlerPtr viewActionLink(
+		std::optional<QPoint> pressPoint) const override;
 	[[nodiscard]] TimeId displayedEditDate() const override;
 	[[nodiscard]] bool toggleSelectionByHandlerClick(
 		const ClickHandlerPtr &handler) const override;
@@ -193,6 +195,7 @@ private:
 	void createTopicButtonRipple();
 
 	void toggleRightActionRipple(bool pressed);
+	void toggleViewActionRipple(bool pressed);
 
 	void toggleReplyRipple(bool pressed);
 

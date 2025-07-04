@@ -51,12 +51,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/features/messageshot/message_shot.h"
 #include "styles/style_ayu_icons.h"
+#include "ayu/ayu_state.h"
+#include "ayu/ayu_settings.h"
 
 
 namespace HistoryView {
 namespace {
 
 constexpr auto kPlayStatusLimit = 12;
+// Минимальный отступ между кнопкой просмотра и правым краем
+constexpr auto kRightActionsMargin = 10;
+// Отступ для широких окон, чтобы кнопки стояли чуть правее
+constexpr auto kRightActionsMarginWide = 1;
 const auto kPsaTooltipPrefix = "cloud_lng_tooltip_psa_";
 
 class KeyboardStyle : public ReplyKeyboard::Style {
@@ -397,6 +403,10 @@ struct Message::RightAction {
 	ClickHandlerPtr link;
 	QPoint lastPoint;
 	std::unique_ptr<SecondRightAction> second;
+	// Дополнительные элементы для кнопки с глазиком
+	std::unique_ptr<Ui::RippleAnimation> viewRipple;
+	ClickHandlerPtr viewLink;
+	QPoint viewLastPoint;
 };
 
 LogEntryOriginal::LogEntryOriginal() = default;
@@ -1506,9 +1516,12 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 				(g.height() - size->height()) / 2,
 				0,
 				st::historyFastShareBottom);
+			const auto margin = delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin;
 			const auto fastShareLeft = hasRightLayout()
 				? (g.left() - size->width() - st::historyFastShareLeft)
-				: (g.left() + g.width() + st::historyFastShareLeft);
+				: (g.left() + g.width() + st::historyFastShareLeft - margin);
 			const auto fastShareTop = data()->isSponsored()
 				? g.top() + fastShareSkip
 				: g.top() + g.height() - fastShareSkip - size->height();
@@ -1583,7 +1596,7 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		const auto outerWidth = st::historySwipeIconSkip
 			+ (isLeftSize ? rect::right(g) : width())
 			+ ((g.height() < size * kMaxHeightRatio)
-				? rightActionSize().value_or(QSize()).width()
+				? rightActionSize().value_or(QSize()).width() * 2
 				: 0);
 		const auto shift = std::min(
 			(size * kShiftRatio * context.gestureHorizontal.ratio),
@@ -2271,6 +2284,8 @@ void Message::clickHandlerPressedChanged(
 		return;
 	} else if (_rightAction && (handler == _rightAction->link)) {
 		toggleRightActionRipple(pressed);
+	} else if (_rightAction && (handler == _rightAction->viewLink)) {
+		toggleViewActionRipple(pressed);
 	} else if (_rightAction
 		&& _rightAction->second
 		&& (handler == _rightAction->second->link)) {
@@ -2340,6 +2355,26 @@ void Message::toggleRightActionRipple(bool pressed) {
 	} else if (_rightAction->ripple) {
 		_rightAction->ripple->lastStop();
 	}
+}
+
+// Ripple для дополнительной кнопки
+void Message::toggleViewActionRipple(bool pressed) {
+	   Expects(_rightAction != nullptr);
+
+	   const auto rightSize = rightActionSize();
+	   Assert(rightSize != std::nullopt);
+
+	   if (pressed) {
+			   if (!_rightAction->viewRipple) {
+					   _rightAction->viewRipple = std::make_unique<Ui::RippleAnimation>(
+							   st::defaultRippleAnimation,
+							   Ui::RippleAnimation::RoundRectMask(*rightSize, rightSize->width() / 2),
+							   [=] { repaint(); });
+			   }
+			   _rightAction->viewRipple->add(_rightAction->viewLastPoint);
+	   } else if (_rightAction->viewRipple) {
+			   _rightAction->viewRipple->lastStop();
+	   }
 }
 
 void Message::toggleReplyRipple(bool pressed) {
@@ -2762,20 +2797,33 @@ TextState Message::textState(
 				(g.height() - size->height()) / 2,
 				0,
 				st::historyFastShareBottom);
+			const auto margin = delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin;
 			const auto fastShareLeft = hasRightLayout()
 				? (g.left() - size->width() - st::historyFastShareLeft)
-				: (g.left() + g.width() + st::historyFastShareLeft);
+				: (g.left() + g.width() + st::historyFastShareLeft - margin);
 			const auto fastShareTop = data()->isSponsored()
 				? g.top() + fastShareSkip
 				: g.top() + g.height() - fastShareSkip - size->height();
-			if (QRect(
+			const auto fastShareRect = QRect(
 				fastShareLeft,
 				fastShareTop,
 				size->width(),
-				size->height()
-			).contains(point)) {
+				size->height());
+			if (fastShareRect.contains(point)) {
 				result.link = rightActionLink(point
 					- QPoint(fastShareLeft, fastShareTop));
+			} else if (AyuSettings::getInstance().showHideButtonNearPosts) {
+			const auto viewRect = QRect(
+					fastShareLeft + size->width() + st::historyFastShareLeft,
+					fastShareTop,
+					size->width(),
+					size->height());
+					if (viewRect.contains(point)) {
+				result.link = viewActionLink(point
+					- QPoint(viewRect.x(), fastShareTop));
+				}
 			}
 		}
 	} else if (media && media->isDisplayed()) {
@@ -3626,6 +3674,12 @@ void Message::refreshDataIdHook() {
 	if (_rightAction && base::take(_rightAction->link)) {
 		_rightAction->link = rightActionLink(_rightAction->lastPoint);
 	}
+	if (AyuSettings::getInstance().showHideButtonNearPosts
+	&& _rightAction && base::take(_rightAction->viewLink)) {
+		_rightAction->viewLink = viewActionLink(_rightAction->viewLastPoint);
+	} else if (_rightAction) {
+		_rightAction->viewLink = nullptr;
+	}
 	if (base::take(_fastReplyLink)) {
 		_fastReplyLink = fastReplyLink();
 	}
@@ -4021,6 +4075,7 @@ void Message::drawRightAction(
 
 	const auto size = rightActionSize();
 	const auto st = context.st;
+	const auto showEye = AyuSettings::getInstance().showHideButtonNearPosts;
 
 	if (_rightAction->ripple) {
 		const auto &stm = context.messageStyle();
@@ -4033,6 +4088,19 @@ void Message::drawRightAction(
 			colorOverride);
 		if (_rightAction->ripple->empty()) {
 			_rightAction->ripple.reset();
+		}
+	}
+	if (showEye && _rightAction->viewRipple) {
+		const auto &stm = context.messageStyle();
+		const auto colorOverride = &stm->msgWaveformInactive->c;
+		_rightAction->viewRipple->paint(
+			p,
+			left + size->width() + st::historyFastShareLeft,
+			top,
+			size->width(),
+			colorOverride);
+		if (_rightAction->viewRipple->empty()) {
+			_rightAction->viewRipple.reset();
 		}
 	}
 	if (_rightAction->second && _rightAction->second->ripple) {
@@ -4055,6 +4123,22 @@ void Message::drawRightAction(
 		PainterHighQualityEnabler hq(p);
 		const auto rect = style::rtlrect(
 			left,
+			top,
+			size->width(),
+			size->height(),
+			outerWidth);
+		const auto usual = st::historyFastShareSize;
+		if (size->width() == size->height() && size->width() == usual) {
+			p.drawEllipse(rect);
+		} else {
+			p.drawRoundedRect(rect, usual / 2, usual / 2);
+		}
+	}
+	// Фон для второй кнопки с глазиком
+	if (showEye) {
+		PainterHighQualityEnabler hq(p);
+		const auto rect = style::rtlrect(
+			left + size->width() + st::historyFastShareLeft,
 			top,
 			size->width(),
 			size->height(),
@@ -4101,6 +4185,15 @@ void Message::drawRightAction(
 			? st->historyFastShareIcon()
 			: st->historyGoToOriginalIcon();
 		icon.paintInCenter(p, Rect(left, top, *size));
+	// Рисуем копию с глазиком правее исходной кнопки
+	if (showEye) {
+		const auto &viewIcon = st->historyFastViewIcon();
+		viewIcon.paintInCenter(
+				p,
+				Rect(left + size->width() + st::historyFastShareLeft,
+				top,
+				*size));
+			}
 	}
 }
 
@@ -4123,6 +4216,43 @@ ClickHandlerPtr Message::rightActionLink(
 	return _rightAction->link;
 }
 
+// Возвращает ссылку для кнопки с глазиком
+// Теперь она скрывает выбранное сообщение, как пункт "Hide" в контекстном меню
+ClickHandlerPtr Message::viewActionLink(
+			   std::optional<QPoint> pressPoint) const {
+	   if (delegate()->elementInSelectionMode(this).progress > 0) {
+			   return nullptr;
+	   }
+	   if (!AyuSettings::getInstance().showHideButtonNearPosts) {
+			   return nullptr;
+	   }
+	   ensureRightAction();
+	   if (!_rightAction->viewLink) {
+			   const auto sessionId = data()->history()->session().uniqueId();
+			   const auto owner = &data()->history()->owner();
+			   const auto ids = owner->itemOrItsGroup(data()); // список всех сообщений в группе
+			   const auto history = data()->history();
+
+			   _rightAction->viewLink = std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+					   const auto controller = ExtractController(context);
+					   if (!controller || controller->session().uniqueId() != sessionId) {
+							   return;
+					   }
+					   // Для альбомов скрываем каждое сообщение группы
+					   for (const auto &fullId : ids) {
+							   if (const auto item = owner->message(fullId)) {
+									   item->destroy();
+									   AyuState::hide(item);
+							   }
+					   }
+					   history->requestChatListMessage();
+			   });
+	   }
+	   if (pressPoint) {
+			   _rightAction->viewLastPoint = *pressPoint;
+	   }
+	   return _rightAction->viewLink;
+}
 void Message::ensureRightAction() const {
 	if (_rightAction) {
 		return;
@@ -4374,9 +4504,16 @@ QRect Message::innerGeometry() const {
 		const auto w = std::max(
 			(media() ? media()->resolveCustomInfoRightBottom().x() : 0),
 			result.width());
-		result.setWidth(std::min(
-			w + rightActionSize().value_or(QSize(0, 0)).width() * 2,
-			width()));
+		// Учитываем две кнопки и дополнительный отступ от правого края
+		const auto margin = hasRightLayout() ? 0
+			: (delegate()->elementIsChatWide()
+			? kRightActionsMarginWide
+			: kRightActionsMargin);
+		const auto eye = AyuSettings::getInstance().showHideButtonNearPosts ? 2 : 1;
+		const auto actionsWidth = rightActionSize().value_or(QSize()).width() * eye
+			+ st::historyFastShareLeft * eye + margin;
+		const auto extra = std::max(actionsWidth - st::msgMargin.right(), 0);
+		result.setWidth(std::min(w + extra, width()));
 	}
 	if (hasBubble()) {
 		const auto cut = [&](int amount) {
@@ -4429,12 +4566,23 @@ QRect Message::countGeometry() const {
 	auto contentWidth = availableWidth;
 	if (hasFromPhoto()) {
 		contentLeft += st::msgPhotoSkip;
-		if (const auto size = rightActionSize()) {
-			contentWidth -= size->width() + (st::msgPhotoSkip - st::historyFastShareSize);
-		}
-	//} else if (!Adaptive::Wide() && !out() && !fromChannel() && st::msgPhotoSkip - (hmaxwidth - hwidth) > 0) {
-	//	contentLeft += st::msgPhotoSkip - (hmaxwidth - hwidth);
 	}
+		if (const auto size = rightActionSize()) {
+		// Ширина двух кнопок и отступ от правого края
+		const auto margin = hasRightLayout() ? 0
+				: (delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin);
+		const auto eye = AyuSettings::getInstance().showHideButtonNearPosts ? 2 : 1;
+		const auto actionsWidth = size->width() * eye + st::historyFastShareLeft * eye + margin;
+		// Отнимаем только разницу между необходимым и уже заложенным отступом
+		const auto extra = std::max(actionsWidth - st::msgMargin.right(), 0);
+			contentWidth -= extra;
+		if (hasFromPhoto()) {
+		// Для сообщений с аватаркой учитываем дополнительное смещение
+		contentWidth -= (st::msgPhotoSkip - st::historyFastShareSize);
+			   }
+	   }
 	accumulate_min(contentWidth, maxWidth());
 	accumulate_min(contentWidth, int(_bubbleWidthLimit));
 	if (mediaWidth < contentWidth) {
@@ -4553,9 +4701,18 @@ int Message::resizeContentGetHeight(int newWidth) {
 	auto contentWidth = newWidth
 		- st::msgMargin.left()
 		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
+	if (const auto size = rightActionSize()) {
+		const auto margin = hasRightLayout() ? 0
+				: (delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin);
+		const auto eye = AyuSettings::getInstance().showHideButtonNearPosts ? 2 : 1;
+		const auto actionsWidth = size->width() * eye + st::historyFastShareLeft * eye + margin;
+		const auto extra = std::max(actionsWidth - st::msgMargin.right(), 0);
+			contentWidth -= extra;
 	if (hasFromPhoto()) {
-		if (const auto size = rightActionSize()) {
-			contentWidth -= size->width() + (st::msgPhotoSkip - st::historyFastShareSize);
+		// Учёт области под аватарку
+			contentWidth -= (st::msgPhotoSkip - st::historyFastShareSize);
 		}
 	}
 	accumulate_min(contentWidth, maxWidth());

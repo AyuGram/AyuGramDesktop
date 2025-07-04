@@ -21,6 +21,7 @@
 #include "styles/style_chat_helpers.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_basic.h"
+#include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
@@ -894,23 +895,71 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::save();
 		});
 
-	AddChooseButtonWithIconAndRightText(
-		container,
-		controller,
-		settings.showHideMessageInContextMenu,
-		options,
-		tr::ayu_ContextHideMessage(),
-		tr::ayu_SettingsContextMenuTitle(),
-		st::menuIconClear,
-		[=](int index)
-		{
-			AyuSettings::set_showHideMessageInContextMenu(index);
-			AyuSettings::save();
-		});
-	AddChooseButtonWithIconAndRightText(
-		container,
-		controller,
-		settings.showUserMessagesInContextMenu,
+	   auto hideValue = container->lifetime().make_state<rpl::variable<int>>(settings.showHideMessageInContextMenu);
+	   rpl::producer<QString> hideLabel = hideValue->value() | rpl::map([=](int val) {
+			   return options[val];
+	   });
+	   // добавляем кнопку для пункта "Hide" с изменяемым подпунктом
+	   // 4-й параметр - стиль, 5-й - иконка
+	   Settings::AddButtonWithLabel(
+			   container,
+			   tr::ayu_ContextHideMessage(),
+			   hideLabel,
+			   st::settingsButton,
+			   { &st::menuIconClear }
+	   )->addClickHandler([=] {
+			   controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+					   box->setTitle(tr::ayu_SettingsContextMenuTitle());
+					   box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
+					   const auto group = std::make_shared<Ui::RadiobuttonGroup>(hideValue->current());
+					   const auto layout = box->verticalLayout();
+					   layout->add(object_ptr<Ui::FixedHeightWidget>(
+							   layout,
+							   st::boxOptionListPadding.top() + st::autolockButton.margin.top()));
+					   int idx = 0;
+					   for (const auto &text : options) {
+							   layout->add(
+									   object_ptr<Ui::Radiobutton>(
+											   layout,
+											   group,
+											   idx++,
+											   text,
+											   st::defaultBoxCheckbox,
+											   st::defaultRadio),
+									   QMargins(
+											   st::boxPadding.left() + st::boxOptionListPadding.left(),
+											   0,
+											   st::boxPadding.right(),
+											   st::boxOptionListSkip));
+					   }
+					   const auto check = layout->add(
+							   object_ptr<Ui::Checkbox>(
+									   layout,
+									   tr::ayu_ShowNearPosts(),
+									   settings.showHideButtonNearPosts,
+									   st::defaultBoxCheckbox),
+							   QMargins(
+									   st::boxPadding.left() + st::boxOptionListPadding.left(),
+									   0,
+									   st::boxPadding.right(),
+									   st::boxOptionListSkip));
+					   group->setChangedCallback([=](int index) {
+							   AyuSettings::set_showHideMessageInContextMenu(index);
+							   AyuSettings::save();
+							   hideValue->force_assign(index);
+							   box->closeBox();
+					   });
+					   check->checkedValue()
+					   | rpl::start_with_next([=](bool enabled) {
+							   AyuSettings::set_showHideButtonNearPosts(enabled);
+							   AyuSettings::save();
+					   }, check->lifetime());
+			   }));
+	   });
+	   AddChooseButtonWithIconAndRightText(
+				container,
+				controller,
+				settings.showUserMessagesInContextMenu,
 		options,
 		tr::ayu_UserMessagesMenuText(),
 		tr::ayu_SettingsContextMenuTitle(),

@@ -30,6 +30,8 @@ namespace HistoryView {
 namespace {
 
 constexpr auto kMaxForwardedBarLines = 4;
+constexpr auto kRightActionsMargin = 10;
+constexpr auto kRightActionsMarginWide = 1;
 
 } // namespace
 
@@ -520,10 +522,23 @@ TextState UnwrappedMedia::textState(QPoint point, StateRequest request) const {
 				fullBottom,
 				fullRight,
 				*rightActionSize);
-			if (QRect(position.x(), position.y(), rightActionSize->width(), rightActionSize->height()).contains(point)) {
+			const auto fastShareRect = QRect(
+				position.x(),
+				position.y(),
+				rightActionSize->width(),
+				rightActionSize->height());
+			const auto viewRect = QRect(
+				position.x() + rightActionSize->width() + st::historyFastShareLeft,
+				position.y(),
+				rightActionSize->width(),
+				rightActionSize->height());
+			if (fastShareRect.contains(point)) {
 				result.link = _parent->rightActionLink(point - position);
 				return result;
-			}
+			} else if (viewRect.contains(point)) {
+				result.link = _parent->viewActionLink(point - QPoint(viewRect.x(), position.y()));
+				return result;
+						}
 		}
 	}
 
@@ -604,8 +619,8 @@ int UnwrappedMedia::calculateFullRight(const QRect &inner) const {
 			? st::msgMargin.right()
 			: st::msgPadding.right());
 	const auto rightActionWidth = rightActionSize
-		? (st::historyFastShareLeft * 2
-			+ rightActionSize->width())
+		? (st::historyFastShareLeft * 3
+			+ rightActionSize->width() * 2)
 		: 0;
 	auto fullRight = inner.x()
 		+ inner.width()
@@ -633,12 +648,15 @@ QPoint UnwrappedMedia::calculateFastActionPosition(
 		- size.height());
 	const auto doesRightActionHitReply = replyRight
 		&& (fastShareTop < replyHeight);
+	const auto margin = _parent->delegate()->elementIsChatWide()
+		? kRightActionsMarginWide
+		: kRightActionsMargin;
 	const auto fastShareLeft = rightAligned
 		? ((doesRightActionHitReply ? replyLeft : inner.x())
 			- size.width()
 			- st::historyFastShareLeft)
 		: ((doesRightActionHitReply ? replyRight : fullRight)
-			+ st::historyFastShareLeft);
+			+ st::historyFastShareLeft - margin);
 	return QPoint(fastShareLeft, fastShareTop);
 }
 

@@ -54,6 +54,8 @@ namespace {
 
 constexpr auto kStoryWidth = 720;
 constexpr auto kStoryHeight = 1280;
+constexpr auto kRightActionsMargin = 10;
+constexpr auto kRightActionsMarginWide = 1;
 
 using Data::PhotoSize;
 
@@ -418,9 +420,12 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 				InfoDisplayType::Image);
 		}
 		if (const auto size = bubble ? std::nullopt : _parent->rightActionSize()) {
+		const auto margin = _parent->delegate()->elementIsChatWide()
+			? kRightActionsMarginWide
+			: kRightActionsMargin;
 			auto fastShareLeft = _parent->hasRightLayout()
 				? (paintx - size->width() - st::historyFastShareLeft)
-				: (fullRight + st::historyFastShareLeft);
+				: (fullRight + st::historyFastShareLeft - margin);
 			auto fastShareTop = (fullBottom - st::historyFastShareBottom - size->height());
 			_parent->drawRightAction(p, context, fastShareLeft, fastShareTop, 2 * paintx + paintw);
 		}
@@ -700,13 +705,29 @@ TextState Photo::textState(QPoint point, StateRequest request) const {
 			return bottomInfoResult;
 		}
 		if (const auto size = bubble ? std::nullopt : _parent->rightActionSize()) {
+			const auto margin = _parent->delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin;
 			auto fastShareLeft = _parent->hasRightLayout()
 				? (paintx - size->width() - st::historyFastShareLeft)
-				: (fullRight + st::historyFastShareLeft);
+				: (fullRight + st::historyFastShareLeft - margin);
 			auto fastShareTop = (fullBottom - st::historyFastShareBottom - size->height());
-			if (QRect(fastShareLeft, fastShareTop, size->width(), size->height()).contains(point)) {
+			const auto fastShareRect = QRect(
+					fastShareLeft,
+					fastShareTop,
+					size->width(),
+					size->height());
+			const auto viewRect = QRect(
+					fastShareLeft + size->width() + st::historyFastShareLeft,
+					fastShareTop,
+					size->width(),
+					size->height());
+			if (fastShareRect.contains(point)) {
 				result.link = _parent->rightActionLink(point
 					- QPoint(fastShareLeft, fastShareTop));
+			} else if (viewRect.contains(point)) {
+				result.link = _parent->viewActionLink(point
+					- QPoint(viewRect.x(), fastShareTop));
 			}
 		}
 	}

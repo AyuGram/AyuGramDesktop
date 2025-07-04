@@ -72,6 +72,8 @@ namespace {
 constexpr auto kMaxGifForwardedBarLines = 4;
 constexpr auto kUseNonBlurredThreshold = 240;
 constexpr auto kMaxInlineArea = 1920 * 1080;
+constexpr auto kRightActionsMargin = 10;
+constexpr auto kRightActionsMarginWide = 1;
 
 [[nodiscard]] int GifMaxStatusWidth(not_null<DocumentData*> document) {
 	auto result = st::normalFont->width(
@@ -851,15 +853,18 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			const auto rightActionWidth = size
 				? size->width()
 				: _transcribe->size().width();
+			const auto margin = _parent->delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin;
 			auto fastShareLeft = rightLayout
 				? (paintx + usex - size->width() - st::historyFastShareLeft)
-				: (fullRight + st::historyFastShareLeft);
+				: (fullRight + st::historyFastShareLeft - margin);
 			auto fastShareTop = fullBottom
 				- st::historyFastShareBottom
 				- (size ? size->height() : 0);
-			if (fastShareLeft + rightActionWidth > maxRight) {
+			if (fastShareLeft + rightActionWidth * 2 > maxRight) {
 				fastShareLeft = fullRight
-					- rightActionWidth
+					- rightActionWidth * 2
 					- st::msgDateImgDelta;
 				fastShareTop -= st::msgDateImgDelta
 					+ st::msgDateImgPadding.y()
@@ -1335,24 +1340,40 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 		}
 		if (const auto size = bubble ? std::nullopt : _parent->rightActionSize()) {
 			const auto rightActionWidth = size->width();
+			const auto margin = _parent->delegate()->elementIsChatWide()
+				? kRightActionsMarginWide
+				: kRightActionsMargin;
 			auto fastShareLeft = _parent->hasRightLayout()
 				? (paintx + usex - size->width() - st::historyFastShareLeft)
-				: (fullRight + st::historyFastShareLeft);
+				: (fullRight + st::historyFastShareLeft - margin);
 			auto fastShareTop = fullBottom
 				- st::historyFastShareBottom
 				- size->height();
-			if (fastShareLeft + rightActionWidth > maxRight) {
+			if (fastShareLeft + rightActionWidth * 2 > maxRight) {
 				fastShareLeft = fullRight
-					- rightActionWidth
+					- rightActionWidth * 2
 					- st::msgDateImgDelta;
 				fastShareTop -= st::msgDateImgDelta
 					+ st::msgDateImgPadding.y()
 					+ st::msgDateFont->height
 					+ st::msgDateImgPadding.y();
 			}
-			if (QRect(QPoint(fastShareLeft, fastShareTop), *size).contains(point)) {
+			const auto fastShareRect = QRect(
+					fastShareLeft,
+					fastShareTop,
+					size->width(),
+					size->height());
+			const auto viewRect = QRect(
+					fastShareLeft + size->width() + st::historyFastShareLeft,
+					fastShareTop,
+					size->width(),
+					size->height());
+			if (fastShareRect.contains(point)) {
 				result.link = _parent->rightActionLink(point
 					- QPoint(fastShareLeft, fastShareTop));
+			} else if (viewRect.contains(point)) {
+				result.link = _parent->viewActionLink(point
+				- QPoint(viewRect.x(), fastShareTop));
 			}
 		}
 		if (_transcribe && _transcribe->contains(point)) {
