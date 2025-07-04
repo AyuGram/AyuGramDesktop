@@ -38,7 +38,7 @@ void MessageShotBox::prepare() {
 void MessageShotBox::setupContent() {
 	_selectedPalette = std::make_shared<style::palette>();
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	const auto savedShowColorfulReplies = !settings.simpleQuotesAndReplies;
 
 	using namespace Settings;

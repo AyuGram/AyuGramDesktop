@@ -8,6 +8,33 @@
 
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
+
+// json.hpp in some build environments may not provide helper macros.
+//  To ensure successful compilation, define them here when missing.
+#ifndef NLOHMANN_JSON_TO
+#define NLOHMANN_JSON_TO(v1) nlohmann_json_j[#v1] = nlohmann_json_t.v1;
+#endif
+#ifndef NLOHMANN_JSON_FROM
+#define NLOHMANN_JSON_FROM(v1) nlohmann_json_j.at(#v1).get_to(nlohmann_json_t.v1);
+#endif
+#ifndef NLOHMANN_JSON_FROM_WITH_DEFAULT
+#define NLOHMANN_JSON_FROM_WITH_DEFAULT(v1) \
+    nlohmann_json_t.v1 = nlohmann_json_j.value(#v1, nlohmann_json_default_obj.v1);
+#endif
+#ifndef NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT
+#define NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Type, ...)               \
+    inline void to_json(nlohmann::json& nlohmann_json_j,                       \
+                        const Type& nlohmann_json_t) {                          \
+        NLOHMANN_JSON_EXPAND(                                                   \
+            NLOHMANN_JSON_PASTE(NLOHMANN_JSON_TO, __VA_ARGS__))                 \
+    }                                                                           \
+    inline void from_json(const nlohmann::json& nlohmann_json_j,                \
+                          Type& nlohmann_json_t) {                              \
+        const Type nlohmann_json_default_obj{};                                 \
+        NLOHMANN_JSON_EXPAND(                                                   \
+            NLOHMANN_JSON_PASTE(NLOHMANN_JSON_FROM_WITH_DEFAULT, __VA_ARGS__))   \
+    }
+#endif
 #include "rpl/producer.h"
 
 namespace AyuSettings {
@@ -133,11 +160,11 @@ void set_increaseWebviewWidth(bool val);
 void set_disableNotificationsDelay(bool val);
 void set_localPremium(bool val);
 
-void set_appIcon(QString val);
+void set_appIcon(const QString &val);
 void set_simpleQuotesAndReplies(bool val);
 void set_replaceBottomInfoWithIcons(bool val);
-void set_deletedMark(QString val);
-void set_editedMark(QString val);
+void set_deletedMark(const QString &val);
+void set_editedMark(const QString &val);
 void set_recentStickersCount(int val);
 
 void set_showReactionsPanelInContextMenu(int val);
@@ -163,7 +190,7 @@ void set_showStreamerToggleInDrawer(bool val);
 void set_showGhostToggleInTray(bool val);
 void set_showStreamerToggleInTray(bool val);
 
-void set_monoFont(QString val);
+void set_monoFont(const QString &val);
 
 void set_hideNotificationCounters(bool val);
 void set_hideNotificationBadge(bool val);

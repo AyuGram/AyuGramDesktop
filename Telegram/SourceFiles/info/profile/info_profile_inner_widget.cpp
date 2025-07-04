@@ -140,7 +140,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 	using namespace rpl::mappers;
 	using MediaType = Media::Type;
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	auto content = object_ptr<Ui::VerticalLayout>(parent);
 	auto tracker = Ui::MultiSlideTracker();
