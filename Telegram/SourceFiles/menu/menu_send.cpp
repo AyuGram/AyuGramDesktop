@@ -694,7 +694,7 @@ FillMenuResult FillSendMenu(
 		: st::defaultComposeIcons;
 
 	if (sending && type != Type::Reminder) {
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		menu->addAction(
 			settings.sendWithoutSound ? tr::ayu_SendWithSound(tr::now) : tr::lng_send_silent_message(tr::now),
 			[=] { action({ Api::SendOptions{ .silent = true } }, details); },

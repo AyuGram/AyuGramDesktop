@@ -67,7 +67,7 @@ bool SendActionPainter::updateNeedsAnimating(
 		return false;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.hideFromBlocked) {
 		if (user->isBlocked()) {
 			return false;

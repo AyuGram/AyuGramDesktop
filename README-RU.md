@@ -67,11 +67,23 @@ brew install --cask ayugram
 
 ### Arch Linux
 
-Вы можете установить `ayugram-desktop` из [AUR](https://aur.archlinux.org/packages?O=0&K=ayugram).
+#### Из исходников (рекомендованный способ)
+
+Установите `ayugram-desktop` из [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
+
+#### Готовые бинарники
+
+Установите `ayugram-desktop-bin` из [AUR](https://aur.archlinux.org/packages/ayugram-desktop-bin).
+
+Примечание: данный пакет собирается не нами.
 
 ### NixOS
 
 Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
+
+### ALT Linux
+
+[Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
 ### Любой другой Линукс дистрибутив
 

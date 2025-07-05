@@ -129,8 +129,6 @@ set(ayugram_files
         ayu/ui/ayu_logo.h
         ayu/ui/utils/ayu_profile_values.cpp
         ayu/ui/utils/ayu_profile_values.h
-        ayu/ui/settings/icon_picker.cpp
-        ayu/ui/settings/icon_picker.h
         ayu/ui/settings/settings_ayu.cpp
         ayu/ui/settings/settings_ayu.h
         ayu/ui/context_menu/context_menu.cpp
@@ -143,10 +141,8 @@ set(ayugram_files
         ayu/ui/message_history/history_item.h
         ayu/ui/message_history/history_section.cpp
         ayu/ui/message_history/history_section.h
-        ayu/ui/boxes/edit_deleted_mark.cpp
-        ayu/ui/boxes/edit_deleted_mark.h
-        ayu/ui/boxes/edit_edited_mark.cpp
-        ayu/ui/boxes/edit_edited_mark.h
+        ayu/ui/boxes/edit_mark_box.cpp
+        ayu/ui/boxes/edit_mark_box.h
         ayu/ui/boxes/font_selector.cpp
         ayu/ui/boxes/font_selector.h
         ayu/ui/boxes/theme_selector_box.cpp
@@ -155,6 +151,8 @@ set(ayugram_files
         ayu/ui/boxes/message_shot_box.h
         ayu/ui/components/image_view.cpp
         ayu/ui/components/image_view.h
+        ayu/ui/components/icon_picker.cpp
+        ayu/ui/components/icon_picker.h
         ayu/libs/json.hpp
         ayu/libs/json_ext.hpp
         ayu/libs/sqlite/sqlite3.c

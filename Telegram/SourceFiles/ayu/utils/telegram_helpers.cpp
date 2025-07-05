@@ -108,7 +108,7 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 		return true;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.hideFromBlocked) {
 		if (item->from()->isUser() &&
 			item->from()->asUser()->isBlocked()) {
@@ -513,7 +513,7 @@ int getScheduleTime(int64 sumSize) {
 }
 
 bool isMessageSavable(const not_null<HistoryItem *> item) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (!settings.saveDeletedMessages) {
 		return false;

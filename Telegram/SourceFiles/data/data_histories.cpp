@@ -627,7 +627,7 @@ void Histories::sendReadRequests() {
 	DEBUG_LOG(("Reading: send requests with count %1.").arg(_states.size()));
 
 	// AyuGram sendReadMessages
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadMessages) {
 		DEBUG_LOG(("[AyuGram] Don't read messages"));
 		_states.clear();
