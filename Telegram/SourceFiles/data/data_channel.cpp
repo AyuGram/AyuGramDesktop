@@ -619,9 +619,11 @@ bool ChannelData::canAddAdmins() const {
 	return amCreator()
 		|| (adminRights() & AdminRight::AddAdmins);
 }
+
 bool ChannelData::isAyuNoForwards() const {
 	return flags() & Flag::AyuNoForwards;
 }
+
 bool ChannelData::allowsForwarding() const {
 	return !(flags() & Flag::NoForwards);
 }

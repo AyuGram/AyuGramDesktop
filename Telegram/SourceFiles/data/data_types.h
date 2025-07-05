@@ -353,7 +353,7 @@ enum class MessageFlag : uint64 {
 	HideDisplayDate       = (1ULL << 51),
 
 
-	AyuNoForwards = (1ULL << 63),
+	AyuNoForwards         = (1ULL << 63),
 };
 inline constexpr bool is_flag_type(MessageFlag) { return true; }
 using MessageFlags = base::flags<MessageFlag>;

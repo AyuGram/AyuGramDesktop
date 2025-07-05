@@ -90,6 +90,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/features/forward/ayu_forward.h"
 
 
 namespace {
@@ -3286,6 +3287,7 @@ void ApiWrap::forwardMessages(
 		});
 		return;
 	}
+
 	const auto ayuIntelligentForwardNeeded = AyuForward::isAyuForwardNeeded(draft.items);
 	if (ayuIntelligentForwardNeeded) {
 		crl::async([=] {
@@ -3782,12 +3784,11 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 		: Data::ForumTopic::kGeneralId;
 	const auto topic = peer->forumTopicFor(topicRootId);
 
-	const bool canTexts = topic
+	const bool canSendTexts = topic
 		? Data::CanSendTexts(topic)
 		: Data::CanSendTexts(peer);
 
-	if (!(canTexts || AyuForward::isForwarding((peer->id)))
-		|| Api::SendDice(message)) {
+	if (!canSendTexts || AyuForward::isForwarding(peer->id) || Api::SendDice(message)) {
 		return;
 	}
 	local().saveRecentSentHashtags(textWithTags.text);

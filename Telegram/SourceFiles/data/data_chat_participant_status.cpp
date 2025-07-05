@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_chat_participant_status.h"
 
-#include "ayu/features/forward/ayu_forward.h"
 #include "base/unixtime.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "chat_helpers/compose/compose_show.h"
@@ -25,6 +24,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
 #include "styles/style_widgets.h"
+
+// AyuGram includes
+#include "ayu/features/forward/ayu_forward.h"
+
 
 namespace {
 

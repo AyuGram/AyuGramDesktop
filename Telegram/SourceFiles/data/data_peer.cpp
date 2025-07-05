@@ -1385,6 +1385,7 @@ Data::ForumTopic *PeerData::forumTopicFor(MsgId rootId) const {
 	}
 	return nullptr;
 }
+
 bool PeerData::isAyuNoForwards() const {
 	if (const auto user = asUser()) {
 		return false;

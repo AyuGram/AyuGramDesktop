@@ -1,28 +1,21 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2025
 #pragma once
-#include "data/data_media_types.h"
-#include "data/data_session.h"
-#include <base/random.h>
-#include <data/data_histories.h>
-#include <data/data_peer.h>
-#include <history/history_item.h>
 
 #include "apiwrap.h"
-#include "base/unixtime.h"
+#include "base/random.h"
 #include "data/data_document.h"
+#include "data/data_media_types.h"
 #include "data/data_photo.h"
-#include "data/data_session.h"
-#include "storage/file_download_mtproto.h"
-#include "storage/file_upload.h"
-#include "api/api_peer_photo.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "storage/localimageloader.h"
-#include "storage/storage_media_prepare.h"
-#include "ui/chat/attach/attach_prepare.h"
+#include "history/history_item.h"
 #include "storage/file_download.h"
+#include "storage/file_upload.h"
 #include "storage/storage_account.h"
+#include "ui/chat/attach/attach_prepare.h"
 
 namespace AyuSync {
 

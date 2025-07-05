@@ -1,8 +1,13 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2025
 #pragma once
 
-#include <main/main_session.h>
-
 #include "history/history.h"
+#include "main/main_session.h"
 
 namespace AyuForward {
 bool isForwarding(const PeerId &id);

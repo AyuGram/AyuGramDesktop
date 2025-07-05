@@ -1,16 +1,24 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2025
 #include "ayu_sync.h"
-
-#include "api/api_sending.h"
 #include "apiwrap.h"
+#include "api/api_sending.h"
 #include "core/application.h"
-#include "data/data_changes.h"
+#include "core/core_settings.h"
+#include "core/file_utilities.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
+#include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
 #include "storage/file_download_mtproto.h"
+#include "storage/localimageloader.h"
 
 class TimedCountDownLatch
 {

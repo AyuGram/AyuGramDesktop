@@ -1766,6 +1766,7 @@ bool HistoryItem::isScheduled() const {
 bool HistoryItem::isSponsored() const {
 	return _flags & MessageFlag::Sponsored;
 }
+
 bool HistoryItem::isAyuNoForwards() const {
 	return _flags & MessageFlag::AyuNoForwards;
 }

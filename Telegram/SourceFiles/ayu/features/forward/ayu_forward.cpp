@@ -1,25 +1,28 @@
+// This is the source code of AyuGram for Desktop.
+//
+// We do not and cannot prevent the use of our code,
+// but be respectful and credit the original author.
+//
+// Copyright @Radolyn, 2025
 #include "ayu_forward.h"
-#include <lang_auto.h>
-#include <base/random.h>
-#include <data/data_peer.h>
-#include <history/history_item.h>
-#include <styles/style_boxes.h>
 #include "apiwrap.h"
 #include "ayu_sync.h"
+#include "lang_auto.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "base/random.h"
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "data/data_changes.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
 #include "data/data_document.h"
+#include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
-#include "data/data_user.h"
+#include "history/history_item.h"
 #include "storage/file_download.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_account.h"
 #include "storage/storage_media_prepare.h"
+#include "styles/style_boxes.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/text/text_utilities.h"
 
@@ -93,20 +96,22 @@ std::pair<QString, QString> stateName(const PeerId &id) {
 
 	return std::make_pair(status, partString);
 }
+
 void ForwardState::updateBottomBar(const Main::Session &session, const PeerId *peer, const State &st) {
 	state = st;
 
 	session.changes().peerUpdated(session.data().peer(*peer), Data::PeerUpdate::Flag::Rights);
 }
 
-
 static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
 									 const std::vector<not_null<HistoryItem*>> &items,
-									 int &i) {
+									 int &i,
+									 std::vector<not_null<Data::Media*>> &groupMedia) {
 	const auto prepare = [&](not_null<Data::Media*> media)
 	{
+		groupMedia.emplace_back(media);
 		auto prepared = Ui::PreparedFile(AyuSync::filePath(session, media));
-		Storage::PrepareDetails(prepared, st::sendMediaPreviewSize, 1280);
+		Storage::PrepareDetails(prepared, st::sendMediaPreviewSize, PhotoSideLimit());
 		return prepared;
 	};
 
@@ -138,7 +143,8 @@ void sendMedia(
 	not_null<Main::Session*> session,
 	std::shared_ptr<Ui::PreparedBundle> bundle,
 	not_null<Data::Media*> primaryMedia,
-	Api::MessageToSend &&message) {
+	Api::MessageToSend &&message,
+	bool sendImagesAsPhotos) {
 	if (const auto document = primaryMedia->document(); document && document->sticker()) {
 		AyuSync::sendStickerSync(session, message, document);
 		return;
@@ -151,9 +157,8 @@ void sendMedia(
 				return SendMediaType::Audio;
 			} else if (document->isVideoMessage()) {
 				return SendMediaType::Round;
-			} else {
-				return SendMediaType::File;
 			}
+			return SendMediaType::File;
 		}
 		return SendMediaType::Photo;
 	}();
@@ -181,17 +186,8 @@ void sendMedia(
 		// at least try to send it as squared-video
 	}
 
-	// workaround
-	auto isTherePhotos = false;
-	for (auto &group : bundle->groups) {
-		for (Ui::PreparedFile &file : group.list.files) {
-			if (file.type == Ui::PreparedFile::Type::Photo) {
-				isTherePhotos = true;
-				break;
-			}
-		}
-	}
-	if (mediaType == SendMediaType::File && isTherePhotos) {
+	// workaround for media albums consisting of video and photos
+	if (sendImagesAsPhotos) {
 		mediaType = SendMediaType::Photo;
 	}
 
@@ -331,7 +327,7 @@ void forwardMessages(
 		}
 	}
 	state->totalMessages = items.size();
-	if (toBeDownloaded.size()) {
+	if (!toBeDownloaded.empty()) {
 		state->state = ForwardState::State::Downloading;
 		state->updateBottomBar(*session, &peer->id, ForwardState::State::Downloading);
 		AyuSync::loadDocuments(session, toBeDownloaded);
@@ -369,11 +365,18 @@ void forwardMessages(
 				continue;
 			}
 
-			auto preparedMedia = prepareMedia(session, items, i);
+			std::vector<not_null<Data::Media*>> groupMedia;
+			auto preparedMedia = prepareMedia(session, items, i, groupMedia);
 
 			Ui::SendFilesWay way;
 			way.setGroupFiles(true);
-			way.setSendImagesAsPhotos(true);
+			way.setSendImagesAsPhotos(false);
+			for (const auto &media2 : groupMedia) {
+				if (media2->photo()) {
+					way.setSendImagesAsPhotos(true);
+					break;
+				}
+			}
 
 			auto groups = Ui::DivideByGroups(
 				std::move(preparedMedia),
@@ -385,7 +388,7 @@ void forwardMessages(
 				way,
 				message.textWithTags,
 				false);
-			sendMedia(session, bundle, media, std::move(message));
+			sendMedia(session, bundle, media, std::move(message), way.sendImagesAsPhotos());
 		}
 		// if there are grouped messages
 		// "i" is incremented in prepareMedia
