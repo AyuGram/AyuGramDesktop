@@ -341,7 +341,6 @@ void forwardMessages(
 	state->sentMessages = 0;
 	state->updateBottomBar(*session, &peer->id, ForwardState::State::Sending);
 
-
 	for (int i = 0; i < items.size(); i++) {
 		const auto item = items[i];
 
@@ -392,6 +391,7 @@ void forwardMessages(
 		// "i" is incremented in prepareMedia
 
 		state->sentMessages = i + 1;
+		state->updateBottomBar(*session, &peer->id, ForwardState::State::Sending);
 	}
 	state->updateBottomBar(*session, &peer->id, ForwardState::State::Finished);
 }
