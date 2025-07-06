@@ -7065,6 +7065,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_UseScheduledMessages" = "Schedule Messages";
 "ayu_UseScheduledMessagesDescription" = "Automatically schedules outgoing messages to send after ~12 seconds (longer for media). Using this feature, you won't appear online.\nAvoid using on unreliable networks.";
 "ayu_SendWithoutSoundByDefault" = "Send without Sound";
+"ayu_SendWithoutSoundByDefaultNever" = "Never";
+"ayu_SendWithoutSoundByDefaultInGhostMode" = "When using Ghost Mode";
+"ayu_SendWithoutSoundByDefaultAlways" = "Always";
 "ayu_SendWithoutSoundByDefaultDescription" = "Sends outgoing messages without sound by default.";
 "ayu_SuggestGhostModeBeforeViewingStory" = "Story Ghost Mode Alert";
 "ayu_SuggestGhostModeBeforeViewingStoryDescription" = "Displays an alert before opening a story, suggesting you enable Ghost Mode.";
@@ -7079,6 +7082,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageSavingSaveMediaInPublicGroups" = "Public Groups";
 "ayu_MessageSavingSaveMediaInPrivateGroups" = "Private Groups";
 "ayu_MessageSavingSaveMediaHintPopup" = "Make sure it's configured to your needs.";
+"ayu_AttachmentsFolderMaxSizeHeader" = "Max folder size";
+"ayu_AttachmentsFolderMaxSizeDescription" = "If folder size exceeds this limit, the oldest attachments will be removed from the device.";
 "ayu_MaximumMediaSizeCellular" = "Media size limit (cellular data)";
 "ayu_MaximumMediaSizeWiFi" = "Media size limit (WiFi)";
 "ayu_MessageSavingOtherHeader" = "Other";
@@ -7096,12 +7101,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableAds" = "Disable Ads";
 "ayu_DisableStories" = "Disable Stories";
 "ayu_DisableCustomBackgrounds" = "Disable Custom Backgrounds";
-"ayu_HideChannelReactions" = "Hide Reactions in Channels";
-"ayu_HideGroupReactions" = "Hide Reactions in Groups";
 "ayu_DisableNotificationsDelay" = "Disable Notify Delay";
 "ayu_LocalPremium" = "Local Telegram Premium";
 "ayu_DisplayGhostStatus" = "Display Ghost Mode Status";
 "ayu_CopyUsernameAsLink" = "Copy Username as Link";
+"ayu_HideChannelReactions" = "Hide Reactions in Channels";
+"ayu_HideGroupReactions" = "Hide Reactions in Groups";
 "ayu_CustomizationHeader" = "Customization";
 "ayu_DeletedMarkText" = "Deleted Mark";
 "ayu_DeletedMarkNothing" = "Nothing";
@@ -7165,6 +7170,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFiltersExcludedAmount#other" = "{count} excluded";
 "ayu_RegexFiltersHeader" = "Filters";
 "ayu_RegexFiltersShared" = "Shared Filters";
+"ayu_FiltersShadowBan" = "Shadow Ban";
 "ayu_RegexFiltersExcluded" = "Excluded Filters";
 "ayu_RegexFiltersEnable" = "Enable Filters";
 "ayu_FiltersHideFromBlocked" = "Hide from Blocked Users";
@@ -7181,6 +7187,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFilterBulletinText" = "Filter added to the **Shared filters**.";
 "ayu_RegexFilterBulletinAction" = "To Current Chat";
 "ayu_RegexFiltersListEmpty" = "No filters here yet.";
+"ayu_FiltersQuickShadowBan" = "Shadow Ban";
+"ayu_FiltersQuickUnshadowBan" = "Unshadow Ban";
 "ayu_FiltersMenuSelectChat" = "Select Chat";
 "ayu_FiltersMenuImport" = "Import";
 "ayu_FiltersMenuExport" = "Export";
@@ -7222,6 +7230,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IconNothing" = "Nothing";
 "ayu_IconBard" = "Google Bard";
 "ayu_IconYaPlus" = "Yandex Plus";
+"ayu_IconAyuTyan" = "AyuTyan";
 "ayu_WALMode" = "Enable WAL mode";
 "ayu_PushNotificationCount" = "FCM notifications received";
 "ayu_AyuAttachments" = "AyuGram Attachments Folder";
