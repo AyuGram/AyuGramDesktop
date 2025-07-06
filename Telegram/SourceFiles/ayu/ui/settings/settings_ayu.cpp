@@ -846,6 +846,10 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
+
 	AddButtonWithIcon(
 		container,
 		tr::ayu_HideChannelReactions(),
