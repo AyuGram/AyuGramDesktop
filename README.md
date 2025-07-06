@@ -87,6 +87,10 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
+### EPM
+
+`epm play ayugram`
+
 ### Any other Linux distro
 
 Follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
