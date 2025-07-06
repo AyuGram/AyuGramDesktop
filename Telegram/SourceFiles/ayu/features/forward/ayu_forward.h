@@ -42,7 +42,7 @@ bool isFullAyuForwardNeeded(not_null<HistoryItem*> item);
 void intelligentForward(
 	not_null<Main::Session*> session,
 	const Api::SendAction &action,
-	Data::ResolvedForwardDraft draft);
+	const Data::ResolvedForwardDraft &draft);
 void forwardMessages(
 	not_null<Main::Session*> session,
 	const Api::SendAction &action,

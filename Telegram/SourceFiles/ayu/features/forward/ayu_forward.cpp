@@ -141,7 +141,7 @@ static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
 
 void sendMedia(
 	not_null<Main::Session*> session,
-	std::shared_ptr<Ui::PreparedBundle> bundle,
+	const std::shared_ptr<Ui::PreparedBundle> &bundle,
 	not_null<Data::Media*> primaryMedia,
 	Api::MessageToSend &&message,
 	bool sendImagesAsPhotos) {
@@ -230,9 +230,9 @@ struct ForwardChunk
 void intelligentForward(
 	not_null<Main::Session*> session,
 	const Api::SendAction &action,
-	Data::ResolvedForwardDraft draft) {
+	const Data::ResolvedForwardDraft &draft) {
 	const auto history = action.history;
-	history->setForwardDraft(action.replyTo.topicRootId, {});
+	history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
 
 	const auto items = draft.items;
 	const auto peer = history->peer;
@@ -296,7 +296,7 @@ void forwardMessages(
 	const auto history = action.history;
 	const auto peer = history->peer;
 
-	history->setForwardDraft(action.replyTo.topicRootId, {});
+	history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
 
 	std::shared_ptr<ForwardState> state;
 

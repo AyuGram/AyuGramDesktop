@@ -1,9 +1,15 @@
 [Desktop Entry]
 Name=AyuGram Desktop
 Comment=Desktop version of AyuGram - ToS breaking Telegram client
+<<<<<<< HEAD
 TryExec=ayugram-desktop
 Exec=env DESKTOPINTEGRATION=1 ayugram-desktop -- %u
 Icon=ayugram
+=======
+TryExec=AyuGram
+Exec=env DESKTOPINTEGRATION=1 AyuGram -- %u
+Icon=com.ayugram.desktop
+>>>>>>> e5ca216c99 (fix: make it build)
 Terminal=false
 StartupWMClass=AyuGram
 Type=Application
@@ -17,6 +23,6 @@ X-GNOME-UsesNotifications=true
 X-GNOME-SingleWindow=true
 
 [Desktop Action quit]
-Exec=ayugram-desktop -quit
+Exec=AyuGram -quit
 Name=Quit AyuGram
 Icon=application-exit

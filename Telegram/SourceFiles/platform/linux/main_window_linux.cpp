@@ -431,7 +431,8 @@ void MainWindow::createGlobalMenu() {
 			u"AyuGram"_q),
 		[=] {
 			ensureWindowShown();
-			controller().show(Box<AboutBox>(sessionController()));
+
+			controller().show(Box(AboutBox, sessionController()));
 		});
 
 	about->setMenuRole(QAction::AboutQtRole);

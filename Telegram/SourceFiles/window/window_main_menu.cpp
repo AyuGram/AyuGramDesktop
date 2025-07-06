@@ -397,7 +397,7 @@ MainMenu::MainMenu(
 	_version->setLink(
 		2,
 		std::make_shared<LambdaClickHandler>([=] {
-			controller->show(Box<AboutBox>(controller));
+			controller->show(Box(AboutBox, controller));
 		}));
 
 	rpl::combine(

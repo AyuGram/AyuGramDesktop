@@ -13,6 +13,8 @@ namespace Window {
 class SessionController;
 }
 
+void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller);
+
 namespace Ui {
 class LinkButton;
 class FlatLabel;

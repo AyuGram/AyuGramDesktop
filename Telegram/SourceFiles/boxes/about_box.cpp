@@ -34,8 +34,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
-
-
 namespace {
 
 rpl::producer<TextWithEntities> Text() {
@@ -59,6 +57,9 @@ AboutBox::AboutBox(QWidget *parent, Window::SessionController* controller)
 , _controller(controller) {
 }
 
+void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller) {
+	box->setTitle(rpl::single(u"AyuGram Desktop"_q));
+}
 void AboutBox::prepare() {
 	setTitle(rpl::single(u"AyuGram Desktop"_q));
 
@@ -100,6 +101,15 @@ void AboutBox::showVersionHistory() {
 	addText(Text3());
 
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+	box->addLeftButton(
+		rpl::single(QString("@AyuGramReleases")),
+		[box, controller]
+		{
+			box->closeBox();
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = QString("ayugramreleases"),
+			});
+		});
 
 	box->setWidth(st::aboutWidth);
 }
