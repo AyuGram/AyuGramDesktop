@@ -420,16 +420,15 @@ void set_localPremium(bool val) {
 }
 
 void set_hideChannelReactions(bool val) {
-        settings->hideChannelReactions = val;
+	settings->hideChannelReactions = val;
 }
 
 void set_hideGroupReactions(bool val) {
-        settings->hideGroupReactions = val;
+	settings->hideGroupReactions = val;
 }
 
 void set_appIcon(const QString &val) {
 	settings->appIcon = val;
-
 }
 
 void set_simpleQuotesAndReplies(bool val) {
