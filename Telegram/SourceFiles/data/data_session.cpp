@@ -880,7 +880,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 			| Flag::Forbidden
 			| Flag::CallActive
 			| Flag::CallNotEmpty
-			| Flag::NoForwards;
+			| Flag::NoForwards
+			| Flag::AyuNoForwards;
 		const auto flagsSet = (data.is_left() ? Flag::Left : Flag())
 			| (data.is_creator() ? Flag::Creator : Flag())
 			| (data.is_deactivated() ? Flag::Deactivated : Flag())
@@ -1004,6 +1005,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? (Flag::Left | Flag::Creator)
 				: Flag())
 			| Flag::NoForwards
+			| Flag::AyuNoForwards
 			| Flag::JoinToWrite
 			| Flag::RequestToJoin
 			| Flag::Forum
