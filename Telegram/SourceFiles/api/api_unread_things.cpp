@@ -18,6 +18,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "apiwrap.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Api {
 namespace {
 
@@ -39,7 +43,17 @@ bool UnreadThings::trackMentions(Data::Thread *thread) const {
 
 bool UnreadThings::trackReactions(Data::Thread *thread) const {
 	const auto peer = thread ? thread->peer().get() : nullptr;
-	return peer && (peer->isUser() || peer->isChat() || peer->isMegagroup());
+	if (!peer) {
+		return false;
+	}
+	const auto &settings = AyuSettings::getInstance();
+	if (peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions) {
+		return false;
+	}
+	if (peer->isMegagroup() && !settings.hideGroupReactions) {
+		return false;
+	}
+	return peer->isUser() || peer->isChat() || peer->isMegagroup();
 }
 
 void UnreadThings::preloadEnough(Data::Thread *thread) {

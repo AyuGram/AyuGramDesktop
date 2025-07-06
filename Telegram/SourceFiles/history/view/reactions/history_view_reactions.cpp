@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/features/messageshot/message_shot.h"
 
 
@@ -101,9 +102,12 @@ std::vector<ReactionId> InlineList::computeTagsList() const {
 	if (!areTags()) {
 		return {};
 	}
-	return _buttons | ranges::views::transform(
-		&Button::id
-	) | ranges::to_vector;
+	auto result = std::vector<ReactionId>();
+	result.reserve(_buttons.size());
+	for (const auto &button : _buttons) {
+		result.push_back(button.id);
+	}
+	return result;
 }
 
 bool InlineList::hasCustomEmoji() const {
@@ -132,11 +136,11 @@ void InlineList::layoutButtons() {
 		_buttons.clear();
 		return;
 	}
-	auto sorted = ranges::views::all(
-		_data.reactions
-	) | ranges::views::transform([](const MessageReaction &reaction) {
-		return not_null{ &reaction };
-	}) | ranges::to_vector;
+	auto sorted = std::vector<not_null<const MessageReaction*>>();
+	sorted.reserve(_data.reactions.size());
+	for (const auto &reaction : _data.reactions) {
+		sorted.push_back(&reaction);
+	}
 	const auto tags = areTags();
 	if (!tags) {
 		const auto &list = _owner->list(::Data::Reactions::Type::All);
@@ -830,6 +834,16 @@ void InlineList::continueAnimations(base::flat_map<
 InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 	using Flag = InlineListData::Flag;
 	const auto item = view->data();
+	const auto &settings = AyuSettings::getInstance();
+	if (!settings.hideChannelReactions
+		&& item->history()->peer->isChannel()
+		&& !item->history()->peer->isMegagroup()) {
+		return InlineListData();
+	}
+	if (!settings.hideGroupReactions
+		&& item->history()->peer->isMegagroup()) {
+		return InlineListData();
+	}
 	auto result = InlineListData();
 	result.reactions = item->reactionsWithLocal();
 	if (const auto user = item->history()->peer->asUser()) {
@@ -867,9 +881,11 @@ InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 		if (showUserpics) {
 			result.recent.reserve(recent.size());
 			for (const auto &[id, list] : recent) {
-				result.recent.emplace(id).first->second = list
-					| ranges::views::transform(&Data::RecentReaction::peer)
-					| ranges::to_vector;
+				auto &out = result.recent.emplace(id).first->second;
+				out.reserve(list.size());
+				for (const auto &r : list) {
+					out.push_back(r.peer);
+				}
 			}
 		}
 	}

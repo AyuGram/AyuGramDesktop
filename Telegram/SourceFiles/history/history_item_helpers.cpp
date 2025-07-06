@@ -1167,6 +1167,13 @@ void CheckReactionNotificationSchedule(
 	if (!item->hasUnreadReaction()) {
 		return;
 	}
+	const auto peer = item->history()->peer;
+	const auto &settings = AyuSettings::getInstance();
+	if ((peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions)
+		|| (peer->isMegagroup() && !settings.hideGroupReactions)) {
+		item->markEffectWatched();
+		return;
+	}
 	for (const auto &[emoji, reactions] : item->recentReactions()) {
 		for (const auto &reaction : reactions) {
 			if (!reaction.unread) {
