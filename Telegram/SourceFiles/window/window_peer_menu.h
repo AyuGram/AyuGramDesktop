@@ -147,9 +147,6 @@ Fn<void()> DeleteAndLeaveHandler(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer);
 
-Fn<void()> DeleteMyMessagesHandler(
-	not_null<Window::SessionController*> controller,
-	not_null<PeerData*> peer);
 object_ptr<Ui::BoxContent> PrepareChooseRecipientBox(
 	not_null<Main::Session*> session,
 	FnMut<bool(not_null<Data::Thread*>)> &&chosen,

@@ -32,7 +32,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/pin_messages_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/report_messages_box.h"
-#include "data/data_search_controller.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/add_participants_box.h"
 #include "boxes/peers/edit_forum_topic_box.h"
@@ -288,7 +287,6 @@ private:
 	void addToggleUnreadMark();
 	void addToggleArchive();
 	void addClearHistory();
-	void addDeleteMyMessages();
 	void addDeleteChat();
 	void addLeaveChat();
 	void addJoinChat();
@@ -745,31 +743,6 @@ void Filler::addClearHistory() {
 		tr::lng_profile_clear_history(tr::now),
 		ClearHistoryHandler(_controller, _peer),
 		&st::menuIconClear);
-}
-
-void Filler::addDeleteMyMessages() {
-	   if (_topic) {
-			   return;
-	   }
-	   const auto isGroup = _peer->isChat() || _peer->isMegagroup();
-	   if (!isGroup) {
-			   return;
-	   }
-	   if (const auto chat = _peer->asChat()) {
-			   if (!chat->amIn() || chat->amCreator() || chat->hasAdminRights()) {
-					   return;
-			   }
-	   } else if (const auto channel = _peer->asChannel()) {
-			   if (!channel->isMegagroup() || !channel->amIn() || channel->amCreator() || channel->hasAdminRights()) {
-					   return;
-			   }
-	   } else {
-			   return;
-	   }
-	   _addAction(
-			   tr::lng_profile_delete_my_messages(tr::now),
-			   DeleteMyMessagesHandler(_controller, _peer),
-			   &st::menuIconDelete);
 }
 
 void Filler::addDeleteChat() {
@@ -1452,7 +1425,7 @@ void Filler::fillContextMenuActions() {
 		}
 	}
 	addClearHistory();
-	addDeleteMyMessages();
+	AyuUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
 	addDeleteChat();
 	addLeaveChat();
 	addDeleteTopic();
@@ -1476,7 +1449,7 @@ void Filler::fillHistoryActions() {
 	addReport();
 	AyuUi::AddDeletedMessagesActions(_peer, _thread, _controller, _addAction);
 	addClearHistory();
-	addDeleteMyMessages();
+	AyuUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
 	addDeleteChat();
 	addLeaveChat();
 }
@@ -3208,128 +3181,6 @@ Fn<void()> ClearHistoryHandler(
 	};
 }
 
-void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
-	   const auto session = &peer->session();
-
-	   auto collected = std::make_shared<std::vector<MsgId>>();
-
-	   const auto removeNext = std::make_shared<Fn<void(int)>>();
-	   const auto requestNext = std::make_shared<Fn<void(MsgId)>>();
-
-	   *removeNext = [=](int index) {
-			   if (index >= int(collected->size())) {
-					   DEBUG_LOG(("Deleted all %1 my messages in this chat").arg(collected->size()));
-					   return;
-			   }
-
-			   QVector<MTPint> ids;
-			   ids.reserve(std::min<int>(100, collected->size() - index));
-			   for (auto i = 0; i < 100 && (index + i) < int(collected->size()); ++i) {
-					   ids.push_back(MTP_int((*collected)[index + i].bare));
-			   }
-
-			   const auto batch = index / 100 + 1;
-			   const auto done = [=](const MTPmessages_AffectedMessages &result) {
-					   session->api().applyAffectedMessages(peer, result);
-				   if (peer->isChannel()) {
-					   session->data().processMessagesDeleted(peer->id, ids);
-				   } else {
-					   session->data().processNonChannelMessagesDeleted(ids);
-				   }
-					   const auto deleted = index + ids.size();
-					   DEBUG_LOG(("Deleted batch %1, total deleted %2/%3").arg(batch).arg(deleted).arg(collected->size()));
-					   const auto delay = crl::time(500 + base::RandomValue<int>() % 500);
-					   base::call_delayed(delay, [=] { (*removeNext)(deleted); });
-			   };
-			   const auto fail = [=](const MTP::Error &error) {
-					   DEBUG_LOG(("Delete batch failed: %1").arg(error.type()));
-					   const auto delay = crl::time(1000);
-					   base::call_delayed(delay, [=] { (*removeNext)(index); });
-			   };
-
-			   if (const auto channel = peer->asChannel()) {
-					   session->api()
-							   .request(MTPchannels_DeleteMessages(channel->inputChannel, MTP_vector<MTPint>(ids)))
-							   .done(done)
-							   .fail(fail)
-							   .handleFloodErrors()
-							   .send();
-			   } else {
-					   using Flag = MTPmessages_DeleteMessages::Flag;
-					   session->api()
-							   .request(MTPmessages_DeleteMessages(MTP_flags(Flag::f_revoke), MTP_vector<MTPint>(ids)))
-							   .done(done)
-							   .fail(fail)
-							   .handleFloodErrors()
-							   .send();
-			   }
-	   };
-
-	   *requestNext = [=](MsgId from) {
-			   using Flag = MTPmessages_Search::Flag;
-			   auto request = MTPmessages_Search(
-					   MTP_flags(Flag::f_from_id),
-					   peer->input,
-					   MTP_string(),
-					   MTP_inputPeerSelf(),
-					   MTPInputPeer(),
-					   MTPVector<MTPReaction>(),
-					   MTP_int(0), // top_msg_id
-					   MTP_inputMessagesFilterEmpty(),
-					   MTP_int(0), // min_date
-					   MTP_int(0), // max_date
-					   MTP_int(from.bare),
-					   MTP_int(0), // add_offset
-					   MTP_int(100),
-					   MTP_int(0), // max_id
-					   MTP_int(0), // min_id
-					   MTP_long(0)); // hash
-
-			   session->api()
-					   .request(std::move(request))
-					   .done([=](const Api::HistoryRequestResult &result) {
-							   auto parsed = Api::ParseHistoryResult(peer, from, Data::LoadDirection::Before, result);
-							   MsgId minId;
-							   int batchCount = 0;
-							   for (const auto &id : parsed.messageIds) {
-									   if (!minId || id < minId) minId = id;
-									   collected->push_back(id);
-									   ++batchCount;
-							   }
-							   DEBUG_LOG(("Batch found %1 my messages, total %2").arg(batchCount).arg(collected->size()));
-							   if (parsed.messageIds.size() == 100 && minId) {
-									   (*requestNext)(minId - MsgId(1));
-							   } else {
-									   DEBUG_LOG(("Found %1 my messages in this chat (SEARCH)").arg(collected->size()));
-									   (*removeNext)(0);
-							   }
-					   })
-					   .fail([=](const MTP::Error &error) { DEBUG_LOG(("History fetch failed: %1").arg(error.type())); })
-					   .send();
-	   };
-
-	   (*requestNext)(MsgId(0));
-}
-
-Fn<void()> DeleteMyMessagesHandler(not_null<Window::SessionController *> controller, not_null<PeerData *> peer) {
-	return [=]
-	{
-		if (!controller->showFrozenError()) {
-			controller->show(Ui::MakeConfirmBox({
-				.text = tr::lng_sure_delete_my_messages(tr::now),
-				.confirmed =
-					[=](Fn<void()> &&close)
-				{
-					DeleteMyMessagesAfterConfirm(peer);
-					close();
-				},
-				.confirmText = tr::lng_box_delete(),
-				.cancelText = tr::lng_cancel(),
-				.confirmStyle = &st::attentionBoxButton,
-			}));
-		}
-	};
-}
 Fn<void()> DeleteAndLeaveHandler(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
