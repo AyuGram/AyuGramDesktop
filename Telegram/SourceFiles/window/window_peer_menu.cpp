@@ -2661,7 +2661,12 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 			if (showLockedError(row) || (count && row->peer()->isForum())) {
 				return;
 			} else if (!count || row->peer()->isForum()) {
-				ChooseRecipientBoxController::rowClicked(row);
+				if (base::IsCtrlPressed() || base::IsShiftPressed()) {
+					delegate()->peerListSetRowChecked(row, !row->checked());
+					_selectionChanges.fire({});
+				} else {
+					ChooseRecipientBoxController::rowClicked(row);
+				}
 			} else if (count) {
 				delegate()->peerListSetRowChecked(row, !row->checked());
 				_selectionChanges.fire({});
