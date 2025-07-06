@@ -40,9 +40,9 @@
 
 namespace {
 
-constexpr auto usernameResolverBotId = 189165596L;
-const auto usernameResolverBotUsername = QString("usinfobot");
-const auto usernameResolverEmpty = QString("¯\\_(ツ)_/¯");
+constexpr auto usernameResolverBotId = 8001593505L;
+const auto usernameResolverBotUsername = QString("TgDBSearchBot");
+const auto usernameResolverEmpty = QString("Error, username or id invalid/not found.");
 
 }
 
@@ -656,22 +656,21 @@ void searchUser(long long userId, Main::Session *session, bool searchUserFlag, c
 					return QString();
 				});
 
-			if (text.isEmpty() || text.startsWith(usernameResolverEmpty)) {
+			if (text.isEmpty() || text.contains(usernameResolverEmpty)) {
 				continue;
 			}
 
-			ID id = 0; // 👤
-			QString title; // 👦🏻
-			QString username; // 🌐
+			ID id = 0; // 🆔
+			QString title; // 🏷
+			QString username; // 📧
 
 			for (auto &line : text.split('\n')) {
-				line = line.replace("⁣", "");
-				if (line.startsWith("👤")) {
-					id = line.mid(line.indexOf(' ') + 1).toLongLong();
-				} else if (line.startsWith("👦🏻")) {
-					title = line.mid(line.indexOf(' ') + 1);
-				} else if (line.startsWith("🌐")) {
-					username = line.mid(line.indexOf(' ') + 1);
+				if (line.startsWith("🆔")) {
+					id = line.mid(line.indexOf(": ") + 2).toLongLong();
+				} else if (line.startsWith("🏷")) {
+					title = line.mid(line.indexOf(": ") + 2);
+				} else if (line.startsWith("📧")) {
+					username = line.mid(line.indexOf(": ") + 2);
 				}
 			}
 

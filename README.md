@@ -170,5 +170,4 @@ Enjoy using **AyuGram**? Consider sending us a tip!
 
 ### Bots
 
-- [TelegramDB](https://t.me/tgdatabase) for username lookup by ID (until closing free inline mode at 25 May 2025)
-- [usinfobot](https://t.me/usinfobot) for username lookup by ID
+- [TelegramDB](https://t.me/tgdatabase) for username lookup by ID
