@@ -843,7 +843,9 @@ MessageFlags FlagsFromMTP(
 			? Flag::IsOrWasScheduled
 			: Flag())
 		| ((flags & MTP::f_views) ? Flag::HasViews : Flag())
-		//| ((flags & MTP::f_noforwards) ? Flag::NoForwards : Flag())
+		// AyuGram: removed
+		// | ((flags & MTP::f_noforwards) ? Flag::NoForwards : Flag())
+		| (flags & MTP::f_noforwards ? Flag::AyuNoForwards : Flag())
 		| ((flags & MTP::f_invert_media) ? Flag::InvertMedia : Flag())
 		| ((flags & MTP::f_video_processing_pending)
 			? Flag::EstimatedDate

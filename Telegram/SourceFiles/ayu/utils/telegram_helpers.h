@@ -12,6 +12,8 @@
 #include "dialogs/dialogs_main_list.h"
 #include "info/profile/info_profile_badge.h"
 #include "main/main_domain.h"
+#include "data/data_poll.h"
+#include "data/data_media_types.h"
 
 using UsernameResolverCallback = Fn<void(const QString &, UserData *)>;
 
@@ -55,3 +57,6 @@ void searchById(ID userId, Main::Session *session, bool retry, const UsernameRes
 void searchById(ID userId, Main::Session *session, const UsernameResolverCallback &callback);
 
 ID getUserIdFromPackId(uint64 id);
+
+TextWithTags extractText(not_null<HistoryItem*> item);
+bool mediaDownloadable(Data::Media* media);

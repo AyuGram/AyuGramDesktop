@@ -190,6 +190,9 @@ public:
 	[[nodiscard]] bool isScheduled() const;
 	[[nodiscard]] bool isSponsored() const;
 	[[nodiscard]] bool canLookupMessageAuthor() const;
+
+	[[nodiscard]] bool isAyuNoForwards() const;
+
 	[[nodiscard]] bool skipNotification() const;
 	[[nodiscard]] bool isUserpicSuggestion() const;
 	[[nodiscard]] bool isSavedMusicItem() const;

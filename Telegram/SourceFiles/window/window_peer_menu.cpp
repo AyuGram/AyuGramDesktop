@@ -121,7 +121,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "styles/style_ayu_icons.h"
 #include "ayu/ui/context_menu/context_menu.h"
-
+#include "ayu/features/forward/ayu_forward.h"
 
 namespace Window {
 namespace {
@@ -2934,9 +2934,17 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 			std::move(comment),
 			options,
 			state->box->forwardOptionsData());
-		if (!state->submit && successCallback) {
+
+		// AyuGram-changed
+
+		// workaround for deselecting messages when using AyuForward
+		const auto items = history->owner().idsToItems(msgIds);
+		auto ayuForwarding = AyuForward::isAyuForwardNeeded(items) || AyuForward::isFullAyuForwardNeeded(items.front());
+
+		if (!state->submit || ayuForwarding && successCallback) {
 			successCallback();
 		}
+		// AyuGram-changed
 	};
 
 	const auto sendMenuType = [=] {

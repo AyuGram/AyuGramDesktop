@@ -890,7 +890,8 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 					&& chat->groupCall()->fullCount() > 0))
 				? Flag::CallNotEmpty
 				: Flag())
-			| (data.is_noforwards() ? Flag::NoForwards : Flag());
+			| (data.is_noforwards() ? Flag::NoForwards : Flag())
+			| (data.is_ayuNoforwards() ? Flag::AyuNoForwards : Flag());
 		chat->setFlags((chat->flags() & ~flagsMask) | flagsSet);
 		chat->count = data.vparticipants_count().v;
 
@@ -1065,6 +1066,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? Flag::StoriesHidden
 				: Flag())
 			| (data.is_autotranslation() ? Flag::AutoTranslation : Flag())
+            | (data.is_ayuNoforwards() ? Flag::AyuNoForwards : Flag()
 			| (data.is_monoforum() ? Flag::Monoforum : Flag())
 			| (hasStarsPerMessage
 				? (Flag::HasStarsPerMessage

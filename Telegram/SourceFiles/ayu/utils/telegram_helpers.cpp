@@ -741,3 +741,34 @@ ID getUserIdFromPackId(uint64 id) {
 
 	return ownerId;
 }
+
+TextWithTags extractText(not_null<HistoryItem*> item) {
+	TextWithTags result;
+
+	QString text;
+	if (const auto media = item->media()) {
+		if (const auto poll = media->poll()) {
+			text.append("\xF0\x9F\x93\x8A ") // 📊
+				.append(poll->question.text).append("\n");
+			for (const auto answer : poll->answers) {
+				text.append("• ").append(answer.text.text).append("\n");
+			}
+		}
+	}
+
+	result.tags = TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities);
+	result.text = text.isEmpty() ? item->originalText().text : text;
+	return result;
+}
+
+bool mediaDownloadable(Data::Media *media) {
+	if (!media
+		|| media->webpage() || media->poll() || media->game()
+		|| media->invoice() || media->location() || media->paper()
+		|| media->giveawayStart() || media->giveawayResults()
+		|| media->sharedContact() || media->call()
+	) {
+		return false;
+	}
+	return true;
+}
