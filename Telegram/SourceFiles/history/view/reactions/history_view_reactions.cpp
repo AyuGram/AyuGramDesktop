@@ -29,8 +29,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 
 // AyuGram includes
-#include "ayu/features/messageshot/message_shot.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/features/messageshot/message_shot.h"
 
 
 namespace HistoryView::Reactions {
@@ -104,7 +104,7 @@ std::vector<ReactionId> InlineList::computeTagsList() const {
 	}
 	auto result = std::vector<ReactionId>();
 	result.reserve(_buttons.size());
-	for (const auto& button : _buttons) {
+	for (const auto &button : _buttons) {
 		result.push_back(button.id);
 	}
 	return result;
@@ -136,11 +136,11 @@ void InlineList::layoutButtons() {
 		_buttons.clear();
 		return;
 	}
-       auto sorted = std::vector<not_null<const MessageReaction*>>();
-       sorted.reserve(_data.reactions.size());
-       for (const auto &reaction : _data.reactions) {
-               sorted.push_back(&reaction);
-       }
+	auto sorted = std::vector<not_null<const MessageReaction*>>();
+	sorted.reserve(_data.reactions.size());
+	for (const auto &reaction : _data.reactions) {
+		sorted.push_back(&reaction);
+	}
 	const auto tags = areTags();
 	if (!tags) {
 		const auto &list = _owner->list(::Data::Reactions::Type::All);
@@ -834,16 +834,16 @@ void InlineList::continueAnimations(base::flat_map<
 InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 	using Flag = InlineListData::Flag;
 	const auto item = view->data();
-       const auto &settings = AyuSettings::getInstance();
-       if (!settings.hideChannelReactions
-               && item->history()->peer->isChannel()
-               && !item->history()->peer->isMegagroup()) {
-               return InlineListData();
-       }
-       if (!settings.hideGroupReactions
-               && item->history()->peer->isMegagroup()) {
-               return InlineListData();
-		}
+	const auto &settings = AyuSettings::getInstance();
+	if (!settings.hideChannelReactions
+		&& item->history()->peer->isChannel()
+		&& !item->history()->peer->isMegagroup()) {
+		return InlineListData();
+	}
+	if (!settings.hideGroupReactions
+		&& item->history()->peer->isMegagroup()) {
+		return InlineListData();
+	}
 	auto result = InlineListData();
 	result.reactions = item->reactionsWithLocal();
 	if (const auto user = item->history()->peer->asUser()) {
@@ -881,9 +881,9 @@ InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 		if (showUserpics) {
 			result.recent.reserve(recent.size());
 			for (const auto &[id, list] : recent) {
-				auto& out = result.recent.emplace(id).first->second;
+				auto &out = result.recent.emplace(id).first->second;
 				out.reserve(list.size());
-				for (const auto& r : list) {
+				for (const auto &r : list) {
 					out.push_back(r.peer);
 				}
 			}

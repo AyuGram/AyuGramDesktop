@@ -231,7 +231,7 @@ AyuGramSettings::AyuGramSettings() {
 
 	disableNotificationsDelay = false;
 	localPremium = false;
-        hideChannelReactions = true;
+	hideChannelReactions = true;
 	hideGroupReactions = true;
 
 	// ~ Customization

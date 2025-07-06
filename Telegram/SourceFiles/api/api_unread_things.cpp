@@ -16,7 +16,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_unread_things.h"
 #include "apiwrap.h"
-#include <ayu/ayu_settings.h>
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
 
 namespace Api {
 namespace {
