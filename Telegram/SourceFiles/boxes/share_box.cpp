@@ -64,6 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/features/forward/ayu_forward.h"
 
 
 class ShareBox::Inner final : public Ui::RpWidget {
@@ -1671,6 +1672,48 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			result,
 			msgIds);
 		const auto requestType = Data::Histories::RequestType::Send;
+
+
+		// AyuGram-changed
+		const auto dismiss = [=]
+		{
+			if (show->valid()) {
+				show->hideLayer();
+			}
+		};
+
+
+		if (AyuForward::isFullAyuForwardNeeded(items.front())) {
+			crl::async([=]{
+				for (const auto thread : result) {
+					AyuForward::forwardMessages(
+					&history->owner().session(),
+					Api::SendAction(thread, options),
+					false,
+					Data::ResolvedForwardDraft(items, forwardOptions));
+				}
+			});
+
+			dismiss();
+			return;
+		}
+		if (AyuForward::isAyuForwardNeeded(items)) {
+			crl::async([=]
+			{
+				for (const auto thread : result) {
+					AyuForward::intelligentForward(
+						&history->owner().session(),
+						Api::SendAction(thread, options),
+						Data::ResolvedForwardDraft(items, forwardOptions));
+				}
+			});
+
+			dismiss();
+			return;
+		}
+		// AyuGram-changed
+
+
 		for (const auto thread : result) {
 			if (!comment.text.isEmpty()) {
 				auto message = Api::MessageToSend(
