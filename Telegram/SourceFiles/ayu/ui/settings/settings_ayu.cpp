@@ -785,6 +785,25 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 
 	AddCollapsibleToggle(container, tr::ayu_DisableSimilarChannels(), checkboxes, true);
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_DisableOpenLinkWarning(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->disableOpenLinkWarning)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableOpenLinkWarning);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_disableOpenLinkWarning(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
 	AddSkip(container);
 	AddDivider(container);
 	AddSkip(container);
