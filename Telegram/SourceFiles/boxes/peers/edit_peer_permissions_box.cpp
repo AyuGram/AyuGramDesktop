@@ -53,6 +53,7 @@ namespace {
 constexpr auto kSlowmodeValues = 7;
 constexpr auto kBoostsUnrestrictValues = 5;
 constexpr auto kForceDisableTooltipDuration = 3 * crl::time(1000);
+constexpr auto kDefaultChargeStars = 10;
 
 [[nodiscard]] auto Dependencies(PowerSaving::Flags)
 -> std::vector<std::pair<PowerSaving::Flag, PowerSaving::Flag>> {
@@ -163,11 +164,15 @@ constexpr auto kForceDisableTooltipDuration = 3 * crl::time(1000);
 	auto stories = std::vector<AdminRightLabel>{
 		{ Flag::PostStories, tr::lng_rights_channel_post_stories(tr::now) },
 		{ Flag::EditStories, tr::lng_rights_channel_edit_stories(tr::now) },
-		{ Flag::DeleteStories, tr::lng_rights_channel_delete_stories(tr::now) },
+		{
+			Flag::DeleteStories,
+			tr::lng_rights_channel_delete_stories(tr::now),
+		},
 	};
 	auto second = std::vector<AdminRightLabel>{
 		{ Flag::InviteByLinkOrAdd, tr::lng_rights_group_invite(tr::now) },
 		{ Flag::ManageCall, tr::lng_rights_channel_manage_calls(tr::now) },
+		{ Flag::ManageDirect, tr::lng_rights_channel_manage_direct(tr::now) },
 		{ Flag::AddAdmins, tr::lng_rights_add_admins(tr::now) },
 	};
 	return {
@@ -1176,7 +1181,7 @@ void ShowEditPeerPermissionsBox(
 	if (available) {
 		Ui::AddSkip(inner);
 		const auto starsPerMessage = peer->isChannel()
-			? peer->asChannel()->starsPerMessage()
+			? peer->asChannel()->commonStarsPerMessage()
 			: 0;
 		charging = inner->add(object_ptr<Ui::SettingsButton>(
 			inner,
@@ -1198,7 +1203,8 @@ void ShowEditPeerPermissionsBox(
 		state->starsPerMessage = SetupChargeSlider(
 			chargeInner,
 			peer,
-			starsPerMessage);
+			(starsPerMessage > 0) ? starsPerMessage : std::optional<int>(),
+			kDefaultChargeStars);
 	}
 
 	static constexpr auto kSendRestrictions = Flag::EmbedLinks

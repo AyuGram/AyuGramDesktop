@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_abstract_structure.h"
 #include "data/data_chat.h"
 #include "data/data_channel.h"
+#include "data/data_todo_list.h"
 #include "info/profile/info_profile_cover.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/reaction_fly_animation.h"
@@ -423,7 +424,7 @@ bool Service::consumeHorizontalScroll(QPoint position, int delta) {
 
 QRect Service::countGeometry() const {
 	auto result = QRect(0, 0, width(), height());
-	if (delegate()->elementIsChatWide()) {
+	if (delegate()->elementChatMode() == ElementChatMode::Wide) {
 		result.setWidth(qMin(result.width(), st::msgMaxWidth + 2 * st::msgPhotoSkip + 2 * st::msgMargin.left()));
 	}
 	auto margins = st::msgServiceMargin;
@@ -448,12 +449,13 @@ void Service::animateReaction(Ui::ReactionFlyAnimationArgs &&args) {
 }
 
 QSize Service::performCountCurrentSize(int newWidth) {
-	auto newHeight = displayedDateHeight();
-	if (const auto bar = Get<UnreadBar>()) {
-		newHeight += bar->height();
-	}
+	auto newHeight = marginTop();
 
 	data()->resolveDependent();
+
+	if (const auto service = Get<ServicePreMessage>()) {
+		service->resizeToWidth(newWidth, delegate()->elementChatMode());
+	}
 
 	if (isHidden()) {
 		return { newWidth, newHeight };
@@ -462,11 +464,9 @@ QSize Service::performCountCurrentSize(int newWidth) {
 	const auto mediaDisplayed = media && media->isDisplayed();
 	auto contentWidth = newWidth;
 	if (mediaDisplayed && media->hideServiceText()) {
-		newHeight += st::msgServiceMargin.top()
-			+ media->resizeGetHeight(newWidth)
-			+ st::msgServiceMargin.bottom();
+		newHeight += media->resizeGetHeight(newWidth) + marginBottom();
 	} else if (!text().isEmpty()) {
-		if (delegate()->elementIsChatWide()) {
+		if (delegate()->elementChatMode() == ElementChatMode::Wide) {
 			accumulate_min(contentWidth, st::msgMaxWidth + 2 * st::msgPhotoSkip + 2 * st::msgMargin.left());
 		}
 		contentWidth -= st::msgServiceMargin.left() + st::msgServiceMargin.left(); // two small margins
@@ -478,12 +478,15 @@ QSize Service::performCountCurrentSize(int newWidth) {
 		newHeight += (contentWidth >= maxWidth())
 			? minHeight()
 			: textHeightFor(nwidth);
-		newHeight += st::msgServicePadding.top() + st::msgServicePadding.bottom() + st::msgServiceMargin.top() + st::msgServiceMargin.bottom();
+		newHeight += st::msgServicePadding.top() + st::msgServicePadding.bottom();
 		if (mediaDisplayed) {
 			const auto mediaWidth = std::min(media->maxWidth(), nwidth);
 			newHeight += st::msgServiceMargin.top()
 				+ media->resizeGetHeight(mediaWidth);
 		}
+		newHeight += marginBottom();
+	} else {
+		newHeight -= st::msgServiceMargin.top();
 	}
 
 	if (_reactions) {
@@ -520,10 +523,16 @@ bool Service::isHidden() const {
 }
 
 int Service::marginTop() const {
-	auto result = st::msgServiceMargin.top();
+	auto result = isHidden() ? 0 : st::msgServiceMargin.top();
 	result += displayedDateHeight();
 	if (const auto bar = Get<UnreadBar>()) {
 		result += bar->height();
+	}
+	if (const auto monoforumBar = Get<MonoforumSenderBar>()) {
+		result += monoforumBar->height();
+	}
+	if (const auto service = Get<ServicePreMessage>()) {
+		result += service->height;
 	}
 	return result;
 }
@@ -541,20 +550,27 @@ void Service::draw(Painter &p, const PaintContext &context) const {
 	const auto st = context.st;
 	if (const auto bar = Get<UnreadBar>()) {
 		auto unreadbarh = bar->height();
-		auto dateh = 0;
+		auto aboveh = 0;
 		if (const auto date = Get<DateBadge>()) {
-			dateh = date->height();
+			aboveh += date->height();
 		}
-		if (context.clip.intersects(QRect(0, dateh, width(), unreadbarh))) {
-			p.translate(0, dateh);
+		if (const auto sender = Get<MonoforumSenderBar>()) {
+			aboveh += sender->height();
+		}
+		if (context.clip.intersects(QRect(0, aboveh, width(), unreadbarh))) {
+			p.translate(0, aboveh);
 			bar->paint(
 				p,
 				context,
 				0,
 				width(),
-				delegate()->elementIsChatWide());
-			p.translate(0, -dateh);
+				delegate()->elementChatMode());
+			p.translate(0, -aboveh);
 		}
+	}
+
+	if (const auto service = Get<ServicePreMessage>()) {
+		service->paint(p, context, g, delegate()->elementChatMode());
 	}
 
 	if (isHidden()) {
@@ -658,6 +674,13 @@ TextState Service::textState(QPoint point, StateRequest request) const {
 		return result;
 	}
 
+	if (const auto service = Get<ServicePreMessage>()) {
+		result.link = service->textState(point, request, g);
+		if (result.link) {
+			return result;
+		}
+	}
+
 	if (_reactions) {
 		const auto reactionsHeight = st::mediaInBubbleSkip + _reactions->height();
 		const auto reactionsLeft = 0;
@@ -715,6 +738,12 @@ TextState Service::textState(QPoint point, StateRequest request) const {
 				result.link = custom->link;
 			} else if (const auto payment = item->Get<HistoryServicePaymentRefund>()) {
 				result.link = payment->link;
+			} else if (const auto done = item->Get<HistoryServiceTodoCompletions>()) {
+				result.link = done->lnk;
+			} else if (const auto append = item->Get<HistoryServiceTodoAppendTasks>()) {
+				result.link = append->lnk;
+			} else if (const auto finish = item->Get<HistoryServiceSuggestFinish>()) {
+				result.link = finish->lnk;
 			} else if (media && data()->showSimilarChannels()) {
 				result = media->textState(mediaPoint, request);
 			}

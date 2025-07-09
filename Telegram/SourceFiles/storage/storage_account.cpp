@@ -67,6 +67,7 @@ constexpr auto kMultiDraftCursorsTagOld = quint64(0xFFFF'FFFF'FFFF'FF02ULL);
 constexpr auto kMultiDraftTag = quint64(0xFFFF'FFFF'FFFF'FF03ULL);
 constexpr auto kMultiDraftCursorsTag = quint64(0xFFFF'FFFF'FFFF'FF04ULL);
 constexpr auto kRichDraftsTag = quint64(0xFFFF'FFFF'FFFF'FF05ULL);
+constexpr auto kDraftsTag2 = quint64(0xFFFF'FFFF'FFFF'FF06ULL);
 
 enum { // Local Storage Keys
 	lskUserMap = 0x00,
@@ -133,6 +134,33 @@ auto EmptyMessageDraftSources()
 
 [[nodiscard]] QString LegacyTempDirectory() {
 	return cWorkingDir() + u"tdata/tdld/"_q;
+}
+
+[[nodiscard]] std::pair<quint64, quint64> SerializeSuggest(
+		SuggestPostOptions options) {
+	return {
+		((quint64(options.exists) << 63)
+			| (quint64(quint32(options.date)))),
+		((quint64(options.ton) << 63)
+			| (quint64(options.priceWhole) << 32)
+			| (quint64(options.priceNano))),
+	};
+}
+
+[[nodiscard]] SuggestPostOptions DeserializeSuggest(
+		std::pair<quint64, quint64> suggest) {
+	const auto exists = (suggest.first >> 63) ? 1 : 0;
+	const auto date = TimeId(uint32(suggest.first & 0xFFFF'FFFFULL));
+	const auto ton = (suggest.second >> 63) ? 1 : 0;
+	const auto priceWhole = uint32((suggest.second >> 32) & 0x7FFF'FFFFULL);
+	const auto priceNano = uint32(suggest.second & 0xFFFF'FFFFULL);
+	return {
+		.exists = uint32(exists),
+		.priceWhole = priceWhole,
+		.priceNano = priceNano,
+		.ton = uint32(ton),
+		.date = date,
+	};
 }
 
 } // namespace
@@ -1176,7 +1204,9 @@ void EnumerateDrafts(
 		} else if (key.isLocal()
 			&& (!supportMode || key.topicRootId())) {
 			const auto i = map.find(
-				Data::DraftKey::Cloud(key.topicRootId()));
+				Data::DraftKey::Cloud(
+					key.topicRootId(),
+					key.monoforumPeerId()));
 			const auto cloud = (i != end(map)) ? i->second.get() : nullptr;
 			if (Data::DraftsAreEqual(draft.get(), cloud)) {
 				continue;
@@ -1185,6 +1215,7 @@ void EnumerateDrafts(
 		callback(
 			key,
 			draft->reply,
+			draft->suggest,
 			draft->textWithTags,
 			draft->webpage,
 			draft->cursor);
@@ -1198,6 +1229,7 @@ void EnumerateDrafts(
 			callback(
 				key,
 				draft.reply,
+				draft.suggest,
 				draft.textWithTags,
 				draft.webpage,
 				cursor);
@@ -1263,6 +1295,7 @@ void Account::writeDrafts(not_null<History*> history) {
 	const auto sizeCallback = [&](
 			auto&&, // key
 			const FullReplyTo &reply,
+			SuggestPostOptions suggest,
 			const TextWithTags &text,
 			const Data::WebPageDraft &webpage,
 			auto&&) { // cursor
@@ -1270,6 +1303,7 @@ void Account::writeDrafts(not_null<History*> history) {
 			+ Serialize::stringSize(text.text)
 			+ TextUtilities::SerializeTagsSize(text.tags)
 			+ sizeof(qint64) + sizeof(qint64) // messageId
+			+ (sizeof(quint64) * 2) // suggest
 			+ Serialize::stringSize(webpage.url)
 			+ sizeof(qint32) // webpage.forceLargeMedia
 			+ sizeof(qint32) // webpage.forceSmallMedia
@@ -1285,22 +1319,26 @@ void Account::writeDrafts(not_null<History*> history) {
 
 	EncryptedDescriptor data(size);
 	data.stream
-		<< quint64(kRichDraftsTag)
+		<< quint64(kDraftsTag2)
 		<< SerializePeerId(peerId)
 		<< quint32(count);
 
 	const auto writeCallback = [&](
 			const Data::DraftKey &key,
 			const FullReplyTo &reply,
+			SuggestPostOptions suggest,
 			const TextWithTags &text,
 			const Data::WebPageDraft &webpage,
 			auto&&) { // cursor
+		const auto serialized = SerializeSuggest(suggest);
 		data.stream
 			<< key.serialize()
 			<< text.text
 			<< TextUtilities::SerializeTags(text.tags)
 			<< qint64(reply.messageId.peer.value)
 			<< qint64(reply.messageId.msg.bare)
+			<< serialized.first
+			<< serialized.second
 			<< webpage.url
 			<< qint32(webpage.forceLargeMedia ? 1 : 0)
 			<< qint32(webpage.forceSmallMedia ? 1 : 0)
@@ -1357,6 +1395,7 @@ void Account::writeDraftCursors(not_null<History*> history) {
 	const auto writeCallback = [&](
 			const Data::DraftKey &key,
 			auto&&, // reply
+			auto&&, // suggest
 			auto&&, // text
 			auto&&, // webpage
 			const MessageCursor &cursor) { // cursor
@@ -1426,7 +1465,7 @@ void Account::readDraftCursors(PeerId peerId, Data::HistoryDrafts &map) {
 			? Data::DraftKey::FromSerialized(keyValue)
 			: keysOld
 			? Data::DraftKey::FromSerializedOld(keyValueOld)
-			: Data::DraftKey::Local(0);
+			: Data::DraftKey::Local(MsgId(), PeerId());
 		qint32 position = 0, anchor = 0, scroll = Ui::kQFixedMax;
 		draft.stream >> position >> anchor >> scroll;
 		if (const auto i = map.find(key); i != end(map)) {
@@ -1453,13 +1492,14 @@ void Account::readDraftCursorsLegacy(
 		return;
 	}
 
-	if (const auto i = map.find(Data::DraftKey::Local({})); i != end(map)) {
+	if (const auto i = map.find(Data::DraftKey::Local(MsgId(), PeerId()))
+		; i != end(map)) {
 		i->second->cursor = MessageCursor(
 			localPosition,
 			localAnchor,
 			localScroll);
 	}
-	if (const auto i = map.find(Data::DraftKey::LocalEdit({}))
+	if (const auto i = map.find(Data::DraftKey::LocalEdit(MsgId(), PeerId()))
 		; i != end(map)) {
 		i->second->cursor = MessageCursor(
 			editPosition,
@@ -1472,7 +1512,7 @@ void Account::readDraftsWithCursors(not_null<History*> history) {
 	const auto guard = gsl::finally([&] {
 		if (const auto migrated = history->migrateFrom()) {
 			readDraftsWithCursors(migrated);
-			migrated->clearLocalEditDraft({});
+			migrated->clearLocalEditDraft(MsgId(), PeerId());
 			history->takeLocalDraft(migrated);
 		}
 	});
@@ -1516,12 +1556,14 @@ void Account::readDraftsWithCursors(not_null<History*> history) {
 	}
 	auto map = Data::HistoryDrafts();
 	const auto keysOld = (tag == kMultiDraftTagOld);
-	const auto rich = (tag == kRichDraftsTag);
+	const auto withSuggest = (tag == kDraftsTag2);
+	const auto rich = (tag == kRichDraftsTag) || withSuggest;
 	for (auto i = 0; i != count; ++i) {
 		TextWithTags text;
 		QByteArray textTagsSerialized;
 		qint64 keyValue = 0;
 		qint64 messageIdPeer = 0, messageIdMsg = 0;
+		std::pair<quint64, quint64> suggestSerialized;
 		qint32 keyValueOld = 0;
 		QString webpageUrl;
 		qint32 webpageForceLargeMedia = 0;
@@ -1555,7 +1597,13 @@ void Account::readDraftsWithCursors(not_null<History*> history) {
 				>> text.text
 				>> textTagsSerialized
 				>> messageIdPeer
-				>> messageIdMsg
+				>> messageIdMsg;
+			if (withSuggest) {
+				draft.stream
+					>> suggestSerialized.first
+					>> suggestSerialized.second;
+			}
+			draft.stream
 				>> webpageUrl
 				>> webpageForceLargeMedia
 				>> webpageForceSmallMedia
@@ -1578,6 +1626,7 @@ void Account::readDraftsWithCursors(not_null<History*> history) {
 						MsgId(messageIdMsg)),
 					.topicRootId = key.topicRootId(),
 				},
+				DeserializeSuggest(suggestSerialized),
 				MessageCursor(),
 				Data::WebPageDraft{
 					.url = webpageUrl,
@@ -1643,13 +1692,15 @@ void Account::readDraftsWithCursorsLegacy(
 		editData.text.size());
 
 	const auto topicRootId = MsgId();
+	const auto monoforumPeerId = PeerId();
 	auto map = base::flat_map<Data::DraftKey, std::unique_ptr<Data::Draft>>();
 	if (!msgData.text.isEmpty() || msgReplyTo) {
 		map.emplace(
-			Data::DraftKey::Local(topicRootId),
+			Data::DraftKey::Local(topicRootId, monoforumPeerId),
 			std::make_unique<Data::Draft>(
 				msgData,
 				FullReplyTo{ FullMsgId(peerId, MsgId(msgReplyTo)) },
+				SuggestPostOptions(),
 				MessageCursor(),
 				Data::WebPageDraft{
 					.removed = (msgPreviewCancelled == 1),
@@ -1657,10 +1708,11 @@ void Account::readDraftsWithCursorsLegacy(
 	}
 	if (editMsgId) {
 		map.emplace(
-			Data::DraftKey::LocalEdit(topicRootId),
+			Data::DraftKey::LocalEdit(topicRootId, monoforumPeerId),
 			std::make_unique<Data::Draft>(
 				editData,
 				FullReplyTo{ FullMsgId(peerId, editMsgId) },
+				SuggestPostOptions(),
 				MessageCursor(),
 				Data::WebPageDraft{
 					.removed = (editPreviewCancelled == 1),

@@ -22,6 +22,10 @@ QString MajorPart(EarnInt value) {
 	return (diff <= 0) ? QString(kZero) : string.mid(0, diff);
 }
 
+QString MajorPart(CreditsAmount value) {
+	return QString::number(int64(value.value()));
+}
+
 QString MinorPart(EarnInt value) {
 	if (!value) {
 		return QString(kDot) + kZero + kZero;
@@ -46,26 +50,29 @@ QString MinorPart(EarnInt value) {
 	return result.chopped(zeroCount);
 }
 
+QString MinorPart(CreditsAmount value) {
+	return QString::number(value.value(), 'f', 2).right(3);
+}
+
 QString ToUsd(
 		Data::EarnInt value,
 		float64 rate,
 		int afterFloat) {
-	return ToUsd(StarsAmount(value), rate, afterFloat);
+	return ToUsd(CreditsAmount(value), rate, afterFloat);
 }
 
 QString ToUsd(
-		StarsAmount value,
+		CreditsAmount value,
 		float64 rate,
 		int afterFloat) {
 	constexpr auto kApproximately = QChar(0x2248);
 
-	const auto result = int64(base::SafeRound(value.value() * rate));
 	return QString(kApproximately)
 		+ QChar('$')
-		+ MajorPart(result)
-		+ ((afterFloat > 0)
-			? MinorPart(result).left(afterFloat)
-			: MinorPart(result));
+		+ QString::number(
+			value.value() * rate,
+			'f',
+			afterFloat ? afterFloat : 2);
 }
 
 } // namespace Info::ChannelEarn

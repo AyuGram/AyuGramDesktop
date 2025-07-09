@@ -21,8 +21,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "menu/menu_ttl_validator.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
@@ -38,13 +40,21 @@ DeleteMessagesBox::DeleteMessagesBox(
 	bool suggestModerateActions)
 : _session(&item->history()->session())
 , _ids(1, item->fullId()) {
+	const auto peer = item->history()->peer;
+	const auto channel = peer->asChannel();
 	if (suggestModerateActions) {
 		_moderateBan = item->suggestBanReport();
 		_moderateDeleteAll = item->suggestDeleteAllReport();
-		if (_moderateBan || _moderateDeleteAll) {
-			_moderateFrom = item->from();
-			_moderateInChannel = item->history()->peer->asChannel();
+	} else if (item->out()) {
+		const auto chat = peer->asChat();
+		if ((chat && chat->canDeleteMessages()) ||
+			(channel && !channel->isBroadcast() && channel->canDeleteMessages())) {
+			_moderateDeleteAll = true;
 		}
+	}
+	if ((_moderateBan || _moderateDeleteAll) && channel) {
+		_moderateFrom = item->from();
+		_moderateInChannel = channel;
 	}
 }
 
@@ -492,7 +502,58 @@ void DeleteMessagesBox::keyPressEvent(QKeyEvent *e) {
 	}
 }
 
+PaidPostType DeleteMessagesBox::paidPostType() const {
+	auto result = PaidPostType::None;
+	const auto now = base::unixtime::now();
+	for (const auto &id : _ids) {
+		if (const auto item = _session->data().message(id)) {
+			const auto type = item->paidType();
+			if (type != PaidPostType::None) {
+				const auto date = item->date();
+				const auto config = &item->history()->session().appConfig();
+				const auto limit = config->suggestedPostAgeMin();
+				if (now < date || now - date <= limit) {
+					if (type == PaidPostType::Ton) {
+						return type;
+					} else if (type == PaidPostType::Stars) {
+						result = type;
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
 void DeleteMessagesBox::deleteAndClear() {
+	const auto warnPaidType = _confirmedDeletePaidSuggestedPosts
+		? PaidPostType::None
+		: paidPostType();
+	if (warnPaidType != PaidPostType::None) {
+		const auto weak = Ui::MakeWeak(this);
+		const auto callback = [=](Fn<void()> close) {
+			close();
+			if (const auto strong = weak.data()) {
+				strong->_confirmedDeletePaidSuggestedPosts = true;
+				strong->deleteAndClear();
+			}
+		};
+		const auto ton = (warnPaidType == PaidPostType::Ton);
+		uiShow()->show(Ui::MakeConfirmBox({
+			.text = (ton
+				? tr::lng_suggest_warn_text_ton
+				: tr::lng_suggest_warn_text_stars)(
+					tr::now,
+					Ui::Text::RichLangValue),
+			.confirmed = callback,
+			.confirmText = tr::lng_suggest_warn_delete_anyway(tr::now),
+			.confirmStyle = &st::attentionBoxButton,
+			.title = (ton
+				? tr::lng_suggest_warn_title_ton
+				: tr::lng_suggest_warn_title_stars)(tr::now),
+		}));
+		return;
+	}
 	if (_revoke
 		&& _revokeRemember
 		&& _revokeRemember->toggled()

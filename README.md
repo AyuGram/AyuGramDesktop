@@ -86,6 +86,10 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
+### EPM
+
+`epm play ayugram`
+
 ### Any other Linux distro
 
 Follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
@@ -125,5 +129,4 @@ Enjoy using **AyuGram**? Consider sending us a tip!
 
 ### Bots
 
-- [TelegramDB](https://t.me/tgdatabase) for username lookup by ID (until closing free inline mode at 25 May 2025)
-- [usinfobot](https://t.me/usinfobot) for username lookup by ID
+- [TelegramDB](https://t.me/tgdatabase) for username lookup by ID

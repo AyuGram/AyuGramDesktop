@@ -107,7 +107,7 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 	const auto json = doc.object();
 	for (const QString &brokenKey : json.keys()) {
 		auto key = qsl("ayu_") + brokenKey;
-		const auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&")).toUtf8();
+		auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&"));
 
 		if (key.endsWith("_zero") || key.endsWith("_two") || key.endsWith("_few") || key.endsWith("_many")) {
 			continue;
@@ -119,8 +119,16 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 			key = key.replace("_other", "#other");
 		}
 
+		if (val.contains(qsl("%1$d")) && !val.contains(qsl("%2$d"))) {
+			val = val.replace(qsl("%1$d"), qsl("{count}"));
+		} else if (val.contains(qsl("%1$d")) && val.contains(qsl("%2$d"))) {
+			val = val.replace(qsl("%1$d"), qsl("{count1}")).replace(qsl("%2$d"), qsl("{count2}"));
+		} else if (val.contains(qsl("%1$s"))) {
+			val = val.replace(qsl("%1$s"), qsl("{item}"));
+		}
+
 		Lang::GetInstance().resetValue(key.toUtf8());
-		Lang::GetInstance().applyValue(key.toUtf8(), val);
+		Lang::GetInstance().applyValue(key.toUtf8(), val.toUtf8());
 	}
 	Lang::GetInstance().updatePluralRules();
 }
