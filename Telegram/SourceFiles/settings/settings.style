@@ -103,6 +103,7 @@ settingsPremiumIconLastSeen: icon {{ "settings/premium/lastseen", settingsIconFg
 settingsPremiumIconPrivacy: icon {{ "settings/premium/privacy", settingsIconFg }};
 settingsPremiumIconBusiness: icon {{ "settings/premium/market", settingsIconFg }};
 settingsPremiumIconEffects: icon {{ "settings/premium/effects", settingsIconFg }};
+settingsPremiumIconChecklist: icon {{ "settings/premium/checklist", settingsIconFg }};
 
 settingsStoriesIconOrder: icon {{ "settings/premium/stories_order", premiumButtonBg1 }};
 settingsStoriesIconStealth: icon {{ "menu/stealth", premiumButtonBg1 }};
@@ -696,3 +697,11 @@ settingsGiftIconEmoji: IconEmoji {
 	icon: icon{{ "settings/mini_gift", windowFg }};
 	padding: margins(1px, 2px, 1px, 0px);
 }
+
+settingsCreditsButtonBuyIcon: icon {{ "settings/add", windowBgActive, point(7px, 0px) }};
+
+settingsCreditsButton: SettingsButton(settingsButton) {
+	padding: margins(62px, 8px, 22px, 8px);
+}
+settingsButtonIconGift: icon {{ "settings/gift", menuIconColor }};
+settingsButtonIconEarn: icon {{ "settings/earn", menuIconColor }};

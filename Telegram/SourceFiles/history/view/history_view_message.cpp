@@ -7,12 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_message.h"
 
+#include "api/api_suggest_post.h"
+#include "base/unixtime.h"
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "core/ui_integration.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "history/view/media/history_view_media_generic.h"
 #include "history/view/media/history_view_web_page.h"
+#include "history/view/media/history_view_suggest_decision.h"
 #include "history/view/reactions/history_view_reactions.h"
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/history_view_group_call_bar.h" // UserpicInRow.
@@ -23,11 +27,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 #include "ui/effects/glare.h"
 #include "ui/effects/reaction_fly_animation.h"
-#include "ui/rect.h"
-#include "ui/round_rect.h"
 #include "ui/text/text_utilities.h"
 #include "ui/text/text_extended_data.h"
 #include "ui/power_saving.h"
+#include "ui/rect.h"
+#include "ui/round_rect.h"
 #include "data/components/factchecks.h"
 #include "data/components/sponsored_messages.h"
 #include "data/data_session.h"
@@ -422,7 +426,9 @@ Message::Message(
 , _bottomInfo(
 		&data->history()->owner().reactions(),
 		BottomInfoDataFromMessage(this)) {
-	if (const auto media = data->media()) {
+	if (data->Get<HistoryMessageSuggestedPost>()) {
+		_hideReply = 1;
+	} else if (const auto media = data->media()) {
 		if (media->giveawayResults()) {
 			_hideReply = 1;
 		}
@@ -456,9 +462,33 @@ Message::~Message() {
 	}
 }
 
+void Message::refreshSuggestedInfo(
+		not_null<HistoryItem*> item,
+		not_null<const HistoryMessageSuggestedPost*> suggest,
+		const HistoryMessageReply *replyData) {
+	const auto link = (replyData && replyData->resolvedMessage)
+		? JumpToMessageClickHandler(
+			replyData->resolvedMessage.get(),
+			item->fullId())
+		: ClickHandlerPtr();
+	setServicePreMessage({}, link, std::make_unique<MediaGeneric>(
+		this,
+		GenerateSuggestRequestMedia(this, suggest),
+		MediaGenericDescriptor{
+			.maxWidth = st::chatSuggestWidth,
+			.fullAreaLink = link,
+			.service = true,
+			.hideServiceText = true,
+		}));
+}
+
 void Message::initPaidInformation() {
 	const auto item = data();
-	if (!item->history()->peer->isUser()) {
+	if (item->history()->peer->isMonoforum()) {
+		if (const auto suggest = item->Get<HistoryMessageSuggestedPost>()) {
+			const auto replyData = item->Get<HistoryMessageReply>();
+			refreshSuggestedInfo(item, suggest, replyData);
+		}
 		return;
 	}
 	const auto media = this->media();
@@ -839,6 +869,29 @@ QSize Message::performCountOptimalSize() {
 		RemoveComponents(Reply::Bit());
 	}
 
+	if (item->history()->peer->isMonoforum()) {
+		if (const auto suggest = item->Get<HistoryMessageSuggestedPost>()) {
+			if (const auto service = Get<ServicePreMessage>()) {
+				// Ok, we didn't have the message, but now we have.
+				// That means this is not a plain post suggestion,
+				// but a suggestion of changes to previous suggestion.
+				if (service->media
+					&& !service->handler
+					&& replyData
+					&& replyData->resolvedMessage) {
+					refreshSuggestedInfo(item, suggest, replyData);
+				}
+			}
+		}
+	}
+
+	if (const auto postSender = item->discussionPostOriginalSender()) {
+		if (!postSender->isFullLoaded()) {
+			// We need it for available reactions list.
+			postSender->updateFull();
+		}
+	}
+
 	const auto factcheck = item->Get<HistoryMessageFactcheck>();
 	if (factcheck && !factcheck->data.text.empty()) {
 		AddComponents(Factcheck::Bit());
@@ -1118,6 +1171,9 @@ int Message::marginTop() const {
 			result += bar->height();
 		}
 	}
+	if (const auto monoforumBar = Get<MonoforumSenderBar>()) {
+		result += monoforumBar->height();
+	}
 	if (const auto service = Get<ServicePreMessage>()) {
 		if (!AyuFeatures::MessageShot::isTakingShot()) {
 			result += service->height;
@@ -1162,24 +1218,22 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 
 	if (const auto bar = Get<UnreadBar>()) {
 		auto unreadbarh = bar->height();
-		auto dateh = 0;
+		auto aboveh = 0;
 		if (const auto date = Get<DateBadge>()) {
-			dateh = date->height();
+			aboveh += date->height();
 		}
-		if (context.clip.intersects(QRect(0, dateh, width(), unreadbarh))) {
-			p.translate(0, dateh);
-			bar->paint(
-				p,
-				context,
-				0,
-				width(),
-				delegate()->elementIsChatWide());
-			p.translate(0, -dateh);
+		if (const auto sender = Get<MonoforumSenderBar>()) {
+			aboveh += sender->height();
+		}
+		if (context.clip.intersects(QRect(0, aboveh, width(), unreadbarh))) {
+			p.translate(0, aboveh);
+			bar->paint(p, context, 0, width(), delegate()->elementChatMode());
+			p.translate(0, -aboveh);
 		}
 	}
 
 	if (const auto service = Get<ServicePreMessage>()) {
-		service->paint(p, context, g, delegate()->elementIsChatWide());
+		service->paint(p, context, g, delegate()->elementChatMode());
 	}
 
 	if (isHidden()) {
@@ -1575,8 +1629,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 		constexpr auto kMaxHeightRatio = 3.5;
 		constexpr auto kStrokeWidth = 2.;
 		constexpr auto kWaveWidth = 10.;
-		const auto isLeftSize = (!context.outbg)
-			|| delegate()->elementIsChatWide();
+		const auto isLeftSize = !context.outbg
+			|| (delegate()->elementChatMode() == ElementChatMode::Wide);
 		const auto ratio = std::min(context.gestureHorizontal.ratio, 1.);
 		const auto reachRatio = context.gestureHorizontal.reachRatio;
 		const auto size = st::historyFastShareSize;
@@ -1661,7 +1715,8 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 			}
 			const auto o = ScopedPainterOpacity(p, progress);
 			const auto &st = st::msgSelectionCheck;
-			const auto right = delegate()->elementIsChatWide()
+			const auto right = (delegate()->elementChatMode()
+				== ElementChatMode::Wide)
 				? std::min(
 					int(_bubbleWidthLimit
 						+ st::msgPhotoSkip
@@ -2503,6 +2558,8 @@ bool Message::hasFromPhoto() const {
 	switch (context()) {
 	case Context::AdminLog:
 		return true;
+	case Context::Monoforum:
+		return (delegate()->elementChatMode() == ElementChatMode::Wide);
 	case Context::History:
 	case Context::ChatPreview:
 	case Context::TTLViewer:
@@ -2521,8 +2578,10 @@ bool Message::hasFromPhoto() const {
 			|| item->isFakeAboutView()
 			|| (context() == Context::Replies && item->isDiscussionPost())) {
 			return false;
-		} else if (delegate()->elementIsChatWide()) {
-			return true;
+		}
+		const auto mode = delegate()->elementChatMode();
+		if (mode != ElementChatMode::Default) {
+			return (mode == ElementChatMode::Wide);
 		} else if (item->history()->peer->isVerifyCodes()) {
 			return !hasOutLayout();
 		} else if (item->Has<HistoryMessageForwarded>()) {
@@ -3730,6 +3789,8 @@ bool Message::hasFromName() const {
 	switch (context()) {
 	case Context::AdminLog:
 		return true;
+	case Context::Monoforum:
+		return data()->out() || data()->from()->isChannel();
 	case Context::History:
 	case Context::ChatPreview:
 	case Context::TTLViewer:
@@ -3888,6 +3949,9 @@ int Message::minWidthForMedia() const {
 		accumulate_max(result, added + st::semiboldFont->width(
 			tr::lng_replies_view_original(tr::now)));
 	}
+	if (const auto keyboard = data()->inlineReplyKeyboard()) {
+		accumulate_max(result, keyboard->naturalWidth());
+	}
 	return result;
 }
 
@@ -4000,6 +4064,8 @@ bool Message::displayFastShare() const {
 bool Message::displayGoToOriginal() const {
 	if (isPinnedContext()) {
 		return !hasOutLayout();
+	} else if (context() == Context::Monoforum) {
+		return false;
 	}
 	const auto item = data();
 	if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
@@ -4420,12 +4486,15 @@ QRect Message::countGeometry() const {
 		? media->width()
 		: width();
 	const auto outbg = hasOutLayout();
+	const auto useMoreSpace = (delegate()->elementChatMode()
+		== ElementChatMode::Narrow);
+	const auto wideSkip = useMoreSpace
+		? st::msgMargin.left()
+		: st::msgMargin.right();
 	const auto availableWidth = width()
 		- st::msgMargin.left()
-		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
-	auto contentLeft = hasRightLayout()
-		? st::msgMargin.right()
-		: st::msgMargin.left();
+		- (centeredView ? st::msgMargin.left() : wideSkip);
+	auto contentLeft = hasRightLayout() ? wideSkip : st::msgMargin.left();
 	auto contentWidth = availableWidth;
 	if (hasFromPhoto()) {
 		contentLeft += st::msgPhotoSkip;
@@ -4446,7 +4515,8 @@ QRect Message::countGeometry() const {
 			contentWidth = mediaWidth;
 		}
 	}
-	if (contentWidth < availableWidth && !delegate()->elementIsChatWide()) {
+	if (contentWidth < availableWidth
+		&& delegate()->elementChatMode() != ElementChatMode::Wide) {
 		if (outbg) {
 			contentLeft += availableWidth - contentWidth;
 		} else if (centeredView) {
@@ -4535,7 +4605,7 @@ int Message::resizeContentGetHeight(int newWidth) {
 	auto newHeight = minHeight();
 
 	if (const auto service = Get<ServicePreMessage>()) {
-		service->resizeToWidth(newWidth, delegate()->elementIsChatWide());
+		service->resizeToWidth(newWidth, delegate()->elementChatMode());
 	}
 
 	const auto botTop = item->isFakeAboutView()
@@ -4550,9 +4620,14 @@ int Message::resizeContentGetHeight(int newWidth) {
 	// This code duplicates countGeometry() but also resizes media.
 	const auto centeredView = item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
+	const auto useMoreSpace = (delegate()->elementChatMode()
+		== ElementChatMode::Narrow);
+	const auto wideSkip = useMoreSpace
+		? st::msgMargin.left()
+		: st::msgMargin.right();
 	auto contentWidth = newWidth
 		- st::msgMargin.left()
-		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
+		- (centeredView ? st::msgMargin.left() : wideSkip);
 	if (hasFromPhoto()) {
 		if (const auto size = rightActionSize()) {
 			contentWidth -= size->width() + (st::msgPhotoSkip - st::historyFastShareSize);

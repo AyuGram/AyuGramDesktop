@@ -10,6 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flags.h"
 #include "data/data_chat_participant_status.h"
 
+namespace Api {
+struct SendOptions;
+} // namespace Api
+
 namespace Data {
 class Session;
 } // namespace Data
@@ -33,6 +37,9 @@ enum class ReplyMarkupFlag : uint32 {
 	IsNull                = (1U << 7),
 	OnlyBuyButton         = (1U << 8),
 	Persistent            = (1U << 9),
+	SuggestionDecline     = (1U << 10),
+	SuggestionAccept      = (1U << 11),
+	SuggestionSeparator   = (1U << 12),
 };
 inline constexpr bool is_flag_type(ReplyMarkupFlag) { return true; }
 using ReplyMarkupFlags = base::flags<ReplyMarkupFlag>;
@@ -81,6 +88,10 @@ struct HistoryMessageMarkupButton {
 		WebView,
 		SimpleWebView,
 		CopyText,
+
+		SuggestDecline,
+		SuggestAccept,
+		SuggestChange,
 	};
 
 	HistoryMessageMarkupButton(
@@ -135,4 +146,17 @@ struct HistoryMessageRepliesData {
 	int repliesCount = 0;
 	bool isNull = true;
 	int pts = 0;
+};
+
+struct HistoryMessageSuggestInfo {
+	HistoryMessageSuggestInfo() = default;
+	explicit HistoryMessageSuggestInfo(const MTPSuggestedPost *data);
+	explicit HistoryMessageSuggestInfo(const Api::SendOptions &options);
+	explicit HistoryMessageSuggestInfo(SuggestPostOptions options);
+
+	CreditsAmount price;
+	TimeId date = 0;
+	bool accepted = false;
+	bool rejected = false;
+	bool exists = false;
 };

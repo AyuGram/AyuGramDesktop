@@ -7,28 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/about_box.h"
 
-#include "lang/lang_keys.h"
-#include "mainwidget.h"
-#include "mainwindow.h"
-#include "ui/boxes/confirm_box.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/text/text_utilities.h"
 #include "base/platform/base_platform_info.h"
-#include "core/file_utilities.h"
-#include "core/click_handler_types.h"
-#include "core/update_checker.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
+#include "core/update_checker.h"
+#include "lang/lang_keys.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/text/text_utilities.h"
+#include "ui/vertical_list.h"
+#include "ui/widgets/buttons.h"
+#include "ui/wrap/vertical_layout.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
-#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
-
 
 namespace {
 
@@ -47,54 +43,52 @@ rpl::producer<TextWithEntities> Text() {
 
 } // namespace
 
-AboutBox::AboutBox(QWidget *parent, Window::SessionController* controller)
-: _version(this, tr::lng_about_version(tr::now, lt_version, currentVersionText()), st::aboutVersionLink)
-, _text(this, Text(), st::aboutLabel)
-, _controller(controller) {
-}
+void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller) {
+	box->setTitle(rpl::single(u"AyuGram Desktop"_q));
 
-void AboutBox::prepare() {
-	setTitle(rpl::single(u"AyuGram Desktop"_q));
+	auto layout = box->verticalLayout();
 
-	addButton(tr::lng_close(), [this] { closeBox(); });
-	addLeftButton(
+	const auto version = layout->add(
+		object_ptr<Ui::LinkButton>(
+			box,
+			tr::lng_about_version(
+				tr::now,
+				lt_version,
+				currentVersionText()),
+			st::aboutVersionLink),
+		QMargins(
+			st::boxRowPadding.left(),
+			-st::lineWidth * 3,
+			st::boxRowPadding.right(),
+			st::boxRowPadding.bottom()));
+	version->setClickedCallback([=] {
+		File::OpenUrl(Core::App().changelogLink());
+	});
+
+	Ui::AddSkip(layout, st::aboutTopSkip);
+
+	const auto addText = [&](rpl::producer<TextWithEntities> text) {
+		const auto label = layout->add(
+			object_ptr<Ui::FlatLabel>(box, std::move(text), st::aboutLabel),
+			st::boxRowPadding);
+		label->setLinksTrusted();
+		Ui::AddSkip(layout, st::aboutSkip);
+	};
+
+	addText(Text());
+
+	box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+	box->addLeftButton(
 		rpl::single(QString("@AyuGramReleases")),
-		[this, controller = _controller]
+		[box, controller]
 		{
-			closeBox();
+			box->closeBox();
 			controller->showPeerByLink(Window::PeerByLinkInfo{
 				.usernameOrId = QString("ayugramreleases"),
 			});
 		});
 
-	_text->setLinksTrusted();
-
-	_version->setClickedCallback([this] { showVersionHistory(); });
-
-	setDimensions(st::aboutWidth, st::aboutTextTop + _text->height());
-}
-
-void AboutBox::resizeEvent(QResizeEvent *e) {
-	BoxContent::resizeEvent(e);
-
-	const auto available = width()
-		- st::boxPadding.left()
-		- st::boxPadding.right();
-	_version->moveToLeft(st::boxPadding.left(), st::aboutVersionTop);
-	_text->resizeToWidth(available);
-	_text->moveToLeft(st::boxPadding.left(), st::aboutTextTop);
-}
-
-void AboutBox::showVersionHistory() {
-	File::OpenUrl(Core::App().changelogLink());
-}
-
-void AboutBox::keyPressEvent(QKeyEvent *e) {
-	if (e->key() == Qt::Key_Enter || e->key() == Qt::Key_Return) {
-		closeBox();
-	} else {
-		BoxContent::keyPressEvent(e);
-	}
+	box->setWidth(st::aboutWidth);
 }
 
 QString currentVersionText() {
@@ -109,5 +103,8 @@ QString currentVersionText() {
 	} else if (Platform::IsWindowsARM64()) {
 		result += " arm64";
 	}
+#ifdef _DEBUG
+	result += " DEBUG";
+#endif
 	return result;
 }

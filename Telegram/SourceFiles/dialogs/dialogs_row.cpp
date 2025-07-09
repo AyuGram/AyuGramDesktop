@@ -324,7 +324,9 @@ Row::~Row() {
 void Row::recountHeight(float64 narrowRatio, FilterId filterId) {
 	if (const auto history = _id.history()) {
 		const auto hasTags = _id.entry()->hasChatsFilterTags(filterId);
-		_height = history->isForum()
+		const auto wideRow = history->isForum()
+			|| history->amMonoforumAdmin();
+		_height = wideRow
 			? anim::interpolate(
 				hasTags
 					? st::taggedForumDialogRow.height
@@ -470,7 +472,7 @@ void Row::PaintCornerBadgeFrame(
 		for (auto i = 0; i != storiesUnreadCount; ++i) {
 			segments.push_back({ storiesUnreadBrush, storiesUnread });
 		}
-		if (peer && peer->forum()) {
+		if (peer && (peer->forum() || peer->monoforum())) {
 			const auto radius = context.st->photoSize
 				* Ui::ForumUserpicRadiusMultiplier();
 			Ui::PaintOutlineSegments(q, outline, radius, segments);

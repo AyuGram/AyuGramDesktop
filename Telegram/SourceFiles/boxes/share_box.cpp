@@ -45,6 +45,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_histories.h"
 #include "data/data_user.h"
 #include "data/data_peer_values.h"
+#include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
@@ -64,6 +66,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/features/forward/ayu_forward.h"
 
 
 class ShareBox::Inner final : public Ui::RpWidget {
@@ -119,7 +122,9 @@ private:
 		not_null<History*> history;
 		not_null<PeerData*> peer;
 		Data::ForumTopic *topic = nullptr;
+		Data::SavedSublist *sublist = nullptr;
 		rpl::lifetime topicLifetime;
+		rpl::lifetime sublistLifetime;
 		Ui::RoundImageCheckbox checkbox;
 		Ui::Text::String name;
 		Ui::Animations::Simple nameActive;
@@ -148,6 +153,7 @@ private:
 	void preloadUserpic(not_null<Dialogs::Entry*> entry);
 	void changeCheckState(Chat *chat);
 	void chooseForumTopic(not_null<Data::Forum*> forum);
+	void chooseMonoforumSublist(not_null<Data::SavedMessages*> monoforum);
 	enum class ChangeStateWay {
 		Default,
 		SkipCallback,
@@ -643,15 +649,18 @@ void ShareBox::addPeerToMultiSelect(not_null<Data::Thread*> thread) {
 	auto addItemWay = Ui::MultiSelect::AddItemWay::Default;
 	const auto peer = thread->peer();
 	const auto topic = thread->asTopic();
+	const auto sublist = thread->asSublist();
 	_select->addItem(
 		peer->id.value,
 		(topic
 			? topic->title()
+			: sublist
+			? sublist->sublistPeer()->shortName()
 			: peer->isSelf()
 			? tr::lng_saved_short(tr::now)
 			: peer->shortName()),
 		st::activeButtonBg,
-		(topic
+		((topic || sublist)
 			? ForceRoundUserpicCallback(peer)
 			: PaintUserpicCallback(peer, true)),
 		addItemWay);
@@ -975,6 +984,8 @@ void ShareBox::Inner::updateChatName(not_null<Chat*> chat) {
 	const auto peer = chat->peer;
 	const auto text = chat->topic
 		? chat->topic->title()
+		: chat->sublist
+		? chat->sublist->sublistPeer()->name()
 		: peer->isSelf()
 		? tr::lng_saved_messages(tr::now)
 		: peer->isRepliesChat()
@@ -1214,7 +1225,7 @@ ShareBox::Inner::Chat::Chat(
 	st.checkbox,
 	updateCallback,
 	PaintUserpicCallback(peer, true),
-	[=](int size) { return peer->isForum()
+	[=](int size) { return (peer->isForum() || peer->isMonoforum())
 		? int(size * Ui::ForumUserpicRadiusMultiplier())
 		: std::optional<int>(); })
 , name(st.checkbox.imageRadius * 2) {
@@ -1355,10 +1366,13 @@ void ShareBox::Inner::changeCheckState(Chat *chat) {
 
 	const auto checked = chat->checkbox.checked();
 	const auto forum = chat->peer->forum();
-	if (checked || !forum) {
+	const auto monoforum = chat->peer->monoforum();
+	if (checked || (!forum && !monoforum)) {
 		changePeerCheckState(chat, !checked);
-	} else {
-		chooseForumTopic(chat->peer->forum());
+	} else if (forum) {
+		chooseForumTopic(forum);
+	} else if (monoforum) {
+		chooseMonoforumSublist(monoforum);
 	}
 }
 
@@ -1409,6 +1423,54 @@ void ShareBox::Inner::chooseForumTopic(not_null<Data::Forum*> forum) {
 	_show->showBox(std::move(box));
 }
 
+void ShareBox::Inner::chooseMonoforumSublist(
+		not_null<Data::SavedMessages*> monoforum) {
+	const auto guard = Ui::MakeWeak(this);
+	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
+	auto chosen = [=](not_null<Data::SavedSublist*> sublist) {
+		if (const auto strong = *weak) {
+			strong->closeBox();
+		}
+		if (!guard) {
+			return;
+		}
+		const auto row = _chatsIndexed->getRow(sublist->owningHistory());
+		if (!row) {
+			return;
+		}
+		const auto chat = getChat(row);
+		Assert(!chat->sublist);
+		chat->sublist = sublist;
+		chat->sublist->destroyed(
+		) | rpl::start_with_next([=] {
+			changePeerCheckState(chat, false);
+		}, chat->sublistLifetime);
+		updateChatName(chat);
+		changePeerCheckState(chat, true);
+	};
+	auto initBox = [=](not_null<PeerListBox*> box) {
+		box->addButton(tr::lng_cancel(), [=] {
+			box->closeBox();
+		});
+
+		monoforum->destroyed(
+		) | rpl::start_with_next([=] {
+			box->closeBox();
+		}, box->lifetime());
+	};
+	auto filter = [=](not_null<Data::SavedSublist*> sublist) {
+		return guard && _descriptor.filterCallback(sublist);
+	};
+	auto box = Box<PeerListBox>(
+		std::make_unique<ChooseSublistBoxController>(
+			monoforum,
+			std::move(chosen),
+			std::move(filter)),
+		std::move(initBox));
+	*weak = box.data();
+	_show->showBox(std::move(box));
+}
+
 void ShareBox::Inner::peerUnselected(not_null<PeerData*> peer) {
 	if (const auto i = _dataMap.find(peer); i != end(_dataMap)) {
 		changePeerCheckState(
@@ -1437,6 +1499,11 @@ void ShareBox::Inner::changePeerCheckState(
 		if (chat->topic) {
 			chat->topicLifetime.destroy();
 			chat->topic = nullptr;
+			updateChatName(chat);
+		}
+		if (chat->sublist) {
+			chat->sublistLifetime.destroy();
+			chat->sublist = nullptr;
 			updateChatName(chat);
 		}
 	}
@@ -1570,6 +1637,8 @@ not_null<Data::Thread*> ShareBox::Inner::chatThread(
 		not_null<Chat*> chat) const {
 	return chat->topic
 		? (Data::Thread*)chat->topic
+		: chat->sublist
+		? (Data::Thread*)chat->sublist
 		: chat->peer->owner().history(chat->peer).get();
 }
 
@@ -1671,6 +1740,48 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			result,
 			msgIds);
 		const auto requestType = Data::Histories::RequestType::Send;
+
+
+		// AyuGram-changed
+		const auto dismiss = [=]
+		{
+			if (show->valid()) {
+				show->hideLayer();
+			}
+		};
+
+
+		if (AyuForward::isFullAyuForwardNeeded(items.front())) {
+			crl::async([=]{
+				for (const auto thread : result) {
+					AyuForward::forwardMessages(
+					&history->owner().session(),
+					Api::SendAction(thread, options),
+					false,
+					Data::ResolvedForwardDraft(items, forwardOptions));
+				}
+			});
+
+			dismiss();
+			return;
+		}
+		if (AyuForward::isAyuForwardNeeded(items)) {
+			crl::async([=]
+			{
+				for (const auto thread : result) {
+					AyuForward::intelligentForward(
+						&history->owner().session(),
+						Api::SendAction(thread, options),
+						Data::ResolvedForwardDraft(items, forwardOptions));
+				}
+			});
+
+			dismiss();
+			return;
+		}
+		// AyuGram-changed
+
+
 		for (const auto thread : result) {
 			if (!comment.text.isEmpty()) {
 				auto message = Api::MessageToSend(
@@ -1680,6 +1791,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 				api.sendMessage(std::move(message));
 			}
 			const auto topicRootId = thread->topicRootId();
+			const auto sublistPeer = thread->maybeSublistPeer();
 			const auto kGeneralId = Data::ForumTopic::kGeneralId;
 			const auto topMsgId = (topicRootId == kGeneralId)
 				? MsgId(0)
@@ -1704,7 +1816,9 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 					| (options.shortcutId
 						? Flag::f_quick_reply_shortcut
 						: Flag(0))
-					| (starsPaid ? Flag::f_allow_paid_stars : Flag());
+					| (starsPaid ? Flag::f_allow_paid_stars : Flag())
+					| (sublistPeer ? Flag::f_reply_to : Flag())
+					| (options.suggest ? Flag::f_suggested_post : Flag());
 				threadHistory->sendRequestId = api.request(
 					MTPmessages_ForwardMessages(
 						MTP_flags(sendFlags),
@@ -1713,11 +1827,15 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 						MTP_vector<MTPlong>(generateRandom()),
 						peer->input,
 						MTP_int(topMsgId),
+						(sublistPeer
+							? MTP_inputReplyToMonoForum(sublistPeer->input)
+							: MTPInputReplyTo()),
 						MTP_int(options.scheduled),
 						MTP_inputPeerEmpty(), // send_as
 						Data::ShortcutIdToMTP(session, options.shortcutId),
 						MTP_int(videoTimestamp.value_or(0)),
-						MTP_long(starsPaid)
+						MTP_long(starsPaid),
+						Api::SuggestToMTP(options.suggest)
 				)).done([=](const MTPUpdates &updates, mtpRequestId reqId) {
 					threadHistory->session().api().applyUpdates(updates);
 					state->requests.remove(reqId);

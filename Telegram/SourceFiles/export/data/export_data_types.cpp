@@ -335,6 +335,10 @@ Utf8String Reaction::TypeToString(const Reaction &reaction) {
 	Unexpected("Type in Reaction::Type.");
 }
 
+std::vector<TextPart> ParseText(const MTPTextWithEntities &text) {
+	return ParseText(text.data().vtext(), text.data().ventities().v);
+}
+
 Utf8String Reaction::Id(const Reaction &reaction) {
 	auto id = Utf8String();
 	switch (reaction.type) {
@@ -777,17 +781,16 @@ Poll ParsePoll(const MTPDmessageMediaPoll &data) {
 	auto result = Poll();
 	data.vpoll().match([&](const MTPDpoll &poll) {
 		result.id = poll.vid().v;
-		result.question = ParseString(poll.vquestion().data().vtext());
+		result.question = ParseText(poll.vquestion());
 		result.closed = poll.is_closed();
 		result.answers = ranges::views::all(
 			poll.vanswers().v
 		) | ranges::views::transform([](const MTPPollAnswer &answer) {
-			return answer.match([](const MTPDpollAnswer &answer) {
-				auto result = Poll::Answer();
-				result.text = ParseString(answer.vtext().data().vtext());
-				result.option = answer.voption().v;
-				return result;
-			});
+			const auto &data = answer.data();
+			auto result = Poll::Answer();
+			result.text = ParseText(data.vtext());
+			result.option = data.voption().v;
+			return result;
 		}) | ranges::to_vector;
 	});
 	data.vresults().match([&](const MTPDpollResults &results) {
@@ -796,21 +799,43 @@ Poll ParsePoll(const MTPDmessageMediaPoll &data) {
 		}
 		if (const auto resultsList = results.vresults()) {
 			for (const auto &single : resultsList->v) {
-				single.match([&](const MTPDpollAnswerVoters &voters) {
-					const auto i = ranges::find(
-						result.answers,
-						voters.voption().v,
-						&Poll::Answer::option);
-					if (i == end(result.answers)) {
-						return;
-					}
-					i->votes = voters.vvoters().v;
-					if (voters.is_chosen()) {
-						i->my = true;
-					}
-				});
+				const auto &voters = single.data();
+				const auto i = ranges::find(
+					result.answers,
+					voters.voption().v,
+					&Poll::Answer::option);
+				if (i == end(result.answers)) {
+					continue;
+				}
+				i->votes = voters.vvoters().v;
+				if (voters.is_chosen()) {
+					i->my = true;
+				}
 			}
 		}
+	});
+	return result;
+}
+
+TodoListItem ParseTodoListItem(const MTPTodoItem &item) {
+	const auto &data = item.data();
+	auto result = TodoListItem();
+	result.text = ParseText(data.vtitle());
+	result.id = data.vid().v;
+	return result;
+}
+
+TodoList ParseTodoList(const MTPDmessageMediaToDo &data) {
+	auto result = TodoList();
+	data.vtodo().match([&](const MTPDtodoList &data) {
+		result.title = ParseText(data.vtitle());
+		result.othersCanAppend = data.is_others_can_append();
+		result.othersCanComplete = data.is_others_can_complete();
+		result.items = ranges::views::all(
+			data.vlist().v
+		) | ranges::views::transform(
+			ParseTodoListItem
+		) | ranges::to_vector;
 	});
 	return result;
 }
@@ -1367,6 +1392,8 @@ Media ParseMedia(
 		result.ttl = data.vperiod().v;
 	}, [&](const MTPDmessageMediaPoll &data) {
 		result.content = ParsePoll(data);
+	}, [&](const MTPDmessageMediaToDo &data) {
+		result.content = ParseTodoList(data);
 	}, [](const MTPDmessageMediaDice &data) {
 		// #TODO dice
 	}, [](const MTPDmessageMediaStory &data) {
@@ -1654,11 +1681,21 @@ ServiceAction ParseServiceAction(
 		content.transactionId = data.vcharge().data().vid().v;
 		result.content = content;
 	}, [&](const MTPDmessageActionGiftStars &data) {
-		auto content = ActionGiftStars();
+		auto content = ActionGiftCredits();
 		content.cost = Ui::FillAmountAndCurrency(
 			data.vamount().v,
 			qs(data.vcurrency())).toUtf8();
-		content.credits = data.vstars().v;
+		content.amount = CreditsAmount(data.vstars().v, CreditsType::Stars);
+		result.content = content;
+	}, [&](const MTPDmessageActionGiftTon &data) {
+		auto content = ActionGiftCredits();
+		content.cost = Ui::FillAmountAndCurrency(
+			data.vamount().v,
+			qs(data.vcurrency())).toUtf8();
+		content.amount = CreditsAmount(
+			data.vamount().v / uint64(1'000'000'000),
+			data.vamount().v % uint64(1'000'000'000),
+			CreditsType::Ton);
 		result.content = content;
 	}, [&](const MTPDmessageActionPrizeStars &data) {
 		result.content = ActionPrizeStars{
@@ -1712,6 +1749,39 @@ ServiceAction ParseServiceAction(
 	}, [&](const MTPDmessageActionPaidMessagesPrice &data) {
 		result.content = ActionPaidMessagesPrice{
 			.stars = int(data.vstars().v),
+			.broadcastAllowed = data.is_broadcast_messages_allowed(),
+		};
+	}, [&](const MTPDmessageActionTodoCompletions &data) {
+		const auto take = [](const MTPVector<MTPint> &list) {
+			return list.v
+				| ranges::views::transform(&MTPint::v)
+				| ranges::to_vector;
+		};
+		result.content = ActionTodoCompletions{
+			.completed = take(data.vcompleted()),
+			.incompleted = take(data.vincompleted()),
+		};
+	}, [&](const MTPDmessageActionTodoAppendTasks &data) {
+		result.content = ActionTodoAppendTasks{
+			.items = data.vlist().v
+				| ranges::views::transform(ParseTodoListItem)
+				| ranges::to_vector,
+		};
+	}, [&](const MTPDmessageActionSuggestedPostApproval &data) {
+		result.content = ActionSuggestedPostApproval{
+			.rejectComment = data.vreject_comment().value_or_empty(),
+			.scheduleDate = data.vschedule_date().value_or_empty(),
+			.price = CreditsAmountFromTL(data.vprice()),
+			.rejected = data.is_rejected(),
+			.balanceTooLow = data.is_balance_too_low(),
+		};
+	}, [&](const MTPDmessageActionSuggestedPostSuccess &data) {
+		result.content = ActionSuggestedPostSuccess{
+			.price = CreditsAmountFromTL(data.vprice()),
+		};
+	}, [&](const MTPDmessageActionSuggestedPostRefund &data) {
+		result.content = ActionSuggestedPostRefund{
+			.payerInitiated = data.is_payer_initiated(),
 		};
 	}, [&](const MTPDmessageActionConferenceCall &data) {
 		auto content = ActionPhoneCall();

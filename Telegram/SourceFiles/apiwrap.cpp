@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_polls.h"
 #include "api/api_sending.h"
 #include "api/api_text_entities.h"
+#include "api/api_todo_lists.h"
 #include "api/api_self_destruct.h"
 #include "api/api_sensitive_content.h"
 #include "api/api_global_privacy.h"
@@ -42,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
 #include "data/data_forum.h"
+#include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_search_controller.h"
 #include "data/data_session.h"
@@ -90,6 +92,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/features/forward/ayu_forward.h"
 
 
 namespace {
@@ -183,6 +186,7 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _confirmPhone(std::make_unique<Api::ConfirmPhone>(this))
 , _peerPhoto(std::make_unique<Api::PeerPhoto>(this))
 , _polls(std::make_unique<Api::Polls>(this))
+, _todoLists(std::make_unique<Api::TodoLists>(this))
 , _chatParticipants(std::make_unique<Api::ChatParticipants>(this))
 , _unreadThings(std::make_unique<Api::UnreadThings>(this))
 , _ringtones(std::make_unique<Api::Ringtones>(this))
@@ -327,7 +331,7 @@ void ApiWrap::checkChatInvite(
 	request(base::take(_checkInviteRequestId)).cancel();
 	_checkInviteRequestId = request(MTPmessages_CheckChatInvite(
 		MTP_string(hash)
-	)).done(std::move(done)).fail(std::move(fail)).send();
+	)).done(std::move(done)).fail(std::move(fail)).handleFloodErrors().send();
 }
 
 void ApiWrap::checkFilterInvite(
@@ -387,10 +391,13 @@ void ApiWrap::savePinnedOrder(not_null<Data::Forum*> forum) {
 }
 
 void ApiWrap::savePinnedOrder(not_null<Data::SavedMessages*> saved) {
+	if (saved->parentChat()) {
+		return;
+	}
 	const auto &order = _session->data().pinnedChatsOrder(saved);
 	const auto input = [](Dialogs::Key key) {
 		if (const auto sublist = key.sublist()) {
-			return MTP_inputDialogPeer(sublist->peer()->input);
+			return MTP_inputDialogPeer(sublist->sublistPeer()->input);
 		}
 		Unexpected("Key type in pinnedDialogsOrder().");
 	};
@@ -1403,6 +1410,32 @@ void ApiWrap::deleteAllFromParticipantSend(
 	}).send();
 }
 
+void ApiWrap::deleteSublistHistory(
+		not_null<ChannelData*> channel,
+		not_null<PeerData*> sublistPeer) {
+	deleteSublistHistorySend(channel, sublistPeer);
+}
+
+void ApiWrap::deleteSublistHistorySend(
+		not_null<ChannelData*> parentChat,
+		not_null<PeerData*> sublistPeer) {
+	request(MTPmessages_DeleteSavedHistory(
+		MTP_flags(MTPmessages_DeleteSavedHistory::Flag::f_parent_peer),
+		parentChat->input,
+		sublistPeer->input,
+		MTP_int(0), // max_id
+		MTP_int(0), // min_date
+		MTP_int(0) // max_date
+	)).done([=](const MTPmessages_AffectedHistory &result) {
+		const auto offset = applyAffectedHistory(parentChat, result);
+		if (offset > 0) {
+			deleteSublistHistorySend(parentChat, sublistPeer);
+		} else if (const auto monoforum = parentChat->monoforum()) {
+			monoforum->applySublistDeleted(sublistPeer);
+		}
+	}).send();
+}
+
 void ApiWrap::scheduleStickerSetRequest(uint64 setId, uint64 access) {
 	if (!_stickerSetRequests.contains(setId)) {
 		_stickerSetRequests.emplace(setId, StickerSetRequest{ access });
@@ -2098,8 +2131,13 @@ void ApiWrap::saveCurrentDraftToCloud() {
 			_session->local().writeDrafts(history);
 
 			const auto topicRootId = thread->topicRootId();
-			const auto localDraft = history->localDraft(topicRootId);
-			const auto cloudDraft = history->cloudDraft(topicRootId);
+			const auto monoforumPeerId = thread->monoforumPeerId();
+			const auto localDraft = history->localDraft(
+				topicRootId,
+				monoforumPeerId);
+			const auto cloudDraft = history->cloudDraft(
+				topicRootId,
+				monoforumPeerId);
 			if (!Data::DraftsAreEqual(localDraft, cloudDraft)
 				&& !_session->supportMode()) {
 				saveDraftToCloudDelayed(thread);
@@ -2122,15 +2160,22 @@ void ApiWrap::saveDraftsToCloud() {
 
 		const auto history = thread->owningHistory();
 		const auto topicRootId = thread->topicRootId();
-		auto cloudDraft = history->cloudDraft(topicRootId);
-		auto localDraft = history->localDraft(topicRootId);
+		const auto monoforumPeerId = thread->monoforumPeerId();
+		auto cloudDraft = history->cloudDraft(topicRootId, monoforumPeerId);
+		auto localDraft = history->localDraft(topicRootId, monoforumPeerId);
 		if (cloudDraft && cloudDraft->saveRequestId) {
 			request(base::take(cloudDraft->saveRequestId)).cancel();
 		}
 		if (!_session->supportMode()) {
-			cloudDraft = history->createCloudDraft(topicRootId, localDraft);
+			cloudDraft = history->createCloudDraft(
+				topicRootId,
+				monoforumPeerId,
+				localDraft);
 		} else if (!cloudDraft) {
-			cloudDraft = history->createCloudDraft(topicRootId, nullptr);
+			cloudDraft = history->createCloudDraft(
+				topicRootId,
+				monoforumPeerId,
+				nullptr);
 		}
 
 		auto flags = MTPmessages_SaveDraft::Flags(0);
@@ -2140,18 +2185,23 @@ void ApiWrap::saveDraftsToCloud() {
 		} else if (!cloudDraft->webpage.url.isEmpty()) {
 			flags |= MTPmessages_SaveDraft::Flag::f_media;
 		}
-		if (cloudDraft->reply.messageId || cloudDraft->reply.topicRootId) {
+		if (cloudDraft->reply.messageId
+			|| cloudDraft->reply.topicRootId
+			|| cloudDraft->reply.monoforumPeerId) {
 			flags |= MTPmessages_SaveDraft::Flag::f_reply_to;
 		}
 		if (!textWithTags.tags.isEmpty()) {
 			flags |= MTPmessages_SaveDraft::Flag::f_entities;
+		}
+		if (cloudDraft->suggest) {
+			flags |= MTPmessages_SaveDraft::Flag::f_suggested_post;
 		}
 		auto entities = Api::EntitiesToMTP(
 			_session,
 			TextUtilities::ConvertTextTagsToEntities(textWithTags.tags),
 			Api::ConvertOption::SkipLocal);
 
-		history->startSavingCloudDraft(topicRootId);
+		history->startSavingCloudDraft(topicRootId, monoforumPeerId);
 		cloudDraft->saveRequestId = request(MTPmessages_SaveDraft(
 			MTP_flags(flags),
 			ReplyToForMTP(history, cloudDraft->reply),
@@ -2161,16 +2211,21 @@ void ApiWrap::saveDraftsToCloud() {
 			Data::WebPageForMTP(
 				cloudDraft->webpage,
 				textWithTags.text.isEmpty()),
-			MTP_long(0) // effect
+			MTP_long(0), // effect
+			Api::SuggestToMTP(cloudDraft->suggest)
 		)).done([=](const MTPBool &result, const MTP::Response &response) {
 			const auto requestId = response.requestId;
 			history->finishSavingCloudDraft(
 				topicRootId,
+				monoforumPeerId,
 				UnixtimeFromMsgId(response.outerMsgId));
-			if (const auto cloudDraft = history->cloudDraft(topicRootId)) {
+			const auto cloudDraft = history->cloudDraft(
+				topicRootId,
+				monoforumPeerId);
+			if (cloudDraft) {
 				if (cloudDraft->saveRequestId == requestId) {
 					cloudDraft->saveRequestId = 0;
-					history->draftSavedToCloud(topicRootId);
+					history->draftSavedToCloud(topicRootId, monoforumPeerId);
 				}
 			}
 			const auto i = _draftsSaveRequestIds.find(weak);
@@ -2183,10 +2238,14 @@ void ApiWrap::saveDraftsToCloud() {
 			const auto requestId = response.requestId;
 			history->finishSavingCloudDraft(
 				topicRootId,
+				monoforumPeerId,
 				UnixtimeFromMsgId(response.outerMsgId));
-			if (const auto cloudDraft = history->cloudDraft(topicRootId)) {
+			const auto cloudDraft = history->cloudDraft(
+				topicRootId,
+				monoforumPeerId);
+			if (cloudDraft) {
 				if (cloudDraft->saveRequestId == requestId) {
-					history->clearCloudDraft(topicRootId);
+					history->clearCloudDraft(topicRootId, monoforumPeerId);
 				}
 			}
 			const auto i = _draftsSaveRequestIds.find(weak);
@@ -2560,7 +2619,10 @@ void ApiWrap::refreshFileReference(
 	});
 }
 
-void ApiWrap::gotWebPages(ChannelData *channel, const MTPmessages_Messages &result, mtpRequestId req) {
+void ApiWrap::gotWebPages(
+		ChannelData *channel,
+		const MTPmessages_Messages &result,
+		mtpRequestId req) {
 	WebPageData::ApplyChanges(_session, channel, result);
 	for (auto i = _webPagesPending.begin(); i != _webPagesPending.cend();) {
 		if (i->second == req) {
@@ -2574,7 +2636,7 @@ void ApiWrap::gotWebPages(ChannelData *channel, const MTPmessages_Messages &resu
 			++i;
 		}
 	}
-	_session->data().sendWebPageGamePollNotifications();
+	_session->data().sendWebPageGamePollTodoListNotifications();
 }
 
 void ApiWrap::updateStickers() {
@@ -2964,17 +3026,27 @@ void ApiWrap::resolveJumpToDate(
 		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto peer = chat.peer()) {
 		const auto topic = chat.topic();
-		const auto rootId = topic ? topic->rootId() : 0;
-		resolveJumpToHistoryDate(peer, rootId, date, std::move(callback));
+		const auto sublist = chat.sublist();
+		const auto rootId = topic ? topic->rootId() : MsgId();
+		const auto monoforumPeerId = sublist
+			? sublist->sublistPeer()->id
+			: PeerId();
+		resolveJumpToHistoryDate(
+			peer,
+			rootId,
+			monoforumPeerId,
+			date,
+			std::move(callback));
 	}
 }
 
 template <typename Callback>
 void ApiWrap::requestMessageAfterDate(
-		not_null<PeerData*> peer,
-		MsgId topicRootId,
-		const QDate &date,
-		Callback &&callback) {
+	not_null<PeerData*> peer,
+	MsgId topicRootId,
+	PeerId monoforumPeerId,
+	const QDate &date,
+	Callback &&callback) {
 	// API returns a message with date <= offset_date.
 	// So we request a message with offset_date = desired_date - 1 and add_offset = -1.
 	// This should give us the first message with date >= desired_date.
@@ -2997,7 +3069,7 @@ void ApiWrap::requestMessageAfterDate(
 				return &messages.vmessages().v;
 			};
 			const auto list = result.match([&](
-					const MTPDmessages_messages &data) {
+				const MTPDmessages_messages &data) {
 				return handleMessages(data);
 			}, [&](const MTPDmessages_messagesSlice &data) {
 				return handleMessages(data);
@@ -3040,6 +3112,18 @@ void ApiWrap::requestMessageAfterDate(
 			MTP_int(maxId),
 			MTP_int(minId),
 			MTP_long(historyHash)));
+	} else if (monoforumPeerId) {
+		send(MTPmessages_GetSavedHistory(
+			MTP_flags(MTPmessages_GetSavedHistory::Flag::f_parent_peer),
+			peer->input,
+			session().data().peer(monoforumPeerId)->input,
+			MTP_int(offsetId),
+			MTP_int(offsetDate),
+			MTP_int(addOffset),
+			MTP_int(limit),
+			MTP_int(maxId),
+			MTP_int(minId),
+			MTP_long(historyHash)));
 	} else {
 		send(MTPmessages_GetHistory(
 			peer->input,
@@ -3056,28 +3140,41 @@ void ApiWrap::requestMessageAfterDate(
 void ApiWrap::resolveJumpToHistoryDate(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
+		PeerId monoforumPeerId,
 		const QDate &date,
 		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto channel = peer->migrateTo()) {
 		return resolveJumpToHistoryDate(
 			channel,
 			topicRootId,
+			monoforumPeerId,
 			date,
 			std::move(callback));
 	}
 	const auto jumpToDateInPeer = [=] {
-		requestMessageAfterDate(peer, topicRootId, date, [=](MsgId itemId) {
-			callback(peer, itemId);
-		});
+		requestMessageAfterDate(
+			peer,
+			topicRootId,
+			monoforumPeerId,
+			date,
+			[=](MsgId itemId) { callback(peer, itemId); });
 	};
-	if (const auto chat = topicRootId ? nullptr : peer->migrateFrom()) {
-		requestMessageAfterDate(chat, 0, date, [=](MsgId itemId) {
-			if (itemId) {
-				callback(chat, itemId);
-			} else {
-				jumpToDateInPeer();
-			}
-		});
+	const auto migrated = (topicRootId || monoforumPeerId)
+		? nullptr
+		: peer->migrateFrom();
+	if (migrated) {
+		requestMessageAfterDate(
+			migrated,
+			MsgId(),
+			PeerId(),
+			date,
+			[=](MsgId itemId) {
+				if (itemId) {
+					callback(migrated, itemId);
+				} else {
+					jumpToDateInPeer();
+				}
+			});
 	} else {
 		jumpToDateInPeer();
 	}
@@ -3126,12 +3223,14 @@ void ApiWrap::requestHistory(
 void ApiWrap::requestSharedMedia(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
+		PeerId monoforumPeerId,
 		SharedMediaType type,
 		MsgId messageId,
 		SliceType slice) {
 	const auto key = SharedMediaRequest{
 		peer,
 		topicRootId,
+		monoforumPeerId,
 		type,
 		messageId,
 		slice,
@@ -3143,6 +3242,7 @@ void ApiWrap::requestSharedMedia(
 	const auto prepared = Api::PrepareSearchRequest(
 		peer,
 		topicRootId,
+		monoforumPeerId,
 		type,
 		QString(),
 		messageId,
@@ -3165,7 +3265,12 @@ void ApiWrap::requestSharedMedia(
 				messageId,
 				slice,
 				result);
-			sharedMediaDone(peer, topicRootId, type, std::move(parsed));
+			sharedMediaDone(
+				peer,
+				topicRootId,
+				monoforumPeerId,
+				type,
+				std::move(parsed));
 			finish();
 		}).fail([=] {
 			_sharedMediaRequests.remove(key);
@@ -3178,16 +3283,19 @@ void ApiWrap::requestSharedMedia(
 void ApiWrap::sharedMediaDone(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
+		PeerId monoforumPeerId,
 		SharedMediaType type,
 		Api::SearchResult &&parsed) {
 	const auto topic = peer->forumTopicFor(topicRootId);
-	if (topicRootId && !topic) {
+	const auto sublist = peer->monoforumSublistFor(monoforumPeerId);
+	if ((topicRootId && !topic) || (monoforumPeerId && !sublist)) {
 		return;
 	}
 	const auto hasMessages = !parsed.messageIds.empty();
 	_session->storage().add(Storage::SharedMediaAddSlice(
 		peer->id,
 		topicRootId,
+		monoforumPeerId,
 		type,
 		std::move(parsed.messageIds),
 		parsed.noSkipRange,
@@ -3197,6 +3305,9 @@ void ApiWrap::sharedMediaDone(
 		peer->owner().history(peer)->setHasPinnedMessages(true);
 		if (topic) {
 			topic->setHasPinnedMessages(true);
+		}
+		if (sublist) {
+			sublist->setHasPinnedMessages(true);
 		}
 	}
 }
@@ -3234,8 +3345,14 @@ void ApiWrap::sendAction(const SendAction &action) {
 		const auto topic = topicRootId
 			? action.history->peer->forumTopicFor(topicRootId)
 			: nullptr;
+		const auto monoforumPeerId = action.replyTo.monoforumPeerId;
+		const auto sublist = monoforumPeerId
+			? action.history->peer->monoforumSublistFor(monoforumPeerId)
+			: nullptr;
 		if (topic) {
 			topic->readTillEnd();
+		} else if (sublist) {
+			sublist->readTillEnd();
 		} else {
 			_session->data().histories().readInbox(action.history);
 		}
@@ -3247,7 +3364,10 @@ void ApiWrap::sendAction(const SendAction &action) {
 void ApiWrap::finishForwarding(const SendAction &action) {
 	const auto history = action.history;
 	const auto topicRootId = action.replyTo.topicRootId;
-	auto toForward = history->resolveForwardDraft(topicRootId);
+	const auto monoforumPeerId = action.replyTo.monoforumPeerId;
+	auto toForward = history->resolveForwardDraft(
+		topicRootId,
+		monoforumPeerId);
 	if (!toForward.items.empty()) {
 		const auto error = GetErrorForSending(
 			history->peer,
@@ -3260,7 +3380,7 @@ void ApiWrap::finishForwarding(const SendAction &action) {
 		}
 
 		forwardMessages(std::move(toForward), action);
-		history->setForwardDraft(topicRootId, {});
+		history->setForwardDraft(topicRootId, monoforumPeerId, {});
 	}
 
 	_session->data().sendHistoryChangeNotifications();
@@ -3278,6 +3398,22 @@ void ApiWrap::forwardMessages(
 		SendAction action,
 		FnMut<void()> &&successCallback) {
 	Expects(!draft.items.empty());
+
+	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front());
+	if (fullAyuForward) {
+		crl::async([=] {
+			AyuForward::forwardMessages(_session, action, false, draft);
+		});
+		return;
+	}
+
+	const auto ayuIntelligentForwardNeeded = AyuForward::isAyuForwardNeeded(draft.items);
+	if (ayuIntelligentForwardNeeded) {
+		crl::async([=] {
+			AyuForward::intelligentForward(_session, action, draft);
+		});
+		return;
+	}
 
 	auto &histories = _session->data().histories();
 
@@ -3329,6 +3465,9 @@ void ApiWrap::forwardMessages(
 	if (sendAs) {
 		sendFlags |= SendFlag::f_send_as;
 	}
+	if (action.options.suggest) {
+		sendFlags |= SendFlag::f_suggested_post;
+	}
 	const auto kGeneralId = Data::ForumTopic::kGeneralId;
 	const auto topicRootId = action.replyTo.topicRootId;
 	const auto topMsgId = (topicRootId == kGeneralId)
@@ -3336,6 +3475,13 @@ void ApiWrap::forwardMessages(
 		: topicRootId;
 	if (topMsgId) {
 		sendFlags |= SendFlag::f_top_msg_id;
+	}
+	const auto monoforumPeerId = action.replyTo.monoforumPeerId;
+	const auto monoforumPeer = monoforumPeerId
+		? session().data().peer(monoforumPeerId).get()
+		: nullptr;
+	if (monoforumPeer || (action.options.suggest && action.replyTo)) {
+		sendFlags |= SendFlag::f_reply_to;
 	}
 
 	auto forwardFrom = draft.items.front()->history()->peer;
@@ -3366,11 +3512,17 @@ void ApiWrap::forwardMessages(
 				MTP_vector<MTPlong>(randomIds),
 				peer->input,
 				MTP_int(topMsgId),
+				(action.options.suggest
+					? ReplyToForMTP(history, action.replyTo)
+					: monoforumPeer
+					? MTP_inputReplyToMonoForum(monoforumPeer->input)
+					: MTPInputReplyTo()),
 				MTP_int(action.options.scheduled),
 				(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 				Data::ShortcutIdToMTP(_session, action.options.shortcutId),
 				MTPint(), // video_timestamp
-				MTP_long(starsPaid)
+				MTP_long(starsPaid),
+				Api::SuggestToMTP(action.options.suggest)
 			)).done([=](const MTPUpdates &result) {
 				if (!scheduled) {
 					this->updates().checkForSentToScheduled(result);
@@ -3419,12 +3571,15 @@ void ApiWrap::forwardMessages(
 				.id = newId.msg,
 				.flags = flags,
 				.from = NewMessageFromId(action),
-				.replyTo = { .topicRootId = topMsgId },
+				.replyTo = {
+					.topicRootId = topMsgId,
+					.monoforumPeerId = monoforumPeerId,
+				},
 				.date = NewMessageDate(action.options),
 				.shortcutId = action.options.shortcutId,
 				.starsPaid = action.options.starsApproved,
 				.postAuthor = NewMessagePostAuthor(action),
-
+				.suggest = HistoryMessageSuggestInfo(action.options),
 				// forwarded messages don't have effects
 				//.effectId = action.options.effectId,
 			}, item);
@@ -3519,6 +3674,7 @@ void ApiWrap::sendSharedContact(
 		.starsPaid = action.options.starsApproved,
 		.postAuthor = NewMessagePostAuthor(action),
 		.effectId = action.options.effectId,
+		.suggest = HistoryMessageSuggestInfo(action.options),
 	}, TextWithEntities(), MTP_messageMediaContact(
 		MTP_string(phone),
 		MTP_string(firstName),
@@ -3567,7 +3723,19 @@ void ApiWrap::editMedia(
 	if (list.files.empty()) return;
 
 	auto &file = list.files.front();
-	const auto to = FileLoadTaskOptions(action);
+	auto to = FileLoadTaskOptions(action);
+	const auto existing = to.replaceMediaOf
+		? session().data().message(action.history->peer, to.replaceMediaOf)
+		: nullptr;
+	if (existing && existing->computeSuggestionActions()
+		== SuggestionActions::AcceptAndDecline) {
+		to.replyTo.messageId = {
+			action.history->peer->id,
+			to.replaceMediaOf
+		};
+		to.replyTo.monoforumPeerId = existing->sublistPeerId();
+		to.replaceMediaOf = MsgId();
+	}
 	_fileLoader->addTask(std::make_unique<FileLoadTask>(
 		&session(),
 		file.path,
@@ -3757,6 +3925,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 
 	const auto clearCloudDraft = action.clearDraft;
 	const auto draftTopicRootId = action.replyTo.topicRootId;
+	const auto draftMonoforumPeerId = action.replyTo.monoforumPeerId;
 	const auto replyTo = action.replyTo.messageId
 		? peer->owner().message(action.replyTo.messageId)
 		: nullptr;
@@ -3766,8 +3935,12 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 		? replyTo->topicRootId()
 		: Data::ForumTopic::kGeneralId;
 	const auto topic = peer->forumTopicFor(topicRootId);
-	if (!(topic ? Data::CanSendTexts(topic) : Data::CanSendTexts(peer))
-		|| Api::SendDice(message)) {
+
+	const bool canSendTexts = topic
+		? Data::CanSendTexts(topic)
+		: Data::CanSendTexts(peer);
+
+	if (!canSendTexts && !AyuForward::isForwarding(peer->id) || Api::SendDice(message)) {
 		return;
 	}
 	local().saveRecentSentHashtags(textWithTags.text);
@@ -3866,8 +4039,10 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 		if (clearCloudDraft) {
 			sendFlags |= MTPmessages_SendMessage::Flag::f_clear_draft;
 			mediaFlags |= MTPmessages_SendMedia::Flag::f_clear_draft;
-			history->clearCloudDraft(draftTopicRootId);
-			history->startSavingCloudDraft(draftTopicRootId);
+			history->clearCloudDraft(draftTopicRootId, draftMonoforumPeerId);
+			history->startSavingCloudDraft(
+				draftTopicRootId,
+				draftMonoforumPeerId);
 		}
 		const auto sendAs = action.options.sendAs;
 		if (sendAs) {
@@ -3888,6 +4063,10 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			sendFlags |= MTPmessages_SendMessage::Flag::f_effect;
 			mediaFlags |= MTPmessages_SendMedia::Flag::f_effect;
 		}
+		if (action.options.suggest) {
+			sendFlags |= MTPmessages_SendMessage::Flag::f_suggested_post;
+			mediaFlags |= MTPmessages_SendMedia::Flag::f_suggested_post;
+		}
 		const auto starsPaid = std::min(
 			peer->starsPerMessageChecked(),
 			action.options.starsApproved);
@@ -3906,6 +4085,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			.starsPaid = starsPaid,
 			.postAuthor = NewMessagePostAuthor(action),
 			.effectId = action.options.effectId,
+			.suggest = HistoryMessageSuggestInfo(action.options),
 		}, sending, media);
 		const auto done = [=](
 				const MTPUpdates &result,
@@ -3913,6 +4093,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			if (clearCloudDraft) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
+					draftMonoforumPeerId,
 					UnixtimeFromMsgId(response.outerMsgId));
 			}
 
@@ -3929,6 +4110,7 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 			if (clearCloudDraft) {
 				history->finishSavingCloudDraft(
 					draftTopicRootId,
+					draftMonoforumPeerId,
 					UnixtimeFromMsgId(response.outerMsgId));
 			}
 		};
@@ -3955,7 +4137,8 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 					(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 					mtpShortcut,
 					MTP_long(action.options.effectId),
-					MTP_long(starsPaid)
+					MTP_long(starsPaid),
+					Api::SuggestToMTP(action.options.suggest)
 				), done, fail);
 		} else {
 			histories.sendPreparedMessage(
@@ -3974,7 +4157,8 @@ void ApiWrap::sendMessage(MessageToSend &&message) {
 					(sendAs ? sendAs->input : MTP_inputPeerEmpty()),
 					mtpShortcut,
 					MTP_long(action.options.effectId),
-					MTP_long(starsPaid)
+					MTP_long(starsPaid),
+					Api::SuggestToMTP(action.options.suggest)
 				), done, fail);
 		}
 		isFirst = false;
@@ -4055,6 +4239,7 @@ void ApiWrap::sendInlineResult(
 	const auto topicRootId = action.replyTo.messageId
 		? action.replyTo.topicRootId
 		: 0;
+	const auto monoforumPeerId = action.replyTo.monoforumPeerId;
 
 	using SendFlag = MTPmessages_SendInlineBotResult::Flag;
 	auto flags = NewMessageFlags(peer);
@@ -4107,8 +4292,8 @@ void ApiWrap::sendInlineResult(
 		.postAuthor = NewMessagePostAuthor(action),
 	});
 
-	history->clearCloudDraft(topicRootId);
-	history->startSavingCloudDraft(topicRootId);
+	history->clearCloudDraft(topicRootId, monoforumPeerId);
+	history->startSavingCloudDraft(topicRootId, monoforumPeerId);
 
 	auto &histories = history->owner().histories();
 	histories.sendPreparedMessage(
@@ -4129,6 +4314,7 @@ void ApiWrap::sendInlineResult(
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 		history->finishSavingCloudDraft(
 			topicRootId,
+			monoforumPeerId,
 			UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(true);
@@ -4137,6 +4323,7 @@ void ApiWrap::sendInlineResult(
 		sendMessageFail(error, peer, randomId, newId);
 		history->finishSavingCloudDraft(
 			topicRootId,
+			monoforumPeerId,
 			UnixtimeFromMsgId(response.outerMsgId));
 		if (done) {
 			done(false);
@@ -4290,6 +4477,7 @@ void ApiWrap::sendMediaWithRandomId(
 		| (options.sendAs ? Flag::f_send_as : Flag(0))
 		| (options.shortcutId ? Flag::f_quick_reply_shortcut : Flag(0))
 		| (options.effectId ? Flag::f_effect : Flag(0))
+		| (options.suggest ? Flag::f_suggested_post : Flag(0))
 		| (options.invertCaption ? Flag::f_invert_media : Flag(0))
 		| (starsPaid ? Flag::f_allow_paid_stars : Flag(0));
 
@@ -4318,7 +4506,8 @@ void ApiWrap::sendMediaWithRandomId(
 			(options.sendAs ? options.sendAs->input : MTP_inputPeerEmpty()),
 			Data::ShortcutIdToMTP(_session, options.shortcutId),
 			MTP_long(options.effectId),
-			MTP_long(starsPaid)
+			MTP_long(starsPaid),
+			Api::SuggestToMTP(options.suggest)
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 		if (done) done(true);
 		if (updateRecentStickers) {
@@ -4375,6 +4564,7 @@ void ApiWrap::sendMultiPaidMedia(
 		| (options.sendAs ? Flag::f_send_as : Flag(0))
 		| (options.shortcutId ? Flag::f_quick_reply_shortcut : Flag(0))
 		| (options.effectId ? Flag::f_effect : Flag(0))
+		| (options.suggest ? Flag::f_suggested_post : Flag(0))
 		| (options.invertCaption ? Flag::f_invert_media : Flag(0))
 		| (starsPaid ? Flag::f_allow_paid_stars : Flag(0));
 
@@ -4402,7 +4592,8 @@ void ApiWrap::sendMultiPaidMedia(
 			(options.sendAs ? options.sendAs->input : MTP_inputPeerEmpty()),
 			Data::ShortcutIdToMTP(_session, options.shortcutId),
 			MTP_long(options.effectId),
-			MTP_long(starsPaid)
+			MTP_long(starsPaid),
+			Api::SuggestToMTP(options.suggest)
 		), [=](const MTPUpdates &result, const MTP::Response &response) {
 		if (const auto album = _sendingAlbums.take(groupId)) {
 			const auto copy = (*album)->items;
@@ -4740,6 +4931,10 @@ Api::PeerPhoto &ApiWrap::peerPhoto() {
 
 Api::Polls &ApiWrap::polls() {
 	return *_polls;
+}
+
+Api::TodoLists &ApiWrap::todoLists() {
+	return *_todoLists;
 }
 
 Api::ChatParticipants &ApiWrap::chatParticipants() {
