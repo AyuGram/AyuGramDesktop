@@ -370,6 +370,7 @@ struct OverlayWidget::PipWrap {
 struct OverlayWidget::ItemContext {
 	not_null<HistoryItem*> item;
 	MsgId topicRootId = 0;
+	PeerId monoforumPeerId = 0;
 };
 
 struct OverlayWidget::StoriesContext {
@@ -2684,7 +2685,8 @@ void OverlayWidget::handleDocumentClick() {
 			findWindow(),
 			_document,
 			_message,
-			_topicRootId);
+			_topicRootId,
+			_monoforumPeerId);
 		if (_document && _document->loading() && !_radial.animating()) {
 			_radial.start(_documentMedia->progress());
 		}
@@ -2930,12 +2932,21 @@ void OverlayWidget::showMediaOverview() {
 				const auto topic = _topicRootId
 					? _history->peer->forumTopicFor(_topicRootId)
 					: nullptr;
+				const auto sublist = _monoforumPeerId
+					? _history->peer->monoforumSublistFor(_monoforumPeerId)
+					: nullptr;
 				if (_topicRootId && !topic) {
+					return;
+				} else if (_monoforumPeerId && !sublist) {
 					return;
 				}
 				window->showSection(_topicRootId
 					? std::make_shared<Info::Memento>(
 						topic,
+						Info::Section(*overviewType))
+					: _monoforumPeerId
+					? std::make_shared<Info::Memento>(
+						sublist,
 						Info::Section(*overviewType))
 					: std::make_shared<Info::Memento>(
 						_history->peer,
@@ -3026,6 +3037,7 @@ auto OverlayWidget::sharedMediaKey() const -> std::optional<SharedMediaKey> {
 		return SharedMediaKey{
 			_history->peer->id,
 			MsgId(0), // topicRootId
+			PeerId(0), // monoforumPeerId
 			_migrated ? _migrated->peer->id : 0,
 			SharedMediaType::ChatPhoto,
 			_photo
@@ -3041,6 +3053,7 @@ auto OverlayWidget::sharedMediaKey() const -> std::optional<SharedMediaKey> {
 			(isScheduled
 				? SparseIdsMergedSlice::kScheduledTopicId
 				: _topicRootId),
+			(isScheduled ? PeerId() : _monoforumPeerId),
 			_migrated ? _migrated->peer->id : 0,
 			type,
 			(_message->history() == _history
@@ -4624,6 +4637,7 @@ void OverlayWidget::switchToPip() {
 	const auto document = _document;
 	const auto messageId = _message ? _message->fullId() : FullMsgId();
 	const auto topicRootId = _topicRootId;
+	const auto monoforumPeerId = _monoforumPeerId;
 	const auto closeAndContinue = [=] {
 		_showAsPip = false;
 		show(OpenRequest(
@@ -4631,6 +4645,7 @@ void OverlayWidget::switchToPip() {
 			document,
 			document->owner().message(messageId),
 			topicRootId,
+			monoforumPeerId,
 			true));
 	};
 	_showAsPip = true;
@@ -5714,9 +5729,9 @@ OverlayWidget::Entity OverlayWidget::entityForCollage(int index) const {
 		return { v::null, nullptr };
 	}
 	if (const auto document = std::get_if<DocumentData*>(&items[index])) {
-		return { *document, _message, _topicRootId };
+		return { *document, _message, _topicRootId, _monoforumPeerId };
 	} else if (const auto photo = std::get_if<PhotoData*>(&items[index])) {
-		return { *photo, _message, _topicRootId };
+		return { *photo, _message, _topicRootId, _monoforumPeerId };
 	}
 	return { v::null, nullptr };
 }
@@ -5727,12 +5742,12 @@ OverlayWidget::Entity OverlayWidget::entityForItemId(const FullMsgId &itemId) co
 	if (const auto item = _session->data().message(itemId)) {
 		if (const auto media = item->media()) {
 			if (const auto photo = media->photo()) {
-				return { photo, item, _topicRootId };
+				return { photo, item, _topicRootId, _monoforumPeerId };
 			} else if (const auto document = media->document()) {
-				return { document, item, _topicRootId };
+				return { document, item, _topicRootId, _monoforumPeerId };
 			}
 		}
-		return { v::null, item, _topicRootId };
+		return { v::null, item, _topicRootId, _monoforumPeerId };
 	}
 	return { v::null, nullptr };
 }
@@ -5759,6 +5774,9 @@ void OverlayWidget::setContext(
 		_history = _message->history();
 		_peer = _history->peer;
 		_topicRootId = _peer->isForum() ? item->topicRootId : MsgId();
+		_monoforumPeerId = _peer->amMonoforumAdmin()
+			? item->monoforumPeerId
+			: PeerId();
 		setStoriesPeer(nullptr);
 	} else if (const auto peer = std::get_if<not_null<PeerData*>>(&context)) {
 		_peer = *peer;

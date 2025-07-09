@@ -327,7 +327,7 @@ void SendCreditsBox(
 		const auto ministars = box->lifetime().make_state<MiniStars>(
 			ministarsContainer,
 			false,
-			Ui::Premium::MiniStars::Type::BiStars);
+			Ui::Premium::MiniStarsType::BiStars);
 		ministars->setColorOverride(Ui::Premium::CreditsIconGradientStops());
 
 		ministarsContainer->paintRequest(
@@ -487,6 +487,7 @@ void SendCreditsBox(
 		session->credits().load(true);
 		const auto balance = Settings::AddBalanceWidget(
 			content,
+			session,
 			session->credits().balanceValue(),
 			false);
 		rpl::combine(

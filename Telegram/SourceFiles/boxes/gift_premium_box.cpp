@@ -76,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace {
 
 constexpr auto kRarityTooltipDuration = 3 * crl::time(1000);
+constexpr auto kHorizontalBar = QChar(0x2015);
 
 [[nodiscard]] QString CreateMessageLink(
 		not_null<Main::Session*> session,
@@ -94,6 +95,10 @@ constexpr auto kRarityTooltipDuration = 3 * crl::time(1000);
 	}
 	return QString();
 };
+
+[[nodiscard]] QString FixupTransactionId(QString origin) {
+	return origin.replace(kHorizontalBar, QChar('-'));
+}
 
 [[nodiscard]] Data::GiftCodeLink MakeGiftCodeLink(
 		not_null<Main::Session*> session,
@@ -135,9 +140,10 @@ constexpr auto kRarityTooltipDuration = 3 * crl::time(1000);
 
 [[nodiscard]] object_ptr<Ui::FlatLabel> MakeMaybeMultilineTokenValue(
 		not_null<Ui::TableLayout*> table,
-		const QString &token,
+		QString token,
 		Settings::CreditsEntryBoxStyleOverrides st) {
 	constexpr auto kOneLineCount = 24;
+	token = token.replace(QChar('-'), kHorizontalBar);
 	const auto oneLine = token.length() <= kOneLineCount;
 	return object_ptr<Ui::FlatLabel>(
 		table,
@@ -411,7 +417,7 @@ void AddTableRow(
 		table->st().defaultValue.style.font->height);
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
 		raw,
-		Lang::FormatStarsAmountDecimal(entry.credits),
+		Lang::FormatCreditsAmountDecimal(entry.credits),
 		table->st().defaultValue,
 		st::defaultPopupMenu);
 
@@ -1381,7 +1387,7 @@ void AddStarGiftTable(
 			auto label = MakeMaybeMultilineTokenValue(table, address, st);
 			label->setClickHandlerFilter([=](const auto &...) {
 				TextUtilities::SetClipboardText(
-					TextForMimeData::Simple(address));
+					TextForMimeData::Simple(FixupTransactionId(address)));
 				show->showToast(
 					tr::lng_gift_unique_address_copied(tr::now));
 				return false;
@@ -1630,8 +1636,8 @@ void AddCreditsHistoryEntryTable(
 			const auto full = int(base::SafeRound(entry.credits.value()
 				/ (1. - (entry.starrefCommission / 1000.))));
 			auto value = Ui::Text::IconEmoji(&st::starIconEmojiColored);
-			const auto starsText = Lang::FormatStarsAmountDecimal(
-				StarsAmount{ full });
+			const auto starsText = Lang::FormatCreditsAmountDecimal(
+				CreditsAmount{ full });
 			AddTableRow(
 				table,
 				tr::lng_credits_box_history_entry_gift_full_price(),
@@ -1729,7 +1735,7 @@ void AddCreditsHistoryEntryTable(
 			(entry.gift
 				? tr::lng_credits_box_history_entry_peer_in
 				: tr::lng_credits_box_history_entry_via)(),
-			(entry.gift
+			((entry.gift && entry.credits.stars())
 				? tr::lng_credits_box_history_entry_anonymous
 				: tr::lng_credits_box_history_entry_fragment)(
 					Ui::Text::RichLangValue));
@@ -1787,7 +1793,7 @@ void AddCreditsHistoryEntryTable(
 		auto value = Ui::Text::IconEmoji(&st::starIconEmojiColored);
 		const auto full = (entry.in ? 1 : -1)
 			* (entry.credits + entry.paidMessagesAmount);
-		const auto starsText = Lang::FormatStarsAmountDecimal(full);
+		const auto starsText = Lang::FormatCreditsAmountDecimal(full);
 		AddTableRow(
 			table,
 			tr::lng_credits_paid_messages_full(),
@@ -1806,7 +1812,7 @@ void AddCreditsHistoryEntryTable(
 		auto label = MakeMaybeMultilineTokenValue(table, entry.id, st);
 		label->setClickHandlerFilter([=](const auto &...) {
 			TextUtilities::SetClipboardText(
-				TextForMimeData::Simple(entry.id));
+				TextForMimeData::Simple(FixupTransactionId(entry.id)));
 			show->showToast(
 				tr::lng_credits_box_history_entry_id_copied(tr::now));
 			return false;
@@ -1979,5 +1985,31 @@ void AddCreditsBoostTable(
 			table,
 			tr::lng_gift_until(),
 			rpl::single(Ui::Text::WithEntities(langDateTime(b.expiresAt))));
+	}
+}
+
+void AddChannelEarnTable(
+		std::shared_ptr<Ui::Show> show,
+		not_null<Ui::VerticalLayout*> container,
+		const Data::CreditsHistoryEntry &entry) {
+	const auto table = container->add(
+		object_ptr<Ui::TableLayout>(
+			container,
+			st::giveawayGiftCodeTable),
+		st::giveawayGiftCodeTableMargin);
+	if (!entry.id.isEmpty()) {
+		auto label = MakeMaybeMultilineTokenValue(table, entry.id, {});
+		label->setClickHandlerFilter([=](const auto &...) {
+			TextUtilities::SetClipboardText(
+				TextForMimeData::Simple(FixupTransactionId(entry.id)));
+			show->showToast(
+				tr::lng_credits_box_history_entry_id_copied(tr::now));
+			return false;
+		});
+		AddTableRow(
+			table,
+			tr::lng_credits_box_history_entry_id(),
+			std::move(label),
+			st::giveawayGiftCodeValueMargin);
 	}
 }

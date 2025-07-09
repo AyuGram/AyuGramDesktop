@@ -102,7 +102,7 @@ void Tray::rebuildMenu() {
 			[=] { toggleSoundNotifications(); });
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (settings.showGhostToggleInTray) {
 		auto turnGhostModeText = _textUpdates.events(

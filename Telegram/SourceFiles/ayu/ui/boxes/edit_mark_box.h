@@ -8,12 +8,15 @@
 
 #include "base/timer.h"
 #include "boxes/abstract_box.h"
-#include "mtproto/sender.h"
 
-class EditEditedMarkBox : public Ui::BoxContent
+namespace Ui {
+class InputField;
+}
+
+class EditMarkBox : public Ui::BoxContent
 {
 public:
-	EditEditedMarkBox(QWidget *);
+	EditMarkBox(QWidget *, rpl::producer<QString> title, const QString& currentValue, QString  defaultValue, const Fn<void(const QString&)> &saveCallback);
 
 protected:
 	void setInnerFocus() override;
@@ -23,6 +26,10 @@ protected:
 private:
 	void submit();
 	void save();
+
+	rpl::producer<QString> _title;
+	QString _defaultValue;
+	Fn<void(const QString&)> _saveCallback;
 
 	object_ptr<Ui::InputField> _text;
 };

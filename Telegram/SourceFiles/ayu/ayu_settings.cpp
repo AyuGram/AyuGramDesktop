@@ -231,6 +231,8 @@ AyuGramSettings::AyuGramSettings() {
 
 	disableNotificationsDelay = false;
 	localPremium = false;
+	hideChannelReactions = true;
+	hideGroupReactions = true;
 
 	// ~ Customization
 	appIcon =
@@ -417,8 +419,16 @@ void set_localPremium(bool val) {
 	settings->localPremium = val;
 }
 
-void set_appIcon(QString val) {
-	settings->appIcon = std::move(val);
+void set_hideChannelReactions(bool val) {
+	settings->hideChannelReactions = val;
+}
+
+void set_hideGroupReactions(bool val) {
+	settings->hideGroupReactions = val;
+}
+
+void set_appIcon(const QString &val) {
+	settings->appIcon = val;
 }
 
 void set_simpleQuotesAndReplies(bool val) {
@@ -429,13 +439,13 @@ void set_replaceBottomInfoWithIcons(bool val) {
 	settings->replaceBottomInfoWithIcons = val;
 }
 
-void set_deletedMark(QString val) {
-	settings->deletedMark = std::move(val);
+void set_deletedMark(const QString &val) {
+	settings->deletedMark = val;
 	deletedMarkReactive = settings->deletedMark;
 }
 
-void set_editedMark(QString val) {
-	settings->editedMark = std::move(val);
+void set_editedMark(const QString &val) {
+	settings->editedMark = val;
 	editedMarkReactive = settings->editedMark;
 }
 
@@ -522,7 +532,7 @@ void set_showStreamerToggleInTray(bool val) {
 	settings->showStreamerToggleInTray = val;
 }
 
-void set_monoFont(QString val) {
+void set_monoFont(const QString &val) {
 	settings->monoFont = val;
 }
 

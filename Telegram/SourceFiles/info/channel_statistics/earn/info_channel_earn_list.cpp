@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "api/api_updates.h"
 #include "base/unixtime.h"
+#include "boxes/gift_premium_box.h"
 #include "boxes/peers/edit_peer_color_box.h" // AddLevelBadge.
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "core/application.h"
@@ -249,7 +250,6 @@ void InnerWidget::load() {
 		) | rpl::start_with_next([=, peerId = _peer->id](
 				const MTPUpdates &updates) {
 			using TLCreditsUpdate = MTPDupdateStarsRevenueStatus;
-			using TLCurrencyUpdate = MTPDupdateBroadcastRevenueTransactions;
 			using TLNotificationUpdate = MTPDupdateServiceNotification;
 			Api::PerformForUpdate<TLCreditsUpdate>(updates, [&](
 					const TLCreditsUpdate &d) {
@@ -257,29 +257,39 @@ void InnerWidget::load() {
 					return;
 				}
 				const auto &data = d.vstatus().data();
-				auto &e = _state.creditsEarn;
-				e.currentBalance = Data::FromTL(data.vcurrent_balance());
-				e.availableBalance = Data::FromTL(data.vavailable_balance());
-				e.overallRevenue = Data::FromTL(data.voverall_revenue());
-				e.isWithdrawalEnabled = data.is_withdrawal_enabled();
-				e.nextWithdrawalAt = data.vnext_withdrawal_at()
-					? base::unixtime::parse(
-						data.vnext_withdrawal_at()->v)
-					: QDateTime();
-				state->apiCreditsHistory.request({}, [=](
-						const Data::CreditsStatusSlice &data) {
-					_state.creditsStatusSlice = data;
-					_stateUpdated.fire({});
+				const auto isCredits = data.vcurrent_balance().match([](
+						const MTPDstarsAmount &) {
+					return true;
+				}, [](const MTPDstarsTonAmount &) {
+					return false;
 				});
-			});
-			Api::PerformForUpdate<TLCurrencyUpdate>(updates, [&](
-					const TLCurrencyUpdate &d) {
-				if (peerId == peerFromMTP(d.vpeer())) {
-					const auto &data = d.vbalances().data();
-					auto &e = _state.currencyEarn;
-					e.currentBalance = data.vcurrent_balance().v;
-					e.availableBalance = data.vavailable_balance().v;
-					e.overallRevenue = data.voverall_revenue().v;
+				if (isCredits) {
+					auto &credits = _state.creditsEarn;
+					credits.currentBalance = CreditsAmountFromTL(
+						data.vcurrent_balance());
+					credits.availableBalance = CreditsAmountFromTL(
+						data.vavailable_balance());
+					credits.overallRevenue = CreditsAmountFromTL(
+						data.voverall_revenue());
+					credits.isWithdrawalEnabled
+						= data.is_withdrawal_enabled();
+					credits.nextWithdrawalAt = data.vnext_withdrawal_at()
+						? base::unixtime::parse(
+							data.vnext_withdrawal_at()->v)
+						: QDateTime();
+					state->apiCreditsHistory.request({}, [=](
+							const Data::CreditsStatusSlice &data) {
+						_state.creditsStatusSlice = data;
+						_stateUpdated.fire({});
+					});
+				} else {
+					auto &currency = _state.currencyEarn;
+					currency.currentBalance = CreditsAmountFromTL(
+						data.vcurrent_balance());
+					currency.availableBalance = CreditsAmountFromTL(
+						data.vavailable_balance());
+					currency.overallRevenue = CreditsAmountFromTL(
+						data.voverall_revenue());
 					_stateUpdated.fire({});
 				}
 			});
@@ -395,9 +405,8 @@ void InnerWidget::fill() {
 	//constexpr auto kApproximately = QChar(0x2248);
 	const auto multiplier = data.usdRate;
 
-	const auto creditsToUsdMap = [=](StarsAmount c) {
-		const auto creditsMultiplier = _state.creditsEarn.usdRate
-			* Data::kEarnMultiplier;
+	const auto creditsToUsdMap = [=](CreditsAmount c) {
+		const auto creditsMultiplier = _state.creditsEarn.usdRate;
 		return c ? ToUsd(c, creditsMultiplier, 0) : QString();
 	};
 
@@ -405,7 +414,7 @@ void InnerWidget::fill() {
 	const auto withdrawalEnabled = WithdrawalEnabled(session);
 	const auto addEmojiToMajor = [=](
 			not_null<Ui::FlatLabel*> label,
-			rpl::producer<EarnInt> value,
+			rpl::producer<CreditsAmount> value,
 			std::optional<bool> isIn,
 			std::optional<QMargins> margins) {
 		const auto &st = label->st();
@@ -414,7 +423,7 @@ void InnerWidget::fill() {
 				Ui::Earn::IconCurrencyColored(
 					st.style.font,
 					!isIn
-						? st::activeButtonBg->c
+						? st::currencyFg->c
 						: (*isIn)
 						? st::boxTextFgGood->c
 						: st::menuIconAttentionColor->c),
@@ -425,7 +434,7 @@ void InnerWidget::fill() {
 			: TextWithEntities::Simple((*isIn) ? QChar('+') : kMinus);
 		std::move(
 			value
-		) | rpl::start_with_next([=](EarnInt v) {
+		) | rpl::start_with_next([=](CreditsAmount v) {
 			label->setMarkedText(
 				base::duplicate(prepended).append(icon).append(MajorPart(v)),
 				Core::TextContext({ .session = session }));
@@ -436,7 +445,7 @@ void InnerWidget::fill() {
 		session->data().customEmojiManager().registerInternalEmoji(
 			Ui::Earn::IconCurrencyColored(
 				st::boxTitle.style.font,
-				st::activeButtonBg->c),
+				st::currencyFg->c),
 			st::channelEarnCurrencyLearnMargins,
 			false));
 
@@ -706,8 +715,8 @@ void InnerWidget::fill() {
 		Ui::AddSkip(container, st::channelEarnOverviewTitleSkip);
 
 		const auto addOverview = [&](
-				rpl::producer<EarnInt> currencyValue,
-				rpl::producer<StarsAmount> creditsValue,
+				rpl::producer<CreditsAmount> currencyValue,
+				rpl::producer<CreditsAmount> creditsValue,
 				const tr::phrase<> &text,
 				bool showCurrency,
 				bool showCredits) {
@@ -724,15 +733,17 @@ void InnerWidget::fill() {
 				{});
 			const auto minorLabel = Ui::CreateChild<Ui::FlatLabel>(
 				line,
-				rpl::duplicate(currencyValue) | rpl::map([=](EarnInt v) {
-					return MinorPart(v).left(kMinorLength);
+				rpl::duplicate(
+					currencyValue
+				) | rpl::map([](CreditsAmount v) {
+					return MinorPart(v);
 				}),
 				st::channelEarnOverviewMinorLabel);
 			const auto secondMinorLabel = Ui::CreateChild<Ui::FlatLabel>(
 				line,
 				std::move(
 					currencyValue
-				) | rpl::map([=](EarnInt value) {
+				) | rpl::map([=](CreditsAmount value) {
 					return value
 						? ToUsd(value, multiplier, kMinorLength)
 						: QString();
@@ -741,8 +752,10 @@ void InnerWidget::fill() {
 
 			const auto creditsLabel = Ui::CreateChild<Ui::FlatLabel>(
 				line,
-				rpl::duplicate(creditsValue) | rpl::map([](StarsAmount value) {
-					return Lang::FormatStarsAmountDecimal(value);
+				rpl::duplicate(
+					creditsValue
+				) | rpl::map([](CreditsAmount value) {
+					return Lang::FormatCreditsAmountDecimal(value);
 				}),
 				st::channelEarnOverviewMajorLabel);
 			const auto icon = Ui::CreateSingleStarWidget(
@@ -761,7 +774,7 @@ void InnerWidget::fill() {
 					int available,
 					const QSize &size,
 					const QSize &creditsSize,
-					StarsAmount credits) {
+					CreditsAmount credits) {
 				const auto skip = st::channelEarnOverviewSubMinorLabelPos.x();
 				line->resize(line->width(), size.height());
 				minorLabel->moveToLeft(
@@ -1088,7 +1101,7 @@ void InnerWidget::fill() {
 
 			const auto historyList = tabCurrencyList->entity();
 			const auto addHistoryEntry = [=](
-					const Data::EarnHistoryEntry &entry,
+					const Data::CreditsHistoryEntry &entry,
 					const tr::phrase<> &text) {
 				const auto wrap = historyList->add(
 					object_ptr<Ui::PaddingWrap<Ui::VerticalLayout>>(
@@ -1102,8 +1115,7 @@ void InnerWidget::fill() {
 					text(),
 					st::channelEarnSemiboldLabel));
 
-				const auto isIn
-					= (entry.type == Data::EarnHistoryEntry::Type::In);
+				const auto isIn = entry.in;
 				const auto recipient = Ui::Text::Wrapped(
 					{ entry.provider },
 					EntityType::Code);
@@ -1120,18 +1132,17 @@ void InnerWidget::fill() {
 					Ui::AddSkip(inner, st::channelEarnHistoryTwoSkip);
 				}
 
-				const auto isFailed = entry.status
-					== Data::EarnHistoryEntry::Status::Failed;
-				const auto isPending = entry.status
-					== Data::EarnHistoryEntry::Status::Pending;
-				const auto dateText = (!entry.dateTo.isNull() || isFailed)
+				const auto isFailed = entry.failed;
+				const auto isPending = entry.pending;
+				const auto dateText = (!entry.adsProceedsToDate.isNull()
+						|| isFailed)
 					? (FormatDate(entry.date)
 						+ ' '
 						+ QChar(8212)
 						+ ' '
 						+ (isFailed
 							? tr::lng_channel_earn_history_out_failed(tr::now)
-							: FormatDate(entry.dateTo)))
+							: FormatDate(entry.adsProceedsToDate)))
 					: isPending
 					? tr::lng_channel_earn_history_pending(tr::now)
 					: FormatDate(entry.date);
@@ -1152,12 +1163,12 @@ void InnerWidget::fill() {
 					st::channelEarnHistoryMajorLabel);
 				addEmojiToMajor(
 					majorLabel,
-					rpl::single(entry.amount),
+					rpl::single(entry.credits),
 					isIn,
 					{});
 				majorLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 				majorLabel->setTextColorOverride(color);
-				const auto minorText = MinorPart(entry.amount);
+				const auto minorText = MinorPart(entry.credits);
 				const auto minorLabel = Ui::CreateChild<Ui::FlatLabel>(
 					wrap,
 					rpl::single(minorText),
@@ -1186,7 +1197,7 @@ void InnerWidget::fill() {
 						st::channelEarnOverviewMajorLabel);
 					addEmojiToMajor(
 						majorLabel,
-						rpl::single(entry.amount),
+						rpl::single(entry.credits),
 						isIn,
 						{});
 					majorLabel->setAttribute(
@@ -1222,6 +1233,11 @@ void InnerWidget::fill() {
 							dateText,
 							st::channelEarnHistorySubLabel)));
 					Ui::AddSkip(box->verticalLayout());
+					Ui::AddSkip(box->verticalLayout());
+					AddChannelEarnTable(
+						box->uiShow(),
+						box->verticalLayout(),
+						entry);
 					Ui::AddSkip(box->verticalLayout());
 					Ui::AddSkip(box->verticalLayout());
 					box->addRow(object_ptr<Ui::CenterWrap<>>(
@@ -1303,15 +1319,14 @@ void InnerWidget::fill() {
 				}, wrap->lifetime());
 			};
 			const auto handleSlice = [=](const Data::EarnHistorySlice &s) {
-				using Type = Data::EarnHistoryEntry::Type;
 				for (const auto &entry : s.list) {
 					addHistoryEntry(
 						entry,
-						(entry.type == Type::In)
-							? tr::lng_channel_earn_history_in
-							: (entry.type == Type::Return)
+						(entry.refunded
 							? tr::lng_channel_earn_history_return
-							: tr::lng_channel_earn_history_out);
+							: entry.in
+							? tr::lng_channel_earn_history_in
+							: tr::lng_channel_earn_history_out));
 				}
 				historyList->resizeToWidth(listsContainer->width());
 			};

@@ -465,6 +465,10 @@ rpl::producer<bool> ChatFilters::tagsEnabledValue() const {
 	return _tagsEnabled.value();
 }
 
+rpl::producer<bool> ChatFilters::tagsEnabledChanges() const {
+	return _tagsEnabled.changes();
+}
+
 void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {
 	if (_toggleTagsRequestId) {
 		return;
@@ -484,7 +488,7 @@ void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {
 
 void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 	// AyuGram hideAllChatsFolder
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	auto position = 0;
 	auto changed = false;
@@ -526,7 +530,7 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 
 void ChatFilters::apply(const MTPUpdate &update) {
 	// AyuGram hideAllChatsFolder
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	update.match([&](const MTPDupdateDialogFilter &data) {
 		if (const auto filter = data.vfilter()) {
@@ -912,7 +916,7 @@ FilterId ChatFilters::lookupId(int index) const {
 		return FilterId(); // AyuGram: fix crash when using `hideAllChatsFolder`
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (_owner->session().user()->isPremium() || !_list.front().id() || settings.hideAllChatsFolder) {
 		return _list[index].id();

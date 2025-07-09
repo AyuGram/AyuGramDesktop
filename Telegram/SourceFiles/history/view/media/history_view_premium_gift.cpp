@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "base/unixtime.h"
 #include "boxes/gift_premium_box.h" // ResolveGiftCode
+#include "boxes/star_gift_box.h" // GiftReleasedByHandler
 #include "chat_helpers/stickers_gift_box_pack.h"
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "data/stickers/data_custom_emoji.h"
@@ -29,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_credits_graphics.h" // GiftedCreditsBox
 #include "settings/settings_premium.h" // Settings::ShowGiftPremium
 #include "ui/chat/chat_style.h"
+#include "ui/controls/ton_common.h" // kNanosInOne
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "window/window_session_controller.h"
@@ -47,17 +49,19 @@ PremiumGift::PremiumGift(
 PremiumGift::~PremiumGift() = default;
 
 int PremiumGift::top() {
-	return starGift()
+	return (starGift() || tonGift())
 		? st::msgServiceStarGiftStickerTop
 		: st::msgServiceGiftBoxStickerTop;
 }
 
 int PremiumGift::width() {
-	return st::msgServiceStarGiftBoxWidth;
+	return _data.stargiftReleasedBy
+		? st::msgServiceStarGiftByWidth
+		: st::msgServiceStarGiftBoxWidth;
 }
 
 QSize PremiumGift::size() {
-	return starGift()
+	return (starGift() || tonGift())
 		? QSize(
 			st::msgServiceStarGiftStickerSize,
 			st::msgServiceStarGiftStickerSize)
@@ -68,7 +72,13 @@ QSize PremiumGift::size() {
 
 TextWithEntities PremiumGift::title() {
 	using namespace Ui::Text;
-	if (starGift()) {
+	if (tonGift()) {
+		return tr::lng_gift_ton_amount(
+			tr::now,
+			lt_count_decimal,
+			CreditsAmount(0, _data.count, CreditsType::Ton).value(),
+			Ui::Text::WithEntities);
+	} else if (starGift()) {
 		const auto peer = _parent->history()->peer;
 		return peer->isSelf()
 			? tr::lng_action_gift_self_subtitle(tr::now, WithEntities)
@@ -113,8 +123,22 @@ TextWithEntities PremiumGift::title() {
 		: tr::lng_prize_title(tr::now, WithEntities);
 }
 
+TextWithEntities PremiumGift::author() {
+	using namespace Ui::Text;
+	if (!_data.stargiftReleasedBy) {
+		return {};
+	}
+	return tr::lng_gift_released_by(
+		tr::now,
+		lt_name,
+		Ui::Text::Link('@' + _data.stargiftReleasedBy->username()),
+		Ui::Text::WithEntities);
+}
+
 TextWithEntities PremiumGift::subtitle() {
-	if (starGift()) {
+	if (tonGift()) {
+		return tr::lng_action_gift_got_ton(tr::now, Ui::Text::WithEntities);
+	} else if (starGift()) {
 		const auto toChannel = _data.channel
 			&& _parent->history()->peer->isServiceUser();
 		return !_data.message.empty()
@@ -237,11 +261,34 @@ rpl::producer<QString> PremiumGift::button() {
 		: tr::lng_prize_open();
 }
 
-bool PremiumGift::buttonMinistars() {
-	return true;
+std::optional<Ui::Premium::MiniStarsType> PremiumGift::buttonMinistars() {
+	return tonGift()
+		? Ui::Premium::MiniStarsType::SlowDiamondStars
+		: Ui::Premium::MiniStarsType::SlowStars;
 }
 
 ClickHandlerPtr PremiumGift::createViewLink() {
+	if (tonGift()) {
+		const auto lifetime = std::make_shared<rpl::lifetime>();
+		return std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+			const auto my = context.other.value<ClickHandlerContext>();
+			const auto weak = my.sessionWindow;
+			if (const auto window = weak.get()) {
+				window->session().credits().tonLoad();
+				*lifetime = window->session().credits().tonLoadedValue(
+				) | rpl::filter([=] {
+					if (const auto window = weak.get()) {
+						return window->session().credits().tonLoaded();
+					}
+					return false;
+				}) | rpl::take(1) | rpl::start_with_next([=] {
+					if (const auto window = weak.get()) {
+						window->showSettings(Settings::CurrencyId());
+					}
+				});
+			}
+		});
+	}
 	if (auto link = OpenStarGiftLink(_parent->data())) {
 		return link;
 	}
@@ -285,6 +332,18 @@ ClickHandlerPtr PremiumGift::createViewLink() {
 		showForWeakWindow(
 			context.other.value<ClickHandlerContext>().sessionWindow);
 	});
+}
+
+ClickHandlerPtr PremiumGift::authorLink() {
+	if (const auto by = _data.stargiftReleasedBy) {
+		if (!_authorLink) {
+			_authorLink = std::make_shared<LambdaClickHandler>([=] {
+				Ui::GiftReleasedByHandler(by);
+			});
+		}
+		return _authorLink;
+	}
+	return nullptr;
 }
 
 int PremiumGift::buttonSkip() {
@@ -376,6 +435,10 @@ bool PremiumGift::gift() const {
 	return _data.slug.isEmpty() || !_data.channel;
 }
 
+bool PremiumGift::tonGift() const {
+	return (_data.type == Data::GiftType::Ton);
+}
+
 bool PremiumGift::starGift() const {
 	return (_data.type == Data::GiftType::StarGift);
 }
@@ -397,6 +460,19 @@ int PremiumGift::credits() const {
 void PremiumGift::ensureStickerCreated() const {
 	if (_sticker) {
 		return;
+	} else if (tonGift()) {
+		const auto &session = _parent->history()->session();
+		auto &packs = session.giftBoxStickersPacks();
+		const auto count = _data.count / Ui::kNanosInOne;
+		if (const auto document = packs.tonLookup(count)) {
+			if (document->sticker()) {
+				const auto skipPremiumEffect = false;
+				_sticker.emplace(_parent, document, skipPremiumEffect, _parent);
+				_sticker->setStopOnLastFrame(true);
+				_sticker->initSize(st::msgServiceGiftBoxStickerSize);
+			}
+		}
+		return;
 	} else if (const auto document = _data.document) {
 		const auto sticker = document->sticker();
 		Assert(sticker != nullptr);
@@ -414,7 +490,7 @@ void PremiumGift::ensureStickerCreated() const {
 		if (document->sticker()) {
 			const auto skipPremiumEffect = false;
 			_sticker.emplace(_parent, document, skipPremiumEffect, _parent);
-			_sticker->setPlayingOnce(true);
+			_sticker->setStopOnLastFrame(true);
 			_sticker->initSize(st::msgServiceGiftBoxStickerSize);
 		}
 	}

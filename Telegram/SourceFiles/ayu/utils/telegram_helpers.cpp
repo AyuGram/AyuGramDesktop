@@ -37,12 +37,13 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
+#include "data/data_saved_sublist.h"
 
 namespace {
 
-constexpr auto usernameResolverBotId = 189165596L;
-const auto usernameResolverBotUsername = QString("usinfobot");
-const auto usernameResolverEmpty = QString("¯\\_(ツ)_/¯");
+constexpr auto usernameResolverBotId = 8001593505L;
+const auto usernameResolverBotUsername = QString("TgDBSearchBot");
+const auto usernameResolverEmpty = QString("Error, username or id invalid/not found.");
 
 }
 
@@ -108,7 +109,7 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 		return true;
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.hideFromBlocked) {
 		if (item->from()->isUser() &&
 			item->from()->asUser()->isBlocked()) {
@@ -170,13 +171,15 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 		return;
 	}
 	const auto topic = thread->asTopic();
+	const auto sublist = thread->asSublist();
 	const auto peer = thread->peer();
 	const auto rootId = topic ? topic->rootId() : 0;
 	using Flag = MTPmessages_ReadReactions::Flag;
 	peer->session().api().request(MTPmessages_ReadReactions(
 		MTP_flags(rootId ? Flag::f_top_msg_id : Flag(0)),
 		peer->input,
-		MTP_int(rootId)
+		MTP_int(rootId),
+		sublist ? sublist->sublistPeer()->input : MTPInputPeer()
 	)).done([=](const MTPmessages_AffectedHistory &result)
 	{
 		const auto offset = peer->session().api().applyAffectedHistory(
@@ -185,7 +188,7 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 		if (offset > 0) {
 			readReactions(weakThread);
 		} else {
-			peer->owner().history(peer)->clearUnreadReactionsFor(rootId);
+			peer->owner().history(peer)->clearUnreadReactionsFor(rootId, sublist);
 		}
 	}).send();
 }
@@ -513,7 +516,7 @@ int getScheduleTime(int64 sumSize) {
 }
 
 bool isMessageSavable(const not_null<HistoryItem *> item) {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (!settings.saveDeletedMessages) {
 		return false;
@@ -656,22 +659,21 @@ void searchUser(long long userId, Main::Session *session, bool searchUserFlag, c
 					return QString();
 				});
 
-			if (text.isEmpty() || text.startsWith(usernameResolverEmpty)) {
+			if (text.isEmpty() || text.contains(usernameResolverEmpty)) {
 				continue;
 			}
 
-			ID id = 0; // 👤
-			QString title; // 👦🏻
-			QString username; // 🌐
+			ID id = 0; // 🆔
+			QString title; // 🏷
+			QString username; // 📧
 
 			for (auto &line : text.split('\n')) {
-				line = line.replace("⁣", "");
-				if (line.startsWith("👤")) {
-					id = line.mid(line.indexOf(' ') + 1).toLongLong();
-				} else if (line.startsWith("👦🏻")) {
-					title = line.mid(line.indexOf(' ') + 1);
-				} else if (line.startsWith("🌐")) {
-					username = line.mid(line.indexOf(' ') + 1);
+				if (line.startsWith("🆔")) {
+					id = line.mid(line.indexOf(": ") + 2).toLongLong();
+				} else if (line.startsWith("🏷")) {
+					title = line.mid(line.indexOf(": ") + 2);
+				} else if (line.startsWith("📧")) {
+					username = line.mid(line.indexOf(": ") + 2);
 				}
 			}
 
@@ -741,4 +743,35 @@ ID getUserIdFromPackId(uint64 id) {
 	}
 
 	return ownerId;
+}
+
+TextWithTags extractText(not_null<HistoryItem*> item) {
+	TextWithTags result;
+
+	QString text;
+	if (const auto media = item->media()) {
+		if (const auto poll = media->poll()) {
+			text.append("\xF0\x9F\x93\x8A ") // 📊
+				.append(poll->question.text).append("\n");
+			for (const auto answer : poll->answers) {
+				text.append("• ").append(answer.text.text).append("\n");
+			}
+		}
+	}
+
+	result.tags = TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities);
+	result.text = text.isEmpty() ? item->originalText().text : text;
+	return result;
+}
+
+bool mediaDownloadable(Data::Media *media) {
+	if (!media
+		|| media->webpage() || media->poll() || media->game()
+		|| media->invoice() || media->location() || media->paper()
+		|| media->giveawayStart() || media->giveawayResults()
+		|| media->sharedContact() || media->call()
+	) {
+		return false;
+	}
+	return true;
 }

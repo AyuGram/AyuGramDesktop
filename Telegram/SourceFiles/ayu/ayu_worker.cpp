@@ -42,7 +42,7 @@ void runOnce() {
 		lateInit();
 	}
 
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendOfflinePacketAfterOnline) {
 		return;
 	}

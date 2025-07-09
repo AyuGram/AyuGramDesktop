@@ -15,6 +15,7 @@ class RippleAnimation;
 
 namespace Ui::Premium {
 class ColoredMiniStars;
+enum class MiniStarsType;
 } // namespace Ui::Premium
 
 namespace HistoryView {
@@ -27,13 +28,17 @@ public:
 	[[nodiscard]] virtual int top() = 0;
 	[[nodiscard]] virtual QSize size() = 0;
 	[[nodiscard]] virtual TextWithEntities title() = 0;
+	[[nodiscard]] virtual TextWithEntities author() {
+		return {};
+	}
 	[[nodiscard]] virtual TextWithEntities subtitle() = 0;
 	[[nodiscard]] virtual int buttonSkip() {
 		return top();
 	}
 	[[nodiscard]] virtual rpl::producer<QString> button() = 0;
-	[[nodiscard]] virtual bool buttonMinistars() {
-		return false;
+	[[nodiscard]] virtual auto buttonMinistars()
+	-> std::optional<Ui::Premium::MiniStarsType> {
+		return std::nullopt;
 	}
 	[[nodiscard]] virtual QImage cornerTag(const PaintContext &context) {
 		return {};
@@ -43,6 +48,9 @@ public:
 		const PaintContext &context,
 		const QRect &geometry) = 0;
 	[[nodiscard]] virtual ClickHandlerPtr createViewLink() = 0;
+	[[nodiscard]] virtual ClickHandlerPtr authorLink() {
+		return nullptr;
+	}
 
 	[[nodiscard]] virtual bool hideServiceText() = 0;
 
@@ -121,6 +129,7 @@ private:
 
 	const int _maxWidth = 0;
 	Ui::Text::String _title;
+	Ui::Text::String _author;
 	Ui::Text::String _subtitle;
 	const QSize _size;
 	const QSize _innerSize;

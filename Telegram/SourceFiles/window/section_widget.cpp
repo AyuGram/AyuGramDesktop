@@ -283,6 +283,7 @@ void SectionWidget::setGeometryWithTopMoved(
 void SectionWidget::showAnimated(
 		SlideDirection direction,
 		const SectionSlideParams &params) {
+	validateSubsectionTabs();
 	if (_showAnimation) {
 		return;
 	}
@@ -313,6 +314,7 @@ std::shared_ptr<SectionMemento> SectionWidget::createMemento() {
 }
 
 void SectionWidget::showFast() {
+	validateSubsectionTabs();
 	show();
 	showFinished();
 }
@@ -482,7 +484,7 @@ auto ChatThemeValueFromPeer(
 		peer
 	) | rpl::map([=](ResolvedTheme resolved)
 	-> rpl::producer<std::shared_ptr<Ui::ChatTheme>> {
-		const auto& settings = AyuSettings::getInstance();
+		const auto &settings = AyuSettings::getInstance();
 		// this check ensures that background is not a pattern wallpaper in a private chat
 		if (settings.disableCustomBackgrounds && resolved.paper && resolved.paper->media) {
 			resolved.paper = std::nullopt;

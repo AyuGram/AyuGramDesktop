@@ -228,7 +228,7 @@ void SponsoredMessages::inject(
 }
 
 bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.disableAds) {
 		return false;
 	}
@@ -242,7 +242,7 @@ bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
 }
 
 bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
-	const auto& settings = AyuSettings::getInstance();
+	const auto &settings = AyuSettings::getInstance();
 	if (settings.disableAds) {
 		return false;
 	}
@@ -277,7 +277,10 @@ void SponsoredMessages::request(not_null<History*> history, Fn<void()> done) {
 		}
 	}
 	request.requestId = _session->api().request(
-		MTPmessages_GetSponsoredMessages(history->peer->input)
+		MTPmessages_GetSponsoredMessages(
+			MTP_flags(0),
+			history->peer->input,
+			MTPint()) // msg_id
 	).done([=](const MTPmessages_sponsoredMessages &result) {
 		parse(history, result);
 		if (done) {

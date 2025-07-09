@@ -4,6 +4,10 @@
 
 Choose a folder for the future build, for example **/Users/user/TBuild**. It will be named ***BuildPath*** in the rest of this document. All commands will be launched from Terminal.
 
+**Note about disk space:** The full build process will require approximately **55 GB** of free space. This includes:
+- **~35 GB** for libraries (when building for both x64 and arm64 architectures)
+- **~20 GB** for the compiled Telegram app (in the `out` folder)
+
 ### Clone source code and prepare libraries
 
 Go to ***BuildPath*** and run

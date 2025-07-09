@@ -35,15 +35,16 @@ namespace Info::Profile {
 
 class EmojiStatusPanel;
 
-enum class BadgeType {
+enum class BadgeType : uchar {
 	None = 0x00,
 	Verified = 0x01,
 	BotVerified = 0x02,
 	Premium = 0x04,
 	Scam = 0x08,
 	Fake = 0x10,
-	Extera = 0x20,
-	ExteraSupporter = 0x40,
+	Direct = 0x20,
+	Extera = 0x40,
+	ExteraSupporter = 0x80, // todo: remove `uchar` if they add more badges
 };
 inline constexpr bool is_flag_type(BadgeType) { return true; }
 

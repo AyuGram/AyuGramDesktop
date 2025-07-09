@@ -494,8 +494,15 @@ void ChatParticipants::requestBots(not_null<ChannelData*> channel) {
 			LOG(("API Error: "
 				"channels.channelParticipantsNotModified received!"));
 		});
-	}).fail([=] {
+	}).fail([=](const MTP::Error &error) {
 		_botsRequests.remove(channel);
+		if (error.type() == u"CHANNEL_MONOFORUM_UNSUPPORTED"_q) {
+			channel->mgInfo->bots.clear();
+			channel->mgInfo->botStatus = -1;
+			channel->session().changes().peerUpdated(
+				channel,
+				Data::PeerUpdate::Flag::FullInfo);
+		}
 	}).send();
 
 	_botsRequests[channel] = requestId;
@@ -648,10 +655,7 @@ void ChatParticipants::Restrict(
 	channel->session().api().request(MTPchannels_EditBanned(
 		channel->inputChannel,
 		participant->input,
-		MTP_chatBannedRights(
-			MTP_flags(MTPDchatBannedRights::Flags::from_raw(
-				uint32(newRights.flags))),
-			MTP_int(newRights.until))
+		RestrictionsToMTP(newRights)
 	)).done([=](const MTPUpdates &result) {
 		channel->session().api().applyUpdates(result);
 		channel->applyEditBanned(participant, oldRights, newRights);
@@ -756,10 +760,7 @@ void ChatParticipants::kick(
 	const auto requestId = _api.request(MTPchannels_EditBanned(
 		channel->inputChannel,
 		participant->input,
-		MTP_chatBannedRights(
-			MTP_flags(
-				MTPDchatBannedRights::Flags::from_raw(uint32(rights.flags))),
-			MTP_int(rights.until))
+		RestrictionsToMTP(rights)
 	)).done([=](const MTPUpdates &result) {
 		channel->session().api().applyUpdates(result);
 

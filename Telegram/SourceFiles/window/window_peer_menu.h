@@ -32,6 +32,8 @@ class Folder;
 class Session;
 struct ForwardDraft;
 class ForumTopic;
+class SavedMessages;
+class SavedSublist;
 class Thread;
 } // namespace Data
 
@@ -105,10 +107,31 @@ void PeerMenuCreatePoll(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
 	FullReplyTo replyTo = FullReplyTo(),
+	SuggestPostOptions suggest = SuggestPostOptions(),
 	PollData::Flags chosen = PollData::Flags(),
 	PollData::Flags disabled = PollData::Flags(),
 	Api::SendType sendType = Api::SendType::Normal,
 	SendMenu::Details sendMenuDetails = SendMenu::Details());
+enum class TodoWantsPremium {
+	Create,
+	Add,
+	Mark,
+};
+void PeerMenuTodoWantsPremium(TodoWantsPremium type);
+void PeerMenuCreateTodoList(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer,
+	FullReplyTo replyTo = FullReplyTo(),
+	SuggestPostOptions suggest = SuggestPostOptions(),
+	Api::SendType sendType = Api::SendType::Normal,
+	SendMenu::Details sendMenuDetails = SendMenu::Details());
+void PeerMenuEditTodoList(
+	not_null<Window::SessionController*> controller,
+	not_null<HistoryItem*> item);
+[[nodiscard]] bool PeerMenuShowAddTodoListTasks(not_null<HistoryItem*> item);
+void PeerMenuAddTodoListTasks(
+	not_null<Window::SessionController*> controller,
+	not_null<HistoryItem*> item);
 void PeerMenuDeleteTopicWithConfirmation(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<Data::ForumTopic*> topic);
@@ -146,6 +169,9 @@ Fn<void()> ClearHistoryHandler(
 Fn<void()> DeleteAndLeaveHandler(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer);
+Fn<void()> DeleteSublistHandler(
+	not_null<Window::SessionController*> controller,
+	not_null<Data::SavedSublist*> sublist);
 
 Fn<void()> DeleteByKeywordHandler(
 		not_null<Window::SessionController*> controller,
@@ -191,6 +217,11 @@ QPointer<Ui::BoxContent> ShowDropMediaBox(
 	std::shared_ptr<QMimeData> data,
 	not_null<Data::Forum*> forum,
 	FnMut<void()> &&successCallback = nullptr);
+QPointer<Ui::BoxContent> ShowDropMediaBox(
+	not_null<Window::SessionNavigation*> navigation,
+	std::shared_ptr<QMimeData> data,
+	not_null<Data::SavedMessages*> monoforum,
+	FnMut<void()> &&successCallback = nullptr);
 
 QPointer<Ui::BoxContent> ShowSendNowMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
@@ -211,6 +242,7 @@ void HidePinnedBar(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
+	PeerId monoforumPeerId,
 	Fn<void()> onHidden);
 void UnpinAllMessages(
 	not_null<Window::SessionNavigation*> navigation,
@@ -223,5 +255,12 @@ void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction);
 
 [[nodiscard]] bool IsArchived(not_null<History*> history);
 [[nodiscard]] bool CanArchive(History *history, PeerData *peer);
+
+void PeerMenuConfirmToggleFee(
+	not_null<Window::SessionNavigation*> navigation,
+	std::shared_ptr<rpl::variable<int>> paidAmount,
+	not_null<PeerData*> peer,
+	not_null<UserData*> user,
+	bool removeFee);
 
 } // namespace Window
