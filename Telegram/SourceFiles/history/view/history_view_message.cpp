@@ -4623,9 +4623,7 @@ QRect Message::countGeometry() const {
 		? media->width()
 		: width();
 	const auto outbg = hasOutLayout();
-	const auto useMoreSpace = (delegate()->elementChatMode()
-		== ElementChatMode::Narrow);
-	const auto wideSkip = useMoreSpace
+	const auto wideSkip = delegate()->elementIsChatWide()
 		? st::msgMargin.left()
 		: st::msgMargin.right();
 	const auto availableWidth = width()
@@ -4768,11 +4766,6 @@ int Message::resizeContentGetHeight(int newWidth) {
 	// This code duplicates countGeometry() but also resizes media.
 	const auto centeredView = item->isFakeAboutView()
 		|| (context() == Context::Replies && item->isDiscussionPost());
-	const auto useMoreSpace = (delegate()->elementChatMode()
-		== ElementChatMode::Narrow);
-	const auto wideSkip = useMoreSpace
-		? st::msgMargin.left()
-		: st::msgMargin.right();
 	auto contentWidth = newWidth
 		- st::msgMargin.left()
 		- (centeredView ? st::msgMargin.left() : st::msgMargin.right());
