@@ -207,7 +207,6 @@ void set_showMessageSeconds(bool val);
 void set_showMessageShot(bool val);
 
 void set_showHideButtonNearPosts(bool val);
-
 void set_stickerConfirmation(bool val);
 void set_gifConfirmation(bool val);
 void set_voiceConfirmation(bool val);
