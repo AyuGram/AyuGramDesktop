@@ -121,6 +121,9 @@ public:
 		const FullMsgId &context) = 0;
 	virtual void elementHandleViaClick(not_null<UserData*> bot) = 0;
 	virtual ElementChatMode elementChatMode() = 0;
+	[[nodiscard]] bool elementIsChatWide() {
+		return elementChatMode() == ElementChatMode::Wide;
+	}
 	virtual not_null<Ui::PathShiftGradient*> elementPathShiftGradient() = 0;
 	virtual void elementReplyTo(const FullReplyTo &to) = 0;
 	virtual void elementStartInteraction(not_null<const Element*> view) = 0;
