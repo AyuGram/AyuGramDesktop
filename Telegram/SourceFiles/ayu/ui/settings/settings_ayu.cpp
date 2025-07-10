@@ -936,7 +936,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::save();
 		});
 
-	   auto hideValue = container->lifetime().make_state<rpl::variable<int>>(settings.showHideMessageInContextMenu);
+	   auto hideValue = container->lifetime().make_state<rpl::variable<int>>(settings->showHideMessageInContextMenu);
 	   rpl::producer<QString> hideLabel = hideValue->value() | rpl::map([=](int val) {
 			   return options[val];
 	   });
@@ -977,7 +977,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 							   object_ptr<Ui::Checkbox>(
 									   layout,
 									   tr::ayu_ShowNearPosts(),
-									   settings.showHideButtonNearPosts,
+									   settings->showHideButtonNearPosts,
 									   st::defaultBoxCheckbox),
 							   QMargins(
 									   st::boxPadding.left() + st::boxOptionListPadding.left(),
@@ -1000,7 +1000,7 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 	   AddChooseButtonWithIconAndRightText(
 				container,
 				controller,
-				settings.showUserMessagesInContextMenu,
+				settings->showUserMessagesInContextMenu,
 		options,
 		tr::ayu_UserMessagesMenuText(),
 		tr::ayu_SettingsContextMenuTitle(),
