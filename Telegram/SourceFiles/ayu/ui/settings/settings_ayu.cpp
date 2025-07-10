@@ -809,9 +809,9 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		container->lifetime());
 
         AddButtonWithIcon(container, tr::ayu_DisableTooltipDelay(), st::settingsButtonNoIcon)
-			->toggleOn(rpl::single(settings.disableTooltipDelay))
+			->toggleOn(rpl::single(settings->disableTooltipDelay))
 			->toggledValue() |
-		rpl::filter([=](bool enabled) { return (enabled != settings.disableTooltipDelay); }) |
+		rpl::filter([=](bool enabled) { return (enabled != settings->disableTooltipDelay); }) |
 		start_with_next(
 			[=](bool enabled)
 			{
