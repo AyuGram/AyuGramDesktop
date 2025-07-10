@@ -298,7 +298,6 @@ AyuGramSettings::AyuGramSettings() {
 	showMessageShot = true;
 
 	showHideButtonNearPosts = true;
-
 	// ~ Confirmations
 	stickerConfirmation = false;
 	gifConfirmation = false;
@@ -570,7 +569,6 @@ void set_showMessageShot(bool val) {
 void set_showHideButtonNearPosts(bool val) {
 	settings->showHideButtonNearPosts = val;
 }
-
 void set_stickerConfirmation(bool val) {
 	settings->stickerConfirmation = val;
 }
