@@ -893,12 +893,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 				tr::ayu_ShowForwardsCount(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(settings.showForwards)
+				rpl::single(settings->showForwards)
 		)->toggledValue(
 		) | rpl::filter(
 				[=](bool enabled)
 				{
-						return (enabled != settings.showForwards);
+						return (enabled != settings->showForwards);
 				}) | start_with_next(
 				[=](bool enabled)
 				{
@@ -912,12 +912,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 				tr::ayu_ShowForwardsRatio(),
 				st::settingsButtonNoIcon
 		)->toggleOn(
-				rpl::single(settings.showForwardsRatio)
+				rpl::single(settings->showForwardsRatio)
 		)->toggledValue(
 		) | rpl::filter(
 				[=](bool enabled)
 				{
-						return (enabled != settings.showForwardsRatio);
+						return (enabled != settings->showForwardsRatio);
 				}) | start_with_next(
 				[=](bool enabled)
 				{
