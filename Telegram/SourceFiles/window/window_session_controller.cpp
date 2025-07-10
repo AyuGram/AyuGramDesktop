@@ -25,17 +25,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/view/reactions/history_view_reactions.h"
 //#include "history/view/reactions/history_view_reactions_button.h"
-#include "history/view/history_view_replies_section.h"
+#include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_scheduled_section.h"
-#include "history/view/history_view_sublist_section.h"
+#include "history/view/history_view_subsection_tabs.h"
 #include "media/player/media_player_instance.h"
 #include "media/view/media_view_open_common.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_document_resolver.h"
 #include "data/data_download_manager.h"
 #include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_file_origin.h"
+#include "data/data_flags.h"
 #include "data/data_folder.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -588,7 +590,8 @@ void SessionNavigation::showPeerByLinkResolved(
 		if (const auto forum = peer->forum()) {
 			if (controller->windowId().hasChatsList()
 				&& !controller->adaptive().isOneColumn()
-				&& controller->shownForum().current() != forum) {
+				&& controller->shownForum().current() != forum
+				&& !forum->channel()->useSubsectionTabs()) {
 				controller->showForum(forum);
 			}
 		}
@@ -1139,9 +1142,12 @@ void SessionNavigation::showRepliesForMessage(
 	if (const auto topic = history->peer->forumTopicFor(rootId)) {
 		auto replies = topic->replies();
 		if (replies->unreadCountKnown()) {
-			auto memento = std::make_shared<HistoryView::RepliesMemento>(
-				history,
-				rootId,
+			using namespace HistoryView;
+			auto memento = std::make_shared<ChatMemento>(
+				ChatViewId{
+					.history = history,
+					.repliesRootId = rootId,
+				},
 				commentId,
 				params.highlightPart,
 				params.highlightPartOffsetHint);
@@ -1155,7 +1161,7 @@ void SessionNavigation::showRepliesForMessage(
 		&& _showingRepliesRootId == rootId) {
 		return;
 	} else if (!history->peer->asChannel()) {
-		// HistoryView::RepliesWidget right now handles only channels.
+		// HistoryView::ChatWidget replies right now handles only channels.
 		return;
 	}
 	_api.request(base::take(_showingRepliesRequestId)).cancel();
@@ -1210,14 +1216,16 @@ void SessionNavigation::showRepliesForMessage(
 				}
 			}
 			if (deleted || item) {
+				using namespace HistoryView;
 				auto memento = item
-					? std::make_shared<HistoryView::RepliesMemento>(
+					? std::make_shared<ChatMemento>(
+						ChatMemento::Comments(),
 						item,
 						commentId)
-					: std::make_shared<HistoryView::RepliesMemento>(
-						history,
-						rootId,
-						commentId);
+					: std::make_shared<ChatMemento>(ChatViewId{
+						.history = history,
+						.repliesRootId = rootId,
+					}, commentId);
 				memento->setReadInformation(
 					data.vread_inbox_max_id().value_or_empty(),
 					data.vunread_count().v,
@@ -1253,12 +1261,30 @@ void SessionNavigation::showTopic(
 		params);
 }
 
+void SessionNavigation::showSublist(
+		not_null<Data::SavedSublist*> sublist,
+		MsgId itemId,
+		const SectionShow &params) {
+	using namespace HistoryView;
+	auto memento = std::make_shared<ChatMemento>(
+		ChatViewId{
+			.history = sublist->owningHistory(),
+			.sublist = sublist,
+		},
+		itemId,
+		params.highlightPart,
+		params.highlightPartOffsetHint);
+	showSection(std::move(memento), params);
+}
+
 void SessionNavigation::showThread(
 		not_null<Data::Thread*> thread,
 		MsgId itemId,
 		const SectionShow &params) {
 	if (const auto topic = thread->asTopic()) {
 		showTopic(topic, itemId, params);
+	} else if (const auto sublist = thread->asSublist()) {
+		showSublist(sublist, itemId, params);
 	} else {
 		showPeerHistory(thread->asHistory(), params, itemId);
 	}
@@ -1283,6 +1309,9 @@ void SessionNavigation::showPeerInfo(
 		const SectionShow &params) {
 	if (const auto topic = thread->asTopic()) {
 		showSection(std::make_shared<Info::Memento>(topic), params);
+	} else if (const auto sublist = thread->asSublist()
+		; sublist && sublist->parentChat()) {
+		showPeerInfo(sublist->sublistPeer()->id, params);
 	} else {
 		showPeerInfo(thread->peer()->id, params);
 	}
@@ -1325,42 +1354,24 @@ void SessionNavigation::showByInitialId(
 		showThread(id.thread, msgId, instant);
 		break;
 	case SeparateType::SharedMedia: {
-		Assert(id.sharedMedia != SeparateSharedMediaType::None);
 		clearSectionStack(instant);
-		const auto type = (id.sharedMedia == SeparateSharedMediaType::Photos)
-			? Storage::SharedMediaType::Photo
-			: (id.sharedMedia == SeparateSharedMediaType::Videos)
-			? Storage::SharedMediaType::Video
-			: (id.sharedMedia == SeparateSharedMediaType::Files)
-			? Storage::SharedMediaType::File
-			: (id.sharedMedia == SeparateSharedMediaType::Audio)
-			? Storage::SharedMediaType::MusicFile
-			: (id.sharedMedia == SeparateSharedMediaType::Links)
-			? Storage::SharedMediaType::Link
-			: (id.sharedMedia == SeparateSharedMediaType::Voices)
-			? Storage::SharedMediaType::RoundVoiceFile
-			: (id.sharedMedia == SeparateSharedMediaType::GIF)
-			? Storage::SharedMediaType::GIF
-			: Storage::SharedMediaType::Photo;
-		const auto topicRootId = id.sharedMediaTopicRootId();
-		const auto peer = id.sharedMediaPeer();
-		const auto topic = topicRootId
-			? peer->forumTopicFor(topicRootId)
-			: nullptr;
-		if (topicRootId && !topic) {
-			break;
-		}
+		const auto type = id.sharedMediaType;
+		const auto topic = id.thread->asTopic();
 		showSection(
-			topicRootId
+			(topic
 				? std::make_shared<Info::Memento>(topic, type)
-				: std::make_shared<Info::Memento>(peer, type),
+				: std::make_shared<Info::Memento>(id.thread->peer(), type)),
 			instant);
 		parent->widget()->setMaximumWidth(st::maxWidthSharedMediaWindow);
 		break;
 	}
 	case SeparateType::SavedSublist:
+		using namespace HistoryView;
 		showSection(
-			std::make_shared<HistoryView::SublistMemento>(id.sublist()),
+			std::make_shared<ChatMemento>(ChatViewId{
+				.history = id.sublist()->owningHistory(),
+				.sublist = id.sublist(),
+			}),
 			instant);
 		break;
 	}
@@ -1873,7 +1884,15 @@ bool SessionController::showForumInDifferentWindow(
 void SessionController::showForum(
 		not_null<Data::Forum*> forum,
 		const SectionShow &params) {
+	const auto forced = params.forceTopicsList;
 	if (showForumInDifferentWindow(forum, params)) {
+		return;
+	} else if (!forced && forum->channel()->useSubsectionTabs()) {
+		if (const auto active = forum->activeSubsectionThread()) {
+			showThread(active, ShowAtUnreadMsgId, params);
+		} else {
+			showPeerHistory(forum->channel(), params);
+		}
 		return;
 	}
 	_shownForumLifetime.destroy();
@@ -1889,10 +1908,11 @@ void SessionController::showForum(
 	if (_shownForum.current() != forum) {
 		return;
 	}
-	forum->destroyed(
-	) | rpl::start_with_next([=, history = forum->history()] {
+	const auto history = forum->history();
+	const auto closeAndShowHistory = [=](bool showOnlyIfEmpty) {
 		const auto now = activeChatCurrent().owningHistory();
-		const auto showHistory = !now || (now == history);
+		const auto showHistory = !now
+			|| (!showOnlyIfEmpty && (now == history));
 		const auto weak = base::make_weak(this);
 		closeForum();
 		if (weak && showHistory) {
@@ -1902,8 +1922,27 @@ void SessionController::showForum(
 				anim::activation::background,
 			});
 		}
-	}, _shownForumLifetime);
+	};
 	content()->showForum(forum, params);
+	if (_shownForum.current() != forum) {
+		return;
+	}
+
+	forum->destroyed(
+	) | rpl::start_with_next([=] {
+		closeAndShowHistory(false);
+	}, _shownForumLifetime);
+	if (!forced) {
+		using FlagChange = Data::Flags<ChannelDataFlags>::Change;
+		forum->channel()->flagsValue(
+		) | rpl::start_with_next([=](FlagChange change) {
+			if (change.diff & ChannelDataFlag::ForumTabs) {
+				if (HistoryView::SubsectionTabs::UsedFor(history)) {
+					closeAndShowHistory(true);
+				}
+			}
+		}, _shownForumLifetime);
+	}
 }
 
 void SessionController::closeForum() {
@@ -1973,9 +2012,9 @@ void SessionController::setActiveChatEntry(Dialogs::RowDescriptor row) {
 			Data::PeerFlagValue(
 				channel,
 				ChannelData::Flag::Forum
-			) | rpl::filter(
-				rpl::mappers::_1
-			) | rpl::start_with_next([=] {
+			) | rpl::filter([=](bool forum) {
+				return forum && !channel->useSubsectionTabs();
+			}) | rpl::start_with_next([=] {
 				clearSectionStack(
 					{ anim::type::normal, anim::activation::background });
 				showForum(channel->forum(),
@@ -2083,9 +2122,13 @@ bool SessionController::switchInlineQuery(
 		&& to.currentReplyTo.quote.empty()) {
 		to.currentReplyTo.messageId.msg = MsgId();
 	}
+	if (!history->suggestDraftAllowed()) {
+		to.currentSuggest = SuggestPostOptions();
+	}
 	auto draft = std::make_unique<Data::Draft>(
 		textWithTags,
 		to.currentReplyTo,
+		to.currentSuggest,
 		cursor,
 		Data::WebPageDraft());
 
@@ -2098,8 +2141,9 @@ bool SessionController::switchInlineQuery(
 			params);
 	} else {
 		const auto topicRootId = to.currentReplyTo.topicRootId;
+		const auto monoforumPeerId = to.currentReplyTo.monoforumPeerId;
 		history->setLocalDraft(std::move(draft));
-		history->clearLocalEditDraft(topicRootId);
+		history->clearLocalEditDraft(topicRootId, monoforumPeerId);
 		if (to.section == Section::Replies) {
 			const auto commentId = MsgId();
 			showRepliesForMessage(history, topicRootId, commentId, params);
@@ -2907,8 +2951,12 @@ void SessionController::openPhoto(
 	if (openSharedStory(item) || openFakeItemStory(message.id, stories)) {
 		return;
 	}
-	_window->openInMediaView(
-		Media::View::OpenRequest(this, photo, item, message.topicRootId));
+	_window->openInMediaView(Media::View::OpenRequest(
+		this,
+		photo,
+		item,
+		message.topicRootId,
+		message.monoforumPeerId));
 }
 
 void SessionController::openPhoto(
@@ -2943,11 +2991,17 @@ void SessionController::openDocument(
 			document,
 			item,
 			message.topicRootId,
+			message.monoforumPeerId,
 			false,
 			usedTimestamp));
 		return;
 	}
-	Data::ResolveDocument(this, document, item, message.topicRootId);
+	Data::ResolveDocument(
+		this,
+		document,
+		item,
+		message.topicRootId,
+		message.monoforumPeerId);
 }
 
 bool SessionController::openSharedStory(HistoryItem *item) {
@@ -3385,8 +3439,37 @@ std::shared_ptr<ChatHelpers::Show> SessionController::uiShow() {
 	return _cachedShow;
 }
 
+void SessionController::saveSubsectionTabs(
+		std::unique_ptr<HistoryView::SubsectionTabs> tabs) {
+	_savedSubsectionTabsLifetime.destroy();
+	_savedSubsectionTabs = std::move(tabs);
+	_savedSubsectionTabs->extractToParent(widget());
+	_savedSubsectionTabs->removeRequests() | rpl::start_with_next([=] {
+		_savedSubsectionTabs = nullptr;
+	}, _savedSubsectionTabsLifetime);
+}
+
+auto SessionController::restoreSubsectionTabsFor(
+	not_null<Ui::RpWidget*> parent,
+	not_null<Data::Thread*> thread)
+-> std::unique_ptr<HistoryView::SubsectionTabs> {
+	if (!_savedSubsectionTabs) {
+		return nullptr;
+	} else if (_savedSubsectionTabs->switchTo(thread, parent)) {
+		_savedSubsectionTabsLifetime.destroy();
+		return base::take(_savedSubsectionTabs);
+	}
+	return nullptr;
+}
+
+void SessionController::dropSubsectionTabs() {
+	_savedSubsectionTabsLifetime.destroy();
+	base::take(_savedSubsectionTabs);
+}
+
 SessionController::~SessionController() {
 	resetFakeUnreadWhileOpened();
+	dropSubsectionTabs();
 }
 
 bool CheckAndJumpToNearChatsFilter(

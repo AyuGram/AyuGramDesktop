@@ -243,15 +243,19 @@ void AddDownloadFilesAction(
 void AddDownloadFilesAction(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<Window::SessionController*> window,
-		const std::map<HistoryItem*, TextSelection, std::less<>> &items,
+		const base::flat_map<HistoryItem*, TextSelection, std::less<>> &items,
 		not_null<HistoryInner*> list) {
 	if (items.empty()) {
 		return;
 	}
+	auto sortedItems = ranges::views::all(items)
+		| ranges::views::keys
+		| ranges::to<std::vector>();
+	ranges::sort(sortedItems, {}, &HistoryItem::fullId);
 	auto docs = Documents();
 	auto photos = Photos();
-	for (const auto &pair : items) {
-		if (!Added(pair.first, docs, photos)) {
+	for (const auto &item : sortedItems) {
+		if (!Added(item, docs, photos)) {
 			return;
 		}
 	}

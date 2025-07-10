@@ -273,8 +273,9 @@ ReactionView::ReactionView(
 
 void ReactionView::setupCustomChatStylePalette() {
 	const auto color = uchar(_data.dark ? 255 : 0);
-	_chatStyle->historyTextInFg().set(color, color, color, 255);
-	_chatStyle->applyCustomPalette(_chatStyle.get());
+	Ui::ChatStyle custom{_chatStyle.get()};
+	custom.historyTextInFg().set(color, color, color, 255);
+	_chatStyle->applyCustomPalette(&custom);
 }
 
 void ReactionView::setAreaGeometry(QRect geometry, float64 radius) {

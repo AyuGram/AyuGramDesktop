@@ -16,11 +16,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_config.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
-#include "history/view/history_view_replies_section.h"
+#include "history/view/history_view_chat_section.h"
 #include "lang/lang_keys.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_document_media.h"
+#include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_channel.h"
 #include "data/data_forum_topic.h"
@@ -359,6 +360,15 @@ void System::registerThread(not_null<Data::Thread*> thread) {
 				clearFromTopic(topic);
 			}, i->second);
 		}
+	} else if (const auto sublist = thread->asSublist()) {
+		const auto &[i, ok] = _watchedSublists.emplace(
+			sublist,
+			rpl::lifetime());
+		if (ok) {
+			sublist->destroyed() | rpl::start_with_next([=] {
+				clearFromSublist(sublist);
+			}, i->second);
+		}
 	}
 }
 
@@ -436,6 +446,7 @@ void System::clearAll() {
 	_waiters.clear();
 	_settingWaiters.clear();
 	_watchedTopics.clear();
+	_watchedSublists.clear();
 }
 
 void System::clearFromTopic(not_null<Data::ForumTopic*> topic) {
@@ -450,6 +461,23 @@ void System::clearFromTopic(not_null<Data::ForumTopic*> topic) {
 	_settingWaiters.remove(topic);
 
 	_watchedTopics.remove(topic);
+
+	_waitTimer.cancel();
+	showNext();
+}
+
+void System::clearFromSublist(not_null<Data::SavedSublist*> sublist) {
+	if (_manager) {
+		_manager->clearFromSublist(sublist);
+	}
+
+	sublist->clearNotifications();
+	_whenMaps.remove(sublist);
+	_whenAlerts.remove(sublist);
+	_waiters.remove(sublist);
+	_settingWaiters.remove(sublist);
+
+	_watchedSublists.remove(sublist);
 
 	_waitTimer.cancel();
 	showNext();
@@ -470,6 +498,8 @@ void System::clearForThreadIf(Fn<bool(not_null<Data::Thread*>)> predicate) {
 		_settingWaiters.remove(thread);
 		if (const auto topic = thread->asTopic()) {
 			_watchedTopics.remove(topic);
+		} else if (const auto sublist = thread->asSublist()) {
+			_watchedSublists.remove(sublist);
 		}
 	}
 	const auto clearFrom = [&](auto &map) {
@@ -478,6 +508,8 @@ void System::clearForThreadIf(Fn<bool(not_null<Data::Thread*>)> predicate) {
 			if (predicate(thread)) {
 				if (const auto topic = thread->asTopic()) {
 					_watchedTopics.remove(topic);
+				} else if (const auto sublist = thread->asSublist()) {
+					_watchedSublists.remove(sublist);
 				}
 				i = map.erase(i);
 			} else {
@@ -527,6 +559,15 @@ void System::clearIncomingFromTopic(not_null<Data::ForumTopic*> topic) {
 	_whenAlerts.remove(topic);
 }
 
+void System::clearIncomingFromSublist(
+		not_null<Data::SavedSublist*> sublist) {
+	if (_manager) {
+		_manager->clearFromSublist(sublist);
+	}
+	sublist->clearIncomingNotifications();
+	_whenAlerts.remove(sublist);
+}
+
 void System::clearFromItem(not_null<HistoryItem*> item) {
 	if (_manager) {
 		_manager->clearFromItem(item);
@@ -543,6 +584,7 @@ void System::clearAllFast() {
 	_waiters.clear();
 	_settingWaiters.clear();
 	_watchedTopics.clear();
+	_watchedSublists.clear();
 }
 
 void System::checkDelayed() {
@@ -1124,10 +1166,14 @@ void Manager::notificationActivated(
 			history->peer,
 			id.msgId);
 		const auto topic = item ? item->topic() : nullptr;
+		const auto sublist = item ? item->savedSublist() : nullptr;
 		if (!options.draft.text.isEmpty()) {
 			const auto topicRootId = topic
 				? topic->rootId()
 				: id.contextId.topicRootId;
+			const auto monoforumPeerId = (sublist && sublist->parentChat())
+				? sublist->sublistPeer()->id
+				: id.contextId.monoforumPeerId;
 			const auto replyToId = (id.msgId > 0
 				&& !history->peer->isUser()
 				&& id.msgId != topicRootId)
@@ -1139,7 +1185,9 @@ void Manager::notificationActivated(
 				FullReplyTo{
 					.messageId = replyToId,
 					.topicRootId = topicRootId,
+					.monoforumPeerId = monoforumPeerId,
 				},
+				SuggestPostOptions(),
 				MessageCursor{
 					length,
 					length,
@@ -1177,18 +1225,23 @@ Window::SessionController *Manager::openNotificationMessage(
 		&& item->isRegular()
 		&& (item->out() || (item->mentionsMe() && !history->peer->isUser()));
 	const auto topic = item ? item->topic() : nullptr;
+	const auto sublist = item ? item->savedSublist() : nullptr;
 
 	const auto guard = gsl::finally([&] {
 		if (topic) {
 			system()->clearFromTopic(topic);
+		} else if (sublist && sublist->parentChat()) {
+			system()->clearFromSublist(sublist);
 		} else {
 			system()->clearFromHistory(history);
 		}
 	});
 
-	const auto separateId = topic
-		? Window::SeparateId(Window::SeparateType::Forum, history)
-		: Window::SeparateId(history->peer);
+	const auto separateId = !topic
+		? Window::SeparateId(history->peer)
+		: history->peer->asChannel()->useSubsectionTabs()
+		? Window::SeparateId(Window::SeparateType::Chat, topic)
+		: Window::SeparateId(Window::SeparateType::Forum, history);
 	const auto separate = Core::App().separateWindowFor(separateId);
 	const auto itemId = openExactlyMessage ? messageId : ShowAtUnreadMsgId;
 	if (openSeparated && !separate && !topic) {
@@ -1231,12 +1284,9 @@ Window::SessionController *Manager::openNotificationMessage(
 	if (window) {
 		window->widget()->showFromTray();
 		if (topic) {
-			window->showSection(
-				std::make_shared<HistoryView::RepliesMemento>(
-					history,
-					topic->rootId(),
-					itemId),
-				SectionShow::Way::Forward);
+			window->showTopic(topic, itemId, SectionShow::Way::Forward);
+		} else if (sublist) {
+			window->showSublist(sublist, itemId, SectionShow::Way::Forward);
 		} else {
 			window->showPeerHistory(
 				history->peer->id,
@@ -1264,6 +1314,10 @@ void Manager::notificationReplied(
 	const auto topicRootId = topic
 		? topic->rootId()
 		: id.contextId.topicRootId;
+	const auto sublist = item ? item->savedSublist() : nullptr;
+	const auto monoforumPeerId = (sublist && sublist->parentChat())
+		? sublist->sublistPeer()->id
+		: id.contextId.monoforumPeerId;
 
 	auto message = Api::MessageToSend(Api::SendAction(history));
 	message.textWithTags = reply;
@@ -1276,6 +1330,7 @@ void Manager::notificationReplied(
 	message.action.replyTo = {
 		.messageId = { replyToId ? history->peer->id : 0, replyToId },
 		.topicRootId = topic ? topic->rootId() : 0,
+		.monoforumPeerId = monoforumPeerId,
 	};
 	message.action.clearDraft = false;
 	history->session().api().sendMessage(std::move(message));
@@ -1301,16 +1356,21 @@ void NativeManager::doShowNotification(NotificationFields &&fields) {
 		&& !reactionFrom
 		&& (item->out() || peer->isSelf())
 		&& item->isFromScheduled();
-	const auto topicWithChat = [&] {
+	const auto subWithChat = [&] {
 		const auto name = peer->name();
 		const auto topic = item->topic();
-		return topic ? (topic->title() + u" ("_q + name + ')') : name;
+		const auto sublist = item->savedSublist();
+		return topic
+			? (topic->title() + u" ("_q + name + ')')
+			: (sublist && sublist->parentChat())
+			? (sublist->sublistPeer()->shortName() + u" ("_q + name + ')')
+			: name;
 	};
 	const auto title = options.hideNameAndPhoto
 		? AppName.utf16()
 		: (scheduled && peer->isSelf())
 		? tr::lng_notification_reminder(tr::now)
-		: topicWithChat();
+		: subWithChat();
 	const auto fullTitle = addTargetAccountName(title, &peer->session());
 	const auto subtitle = reactionFrom
 		? (reactionFrom != peer ? reactionFrom->name() : QString())
@@ -1349,6 +1409,9 @@ void NativeManager::doShowNotification(NotificationFields &&fields) {
 	doShowNativeNotification({
 		.peer = item->history()->peer,
 		.topicRootId = item->topicRootId(),
+		.monoforumPeerId = (item->history()->amMonoforumAdmin()
+			? item->sublistPeerId()
+			: PeerId()),
 		.itemId = item->id,
 		.title = scheduled ? WrapFromScheduled(fullTitle) : fullTitle,
 		.subtitle = subtitle,

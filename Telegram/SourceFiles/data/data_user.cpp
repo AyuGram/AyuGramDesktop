@@ -733,6 +733,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		| Flag::CanPinMessages
 		| Flag::VoiceMessagesForbidden
 		| Flag::ReadDatesPrivate
+		| (update.is_contact_require_premium()
+			? Flag::HasRequirePremiumToWrite
+			: Flag())
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::MessageMoneyRestrictionsKnown
 		| Flag::RequiresPremiumToWrite;
 	user->setFlags((user->flags() & ~mask)
@@ -746,9 +750,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			? Flag::VoiceMessagesForbidden
 			: Flag())
 		| (update.is_read_dates_private() ? Flag::ReadDatesPrivate : Flag())
+		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::MessageMoneyRestrictionsKnown
 		| (update.is_contact_require_premium()
-			? Flag::RequiresPremiumToWrite
+			? (Flag::RequiresPremiumToWrite | Flag::HasRequirePremiumToWrite)
 			: Flag()));
 	user->setIsBlocked(update.is_blocked());
 	user->setCallsStatus(update.is_phone_calls_private()
@@ -802,14 +807,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 				= std::make_shared<rpl::lifetime>();
 			const auto currencyLoad
 				= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
-			const auto apply = [=](Data::EarnInt balance) {
+			const auto apply = [=](const CreditsAmount &balance) {
 				if (const auto strong = weak.get()) {
 					strong->credits().applyCurrency(id, balance);
 				}
 				currencyLoadLifetime->destroy();
 			};
 			currencyLoad->request() | rpl::start_with_error_done(
-				[=](const QString &error) { apply(0); },
+				[=](const QString &error) {
+					apply(CreditsAmount(0, CreditsType::Ton));
+				},
 				[=] { apply(currencyLoad->data().currentBalance); },
 				*currencyLoadLifetime);
 			base::timer_once(kTimeout) | rpl::start_with_next([=] {
@@ -882,9 +889,8 @@ StarRefProgram ParseStarRefProgram(const MTPStarRefProgram *program) {
 	const auto &data = program->data();
 	result.commission = data.vcommission_permille().v;
 	result.durationMonths = data.vduration_months().value_or_empty();
-	result.revenuePerUser = data.vdaily_revenue_per_user()
-		? Data::FromTL(*data.vdaily_revenue_per_user())
-		: StarsAmount();
+	result.revenuePerUser = CreditsAmountFromTL(
+		data.vdaily_revenue_per_user());
 	result.endDate = data.vend_date().value_or_empty();
 	return result;
 }

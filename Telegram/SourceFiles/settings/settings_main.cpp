@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_credits.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/settings_advanced.h"
 #include "settings/settings_business.h"
 #include "settings/settings_calls.h"
@@ -42,6 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/new_badges.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+#include "info/channel_statistics/earn/earn_icons.h"
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "data/components/credits.h"
@@ -71,6 +73,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "base/call_delayed.h"
 #include "base/platform/base_platform_info.h"
+#include "styles/style_chat.h"
 #include "styles/style_settings.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h" // boxLabel
@@ -496,7 +499,7 @@ void SetupValidatePhoneNumberSuggestion(
 	yes->setClickedCallback([=] {
 		controller->session().promoSuggestions().dismiss(
 			kSugValidatePhone.utf8());
-		 mainWrap->toggle(false, anim::type::normal);
+		mainWrap->toggle(false, anim::type::normal);
 	});
 	const auto no = Ui::CreateChild<Ui::RoundButton>(
 		wrap,
@@ -551,6 +554,77 @@ void SetupValidatePhoneNumberSuggestion(
 	Ui::AddSkip(content);
 }
 
+void SetupValidatePasswordSuggestion(
+		not_null<Window::SessionController*> controller,
+		not_null<Ui::VerticalLayout*> container,
+		Fn<void(Type)> showOther) {
+	if (!controller->session().promoSuggestions().current(
+			Data::PromoSuggestions::SugValidatePassword())
+		|| controller->session().promoSuggestions().current(
+			kSugValidatePhone.utf8())) {
+		return;
+	}
+	const auto mainWrap = container->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			container,
+			object_ptr<Ui::VerticalLayout>(container)));
+	const auto content = mainWrap->entity();
+	Ui::AddSubsectionTitle(
+		content,
+		tr::lng_settings_suggestion_password_title(),
+		QMargins(
+			st::boxRowPadding.left()
+				- st::defaultSubsectionTitlePadding.left(),
+			0,
+			0,
+			0));
+	content->add(
+		object_ptr<Ui::FlatLabel>(
+			content,
+			tr::lng_settings_suggestion_password_about(),
+			st::boxLabel),
+		st::boxRowPadding);
+
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+
+	const auto wrap = content->add(
+		object_ptr<Ui::FixedHeightWidget>(
+			content,
+			st::inviteLinkButton.height),
+		st::inviteLinkButtonsPadding);
+	const auto yes = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_settings_suggestion_password_yes(),
+		st::inviteLinkButton);
+	yes->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	yes->setClickedCallback([=] {
+		controller->session().promoSuggestions().dismiss(
+			Data::PromoSuggestions::SugValidatePassword());
+		mainWrap->toggle(false, anim::type::normal);
+	});
+	const auto no = Ui::CreateChild<Ui::RoundButton>(
+		wrap,
+		tr::lng_settings_suggestion_password_no(),
+		st::inviteLinkButton);
+	no->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
+	no->setClickedCallback([=] {
+		showOther(Settings::CloudPasswordSuggestionInputId());
+	});
+
+	wrap->widthValue() | rpl::start_with_next([=](int width) {
+		const auto buttonWidth = (width - st::inviteLinkButtonsSkip) / 2;
+		yes->setFullWidth(buttonWidth);
+		no->setFullWidth(buttonWidth);
+		yes->moveToLeft(0, 0, width);
+		no->moveToRight(0, 0, width);
+	}, wrap->lifetime());
+	Ui::AddSkip(content);
+	Ui::AddSkip(content);
+	Ui::AddDivider(content);
+	Ui::AddSkip(content);
+}
+
 void SetupSections(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container,
@@ -558,6 +632,10 @@ void SetupSections(
 	Ui::AddDivider(container);
 
 	SetupValidatePhoneNumberSuggestion(
+		controller,
+		container,
+		showOther);
+	SetupValidatePasswordSuggestion(
 		controller,
 		container,
 		showOther);
@@ -700,9 +778,9 @@ void SetupPremium(
 				container,
 				tr::lng_settings_credits(),
 				controller->session().credits().balanceValue(
-				) | rpl::map([=](StarsAmount c) {
+				) | rpl::map([=](CreditsAmount c) {
 					return c
-						? Lang::FormatStarsAmountToShort(c).string
+						? Lang::FormatCreditsAmountToShort(c).string
 						: QString();
 				}),
 				st::settingsButton),
@@ -712,6 +790,50 @@ void SetupPremium(
 			controller->setPremiumRef("settings");
 			showOther(CreditsId());
 		});
+	}
+	{
+		const auto wrap = container->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				container,
+				object_ptr<Ui::VerticalLayout>(container)));
+		wrap->toggleOn(
+			controller->session().credits().tonBalanceValue(
+			) | rpl::map([](CreditsAmount c) -> bool { return !c.empty(); }));
+		wrap->finishAnimating();
+		controller->session().credits().tonLoad();
+		const auto button = AddButtonWithLabel(
+			wrap->entity(),
+			tr::lng_settings_currency(),
+			controller->session().credits().tonBalanceValue(
+			) | rpl::map([=](CreditsAmount c) {
+				return c
+					? Lang::FormatCreditsAmountToShort(c).string
+					: QString();
+			}),
+			st::settingsButton);
+		button->addClickHandler([=] {
+			controller->setPremiumRef("settings");
+			showOther(CurrencyId());
+		});
+
+		const auto badge = Ui::CreateChild<Ui::RpWidget>(button.get());
+		const auto image = Ui::Earn::IconCurrencyColored(
+			st::tonFieldIconSize,
+			st::menuIconColor->c);
+
+		badge->resize(Size(st::tonFieldIconSize));
+		badge->paintRequest(
+		) | rpl::start_with_next([=] {
+			auto p = QPainter(badge);
+			p.drawImage(0, 0, image);
+		}, badge->lifetime());
+
+		button->sizeValue() | rpl::start_with_next([=](const QSize &s) {
+			badge->moveToLeft(
+				button->st().iconLeft
+					+ (st::menuIconShop.width() - badge->width()) / 2,
+				(s.height() - badge->height()) / 2);
+		}, badge->lifetime());
 	}
 	const auto button = AddButtonWithIcon(
 		container,

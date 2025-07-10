@@ -89,8 +89,16 @@ int AppConfig::starrefCommissionMax() const {
 	return get<int>(u"starref_max_commission_permille"_q, 900);
 }
 
+int AppConfig::starsWithdrawMax() const {
+	return get<int>(u"stars_revenue_withdrawal_max"_q, 100);
+}
+
 float64 AppConfig::starsWithdrawRate() const {
 	return get<float64>(u"stars_usd_withdraw_rate_x1000"_q, 1300) / 1000.;
+}
+
+float64 AppConfig::currencyWithdrawRate() const {
+	return get<float64>(u"ton_usd_rate"_q, 1);
 }
 
 bool AppConfig::paidMessagesAvailable() const {
@@ -103,6 +111,10 @@ int AppConfig::paidMessageStarsMax() const {
 
 int AppConfig::paidMessageCommission() const {
 	return get<int>(u"stars_paid_message_commission_permille"_q, 850);
+}
+
+int AppConfig::paidMessageChannelStarsDefault() const {
+	return get<int>(u"stars_paid_messages_channel_amount_default"_q, 10);
 }
 
 int AppConfig::pinnedGiftsLimit() const {
@@ -138,6 +150,62 @@ int AppConfig::giftResalePriceMin() const {
 
 int AppConfig::giftResaleReceiveThousandths() const {
 	return get<int>(u"stars_stargift_resale_commission_permille"_q, 800);
+}
+
+int AppConfig::pollOptionsLimit() const {
+	return get<int>(u"poll_answers_max"_q, 12);
+}
+
+int AppConfig::todoListItemsLimit() const {
+	return get<int>(
+		u"todo_items_max"_q,
+		_account->mtp().isTestMode() ? 10 : 30);
+}
+
+int AppConfig::todoListTitleLimit() const {
+	return get<int>(u"todo_title_length_max"_q, 32);
+}
+
+int AppConfig::todoListItemTextLimit() const {
+	return get<int>(u"todo_item_length_max"_q, 64);
+}
+
+int AppConfig::suggestedPostCommissionStars() const {
+	return get<int>(u"stars_suggested_post_commission_permille"_q, 850);
+}
+
+int AppConfig::suggestedPostCommissionTon() const {
+	return get<int>(u"ton_suggested_post_commission_permille"_q, 850);
+}
+
+int AppConfig::suggestedPostStarsMin() const {
+	return get<int>(u"stars_suggested_post_amount_min"_q, 5);
+}
+
+int AppConfig::suggestedPostStarsMax() const {
+	return get<int>(u"stars_suggested_post_amount_max"_q, 100'000);
+}
+
+int64 AppConfig::suggestedPostNanoTonMin() const {
+	return get<int64>(u"ton_suggested_post_amount_min"_q, 10'000'000LL);
+}
+
+int64 AppConfig::suggestedPostNanoTonMax() const {
+	return get<int64>(
+		u"ton_suggested_post_amount_max"_q,
+		10'000'000'000'000LL);
+}
+
+int AppConfig::suggestedPostDelayMin() const {
+	return get<int>(u"stars_suggested_post_future_min"_q, 300);
+}
+
+int AppConfig::suggestedPostDelayMax() const {
+	return get<int>(u"appConfig.stars_suggested_post_future_max"_q, 2678400);
+}
+
+TimeId AppConfig::suggestedPostAgeMin() const {
+	return get<int>(u"stars_suggested_post_age_min"_q, 86400);
 }
 
 void AppConfig::refresh(bool force) {

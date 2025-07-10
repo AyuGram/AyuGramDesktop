@@ -13,6 +13,10 @@ namespace style {
 struct RoundCheckbox;
 } // namespace style
 
+namespace Main {
+class Session;
+} // namespace Main
+
 namespace Ui {
 
 class BoxContent;
@@ -39,9 +43,10 @@ struct PaidReactionBoxArgs {
 
 	std::vector<PaidReactionTop> top;
 
+	not_null<Main::Session*> session;
 	QString channel;
 	Fn<rpl::producer<TextWithContext>(rpl::producer<int> amount)> submit;
-	rpl::producer<StarsAmount> balanceValue;
+	rpl::producer<CreditsAmount> balanceValue;
 	Fn<void(int, uint64)> send;
 };
 

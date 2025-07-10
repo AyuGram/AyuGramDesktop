@@ -161,7 +161,7 @@ public:
 	not_null<Ui::PathShiftGradient*> elementPathShiftGradient() override;
 	HistoryView::Context elementContext() override;
 	bool elementHideReply(not_null<const HistoryView::Element*> view) override;
-	bool elementIsChatWide() override;
+	HistoryView::ElementChatMode elementChatMode() override;
 
 private:
 	const not_null<QWidget*> _parent;
@@ -207,8 +207,10 @@ bool MessageShotDelegate::elementHideReply(not_null<const HistoryView::Element*>
 	return false;
 }
 
-bool MessageShotDelegate::elementIsChatWide() {
-	return true;
+HistoryView::ElementChatMode MessageShotDelegate::elementChatMode() {
+	using Mode = HistoryView::ElementChatMode;
+	// Mode::Wide;
+	return Mode::Default;
 }
 
 QImage removeEmptySpaceAround(const QImage &original) {

@@ -1033,7 +1033,7 @@ void Reactions::requestMyTags(SavedSublist *sublist) {
 	using Flag = MTPmessages_GetSavedReactionTags::Flag;
 	my.requestId = api.request(MTPmessages_GetSavedReactionTags(
 		MTP_flags(sublist ? Flag::f_peer : Flag()),
-		(sublist ? sublist->peer()->input : MTP_inputPeerEmpty()),
+		(sublist ? sublist->sublistPeer()->input : MTP_inputPeerEmpty()),
 		MTP_long(my.hash)
 	)).done([=](const MTPmessages_SavedReactionTags &result) {
 		auto &my = _myTags[sublist];
@@ -2255,7 +2255,7 @@ void MessageReactions::scheduleSendPaid(
 		_paid->scheduledPrivacySet = true;
 	}
 	if (count > 0) {
-		_item->history()->session().credits().lock(StarsAmount(count));
+		_item->history()->session().credits().lock(CreditsAmount(count));
 	}
 	_item->history()->owner().reactions().schedulePaid(_item);
 }
@@ -2269,7 +2269,7 @@ void MessageReactions::cancelScheduledPaid() {
 		if (_paid->scheduledFlag) {
 			if (const auto amount = int(_paid->scheduled)) {
 				_item->history()->session().credits().unlock(
-					StarsAmount(amount));
+					CreditsAmount(amount));
 			}
 			_paid->scheduled = 0;
 			_paid->scheduledFlag = 0;
@@ -2332,9 +2332,9 @@ void MessageReactions::finishPaidSending(
 	if (const auto amount = send.count) {
 		const auto credits = &_item->history()->session().credits();
 		if (success) {
-			credits->withdrawLocked(StarsAmount(amount));
+			credits->withdrawLocked(CreditsAmount(amount));
 		} else {
-			credits->unlock(StarsAmount(amount));
+			credits->unlock(CreditsAmount(amount));
 		}
 	}
 }

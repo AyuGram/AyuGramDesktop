@@ -44,6 +44,7 @@ struct UniqueGift {
 	QString ownerAddress;
 	QString ownerName;
 	PeerId ownerId = 0;
+	PeerData *releasedBy = nullptr;
 	int number = 0;
 	int starsForTransfer = -1;
 	int starsForResale = -1;
@@ -68,6 +69,7 @@ struct StarGift {
 	int64 starsToUpgrade = 0;
 	int64 starsResellMin = 0;
 	not_null<DocumentData*> document;
+	PeerData *releasedBy = nullptr;
 	QString resellTitle;
 	int resellCount = 0;
 	int limitedLeft = 0;

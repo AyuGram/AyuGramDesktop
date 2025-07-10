@@ -57,7 +57,7 @@ struct MediaGenericDescriptor {
 		Painter&,
 		const PaintContext&,
 		not_null<const MediaGeneric*>)> paintBg;
-	ClickHandlerPtr serviceLink;
+	ClickHandlerPtr fullAreaLink;
 	bool service = false;
 	bool hideServiceText = false;
 };
@@ -128,6 +128,7 @@ private:
 		Painter&,
 		const PaintContext&,
 		not_null<const MediaGeneric*>)> _paintBg;
+	ClickHandlerPtr _fullAreaLink;
 	int _maxWidthCap = 0;
 	bool _service : 1 = false;
 	bool _hideServiceText : 1 = false;
@@ -141,7 +142,8 @@ public:
 		QMargins margins,
 		const style::TextStyle &st = st::defaultTextStyle,
 		const base::flat_map<uint16, ClickHandlerPtr> &links = {},
-		const Ui::Text::MarkedContext &context = {});
+		const Ui::Text::MarkedContext &context = {},
+		style::align align = style::al_top);
 
 	void draw(
 		Painter &p,
@@ -161,10 +163,12 @@ protected:
 		Painter &p,
 		not_null<const MediaGeneric*> owner,
 		const PaintContext &context) const;
+	virtual int elisionLines() const;
 
 private:
 	Ui::Text::String _text;
 	QMargins _margins;
+	style::align _align = {};
 
 };
 
@@ -194,7 +198,7 @@ public:
 		int skipTop = 0;
 		int size = 0;
 		ChatHelpers::StickerLottieSize cacheTag = {};
-		bool singleTimePlayback = false;
+		bool stopOnLastFrame = false;
 		ClickHandlerPtr link;
 
 		explicit operator bool() const {

@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "data/data_birthday.h"
 #include "data/data_changes.h"
+#include "data/data_peer_values.h" // Data::AmPremiumValue.
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
@@ -204,32 +205,22 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 						repeat(repeat);
 					});
 
-					const auto fontH = content->contentTitleSt().font->height;
-					auto customEmojiFactory = [=](
-						QStringView data,
-						const Ui::Text::MarkedContext &context
-					) -> std::unique_ptr<Ui::Text::CustomEmoji> {
-						return Ui::MakeCreditsIconEmoji(fontH, 1);
-					};
-					using namespace Ui::Text;
-					auto context = MarkedContext{
-						.customEmojiFactory = std::move(customEmojiFactory),
-					};
-
 					content->setContent(
 						tr::lng_dialogs_suggestions_credits_sub_low_title(
 							tr::now,
 							lt_count,
 							float64(needed - whole),
 							lt_emoji,
-							Ui::Text::SingleCustomEmoji(Ui::kCreditsCurrency),
+							Ui::MakeCreditsIconEntity(),
 							lt_channels,
 							{ peers },
 							Ui::Text::Bold),
 						tr::lng_dialogs_suggestions_credits_sub_low_about(
 							tr::now,
 							TextWithEntities::Simple),
-						std::move(context));
+						Ui::MakeCreditsIconContext(
+							content->contentTitleSt().font->height,
+							1));
 					state->desiredWrapToggle.force_assign(
 						Toggle{ true, anim::type::normal });
 				};
@@ -292,7 +283,7 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 						? tr::lng_dialogs_suggestions_birthday_contact_title(
 							tr::now,
 							lt_text,
-							{ first->name() },
+							{ first->shortName() },
 							Ui::Text::RichLangValue)
 						: tr::lng_dialogs_suggestions_birthday_contacts_title(
 							tr::now,
@@ -584,7 +575,10 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 				(was == now) ? toggle.type : anim::type::instant);
 		}, lifetime);
 
-		session->promoSuggestions().value() | rpl::start_with_next([=] {
+		rpl::merge(
+			session->promoSuggestions().value(),
+			Data::AmPremiumValue(session) | rpl::skip(1) | rpl::to_empty
+		) | rpl::start_with_next([=] {
 			const auto was = state->wrap;
 			processCurrentSuggestion(processCurrentSuggestion);
 			if (was != state->wrap) {

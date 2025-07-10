@@ -75,6 +75,6 @@
     </content_rating>
     <launchable type="desktop-id">com.ayugram.desktop.desktop</launchable>
     <provides>
-        <binary>ayugram-desktop</binary>
+        <binary>AyuGram</binary>
     </provides>
 </component>

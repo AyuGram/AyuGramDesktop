@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/send_credits_box.h" // CreditsEmoji.
 #include "history/history.h"
 #include "history/history_item.h" // CreateMedia.
+#include "history/history_item_components.h"
 #include "history/history_location_manager.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_item_preview.h"
@@ -29,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/media/history_view_poll.h"
 #include "history/view/media/history_view_theme_document.h"
+#include "history/view/media/history_view_todo_list.h"
 #include "history/view/media/history_view_slot_machine.h"
 #include "history/view/media/history_view_dice.h"
 #include "history/view/media/history_view_service_box.h"
@@ -65,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_stories.h"
 #include "data/data_story.h"
+#include "data/data_todo_list.h"
 #include "data/data_user.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -645,6 +648,10 @@ PollData *Media::poll() const {
 	return nullptr;
 }
 
+TodoListData *Media::todolist() const {
+	return nullptr;
+}
+
 const WallPaper *Media::paper() const {
 	return nullptr;
 }
@@ -922,9 +929,9 @@ ItemPreview MediaPhoto::toPreview(ToPreviewOptions options) const {
 	const auto type = tr::lng_in_dlg_photo(tr::now);
 	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
-		: options.translated
-		? parent()->translatedText()
-		: parent()->originalText();
+		: Dialogs::Ui::DialogsPreviewText(options.translated
+			? parent()->translatedText()
+			: parent()->originalText());
 	const auto hasMiniImages = !images.empty();
 	return {
 		.text = WithCaptionNotificationText(type, caption, hasMiniImages),
@@ -1194,9 +1201,9 @@ ItemPreview MediaFile::toPreview(ToPreviewOptions options) const {
 	}();
 	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
-		: options.translated
-		? parent()->translatedText()
-		: parent()->originalText();
+		: Dialogs::Ui::DialogsPreviewText(options.translated
+			? parent()->translatedText()
+			: parent()->originalText());
 	const auto hasMiniImages = !images.empty();
 	return {
 		.text = WithCaptionNotificationText(type, caption, hasMiniImages),
@@ -2199,9 +2206,9 @@ ItemPreview MediaInvoice::toPreview(ToPreviewOptions options) const {
 	const auto type = ComputeAlbumCountsString(counts);
 	const auto caption = (options.hideCaption || options.ignoreMessageText)
 		? TextWithEntities()
-		: options.translated
-		? parent()->translatedText()
-		: parent()->originalText();
+		: Dialogs::Ui::DialogsPreviewText(options.translated
+			? parent()->translatedText()
+			: parent()->originalText());
 	const auto hasMiniImages = !images.empty();
 	auto nice = Ui::Text::Colorized(
 		Ui::CreditsEmojiSmall(&parent()->history()->session()));
@@ -2313,6 +2320,74 @@ std::unique_ptr<HistoryView::Media> MediaPoll::createView(
 		not_null<HistoryItem*> realParent,
 		HistoryView::Element *replacing) {
 	return std::make_unique<HistoryView::Poll>(message, _poll);
+}
+
+MediaTodoList::MediaTodoList(
+	not_null<HistoryItem*> parent,
+	not_null<TodoListData*> todolist)
+: Media(parent)
+, _todolist(todolist) {
+}
+
+MediaTodoList::~MediaTodoList() {
+}
+
+std::unique_ptr<Media> MediaTodoList::clone(not_null<HistoryItem*> parent) {
+	const auto id = parent->fullId();
+	return std::make_unique<MediaTodoList>(
+		parent,
+		parent->history()->owner().duplicateTodoList(id, _todolist));
+}
+
+TodoListData *MediaTodoList::todolist() const {
+	return _todolist;
+}
+
+TextWithEntities MediaTodoList::notificationText() const {
+	return TextWithEntities()
+		.append(QChar(0x2611))
+		.append(QChar(' '))
+		.append(Ui::Text::Colorized(_todolist->title));
+}
+
+QString MediaTodoList::pinnedTextSubstring() const {
+	return QChar(171) + _todolist->title.text + QChar(187);
+}
+
+TextForMimeData MediaTodoList::clipboardText() const {
+	auto result = TextWithEntities();
+	result
+		.append(u"[ "_q)
+		.append(tr::lng_in_dlg_todo_list(tr::now))
+		.append(u" : "_q)
+		.append(_todolist->title)
+		.append(u" ]"_q);
+	for (const auto &item : _todolist->items) {
+		result.append(u"\n- "_q).append(item.text);
+	}
+	return TextForMimeData::Rich(std::move(result));
+}
+
+bool MediaTodoList::allowsEdit() const {
+	return parent()->out();
+}
+
+bool MediaTodoList::updateInlineResultMedia(const MTPMessageMedia &media) {
+	return false;
+}
+
+bool MediaTodoList::updateSentMedia(const MTPMessageMedia &media) {
+	return false;
+}
+
+std::unique_ptr<HistoryView::Media> MediaTodoList::createView(
+		not_null<HistoryView::Element*> message,
+		not_null<HistoryItem*> realParent,
+		HistoryView::Element *replacing) {
+	return std::make_unique<HistoryView::TodoList>(
+		message,
+		_todolist,
+		replacing);
 }
 
 MediaDice::MediaDice(not_null<HistoryItem*> parent, QString emoji, int value)
@@ -2440,7 +2515,7 @@ MediaGiftBox::MediaGiftBox(
 	not_null<HistoryItem*> parent,
 	not_null<PeerData*> from,
 	GiftType type,
-	int count)
+	int64 count)
 : MediaGiftBox(parent, from, GiftCode{ .count = count, .type = type }) {
 }
 
@@ -2494,7 +2569,9 @@ std::unique_ptr<HistoryView::Media> MediaGiftBox::createView(
 			message,
 			HistoryView::GenerateUniqueGiftMedia(message, replacing, unique),
 			HistoryView::MediaGenericDescriptor{
-				.maxWidth = st::msgServiceGiftBoxSize.width(),
+				.maxWidth = (_data.stargiftReleasedBy
+					? st::msgServiceStarGiftByWidth
+					: st::msgServiceGiftBoxSize.width()),
 				.paintBg = HistoryView::UniqueGiftBg(message, unique),
 				.service = true,
 			});

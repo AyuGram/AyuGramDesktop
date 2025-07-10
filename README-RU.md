@@ -85,6 +85,10 @@ brew install --cask ayugram
 
 [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
+### EPM
+
+`epm play ayugram`
+
 ### Любой другой Линукс дистрибутив
 
 Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
@@ -124,5 +128,4 @@ brew install --cask ayugram
 
 ### Боты
 
-- [TelegramDB](https://t.me/tgdatabase) для получения юзернейма по ID (до закрытия бесплатной версии 25 мая 2025)
-- [usinfobot](https://t.me/usinfobot) для получения юзернейма по ID
+- [TelegramDB](https://t.me/tgdatabase) для получения юзернейма по ID

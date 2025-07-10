@@ -9,6 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ui/layers/box_content.h"
 
+enum class PaidPostType : uchar;
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -58,6 +60,7 @@ private:
 	[[nodiscard]] bool hasScheduledMessages() const;
 	[[nodiscard]] std::optional<RevokeConfig> revokeText(
 		not_null<PeerData*> peer) const;
+	[[nodiscard]] PaidPostType paidPostType() const;
 
 	const not_null<Main::Session*> _session;
 
@@ -82,6 +85,7 @@ private:
 	object_ptr<Ui::LinkButton> _autoDeleteSettings = { nullptr };
 
 	int _fullHeight = 0;
+	bool _confirmedDeletePaidSuggestedPosts = false;
 
 	Fn<void()> _deleteConfirmedCallback;
 
