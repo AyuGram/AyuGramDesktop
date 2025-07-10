@@ -846,44 +846,85 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 
-        AddButtonWithIcon(
-                container,
-                tr::ayu_ShowForwardsCount(),
-                st::settingsButtonNoIcon
-        )->toggleOn(
-                rpl::single(settings.showForwards)
-        )->toggledValue(
-        ) | rpl::filter(
-                [=](bool enabled)
-                {
-                        return (enabled != settings.showForwards);
-                }) | start_with_next(
-                [=](bool enabled)
-                {
-                        AyuSettings::set_showForwards(enabled);
-                        AyuSettings::save();
-                },
-                container->lifetime());
+	AddSkip(container);
+	AddDivider(container);
+	AddSkip(container);
 
-        AddButtonWithIcon(
-                container,
-                tr::ayu_ShowForwardsRatio(),
-                st::settingsButtonNoIcon
-        )->toggleOn(
-                rpl::single(settings.showForwardsRatio)
-        )->toggledValue(
-        ) | rpl::filter(
-                [=](bool enabled)
-                {
-                        return (enabled != settings.showForwardsRatio);
-                }) | start_with_next(
-                [=](bool enabled)
-                {
-                        AyuSettings::set_showForwardsRatio(enabled);
-                        AyuSettings::save();
-                },
-                container->lifetime());
+	AddButtonWithIcon(
+		container,
+		tr::ayu_HideChannelReactions(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(!settings->hideChannelReactions)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (!enabled != settings->hideChannelReactions);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_hideChannelReactions(!enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_HideGroupReactions(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(!settings->hideGroupReactions)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (!enabled != settings->hideGroupReactions);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_hideGroupReactions(!enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
+		AddButtonWithIcon(
+				container,
+				tr::ayu_ShowForwardsCount(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(settings.showForwards)
+		)->toggledValue(
+		) | rpl::filter(
+				[=](bool enabled)
+				{
+						return (enabled != settings.showForwards);
+				}) | start_with_next(
+				[=](bool enabled)
+				{
+						AyuSettings::set_showForwards(enabled);
+						AyuSettings::save();
+				},
+				container->lifetime());
+
+		AddButtonWithIcon(
+				container,
+				tr::ayu_ShowForwardsRatio(),
+				st::settingsButtonNoIcon
+		)->toggleOn(
+				rpl::single(settings.showForwardsRatio)
+		)->toggledValue(
+		) | rpl::filter(
+				[=](bool enabled)
+				{
+						return (enabled != settings.showForwardsRatio);
+				}) | start_with_next(
+				[=](bool enabled)
+				{
+						AyuSettings::set_showForwardsRatio(enabled);
+						AyuSettings::save();
+				},
+				container->lifetime());
 }
 
 void SetupAppIcon(not_null<Ui::VerticalLayout*> container) {
