@@ -99,8 +99,11 @@ std::pair<QString, QString> stateName(const PeerId &id) {
 
 void ForwardState::updateBottomBar(const Main::Session &session, const PeerId *peer, const State &st) {
 	state = st;
-
-	session.changes().peerUpdated(session.data().peer(*peer), Data::PeerUpdate::Flag::Rights);
+	auto peerCopy = *peer;
+	crl::on_main([&, peerCopy]
+	{
+		session.changes().peerUpdated(session.data().peer(peerCopy), Data::PeerUpdate::Flag::Rights);
+	});
 }
 
 static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
@@ -111,6 +114,10 @@ static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
 	{
 		groupMedia.emplace_back(media);
 		auto prepared = Ui::PreparedFile(AyuSync::filePath(session, media));
+		if (prepared.path.isEmpty()) {
+			// otherwise will fail assertion in PrepareDetails
+			return prepared;
+		}
 		Storage::PrepareDetails(prepared, st::sendMediaPreviewSize, PhotoSideLimit());
 		return prepared;
 	};
@@ -120,7 +127,9 @@ static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
 	const auto groupId = startItem->groupId();
 
 	Ui::PreparedList list;
-	list.files.emplace_back(prepare(media));
+	if (auto prepared = prepare(media); !prepared.path.isEmpty()) {
+		list.files.emplace_back(std::move(prepared));
+	}
 
 	if (!groupId.value) {
 		return list;
@@ -132,7 +141,9 @@ static Ui::PreparedList prepareMedia(not_null<Main::Session*> session,
 			break;
 		}
 		if (const auto nextMedia = nextItem->media()) {
-			list.files.emplace_back(prepare(nextMedia));
+			if (auto prepared = prepare(nextMedia); !prepared.path.isEmpty()) {
+				list.files.emplace_back(std::move(prepared));
+			}
 			i = k;
 		}
 	}
@@ -296,7 +307,10 @@ void forwardMessages(
 	const auto history = action.history;
 	const auto peer = history->peer;
 
-	history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
+	crl::on_main([&]
+	{
+		history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
+	});
 
 	std::shared_ptr<ForwardState> state;
 

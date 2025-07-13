@@ -5,8 +5,9 @@
 //
 // Copyright @Radolyn, 2025
 #include "ayu_sync.h"
-#include "apiwrap.h"
 #include "api/api_sending.h"
+#include "apiwrap.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
@@ -127,19 +128,22 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 	auto lifetime = std::make_shared<rpl::lifetime>();
 
-	data->save(Data::FileOriginMessage(item->fullId()), filePath(session, item->media()));
-
-	rpl::single() | rpl::then(
-		session->downloaderTaskFinished()
-	) | rpl::filter([&]
+	crl::on_main([&]
 	{
-		return data->status == FileDownloadFailed || fileSize(item) == data->size;
-	}) | rpl::start_with_next([&]() mutable
-							  {
-								  latch->countDown();
-								  base::take(lifetime)->destroy();
-							  },
-							  *lifetime);
+		data->save(Data::FileOriginMessage(item->fullId()), filePath(session, item->media()));
+
+		rpl::single() | rpl::then(
+			session->downloaderTaskFinished()
+		) | rpl::filter([&]
+		{
+			return data->status == FileDownloadFailed || fileSize(item) == data->size;
+		}) | rpl::start_with_next([&]() mutable
+								  {
+									  latch->countDown();
+									  base::take(lifetime)->destroy();
+								  },
+								  *lifetime);
+	});
 
 	latch->await(std::chrono::minutes(5));
 }
@@ -207,19 +211,21 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 	if (finalCheck()) {
 		saveToFiles();
 	} else {
-		session->downloaderTaskFinished() | rpl::filter([&]
+		crl::on_main([&]
 		{
-			return finalCheck();
-		}) | rpl::start_with_next([&]() mutable
-								  {
-									  saveToFiles();
-									  latch->countDown();
-									  base::take(lifetime)->destroy();
-								  },
-								  *lifetime);
+			session->downloaderTaskFinished() | rpl::filter([&]
+			{
+				return finalCheck();
+			}) | rpl::start_with_next([&]() mutable
+									  {
+										  saveToFiles();
+										  latch->countDown();
+										  base::take(lifetime)->destroy();
+									  },
+									  *lifetime);
+		});
+		latch->await(std::chrono::minutes(5));
 	}
-
-	latch->await(std::chrono::minutes(5));
 }
 
 void sendMessageSync(not_null<Main::Session*> session, Api::MessageToSend &message) {
@@ -240,17 +246,19 @@ void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &act
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 	auto lifetime = std::make_shared<rpl::lifetime>();
 
-
-	session->data().itemIdChanged()
-		| rpl::filter([&](const Data::Session::IdChange &update)
-		{
-			return action.history->peer->id == update.newId.peer;
-		}) | rpl::start_with_next([&]
-								  {
-									  latch->countDown();
-									  base::take(lifetime)->destroy();
-								  },
-								  *lifetime);
+	crl::on_main([&]
+	{
+		session->data().itemIdChanged()
+			| rpl::filter([&](const Data::Session::IdChange &update)
+			{
+				return action.history->peer->id == update.newId.peer;
+			}) | rpl::start_with_next([&]
+									  {
+										  latch->countDown();
+										  base::take(lifetime)->destroy();
+									  },
+									  *lifetime);
+	});
 
 	latch->await(std::chrono::minutes(2));
 }
@@ -260,9 +268,6 @@ void sendDocumentSync(not_null<Main::Session*> session,
 					  SendMediaType type,
 					  TextWithTags &&caption,
 					  const Api::SendAction &action) {
-	const auto size = group.list.files.size();
-	auto latch = std::make_shared<TimedCountDownLatch>(size);
-	auto lifetime = std::make_shared<rpl::lifetime>();
 
 	auto groupId = std::make_shared<SendingAlbum>();
 	groupId->groupId = base::RandomValue<uint64>();
@@ -272,27 +277,7 @@ void sendDocumentSync(not_null<Main::Session*> session,
 		session->api().sendFiles(std::move(lst), type, std::move(caption), groupId, action);
 	});
 
-
-	// probably need to handle
-	// session->uploader().photoFailed()
-	// and
-	// session->uploader().documentFailed()
-	// too
-
-	rpl::merge(
-		session->uploader().documentReady(),
-		session->uploader().photoReady()
-	) | rpl::filter([&](const Storage::UploadedMedia &docOrPhoto)
-	{
-		return docOrPhoto.fullId.peer == action.history->peer->id;
-	}) | rpl::start_with_next([&]
-							  {
-								  latch->countDown();
-							  },
-							  *lifetime);
-
-	latch->await(std::chrono::minutes(5 * size));
-	base::take(lifetime)->destroy();
+	waitForMsgSync(session, action);
 }
 
 void sendStickerSync(not_null<Main::Session*> session,
