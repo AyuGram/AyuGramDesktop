@@ -71,6 +71,7 @@ public:
 	bool showOnlyAddedEmojisAndStickers;
 	bool collapseSimilarChannels;
 	bool hideSimilarChannels;
+	bool disableOpenLinkWarning;
 
 	double wideMultiplier;
 
@@ -178,6 +179,7 @@ void set_disableCustomBackgrounds(bool val);
 void set_showOnlyAddedEmojisAndStickers(bool val);
 void set_collapseSimilarChannels(bool val);
 void set_hideSimilarChannels(bool val);
+void set_disableOpenLinkWarning(bool val);
 
 void set_wideMultiplier(double val);
 
@@ -279,6 +281,7 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(showOnlyAddedEmojisAndStickers)
 	NLOHMANN_JSON_TO(collapseSimilarChannels)
 	NLOHMANN_JSON_TO(hideSimilarChannels)
+	NLOHMANN_JSON_TO(disableOpenLinkWarning)
 	NLOHMANN_JSON_TO(wideMultiplier)
 	NLOHMANN_JSON_TO(spoofWebviewAsAndroid)
 	NLOHMANN_JSON_TO(increaseWebviewHeight)
@@ -364,6 +367,7 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showOnlyAddedEmojisAndStickers)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(collapseSimilarChannels)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideSimilarChannels)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableOpenLinkWarning)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(wideMultiplier)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(spoofWebviewAsAndroid)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(increaseWebviewHeight)

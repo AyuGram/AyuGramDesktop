@@ -163,6 +163,25 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		},
 		container->lifetime());
 
+	AddButtonWithIcon(
+		container,
+		tr::ayu_DisableOpenLinkWarning(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->disableOpenLinkWarning)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->disableOpenLinkWarning);
+		}) | rpl::on_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_disableOpenLinkWarning(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
+
 	std::vector checkboxes = {
 		NestedEntry{
 			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)
