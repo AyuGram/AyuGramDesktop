@@ -9,6 +9,7 @@
 
 #include "api/api_chat_participants.h"
 #include "api/api_text_entities.h"
+#include "ayu/utils/ayu_mapper.h"
 #include "ayu/ui/message_history/history_inner.h"
 #include "base/unixtime.h"
 #include "core/application.h"
@@ -118,7 +119,10 @@ void GenerateItems(
 	};
 
 	const auto text = QString::fromStdString(message.text);
-	addSimpleTextMessage(Ui::Text::WithEntities(text));
+	auto textAndEntities = Ui::Text::WithEntities(text);
+	const auto entities = AyuMapper::deserializeTextWithEntities(message.textEntities);
+	textAndEntities.entities = Api::EntitiesFromMTP(&history->session(), entities.v);
+	addSimpleTextMessage(std::move(textAndEntities));
 }
 
 } // namespace MessageHistory

@@ -6,9 +6,14 @@
 // Copyright @Radolyn, 2025
 #include "ayu_mapper.h"
 
+#include "apiwrap.h"
+#include "api/api_text_entities.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "main/main_session.h"
+#include "mtproto/connection_abstract.h"
+#include "mtproto/details/mtproto_dump_to_text.h"
 
 namespace AyuMapper {
 
@@ -39,15 +44,55 @@ constexpr auto kMessageFlagHasTTL = 0x02000000;
 constexpr auto kMessageFlagInvertMedia = 0x08000000;
 constexpr auto kMessageFlagHasSavedPeer = 0x10000000;
 
+template<typename MTPObject>
+std::vector<char> serializeObject(MTPObject object) {
+	mtpBuffer buffer;
+
+	object.write(buffer);
+
+	auto from = reinterpret_cast<char*>(buffer.data());
+	const auto end = from + buffer.size() * sizeof(mtpBuffer);
+
+	std::vector<char> entities(from, end);
+	return entities;
+}
+
+template<typename MTPObject>
+MTPObject deserializeObject(std::vector<char> serialized) {
+	gsl::span<char> span(serialized.data(), serialized.size());
+
+	auto from = reinterpret_cast<const mtpPrime*>(span.data());
+	const auto end = from + span.size() / sizeof(mtpPrime);
+
+	MTPObject data;
+	if (!data.read(from, end)) {
+		LOG(("AyuMapper: Failed to deserialize object"));
+	}
+	return data;
+}
+
 std::pair<std::string, std::vector<char>> serializeTextWithEntities(not_null<HistoryItem*> item) {
 	if (item->emptyText()) {
 		return std::make_pair("", std::vector<char>());
 	}
-
 	auto textWithEntities = item->originalText();
-	std::vector<char> entities; // todo: implement writing to buffer
+
+
+	std::vector<char> entities;
+	if (!textWithEntities.entities.empty()) {
+		const auto mtpEntities = Api::EntitiesToMTP(
+			&item->history()->session(),
+			textWithEntities.entities,
+			Api::ConvertOption::WithLocal);
+
+		entities = serializeObject(mtpEntities);
+	}
 
 	return std::make_pair(textWithEntities.text.toStdString(), entities);
+}
+
+MTPVector<MTPMessageEntity> deserializeTextWithEntities(std::vector<char> serialized) {
+	return deserializeObject<MTPVector<MTPMessageEntity>>(serialized);
 }
 
 int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item) {
