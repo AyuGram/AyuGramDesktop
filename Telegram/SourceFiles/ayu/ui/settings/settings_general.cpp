@@ -132,6 +132,13 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setDisableStories,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/disableOpenLinkWarning"_q,
+		.title = tr::ayu_DisableOpenLinkWarning(),
+		.getter = &AyuSettings::disableOpenLinkWarning,
+		.setter = &AyuSettings::setDisableOpenLinkWarning,
+	});
+
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/similarChannels"_q,
 		.title = tr::ayu_DisableSimilarChannels(),

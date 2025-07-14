@@ -7800,6 +7800,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_KeepAliveServiceNote" = "We recommend migrating to **FCM** version.";
 "ayu_DisableAds" = "Disable Ads";
 "ayu_DisableStories" = "Disable Stories";
+"ayu_DisableOpenLinkWarning" = "Disable Open Link Warning";
 "ayu_DisableCustomBackgrounds" = "Disable Custom Backgrounds";
 "ayu_SmoothScroll" = "Smooth Scroll";
 "ayu_DisableNotificationsDelay" = "Disable Notify Delay";
