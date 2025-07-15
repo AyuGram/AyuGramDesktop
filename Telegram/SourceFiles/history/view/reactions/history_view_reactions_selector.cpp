@@ -1189,11 +1189,6 @@ bool AdjustMenuGeometryForSelector(
 		not_null<Ui::PopupMenu*> menu,
 		QPoint desiredPosition,
 		not_null<Selector*> selector) {
-	const auto &settings = AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
-		return false;
-	}
-
 	const auto useTransparency = selector->useTransparency();
 	const auto extend = useTransparency
 		? st::reactStripExtend
@@ -1359,6 +1354,12 @@ AttachSelectorResult AttachSelectorToMenu(
 		IconFactory iconFactory) {
 	const auto &settings = AyuSettings::getInstance();
 	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
+		return AttachSelectorResult::Skipped;
+	}
+
+	const auto peer = item->history()->peer;
+	if ((peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions)
+		|| (peer->isMegagroup() && !settings.hideGroupReactions)) {
 		return AttachSelectorResult::Skipped;
 	}
 
