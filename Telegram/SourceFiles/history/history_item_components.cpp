@@ -706,7 +706,8 @@ auto ReplyMarkupClickHandler::getUrlButton() const
 -> const HistoryMessageMarkupButton* {
 	if (const auto button = getButton()) {
 		using Type = HistoryMessageMarkupButton::Type;
-		if (button->type == Type::Url || button->type == Type::Auth || button->type == Type::Callback) {
+		if (button->type == Type::Url || button->type == Type::Auth || button->type == Type::Callback ||
+			button->type == Type::WebView || button->type == Type::SimpleWebView) {
 			return button;
 		}
 	}
