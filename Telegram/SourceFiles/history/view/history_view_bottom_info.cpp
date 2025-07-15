@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/messageshot/message_shot.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "core/ui_integration.h"
 #include "styles/style_ayu_icons.h"
 
@@ -428,12 +429,7 @@ void BottomInfo::layoutDateText() {
 			: QString();
 		const auto author = _data.author;
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
-		const auto date = edited + QLocale().toString(
-			_data.date.time(),
-			settings.showMessageSeconds
-				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-				: QLocale::system().timeFormat(QLocale::ShortFormat)
-		);
+		const auto date = edited + formatMessageTime(_data.date.time());
 		const auto afterAuthor = prefix + date;
 		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 		const auto authorWidth = st::msgDateFont->width(author);
@@ -486,12 +482,9 @@ void BottomInfo::layoutDateText() {
 		const auto author = _data.author;
 		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
 
-		const auto date = TextWithEntities{}.append(edited).append(QLocale().toString(
-			_data.date.time(),
-			settings.showMessageSeconds
-				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-				: QLocale::system().timeFormat(QLocale::ShortFormat)
-		));
+		const auto date = TextWithEntities{}
+			.append(edited)
+			.append(formatMessageTime(_data.date.time()));
 
 		const auto afterAuthor = TextWithEntities{}.append(prefix).append(date);
 		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor.text);

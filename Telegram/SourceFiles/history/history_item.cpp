@@ -1328,14 +1328,8 @@ void HistoryItem::setCommentsItemId(FullMsgId id) {
 void HistoryItem::setServiceText(PreparedServiceText &&prepared) {
 	auto text = std::move(prepared.text);
 
-	const auto &settings = AyuSettings::getInstance();
 	if (date() > 0) {
-		const auto timeString = QString(" (%1)").arg(QLocale().toString(
-			base::unixtime::parse(_date),
-			settings.showMessageSeconds
-				? QLocale::system().timeFormat(QLocale::LongFormat).remove(" t")
-				: QLocale::system().timeFormat(QLocale::ShortFormat)
-		));
+		const auto timeString = QString(" (%1)").arg(formatMessageTime(base::unixtime::parse(_date).time()));
 		if (!text.text.isEmpty() && !text.text.contains(timeString)) {
 			text = text.append(timeString);
 		}

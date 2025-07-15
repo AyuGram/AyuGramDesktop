@@ -320,6 +320,22 @@ QString formatDateTime(const QDateTime &date) {
 	return datePart + getLocalizedAt() + timePart;
 }
 
+QString formatMessageTime(const QTime &time) {
+	const auto &settings = AyuSettings::getInstance();
+
+	const auto format =
+		settings.showMessageSeconds
+			? (QLocale().timeFormat(QLocale::ShortFormat).contains("AP")
+				   ? "h:mm:ss AP"
+				   : "HH:mm:ss")
+			: QLocale().timeFormat(QLocale::ShortFormat);
+
+	return QLocale().toString(
+		time,
+		format
+	);
+}
+
 int getMediaSizeBytes(not_null<HistoryItem*> message) {
 	if (!message->media()) {
 		return -1;
