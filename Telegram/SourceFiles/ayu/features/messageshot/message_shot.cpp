@@ -209,8 +209,7 @@ bool MessageShotDelegate::elementHideReply(not_null<const HistoryView::Element*>
 
 HistoryView::ElementChatMode MessageShotDelegate::elementChatMode() {
 	using Mode = HistoryView::ElementChatMode;
-	// Mode::Wide;
-	return Mode::Default;
+	return Mode::Wide;
 }
 
 QImage removeEmptySpaceAround(const QImage &original) {
