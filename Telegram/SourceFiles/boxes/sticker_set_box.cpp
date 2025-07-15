@@ -732,11 +732,42 @@ void StickerSetBox::updateButtons() {
 					: tr::lng_stickers_copied(tr::now));
 		};
 		const auto addPackOwner = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
+		const auto fillSetCreatorMenu = [&] {
+			using Filler = Fn<void(not_null<Ui::PopupMenu*>)>;
+			if (!_inner->amSetCreator()) {
+				return Filler(nullptr);
+			}
+			const auto data = &_session->data();
+			return Filler([=, show = _show, set = _set](
+					not_null<Ui::PopupMenu*> menu) {
+				const auto done = [inner = _inner](const TLStickerSet &set) {
+					if (const auto raw = inner.data()) {
+						raw->applySet(set);
+					}
+				};
+				menu->addAction(
+					tr::lng_stickers_context_edit_name(tr::now),
+					[=] {
+						show->showBox(Box(ChangeSetNameBox, data, set, done));
+					},
+					&st::menuIconEdit);
+				menu->addAction(
+					tr::lng_stickers_context_reorder(tr::now),
+					[=] {
+						_inner->setReorderState(true);
+						updateButtons();
+					},
+					&st::menuIconManage);
+			});
+		}();
+		const auto addPackIdActions = [=](const std::shared_ptr<base::unique_qptr<Ui::PopupMenu>> &menu)
 		{
 			if (type == Data::StickersType::Stickers || type == Data::StickersType::Emoji) {
+				const auto &settings = AyuSettings::getInstance();
 				const auto weak = Ui::MakeWeak(this);
 				const auto session = _session;
-				const auto innerId = _inner->setId() >> 32;
+				const auto setId = _inner->setId();
+				const auto innerId = setId >> 32;
 
 				(*menu)->addAction(
 					tr::ayu_MessageDetailsPackOwnerPC(tr::now),
@@ -779,6 +810,26 @@ void StickerSetBox::updateButtons() {
 							});
 					},
 					&st::menuIconProfile);
+
+				if (settings.showPeerId != 0) {
+					(*menu)->addAction(
+						tr::ayu_ContextCopyID(tr::now),
+						[weak, session, setId]
+						{
+							if (!weak) {
+								return;
+							}
+
+							const auto strongInner = weak.data();
+							if (!strongInner) {
+								return;
+							}
+
+							QGuiApplication::clipboard()->setText(QString::number(setId));
+							strongInner->showToast(tr::ayu_IDCopiedToast(tr::now));
+						},
+						&st::menuIconCopy);
+				}
 			}
 		};
 		if (_inner->notInstalled()) {
@@ -828,7 +879,7 @@ void StickerSetBox::updateButtons() {
 							: tr::lng_stickers_share_pack)(tr::now),
 						[=] { share(); closeBox(); },
 						&st::menuIconShare);
-					addPackOwner(menu);
+					addPackIdActions(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
@@ -881,7 +932,7 @@ void StickerSetBox::updateButtons() {
 							archive,
 							&st::menuIconArchive);
 					}
-					addPackOwner(menu);
+					addPackIdActions(menu);
 					(*menu)->popup(QCursor::pos());
 					return true;
 				});
@@ -1449,6 +1500,16 @@ void StickerSetBox::Inner::contextMenuEvent(QContextMenuEvent *e) {
 					QGuiApplication::clipboard()->setMimeData(data.release());
 				}
 			}, &st::menuIconCopy);
+
+			const auto &settings = AyuSettings::getInstance();
+			if (settings.showPeerId != 0) {
+				_menu->addAction(tr::ayu_ContextCopyID(tr::now),
+								 [=]
+								 {
+									 QGuiApplication::clipboard()->setText(QString::number(_pack[index]->id));
+								 },
+								 &st::menuIconCopy);
+			}
 		}
 	} else if (details.type != SendMenu::Type::Disabled) {
 		const auto document = _pack[index];
