@@ -93,6 +93,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -119,6 +123,13 @@ using SendActionUpdate = ComposeControls::SendActionUpdate;
 using SetHistoryArgs = ComposeControls::SetHistoryArgs;
 using VoiceRecordBar = Controls::VoiceRecordBar;
 using ForwardPanel = Controls::ForwardPanel;
+
+#define SWITCH_BUTTON(button, show_v) \
+	if (show_v) { \
+		(button)->show(); \
+	} else { \
+		(button)->hide(); \
+	}
 
 } // namespace
 
@@ -1610,6 +1621,14 @@ void ComposeControls::init() {
 		updateAttachBotsMenu();
 	}, _wrap->lifetime());
 
+	AyuSettings::get_historyUpdateReactive() | rpl::start_with_next([=]
+	{
+		updateSendButtonType();
+		updateControlsVisibility();
+		updateControlsGeometry(_wrap->size());
+		orderControls();
+	}, _wrap->lifetime());
+
 	orderControls();
 }
 
@@ -1619,6 +1638,11 @@ void ComposeControls::orderControls() {
 }
 
 bool ComposeControls::showRecordButton() const {
+	const auto &settings = AyuSettings::getInstance();
+	if (!settings.showMicrophoneButtonInMessageField) {
+		return false;
+	}
+
 	return (_recordAvailability != Webrtc::RecordAvailability::None)
 		&& !_voiceRecordBar->isListenState()
 		&& !_voiceRecordBar->isRecordingByAnotherBar()
@@ -2718,17 +2742,19 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	// (_attachToggle|_replaceMedia) (_sendAs) -- _inlineResults ------ _tabbedPanel -- _fieldBarCancel
 	// (_attachDocument|_attachPhoto) _field (_ttlInfo) (_scheduled) (_silent|_botCommandStart) _tabbedSelectorToggle _send
 
+	const auto &settings = AyuSettings::getInstance();
+
 	const auto fieldWidth = size.width()
-		- _attachToggle->width()
+		- (settings.showAttachButtonInMessageField ? _attachToggle->width() : 0)
 		- (_sendAs ? _sendAs->width() : 0)
 		- st::historySendRight
 		- _send->width()
-		- _tabbedSelectorToggle->width()
+		- (settings.showEmojiButtonInMessageField ? _tabbedSelectorToggle->width() : 0)
 		- (_likeShown ? _like->width() : 0)
-		- (_botCommandShown ? _botCommandStart->width() : 0)
+		- (_botCommandShown && settings.showCommandsButtonInMessageField ? _botCommandStart->width() : 0)
 		- (_silent ? _silent->width() : 0)
 		- (_scheduled ? _scheduled->width() : 0)
-		- (_ttlInfo ? _ttlInfo->width() : 0);
+		- (_ttlInfo && settings.showAutoDeleteButtonInMessageField ? _ttlInfo->width() : 0);
 	{
 		const auto oldFieldHeight = _field->height();
 		_field->resizeToWidth(fieldWidth);
@@ -2745,8 +2771,10 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	if (_replaceMedia) {
 		_replaceMedia->moveToLeft(left, buttonsTop);
 	}
-	_attachToggle->moveToLeft(left, buttonsTop);
-	left += _attachToggle->width();
+	if (settings.showAttachButtonInMessageField) {
+		_attachToggle->moveToLeft(left, buttonsTop);
+		left += _attachToggle->width();
+	}
 	if (_sendAs) {
 		_sendAs->moveToLeft(left, buttonsTop);
 		left += _sendAs->width();
@@ -2763,8 +2791,10 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	auto right = st::historySendRight;
 	_send->moveToRight(right, buttonsTop);
 	right += _send->width();
-	_tabbedSelectorToggle->moveToRight(right, buttonsTop);
-	right += _tabbedSelectorToggle->width();
+	if (settings.showEmojiButtonInMessageField) {
+		_tabbedSelectorToggle->moveToRight(right, buttonsTop);
+		right += _tabbedSelectorToggle->width();
+	}
 	if (_like) {
 		using Type = Controls::WriteRestrictionType;
 		if (_writeRestriction.current().type == Type::PremiumRequired) {
@@ -2778,7 +2808,7 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 	}
 	if (_botCommandStart) {
 		_botCommandStart->moveToRight(right, buttonsTop);
-		if (_botCommandShown) {
+		if (_botCommandShown && settings.showCommandsButtonInMessageField) {
 			right += _botCommandStart->width();
 		}
 	}
@@ -2790,7 +2820,7 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		_scheduled->moveToRight(right, buttonsTop);
 		right += _scheduled->width();
 	}
-	if (_ttlInfo) {
+	if (_ttlInfo && settings.showAutoDeleteButtonInMessageField) {
 		_ttlInfo->move(size.width() - right - _ttlInfo->width(), buttonsTop);
 	}
 
@@ -2801,14 +2831,16 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 }
 
 void ComposeControls::updateControlsVisibility() {
+	const auto &settings = AyuSettings::getInstance();
+
 	if (_botCommandStart) {
-		_botCommandStart->setVisible(_botCommandShown);
+		SWITCH_BUTTON(_botCommandStart, _botCommandShown && settings.showCommandsButtonInMessageField);
 	}
 	if (_like) {
 		_like->setVisible(_likeShown);
 	}
 	if (_ttlInfo) {
-		_ttlInfo->show();
+		SWITCH_BUTTON(_ttlInfo, settings.showAutoDeleteButtonInMessageField);
 	}
 	if (_sendAs) {
 		_sendAs->show();
@@ -2817,11 +2849,12 @@ void ComposeControls::updateControlsVisibility() {
 		_replaceMedia->show();
 		_attachToggle->hide();
 	} else {
-		_attachToggle->show();
+		SWITCH_BUTTON(_attachToggle, settings.showAttachButtonInMessageField);
 	}
 	if (_scheduled) {
 		_scheduled->setVisible(!isEditingMessage());
 	}
+	SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField);
 }
 
 bool ComposeControls::updateLikeShown() {
