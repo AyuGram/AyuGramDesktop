@@ -76,8 +76,8 @@ public:
 
 	bool disableNotificationsDelay;
 	bool localPremium;
-	bool hideChannelReactions;
-	bool hideGroupReactions;
+	bool showChannelReactions;
+	bool showGroupReactions;
 
 	QString appIcon;
 	bool simpleQuotesAndReplies;
@@ -259,8 +259,8 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(showGhostToggleInTray)
 	NLOHMANN_JSON_TO(showStreamerToggleInTray)
 	NLOHMANN_JSON_TO(monoFont)
-	NLOHMANN_JSON_TO(hideChannelReactions)
-	NLOHMANN_JSON_TO(hideGroupReactions)
+	NLOHMANN_JSON_TO(showChannelReactions)
+	NLOHMANN_JSON_TO(showGroupReactions)
 	NLOHMANN_JSON_TO(hideNotificationCounters)
 	NLOHMANN_JSON_TO(hideNotificationBadge)
 	NLOHMANN_JSON_TO(hideAllChatsFolder)
@@ -324,8 +324,8 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGhostToggleInTray)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showStreamerToggleInTray)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(monoFont)
-	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideChannelReactions)
-	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideGroupReactions)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showChannelReactions)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGroupReactions)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideNotificationCounters)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideNotificationBadge)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideAllChatsFolder)

@@ -1171,8 +1171,8 @@ void CheckReactionNotificationSchedule(
 	}
 	const auto peer = item->history()->peer;
 	const auto &settings = AyuSettings::getInstance();
-	if ((peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions)
-		|| (peer->isMegagroup() && !settings.hideGroupReactions)) {
+	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions)
+		|| (peer->isMegagroup() && !settings.showGroupReactions)) {
 		item->markEffectWatched();
 		return;
 	}

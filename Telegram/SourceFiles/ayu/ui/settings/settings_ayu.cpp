@@ -855,12 +855,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_HideChannelReactions(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(!settings->hideChannelReactions)
+		rpl::single(!settings->showChannelReactions)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (!enabled != settings->hideChannelReactions);
+			return (!enabled != settings->showChannelReactions);
 		}) | start_with_next(
 		[=](bool enabled)
 		{
@@ -874,12 +874,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container) {
 		tr::ayu_HideGroupReactions(),
 		st::settingsButtonNoIcon
 	)->toggleOn(
-		rpl::single(!settings->hideGroupReactions)
+		rpl::single(!settings->showGroupReactions)
 	)->toggledValue(
 	) | rpl::filter(
 		[=](bool enabled)
 		{
-			return (!enabled != settings->hideGroupReactions);
+			return (!enabled != settings->showGroupReactions);
 		}) | start_with_next(
 		[=](bool enabled)
 		{

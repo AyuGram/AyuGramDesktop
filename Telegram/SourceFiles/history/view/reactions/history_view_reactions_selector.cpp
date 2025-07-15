@@ -1358,8 +1358,8 @@ AttachSelectorResult AttachSelectorToMenu(
 	}
 
 	const auto peer = item->history()->peer;
-	if ((peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions)
-		|| (peer->isMegagroup() && !settings.hideGroupReactions)) {
+	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions)
+		|| (peer->isMegagroup() && !settings.showGroupReactions)) {
 		return AttachSelectorResult::Skipped;
 	}
 

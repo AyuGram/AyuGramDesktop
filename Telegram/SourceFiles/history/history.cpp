@@ -2440,8 +2440,8 @@ Dialogs::UnreadState History::computeUnreadState() const {
 	result.mentions = unreadMentions().has() ? 1 : 0;
 	const auto peer = this->peer.get();
 	const auto &settings = AyuSettings::getInstance();
-	const auto hideReactions = (peer->isChannel() && !peer->isMegagroup() && !settings.hideChannelReactions)
-		|| (peer->isMegagroup() && !settings.hideGroupReactions);
+	const auto hideReactions = (peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions)
+		|| (peer->isMegagroup() && !settings.showGroupReactions);
 	result.reactions = hideReactions ? 0 : (unreadReactions().has() ? 1 : 0);
 	result.messagesMuted = muted ? result.messages : 0;
 	result.chatsMuted = muted ? result.chats : 0;

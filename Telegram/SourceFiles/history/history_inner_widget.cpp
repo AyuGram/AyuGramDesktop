@@ -1292,8 +1292,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			if (markingAsViewed && item->hasUnwatchedEffect()) {
 				const auto peer = item->history()->peer;
 				const auto &settings = AyuSettings::getInstance();
-				const auto hide = (!settings.hideChannelReactions && peer->isChannel() && !peer->isMegagroup()) ||
-					(!settings.hideGroupReactions && peer->isMegagroup());
+				const auto hide = (!settings.showChannelReactions && peer->isChannel() && !peer->isMegagroup()) ||
+					(!settings.showGroupReactions && peer->isMegagroup());
 				if (!hide) {
 					startEffects.emplace(view);
 				} else {

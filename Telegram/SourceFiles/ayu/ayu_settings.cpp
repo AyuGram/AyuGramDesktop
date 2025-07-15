@@ -231,8 +231,8 @@ AyuGramSettings::AyuGramSettings() {
 
 	disableNotificationsDelay = false;
 	localPremium = false;
-	hideChannelReactions = true;
-	hideGroupReactions = true;
+	showChannelReactions = true;
+	showGroupReactions = true;
 
 	// ~ Customization
 	appIcon =
@@ -420,11 +420,11 @@ void set_localPremium(bool val) {
 }
 
 void set_hideChannelReactions(bool val) {
-	settings->hideChannelReactions = val;
+	settings->showChannelReactions = val;
 }
 
 void set_hideGroupReactions(bool val) {
-	settings->hideGroupReactions = val;
+	settings->showGroupReactions = val;
 }
 
 void set_appIcon(const QString &val) {
