@@ -47,11 +47,10 @@ constexpr auto kMessageFlagHasSavedPeer = 0x10000000;
 template<typename MTPObject>
 std::vector<char> serializeObject(MTPObject object) {
 	mtpBuffer buffer;
-
 	object.write(buffer);
 
-	auto from = reinterpret_cast<char*>(buffer.data());
-	const auto end = from + buffer.size() * sizeof(mtpBuffer);
+	const auto from = reinterpret_cast<char*>(buffer.data());
+	const auto end = from + buffer.size() * sizeof(mtpPrime);
 
 	std::vector<char> entities(from, end);
 	return entities;
