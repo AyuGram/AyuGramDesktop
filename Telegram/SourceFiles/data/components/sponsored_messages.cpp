@@ -245,6 +245,11 @@ bool SponsoredMessages::canHaveFor(not_null<History*> history) const {
 }
 
 bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.disableAds) {
+		return false;
+	}
+
 	return item->history()->peer->isBroadcast()
 		&& item->isRegular();
 }
@@ -430,6 +435,11 @@ void SponsoredMessages::parseForVideo(
 
 SponsoredForVideo SponsoredMessages::prepareForVideo(
 		not_null<PeerData*> peer) {
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.disableAds) {
+		return {};
+	}
+
 	const auto i = _dataForVideo.find(peer);
 	if (i == end(_dataForVideo) || i->second.entries.empty()) {
 		return {};
