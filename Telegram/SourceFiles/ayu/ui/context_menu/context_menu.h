@@ -36,5 +36,11 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
 void AddLocalMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
+void AddLocalMessagesManagerAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item);
+
+void AddLocalMessagesManagerToChatMenu(PeerData *peerData,
+									   Data::Thread *thread,
+									   not_null<Window::SessionController*> sessionController,
+									   const Window::PeerMenuCallback &addCallback);
 
 }

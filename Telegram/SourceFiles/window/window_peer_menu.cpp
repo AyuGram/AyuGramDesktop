@@ -1447,6 +1447,7 @@ void Filler::fillHistoryActions() {
 	addTranslate();
 	addReport();
 	AyuUi::AddDeletedMessagesActions(_peer, _thread, _controller, _addAction);
+	AyuUi::AddLocalMessagesManagerToChatMenu(_peer, _thread, _controller, _addAction);
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();

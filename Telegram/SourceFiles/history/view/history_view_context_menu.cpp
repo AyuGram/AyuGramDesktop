@@ -1032,6 +1032,7 @@ void AddMessageActions(
 		AyuUi::AddUserMessagesAction(menu, request.item);
 		AyuUi::AddMessageDetailsAction(menu, request.item);
 		AyuUi::AddLocalMessageAction(menu, request.item);
+		AyuUi::AddLocalMessagesManagerAction(menu, request.item);
 	}
 
 	AddPostLinkAction(menu, request);
