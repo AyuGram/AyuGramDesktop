@@ -15,6 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "main/main_session.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Api {
 namespace {
 
@@ -83,6 +87,8 @@ void ViewsManager::pollExtendedMedia(
 }
 
 void ViewsManager::viewsIncrement() {
+	const auto &settings = AyuSettings::getInstance();
+
 	for (auto i = _toIncrement.begin(); i != _toIncrement.cend();) {
 		if (_incrementRequests.contains(i->first)) {
 			++i;
@@ -97,7 +103,7 @@ void ViewsManager::viewsIncrement() {
 		const auto requestId = _api.request(MTPmessages_GetMessagesViews(
 			i->first->input,
 			MTP_vector<MTPint>(ids),
-			MTP_bool(true)
+			MTP_bool(settings.sendReadMessages)
 		)).done([=](
 				const MTPmessages_MessageViews &result,
 				mtpRequestId requestId) {
