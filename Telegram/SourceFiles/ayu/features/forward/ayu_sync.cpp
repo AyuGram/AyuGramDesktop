@@ -55,7 +55,7 @@ private:
 namespace AyuSync {
 
 QString pathForSave(not_null<Main::Session*> session) {
-	const auto path = Core::App().settings().downloadPath();
+	auto path = Core::App().settings().downloadPath();
 	if (path.isEmpty()) {
 		return File::DefaultDownloadPath(session);
 	}
@@ -66,6 +66,10 @@ QString pathForSave(not_null<Main::Session*> session) {
 }
 
 QString filePath(not_null<Main::Session*> session, const Data::Media *media) {
+	if (!media) {
+		return {};
+	}
+
 	if (const auto document = media->document()) {
 		if (!document->filename().isEmpty()) {
 			return pathForSave(session) + media->document()->filename();
@@ -85,7 +89,7 @@ QString filePath(not_null<Main::Session*> session, const Data::Media *media) {
 		return pathForSave(session) + QString::number(photo->getDC()) + "_" + QString::number(photo->id) + ".jpg";
 	}
 
-	return QString();
+	return {};
 }
 
 qint64 fileSize(not_null<HistoryItem*> item) {
@@ -128,9 +132,13 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 	auto lifetime = std::make_shared<rpl::lifetime>();
 
+	auto path = filePath(session, item->media());
+	if (path.isEmpty()) {
+		return;
+	}
 	crl::on_main([&]
 	{
-		data->save(Data::FileOriginMessage(item->fullId()), filePath(session, item->media()));
+		data->save(Data::FileOriginMessage(item->fullId()), path);
 
 		rpl::single() | rpl::then(
 			session->downloaderTaskFinished()
@@ -140,12 +148,26 @@ void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_
 		}) | rpl::start_with_next([&]() mutable
 								  {
 									  latch->countDown();
-									  base::take(lifetime)->destroy();
 								  },
 								  *lifetime);
 	});
 
-	latch->await(std::chrono::minutes(5));
+
+	constexpr auto overall = std::chrono::minutes(15);
+	const auto startTime = std::chrono::steady_clock::now();
+
+
+	while (std::chrono::steady_clock::now() - startTime < overall) {
+		if (latch->await(std::chrono::minutes(5))) {
+			break;
+		}
+
+		if (!data->loading()) {
+			break;
+		}
+	}
+
+	base::take(lifetime)->destroy();
 }
 
 void forwardMessagesSync(not_null<Main::Session*> session,
@@ -220,11 +242,11 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 									  {
 										  saveToFiles();
 										  latch->countDown();
-										  base::take(lifetime)->destroy();
 									  },
 									  *lifetime);
 		});
 		latch->await(std::chrono::minutes(5));
+		base::take(lifetime)->destroy();
 	}
 }
 
@@ -255,12 +277,12 @@ void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &act
 			}) | rpl::start_with_next([&]
 									  {
 										  latch->countDown();
-										  base::take(lifetime)->destroy();
 									  },
 									  *lifetime);
 	});
 
-	latch->await(std::chrono::minutes(2));
+	latch->await(std::chrono::minutes(5));
+	base::take(lifetime)->destroy();
 }
 
 void sendDocumentSync(not_null<Main::Session*> session,

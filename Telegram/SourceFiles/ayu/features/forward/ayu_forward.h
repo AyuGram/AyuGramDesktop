@@ -47,6 +47,6 @@ void forwardMessages(
 	not_null<Main::Session*> session,
 	const Api::SendAction &action,
 	bool forwardState,
-	Data::ResolvedForwardDraft draft);
+	const Data::ResolvedForwardDraft &draft);
 
 }

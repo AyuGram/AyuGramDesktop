@@ -213,12 +213,11 @@ void sendMedia(
 }
 
 bool isAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items) {
-	for (const auto &item : items) {
-		if (isAyuForwardNeeded(item)) {
-			return true;
-		}
-	}
-	return false;
+	const auto needAyuForward = [&](const auto &item)
+	{
+		return isAyuForwardNeeded(item);
+	};
+	return std::ranges::any_of(items, needAyuForward);
 }
 
 bool isAyuForwardNeeded(not_null<HistoryItem*> item) {
@@ -243,7 +242,10 @@ void intelligentForward(
 	const Api::SendAction &action,
 	const Data::ResolvedForwardDraft &draft) {
 	const auto history = action.history;
-	history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
+	crl::on_main([&]
+	{
+		history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
+	});
 
 	const auto items = draft.items;
 	const auto peer = history->peer;
@@ -302,7 +304,7 @@ void forwardMessages(
 	not_null<Main::Session*> session,
 	const Api::SendAction &action,
 	bool forwardState,
-	Data::ResolvedForwardDraft draft) {
+	const Data::ResolvedForwardDraft &draft) {
 	const auto items = draft.items;
 	const auto history = action.history;
 	const auto peer = history->peer;
@@ -390,6 +392,23 @@ void forwardMessages(
 					way.setSendImagesAsPhotos(true);
 					break;
 				}
+			}
+
+			// remove not finished files
+			for (int j = preparedMedia.files.size() - 1; j >= 0; j--) {
+				auto &file = preparedMedia.files[j];
+
+				QFile f(file.path);
+				if (groupMedia[j]->photo() && f.size() < groupMedia[j]->photo()->imageByteSize(Data::PhotoSize::Large)
+					||
+					groupMedia[j]->document() && f.size() < groupMedia[j]->document()->size
+				) {
+					preparedMedia.files.erase(preparedMedia.files.begin() + j);
+				}
+			}
+
+			if (preparedMedia.files.empty()) {
+				continue;
 			}
 
 			auto groups = Ui::DivideByGroups(
