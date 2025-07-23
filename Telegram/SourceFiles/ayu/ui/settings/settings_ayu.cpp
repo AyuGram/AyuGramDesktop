@@ -933,6 +933,19 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::set_showMessageDetailsInContextMenu(index);
 			AyuSettings::save();
 		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings.showAddLocalMessageInContextMenu,
+		options,
+		tr::ayu_AddLocalMessage(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconEdit,
+		[=](int index)
+		{
+			AyuSettings::set_showAddLocalMessageInContextMenu(index);
+			AyuSettings::save();
+		});
 
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());

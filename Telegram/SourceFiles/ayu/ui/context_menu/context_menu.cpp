@@ -22,6 +22,8 @@
 #include "styles/style_menu_icons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/boxes/generic_box.h"
 #include "window/window_peer_menu.h"
 
 #include "ayu/ui/message_history/history_section.h"
@@ -34,8 +36,10 @@
 #include "data/data_session.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "history/history.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "base/unixtime.h"
 
 namespace AyuUi {
 
@@ -540,6 +544,108 @@ void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			item->markContentsRead();
 		},
 		&st::menuIconTTLAny);
+}
+
+void AddLocalMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+	if (!item) {
+		return;
+	}
+
+	const auto& settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showAddLocalMessageInContextMenu)) {
+		return;
+	}
+
+	const auto history = item->history();
+	const auto controller = history->session().tryResolveWindow();
+	if (!controller) {
+		return;
+	}
+
+	menu->addAction(
+		tr::ayu_AddLocalMessage(tr::now),
+		[=]() {
+			const auto showBox = [=](const QString &text, PeerId fromId) {
+				if (text.isEmpty()) {
+					return;
+				}
+
+				// Создаем локальное сообщение
+				const auto localId = history->session().data().nextLocalMessageId();
+				const auto localItem = history->addNewLocalMessage({
+					.id = localId,
+					.flags = MessageFlag::HasFromId,
+					.from = fromId,
+					.date = base::unixtime::now(),
+				}, TextWithEntities{ text }, MTP_messageMediaEmpty());
+
+				// Добавляем в базу данных локальных сообщений
+				AyuMessages::addLocalMessage(localItem);
+			};
+
+			controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+				box->setTitle(tr::ayu_AddLocalMessageTitle());
+				
+				// Поле для ввода текста сообщения
+				const auto textField = box->addRow(object_ptr<Ui::InputField>(
+					box,
+					st::defaultInputField,
+					tr::ayu_AddLocalMessagePlaceholder(),
+					QString()));
+				textField->setMaxLength(4096);
+
+				// Поле для выбора отправителя
+				const auto fromField = box->addRow(object_ptr<Ui::InputField>(
+					box,
+					st::defaultInputField,
+					tr::ayu_AddLocalMessageFromPlaceholder(),
+					QString()));
+
+				box->setFocusCallback([=] {
+					textField->setFocusFast();
+				});
+
+				box->addButton(tr::lng_box_ok(), [=] {
+					const auto text = textField->getLastText().trimmed();
+					const auto fromText = fromField->getLastText().trimmed();
+					
+					PeerId fromId = history->peer->id;
+					if (!fromText.isEmpty()) {
+						// Пытаемся найти пользователя по имени или username
+						const auto session = &history->session();
+						const auto &owner = session->data();
+						
+						// Сначала пытаемся найти по username
+						if (const auto user = owner.userByUsername(fromText)) {
+							fromId = user->id;
+						} else {
+							// Затем ищем по имени среди участников чата
+							if (const auto chat = history->peer->asChat()) {
+								for (const auto &participant : chat->participants) {
+									if (const auto user = owner.user(participant.userId())) {
+										if (user->name().toLower().contains(fromText.toLower())) {
+											fromId = user->id;
+											break;
+										}
+									}
+								}
+							} else if (const auto channel = history->peer->asChannel()) {
+								// Для каналов используем текущего пользователя, если не найден
+								// В реальном приложении можно было бы реализовать поиск по участникам
+							}
+						}
+					}
+					
+					showBox(text, fromId);
+					box->closeBox();
+				});
+
+				box->addButton(tr::lng_cancel(), [=] {
+					box->closeBox();
+				});
+			}));
+		},
+		&st::menuIconEdit);
 }
 
 } // namespace AyuUi

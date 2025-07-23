@@ -255,6 +255,7 @@ AyuGramSettings::AyuGramSettings() {
 	showHideMessageInContextMenu = 0;
 	showUserMessagesInContextMenu = 2;
 	showMessageDetailsInContextMenu = 2;
+	showAddLocalMessageInContextMenu = 2;
 
 	showAttachButtonInMessageField = true;
 	showCommandsButtonInMessageField = true;
@@ -461,6 +462,10 @@ void set_showUserMessagesInContextMenu(int val) {
 
 void set_showMessageDetailsInContextMenu(int val) {
 	settings->showMessageDetailsInContextMenu = val;
+}
+
+void set_showAddLocalMessageInContextMenu(int val) {
+	settings->showAddLocalMessageInContextMenu = val;
 }
 
 void set_showAttachButtonInMessageField(bool val) {

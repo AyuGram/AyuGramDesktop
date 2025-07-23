@@ -62,6 +62,7 @@ public:
 	int showHideMessageInContextMenu;
 	int showUserMessagesInContextMenu;
 	int showMessageDetailsInContextMenu;
+	int showAddLocalMessageInContextMenu;
 
 	bool showAttachButtonInMessageField;
 	bool showCommandsButtonInMessageField;
@@ -144,6 +145,7 @@ void set_showViewsPanelInContextMenu(int val);
 void set_showHideMessageInContextMenu(int val);
 void set_showUserMessagesInContextMenu(int val);
 void set_showMessageDetailsInContextMenu(int val);
+void set_showAddLocalMessageInContextMenu(int val);
 
 void set_showAttachButtonInMessageField(bool val);
 void set_showCommandsButtonInMessageField(bool val);
@@ -215,6 +217,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(
 	showHideMessageInContextMenu,
 	showUserMessagesInContextMenu,
 	showMessageDetailsInContextMenu,
+	showAddLocalMessageInContextMenu,
 	showAttachButtonInMessageField,
 	showCommandsButtonInMessageField,
 	showEmojiButtonInMessageField,
