@@ -37,6 +37,7 @@ const QVector<QString> icons{
 	AyuAssets::CHIBI2_ICON,
 	AyuAssets::EXTERA2_ICON,
 };
+std::unordered_map<QString, QImage> cachedIcons;
 
 const auto rows = static_cast<int>(icons.size()) / 4 + std::min(1, static_cast<int>(icons.size()) % 4);
 
@@ -83,6 +84,9 @@ IconPicker::IconPicker(QWidget *parent)
 	setMinimumSize(st::boxWidth, (st::cpIconSize + st::cpPadding) * rows - st::cpPadding);
 }
 
+IconPicker::~IconPicker() {
+	cachedIcons.clear();
+}
 void IconPicker::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	PainterHighQualityEnabler hq(p);
@@ -98,10 +102,16 @@ void IconPicker::paintEvent(QPaintEvent *e) {
 			if (iconName.isEmpty()) {
 				continue;
 			}
-
-			auto icon = AyuAssets::loadPreview(iconName)
-				.scaled(st::cpIconSize, st::cpIconSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
+			QImage icon;
+			if (const auto cached = cachedIcons.find(iconName); cached != cachedIcons.end()) {
+				icon = cached->second;
+			} else {
+				icon = cachedIcons[iconName] = AyuAssets::loadPreview(iconName).scaled(
+					st::cpIconSize,
+					st::cpIconSize,
+					Qt::KeepAspectRatio,
+					Qt::SmoothTransformation);
+			}
 			auto opacity = 0.0f;
 			if (iconName == wasSelected) {
 				opacity = 1.0f - animation.value(1.0f);

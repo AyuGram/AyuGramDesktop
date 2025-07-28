@@ -13,6 +13,7 @@ class IconPicker : public Ui::RpWidget
 {
 public:
 	IconPicker(QWidget *parent);
+	~IconPicker();
 
 protected:
 	void paintEvent(QPaintEvent *e) override;
