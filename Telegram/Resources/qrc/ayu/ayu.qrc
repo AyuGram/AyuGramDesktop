@@ -52,5 +52,12 @@
         <file alias="art/ayu/yaplus/app_preview.png">../../art/ayu/yaplus/app_preview.png</file>
         <file alias="art/ayu/yaplus/app_macos.png">../../art/ayu/yaplus/app_macos.png</file>
         <file alias="art/ayu/yaplus/app_icon.ico">../../art/ayu/yaplus/app_icon.ico</file>
+        <file alias="icons/ayu/donates/boosty.svg">../../icons/ayu/donates/boosty.svg</file>
+        <file alias="icons/ayu/donates/ton.svg">../../icons/ayu/donates/ton.svg</file>
+        <file alias="icons/ayu/donates/bitcoin.svg">../../icons/ayu/donates/bitcoin.svg</file>
+        <file alias="icons/ayu/donates/ethereum.svg">../../icons/ayu/donates/ethereum.svg</file>
+        <file alias="icons/ayu/donates/solana.svg">../../icons/ayu/donates/solana.svg</file>
+        <file alias="icons/ayu/donates/tron.svg">../../icons/ayu/donates/tron.svg</file>
+        <file alias="icons/ayu/donates/support_logo.svg">../../icons/ayu/donates/support_logo.svg</file>
     </qresource>
 </RCC>

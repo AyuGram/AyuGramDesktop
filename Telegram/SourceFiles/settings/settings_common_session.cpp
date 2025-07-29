@@ -14,11 +14,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/settings/settings_ayu.h"
 
-
-// AyuGram includes
-#include "ayu/ui/settings/settings_ayu.h"
-
-
 namespace Settings {
 
 void FillMenu(
@@ -77,8 +72,7 @@ void FillMenu(
 bool HasMenu(Type type) {
 	return (type == ::Settings::CloudPasswordEmailConfirmId())
 		|| (type == Main::Id())
-		|| (type == Chat::Id())
-		|| (type == Ayu::Id());
+		|| (type == Chat::Id());
 }
 
 } // namespace Settings

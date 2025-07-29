@@ -51,6 +51,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace {
 
 using Language = Lang::Language;
@@ -1196,7 +1200,15 @@ void LanguageBox::setupTop(not_null<Ui::VerticalLayout*> container) {
 	}, translateEnabled->lifetime());
 
 	using namespace rpl::mappers;
-	auto premium = Data::AmPremiumValue(&_controller->session());
+	auto premium = Data::AmPremiumValue(&_controller->session()) | rpl::map([=](bool val)
+	{
+		// const auto &settings = AyuSettings::getInstance();
+		// if (settings.translationProvider != "telegram") {
+		// 	return true;
+		// }
+		// return val;
+		return true;
+	});
 	const auto translateChat = container->add(object_ptr<Ui::SettingsButton>(
 		container,
 		tr::lng_translate_settings_chat(),

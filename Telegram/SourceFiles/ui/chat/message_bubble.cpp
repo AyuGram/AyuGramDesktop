@@ -12,6 +12,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_style.h"
 #include "styles/style_chat.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace Ui {
 namespace {
 
@@ -32,8 +36,8 @@ void PaintBubbleGeneric(
 
 	const auto topLeft = args.rounding.topLeft;
 	const auto topRight = args.rounding.topRight;
-	const auto bottomWithTailLeft = args.rounding.bottomLeft;
-	const auto bottomWithTailRight = args.rounding.bottomRight;
+	auto bottomWithTailLeft = args.rounding.bottomLeft;
+	auto bottomWithTailRight = args.rounding.bottomRight;
 	if (topLeft == Corner::None
 		&& topRight == Corner::None
 		&& bottomWithTailLeft == Corner::None
@@ -41,6 +45,17 @@ void PaintBubbleGeneric(
 		fillBg(args.geometry);
 		return;
 	}
+
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.removeMessageTail) {
+		if (bottomWithTailLeft == Corner::Tail) {
+			bottomWithTailLeft = Corner::Large;
+		}
+		if (bottomWithTailRight == Corner::Tail) {
+			bottomWithTailRight = Corner::Large;
+		}
+	}
+
 	const auto bottomLeft = (bottomWithTailLeft == Corner::Tail)
 		? Corner::None
 		: bottomWithTailLeft;

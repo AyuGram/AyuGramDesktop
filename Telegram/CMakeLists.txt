@@ -127,8 +127,20 @@ set(ayugram_files
         ayu/ui/ayu_logo.h
         ayu/ui/utils/ayu_profile_values.cpp
         ayu/ui/utils/ayu_profile_values.h
+        ayu/ui/settings/settings_appearance.cpp
+        ayu/ui/settings/settings_appearance.h
+        ayu/ui/settings/settings_ayu_utils.cpp
+        ayu/ui/settings/settings_ayu_utils.h
+        ayu/ui/settings/settings_chats.cpp
+        ayu/ui/settings/settings_chats.h
+        ayu/ui/settings/settings_general.cpp
+        ayu/ui/settings/settings_general.h
         ayu/ui/settings/settings_ayu.cpp
         ayu/ui/settings/settings_ayu.h
+        ayu/ui/settings/settings_main.cpp
+        ayu/ui/settings/settings_main.h
+        ayu/ui/settings/settings_other.cpp
+        ayu/ui/settings/settings_other.h
         ayu/ui/context_menu/context_menu.cpp
         ayu/ui/context_menu/context_menu.h
         ayu/ui/context_menu/menu_item_subtext.cpp
@@ -147,6 +159,10 @@ set(ayugram_files
         ayu/ui/boxes/theme_selector_box.h
         ayu/ui/boxes/message_shot_box.cpp
         ayu/ui/boxes/message_shot_box.h
+        ayu/ui/boxes/donate_qr_box.cpp
+        ayu/ui/boxes/donate_qr_box.h
+        ayu/ui/boxes/donate_info_box.cpp
+        ayu/ui/boxes/donate_info_box.h
         ayu/ui/components/image_view.cpp
         ayu/ui/components/image_view.h
         ayu/ui/components/icon_picker.cpp
@@ -170,6 +186,18 @@ set(ayugram_files
         ayu/features/forward/ayu_forward.h
         ayu/features/forward/ayu_sync.cpp
         ayu/features/forward/ayu_sync.h
+        ayu/features/translator/ayu_translator.cpp
+        ayu/features/translator/ayu_translator.h
+        ayu/features/translator/html_parser.cpp
+        ayu/features/translator/html_parser.h
+        ayu/features/translator/implementations/google.cpp
+        ayu/features/translator/implementations/google.h
+        ayu/features/translator/implementations/yandex.cpp
+        ayu/features/translator/implementations/yandex.h
+        ayu/features/translator/implementations/telegram.cpp
+        ayu/features/translator/implementations/telegram.h
+        ayu/features/translator/implementations/base.cpp
+        ayu/features/translator/implementations/base.h
         ayu/data/messages_storage.cpp
         ayu/data/messages_storage.h
         ayu/data/entities.h

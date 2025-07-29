@@ -1,0 +1,23 @@
+/*
+ * This is the source code of AyuGram for Desktop.
+ *
+ * We do not and cannot prevent the use of our code,
+ * but be respectful and credit the original author.
+ *
+ * Copyright @Radolyn, 2025
+ */
+
+using "ui/basic.style";
+using "ui/layers/layers.style";
+using "ui/widgets/widgets.style";
+
+centeredBoxLabelStyle: TextStyle(boxLabelStyle) {
+    font: font(13px);
+    lineHeight: 0px;
+}
+
+centeredBoxLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+	align: align(center);
+	style: centeredBoxLabelStyle;
+}

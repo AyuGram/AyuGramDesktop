@@ -9,24 +9,18 @@
 #include "settings/settings_common.h"
 #include "settings/settings_common_session.h"
 
-class BoxContent;
-
 namespace Window {
-class Controller;
 class SessionController;
 } // namespace Window
 
 namespace Settings {
 
-class Ayu : public Section<Ayu>
+class AyuGhost : public Section<AyuGhost>
 {
 public:
-	Ayu(QWidget *parent, not_null<Window::SessionController*> controller);
+	AyuGhost(QWidget *parent, not_null<Window::SessionController*> controller);
 
 	[[nodiscard]] rpl::producer<QString> title() override;
-
-	void fillTopBarMenu(
-		const Ui::Menu::MenuCallback &addAction) override;
 
 private:
 	void setupContent(not_null<Window::SessionController*> controller);

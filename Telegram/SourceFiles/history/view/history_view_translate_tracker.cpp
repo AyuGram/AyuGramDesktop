@@ -23,6 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "spellcheck/platform/platform_language.h"
 
+// AyuGram includes
+#include "ayu/features/translator/ayu_translator.h"
+
+
 namespace HistoryView {
 namespace {
 
@@ -240,7 +244,7 @@ void TranslateTracker::cancelSentRequest() {
 				item->translationShowRequiresRequest({});
 			}
 		}
-		_history->session().api().request(base::take(_requestId)).cancel();
+		Ayu::Translator::TranslateManager::currentInstance()->cancel(_requestId);
 	}
 }
 
@@ -277,13 +281,14 @@ void TranslateTracker::requestSome() {
 		}
 	}
 	using Flag = MTPmessages_TranslateText::Flag;
-	_requestId = session->api().request(MTPmessages_TranslateText(
+	_requestId = Ayu::Translator::TranslateManager::currentInstance()->request(
+		peer->session(),
 		MTP_flags(Flag::f_peer | Flag::f_id),
 		peer->input,
 		MTP_vector<MTPint>(list),
 		MTPVector<MTPTextWithEntities>(),
 		MTP_string(to.twoLetterCode())
-	)).done([=](const MTPmessages_TranslatedText &result) {
+	).done([=](const MTPmessages_TranslatedText &result) {
 		requestDone(to, result.data().vresult().v);
 	}).fail([=] {
 		requestDone(to, {});

@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2025
 #pragma once
 
+#include "rc_manager.h"
 #include "ayu/data/entities.h"
 
 #include "core/application.h"
@@ -25,6 +26,8 @@ ID getBareID(not_null<PeerData*> peer);
 
 bool isExteraPeer(ID peerId);
 bool isSupporterPeer(ID peerId);
+bool isCustomBadgePeer(ID peerId);
+CustomBadge getCustomBadge(ID peerId);
 
 rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer);
 

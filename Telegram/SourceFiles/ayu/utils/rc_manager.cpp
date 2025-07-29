@@ -51,7 +51,7 @@ void RCManager::makeRequest() {
 
 	clearSentRequest();
 
-	const auto request = QNetworkRequest(QUrl("https://update.ayugram.one/rc/current/desktop"));
+	const auto request = QNetworkRequest(QUrl("https://update.ayugram.one/rc/current/desktop2"));
 	_reply = _manager->get(request);
 	connect(_reply,
 			&QNetworkReply::finished,
@@ -105,12 +105,16 @@ bool RCManager::applyResponse(const QByteArray &response) {
 	const auto root = document.object();
 
 	const auto developers = root.value("developers").toArray();
-	const auto channels = root.value("channels").toArray();
+	const auto officialChannels = root.value("officialChannels").toArray();
 	const auto supporters = root.value("supporters").toArray();
+	const auto supporterChannels = root.value("supporterChannels").toArray();
+	const auto customBadges = root.value("customBadges").toArray();
 
 	_developers.clear();
-	_channels.clear();
+	_officialChannels.clear();
 	_supporters.clear();
+	_supporterChannels.clear();
+	_customBadges.clear();
 
 	for (const auto &developer : developers) {
 		if (const auto id = developer.toVariant().toLongLong()) {
@@ -118,9 +122,9 @@ bool RCManager::applyResponse(const QByteArray &response) {
 		}
 	}
 
-	for (const auto &channel : channels) {
+	for (const auto &channel : officialChannels) {
 		if (const auto id = channel.toVariant().toLongLong()) {
-			_channels.insert(id);
+			_officialChannels.insert(id);
 		}
 	}
 
@@ -130,10 +134,47 @@ bool RCManager::applyResponse(const QByteArray &response) {
 		}
 	}
 
+	for (const auto &channel : supporterChannels) {
+		if (const auto id = channel.toVariant().toLongLong()) {
+			_supporterChannels.insert(id);
+		}
+	}
+
+	for (const auto &badge : customBadges) {
+		if (!badge.isObject()) {
+			continue;
+		}
+		const auto obj = badge.toObject();
+		const auto id = obj.value("id").toVariant().toLongLong();
+		if (!id) {
+			continue;
+		}
+		const auto badgeObj = obj.value("badge");
+		if (!badgeObj.isObject()) {
+			continue;
+		}
+		const auto badgeData = badgeObj.toObject();
+		CustomBadge customBadge;
+		if (const auto emojiStatusId = badgeData.value("documentId").toVariant().toLongLong()) {
+			customBadge.emojiStatusId = EmojiStatusId(emojiStatusId);
+		} else {
+			continue;
+		}
+		if (const auto text = badgeData.value("text").toString(); !text.isEmpty()) {
+			customBadge.text = text;
+		}
+		_customBadges[id] = customBadge;
+	}
+
+	_donateUsername = root.value("donateUsername").toString();
+	_donateAmountUsd = root.value("donateAmountUsd").toString();
+	_donateAmountTon = root.value("donateAmountTon").toString();
+	_donateAmountRub = root.value("donateAmountRub").toString();
+
 	initialized = true;
 
-	LOG(("RCManager: Loaded %1 developers, %2 channels"
-	).arg(_developers.size()).arg(_channels.size()));
+	LOG(("RCManager: Loaded %1 developers, %2 official channels"
+	).arg(_developers.size()).arg(_officialChannels.size()));
 
 	return true;
 }

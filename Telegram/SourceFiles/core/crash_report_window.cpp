@@ -23,6 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QStandardPaths>
 #include <QtCore/QTimer>
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
+
 namespace {
 
 constexpr auto kDefaultProxyPort = 80;
@@ -273,11 +277,11 @@ LastCrashedWindow::LastCrashedWindow(
 	excludeReportUsername();
 
 #ifndef TDESKTOP_DISABLE_AUTOUPDATE
-	if (false) {
+	const auto &settings = AyuSettings::getInstance();
+	if (!settings.crashReporting) {
 #else
 	if (true) {
 #endif
-		// Currently accept crash reports only from testers.
 		_sendingState = SendingNoReport;
 	} else if (Core::OpenGLLastCheckFailed()) {
 		// Nothing we can do right now with graphics driver crashes in GL.

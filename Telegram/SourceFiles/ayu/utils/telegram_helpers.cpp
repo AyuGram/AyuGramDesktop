@@ -92,16 +92,37 @@ bool isExteraPeer(ID peerId) {
 }
 
 bool isSupporterPeer(ID peerId) {
-	return RCManager::getInstance().supporters().contains(peerId);
+	return RCManager::getInstance().supporters().contains(peerId) || RCManager::getInstance().supporterChannels().contains(peerId);
+}
+
+bool isCustomBadgePeer(ID peerId) {
+	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
+}
+
+CustomBadge getCustomBadge(ID peerId) {
+	const auto &badges = RCManager::getInstance().supporterCustomBadges();
+	if (const auto it = badges.find(peerId); it != badges.end()) {
+		return it->second;
+	}
+	return {};
 }
 
 rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
-	if (isExteraPeer(getBareID(peer))) {
-		return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::Extera });
+	if (isCustomBadgePeer(getBareID(peer))) {
+		return rpl::single(Info::Profile::Badge::Content{
+			.badge = Info::Profile::BadgeType::ExteraCustom,
+			.emojiStatusId = getCustomBadge(getBareID(peer)).emojiStatusId
+		});
+	} else if (isExteraPeer(getBareID(peer))) {
+		return rpl::single(Info::Profile::Badge::Content{
+			.badge = Info::Profile::BadgeType::Extera
+		});
 	} else if (isSupporterPeer(getBareID(peer))) {
-		return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::ExteraSupporter });
+		return rpl::single(Info::Profile::Badge::Content{
+			.badge = Info::Profile::BadgeType::ExteraSupporter
+		});
 	}
-	return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::None });
+	return rpl::single(Info::Profile::Badge::Content{Info::Profile::BadgeType::None});
 }
 
 bool isMessageHidden(const not_null<HistoryItem*> item) {

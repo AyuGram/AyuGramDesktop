@@ -38,6 +38,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QLocale>
 
+// AyuGram includes
+#include "ayu/features/translator/ayu_translator.h"
+
+
 namespace Ui {
 namespace {
 
@@ -226,7 +230,8 @@ void TranslateBox(
 	const auto send = [=](LanguageId to) {
 		loading->show(anim::type::instant);
 		translated->hide(anim::type::instant);
-		state->api.request(MTPmessages_TranslateText(
+		Ayu::Translator::TranslateManager::currentInstance()->request(
+			peer->session(),
 			MTP_flags(flags),
 			msgId ? peer->input : MTP_inputPeerEmpty(),
 			(msgId
@@ -241,7 +246,7 @@ void TranslateBox(
 						text.entities,
 						Api::ConvertOption::SkipLocal)))),
 			MTP_string(to.twoLetterCode())
-		)).done([=](const MTPmessages_TranslatedText &result) {
+		).done([=](const MTPmessages_TranslatedText &result) {
 			const auto &data = result.data();
 			const auto &list = data.vresult().v;
 			if (list.isEmpty()) {

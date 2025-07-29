@@ -50,8 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "styles/style_ayu_icons.h"
 #include "lang_auto.h"
-#include "ayu/ui/settings/settings_ayu.h"
-
+#include "ayu/ui/settings/settings_main.h"
 
 namespace Window {
 namespace {
@@ -619,7 +618,7 @@ void MainMenu::setupAccountsToggle() {
 
 void MainMenu::setupSetEmojiStatus() {
 	_setEmojiStatus->overrideLinkClickHandler([=] {
-		_controller->showSettings(Settings::Ayu::Id());
+		_controller->showSettings(Settings::AyuMain::Id());
 	});
 }
 
@@ -647,6 +646,7 @@ void MainMenu::setupMenu() {
 			std::move(descriptor));
 	};
 	if (!_controller->session().supportMode()) {
+		if (settings.showMyProfileInDrawer)
 		_menu->add(
 			CreateButtonWithIcon(
 				_menu,
@@ -658,12 +658,15 @@ void MainMenu::setupMenu() {
 				Info::Stories::Make(controller->session().user()));
 		});
 
+		if (settings.showBotsInDrawer)
 		SetupMenuBots(_menu, controller);
 
+		if (settings.showMyProfileInDrawer || settings.showBotsInDrawer)
 		_menu->add(
 			object_ptr<Ui::PlainShadow>(_menu),
 			{ 0, st::mainMenuSkip, 0, st::mainMenuSkip });
 
+		if (settings.showNewGroupInDrawer)
 		AddMyChannelsBox(addAction(
 			tr::lng_create_group_title(),
 			{ &st::menuIconGroups }
@@ -673,6 +676,7 @@ void MainMenu::setupMenu() {
 			}
 		});
 
+		if (settings.showNewChannelInDrawer)
 		AddMyChannelsBox(addAction(
 			tr::lng_create_channel_title(),
 			{ &st::menuIconChannel }
@@ -713,18 +717,21 @@ void MainMenu::setupMenu() {
 
 		SetupMenuBots(_menu, controller);
 
+		if (settings.showContactsInDrawer)
 		addAction(
 			tr::lng_menu_contacts(),
 			{ &st::menuIconUserShow }
 		)->setClickedCallback([=] {
 			controller->show(PrepareContactsBox(controller));
 		});
+		if (settings.showCallsInDrawer)
 		addAction(
 			tr::lng_menu_calls(),
 			{ &st::menuIconPhone }
 		)->setClickedCallback([=] {
 			::Calls::ShowCallsBox(controller);
 		});
+		if (settings.showSavedMessagesInDrawer)
 		addAction(
 			tr::lng_saved_messages(),
 			{ &st::menuIconSavedMessages }
@@ -732,18 +739,16 @@ void MainMenu::setupMenu() {
 			controller->showPeerHistory(controller->session().user());
 		});
 
-		const auto &settings = AyuSettings::getInstance();
-
 		if (settings.showLReadToggleInDrawer) {
 			addAction(
 				tr::ayu_LReadMessages(),
 				{&st::ayuLReadMenuIcon}
 			)->setClickedCallback([=]
 			{
-				auto prev = settings.sendReadMessages;
+				const auto prev = settings.sendReadMessages;
 				AyuSettings::set_sendReadMessages(false);
 
-				auto chats = controller->session().data().chatsList();
+				const auto chats = controller->session().data().chatsList();
 				MarkAsReadChatList(chats);
 
 				AyuSettings::set_sendReadMessages(prev);
@@ -810,6 +815,8 @@ void MainMenu::setupMenu() {
 		controller->showSettings();
 	});
 
+	if (settings.showNightModeToggleInDrawer) {
+
 	_nightThemeToggle = addAction(
 		tr::lng_menu_night_mode(),
 		{ &st::menuIconNightMode }
@@ -839,30 +846,40 @@ void MainMenu::setupMenu() {
 			&_controller->window(),
 			toggle);
 	}, _nightThemeToggle->lifetime());
+	Core::App().settings().systemDarkModeValue(
+	) | rpl::start_with_next([=](std::optional<bool> darkMode) {
+		const auto darkModeEnabled
+			= Core::App().settings().systemDarkModeEnabled();
+		if (darkModeEnabled && darkMode.has_value()) {
+			_nightThemeSwitches.fire_copy(*darkMode);
+		}
+	}, _nightThemeToggle->lifetime());
+
+	}
 
 	if (settings.showGhostToggleInDrawer) {
-		_ghostModeToggle = addAction(
+		const auto ghostModeToggle = addAction(
 			tr::ayu_GhostModeToggle(),
 			{&st::ayuGhostIcon}
 		)->toggleOn(AyuSettings::get_ghostModeEnabledReactive());
 
-		_ghostModeToggle->toggledChanges(
+		ghostModeToggle->toggledChanges(
 		) | rpl::start_with_next(
 			[=](bool ghostMode)
 			{
 				AyuSettings::set_ghostModeEnabled(ghostMode);
 				AyuSettings::save();
 			},
-			_ghostModeToggle->lifetime());
+			ghostModeToggle->lifetime());
 	}
 
 	if (settings.showStreamerToggleInDrawer) {
-		_streamerModeToggle = addAction(
+		const auto streamerModeToggle = addAction(
 			tr::ayu_StreamerModeToggle(),
 			{&st::ayuStreamerModeMenuIcon}
 		)->toggleOn(rpl::single(AyuFeatures::StreamerMode::isEnabled()));
 
-		_streamerModeToggle->toggledChanges(
+		streamerModeToggle->toggledChanges(
 		) | rpl::start_with_next(
 			[=](bool enabled)
 			{
@@ -872,17 +889,8 @@ void MainMenu::setupMenu() {
 					AyuFeatures::StreamerMode::disable();
 				}
 			},
-			_streamerModeToggle->lifetime());
+			streamerModeToggle->lifetime());
 	}
-
-	Core::App().settings().systemDarkModeValue(
-	) | rpl::start_with_next([=](std::optional<bool> darkMode) {
-		const auto darkModeEnabled
-			= Core::App().settings().systemDarkModeEnabled();
-		if (darkModeEnabled && darkMode.has_value()) {
-			_nightThemeSwitches.fire_copy(*darkMode);
-		}
-	}, _nightThemeToggle->lifetime());
 }
 
 void MainMenu::resizeEvent(QResizeEvent *e) {

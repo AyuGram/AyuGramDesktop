@@ -12,7 +12,7 @@ using "ui/colors.palette";
 using "ui/widgets/widgets.style";
 using "info/info.style";
 
-/* Color Picker */
+/* Icon Picker */
 cpPadding: 14px;
 cpSelectedPadding: 2px;
 cpSelectedRounding: 12px;
@@ -69,3 +69,5 @@ exteraBadgeToast: Toast(defaultToast) {
 	icon: icon {{ "ayu/extera_badge", toastFg }};
 	iconPosition: point(13px, 13px);
 }
+
+supportLogoSize: 96px;

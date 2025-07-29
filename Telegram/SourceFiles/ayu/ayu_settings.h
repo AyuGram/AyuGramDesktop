@@ -74,6 +74,9 @@ public:
 	bool increaseWebviewHeight;
 	bool increaseWebviewWidth;
 
+	bool materialSwitches;
+	bool removeMessageTail;
+
 	bool disableNotificationsDelay;
 	bool localPremium;
 	bool showChannelReactions;
@@ -81,6 +84,7 @@ public:
 
 	QString appIcon;
 	bool simpleQuotesAndReplies;
+	bool hideFastShare;
 	bool replaceBottomInfoWithIcons;
 	QString deletedMark;
 	QString editedMark;
@@ -101,8 +105,16 @@ public:
 	bool showAttachPopup;
 	bool showEmojiPopup;
 
+	bool showMyProfileInDrawer;
+	bool showBotsInDrawer;
+	bool showNewGroupInDrawer;
+	bool showNewChannelInDrawer;
+	bool showContactsInDrawer;
+	bool showCallsInDrawer;
+	bool showSavedMessagesInDrawer;
 	bool showLReadToggleInDrawer;
 	bool showSReadToggleInDrawer;
+	bool showNightModeToggleInDrawer;
 	bool showGhostToggleInDrawer;
 	bool showStreamerToggleInDrawer;
 
@@ -116,6 +128,7 @@ public:
 	bool hideAllChatsFolder;
 
 	int channelBottomButton;
+	bool quickAdminShortcuts;
 
 	int showPeerId;
 	bool showMessageSeconds;
@@ -124,6 +137,10 @@ public:
 	bool stickerConfirmation;
 	bool gifConfirmation;
 	bool voiceConfirmation;
+
+	QString translationProvider;
+
+	bool crashReporting;
 };
 
 void set_sendReadMessages(bool val);
@@ -158,6 +175,9 @@ void set_spoofWebviewAsAndroid(bool val);
 void set_increaseWebviewHeight(bool val);
 void set_increaseWebviewWidth(bool val);
 
+void set_materialSwitches(bool val);
+void set_removeMessageTail(bool val);
+
 void set_disableNotificationsDelay(bool val);
 void set_localPremium(bool val);
 void set_hideChannelReactions(bool val);
@@ -165,6 +185,7 @@ void set_hideGroupReactions(bool val);
 
 void set_appIcon(const QString &val);
 void set_simpleQuotesAndReplies(bool val);
+void set_hideFastShare(bool val);
 void set_replaceBottomInfoWithIcons(bool val);
 void set_deletedMark(const QString &val);
 void set_editedMark(const QString &val);
@@ -185,8 +206,16 @@ void set_showAutoDeleteButtonInMessageField(bool val);
 void set_showAttachPopup(bool val);
 void set_showEmojiPopup(bool val);
 
+void set_showMyProfileInDrawer(bool val);
+void set_showBotsInDrawer(bool val);
+void set_showNewGroupInDrawer(bool val);
+void set_showNewChannelInDrawer(bool val);
+void set_showContactsInDrawer(bool val);
+void set_showCallsInDrawer(bool val);
+void set_showSavedMessagesInDrawer(bool val);
 void set_showLReadToggleInDrawer(bool val);
 void set_showSReadToggleInDrawer(bool val);
+void set_showNightModeToggleInDrawer(bool val);
 void set_showGhostToggleInDrawer(bool val);
 void set_showStreamerToggleInDrawer(bool val);
 
@@ -200,6 +229,7 @@ void set_hideNotificationBadge(bool val);
 void set_hideAllChatsFolder(bool val);
 
 void set_channelBottomButton(int val);
+void set_quickAdminShortcuts(bool val);
 
 void set_showPeerId(int val);
 void set_showMessageSeconds(bool val);
@@ -208,6 +238,10 @@ void set_showMessageShot(bool val);
 void set_stickerConfirmation(bool val);
 void set_gifConfirmation(bool val);
 void set_voiceConfirmation(bool val);
+
+void set_translationProvider(const QString &val);
+
+void set_crashReporting(bool val);
 
 inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nlohmann_json_t) {
 	NLOHMANN_JSON_TO(sendReadMessages)
@@ -232,10 +266,13 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(spoofWebviewAsAndroid)
 	NLOHMANN_JSON_TO(increaseWebviewHeight)
 	NLOHMANN_JSON_TO(increaseWebviewWidth)
+	NLOHMANN_JSON_TO(materialSwitches)
+	NLOHMANN_JSON_TO(removeMessageTail)
 	NLOHMANN_JSON_TO(disableNotificationsDelay)
 	NLOHMANN_JSON_TO(localPremium)
 	NLOHMANN_JSON_TO(appIcon)
 	NLOHMANN_JSON_TO(simpleQuotesAndReplies)
+	NLOHMANN_JSON_TO(hideFastShare)
 	NLOHMANN_JSON_TO(replaceBottomInfoWithIcons)
 	NLOHMANN_JSON_TO(deletedMark)
 	NLOHMANN_JSON_TO(editedMark)
@@ -252,8 +289,16 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(showAutoDeleteButtonInMessageField)
 	NLOHMANN_JSON_TO(showAttachPopup)
 	NLOHMANN_JSON_TO(showEmojiPopup)
+	NLOHMANN_JSON_TO(showMyProfileInDrawer)
+	NLOHMANN_JSON_TO(showBotsInDrawer)
+	NLOHMANN_JSON_TO(showNewGroupInDrawer)
+	NLOHMANN_JSON_TO(showNewChannelInDrawer)
+	NLOHMANN_JSON_TO(showContactsInDrawer)
+	NLOHMANN_JSON_TO(showCallsInDrawer)
+	NLOHMANN_JSON_TO(showSavedMessagesInDrawer)
 	NLOHMANN_JSON_TO(showLReadToggleInDrawer)
 	NLOHMANN_JSON_TO(showSReadToggleInDrawer)
+	NLOHMANN_JSON_TO(showNightModeToggleInDrawer)
 	NLOHMANN_JSON_TO(showGhostToggleInDrawer)
 	NLOHMANN_JSON_TO(showStreamerToggleInDrawer)
 	NLOHMANN_JSON_TO(showGhostToggleInTray)
@@ -265,12 +310,15 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(hideNotificationBadge)
 	NLOHMANN_JSON_TO(hideAllChatsFolder)
 	NLOHMANN_JSON_TO(channelBottomButton)
+	NLOHMANN_JSON_TO(quickAdminShortcuts)
 	NLOHMANN_JSON_TO(showPeerId)
 	NLOHMANN_JSON_TO(showMessageSeconds)
 	NLOHMANN_JSON_TO(showMessageShot)
 	NLOHMANN_JSON_TO(stickerConfirmation)
 	NLOHMANN_JSON_TO(gifConfirmation)
 	NLOHMANN_JSON_TO(voiceConfirmation)
+	NLOHMANN_JSON_TO(translationProvider)
+	NLOHMANN_JSON_TO(crashReporting)
 }
 
 inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nlohmann_json_t) {
@@ -297,10 +345,13 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(spoofWebviewAsAndroid)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(increaseWebviewHeight)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(increaseWebviewWidth)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(materialSwitches)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(removeMessageTail)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableNotificationsDelay)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(localPremium)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(appIcon)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(simpleQuotesAndReplies)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideFastShare)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(replaceBottomInfoWithIcons)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(deletedMark)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(editedMark)
@@ -317,8 +368,16 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAutoDeleteButtonInMessageField)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAttachPopup)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showEmojiPopup)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMyProfileInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showBotsInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showNewGroupInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showNewChannelInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showContactsInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showCallsInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showSavedMessagesInDrawer)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showLReadToggleInDrawer)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showSReadToggleInDrawer)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showNightModeToggleInDrawer)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGhostToggleInDrawer)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showStreamerToggleInDrawer)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showGhostToggleInTray)
@@ -330,23 +389,29 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideNotificationBadge)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideAllChatsFolder)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(channelBottomButton)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(quickAdminShortcuts)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showPeerId)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageSeconds)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageShot)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(stickerConfirmation)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(gifConfirmation)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(voiceConfirmation)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(translationProvider)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(crashReporting)
 }
 
 AyuGramSettings &getInstance();
 
 void load();
 void save();
+void reset();
 
 rpl::producer<QString> get_deletedMarkReactive();
 rpl::producer<QString> get_editedMarkReactive();
 
 rpl::producer<int> get_showPeerIdReactive();
+
+rpl::producer<QString> get_translationProviderReactive();
 
 bool isGhostModeActive();
 bool isUseScheduledMessages();

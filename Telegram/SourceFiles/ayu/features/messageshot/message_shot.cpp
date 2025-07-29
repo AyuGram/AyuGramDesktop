@@ -6,8 +6,8 @@
 // Copyright @Radolyn, 2025
 #include "message_shot.h"
 
-#include "styles/style_layers.h"
 #include "styles/style_ayu_styles.h"
+#include "styles/style_layers.h"
 
 #include "qguiapplication.h"
 #include "ayu/ui/boxes/message_shot_box.h"
@@ -20,8 +20,8 @@
 #include "history/history.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item.h"
-#include "history/view/history_view_element.h"
 #include "history/history_item_components.h"
+#include "history/view/history_view_element.h"
 #include "history/view/media/history_view_media.h"
 #include "main/main_session.h"
 #include "styles/style_chat.h"

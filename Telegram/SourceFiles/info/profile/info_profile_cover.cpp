@@ -729,17 +729,43 @@ Cover::Cover(
 			::Settings::ShowEmojiStatusPremium(_controller, _peer);
 		}
 	});
-	if (_peer->isUser() && (isExteraPeer(getBareID(_peer)) || isSupporterPeer(getBareID(_peer)))) {
+
+	const auto isCustomBadge = isCustomBadgePeer(getBareID(_peer));
+	const auto isExtera = isExteraPeer(getBareID(_peer));
+	const auto isSupporter = isSupporterPeer(getBareID(_peer));
+
+	if (isExtera || isSupporter || isCustomBadge) {
 		_exteraBadge->setPremiumClickCallback([=]
 		{
 			TextWithEntities text;
-			if (isExteraPeer(getBareID(_peer))) {
-				text = tr::ayu_DeveloperPopup(
-					tr::now,
-					lt_item,
-					TextWithEntities{_peer->name()},
-					Ui::Text::RichLangValue);
-			} else if (isSupporterPeer(getBareID(_peer))) {
+			if (isCustomBadge) {
+				const auto custom = getCustomBadge(getBareID(_peer));
+				text = custom.text.isEmpty()
+						   ? (isExtera
+								  ? tr::ayu_DeveloperPopup(
+									  tr::now,
+									  lt_item,
+									  TextWithEntities{_peer->name()},
+									  Ui::Text::RichLangValue)
+								  : tr::ayu_SupporterPopup(
+									  tr::now,
+									  lt_item,
+									  TextWithEntities{_peer->name()},
+									  Ui::Text::RichLangValue))
+						   : Ui::Text::RichLangValue(custom.text);
+			} else if (isExtera) {
+				text = _peer->isUser()
+						   ? tr::ayu_DeveloperPopup(
+							   tr::now,
+							   lt_item,
+							   TextWithEntities{_peer->name()},
+							   Ui::Text::RichLangValue)
+						   : tr::ayu_OfficialResourcePopup(
+							   tr::now,
+							   lt_item,
+							   TextWithEntities{_peer->name()},
+							   Ui::Text::RichLangValue);
+			} else if (isSupporter) {
 				text = tr::ayu_SupporterPopup(
 					tr::now,
 					lt_item,

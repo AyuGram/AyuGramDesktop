@@ -18,6 +18,7 @@
 #include <fstream>
 
 #include "ayu_worker.h"
+#include "features/translator/ayu_translator.h"
 #include "window/window_controller.h"
 
 using json = nlohmann::json;
@@ -40,6 +41,8 @@ rpl::variable<QString> deletedMarkReactive;
 rpl::variable<QString> editedMarkReactive;
 
 rpl::variable<int> showPeerIdReactive;
+
+rpl::variable<QString> translationProviderReactive;
 
 rpl::variable<bool> hideFromBlockedReactive;
 rpl::event_stream<> historyUpdateReactive;
@@ -137,6 +140,7 @@ void postinitialize() {
 	deletedMarkReactive = settings->deletedMark;
 	editedMarkReactive = settings->editedMark;
 	showPeerIdReactive = settings->showPeerId;
+	translationProviderReactive = settings->translationProvider;
 
 	hideFromBlockedReactive = settings->hideFromBlocked;
 
@@ -194,6 +198,15 @@ void save() {
 	postinitialize();
 }
 
+void reset() {
+	lifetime.destroy();
+	lifetime = rpl::lifetime();
+	settings = std::nullopt;
+	initialize();
+	postinitialize();
+	save();
+}
+
 AyuGramSettings::AyuGramSettings() {
 	// ~ Ghost essentials
 	sendReadMessages = true;
@@ -229,6 +242,9 @@ AyuGramSettings::AyuGramSettings() {
 	increaseWebviewHeight = false;
 	increaseWebviewWidth = false;
 
+	materialSwitches = true;
+	removeMessageTail = false;
+
 	disableNotificationsDelay = false;
 	localPremium = false;
 	showChannelReactions = true;
@@ -243,6 +259,7 @@ AyuGramSettings::AyuGramSettings() {
 #endif
 	;
 	simpleQuotesAndReplies = true;
+	hideFastShare = false;
 	replaceBottomInfoWithIcons = true;
 	deletedMark = "🧹";
 	editedMark = Core::IsAppLaunched() ? tr::lng_edited(tr::now) : QString("edited");
@@ -267,8 +284,17 @@ AyuGramSettings::AyuGramSettings() {
 	showAttachPopup = true;
 	showEmojiPopup = true;
 
+	// ~ Drawer Elements
+	showMyProfileInDrawer = true;
+	showBotsInDrawer = true;
+	showNewGroupInDrawer = true;
+	showNewChannelInDrawer = true;
+	showContactsInDrawer = true;
+	showCallsInDrawer = true;
+	showSavedMessagesInDrawer = true;
 	showLReadToggleInDrawer = false;
 	showSReadToggleInDrawer = true;
+	showNightModeToggleInDrawer = true;
 	showGhostToggleInDrawer = true;
 	showStreamerToggleInDrawer = false;
 
@@ -287,6 +313,7 @@ AyuGramSettings::AyuGramSettings() {
 		 * channelBottomButton = 2 means "Discuss" + fallback to "Mute"/"Unmute"
 	*/
 	channelBottomButton = 2;
+	quickAdminShortcuts = true;
 
 	/*
 		 * showPeerId = 0 means no ID shown
@@ -301,6 +328,10 @@ AyuGramSettings::AyuGramSettings() {
 	stickerConfirmation = false;
 	gifConfirmation = false;
 	voiceConfirmation = false;
+
+	translationProvider = "telegram"; // telegram, google, yandex
+
+	crashReporting = true;
 }
 
 void set_sendReadMessages(bool val) {
@@ -411,6 +442,14 @@ void set_increaseWebviewWidth(bool val) {
 	settings->increaseWebviewWidth = val;
 }
 
+void set_materialSwitches(bool val) {
+	settings->materialSwitches = val;
+}
+
+void set_removeMessageTail(bool val) {
+	settings->removeMessageTail = val;
+}
+
 void set_disableNotificationsDelay(bool val) {
 	settings->disableNotificationsDelay = val;
 }
@@ -433,6 +472,10 @@ void set_appIcon(const QString &val) {
 
 void set_simpleQuotesAndReplies(bool val) {
 	settings->simpleQuotesAndReplies = val;
+}
+
+void set_hideFastShare(bool val) {
+	settings->hideFastShare = val;
 }
 
 void set_replaceBottomInfoWithIcons(bool val) {
@@ -508,12 +551,44 @@ void set_showEmojiPopup(bool val) {
 	triggerHistoryUpdate();
 }
 
+void set_showMyProfileInDrawer(bool val) {
+	settings->showMyProfileInDrawer = val;
+}
+
+void set_showBotsInDrawer(bool val) {
+	settings->showBotsInDrawer = val;
+}
+
+void set_showNewGroupInDrawer(bool val) {
+	settings->showNewGroupInDrawer = val;
+}
+
+void set_showNewChannelInDrawer(bool val) {
+	settings->showNewChannelInDrawer = val;
+}
+
+void set_showContactsInDrawer(bool val) {
+	settings->showContactsInDrawer = val;
+}
+
+void set_showCallsInDrawer(bool val) {
+	settings->showCallsInDrawer = val;
+}
+
+void set_showSavedMessagesInDrawer(bool val) {
+	settings->showSavedMessagesInDrawer = val;
+}
+
 void set_showLReadToggleInDrawer(bool val) {
 	settings->showLReadToggleInDrawer = val;
 }
 
 void set_showSReadToggleInDrawer(bool val) {
 	settings->showSReadToggleInDrawer = val;
+}
+
+void set_showNightModeToggleInDrawer(bool val) {
+	settings->showNightModeToggleInDrawer = val;
 }
 
 void set_showGhostToggleInDrawer(bool val) {
@@ -557,6 +632,10 @@ void set_channelBottomButton(int val) {
 	settings->channelBottomButton = val;
 }
 
+void set_quickAdminShortcuts(bool val) {
+	settings->quickAdminShortcuts = val;
+}
+
 void set_showMessageSeconds(bool val) {
 	settings->showMessageSeconds = val;
 }
@@ -577,6 +656,16 @@ void set_voiceConfirmation(bool val) {
 	settings->voiceConfirmation = val;
 }
 
+void set_translationProvider(const QString &val) {
+	settings->translationProvider = val;
+	translationProviderReactive = val;
+	Ayu::Translator::TranslateManager::currentInstance()->resetCache();
+}
+
+void set_crashReporting(bool val) {
+	settings->crashReporting = val;
+}
+
 bool isUseScheduledMessages() {
 	return isGhostModeActive() && settings->useScheduledMessages;
 }
@@ -595,6 +684,10 @@ rpl::producer<QString> get_editedMarkReactive() {
 
 rpl::producer<int> get_showPeerIdReactive() {
 	return showPeerIdReactive.value();
+}
+
+rpl::producer<QString> get_translationProviderReactive() {
+	return translationProviderReactive.value();
 }
 
 rpl::producer<bool> get_ghostModeEnabledReactive() {

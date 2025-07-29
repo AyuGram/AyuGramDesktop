@@ -58,7 +58,7 @@ void drawIcon(QPainter &p, const QImage &icon, int xOffset, int yOffset, float s
 	);
 	p.restore();
 
-	auto rect = QRect(
+	const auto rect = QRect(
 		xOffset + st::cpImagePadding,
 		yOffset + st::cpImagePadding,
 		st::cpIconSize,
@@ -87,6 +87,7 @@ IconPicker::IconPicker(QWidget *parent)
 IconPicker::~IconPicker() {
 	cachedIcons.clear();
 }
+
 void IconPicker::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 	PainterHighQualityEnabler hq(p);

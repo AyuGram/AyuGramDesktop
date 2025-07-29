@@ -32,7 +32,8 @@ namespace {
 	return content.badge == BadgeType::Premium
 		|| (content.badge == BadgeType::Verified && content.emojiStatusId)
 		|| (content.badge == BadgeType::Extera)
-		|| (content.badge == BadgeType::ExteraSupporter);
+		|| (content.badge == BadgeType::ExteraSupporter)
+		|| (content.badge == BadgeType::ExteraCustom);
 }
 
 } // namespace
@@ -88,6 +89,7 @@ void Badge::setContent(Content content) {
 	_view.create(_parent);
 	_view->show();
 	switch (_content.badge) {
+	case BadgeType::ExteraCustom:
 	case BadgeType::Verified:
 	case BadgeType::BotVerified:
 	case BadgeType::Premium: {

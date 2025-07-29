@@ -12,7 +12,7 @@
 
 constexpr auto kMaxChannelId = -1000000000000;
 
-QString IDString(not_null<PeerData*> peer) {
+QString IDString(const not_null<PeerData*> peer) {
 	auto resultId = QString::number(getBareID(peer));
 
 	const auto &settings = AyuSettings::getInstance();
@@ -27,10 +27,8 @@ QString IDString(not_null<PeerData*> peer) {
 	return resultId;
 }
 
-QString IDString(MsgId topic_root_id) {
-	auto resultId = QString::number(topic_root_id.bare);
-
-	return resultId;
+QString IDString(MsgId topicRootId) {
+	return QString::number(topicRootId.bare);
 }
 
 rpl::producer<TextWithEntities> IDValue(not_null<PeerData*> peer) {
