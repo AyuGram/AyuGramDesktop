@@ -221,7 +221,7 @@ bool isAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items) {
 }
 
 bool isAyuForwardNeeded(not_null<HistoryItem*> item) {
-	if (item->isDeleted() || item->isAyuNoForwards() || item->ttlDestroyAt()) {
+	if (item->isDeleted() || item->isAyuNoForwards() || item->unsupportedTTL()) {
 		return true;
 	}
 	return false;
