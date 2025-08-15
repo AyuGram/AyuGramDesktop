@@ -79,7 +79,9 @@ brew install --cask ayugram
 
 ### NixOS
 
-Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
+Установите `ayugram-desktop` из [nixpkgs](https://search.nixos.org/packages?channel=unstable&type=packages&query=ayugram-desktop).
+
+Проверьте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop) для получения информации о flake.
 
 ### ALT Linux
 
