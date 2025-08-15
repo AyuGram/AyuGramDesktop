@@ -71,3 +71,5 @@ exteraBadgeToast: Toast(defaultToast) {
 }
 
 supportLogoSize: 96px;
+
+unreadPillPadding: 12px;

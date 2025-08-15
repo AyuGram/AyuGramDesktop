@@ -424,7 +424,7 @@ historyStatusFgActive: windowActiveTextFg;
 historyStatusFgTyping: historyStatusFgActive;
 
 historyUnreadBarHeight: 32px;
-historyUnreadBarMargin: 8px;
+historyUnreadBarMargin: 3px;
 historyUnreadBarFont: semiboldFont;
 
 historyForwardChooseMargins: margins(30px, 10px, 30px, 10px);

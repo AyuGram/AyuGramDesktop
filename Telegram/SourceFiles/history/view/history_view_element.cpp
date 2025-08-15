@@ -56,9 +56,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/ayu_state.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "styles/style_ayu_styles.h"
 
 
 namespace HistoryView {
@@ -375,7 +375,7 @@ void UnreadBar::paint(
 	}
 
 	const auto st = context.st;
-	const auto bottom = y + height();
+	/*const auto bottom = y + height();
 	y += marginTop();
 	p.fillRect(
 		0,
@@ -388,7 +388,7 @@ void UnreadBar::paint(
 		bottom - st::lineWidth,
 		w,
 		st::lineWidth,
-		st->historyUnreadBarBorder());
+		st->historyUnreadBarBorder());*/
 	p.setFont(st::historyUnreadBarFont);
 	p.setPen(st->historyUnreadBarFg());
 
@@ -402,13 +402,31 @@ void UnreadBar::paint(
 	}
 	w = maxwidth;
 
-	const auto skip = st::historyUnreadBarHeight
-		- 2 * st::lineWidth
-		- st::historyUnreadBarFont->height;
-	p.drawText(
-		(w - width) / 2,
-		y + (skip / 2) + st::historyUnreadBarFont->ascent,
-		text);
+	{
+		auto hq = PainterHighQualityEnabler(p);
+
+		// `width` - width of the text
+		const auto pillWidth = width + 2 * st::unreadPillPadding;
+		const auto pillHeight = height() - marginTop();
+		const auto pillX = (w - pillWidth) / 2;
+		const auto pillY = y + marginTop();
+
+		QPainterPath path;
+		path.addRoundedRect(pillX,
+							pillY,
+							pillWidth,
+							pillHeight,
+							static_cast<double>(pillHeight) / 2,
+							static_cast<double>(pillHeight) / 2);
+		p.fillPath(path, st->historyUnreadBarBg());
+
+		const auto textY = pillY
+			+ (pillHeight - st::historyUnreadBarFont->height) / 2
+			+ st::historyUnreadBarFont->ascent;
+
+		p.drawText((w - width) / 2, textY, text);
+	}
+
 	if (previousTranslation != 0) {
 		p.translate(previousTranslation, 0);
 	}
