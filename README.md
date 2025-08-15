@@ -80,7 +80,9 @@ Note: these binaries aren't officially maintained by us.
 
 ### NixOS
 
-See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
+Install from `ayugram-desktop` from [nixpkgs](https://search.nixos.org/packages?channel=unstable&type=packages&query=ayugram-desktop).
+
+See [this repository](https://github.com/ayugram-port/ayugram-desktop) for flake.
 
 ### ALT Linux
 
