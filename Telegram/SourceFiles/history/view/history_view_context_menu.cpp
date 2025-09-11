@@ -98,6 +98,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/forward/ayu_forward.h"
 #include "ayu/ui/context_menu/context_menu.h"
 
 
@@ -1401,7 +1402,7 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	}
 	AddMessageActions(result, request, list);
 
-	/*const auto wasAmount = result->actions().size();*/
+	const auto wasAmount = result->actions().size();
 	if (const auto textItem = view ? view->textItem() : item) {
 		AddEmojiPacksAction(
 			result,
@@ -1409,10 +1410,10 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 			HistoryView::EmojiPacksSource::Message,
 			list->controller());
 	}
-	/*{
+	if (item) {
 		const auto added = (result->actions().size() > wasAmount);
 		AddSelectRestrictionAction(result, item, !added);
-	}*/
+	}
 	if (hasWhoReactedItem) {
 		AddWhoReactedAction(result, list, item, list->controller());
 	} else if (item) {
@@ -2058,7 +2059,7 @@ void AddSelectRestrictionAction(
 		not_null<HistoryItem*> item,
 		bool addIcon) {
 	const auto peer = item->history()->peer;
-	if ((peer->allowsForwarding() && !item->forbidsForward())
+	if ((!peer->isAyuNoForwards() && !AyuForward::isAyuForwardNeeded(item))
 		|| item->isSponsored()) {
 		return;
 	}
@@ -2072,13 +2073,7 @@ void AddSelectRestrictionAction(
 		addIcon
 			? st::historySponsoredAboutMenuLabelPosition
 			: st::historyHasCustomEmojiPosition,
-		(peer->isMegagroup()
-			? tr::lng_context_noforwards_info_group
-			: (peer->isChannel())
-			? tr::lng_context_noforwards_info_channel
-			: (peer->isUser() && peer->asUser()->isBot())
-			? tr::lng_context_noforwards_info_channel
-			: tr::lng_context_noforwards_info_bot)(
+		tr::ayu_UnforwardableContextMenuText(
 			tr::now,
 			Ui::Text::RichLangValue),
 		addIcon ? &st::menuIconCopyright : nullptr);
