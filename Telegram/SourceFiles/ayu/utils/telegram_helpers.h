@@ -10,16 +10,14 @@
 #include "ayu/data/entities.h"
 
 #include "core/application.h"
+#include "data/data_media_types.h"
 #include "dialogs/dialogs_main_list.h"
 #include "info/profile/info_profile_badge.h"
-#include "main/main_domain.h"
-#include "data/data_poll.h"
-#include "data/data_media_types.h"
 
 using UsernameResolverCallback = Fn<void(const QString &, UserData *)>;
 
 Main::Session *getSession(ID userId);
-void dispatchToMainThread(std::function<void()> callback, int delay = 0);
+void dispatchToMainThread(const std::function<void()> &callback, int delay = 0);
 ID getDialogIdFromPeer(not_null<PeerData*> peer);
 
 ID getBareID(not_null<PeerData*> peer);
@@ -63,4 +61,4 @@ void searchById(ID userId, Main::Session *session, const UsernameResolverCallbac
 ID getUserIdFromPackId(uint64 id);
 
 TextWithTags extractText(not_null<HistoryItem*> item);
-bool mediaDownloadable(Data::Media* media);
+bool mediaDownloadable(const Data::Media* media);

@@ -55,7 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 // AyuGram includes
-#include "ayu/features/messageshot/message_shot.h"
+#include "ayu/features/message_shot/message_shot.h"
 
 
 namespace HistoryView {

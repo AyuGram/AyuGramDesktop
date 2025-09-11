@@ -180,8 +180,8 @@ set(ayugram_files
         ayu/features/streamer_mode/platform/streamer_mode_mac.h
         ayu/features/streamer_mode/streamer_mode.cpp
         ayu/features/streamer_mode/streamer_mode.h
-        ayu/features/messageshot/message_shot.cpp
-        ayu/features/messageshot/message_shot.h
+        ayu/features/message_shot/message_shot.cpp
+        ayu/features/message_shot/message_shot.h
         ayu/features/forward/ayu_forward.cpp
         ayu/features/forward/ayu_forward.h
         ayu/features/forward/ayu_sync.cpp

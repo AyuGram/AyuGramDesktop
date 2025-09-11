@@ -6,7 +6,7 @@
 // Copyright @Radolyn, 2025
 #pragma once
 
-#include "ayu/features/messageshot/message_shot.h"
+#include "ayu/features/message_shot/message_shot.h"
 #include "ui/layers/box_content.h"
 
 class MessageShotBox : public Ui::BoxContent

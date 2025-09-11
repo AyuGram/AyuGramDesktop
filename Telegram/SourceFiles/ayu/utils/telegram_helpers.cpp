@@ -37,7 +37,9 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
+#include "data/data_poll.h"
 #include "data/data_saved_sublist.h"
+#include "main/main_domain.h"
 
 namespace {
 
@@ -59,7 +61,7 @@ Main::Session *getSession(ID userId) {
 	return nullptr;
 }
 
-void dispatchToMainThread(std::function<void()> callback, int delay) {
+void dispatchToMainThread(const std::function<void()> &callback, int delay) {
 	auto timer = new QTimer();
 	timer->moveToThread(qApp->thread());
 	timer->setSingleShot(true);
@@ -215,19 +217,19 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 }
 
 void MarkAsReadThread(not_null<Data::Thread*> thread) {
-	const auto readHistoryNative = [&](not_null<History*> history)
+	const auto readHistoryNative = [&](const not_null<History*> history)
 	{
 		history->owner().histories().readInbox(history);
 	};
 	const auto sendReadMentions = [=](
-		not_null<Data::Thread*> thread)
+		const not_null<Data::Thread*> threadInner)
 	{
-		readMentions(base::make_weak(thread));
+		readMentions(base::make_weak(threadInner));
 	};
 	const auto sendReadReactions = [=](
-		not_null<Data::Thread*> thread)
+		const not_null<Data::Thread*> threadInner)
 	{
-		readReactions(base::make_weak(thread));
+		readReactions(base::make_weak(threadInner));
 	};
 
 	if (thread->chatListBadgesState().unread) {
@@ -304,7 +306,7 @@ QString formatTTL(int time) {
 }
 
 QString getDCName(int dc) {
-	const auto getName = [=](int dc)
+	const auto getName = [=]
 	{
 		switch (dc) {
 			case 1:
@@ -320,7 +322,7 @@ QString getDCName(int dc) {
 		return {"DC_UNKNOWN"};
 	}
 
-	return QString("DC%1, %2").arg(dc).arg(getName(dc));
+	return QString("DC%1, %2").arg(dc).arg(getName());
 }
 
 QString getLocalizedAt() {
@@ -435,9 +437,7 @@ QString getMediaName(not_null<HistoryItem*> message) {
 
 	const auto media = message->media();
 
-	const auto document = media->document();
-
-	if (document) {
+	if (const auto document = media->document()) {
 		return document->filename();
 	}
 
@@ -801,7 +801,7 @@ TextWithTags extractText(not_null<HistoryItem*> item) {
 	return result;
 }
 
-bool mediaDownloadable(Data::Media *media) {
+bool mediaDownloadable(const Data::Media *media) {
 	if (!media
 		|| media->webpage() || media->poll() || media->game()
 		|| media->invoice() || media->location() || media->paper()

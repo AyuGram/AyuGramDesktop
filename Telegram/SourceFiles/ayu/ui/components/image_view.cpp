@@ -6,7 +6,7 @@
 // Copyright @Radolyn, 2025
 #include "image_view.h"
 
-#include "ayu/features/messageshot/message_shot.h"
+#include "ayu/features/message_shot/message_shot.h"
 #include "styles/style_ayu_styles.h"
 
 #include "ayu/utils/telegram_helpers.h"
