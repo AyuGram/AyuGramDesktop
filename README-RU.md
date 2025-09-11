@@ -11,6 +11,7 @@
 - Кастомизация шрифта
 - Режим Стримера
 - Локальный телеграм премиум
+- Переводчик
 - Превью медиа и быстрая реакция при сильном нажатии на тачпад (macOS)
 - Улучшенный вид
 
@@ -91,7 +92,9 @@ brew install --cask ayugram
 
 ### Любой другой Линукс дистрибутив
 
-Следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
+
+Или следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ### Примечания для Windows
 

@@ -12,6 +12,7 @@
 - Font customization
 - Streamer mode
 - Local Telegram Premium
+- Translator
 - Media preview & quick reaction on force click (macOS)
 - Enhanced appearance
 
@@ -93,7 +94,9 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 ### Any other Linux distro
 
-Follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
+
+Or follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ### Remarks for Windows
 
