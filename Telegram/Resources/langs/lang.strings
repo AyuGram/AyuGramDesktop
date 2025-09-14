@@ -7000,6 +7000,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_FiltersHideFromBlockedNote" = "Message filters were enabled.";
 "ayu_RegexFiltersEnableSharedInChats" = "Enable Shared Filters in Chats";
 "ayu_RegexFiltersAdd" = "Add Filter";
+"ayu_RegexFiltersAddDescription" = "You can use {link} to test and debug your regular expression.";
+"ayu_RegexFiltersAddDescription_link" = "regex101.com";
 "ayu_RegexFiltersEdit" = "Edit Filter";
 "ayu_RegexFiltersPlaceholder" = "Expression";
 "ayu_EnableExpression" = "Enable Filter";

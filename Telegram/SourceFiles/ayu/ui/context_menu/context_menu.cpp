@@ -13,6 +13,7 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
+#include "ayu/features/filters/shadow_ban_utils.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
@@ -210,6 +211,7 @@ void AddDeletedMessagesActions(PeerData *peerData,
 				->showSection(std::make_shared<MessageHistory::SectionMemento>(peerData, nullptr, topicId));
 		},
 		&st::menuIconArchive);
+	// todo view filters
 }
 
 void AddJumpToBeginningAction(PeerData *peerData,
@@ -311,6 +313,32 @@ void AddOpenChannelAction(PeerData *peerData,
 			sessionController->showPeerHistory(chat, Window::SectionShow::Way::Forward);
 		},
 		&st::menuIconChannel);
+}
+
+void AddShadowBanAction(PeerData *peerData,
+	const Window::PeerMenuCallback &addCallback) {
+	const auto &settings = AyuSettings::getInstance();
+	if (!peerData || !peerData->isUser() || !settings.filtersEnabled) {
+		return;
+	}
+
+	const auto realId = peerData->id.value & PeerId::kChatTypeMask;
+	const auto toggleShadowBan = [=]
+	{
+		if (ShadowBanUtils::isShadowBanned(realId)) {
+			ShadowBanUtils::removeShadowBan(realId);
+		} else {
+			ShadowBanUtils::addShadowBan(realId);
+		}
+	};
+
+	addCallback({
+	.text = (ShadowBanUtils::isShadowBanned(realId)
+		? tr::ayu_FiltersQuickUnshadowBan(tr::now)
+		: tr::ayu_FiltersQuickShadowBan(tr::now)),
+	.handler = toggleShadowBan,
+	.icon = &st::menuIconStealth,
+});
 }
 
 void AddDeleteOwnMessagesAction(PeerData *peerData,

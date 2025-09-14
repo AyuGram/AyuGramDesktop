@@ -148,6 +148,12 @@ set(ayugram_files
         ayu/ui/settings/settings_main.h
         ayu/ui/settings/settings_other.cpp
         ayu/ui/settings/settings_other.h
+        ayu/ui/settings/filters/settings_filters_list.cpp
+        ayu/ui/settings/filters/settings_filters_list.h
+        ayu/ui/settings/filters/peer_global_exclusion.cpp
+        ayu/ui/settings/filters/peer_global_exclusion.h
+        ayu/ui/settings/filters/edit_filter.cpp
+        ayu/ui/settings/filters/edit_filter.h
         ayu/ui/context_menu/context_menu.cpp
         ayu/ui/context_menu/context_menu.h
         ayu/ui/context_menu/menu_item_subtext.cpp
@@ -205,6 +211,14 @@ set(ayugram_files
         ayu/features/translator/implementations/telegram.h
         ayu/features/translator/implementations/base.cpp
         ayu/features/translator/implementations/base.h
+        ayu/features/filters/filters_controller.cpp
+        ayu/features/filters/filters_controller.h
+        ayu/features/filters/filters_cache_controller.cpp
+        ayu/features/filters/filters_cache_controller.h
+        ayu/features/filters/filters_utils.cpp
+        ayu/features/filters/filters_utils.h
+        ayu/features/filters/shadow_ban_utils.cpp
+        ayu/features/filters/shadow_ban_utils.h
         ayu/data/messages_storage.cpp
         ayu/data/messages_storage.h
         ayu/data/entities.h

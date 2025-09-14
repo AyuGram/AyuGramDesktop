@@ -44,7 +44,13 @@ rpl::variable<int> showPeerIdReactive;
 
 rpl::variable<QString> translationProviderReactive;
 
+rpl::variable<bool> filtersEnabledReactive;
+rpl::variable<bool> filtersEnabledInChatsReactive;
+rpl::variable<QString> shadowBanIdsReactive;
 rpl::variable<bool> hideFromBlockedReactive;
+
+rpl::event_stream<> filtersUpdateReactive; // triggered on adding / editing filter
+
 rpl::event_stream<> historyUpdateReactive;
 
 rpl::lifetime lifetime = rpl::lifetime();
@@ -142,6 +148,9 @@ void postinitialize() {
 	showPeerIdReactive = settings->showPeerId;
 	translationProviderReactive = settings->translationProvider;
 
+	filtersEnabledReactive = settings->filtersEnabled;
+	filtersEnabledInChatsReactive = settings->filtersEnabledInChats;
+	shadowBanIdsReactive = settings->shadowBanIds;
 	hideFromBlockedReactive = settings->hideFromBlocked;
 
 	ghostModeEnabled = ghostModeEnabled_util(settings.value());
@@ -226,6 +235,8 @@ AyuGramSettings::AyuGramSettings() {
 	saveForBots = false;
 
 	// ~ Message filters
+	filtersEnabled = false;
+	filtersEnabledInChats = false;
 	hideFromBlocked = false;
 
 	// ~ QoL toggles
@@ -395,6 +406,20 @@ void set_saveMessagesHistory(bool val) {
 
 void set_saveForBots(bool val) {
 	settings->saveForBots = val;
+}
+
+void set_filtersEnabled(bool val) {
+	settings->filtersEnabled = val;
+	filtersEnabledReactive = val;
+}
+void set_filtersEnabledInChats(bool val) {
+	settings->filtersEnabledInChats = val;
+	filtersEnabledInChatsReactive = val;
+}
+
+void set_shadowBanIds(const QString &val) {
+	settings->shadowBanIds = val;
+	shadowBanIdsReactive = val;
 }
 
 void set_hideFromBlocked(bool val) {
@@ -694,8 +719,24 @@ rpl::producer<bool> get_ghostModeEnabledReactive() {
 	return ghostModeEnabled.value();
 }
 
+rpl::producer<bool> get_filtersEnabledReactive() {
+	return filtersEnabledReactive.value();
+}
+rpl::producer<bool> get_filtersEnabledInChatsReactive() {
+	return filtersEnabledInChatsReactive.value();
+}
+rpl::producer<QString> get_shadowBanIdsReactive() {
+	return shadowBanIdsReactive.value();
+}
+
 rpl::producer<bool> get_hideFromBlockedReactive() {
 	return hideFromBlockedReactive.value();
+}
+void fire_filtersUpdate() {
+	filtersUpdateReactive.fire({});
+}
+rpl::producer<> get_filtersUpdate() {
+	return filtersUpdateReactive.events();
 }
 
 void triggerHistoryUpdate() {

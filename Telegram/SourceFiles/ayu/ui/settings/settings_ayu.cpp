@@ -9,6 +9,10 @@
 #include "lang_auto.h"
 #include "settings_ayu_utils.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/features/filters/filters_cache_controller.h"
+#include "boxes/peer_list_box.h"
+#include "filters/peer_global_exclusion.h"
+#include "filters/settings_filters_list.h"
 #include "settings/settings_common.h"
 #include "styles/style_settings.h"
 #include "ui/vertical_list.h"
@@ -242,6 +246,116 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 		container->lifetime());
 }
 
+void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
+	auto *settings = &AyuSettings::getInstance();
+
+	AddSubsectionTitle(container, tr::ayu_RegexFilters());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_RegexFiltersEnable(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->filtersEnabled)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->filtersEnabled);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_filtersEnabled(enabled);
+			AyuSettings::save();
+
+			FiltersCacheController::rebuildCache();
+		},
+		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_RegexFiltersEnableSharedInChats(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->filtersEnabledInChats)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->filtersEnabledInChats);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_filtersEnabledInChats(enabled);
+			AyuSettings::save();
+
+			FiltersCacheController::rebuildCache();
+		},
+		container->lifetime());
+
+
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_FiltersHideFromBlocked(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->hideFromBlocked)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->hideFromBlocked);
+		}) | start_with_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_hideFromBlocked(enabled);
+			AyuSettings::save();
+
+			FiltersCacheController::rebuildCache();
+		},
+		container->lifetime());
+
+
+}
+
+void SetupShared(not_null<Window::SessionController *> controller,
+				 Ui::VerticalLayout *container) {
+	Ui::AddSkip(container);
+
+	auto button = container->add(object_ptr<Ui::SettingsButton>(
+		container,
+		rpl::single(QString("Shared Filters"))
+	));
+	button->addClickHandler([=] {
+		controller->dialogId = std::nullopt; // ensure we're handling shared filters
+		controller->showExclude = false;
+		controller->showSettings(AyuFiltersList::Id());
+	});
+}
+
+void SetupExclusions(
+	not_null<Window::SessionController*> controller,
+	not_null<Ui::VerticalLayout*> container
+	) {
+
+	container->add(object_ptr<Ui::SettingsButton>(
+		container,
+		rpl::single(QString("Exclusions"))
+	))->addClickHandler([=] {
+		auto ctrl = std::make_unique<GlobalExclusionListController>(
+			&controller->session(),
+			controller
+			);
+
+		auto box = Box<PeerListBox>(std::move(ctrl), [](not_null<PeerListBox*> box) {
+			box->setTitle(rpl::single(QString("Exclusions")));
+			box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+		});
+
+		controller->show(std::move(box));
+	});
+}
 void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
@@ -327,7 +441,15 @@ void AyuGhost::setupContent(not_null<Window::SessionController*> controller) {
 	AddDivider(content);
 	AddSkip(content);
 
-	SetupMessageFilters(content);
+
+	SetupFiltersSettings(content);
+
+	AddDivider(content);
+
+	SetupShared(controller, content);
+
+	SetupExclusions(controller, content);
+
 
 	AddSkip(content);
 	AddDivider(content);

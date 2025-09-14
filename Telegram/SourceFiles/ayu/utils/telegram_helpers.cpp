@@ -7,6 +7,7 @@
 #include "telegram_helpers.h"
 
 #include <functional>
+#include <latch>
 #include <QTimer>
 
 #include "apiwrap.h"
@@ -38,9 +39,12 @@
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
 #include "data/data_poll.h"
+#include "ayu/features/filters/filters_controller.h"
 #include "data/data_saved_sublist.h"
 #include "main/main_domain.h"
 
+
+#include "unicode/regex.h"
 namespace {
 
 constexpr auto usernameResolverBotId = 8001593505L;
@@ -132,24 +136,7 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 		return true;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-	if (settings.hideFromBlocked) {
-		if (item->from()->isUser() &&
-			item->from()->asUser()->isBlocked()) {
-			// don't hide messages if it's a dialog with blocked user
-			return item->from()->asUser()->id != item->history()->peer->id;
-		}
-
-		if (const auto forwarded = item->Get<HistoryMessageForwarded>()) {
-			if (forwarded->originalSender &&
-				forwarded->originalSender->isUser() &&
-				forwarded->originalSender->asUser()->isBlocked()) {
-				return true;
-			}
-		}
-	}
-
-	return false;
+	return FiltersController::filtered(item);
 }
 
 void MarkAsReadChatList(not_null<Dialogs::MainList*> list) {
@@ -811,4 +798,45 @@ bool mediaDownloadable(const Data::Media *media) {
 		return false;
 	}
 	return true;
+}
+
+void resolveAllChats(const std::map<long long, QString> &peers) {
+	// not sure is this works
+	auto session = currentSession();
+
+	crl::async([=, &session]
+	{
+		while (!peers.empty()) {
+			for (const auto &[id, username] : peers) {
+				std::latch latch(1);
+
+				auto onSuccess = [=, &latch](const MTPChatInvite &invite) {
+
+					invite.match([=](const MTPDchatInvite &data) {},
+						[=](const MTPDchatInviteAlready &data) {
+						if (const auto chat = session->data().processChat(data.vchat())) {
+							if (const auto channel = chat->asChannel()) {
+								channel->clearInvitePeek();
+							}
+						}
+						}, [=](const MTPDchatInvitePeek &data) {});
+
+					latch.count_down();
+				};
+				auto onFail = [=, &latch](const MTP::Error &error) {
+					if (MTP::IsFloodError(error.type())) {
+						std::this_thread::sleep_for(std::chrono::seconds(20));
+					}
+					latch.count_down();
+				};
+
+				session->api().checkChatInvite(username, onSuccess, onFail);
+				latch.wait();
+			}
+		}
+	});
+}
+
+not_null<Main::Session *> currentSession() {
+	return &Core::App().domain().active().session();
 }

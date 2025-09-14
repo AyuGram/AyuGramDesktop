@@ -1579,6 +1579,7 @@ void Filler::fillProfileActions() {
 	addManageTopic();
 	addToggleTopicClosed();
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
+	AyuUi::AddShadowBanAction(_peer, _addAction);
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();

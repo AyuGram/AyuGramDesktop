@@ -59,6 +59,9 @@ public:
 
 	bool saveForBots;
 
+	QString shadowBanIds;
+	bool filtersEnabled;
+	bool filtersEnabledInChats;
 	bool hideFromBlocked;
 
 	bool disableAds;
@@ -160,6 +163,9 @@ void set_saveMessagesHistory(bool val);
 
 void set_saveForBots(bool val);
 
+void set_filtersEnabled(bool val);
+void set_filtersEnabledInChats(bool val);
+void set_shadowBanIds(const QString &val);
 void set_hideFromBlocked(bool val);
 
 void set_disableAds(bool val);
@@ -255,6 +261,9 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(saveDeletedMessages)
 	NLOHMANN_JSON_TO(saveMessagesHistory)
 	NLOHMANN_JSON_TO(saveForBots)
+	NLOHMANN_JSON_TO(shadowBanIds)
+	NLOHMANN_JSON_TO(filtersEnabled)
+	NLOHMANN_JSON_TO(filtersEnabledInChats)
 	NLOHMANN_JSON_TO(hideFromBlocked)
 	NLOHMANN_JSON_TO(disableAds)
 	NLOHMANN_JSON_TO(disableStories)
@@ -334,6 +343,9 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveDeletedMessages)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveMessagesHistory)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(saveForBots)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(filtersEnabled)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(filtersEnabledInChats)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(shadowBanIds)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(hideFromBlocked)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableAds)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(disableStories)
@@ -418,7 +430,13 @@ bool isUseScheduledMessages();
 
 rpl::producer<bool> get_ghostModeEnabledReactive();
 
+rpl::producer<bool> get_filtersEnabledReactive();
+rpl::producer<bool> get_filtersEnabledInChatsReactive();
+rpl::producer<QString> get_shadowBanIdsReactive();
 rpl::producer<bool> get_hideFromBlockedReactive();
+
+void fire_filtersUpdate();
+rpl::producer<> get_filtersUpdate();
 
 void triggerHistoryUpdate();
 rpl::producer<> get_historyUpdateReactive();

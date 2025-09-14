@@ -111,7 +111,7 @@ auto storage = make_storage(
 	),
 	make_table<RegexFilter>(
 		"RegexFilter",
-		make_column("id", &RegexFilter::id),
+		make_column("id", &RegexFilter::id, primary_key()),
 		make_column("text", &RegexFilter::text),
 		make_column("enabled", &RegexFilter::enabled),
 		make_column("reversed", &RegexFilter::reversed),
@@ -274,6 +274,166 @@ bool hasDeletedMessages(ID userId, ID dialogId, ID topicId) {
 	} catch (std::exception &ex) {
 		LOG(("Failed to check if dialog has deleted message: %1").arg(ex.what()));
 		return false;
+	}
+}
+template <typename T>
+std::vector<T> getAllT() {
+	try {
+		return storage.get_all<T>();
+	} catch (std::exception &ex) {
+		LOG(("Failed to get all: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+std::vector<RegexFilter> getAllRegexFilters() {
+	return getAllT<RegexFilter>();
+}
+
+std::vector<RegexFilterGlobalExclusion> getAllFiltersExclusions() {
+	return getAllT<RegexFilterGlobalExclusion>();
+}
+
+std::vector<RegexFilter> getExcludedByDialogId(ID dialogId) {
+	try {
+		return storage.get_all<RegexFilter>(
+			where(in(&RegexFilter::id,
+					 storage.select(columns(&RegexFilterGlobalExclusion::filterId),
+					 	where(is_equal(&RegexFilterGlobalExclusion::dialogId, dialogId))
+					 )
+			))
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to get excluded by dialog id: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+int getCount() {
+	try {
+		return storage.count<RegexFilter>();
+	} catch (std::exception &ex) {
+		LOG(("Failed to get count: %1").arg(ex.what()));
+		return 0;
+	}
+}
+
+RegexFilter getById(std::vector<char> id) {
+	try {
+		return storage.get<RegexFilter>(
+			where(column<RegexFilter>(&RegexFilter::id) == std::move(id))
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to get filters by id: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+std::vector<RegexFilter> getShared() {
+	try {
+		return storage.get_all<RegexFilter>(
+			where(is_null(column<RegexFilter>(&RegexFilter::dialogId)))
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to get shared filters: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+std::vector<RegexFilter> getByDialogId(ID dialogId) {
+	try {
+		return storage.get_all<RegexFilter>(
+			where(column<RegexFilter>(&RegexFilter::dialogId) == dialogId)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to get filters by dialog id: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+
+void addRegexFilter(const RegexFilter &filter) {
+	try {
+		storage.begin_transaction();
+		storage.replace(filter); // we're using replace as we set std::vector<char> as primary key
+		storage.commit();
+	} catch (std::exception &ex) {
+		LOG(("Failed to save regex filter for some reason: %1").arg(ex.what()));
+	}
+}
+
+void addRegexExclusion(const RegexFilterGlobalExclusion &exclusion) {
+	try {
+		storage.begin_transaction();
+		storage.insert(exclusion);
+		storage.commit();
+	} catch (std::exception &ex) {
+		LOG(("Failed to save regex filter exclusion for some reason: %1").arg(ex.what()));
+	}
+}
+
+void updateRegexFilter(const RegexFilter &filter) {
+	try {
+		storage.update_all(
+			set(
+				c(&RegexFilter::text) = filter.text,
+				c(&RegexFilter::enabled) = filter.enabled,
+				c(&RegexFilter::reversed) = filter.reversed,
+				c(&RegexFilter::caseInsensitive) = filter.caseInsensitive,
+				c(&RegexFilter::dialogId) = filter.dialogId
+			),
+			where(c(&RegexFilter::id) == filter.id)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to update regex filter for some reason: %1").arg(ex.what()));
+	}
+}
+
+void deleteFilter(const std::vector<char> &id) {
+	try {
+		storage.remove_all<RegexFilter>(
+			where(column<RegexFilter>(&RegexFilter::id) == id)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to delete regex filter for some reason: %1").arg(ex.what()));
+	}
+}
+
+void deleteExclusionsByFilterId(const std::vector<char> &id) {
+	try {
+		storage.remove_all<RegexFilterGlobalExclusion>(
+			where(column<RegexFilterGlobalExclusion>(&RegexFilterGlobalExclusion::filterId) == id)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to delete regex filter exclusion by filter id for some reason: %1").arg(ex.what()));
+	}
+}
+
+void deleteExclusion(ID dialogId, std::vector<char> filterId) {
+	try {
+		storage.remove_all<RegexFilterGlobalExclusion>(
+			where(column<RegexFilterGlobalExclusion>(&RegexFilterGlobalExclusion::filterId) == filterId and
+					column<RegexFilterGlobalExclusion>(&RegexFilterGlobalExclusion::dialogId) == dialogId
+				)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to delete regex filter exclusion for some reason: %1").arg(ex.what()));
+	}
+}
+
+void deleteAllFilters() {
+	try {
+		storage.remove_all<RegexFilter>();
+	} catch (std::exception &ex) {
+		LOG(("Failed to delete all regex filter for some reason: %1").arg(ex.what()));
+	}
+}
+
+void deleteAllExclusions() {
+	try {
+		storage.remove_all<RegexFilterGlobalExclusion>();
+	} catch (std::exception &ex) {
+		LOG(("Failed to delete all regex filter exclusions for some reason: %1").arg(ex.what()));
 	}
 }
 

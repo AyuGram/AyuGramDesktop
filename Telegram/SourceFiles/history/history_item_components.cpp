@@ -63,7 +63,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-
+#include "ayu/features/filters/filters_controller.h"
 
 namespace {
 
@@ -536,16 +536,21 @@ void HistoryMessageReply::updateData(
 		&& author->isUser()
 		&& author->asUser()->isBlocked();
 
+
+	const auto filtered = resolvedMessage &&
+			!resolvedMessage.empty() &&
+			FiltersController::filtered(resolvedMessage.get());
+
 	const auto displaying = resolvedMessage
 		|| resolvedStory
 		|| ((nonEmptyQuote || _fields.externalMedia)
 			&& (!_fields.messageId || force));
-	_displaying = displaying && !blocked ? 1 : 0;
+	_displaying = displaying && !blocked && !filtered ? 1 : 0;
 
 	const auto unavailable = !resolvedMessage
 		&& !resolvedStory
 		&& ((!_fields.storyId && !_fields.messageId) || force);
-	_unavailable = unavailable && !blocked ? 1 : 0;
+	_unavailable = unavailable && !blocked && !filtered ? 1 : 0;
 
 	if (force) {
 		if (!_displaying && (_fields.messageId || _fields.storyId)) {

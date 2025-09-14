@@ -20,4 +20,28 @@ void addDeletedMessage(const DeletedMessage &message);
 std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit);
 bool hasDeletedMessages(ID userId, ID dialogId, ID topicId);
 
+std::vector<RegexFilter> getAllRegexFilters();
+RegexFilter getById(std::vector<char> id);
+std::vector<RegexFilter> getShared();
+std::vector<RegexFilter> getByDialogId(ID dialogId);
+std::vector<RegexFilterGlobalExclusion> getAllFiltersExclusions();
+std::vector<RegexFilter> getExcludedByDialogId(ID dialogId);
+
+int getCount();
+
+
+void addRegexFilter(const RegexFilter &filter);
+void addRegexExclusion(const RegexFilterGlobalExclusion &exclusion);
+
+void updateRegexFilter(const RegexFilter &filter);
+
+void deleteFilter(const std::vector<char> &id);
+void deleteExclusionsByFilterId(const std::vector<char> &id);
+void deleteExclusion(ID dialogId, std::vector<char> filterId);
+
+void deleteAllFilters();
+void deleteAllExclusions();
+
+
+
 }

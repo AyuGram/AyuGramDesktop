@@ -12,6 +12,7 @@
 #include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
 #include "features/translator/ayu_translator.h"
+#include "features/filters/shadow_ban_utils.h"
 #include "lang/lang_instance.h"
 #include "utils/rc_manager.h"
 
@@ -52,12 +53,16 @@ void initTranslator() {
 	Ayu::Translator::TranslateManager::init();
 }
 
+void initShadowBan() {
+	ShadowBanUtils::reloadShadowBan();
+}
 void init() {
 	initLang();
 	initDatabase();
 	initUiSettings();
 	initWorker();
 	initRCManager();
+	initShadowBan();
 	initTranslator();
 }
 

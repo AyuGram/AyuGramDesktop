@@ -1592,7 +1592,7 @@ void Element::destroyUnreadBar() {
 }
 
 int Element::displayedDateHeight() const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
+	if (AyuFeatures::MessageShot::isTakingShot() || isMessageHidden(data())) {
 		return 0;
 	}
 

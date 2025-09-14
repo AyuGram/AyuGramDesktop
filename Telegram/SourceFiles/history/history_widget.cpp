@@ -661,7 +661,11 @@ HistoryWidget::HistoryWidget(
 		AyuSettings::get_hideFromBlockedReactive() | rpl::to_empty,
 		session().changes().peerUpdates(
 			Data::PeerUpdate::Flag::IsBlocked
-		) | rpl::to_empty
+		) | rpl::to_empty,
+		AyuSettings::get_filtersUpdate() | rpl::to_empty,
+		AyuSettings::get_filtersEnabledReactive() | rpl::to_empty,
+		AyuSettings::get_filtersEnabledInChatsReactive() | rpl::to_empty,
+		AyuSettings::get_shadowBanIdsReactive() | rpl::to_empty
 	) | rpl::start_with_next(
 		[=]
 		{
