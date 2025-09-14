@@ -1,0 +1,15 @@
+{
+  "strategy": "additive",
+  "featureFilters": {
+    "unidata": "include",
+    "conversion_mappings": "include",
+    "confusables": "include",
+    "stringprep": "include"
+  },
+  "localeFilter": {
+    "filterType": "language",
+    "includelist": [
+      "root"
+    ]
+  }
+}
