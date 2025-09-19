@@ -64,6 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "main/main_domain.h"
 #include "menu/menu_sponsored.h"
 #include "window/notifications_manager.h"
 #include "window/window_controller.h"
@@ -5237,6 +5238,54 @@ void InnerWidget::setupShortcuts() {
 			&& !_chatPreviewRow.key;
 	}) | rpl::start_with_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
+
+        const auto app = &Core::App();
+        request->check(Command::AccountNext) && request->handle([=] {
+    auto &domain = app->domain();
+    Main::Account &current = domain.active();
+    const auto &accounts = domain.accounts();
+
+    if (accounts.empty()) return false;
+
+    // Find current account position in the vector
+    int currentPos = -1;
+    for (int i = 0; i < static_cast<int>(accounts.size()); ++i) {
+        if (accounts[i].account.get() == &current) {
+            currentPos = i;
+            break;
+        }
+    }
+
+    if (currentPos >= 0) {
+        int nextPos = (currentPos + 1) % accounts.size();
+        Main::Account *accountToActivate = accounts[nextPos].account.get();
+        domain.activate(accountToActivate);
+    }
+    return true;
+});
+		request->check(Command::AccountPrev) && request->handle([=] {
+    auto &domain = app->domain();
+    Main::Account &current = domain.active();
+    const auto &accounts = domain.accounts();
+
+    if (accounts.empty()) return false;
+
+    // Find current account position in the vector
+    int currentPos = -1;
+    for (int i = 0; i < static_cast<int>(accounts.size()); ++i) {
+        if (accounts[i].account.get() == &current) {
+            currentPos = i;
+            break;
+        }
+    }
+
+    if (currentPos >= 0) {
+        int prevPos = (currentPos - 1 + accounts.size()) % accounts.size();
+        Main::Account *accountToActivate = accounts[prevPos].account.get();
+        domain.activate(accountToActivate);
+    }
+    return true;
+});
 
 		const auto row = _controller->activeChatEntryCurrent();
 		// Those should be computed before the call to request->handle.
