@@ -48,6 +48,9 @@ enum class Command {
 	ShowAccount5,
 	ShowAccount6,
 
+	AccountNext,
+	AccountPrev,
+
 	ShowAllChats,
 	ShowFolder1,
 	ShowFolder2,

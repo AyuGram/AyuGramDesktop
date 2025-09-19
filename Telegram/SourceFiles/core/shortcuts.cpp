@@ -110,6 +110,9 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"account5"_q          , Command::ShowAccount5 },
 	{ u"account6"_q          , Command::ShowAccount6 },
 
+	{ u"account_next"_q      , Command::AccountNext },
+	{ u"account_prev"_q      , Command::AccountPrev },
+
 	{ u"folder1"_q           , Command::ShowFolder1 },
 	{ u"folder2"_q           , Command::ShowFolder2 },
 	{ u"folder3"_q           , Command::ShowFolder3 },
@@ -502,6 +505,9 @@ void Manager::fillDefaults() {
 	set(u"ctrl+6"_q, Command::ChatPinned6);
 	set(u"ctrl+7"_q, Command::ChatPinned7);
 	set(u"ctrl+8"_q, Command::ChatPinned8);
+
+	set(u"ctrl++"_q, Command::AccountNext);
+	set(u"ctrl+-"_q, Command::AccountPrev);
 
 	auto &&folders = ranges::views::zip(
 		kShowFolder,

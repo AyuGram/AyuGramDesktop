@@ -8,6 +8,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_language_name" = "English";
 "lng_switch_to_this" = "Continue in English";
 
+"lng_shortcut_account_next" = "Switch to next account";
+"lng_shortcut_account_prev" = "Switch to previous account";
+
+
 "lng_menu_contacts" = "Contacts";
 "lng_menu_calls" = "Calls";
 "lng_menu_settings" = "Settings";
