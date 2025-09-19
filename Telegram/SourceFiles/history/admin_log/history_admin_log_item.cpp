@@ -1093,18 +1093,27 @@ void GenerateItems(
 			history->nextNonHistoryEntryId(),
 			PrepareLogMessage(action.vnew_message(), date),
 			MessageFlag::AdminLogEntry);
-		if (oldValue.text.isEmpty()) {
-			oldValue = PrepareText(
-				QString(),
-				tr::lng_admin_log_empty_text(tr::now));
+		if (changedMedia) {
+			addPart(
+				history->createItem(
+					history->nextNonHistoryEntryId(),
+					PrepareLogMessage(action.vprev_message(), date),
+					MessageFlag::AdminLogEntry),
+				ExtractSentDate(action.vprev_message()),
+				realId);
+		} else {
+			if (oldValue.text.isEmpty()) {
+				oldValue = PrepareText(
+					QString(),
+					tr::lng_admin_log_empty_text(tr::now));
+			}
+			body->addLogEntryOriginal(
+				id,
+				(canHaveCaption
+					? tr::lng_admin_log_previous_caption
+					: tr::lng_admin_log_previous_message)(tr::now),
+				oldValue);
 		}
-
-		body->addLogEntryOriginal(
-			id,
-			(canHaveCaption
-				? tr::lng_admin_log_previous_caption
-				: tr::lng_admin_log_previous_message)(tr::now),
-			oldValue);
 		addPart(body, sentDate, realId);
 	};
 
