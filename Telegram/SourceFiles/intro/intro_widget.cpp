@@ -157,7 +157,7 @@ Widget::Widget(
 		}, lifetime());
 	}
 
-	_footer->setText(QString("AyuGram Desktop v%1").arg(currentVersionText()));
+	_footer->setText(QString("DildoGram Desktop v%1").arg(currentVersionText()));
 }
 
 rpl::producer<> Widget::showSettingsRequested() const {

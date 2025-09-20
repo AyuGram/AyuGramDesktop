@@ -1,4 +1,4 @@
-// This is the source code of AyuGram for Desktop.
+// This is the source code of DildoGram for Desktop.
 //
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
@@ -86,7 +86,7 @@ void SetupCategories(
 	};
 
 	const auto categories = std::vector<CategoryInfo>{
-		{QString("AyuGram"), &st::menuIconGroupReactions, [=] { showOther(AyuGhost::Id()); }},
+		{QString("DildoGram"), &st::menuIconGroupReactions, [=] { showOther(AyuGhost::Id()); }},
 		// {QString("Filters"), &st::menuIconTagFilter, [=] { showOther(AyuFilters::Id()); }},
 		{tr::ayu_CategoryGeneral(tr::now), &st::menuIconShowAll, [=] { showOther(AyuGeneral::Id()); }},
 		{tr::ayu_CategoryAppearance(tr::now), &st::menuIconPalette, [=] { showOther(AyuAppearance::Id()); }},
@@ -186,7 +186,7 @@ void AyuMain::setupContent(not_null<Window::SessionController*> controller) {
 			content,
 			object_ptr<Ui::FlatLabel>(
 				content,
-				rpl::single(QString("AyuGram Desktop v") + QString::fromLatin1(AppVersionStr)),
+				rpl::single(QString("DildoGram Desktop v") + QString::fromLatin1(AppVersionStr)),
 				st::boxTitle)));
 
 	AddSkip(content);

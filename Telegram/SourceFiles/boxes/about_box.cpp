@@ -58,10 +58,10 @@ AboutBox::AboutBox(QWidget *parent, Window::SessionController* controller)
 }
 
 void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controller) {
-	box->setTitle(rpl::single(u"AyuGram Desktop"_q));
+	box->setTitle(rpl::single(u"DildoGram Desktop"_q));
 }
 void AboutBox::prepare() {
-	setTitle(rpl::single(u"AyuGram Desktop"_q));
+	setTitle(rpl::single(u"DildoGram Desktop"_q));
 
 	addButton(tr::lng_close(), [this] { closeBox(); });
 	addLeftButton(

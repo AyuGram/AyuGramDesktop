@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component type="desktop">
-    <id>com.ayugram.desktop</id>
+    <id>com.dildogram.desktop</id>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
-    <name>AyuGram Desktop</name>
-    <summary>Desktop version of AyuGram - ToS breaking Telegram client</summary>
+    <name>DildoGram Desktop</name>
+    <summary>Desktop version of DildoGram - ToS breaking Telegram client</summary>
     <description>
         <p>Telegram Desktop with Ghost Mode, Anti-Recall and cool design.</p>
     </description>
@@ -33,6 +33,7 @@
         <keyword>sms</keyword>
         <keyword>im</keyword>
         <keyword>ayugram</keyword>
+        <keyword>dildogram</keyword>
     </keywords>
     <requires>
         <display_length compare="ge">medium</display_length>
@@ -75,6 +76,6 @@
     </content_rating>
     <launchable type="desktop-id">com.ayugram.desktop.desktop</launchable>
     <provides>
-        <binary>AyuGram</binary>
+        <binary>DildoGram</binary>
     </provides>
 </component>

@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=DildoGram Desktop
+Comment=Desktop version of DildoGram - ToS breaking Telegram client
+TryExec=DildoGram
+Exec=env DESKTOPINTEGRATION=1 GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb WEBKIT_DISABLE_DMABUF_RENDERER=1 DildoGram -- %u
+Icon=com.dildogram.desktop
+Terminal=false
+StartupWMClass=DildoGram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;sms;telegram;tdesktop;
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=DildoGram -quit
+Name=Quit DildoGram
+Icon=application-exit
