@@ -101,6 +101,10 @@ PRIVATE
     ayugram::lib_icu
 )
 
+if (WIN32)
+    target_link_libraries(Telegram PRIVATE windowsapp)
+endif()
+
 set(ayugram_files
         ayu/ayu_worker.cpp
         ayu/ayu_worker.h

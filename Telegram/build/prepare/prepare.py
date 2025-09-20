@@ -989,6 +989,7 @@ win:
         -DCMAKE_DISABLE_FIND_PACKAGE_TIFF=TRUE ^
         -DCMAKE_DISABLE_FIND_PACKAGE_JPEG=TRUE ^
         -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE ^
+        -DCMAKE_DISABLE_FIND_PACKAGE_Doxygen=TRUE ^
         -DWITH_EXAMPLES=OFF
     cmake --build . --config Debug --parallel
     cmake --install . --config Debug

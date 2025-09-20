@@ -1,0 +1,216 @@
+name: Windows.
+
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win2.yml'
+      - 'lib/xdg/**'
+      - 'snap/**'
+      - 'Telegram/build/docker/**'
+      - 'Telegram/Resources/uwp/**'
+      - 'Telegram/SourceFiles/platform/linux/**'
+      - 'Telegram/SourceFiles/platform/mac/**'
+      - 'Telegram/Telegram/**'
+      - 'Telegram/configure.sh'
+      - 'Telegram/Telegram.plist'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win2.yml'
+      - 'lib/xdg/**'
+      - 'snap/**'
+      - 'Telegram/build/docker/**'
+      - 'Telegram/Resources/uwp/**'
+      - 'Telegram/SourceFiles/platform/linux/**'
+      - 'Telegram/SourceFiles/platform/mac/**'
+      - 'Telegram/Telegram/**'
+      - 'Telegram/configure.sh'
+      - 'Telegram/Telegram.plist'
+
+jobs:
+
+  build-libraries:
+    name: Build Libraries
+    runs-on: windows-latest
+
+    outputs:
+      cache-hit: ${{ steps.check-cache.outputs.cache-hit }}
+      cache-key: ${{ env.CACHE_KEY }}
+
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Prepare directories
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo REPO_NAME=${{ github.event.repository.name }}>>%GITHUB_ENV%
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Calculate cache key
+        shell: bash
+        run: |
+          echo "$(sha256sum $TBUILD/$REPO_NAME/Telegram/build/prepare/prepare.py | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$(find $TBUILD/$REPO_NAME/Telegram/ThirdParty -name "*.cmake" -o -name "*.py" | sort | xargs sha256sum | sha256sum | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "x64" >> CACHE_KEY.txt
+          echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+
+      - name: Check if exact cache exists
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+          lookup-only: true
+
+      - name: NuGet sources
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: Restore partial cache
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-libs-
+
+      - name: Build Libraries
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_VERSION: 2022
+        run: |
+          cd %TBUILD%
+          %REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Clean temporary files
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          cd %TBUILD%
+          del /S Libraries\*.pdb
+          del /S Libraries\*.pch
+          del /S Libraries\*.obj
+
+      - name: Save Libraries cache
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+
+  build-desktop:
+    name: Build Desktop
+    needs: build-libraries
+    runs-on: windows-latest
+
+    env:
+      UPLOAD_ARTIFACT: "true"
+
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Prepare directories
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo REPO_NAME=${{ github.event.repository.name }}>>%GITHUB_ENV%
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Restore Libraries cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ needs.build-libraries.outputs.cache-key }}
+          restore-keys: ${{ runner.OS }}-x64-libs-
+          fail-on-cache-miss: true
+
+      - name: Setup environment
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_VERSION: 2022
+        run: |
+          cd %TBUILD%
+          %REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Configure build
+        shell: bash
+        run: |
+          echo "TDESKTOP_BUILD_ARCH=x64" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=Telegram_x64" >> $GITHUB_ENV
+
+          API="-D TDESKTOP_API_TEST=ON"
+          if [ $GITHUB_REF == 'refs/heads/nightly' ]; then
+            API="-D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c"
+          fi
+          echo "TDESKTOP_BUILD_API=$API" >> $GITHUB_ENV
+
+      - name: Build Desktop
+        run: |
+          cd %TBUILD%\%REPO_NAME%\Telegram
+
+          call configure.bat ^
+          %TDESKTOP_BUILD_ARCH% ^
+          %TDESKTOP_BUILD_API% ^
+          -D CMAKE_C_FLAGS="/WX" ^
+          -D CMAKE_CXX_FLAGS="/WX" ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+          -D DESKTOP_APP_NO_PDB=ON
+
+          cmake --build ..\out --config Release --parallel
+
+      - name: Move artifacts
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        run: |
+          set OUT=%TBUILD%\%REPO_NAME%\out\Release
+          mkdir artifact
+          move %OUT%\AyuGram.exe artifact/
+
+      - name: Upload artifacts
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: artifact\
