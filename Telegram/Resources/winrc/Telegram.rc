@@ -61,10 +61,10 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "Radolyn Labs"
-            VALUE "FileDescription", "AyuGram Desktop"
+            VALUE "FileDescription", "DildoGram Desktop"
             VALUE "FileVersion", "5.16.4.0"
             VALUE "LegalCopyright", "Copyright (C) 2014-2025"
-            VALUE "ProductName", "AyuGram Desktop"
+            VALUE "ProductName", "DildoGram Desktop"
             VALUE "ProductVersion", "5.16.4.0"
         END
     END

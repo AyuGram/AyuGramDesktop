@@ -26,9 +26,9 @@ const PROPERTYKEY pkey_AppUserModel_StartPinOption = { { 0x9F4C2855, 0x9F79, 0x4
 const PROPERTYKEY pkey_AppUserModel_ToastActivator = { { 0x9F4C2855, 0x9F79, 0x4B39, { 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3 } }, 26 };
 
 #ifdef OS_WIN_STORE
-const WCHAR AppUserModelIdBase[] = L"AyuGram.AyuGramDesktop.Store";
+const WCHAR AppUserModelIdBase[] = L"DildoGram.DildoGramDesktop.Store";
 #else // OS_WIN_STORE
-const WCHAR AppUserModelIdBase[] = L"AyuGram.AyuGramDesktop";
+const WCHAR AppUserModelIdBase[] = L"DildoGram.DildoGramDesktop";
 #endif // OS_WIN_STORE
 
 } // namespace
@@ -213,7 +213,7 @@ void CleanupShortcut() {
 		return;
 	}
 
-	QString path = systemShortcutPath() + u"AyuGram.lnk"_q;
+	QString path = systemShortcutPath() + u"DildoGram.lnk"_q;
 	std::wstring p = QDir::toNativeSeparators(path).toStdWString();
 
 	DWORD attributes = GetFileAttributes(p.c_str());
@@ -345,8 +345,8 @@ bool checkInstalled(QString path = {}) {
 		}
 	}
 
-	const auto installed = u"AyuGram Desktop/AyuGram.lnk"_q;
-	const auto old = u"AyuGram for Windows/AyuGram.lnk"_q;
+	const auto installed = u"DildoGram Desktop/DildoGram.lnk"_q;
+	const auto old = u"DildoGram for Windows/DildoGram.lnk"_q;
 	return validateShortcutAt(path + installed)
 		|| validateShortcutAt(path + old);
 }
@@ -358,7 +358,7 @@ bool ValidateShortcut() {
 	}
 
 	if (cAlphaVersion()) {
-		path += u"AyuGramAlpha.lnk"_q;
+		path += u"DildoGramAlpha.lnk"_q;
 		if (validateShortcutAt(path)) {
 			return true;
 		}
@@ -367,7 +367,7 @@ bool ValidateShortcut() {
 			return true;
 		}
 
-		path += u"AyuGram.lnk"_q;
+		path += u"DildoGram.lnk"_q;
 		if (validateShortcutAt(path)) {
 			return true;
 		}

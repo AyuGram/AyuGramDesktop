@@ -29,7 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "apiwrap.h"
 
-// AyuGram includes
+// DildoGram includes
 #include "ayu/ayu_settings.h"
 
 
@@ -668,10 +668,10 @@ void Histories::reportPendingDeliveries() {
 void Histories::sendReadRequests() {
 	DEBUG_LOG(("Reading: send requests with count %1.").arg(_states.size()));
 
-	// AyuGram sendReadMessages
+	// DildoGram sendReadMessages
 	const auto &settings = AyuSettings::getInstance();
 	if (!settings.sendReadMessages) {
-		DEBUG_LOG(("[AyuGram] Don't read messages"));
+		DEBUG_LOG(("[DildoGram] Don't read messages"));
 		_states.clear();
 		return;
 	}

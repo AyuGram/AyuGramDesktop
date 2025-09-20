@@ -15,7 +15,7 @@ desktop_app_parse_version(Telegram/build/version)
 project(Telegram
     LANGUAGES C CXX
     VERSION ${desktop_app_version_cmake}
-    DESCRIPTION "AyuGram Desktop"
+    DESCRIPTION "DildoGram Desktop"
     HOMEPAGE_URL "https://ayugram.one"
 )
 
