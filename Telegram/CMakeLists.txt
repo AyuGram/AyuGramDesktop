@@ -144,6 +144,8 @@ set(ayugram_files
         ayu/ui/settings/settings_general.h
         ayu/ui/settings/settings_ayu.cpp
         ayu/ui/settings/settings_ayu.h
+        ayu/ui/settings/settings_filters.cpp
+        ayu/ui/settings/settings_filters.h
         ayu/ui/settings/settings_main.cpp
         ayu/ui/settings/settings_main.h
         ayu/ui/settings/settings_other.cpp

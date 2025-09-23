@@ -15,6 +15,7 @@
 #include "ui/toast/toast.h"
 #include <QString>
 #include <QByteArray>
+#include <qjsondocument.h>
 #include <vector>
 
 #include "filters_cache_controller.h"
@@ -100,7 +101,7 @@ struct BackupExclusion
 	QJsonObject toJson() const {
 		QJsonObject json;
 		json["dialogId"] = dialogId;
-		json["filterId"] = QString::fromUtf8(filterId);
+		json["filterId"] = QString::fromUtf8(filterId.data());
 		return json;
 	}
 };
@@ -331,7 +332,7 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 
 				const auto dialogIdValue = filter.value("dialogId");
 				if (!dialogIdValue.isNull()) {
-					regex.dialogId = filter.value("dialogId").toInteger();
+					regex.dialogId = filter.value("dialogId").toVariant().toLongLong();
 				} else {
 					regex.dialogId = std::nullopt;
 				}
@@ -366,7 +367,7 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 			if (const auto exclusion = exclusionRef.toObject(); !exclusion.isEmpty()) {
 				RegexFilterGlobalExclusion regex;
 
-				regex.dialogId = exclusion.value("dialogId").toInteger();
+				regex.dialogId = exclusion.value("dialogId").toVariant().toLongLong();
 
 				auto byteArray = exclusion.value("filterId").toString().toUtf8();
 				regex.filterId = std::vector(byteArray.constData(), byteArray.constData() + byteArray.size());

@@ -92,7 +92,7 @@ public:
 	}
 	[[nodiscard]] QJsonObject toJson() const {
 		QJsonObject json;
-		json["id"] = QString::fromUtf8(id);
+		json["id"] = QString::fromUtf8(id.data());
 		json["text"] = QString::fromStdString(text);
 		json["enabled"] = enabled;
 		json["reversed"] = reversed;
