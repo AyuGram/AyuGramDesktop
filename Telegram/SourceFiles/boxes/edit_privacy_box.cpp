@@ -8,37 +8,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/edit_privacy_box.h"
 
 #include "api/api_global_privacy.h"
+#include "apiwrap.h"
 #include "boxes/filters/edit_filter_chats_list.h"
-#include "ui/effects/premium_graphics.h"
-#include "ui/layers/generic_box.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/widgets/continuous_sliders.h"
-#include "ui/widgets/shadow.h"
-#include "ui/text/format_values.h"
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
-#include "ui/wrap/slide_wrap.h"
-#include "ui/painter.h"
-#include "ui/vertical_list.h"
+#include "boxes/peers/edit_peer_invite_link.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_peer_values.h"
+#include "data/data_user.h"
 #include "history/history.h"
-#include "boxes/peer_list_controllers.h"
+#include "lang/lang_keys.h"
+#include "main/main_app_config.h"
+#include "main/main_session.h"
 #include "settings/settings_premium.h"
 #include "settings/settings_privacy_controllers.h"
 #include "settings/settings_privacy_security.h"
-#include "calls/calls_instance.h"
-#include "lang/lang_keys.h"
-#include "apiwrap.h"
-#include "main/main_app_config.h"
-#include "main/main_session.h"
-#include "data/data_user.h"
-#include "data/data_chat.h"
-#include "data/data_channel.h"
-#include "data/data_peer_values.h"
+#include "ui/boxes/peer_qr_box.h"
+#include "ui/controls/invite_link_buttons.h"
+#include "ui/controls/invite_link_label.h"
+#include "ui/effects/premium_graphics.h"
+#include "ui/layers/generic_box.h"
+#include "ui/painter.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/vertical_list.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/continuous_sliders.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/shadow.h"
+#include "ui/wrap/slide_wrap.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
-#include "styles/style_settings.h"
+#include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 #include "styles/style_window.h"
 
 namespace {
@@ -1293,7 +1298,7 @@ void EditDirectMessagesPriceBox(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			box,
 			object_ptr<Ui::VerticalLayout>(box)),
-		{});
+		style::margins());
 	wrap->toggle(savedValue.has_value(), anim::type::instant);
 	wrap->toggleOn(toggle->toggledChanges());
 
@@ -1312,10 +1317,62 @@ void EditDirectMessagesPriceBox(
 		*result = stars;
 	}, box->lifetime());
 
+	if (const auto username = channel->username(); !username.isEmpty()) {
+		Ui::AddSkip(inner);
+		Ui::AddSubsectionTitle(
+			inner,
+			tr::lng_manage_monoforum_link_subtitle());
+
+		constexpr auto kDirectParam = "?direct"_cs;
+		const auto link = channel->session().createInternalLinkFull(username)
+			+ kDirectParam.utf8();
+		const auto copyLink = [=] {
+			TextUtilities::SetClipboardText(TextForMimeData::Simple(link));
+			box->uiShow()->showToast(tr::lng_group_invite_copied(tr::now));
+		};
+		const auto shareLink = [=] {
+			box->uiShow()->showBox(ShareInviteLinkBox(channel, link));
+		};
+		const auto createMenu = [=] {
+			auto result = base::make_unique_q<Ui::PopupMenu>(
+				inner,
+				st::popupMenuWithIcons);
+			result->addAction(
+				tr::lng_group_invite_context_qr(tr::now),
+				[=] {
+					box->uiShow()->showBox(Box([=](
+							not_null<Ui::GenericBox*> qrBox) {
+						Ui::FillPeerQrBox(qrBox, channel, link, nullptr);
+					}));
+				},
+				&st::menuIconQrCode);
+			return result;
+		};
+
+		auto linkText = Ui::Text::StripUrlProtocol(link);
+		const auto label = inner->lifetime().make_state<Ui::InviteLinkLabel>(
+			inner,
+			rpl::single(std::move(linkText)),
+			createMenu);
+		inner->add(
+			label->take(),
+			st::inviteLinkFieldPadding);
+
+		label->clicks() | rpl::start_with_next(copyLink, label->lifetime());
+
+		Ui::AddSkip(inner);
+
+		AddCopyShareLinkButtons(inner, copyLink, shareLink);
+		Ui::AddSkip(inner);
+		Ui::AddSkip(inner);
+
+		Ui::AddDivider(inner);
+	}
+
 	box->addButton(tr::lng_settings_save(), [=] {
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 		callback(toggle->toggled() ? *result : std::optional<int>());
-		if (const auto strong = weak.data()) {
+		if (const auto strong = weak.get()) {
 			strong->closeBox();
 		}
 	});

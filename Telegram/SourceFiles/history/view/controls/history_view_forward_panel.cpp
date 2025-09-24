@@ -434,11 +434,11 @@ void EditWebPageOptions(
 		});
 
 		box->addButton(tr::lng_settings_save(), [=] {
-			const auto weak = Ui::MakeWeak(box.get());
+			const auto weak = base::make_weak(box.get());
 			auto result = state->result.current();
 			result.manual = true;
 			done(result);
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		});
@@ -463,11 +463,20 @@ bool HasOnlyForcedForwardedInfo(const HistoryItemsList &list) {
 
 bool HasOnlyDroppedForwardedInfo(const HistoryItemsList &list) {
 	for (const auto &item : list) {
-		if (!item->computeDropForwardedInfo()) {
+		if (item->isSavedMusicItem() || !item->computeDropForwardedInfo()) {
 			return false;
 		}
 	}
 	return true;
+}
+
+bool HasDropForwardedInfoSetting(const HistoryItemsList &list) {
+	for (const auto &item : list) {
+		if (!item->computeDropForwardedInfo()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace HistoryView::Controls

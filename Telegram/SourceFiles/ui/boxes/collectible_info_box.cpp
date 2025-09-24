@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "settings/settings_common.h"
 #include "styles/style_boxes.h"
+#include "styles/style_credits.h"
 #include "styles/style_layers.h"
 
 #include <QtCore/QRegularExpression>
@@ -47,16 +48,14 @@ constexpr auto kTonMultiplier = uint64(1000000000);
 	return langDateTime(base::unixtime::parse(date));
 }
 
-[[nodiscard]] TextWithEntities FormatPrice(
-		const CollectibleInfo &info,
-		const CollectibleDetails &details) {
+[[nodiscard]] TextWithEntities FormatPrice(const CollectibleInfo &info) {
 	auto minor = Info::ChannelEarn::MinorPart(info.cryptoAmount);
 	if (minor.size() == 1 && minor.at(0) == '.') {
 		minor += '0';
 	}
 	auto price = (info.cryptoCurrency == u"TON"_q)
-		? base::duplicate(
-			details.tonEmoji
+		? Ui::Text::IconEmoji(
+			&st::tonIconEmoji
 		).append(
 			Info::ChannelEarn::MajorPart(info.cryptoAmount)
 		).append(minor)
@@ -123,8 +122,7 @@ CollectibleType DetectCollectibleType(const QString &entity) {
 
 void CollectibleInfoBox(
 		not_null<Ui::GenericBox*> box,
-		CollectibleInfo info,
-		CollectibleDetails details) {
+		CollectibleInfo info) {
 	box->setWidth(st::boxWideWidth);
 	box->setStyle(st::collectibleBox);
 
@@ -187,23 +185,22 @@ void CollectibleInfoBox(
 			lt_username,
 			Ui::Text::Link(formatted),
 			Ui::Text::WithEntities);
-	const auto copyCallback = [box, type, formatted, text = info.copyText](
-			bool copyLink) {
-		QGuiApplication::clipboard()->setText((text.isEmpty() || !copyLink)
-			? formatted
-			: text);
-		box->uiShow()->showToast((type == CollectibleType::Phone)
-			? tr::lng_collectible_phone_copied(tr::now)
-			: copyLink
-			? tr::lng_username_copied(tr::now)
-			: tr::lng_username_text_copied(tr::now));
+	const auto copyCallback = [box, type, formatted, text = info.copyText] {
+		auto toCopy = text.isEmpty() ? formatted : text;
+		if (type == CollectibleType::Username) {
+			toCopy = "@" + toCopy.replace("https://t.me/", "");
+		}
+
+		QGuiApplication::clipboard()->setText(toCopy);
+		box->uiShow()->showToast(tr::lng_text_copied(tr::now));
 	};
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
 			rpl::single(header),
 			st::collectibleHeader),
-		st::collectibleHeaderPadding
+		st::collectibleHeaderPadding,
+		style::al_top
 	)->setClickHandlerFilter([copyCallback](const auto &...) {
 		copyCallback(false);
 		return false;
@@ -218,15 +215,14 @@ void CollectibleInfoBox(
 			lt_date,
 			TextWithEntities{ FormatDate(info.date) },
 			lt_price,
-			FormatPrice(info, details),
+			FormatPrice(info),
 			Ui::Text::RichLangValue);
 	const auto label = box->addRow(
 		object_ptr<Ui::FlatLabel>(box, st::collectibleInfo),
-		st::collectibleInfoPadding);
+		st::collectibleInfoPadding,
+		style::al_top);
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
-	auto context = details.tonEmojiContext;
-	context.repaint = [label] { label->update(); };
-	label->setMarkedText(text, context);
+	label->setMarkedText(text);
 
 	const auto more = box->addRow(
 		object_ptr<Ui::RoundButton>(

@@ -404,7 +404,9 @@ auto ApiWrap::fileRequest(const Data::FileLocation &location, int64 offset) {
 	}).toDC(MTP::ShiftDcId(location.dcId, MTP::kExportMediaDcShift)));
 }
 
-ApiWrap::ApiWrap(QPointer<MTP::Instance> weak, Fn<void(FnMut<void()>)> runner)
+ApiWrap::ApiWrap(
+	base::weak_qptr<MTP::Instance> weak,
+	Fn<void(FnMut<void()>)> runner)
 : _mtp(weak, std::move(runner))
 , _fileCache(std::make_unique<LoadedFileCache>(kLocationCacheSize)) {
 }
@@ -2066,7 +2068,7 @@ bool ApiWrap::processFileLoad(
 	} else if (!story && (_settings->media.types & type) != type) {
 		file.skipReason = SkipReason::FileType;
 		return true;
-	} else if (!story && fullSize >= _settings->media.sizeLimit) {
+	} else if (!story && fullSize > _settings->media.sizeLimit) {
 		// Don't load thumbs for large files that we skip.
 		file.skipReason = SkipReason::FileSize;
 		return true;

@@ -286,6 +286,7 @@ chatThemeEntryMargin: margins(16px, 10px, 16px, 8px);
 chatThemeEmptyPreviewTop: 16px;
 chatThemeEmojiBottom: 12px;
 chatThemeButtonMargin: margins(10px, 0px, 10px, 8px);
+chatThemeGiftTaken: icon {{ "mediaview/mini_repost", msgFileInBg }};
 
 autoDownloadLimitButton: SettingsButton(settingsButtonNoIcon) {
 	padding: margins(22px, 10px, 22px, 0px);
@@ -302,13 +303,15 @@ settingsAccentColorSkip: 4px;
 settingsAccentColorLine: 3px;
 
 settingsFilterDividerLabel: FlatLabel(boxDividerLabel) {
-	minWidth: 258px;
+	minWidth: 200px;
 	maxHeight: 0px;
 	align: align(top);
 }
 settingsFilterDividerLabelPadding: margins(0px, 16px, 0px, 22px);
 settingsFilterIconSize: 74px;
 settingsFilterIconPadding: margins(0px, 17px, 0px, 5px);
+
+settingsFilterTagPreviewSkip: 14px;
 
 settingsDeviceName: InputField(defaultInputField) {
 	textBg: transparent;
@@ -597,8 +600,11 @@ settingsColorButton: SettingsButton(settingsButton) {
 settingsColorRadioMargin: 17px;
 settingsColorRadioSkip: 13px;
 settingsColorRadioStroke: 2px;
-settingsLevelBadgeLock: icon {{ "chat/mini_lock", premiumButtonFg }};
-settingsLevelBadgeLockSkip: 4px;
+settingsLevelBadgeLock: IconEmoji{
+	icon: icon {{ "chat/mini_lock", premiumButtonFg }};
+	padding: margins(0px, 4px, 0px, 0px);
+	useIconColor: true;
+}
 
 messagePrivacyTopSkip: 8px;
 messagePrivacyRadioSkip: 6px;
@@ -705,3 +711,18 @@ settingsCreditsButton: SettingsButton(settingsButton) {
 }
 settingsButtonIconGift: icon {{ "settings/gift", menuIconColor }};
 settingsButtonIconEarn: icon {{ "settings/earn", menuIconColor }};
+
+settingsAgeVerifyBox: Box(filterInviteBox) {
+	buttonPadding: margins(24px, 24px, 24px, 24px);
+}
+settingsAgeVerifyText: FlatLabel(defaultFlatLabel) {
+	minWidth: 200px;
+	align: align(top);
+}
+settingsAgeVerifyMargin: margins(0px, 6px, 0px, 6px);
+settingsAgeVerifyTitle: FlatLabel(boxTitle) {
+	align: align(top);
+}
+settingsAgeVerifyIcon: icon {{ "settings/filled_verify_age-48x48", windowFgActive }};
+settingsAgeVerifyIconPadding: margins(16px, 16px, 16px, 16px);
+settingsAgeVerifyIconMargin: margins(0px, 24px, 0px, 14px);

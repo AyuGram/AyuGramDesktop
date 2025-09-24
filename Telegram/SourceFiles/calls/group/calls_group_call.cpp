@@ -2685,6 +2685,10 @@ void GroupCall::emitShareScreenError(Error error) {
 	_errors.fire_copy(error);
 }
 
+void GroupCall::playSoundRecordingStarted() const {
+	_delegate->groupCallPlaySound(Delegate::GroupCallSound::RecordingStarted);
+}
+
 void GroupCall::setupOutgoingVideo() {
 	using Webrtc::VideoState;
 
@@ -3978,7 +3982,7 @@ void GroupCall::inviteUsers(
 		}
 	};
 
-	if (const auto call = _conferenceCall.get()) {
+	if (_conferenceCall.get()) {
 		for (const auto &request : requests) {
 			inviteToConference(request, [=] {
 				return &state->result;

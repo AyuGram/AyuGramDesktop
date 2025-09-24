@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "storage/localstorage.h"
+#include "lottie/lottie_icon.h"
 #include "main/main_session.h"
 #include "media/player/media_player_float.h" // Media::Player::RoundPainter.
 #include "media/audio/media_audio.h"
@@ -25,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media_common.h"
 #include "ui/text/format_values.h"
 #include "ui/text/format_song_document_name.h"
+#include "ui/text/text_lottie_custom_emoji.h"
 #include "ui/text/text_utilities.h"
 #include "ui/chat/chat_style.h"
 #include "ui/painter.h"
@@ -427,6 +429,7 @@ QSize Document::countOptimalSize() {
 		const auto transcribes = &session->api().transcribes();
 		if (_parent->data()->media()->ttlSeconds()
 			|| _realParent->isScheduled()
+			|| _realParent->isAdminLogEntry()
 			|| (!session->premium()
 				&& !transcribes->freeFor(_realParent)
 				&& !transcribes->trialsSupport())
@@ -446,15 +449,25 @@ QSize Document::countOptimalSize() {
 			voice->transcribe->setLoading(
 				entry.shown && (entry.requestId || entry.pending),
 				update);
+			const auto pending = entry.pending;
+			auto descriptor = pending
+				? Lottie::IconDescriptor{
+					.name = u"transcribe_loading"_q,
+					.color = &st::historyTextInFg,
+					.sizeOverride = Size(st::historyTranscribeLoadingSize),
+					.colorizeUsingAlpha = true,
+				}
+				: Lottie::IconDescriptor();
 			auto text = (entry.requestId || !entry.shown)
 				? TextWithEntities()
 				: entry.toolong
 				? Ui::Text::Italic(tr::lng_audio_transcribe_long(tr::now))
 				: entry.failed
 				? Ui::Text::Italic(tr::lng_attach_failed(tr::now))
-				: TextWithEntities{
-					entry.result + (entry.pending ? " [...]" : ""),
-				};
+				: TextWithEntities{ entry.result }.append(
+					pending
+						? Ui::Text::LottieEmoji(descriptor)
+						: TextWithEntities());
 			voice->transcribe->setOpened(
 				!text.empty(),
 				creating ? Fn<void()>() : update);
@@ -467,7 +480,11 @@ QSize Document::countOptimalSize() {
 				voice->transcribeText = Ui::Text::String(minResizeWidth);
 				voice->transcribeText.setMarkedText(
 					st::messageTextStyle,
-					text);
+					text,
+					kMarkupTextOptions,
+					pending
+						? Ui::Text::LottieEmojiContext(std::move(descriptor))
+						: Ui::Text::MarkedContext());
 				hasTranscribe = true;
 				if (const auto skipBlockWidth = _parent->hasVisibleText()
 					? 0

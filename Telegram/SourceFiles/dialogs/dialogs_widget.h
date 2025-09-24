@@ -131,7 +131,9 @@ public:
 
 	void scrollToEntry(const RowDescriptor &entry);
 
-	void searchMessages(SearchState state);
+	void searchMessages(const QString &query, Key inChat = {}, UserData *from = nullptr);
+	void searchTopics();
+	void searchMore();
 
 	[[nodiscard]] RowDescriptor resolveChatNext(RowDescriptor from = {}) const;
 	[[nodiscard]] RowDescriptor resolveChatPrevious(RowDescriptor from = {}) const;
@@ -331,7 +333,7 @@ private:
 
 	base::unique_qptr<Ui::RpWidget> _chatFilters;
 
-	Ui::SlideWrap<Ui::RpWidget> *_topBarSuggestion = nullptr;
+	QPointer<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
 	rpl::event_stream<int> _topBarSuggestionHeightChanged;
 	rpl::event_stream<bool> _searchStateForTopBarSuggestion;
 	rpl::event_stream<bool> _openedFolderOrForumChanges;

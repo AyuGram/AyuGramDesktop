@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/passcode_box.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/rect.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
 #include "ui/text/text_utilities.h"
@@ -56,7 +57,7 @@ void AddDeleteAccount(
 			fields.customSubmitButton = tr::lng_theme_delete();
 			fields.customCheckCallback = [=](
 					const Core::CloudPasswordResult &result,
-					QPointer<PasscodeBox> box) {
+					base::weak_qptr<PasscodeBox> box) {
 				session->api().request(MTPaccount_DeleteAccount(
 					MTP_flags(MTPaccount_DeleteAccount::Flag::f_password),
 					MTP_string("Manual"),
@@ -148,6 +149,8 @@ void SelfDestructionBox::showContent() {
 			: tr::lng_self_destruct_sessions_description(tr::now)),
 		st::boxLabel);
 	_description->moveToLeft(st::boxPadding.left(), y);
+	_description->resizeToWidth(st::boxWidth
+		- rect::m::sum::h(st::boxPadding));
 	y += _description->height() + st::boxMediumSkip;
 
 	for (const auto value : _ttlValues) {
@@ -200,6 +203,8 @@ void SelfDestructionBox::prepare() {
 			? tr::lng_self_destruct_description(tr::now)
 			: tr::lng_self_destruct_sessions_description(tr::now)),
 		st::boxLabel);
+	fake->resizeToWidth(st::boxWidth
+		- rect::m::sum::h(st::boxPadding));
 	const auto boxHeight = st::boxOptionListPadding.top()
 		+ fake->height() + st::boxMediumSkip
 		+ (_ttlValues.size()

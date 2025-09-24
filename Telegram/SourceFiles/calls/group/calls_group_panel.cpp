@@ -407,7 +407,7 @@ void Panel::startScheduledNow() {
 	} else if (now + kStartNoConfirmation >= date) {
 		_call->startScheduledNow();
 	} else {
-		const auto box = std::make_shared<QPointer<Ui::GenericBox>>();
+		const auto box = std::make_shared<base::weak_qptr<Ui::GenericBox>>();
 		const auto done = [=] {
 			if (*box) {
 				(*box)->closeBox();
@@ -1175,6 +1175,7 @@ void Panel::subscribeToChanges(not_null<Data::GroupCall*> real) {
 		const auto isVideo = real->recordVideo();
 		if (recorded) {
 			*startedAsVideo = isVideo;
+			_call->playSoundRecordingStarted();
 		}
 		validateRecordingMark(recorded);
 		uiShow()->showToast((recorded
@@ -1376,7 +1377,7 @@ void Panel::chooseShareScreenSource() {
 		tr::now,
 		lt_user,
 		screencastFromPeer->shortName());
-	const auto shared = std::make_shared<QPointer<Ui::GenericBox>>();
+	const auto shared = std::make_shared<base::weak_qptr<Ui::GenericBox>>();
 	const auto done = [=] {
 		if (*shared) {
 			base::take(*shared)->closeBox();
@@ -2071,9 +2072,9 @@ void Panel::showNiceTooltip(
 			? st::groupCallStickedTooltip
 			: st::groupCallNiceTooltip));
 	const auto tooltip = _niceTooltip.data();
-	const auto weak = QPointer<QWidget>(tooltip);
+	const auto weak = base::make_weak(tooltip);
 	const auto destroy = [=] {
-		delete weak.data();
+		delete weak.get();
 	};
 	if (type != NiceTooltipType::Sticked) {
 		tooltip->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -2097,9 +2098,9 @@ void Panel::updateTooltipGeometry() {
 		return;
 	}
 	const auto geometry = _niceTooltipControl->geometry();
-	const auto weak = QPointer<QWidget>(_niceTooltip);
+	const auto weak = base::make_weak(_niceTooltip);
 	const auto countPosition = [=](QSize size) {
-		const auto strong = weak.data();
+		const auto strong = weak.get();
 		const auto wide = (_mode.current() == PanelMode::Wide);
 		const auto top = geometry.y()
 			- (wide ? st::groupCallNiceTooltipTop : 0)

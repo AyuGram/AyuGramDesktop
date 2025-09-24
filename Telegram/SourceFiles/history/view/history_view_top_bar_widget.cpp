@@ -69,6 +69,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 #include <QtGui/QWindow>
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "boxes/peers/edit_participants_box.h"
+#include "data/data_chat_filters.h"
+#include "history/admin_log/history_admin_log_section.h"
+#include "styles/style_ayu_styles.h"
+#include "styles/style_ayu_icons.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -365,8 +372,8 @@ bool TopBarWidget::createMenu(not_null<Ui::IconButton*> button) {
 		this,
 		st::popupMenuExpandedSeparator);
 	_menu->setDestroyedCallback([
-			weak = Ui::MakeWeak(this),
-			weakButton = Ui::MakeWeak(button),
+			weak = base::make_weak(this),
+			weakButton = base::make_weak(button),
 			menu = _menu.get()] {
 		if (weak && weak->_menu == menu) {
 			if (weakButton) {
@@ -862,9 +869,12 @@ void TopBarWidget::setActiveChat(
 
 			if (const auto channel = peer->asChannel()) {
 				if (channel->canEditStories()
-					&& !channel->owner().stories().archiveCountKnown(
-						channel->id)) {
-					channel->owner().stories().archiveLoadMore(channel->id);
+					&& !channel->owner().stories().albumIdsCountKnown(
+						channel->id,
+						Data::kStoriesAlbumIdArchive)) {
+					channel->owner().stories().albumIdsLoadMore(
+						channel->id,
+						Data::kStoriesAlbumIdArchive);
 				}
 			}
 		}

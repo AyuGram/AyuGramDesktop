@@ -538,25 +538,24 @@ void LinkController::addHeader(not_null<Ui::VerticalLayout*> container) {
 
 	const auto isStatic = _filterTitle.isStatic;
 	verticalLayout->add(
-		object_ptr<Ui::CenterWrap<>>(
+		object_ptr<Ui::FlatLabel>(
 			verticalLayout,
-			object_ptr<Ui::FlatLabel>(
-				verticalLayout,
-				(_data.url.isEmpty()
-					? tr::lng_filters_link_no_about(Ui::Text::WithEntities)
-					: tr::lng_filters_link_share_about(
-						lt_folder,
-						rpl::single(Ui::Text::Wrapped(
-							_filterTitle.text,
-							EntityType::Bold)),
-						Ui::Text::WithEntities)),
-				st::settingsFilterDividerLabel,
-				st::defaultPopupMenu,
-				Core::TextContext({
-					.session = &_window->session(),
-					.customEmojiLoopLimit = isStatic ? -1 : 0,
-				}))),
-		st::filterLinkDividerLabelPadding);
+			(_data.url.isEmpty()
+				? tr::lng_filters_link_no_about(Ui::Text::WithEntities)
+				: tr::lng_filters_link_share_about(
+					lt_folder,
+					rpl::single(Ui::Text::Wrapped(
+						_filterTitle.text,
+						EntityType::Bold)),
+					Ui::Text::WithEntities)),
+			st::settingsFilterDividerLabel,
+			st::defaultPopupMenu,
+			Core::TextContext({
+				.session = &_window->session(),
+				.customEmojiLoopLimit = isStatic ? -1 : 0,
+			})),
+		st::filterLinkDividerLabelPadding,
+		style::al_top)->setTryMakeSimilarLines(true);
 
 	verticalLayout->geometryValue(
 	) | rpl::start_with_next([=](const QRect &r) {
@@ -582,7 +581,7 @@ void LinkController::addLinkBlock(not_null<Ui::VerticalLayout*> container) {
 	using namespace Settings;
 
 	const auto link = _data.url;
-	const auto weak = Ui::MakeWeak(container);
+	const auto weak = base::make_weak(container);
 	const auto copyLink = crl::guard(weak, [=] {
 		CopyInviteLink(delegate()->peerListUiShow(), link);
 	});

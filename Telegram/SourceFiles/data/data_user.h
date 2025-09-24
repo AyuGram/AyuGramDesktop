@@ -121,6 +121,7 @@ enum class UserDataFlag : uint32 {
 	HasStarsPerMessage = (1 << 23),
 	MessageMoneyRestrictionsKnown = (1 << 24),
 	ReadDatesPrivate = (1 << 25),
+	StoriesCorrespondent = (1 << 26),
 };
 inline constexpr bool is_flag_type(UserDataFlag) { return true; };
 using UserDataFlags = base::flags<UserDataFlag>;
@@ -188,8 +189,14 @@ public:
 	[[nodiscard]] bool canSendIgnoreMoneyRestrictions() const;
 	[[nodiscard]] bool readDatesPrivate() const;
 
+	void setStoriesCorrespondent(bool is);
+	[[nodiscard]] bool storiesCorrespondent() const;
+
 	void setStarsPerMessage(int stars);
 	[[nodiscard]] int starsPerMessage() const;
+
+	void setStarsRating(Data::StarsRating value);
+	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] bool canShareThisContact() const;
 	[[nodiscard]] bool canAddContact() const;
@@ -296,6 +303,7 @@ private:
 	QString _phone;
 	QString _privateForwardName;
 	std::unique_ptr<Ui::BotVerifyDetails> _botVerifyDetails;
+	Data::StarsRating _starsRating;
 
 	ChannelId _personalChannelId = 0;
 	MsgId _personalChannelMessageId = 0;

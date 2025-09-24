@@ -507,7 +507,7 @@ void SetupValidatePhoneNumberSuggestion(
 		st::inviteLinkButton);
 	no->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	no->setClickedCallback([=] {
-		const auto sharedLabel = std::make_shared<QPointer<Ui::FlatLabel>>();
+		const auto sharedLabel = std::make_shared<base::weak_qptr<Ui::FlatLabel>>();
 		const auto height = st::boxLabel.style.font->height;
 		const auto customEmojiFactory = [=](
 			QStringView data,
@@ -639,7 +639,6 @@ void SetupSections(
 		controller,
 		container,
 		showOther);
-
 	const auto addSection = [&](
 			rpl::producer<QString> label,
 			Type type,
@@ -738,7 +737,7 @@ void SetupSections(
 	addSection(
 		tr::lng_settings_section_devices(),
 		Calls::Id(),
-		{ &st::menuIconUnmute });
+		{ &st::settingsIconCalls, kIconGreen });
 
 	SetupPowerSavingButton(&controller->window(), container);
 	SetupLanguageButton(&controller->window(), container);
@@ -810,30 +809,12 @@ void SetupPremium(
 					? Lang::FormatCreditsAmountToShort(c).string
 					: QString();
 			}),
-			st::settingsButton);
+			st::settingsButton,
+			{ &st::menuIconTon });
 		button->addClickHandler([=] {
 			controller->setPremiumRef("settings");
 			showOther(CurrencyId());
 		});
-
-		const auto badge = Ui::CreateChild<Ui::RpWidget>(button.get());
-		const auto image = Ui::Earn::IconCurrencyColored(
-			st::tonFieldIconSize,
-			st::menuIconColor->c);
-
-		badge->resize(Size(st::tonFieldIconSize));
-		badge->paintRequest(
-		) | rpl::start_with_next([=] {
-			auto p = QPainter(badge);
-			p.drawImage(0, 0, image);
-		}, badge->lifetime());
-
-		button->sizeValue() | rpl::start_with_next([=](const QSize &s) {
-			badge->moveToLeft(
-				button->st().iconLeft
-					+ (st::menuIconShop.width() - badge->width()) / 2,
-				(s.height() - badge->height()) / 2);
-		}, badge->lifetime());
 	}
 	const auto button = AddButtonWithIcon(
 		container,

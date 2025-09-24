@@ -351,6 +351,8 @@ InfoProfileCover {
 	status: FlatLabel;
 	statusLeft: pixels;
 	statusTop: pixels;
+	starsRatingLeft: pixels;
+	starsRatingTop: pixels;
 	showLastSeen: RoundButton;
 	showLastSeenPosition: point;
 	showLastSeenVisible: bool;
@@ -384,6 +386,8 @@ infoProfileCover: InfoProfileCover {
 	status: infoProfileStatus;
 	statusLeft: 109px;
 	statusTop: 58px;
+	starsRatingLeft: 107px;
+	starsRatingTop: 57px;
 	showLastSeen: RoundButton(defaultActiveButton) {
 		textFg: windowSubTextFg;
 		textFgOver: windowSubTextFg;
@@ -426,6 +430,10 @@ infoEditContactCover: InfoProfileCover(infoProfileCover) {
 }
 infoEditContactPersonalLeft: 6px;
 
+infoRatingDeductedBadge: RoundButton(customEmojiTextBadge) {
+	textBg: windowSubTextFg;
+}
+
 infoProfileInaccessibleUserpic: icon {{ "info/inaccessible_userpic", historyPeerUserpicFg }};
 
 infoVerifiedCheckPosition: point(4px, 2px);
@@ -441,6 +449,9 @@ infoPeerBadge: InfoPeerBadge {
 	premiumFg: profileVerifiedCheckBg;
 	position: infoVerifiedCheckPosition;
 	sizeTag: 0; // Normal
+}
+infoBotVerifyBadge: InfoPeerBadge(infoPeerBadge) {
+	position: point(-2px, 2px);
 }
 
 infoIconFg: windowBoldFg;
@@ -759,7 +770,6 @@ infoEmptyAudio: icon {{ "info/info_media_audio_empty", infoEmptyFg }};
 infoEmptyFile: icon {{ "info/info_media_file_empty", infoEmptyFg }};
 infoEmptyVoice: icon {{ "info/info_media_voice_empty", infoEmptyFg }};
 infoEmptyLink: icon {{ "info/info_media_link_empty", infoEmptyFg }};
-infoEmptyStories: icon {{ "info/info_media_story_empty", infoEmptyFg }};
 infoEmptyIconTop: 120px;
 infoEmptyLabelTop: 40px;
 infoEmptyLabelSkip: 20px;
@@ -1187,3 +1197,102 @@ topicsLayoutButtonIconPadding: margins(4px, 0px, 4px, 0px);
 topicsLayoutButtonIconSize: 140px;
 topicsLayoutButtonPadding: margins(4px, 0px, 4px, 12px);
 topicsLayoutButtonSkip: 0px;
+
+infoStarsTitle: FlatLabel(defaultFlatLabel) {
+	minWidth: 40px;
+	textFg: windowBoldFg;
+	maxHeight: 24px;
+	style: TextStyle(boxTextStyle) {
+		font: font(17px semibold);
+	}
+	align: align(top);
+}
+infoStarsFeatureTitle: FlatLabel(defaultFlatLabel) {
+	textFg: windowBoldFg;
+	style: semiboldTextStyle;
+	minWidth: 10px;
+	maxHeight: 20px;
+}
+infoStarsFeatureAbout: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 20px;
+}
+infoStarsFeatureIconPosition: point(3px, 7px);
+infoStarsFeatureMargin: margins(0px, 8px, 0px, 6px);
+infoStarsFeatureLabelLeft: 46px;
+infoStarsFeatureSkip: 2px;
+infoStarsCrown: icon {{ "limits/filled_rating_crown-24x24", windowFgActive }};
+infoStarsUnderstood: IconEmoji{
+	icon: icon {{ "limits/filled_understood-20x20", windowFgActive }};
+	padding: margins(0px, -1px, 0px, 0px);
+}
+
+collectionAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+}
+collectionNameField: InputField(defaultInputField) {
+	textBg: transparent;
+	textMargins: margins(2px, 10px, 32px, 2px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+
+	heightMin: 36px;
+}
+collectionEmptyTitle: FlatLabel(boxTitle) {
+}
+collectionEmptyText: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+}
+collectionEmptyButton: RoundButton(defaultActiveButton) {
+	width: -96px;
+}
+collectionEmptyTitleMargin: margins(10px, 24px, 10px, 4px);
+collectionEmptyTextMargin: margins(10px, 4px, 10px, 12px);
+collectionEmptyAddMargin: margins(10px, 12px, 10px, 24px);
+collectionAddIcon: IconEmoji {
+	icon: icon {{ "settings/plus", windowFgActive }};
+	padding: margins(1px, -2px, 1px, 0px);
+}
+collectionEditBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+}
+collectionEditMenuToggle: IconButton(infoTopBarMenu) {
+	width: boxTitleHeight;
+	height: boxTitleHeight;
+
+	icon: icon {{ "title_menu_dots", boxTitleCloseFg }};
+	iconOver: icon {{ "title_menu_dots", boxTitleCloseFgOver }};
+	iconPosition: point(-1px, -1px);
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: defaultRippleAnimationBgOver;
+}
+
+earnTonIconSize: 16px;
+earnTonIconMargin: margins(0px, 2px, 0px, 0px);
+
+infoMusicButtonRipple: defaultRippleAnimation;
+infoMusicButtonPerformer: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	maxHeight: 20px;
+}
+infoMusicButtonTitle: FlatLabel(defaultFlatLabel) {
+	textFg: windowBoldFg;
+	style: semiboldTextStyle;
+	maxHeight: 20px;
+}
+infoMusicButtonPadding: margins(48px, 6px, 12px, 6px);
+infoMusicButtonBottom: 8px;
+infoMusicButtonLine: 2px;

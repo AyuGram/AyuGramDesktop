@@ -19,6 +19,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/business/data_business_common.h"
 #include "data/business/data_business_info.h"
 #include "data/components/credits.h"
+#include "data/data_cloud_themes.h"
+#include "data/data_saved_music.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_peer_bot_command.h"
@@ -67,6 +69,20 @@ bool ApplyBotVerifierSettings(
 		return true;
 	}
 	return false;
+}
+
+[[nodiscard]] Data::StarsRating ParseStarsRating(
+		const MTPStarsRating *rating) {
+	if (!rating) {
+		return {};
+	}
+	const auto &data = rating->data();
+	return {
+		.level = data.vlevel().v,
+		.stars = int(data.vstars().v),
+		.thisLevelStars = int(data.vcurrent_level_stars().v),
+		.nextLevelStars = int(data.vnext_level_stars().value_or_empty()),
+	};
 }
 
 } // namespace
@@ -557,12 +573,35 @@ int UserData::starsPerMessage() const {
 	return _starsPerMessage;
 }
 
+void UserData::setStoriesCorrespondent(bool is) {
+	if (is) {
+		_flags.add(UserDataFlag::StoriesCorrespondent);
+	} else {
+		_flags.remove(UserDataFlag::StoriesCorrespondent);
+	}
+}
+
+bool UserData::storiesCorrespondent() const {
+	return (_flags.current() & UserDataFlag::StoriesCorrespondent);
+}
+
 void UserData::setStarsPerMessage(int stars) {
 	if (_starsPerMessage != stars) {
 		_starsPerMessage = stars;
 		session().changes().peerUpdated(this, UpdateFlag::StarsPerMessage);
 	}
 	checkTrustedPayForMessage();
+}
+
+void UserData::setStarsRating(Data::StarsRating value) {
+	if (_starsRating != value) {
+		_starsRating = value;
+		session().changes().peerUpdated(this, UpdateFlag::StarsRating);
+	}
+}
+
+Data::StarsRating UserData::starsRating() const {
+	return _starsRating;
 }
 
 bool UserData::canAddContact() const {
@@ -765,7 +804,16 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	user->setCommonChatsCount(update.vcommon_chats_count().v);
 	user->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
 	user->checkFolder(update.vfolder_id().value_or_empty());
-	user->setThemeEmoji(qs(update.vtheme_emoticon().value_or_empty()));
+	if (const auto theme = update.vtheme()) {
+		theme->match([&](const MTPDchatTheme &data) {
+			user->setThemeToken(qs(data.vemoticon()));
+		}, [&](const MTPDchatThemeUniqueGift &data) {
+			user->setThemeToken(
+				user->owner().cloudThemes().processGiftThemeGetToken(data));
+		});
+	} else {
+		user->setThemeToken(QString());
+	}
 	user->setTranslationDisabled(update.is_translations_disabled());
 	user->setPrivateForwardName(
 		update.vprivate_forward_name().value_or_empty());
@@ -850,6 +898,13 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	}
 	user->setBotVerifyDetails(
 		ParseBotVerifyDetails(update.vbot_verification()));
+	user->setStarsRating(ParseStarsRating(update.vstars_rating()));
+	if (user->isSelf()) {
+		user->owner().setPendingStarsRating({
+			.value = ParseStarsRating(update.vstars_my_pending_rating()),
+			.date = update.vstars_my_pending_rating_date().value_or_empty(),
+		});
+	}
 
 	if (const auto gifts = update.vdisallowed_gifts()) {
 		const auto &data = gifts->data();
@@ -877,6 +932,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	}
 
 	user->owner().stories().apply(user, update.vstories());
+	user->owner().savedMusic().apply(user, update.vsaved_music());
 
 	user->fullUpdated();
 }

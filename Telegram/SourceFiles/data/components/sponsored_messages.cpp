@@ -257,7 +257,6 @@ bool SponsoredMessages::canHaveFor(not_null<HistoryItem*> item) const {
 	return item->history()->peer->isBroadcast()
 		&& item->isRegular();
 }
-
 bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
 	const auto &settings = AyuSettings::getInstance();
 	if (settings.disableAds) {
@@ -269,7 +268,6 @@ bool SponsoredMessages::isTopBarFor(not_null<History*> history) const {
 			return user->isBot();
 		}
 	}
-	return false;
 }
 
 void SponsoredMessages::request(not_null<History*> history, Fn<void()> done) {

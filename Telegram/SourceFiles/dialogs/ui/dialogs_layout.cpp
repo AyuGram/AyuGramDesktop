@@ -598,13 +598,9 @@ void PaintRow(
 						}),
 						Text::WithEntities);
 				if (draft && draft->reply) {
-					auto &data = thread->owner().customEmojiManager();
 					draftText = Ui::Text::Colorized(
-						Ui::Text::SingleCustomEmoji(
-							data.registerInternalEmoji(
-								st::dialogsMiniReplyIcon,
-								{},
-								true))).append(std::move(draftText));
+						Ui::Text::IconEmoji(&st::dialogsMiniReplyIcon)
+					).append(std::move(draftText));
 				}
 				const auto context = Core::TextContext({
 					.session = &thread->session(),
@@ -1153,6 +1149,7 @@ void RowPainter::Paint(
 		return {};
 	}();
 	previewOptions.ignoreGroup = true;
+	previewOptions.searchLowerText = context.searchLowerText;
 
 	const auto badgesState = context.displayUnreadInfo
 		? entry->chatListBadgesState()
@@ -1257,7 +1254,8 @@ void PaintCollapsedRow(
 			+ st::dialogsUnreadFont->ascent;
 		const auto left = context.narrow
 			? ((context.width - st::semiboldFont->width(text)) / 2)
-			: context.st->padding.left();
+			: st::dialogsTopBarLeftPadding;
+			// : context.st->padding.left();
 		p.drawText(left, textBaseline, text);
 	} else {
 		folder->paintUserpic(

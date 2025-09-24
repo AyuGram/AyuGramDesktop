@@ -22,6 +22,7 @@ class FlatLabel;
 template <typename Widget>
 class SlideWrap;
 class RoundButton;
+class StarsRating;
 } // namespace Ui
 
 namespace HistoryView {
@@ -44,6 +45,7 @@ struct InfoProfileCover;
 namespace Info::Profile {
 
 class EmojiStatusPanel;
+class MusicButton;
 class Badge;
 
 class TopicIconView final {
@@ -139,6 +141,7 @@ private:
 
 	void setupShowLastSeen();
 	void setupChildGeometry();
+	void setupSavedMusic();
 	void initViewers(rpl::producer<QString> title);
 	void refreshStatusText();
 	void refreshNameGeometry(int newWidth);
@@ -172,10 +175,14 @@ private:
 	std::optional<QImage> _personalChosen;
 	object_ptr<TopicIconButton> _iconButton;
 	object_ptr<Ui::FlatLabel> _name = { nullptr };
+	std::unique_ptr<Ui::StarsRating> _starsRating;
 	object_ptr<Ui::FlatLabel> _status = { nullptr };
+	rpl::variable<int> _statusShift = 0;
 	object_ptr<Ui::RoundButton> _showLastSeen = { nullptr };
 	//object_ptr<CoverDropArea> _dropArea = { nullptr };
 	base::Timer _refreshStatusTimer;
+
+	std::unique_ptr<MusicButton> _musicButton;
 
 	rpl::event_stream<Section> _showSection;
 

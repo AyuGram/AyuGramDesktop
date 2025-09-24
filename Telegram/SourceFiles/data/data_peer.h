@@ -7,10 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_types.h"
 #include "data/data_flags.h"
-#include "data/notify/data_peer_notify_settings.h"
 #include "data/data_cloud_file.h"
+#include "data/data_peer_common.h"
 #include "ui/userpic_view.h"
 
 struct BotInfo;
@@ -291,6 +292,7 @@ public:
 
 	[[nodiscard]] int starsPerMessage() const;
 	[[nodiscard]] int starsPerMessageChecked() const;
+	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] UserData *asBot();
 	[[nodiscard]] const UserData *asBot() const;
@@ -433,6 +435,9 @@ public:
 	[[nodiscard]] bool canCreateTodoLists() const;
 	[[nodiscard]] bool canCreateTopics() const;
 	[[nodiscard]] bool canManageTopics() const;
+	[[nodiscard]] bool canPostStories() const;
+	[[nodiscard]] bool canEditStories() const;
+	[[nodiscard]] bool canDeleteStories() const;
 	[[nodiscard]] bool canManageGifts() const;
 	[[nodiscard]] bool canTransferGifts() const;
 	[[nodiscard]] bool canExportChatHistory() const;
@@ -526,8 +531,8 @@ public:
 	[[nodiscard]] Data::GroupCall *groupCall() const;
 	[[nodiscard]] PeerId groupCallDefaultJoinAs() const;
 
-	void setThemeEmoji(const QString &emoticon);
-	[[nodiscard]] const QString &themeEmoji() const;
+	void setThemeToken(const QString &token);
+	[[nodiscard]] const QString &themeToken() const;
 
 	void setWallPaper(
 		std::optional<Data::WallPaper> paper,
@@ -611,7 +616,7 @@ private:
 	uint8 _userpicHasVideo : 1 = 0;
 
 	QString _about;
-	QString _themeEmoticon;
+	QString _themeToken;
 	std::unique_ptr<Data::WallPaper> _wallPaper;
 
 };

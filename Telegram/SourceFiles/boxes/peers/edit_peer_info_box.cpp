@@ -904,7 +904,7 @@ void Controller::showEditDiscussionLinkBox() {
 		return;
 	}
 
-	const auto box = std::make_shared<QPointer<Ui::BoxContent>>();
+	const auto box = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 	const auto channel = _peer->asChannel();
 	const auto callback = [=](ChannelData *result) {
 		if (*box) {
@@ -1250,12 +1250,12 @@ void Controller::fillAutoTranslateButton() {
 			_autotranslateSavedValue = value;
 		} else if (value) {
 			state->toggled.fire(false);
-			auto weak = Ui::MakeWeak(autotranslate);
+			auto weak = base::make_weak(autotranslate);
 			CheckBoostLevel(
 				_navigation->uiShow(),
 				_peer,
 				[=](int level) {
-					if (const auto strong = weak.data()) {
+					if (weak.get()) {
 						state->isLocked = (level < requiredLevel);
 					}
 					return (level < requiredLevel)

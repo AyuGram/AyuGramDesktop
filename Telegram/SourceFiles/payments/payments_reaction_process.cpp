@@ -140,7 +140,7 @@ void ShowPaidReactionDetails(
 	const auto chosen = std::clamp(kDefaultPerReaction, 1, max);
 
 	struct State {
-		QPointer<Ui::BoxContent> selectBox;
+		base::weak_qptr<Ui::BoxContent> selectBox;
 		bool ignoreShownPeerSwitch = false;
 		bool sending = false;
 	};
@@ -155,7 +155,7 @@ void ShowPaidReactionDetails(
 			state->sending = false;
 			if (success && count > 0) {
 				state->ignoreShownPeerSwitch = true;
-				if (const auto strong = state->selectBox.data()) {
+				if (const auto strong = state->selectBox.get()) {
 					strong->closeBox();
 				}
 			}
@@ -176,19 +176,13 @@ void ShowPaidReactionDetails(
 
 	auto submitText = [=](rpl::producer<int> amount) {
 		auto nice = std::move(amount) | rpl::map([=](int count) {
-			return Ui::CreditsEmojiSmall(session).append(
+			return Ui::CreditsEmojiSmall().append(
 				Lang::FormatCountDecimal(count));
 		});
 		return tr::lng_paid_react_send(
 			lt_price,
 			std::move(nice),
-			Ui::Text::RichLangValue
-		) | rpl::map([=](TextWithEntities &&text) {
-			return Ui::TextWithContext{
-				.text = std::move(text),
-				.context = Core::TextContext({ .session = session }),
-			};
-		});
+			Ui::Text::RichLangValue);
 	};
 	auto top = std::vector<Ui::PaidReactionTop>();
 	const auto add = [&](const Data::MessageReactionsTopPaid &entry) {
@@ -260,7 +254,7 @@ void ShowPaidReactionDetails(
 		},
 	}));
 
-	if (const auto strong = state->selectBox.data()) {
+	if (const auto strong = state->selectBox.get()) {
 		session->data().itemRemoved(
 		) | rpl::start_with_next([=](not_null<const HistoryItem*> removed) {
 			if (removed == item) {

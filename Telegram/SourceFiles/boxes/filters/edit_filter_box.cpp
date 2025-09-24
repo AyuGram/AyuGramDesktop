@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/filter_icons.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/power_saving.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
@@ -593,7 +594,7 @@ void EditFilterBox(
 		) | rpl::start_with_next([=](const QRect &r) {
 			const auto h = st::normalFont->height;
 			preview->setGeometry(
-				colors->x(),
+				rect::right(colors) - st::settingsFilterTagPreviewSkip,
 				r.y() + (r.height() - h) / 2 + st::lineWidth,
 				colors->width(),
 				h);

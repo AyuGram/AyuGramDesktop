@@ -116,13 +116,12 @@ void ConferenceCallJoinConfirm(
 		st::boxRowPadding + st::confcallLinkHeaderIconPadding);
 
 	box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			object_ptr<Ui::FlatLabel>(
-				box,
-				tr::lng_confcall_join_title(),
-				st::boxTitle)),
-		st::boxRowPadding + st::confcallLinkTitlePadding);
+			tr::lng_confcall_join_title(),
+			st::boxTitle),
+		st::boxRowPadding + st::confcallLinkTitlePadding,
+		style::al_top);
 	const auto wrapName = [&](not_null<PeerData*> peer) {
 		return rpl::single(Ui::Text::Bold(peer->shortName()));
 	};
@@ -136,7 +135,8 @@ void ConferenceCallJoinConfirm(
 					Ui::Text::RichLangValue)
 				: tr::lng_confcall_join_text(Ui::Text::RichLangValue)),
 			st::confcallLinkCenteredText),
-		st::boxRowPadding
+		st::boxRowPadding,
+		style::al_top
 	)->setTryMakeSimilarLines(true);
 
 	const auto &participants = call->participants();
@@ -209,12 +209,13 @@ void ConferenceCallJoinConfirm(
 				box,
 				std::move(text),
 				st::confcallLinkCenteredText),
-			st::boxRowPadding
+			st::boxRowPadding,
+			style::al_top
 		)->setTryMakeSimilarLines(true);
 	}
 	const auto joinAndClose = [=] {
-		join([weak = Ui::MakeWeak(box)] {
-			if (const auto strong = weak.data()) {
+		join([weak = base::make_weak(box)] {
+			if (const auto strong = weak.get()) {
 				strong->closeBox();
 			}
 		});
@@ -275,7 +276,7 @@ void ShowConferenceCallLinkBox(
 				}
 				state->resetting = true;
 				using Flag = MTPphone_ToggleGroupCallSettings::Flag;
-				const auto weak = Ui::MakeWeak(box);
+				const auto weak = base::make_weak(box);
 				call->session().api().request(
 					MTPphone_ToggleGroupCallSettings(
 						MTP_flags(Flag::f_reset_invite_hash),
@@ -284,7 +285,7 @@ void ShowConferenceCallLinkBox(
 				).done([=](const MTPUpdates &result) {
 					call->session().api().applyUpdates(result);
 					ShowConferenceCallLinkBox(show, call, args);
-					if (const auto strong = weak.data()) {
+					if (const auto strong = weak.get()) {
 						strong->closeBox();
 					}
 					show->showToast({
@@ -321,13 +322,12 @@ void ShowConferenceCallLinkBox(
 			Info::BotStarRef::CreateLinkHeaderIcon(box, &call->session()),
 			st::boxRowPadding + st::confcallLinkHeaderIconPadding);
 		box->addRow(
-			object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+			object_ptr<Ui::FlatLabel>(
 				box,
-				object_ptr<Ui::FlatLabel>(
-					box,
-					tr::lng_confcall_link_title(),
-					st.box ? st.box->title : st::boxTitle)),
-			st::boxRowPadding + st::confcallLinkTitlePadding);
+				tr::lng_confcall_link_title(),
+				st.box ? st.box->title : st::boxTitle),
+			st::boxRowPadding + st::confcallLinkTitlePadding,
+			style::al_top);
 		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
@@ -335,7 +335,8 @@ void ShowConferenceCallLinkBox(
 				(st.centerLabel
 					? *st.centerLabel
 					: st::confcallLinkCenteredText)),
-			st::boxRowPadding
+			st::boxRowPadding,
+			style::al_top
 		)->setTryMakeSimilarLines(true);
 
 		Ui::AddSkip(box->verticalLayout(), st::defaultVerticalListSkip * 2);

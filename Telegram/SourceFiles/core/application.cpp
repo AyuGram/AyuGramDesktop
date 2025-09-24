@@ -96,6 +96,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 
 #include <ksandbox.h>
+// AyuGram includes
+#include "ayu/ayu_infra.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 
 // AyuGram includes
 #include "ayu/ayu_infra.h"
@@ -658,6 +661,8 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 		if (base::Platform::GlobalShortcuts::IsToggleFullScreenKey(event)
 			&& toggleActiveWindowFullScreen()) {
 			return true;
+		} else if (Shortcuts::HandlePossibleChatSwitch(event)) {
+			return true;
 		}
 	} break;
 	case QEvent::MouseButtonPress:
@@ -666,8 +671,20 @@ bool Application::eventFilter(QObject *object, QEvent *e) {
 		updateNonIdle();
 	} break;
 
+	case QEvent::KeyRelease: {
+		const auto event = static_cast<QKeyEvent*>(e);
+		if (Shortcuts::HandlePossibleChatSwitch(event)) {
+			return true;
+		}
+	} break;
+
 	case QEvent::ShortcutOverride: {
-		// handle shortcuts ourselves
+		// Ctrl+Tab/Ctrl+Shift+Tab chat switch is a special shortcut case,
+		// because it not only does an action on the shortcut activation,
+		// but also keeps the UI visible until you release the Ctrl key.
+		Shortcuts::HandlePossibleChatSwitch(static_cast<QKeyEvent*>(e));
+
+		// Handle all the shortcut management manually.
 		return true;
 	} break;
 
@@ -912,7 +929,7 @@ void Application::forceLogOut(
 	box->setCloseByEscape(false);
 	box->setCloseByOutsideClick(false);
 	const auto weak = base::make_weak(account);
-	connect(box, &QObject::destroyed, [=] {
+	connect(box.get(), &QObject::destroyed, [=] {
 		crl::on_main(weak, [=] {
 			account->forcedLogOut();
 		});
@@ -1650,7 +1667,7 @@ void Application::registerLeaveSubscription(not_null<QWidget*> widget) {
 				if (e->type() == QEvent::Leave) {
 					if (const auto taken = _leaveFilters.take(window)) {
 						for (const auto &weak : taken->registered) {
-							if (const auto widget = weak.data()) {
+							if (const auto widget = weak.get()) {
 								QEvent ev(QEvent::Leave);
 								QCoreApplication::sendEvent(widget, &ev);
 							}

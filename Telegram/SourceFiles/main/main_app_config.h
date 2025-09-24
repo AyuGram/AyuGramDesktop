@@ -78,14 +78,19 @@ public:
 	[[nodiscard]] int paidMessageChannelStarsDefault() const;
 
 	[[nodiscard]] int pinnedGiftsLimit() const;
+	[[nodiscard]] int giftCollectionsLimit() const;
+	[[nodiscard]] int giftCollectionGiftsLimit() const;
 
 	[[nodiscard]] bool callsDisabledForSession() const;
 	[[nodiscard]] int confcallSizeLimit() const;
 	[[nodiscard]] bool confcallPrioritizeVP8() const;
 
-	[[nodiscard]] int giftResalePriceMax() const;
-	[[nodiscard]] int giftResalePriceMin() const;
-	[[nodiscard]] int giftResaleReceiveThousandths() const;
+	[[nodiscard]] int giftResaleStarsMin() const;
+	[[nodiscard]] int giftResaleStarsMax() const;
+	[[nodiscard]] int giftResaleStarsThousandths() const;
+	[[nodiscard]] int64 giftResaleNanoTonMin() const;
+	[[nodiscard]] int64 giftResaleNanoTonMax() const;
+	[[nodiscard]] int giftResaleNanoTonThousandths() const;
 
 	[[nodiscard]] int pollOptionsLimit() const;
 	[[nodiscard]] int todoListItemsLimit() const;
@@ -101,6 +106,14 @@ public:
 	[[nodiscard]] int suggestedPostDelayMin() const;
 	[[nodiscard]] int suggestedPostDelayMax() const;
 	[[nodiscard]] TimeId suggestedPostAgeMin() const;
+
+	[[nodiscard]] bool ageVerifyNeeded() const;
+	[[nodiscard]] QString ageVerifyCountry() const;
+	[[nodiscard]] int ageVerifyMinAge() const;
+	[[nodiscard]] QString ageVerifyBotUsername() const;
+
+	[[nodiscard]] int storiesAlbumsLimit() const;
+	[[nodiscard]] int storiesAlbumLimit() const;
 
 	void refresh(bool force = false);
 

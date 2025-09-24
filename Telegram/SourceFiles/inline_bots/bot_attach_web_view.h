@@ -163,6 +163,16 @@ struct WebViewSourceBotProfile {
 		WebViewSourceBotProfile) = default;
 };
 
+struct WebViewSourceAgeVerification {
+	Fn<void(int)> done;
+
+	friend inline bool operator==(
+			WebViewSourceAgeVerification,
+			WebViewSourceAgeVerification) {
+		return true;
+	}
+};
+
 struct WebViewSource : std::variant<
 	WebViewSourceButton,
 	WebViewSourceSwitch,
@@ -173,7 +183,8 @@ struct WebViewSource : std::variant<
 	WebViewSourceAttachMenu,
 	WebViewSourceBotMenu,
 	WebViewSourceGame,
-	WebViewSourceBotProfile> {
+	WebViewSourceBotProfile,
+	WebViewSourceAgeVerification> {
 	using variant::variant;
 };
 
@@ -220,6 +231,7 @@ public:
 
 private:
 	void resolve();
+	void requestFullBot();
 
 	bool openAppFromBotMenuLink();
 
@@ -291,6 +303,7 @@ private:
 		Ui::BotWebView::SetEmojiStatusRequest request) override;
 	void botDownloadFile(
 		Ui::BotWebView::DownloadFileRequest request) override;
+	void botVerifyAge(int age) override;
 	void botOpenPrivacyPolicy() override;
 	void botClose() override;
 
@@ -300,6 +313,8 @@ private:
 	const WebViewContext _context;
 	const WebViewButton _button;
 	const WebViewSource _source;
+
+	std::optional<ShowArgs> _botFullWaitingArgs;
 
 	BotAppData *_app = nullptr;
 	QString _appStartParam;

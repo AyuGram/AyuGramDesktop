@@ -77,7 +77,9 @@ DefaultIconEmoji::DefaultIconEmoji(
 	std::move(value) | rpl::start_with_next([=](DefaultIcon value) {
 		_icon = value;
 		_image = QImage();
-		repaint();
+		if (repaint) {
+			repaint();
+		}
 	}, _lifetime);
 }
 
@@ -554,7 +556,7 @@ void EditForumTopicBox(
 		} else {
 			using Flag = MTPchannels_EditForumTopic::Flag;
 			const auto api = &forum->session().api();
-			const auto weak = Ui::MakeWeak(box.get());
+			const auto weak = base::make_weak(box);
 			state->requestId = api->request(MTPchannels_EditForumTopic(
 				MTP_flags(Flag::f_title
 					| (topic->isGeneral() ? Flag() : Flag::f_icon_emoji_id)),
@@ -566,11 +568,11 @@ void EditForumTopicBox(
 				MTPBool() // hidden
 			)).done([=](const MTPUpdates &result) {
 				api->applyUpdates(result);
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					strong->closeBox();
 				}
 			}).fail([=](const MTP::Error &error) {
-				if (const auto strong = weak.data()) {
+				if (const auto strong = weak.get()) {
 					if (error.type() == u"TOPIC_NOT_MODIFIED") {
 						strong->closeBox();
 					} else {

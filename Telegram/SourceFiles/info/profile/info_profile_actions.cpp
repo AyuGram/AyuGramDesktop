@@ -7,14 +7,34 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_actions.h"
 
-#include "api/api_blocked_peers.h"
-#include "api/api_chat_participants.h"
-#include "api/api_credits.h"
-#include "api/api_statistics.h"
-#include "apiwrap.h"
-#include "base/options.h"
-#include "base/timer_rpl.h"
-#include "base/unixtime.h"
+#include "data/data_peer_values.h"
+#include "data/data_session.h"
+#include "data/data_folder.h"
+#include "data/data_forum_topic.h"
+#include "data/data_channel.h"
+#include "data/data_changes.h"
+#include "data/data_user.h"
+#include "data/notify/data_notify_settings.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/wrap/padding_wrap.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/widgets/shadow.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/box_content_divider.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/boxes/report_box.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/layers/generic_box.h"
+#include "ui/toast/toast.h"
+#include "ui/text/text_utilities.h" // Ui::Text::ToUpper
+#include "ui/text/text_variant.h"
+#include "history/history_location_manager.h" // LocationClickHandler.
+#include "history/view/history_view_context_menu.h" // HistoryView::ShowReportPeerBox
+#include "boxes/abstract_box.h"
+#include "boxes/peer_list_box.h"
+#include "boxes/peer_list_controllers.h"
+#include "boxes/add_contact_box.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_contact_box.h"
 #include "boxes/peers/edit_participants_box.h"
@@ -177,10 +197,16 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 				+ addToLink;
 		}
 		if (!link.isEmpty()) {
-			TextUtilities::SetClipboardText({ link });
-			if (const auto strong = weak.get()) {
-				strong->showToast(
-					tr::lng_channel_public_link_copied(tr::now));
+			if (addToLink.isEmpty()) {
+				link = '@' + link.replace("https://t.me/", "");
+			}
+
+			QGuiApplication::clipboard()->setText(link);
+			const auto isLink = link.startsWith(u"https://t.me/"_q);
+			if (const auto window = weak.get()) {
+				window->showToast(isLink
+									  ? tr::lng_username_copied(tr::now) // "Link copied to clipboard."
+									  : tr::lng_text_copied(tr::now)); // "Text copied to clipboard."
 			}
 		}
 	};
@@ -863,6 +889,7 @@ rpl::producer<CreditsAmount> AddCurrencyAction(
 		not_null<Controller*> controller) {
 	struct State final {
 		rpl::variable<CreditsAmount> balance;
+		Ui::Text::CustomEmojiHelper helper;
 	};
 	const auto state = wrap->lifetime().make_state<State>();
 	const auto parentController = controller->parentController();
@@ -893,13 +920,13 @@ rpl::producer<CreditsAmount> AddCurrencyAction(
 		state->balance = balance;
 	}
 	{
-		const auto weak = Ui::MakeWeak(wrap);
+		const auto weak = base::make_weak(wrap);
 		const auto currencyLoadLifetime
 			= std::make_shared<rpl::lifetime>();
 		const auto currencyLoad
 			= currencyLoadLifetime->make_state<Api::EarnStatistics>(user);
 		const auto done = [=](CreditsAmount balance) {
-			if ([[maybe_unused]] const auto strong = weak.data()) {
+			if ([[maybe_unused]] const auto strong = weak.get()) {
 				state->balance = balance;
 				currencyLoadLifetime->destroy();
 			}
@@ -914,13 +941,11 @@ rpl::producer<CreditsAmount> AddCurrencyAction(
 	const auto &st = st::infoSharedMediaButton;
 	const auto button = wrapButton->entity();
 	const auto name = Ui::CreateChild<Ui::FlatLabel>(button, st.rightLabel);
-	const auto icon = Ui::Text::SingleCustomEmoji(
-		user->owner().customEmojiManager().registerInternalEmoji(
-			Ui::Earn::IconCurrencyColored(
-				st.rightLabel.style.font,
-				st.rightLabel.textFg->c),
-			st::channelEarnCurrencyCommonMargins,
-			false));
+	const auto icon = state->helper.paletteDependent({ .factory = [=] {
+		return Ui::Earn::IconCurrencyColored(
+			st.rightLabel.style.font,
+			st.rightLabel.textFg->c);
+	}, .margin = st::channelEarnCurrencyCommonMargins });
 	name->show();
 	rpl::combine(
 		button->widthValue(),
@@ -939,10 +964,7 @@ rpl::producer<CreditsAmount> AddCurrencyAction(
 				.append(QChar(' '))
 				.append(Info::ChannelEarn::MajorPart(balance))
 				.append(Info::ChannelEarn::MinorPart(balance)),
-			Core::TextContext({
-				.session = &user->session(),
-				.repaint = [=] { name->update(); },
-			}));
+			state->helper.context());
 		name->resizeToNaturalWidth(available);
 		name->moveToRight(st::settingsButtonRightSkip, st.padding.top());
 	}, name->lifetime());
@@ -995,7 +1017,10 @@ rpl::producer<CreditsAmount> AddCreditsAction(
 	const auto &st = st::infoSharedMediaButton;
 	const auto button = wrapButton->entity();
 	const auto name = Ui::CreateChild<Ui::FlatLabel>(button, st.rightLabel);
-	const auto icon = user->owner().customEmojiManager().creditsEmoji();
+
+	auto helper = Ui::Text::CustomEmojiHelper();
+	const auto icon = helper.paletteDependent(Ui::Earn::IconCreditsEmoji());
+	const auto context = helper.context([=] { name->update(); });
 	name->show();
 	rpl::combine(
 		button->widthValue(),
@@ -1013,10 +1038,7 @@ rpl::producer<CreditsAmount> AddCreditsAction(
 			base::duplicate(icon)
 				.append(QChar(' '))
 				.append(Lang::FormatCreditsAmountDecimal(balance)),
-			Core::TextContext({
-				.session = &user->session(),
-				.repaint = [=] { name->update(); },
-			}));
+			context);
 		name->resizeToNaturalWidth(available);
 		name->moveToRight(st::settingsButtonRightSkip, st.padding.top());
 	}, name->lifetime());
@@ -1507,8 +1529,11 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 
 		if (!user->isBot()) {
 			tracker.track(result->add(
-				CreateBirthday(result, controller, user)));
-			tracker.track(result->add(CreateWorkingHours(result, user)));
+				CreateBirthday(result, controller, user),
+				{},
+				style::al_justify));
+			tracker.track(result->add(
+				CreateWorkingHours(result, user), {}, style::al_justify));
 
 			auto locationText = user->session().changes().peerFlagsValue(
 				user,
@@ -2105,7 +2130,8 @@ void DetailsFiller::setupMainApp() {
 			_wrap,
 			tr::lng_profile_open_app(),
 			st::infoOpenApp),
-		st::infoOpenAppMargin);
+		st::infoOpenAppMargin,
+		style::al_justify);
 	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 
 	const auto user = _peer->asUser();

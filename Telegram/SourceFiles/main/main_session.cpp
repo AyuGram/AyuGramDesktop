@@ -337,7 +337,7 @@ bool Session::premiumPossible() const {
 		return true;
 	}
 
-	return premium() || premiumCanBuy();
+	return premium() || _premiumPossible.current();
 }
 
 bool Session::premiumBadgesShown() const {

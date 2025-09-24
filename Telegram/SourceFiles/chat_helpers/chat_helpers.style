@@ -1297,6 +1297,7 @@ historyRecordLockPosition: point(1px, 22px);
 historyRecordCancelButtonWidth: 100px;
 historyRecordCancelButtonFg: lightButtonFg;
 
+historyRecordTooltipSkip: 8px;
 historyRecordTooltip: ImportantTooltip(defaultImportantTooltip) {
 	padding: margins(4px, 4px, 4px, 4px);
 	radius: 11px;
@@ -1489,9 +1490,6 @@ editTagField: InputField(defaultInputField) {
 
 	heightMin: 36px;
 }
-editTagLimit: FlatLabel(defaultFlatLabel) {
-	textFg: windowSubTextFg;
-}
 
 editStickerSetNameField: InputField(defaultInputField) {
 	textMargins: margins(0px, 8px, 26px, 4px);
@@ -1629,6 +1627,19 @@ frozenInfoBox: Box(defaultBox) {
 		style: semiboldTextStyle;
 	}
 	shadowIgnoreTopSkip: true;
+}
+
+menuTranscribeItemPadding: margins(0px, 10px, 0px, 10px);
+menuTranscribeDummyButton: IconButton(defaultIconButton) {
+	width: 40px;
+	height: 40px;
+
+	icon: icon {{ "chat/input_attach", historyComposeIconFgOver }};
+	iconOver: icon {{ "chat/input_attach", historyComposeIconFgOver }};
+
+	rippleAreaPosition: point(3px, 3px);
+	rippleAreaSize: 34px;
+	ripple: defaultRippleAnimationBgOver;
 }
 
 roundVideoFont: font(14px semibold);

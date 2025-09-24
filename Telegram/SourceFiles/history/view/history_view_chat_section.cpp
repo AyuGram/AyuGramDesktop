@@ -464,7 +464,7 @@ ChatWidget::~ChatWidget() {
 	if (_repliesRootId) {
 		controller()->sendingAnimation().clear();
 	}
-	if (_subsectionTabs) {
+	if (_subsectionTabs && !_subsectionTabs->dying()) {
 		_subsectionTabsLifetime.destroy();
 		controller()->saveSubsectionTabs(base::take(_subsectionTabs));
 	}
@@ -816,6 +816,11 @@ void ChatWidget::setupComposeControls() {
 	_composeControls->sendRequests(
 	) | rpl::start_with_next([=](Api::SendOptions options) {
 		send(options);
+	}, lifetime());
+
+	_composeControls->scrollToMaxRequests(
+	) | rpl::start_with_next([=] {
+		listScrollTo(_scroll->scrollTopMax());
 	}, lifetime());
 
 	_composeControls->sendVoiceRequests(
@@ -2324,9 +2329,9 @@ bool ChatWidget::preventsClose(Fn<void()> &&continueCallback) const {
 	} else if (!_newTopicDiscarded
 		&& _topic
 		&& _topic->creating()) {
-		const auto weak = Ui::MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		auto sure = [=](Fn<void()> &&close) {
-			if (const auto strong = weak.data()) {
+			if (const auto strong = weak.get()) {
 				strong->_newTopicDiscarded = true;
 			}
 			close();
@@ -2611,7 +2616,7 @@ void ChatWidget::subscribeToSublist() {
 void ChatWidget::unreadCountUpdated() {
 	if (_sublist && _sublist->unreadMark()) {
 		crl::on_main(this, [=] {
-			const auto guard = Ui::MakeWeak(this);
+			const auto guard = base::make_weak(this);
 			controller()->showPeerHistory(_sublist->owningHistory());
 			if (guard) {
 				closeCurrent();

@@ -815,7 +815,36 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			}
 		}
 	}
-	if (!inWebPage && !skipDrawingSurrounding && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+
+	if (!unwrapped && !_caption.isEmpty()) {
+		p.setPen(stm->historyTextFg);
+		_parent->prepareCustomEmojiPaint(p, context, _caption);
+		auto top = painty + painth + st::mediaCaptionSkip;
+		if (botTop) {
+			botTop->text.drawLeftElided(
+				p,
+				st::msgPadding.left(),
+				top,
+				captionw,
+				_parent->width());
+			top += botTop->height;
+		}
+		auto highlightRequest = context.computeHighlightCache();
+		_caption.draw(p, {
+			.position = QPoint(st::msgPadding.left(), top),
+			.availableWidth = captionw,
+			.palette = &stm->textPalette,
+			.pre = stm->preCache.get(),
+			.blockquote = context.quoteCache(parent()->contentColorIndex()),
+			.colors = context.st->highlightColors(),
+			.spoiler = Ui::Text::DefaultSpoilerCache(),
+			.now = context.now,
+			.pausedEmoji = context.paused || On(PowerSaving::kEmojiChat),
+			.pausedSpoiler = context.paused || On(PowerSaving::kChatSpoiler),
+			.selection = context.selection,
+			.highlight = highlightRequest ? &*highlightRequest : nullptr,
+		});
+	} else if (!inWebPage && !skipDrawingSurrounding && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
 		auto fullRight = paintx + usex + usew;
 		auto fullBottom = painty + painth;
 		auto maxRight = _parent->width() - st::msgMargin.left();
@@ -2213,6 +2242,7 @@ void Gif::ensureTranscribeButton() const {
 	if (_data->isVideoMessage()
 		&& !_parent->data()->media()->ttlSeconds()
 		&& !_parent->data()->isScheduled()
+		&& !_parent->data()->isAdminLogEntry()
 		&& (_data->session().premium()
 			|| _data->session().api().transcribes().trialsSupport())) {
 		if (!_transcribe) {

@@ -50,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "api/api_authorizations.h"
 #include "api/api_chat_filters.h"
 #include "apiwrap.h"
 #include "chat_helpers/message_field.h"
@@ -969,13 +970,20 @@ void Widget::chosenRow(const ChosenRow &row) {
 		}
 		return;
 	} else if (history) {
+		const auto settings = &AyuSettings::getInstance();
 		const auto peer = history->peer;
-		const auto showAtMsgId = controller()->uniqueChatsInSearchResults(
-			_searchState
-		) ? ShowAtUnreadMsgId : row.message.fullId.msg;
-		auto params = Window::SectionShow(
-			Window::SectionShow::Way::ClearStack);
-		params.highlight = Window::SearchHighlightId(_searchState.query);
+		if (row.message.fullId.msg == ShowAtUnreadMsgId) {
+			if (row.userpicClick
+				&& peer->hasActiveStories()
+				&& !peer->isSelf()
+				&& !settings->disableStories) {
+				controller()->openPeerStories(peer->id);
+				return;
+			}
+		}
+		const auto showAtMsgId = controller()->uniqueChatsInSearchResults()
+			? ShowAtUnreadMsgId
+			: row.message.fullId.msg;
 		if (row.newWindow) {
 			controller()->showInNewWindow(peer, showAtMsgId);
 		} else {
@@ -1016,7 +1024,7 @@ void Widget::setGeometryWithTopMoved(
 	_topDelta = topDelta;
 	bool willBeResized = (size() != newGeometry.size());
 	if (geometry() != newGeometry) {
-		auto weak = Ui::MakeWeak(this);
+		auto weak = base::make_weak(this);
 		setGeometry(newGeometry);
 		if (!weak) {
 			return;
@@ -1067,6 +1075,10 @@ void Widget::setupTopBarSuggestions(not_null<Ui::VerticalLayout*> dialogs) {
 	}
 	using namespace rpl::mappers;
 	crl::on_main(&session(), [=, session = &session()] {
+		session->api().authorizations().unreviewedChanges(
+		) | rpl::start_with_next([=] {
+			updateForceDisplayWide();
+		}, lifetime());
 		(session->data().chatsListLoaded(nullptr)
 			? rpl::single<Data::Folder*>(nullptr)
 			: session->data().chatsListLoadedEvents()
@@ -1749,7 +1761,7 @@ void Widget::updateSuggestions(anim::type animated) {
 			_suggestions = nullptr;
 			_hidingSuggestions.clear();
 			storiesExplicitCollapse();
-			updateStoriesVisibility();
+			updateControlsVisibility();
 			_scroll->show();
 		}
 	} else if (suggest && !_suggestions) {
@@ -2749,9 +2761,21 @@ void Widget::showMainMenu() {
 	controller()->widget()->showMainMenu();
 }
 
-void Widget::searchMessages(SearchState state) {
-	applySearchState(std::move(state));
-	session().local().saveRecentSearchHashtags(_searchState.query);
+void Widget::searchMessages(const QString &query, Key inChat, UserData *from) {
+	if (_childList) {
+		const auto forum = controller()->shownForum().current();
+		const auto topic = inChat.topic();
+		if ((forum && forum->channel() == inChat.peer())
+			|| (topic && topic->forum() == forum)) {
+			_childList->searchMessages(query, inChat, from);
+			return;
+		}
+	}
+
+	if (inChat && from) {
+		setSearchInChat(inChat, from);
+		applySearchUpdate(true);
+	}
 }
 
 void Widget::searchTopics() {
@@ -2925,15 +2949,19 @@ void Widget::requestPublicPosts(bool fromStart) {
 		.posts = true,
 		.start = fromStart,
 	};
+	using Flag = MTPchannels_SearchPosts::Flag;
 	_postsProcess.requestId = session().api().request(
 		MTPchannels_SearchPosts(
+			MTP_flags(Flag::f_hashtag),
 			MTP_string(_searchState.query.trimmed().mid(1)),
+			MTP_string(), // query
 			MTP_int(fromStart ? 0 : _postsProcess.nextRate),
 			(fromStart
 				? MTP_inputPeerEmpty()
 				: _postsProcess.lastPeer->input),
 			MTP_int(fromStart ? 0 : _postsProcess.lastId),
-			MTP_int(kSearchPerPage))
+			MTP_int(kSearchPerPage),
+			MTP_long(0)) // allow_paid_stars
 	).done([=](const MTPmessages_Messages &result) {
 		searchReceived(type, result, &_postsProcess);
 	}).fail([=](const MTP::Error &error) {
@@ -3312,7 +3340,8 @@ void Widget::updateForceDisplayWide() {
 		|| (_subsectionTopBar && _subsectionTopBar->searchHasFocus())
 		|| _searchSuggestionsLocked
 		|| !_searchState.query.isEmpty()
-		|| _searchState.inChat);
+		|| _searchState.inChat
+		|| !session().api().authorizations().unreviewed().empty());
 }
 
 void Widget::showForum(

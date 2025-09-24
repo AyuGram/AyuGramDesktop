@@ -7,44 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_main_menu.h"
 
-#include "apiwrap.h"
-#include "base/event_filter.h"
-#include "base/qt_signal_producer.h"
-#include "boxes/about_box.h"
-#include "boxes/peer_list_controllers.h"
-#include "boxes/premium_preview_box.h"
-#include "calls/group/calls_group_common.h"
-#include "calls/calls_box_controller.h"
-#include "calls/calls_instance.h"
-#include "core/application.h"
-#include "core/click_handler_types.h"
-#include "data/data_changes.h"
-#include "data/data_document_media.h"
-#include "data/data_folder.h"
-#include "data/data_group_call.h"
-#include "data/data_session.h"
-#include "data/data_stories.h"
-#include "data/data_user.h"
-#include "info/info_memento.h"
-#include "info/profile/info_profile_badge.h"
-#include "info/profile/info_profile_emoji_status_panel.h"
-#include "info/profile/info_profile_icon.h"
-#include "info/stories/info_stories_widget.h"
-#include "lang/lang_keys.h"
-#include "main/main_account.h"
-#include "main/main_domain.h"
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "mtproto/mtproto_config.h"
-#include "settings/settings_advanced.h"
-#include "settings/settings_calls.h"
-#include "settings/settings_information.h"
-#include "storage/localstorage.h"
-#include "storage/storage_account.h"
-#include "support/support_templates.h"
-#include "tde2e/tde2e_api.h"
-#include "tde2e/tde2e_integration.h"
-#include "ui/boxes/confirm_box.h"
+#include "window/themes/window_theme.h"
+#include "window/window_peer_menu.h"
+#include "window/window_session_controller.h"
+#include "window/window_controller.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/controls/userpic_button.h"
@@ -70,8 +36,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h" // infoTopBarMenu
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
-#include "styles/style_settings.h"
-#include "styles/style_window.h"
 
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
@@ -92,6 +56,37 @@ namespace Window {
 namespace {
 
 constexpr auto kPlayStatusLimit = 12;
+
+class VersionLabel final
+	: public Ui::FlatLabel
+	, public Ui::AbstractTooltipShower {
+public:
+	using Ui::FlatLabel::FlatLabel;
+
+	void clickHandlerActiveChanged(
+			const ClickHandlerPtr &action,
+			bool active) override {
+		update();
+		if (active && action && !action->dragText().isEmpty()) {
+			Ui::Tooltip::Show(350, this);
+		} else {
+			Ui::Tooltip::Hide();
+		}
+	}
+
+	QString tooltipText() const override {
+		return u"Build date: %1."_q.arg(__DATE__);
+	}
+
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+
+	bool tooltipWindowActive() const override {
+		return Ui::AppInFocus() && Ui::InFocusChain(window());
+	}
+
+};
 
 [[nodiscard]] bool CanCheckSpecialEvent() {
 	static const auto result = [] {
@@ -691,6 +686,37 @@ void MainMenu::setupMenu() {
 			}
 		});
 
+		const auto wrap = _menu->add(
+			object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
+				_menu,
+				CreateButtonWithIcon(
+					_menu,
+					tr::lng_menu_my_stories(),
+					st::mainMenuButton,
+					IconDescriptor{ &st::menuIconStoriesSavedSection })));
+		const auto selfId = controller->session().userPeerId();
+		const auto stories = &controller->session().data().stories();
+		if (stories->archiveCount(selfId) > 0) {
+			wrap->toggle(!settings->disableStories, anim::type::instant);
+		} else {
+			wrap->toggle(false, anim::type::instant);
+			if (!stories->archiveCountKnown(selfId)) {
+				stories->archiveLoadMore(selfId);
+				wrap->toggleOn(stories->archiveChanged(
+				) | rpl::filter(
+					rpl::mappers::_1 == selfId
+				) | rpl::map([=] {
+					return stories->archiveCount(selfId) > 0 && !settings->disableStories;
+				}) | rpl::filter(rpl::mappers::_1) | rpl::take(1));
+			}
+		}
+		wrap->entity()->setClickedCallback([=] {
+			controller->showSection(
+				Info::Stories::Make(controller->session().user()));
+		});
+
+		SetupMenuBots(_menu, controller);
+
 		if (settings.showContactsInDrawer)
 		addAction(
 			tr::lng_menu_contacts(),
@@ -807,7 +833,7 @@ void MainMenu::setupMenu() {
 				tr::lng_theme_editor_cant_change_theme()));
 			return;
 		}
-		const auto weak = MakeWeak(this);
+		const auto weak = base::make_weak(this);
 		const auto toggle = [=] {
 			if (!weak) {
 				Window::Theme::ToggleNightMode();
@@ -1033,7 +1059,7 @@ base::EventFilterResult MainMenu::redirectToInnerChecked(not_null<QEvent*> e) {
 	if (_insideEventRedirect) {
 		return base::EventFilterResult::Continue;
 	}
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	_insideEventRedirect = true;
 	QGuiApplication::sendEvent(_inner, e);
 	if (weak) {

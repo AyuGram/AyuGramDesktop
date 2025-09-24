@@ -1019,7 +1019,7 @@ void Pip::handleLeave() {
 }
 
 void Pip::handleMouseMove(QPoint position) {
-	const auto weak = Ui::MakeWeak(_panel.widget());
+	const auto weak = base::make_weak(_panel.widget());
 	const auto guard = gsl::finally([&] {
 		if (weak) {
 			_panel.handleMouseMove(position);
@@ -1097,7 +1097,7 @@ Pip::OverState Pip::ResolveShownOver(OverState state) {
 }
 
 void Pip::handleMousePress(QPoint position, Qt::MouseButton button) {
-	const auto weak = Ui::MakeWeak(_panel.widget());
+	const auto weak = base::make_weak(_panel.widget());
 	const auto guard = gsl::finally([&] {
 		if (weak) {
 			_panel.handleMousePress(position, button);
@@ -1115,7 +1115,7 @@ void Pip::handleMousePress(QPoint position, Qt::MouseButton button) {
 }
 
 void Pip::handleMouseRelease(QPoint position, Qt::MouseButton button) {
-	const auto weak = Ui::MakeWeak(_panel.widget());
+	const auto weak = base::make_weak(_panel.widget());
 	const auto guard = gsl::finally([&] {
 		if (weak) {
 			_panel.handleMouseRelease(position, button);

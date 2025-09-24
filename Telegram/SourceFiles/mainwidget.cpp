@@ -110,6 +110,8 @@ void ClearBotStartToken(PeerData *peer) {
 }
 
 } // namespace
+// AyuGram includes
+#include "ayu/utils/telegram_helpers.h"
 
 enum StackItemType {
 	HistoryStackItem,
@@ -770,26 +772,14 @@ void MainWidget::hideSingleUseKeyboard(FullMsgId replyToId) {
 	_history->hideSingleUseKeyboard(replyToId);
 }
 
-void MainWidget::searchMessages(
-		const QString &query,
-		Dialogs::Key inChat,
-		PeerData *searchFrom) {
-	const auto complex = Data::HashtagWithUsernameFromQuery(query);
-	if (!complex.username.isEmpty()) {
-		_controller->showPeerByLink(Window::PeerByLinkInfo{
-			.usernameOrId = complex.username,
-			.text = complex.hashtag,
-			.resolveType = Window::ResolveType::HashtagSearch,
-		});
-		return;
-	}
+void MainWidget::searchMessages(const QString &query, Dialogs::Key inChat, PeerData *from) {
 	auto tags = Data::SearchTagsFromQuery(query);
-	if (_dialogs) {
+	if (controller()->isPrimary()) {
 		auto state = Dialogs::SearchState{
 			.inChat = ((tags.empty() || inChat.sublist())
 				? inChat
 				: session().data().history(session().user())),
-			.fromPeer = inChat ? searchFrom : nullptr,
+			.fromPeer = from,
 			.tags = tags,
 			.query = tags.empty() ? query : QString(),
 		};
@@ -801,28 +791,17 @@ void MainWidget::searchMessages(
 			_dialogs->setInnerFocus();
 		}
 	} else {
-		if (const auto sublist = inChat.sublist()) {
-			using namespace HistoryView;
-			controller()->showSection(
-				std::make_shared<ChatMemento>(ChatViewId{
-					.history = sublist->owningHistory(),
-					.sublist = sublist,
-				}));
-		} else if (!tags.empty()) {
-			inChat = controller()->session().data().history(
-				controller()->session().user());
-		}
-		if ((!_mainSection
-			|| !_mainSection->searchInChatEmbedded(query, inChat, searchFrom))
-			&& !_history->searchInChatEmbedded(query, inChat, searchFrom)) {
-			const auto account = not_null(&session().account());
-			if (const auto window = Core::App().windowFor(account)) {
-				if (const auto controller = window->sessionController()) {
-					controller->content()->searchMessages(
-						query,
-						inChat,
-						searchFrom);
-					controller->widget()->activate();
+		const auto searchIn = [&](not_null<Window::Controller*> window) {
+			if (const auto controller = window->sessionController()) {
+				controller->content()->searchMessages(query, inChat, from);
+				controller->widget()->activate();
+			}
+		};
+		const auto account = &session().account();
+		if (const auto peer = inChat.peer()) {
+			if (peer == controller()->singlePeer()) {
+				if (_history->peer() != peer) {
+					controller()->showPeerHistory(peer);
 				}
 			}
 		}

@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/top_peers.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/stickers/data_stickers.h"
+#include "data/data_cloud_themes.h"
 #include "data/data_drafts.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
@@ -33,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel_admins.h"
 #include "data/data_changes.h"
 #include "data/data_chat_filters.h"
+#include "data/data_replies_list.h"
 #include "data/data_send_action.h"
 #include "data/data_star_gift.h"
 #include "data/data_emoji_statuses.h"
@@ -1312,7 +1314,12 @@ void History::applyServiceChanges(
 			}
 		}
 	}, [&](const MTPDmessageActionSetChatTheme &data) {
-		peer->setThemeEmoji(qs(data.vemoticon()));
+		data.vtheme().match([&](const MTPDchatTheme &data) {
+			peer->setThemeToken(qs(data.vemoticon()));
+		}, [&](const MTPDchatThemeUniqueGift &data) {
+			peer->setThemeToken(
+				owner().cloudThemes().processGiftThemeGetToken(data));
+		});
 	}, [&](const MTPDmessageActionSetChatWallPaper &data) {
 		if (item->out() || data.is_for_both()) {
 			peer->setWallPaper(
@@ -1993,13 +2000,17 @@ bool History::unreadCountKnown() const {
 	return _unreadCount.has_value();
 }
 
+bool History::useMyUnreadInParent() const {
+	return !isForum() && !amMonoforumAdmin();
+}
+
 void History::setUnreadCount(int newUnreadCount) {
 	Expects(folderKnown());
 
 	if (_unreadCount == newUnreadCount) {
 		return;
 	}
-	const auto notifier = unreadStateChangeNotifier(!isForum());
+	const auto notifier = unreadStateChangeNotifier(useMyUnreadInParent());
 	_unreadCount = newUnreadCount;
 
 	const auto lastOutgoing = [&] {
@@ -2038,7 +2049,7 @@ void History::setUnreadMark(bool unread) {
 		return;
 	}
 	const auto notifier = unreadStateChangeNotifier(
-		!unreadCount() && !isForum());
+		useMyUnreadInParent() && !unreadCount());
 	Thread::setUnreadMarkFlag(unread);
 }
 
@@ -2070,9 +2081,9 @@ void History::setMuted(bool muted) {
 	if (this->muted() == muted) {
 		return;
 	} else {
-		const auto state = isForum()
-			? Dialogs::BadgesState()
-			: computeBadgesState();
+		const auto state = useMyUnreadInParent()
+			? computeBadgesState()
+			: Dialogs::BadgesState();
 		const auto notify = (state.unread || state.reaction);
 		const auto notifier = unreadStateChangeNotifier(notify);
 		Thread::setMuted(muted);
@@ -3166,6 +3177,58 @@ void History::applyDialogTopMessage(MsgId topMessageId) {
 	}
 }
 
+void History::tryMarkForumIntervalRead(
+		MsgId wasInboxReadBefore,
+		MsgId nowInboxReadBefore) {
+	if (!isForum()
+		|| !peer->asChannel()->useSubsectionTabs()
+		|| (nowInboxReadBefore <= wasInboxReadBefore)) {
+		return;
+	} else if (loadedAtBottom() && nowInboxReadBefore >= minMsgId()) {
+		// Count for each sublist how many messages are still not read.
+		auto counts = base::flat_map<not_null<Data::ForumTopic*>, int>();
+		for (const auto &block : blocks) {
+			for (const auto &message : block->messages) {
+				const auto item = message->data();
+				if (!item->isRegular() || item->id < nowInboxReadBefore) {
+					continue;
+				}
+				if (const auto topic = item->topic()) {
+					++counts[topic];
+				}
+			}
+		}
+		if (const auto forum = peer->forum()) {
+			forum->updateUnreadCounts(nowInboxReadBefore - 1, counts);
+		}
+	} else if (minMsgId() <= wasInboxReadBefore
+		&& maxMsgId() >= nowInboxReadBefore) {
+		// Count for each sublist how many messages were read.
+		for (const auto &block : blocks) {
+			for (const auto &message : block->messages) {
+				const auto item = message->data();
+				if (!item->isRegular() || item->id < wasInboxReadBefore) {
+					continue;
+				} else if (item->id >= nowInboxReadBefore) {
+					break;
+				}
+				if (const auto topic = item->topic()) {
+					const auto replies = topic->replies();
+					const auto unread = replies->unreadCountCurrent();
+					if (unread > 0) {
+						replies->setInboxReadTill(item->id, unread - 1);
+					}
+				}
+			}
+		}
+	} else {
+		// We can't invalidate sublist unread counts here, because no read
+		// request was yet sent to the server (so it can't return correct
+		// values yet), we need to do that after we send read request.
+		_flags |= Flag::MonoAndForumUnreadInvalidatePending;
+	}
+}
+
 void History::tryMarkMonoforumIntervalRead(
 		MsgId wasInboxReadBefore,
 		MsgId nowInboxReadBefore) {
@@ -3211,24 +3274,29 @@ void History::tryMarkMonoforumIntervalRead(
 		// We can't invalidate sublist unread counts here, because no read
 		// request was yet sent to the server (so it can't return correct
 		// values yet), we need to do that after we send read request.
-		_flags |= Flag::MonoforumUnreadInvalidatePending;
+		_flags |= Flag::MonoAndForumUnreadInvalidatePending;
 	}
 }
 
-void History::validateMonoforumUnread(MsgId readTillId) {
-	if (!(_flags & Flag::MonoforumUnreadInvalidatePending)) {
+void History::validateMonoAndForumUnread(MsgId readTillId) {
+	if (!(_flags & Flag::MonoAndForumUnreadInvalidatePending)) {
 		return;
 	}
-	_flags &= ~Flag::MonoforumUnreadInvalidatePending;
-	if (!amMonoforumAdmin()) {
-		return;
-	} else if (const auto monoforum = peer->monoforum()) {
-		monoforum->markUnreadCountsUnknown(readTillId);
+	_flags &= ~Flag::MonoAndForumUnreadInvalidatePending;
+	if (isForum()) {
+		if (const auto forum = peer->forum()) {
+			forum->markUnreadCountsUnknown(readTillId);
+		}
+	} else if (amMonoforumAdmin()) {
+		if (const auto monoforum = peer->monoforum()) {
+			monoforum->markUnreadCountsUnknown(readTillId);
+		}
 	}
 }
 
 void History::setInboxReadTill(MsgId upTo) {
 	if (_inboxReadBefore) {
+		tryMarkForumIntervalRead(*_inboxReadBefore, upTo + 1);
 		tryMarkMonoforumIntervalRead(*_inboxReadBefore, upTo + 1);
 		accumulate_max(*_inboxReadBefore, upTo + 1);
 	} else {
@@ -3414,6 +3482,26 @@ bool History::amMonoforumAdmin() const {
 
 bool History::suggestDraftAllowed() const {
 	return peer->isMonoforum() && !peer->amMonoforumAdmin();
+}
+
+bool History::hasForumThreadBars() const {
+	if (amMonoforumAdmin()) {
+		return true;
+	} else if (const auto channel = peer->asChannel()) {
+		return channel->forum() && channel->useSubsectionTabs();
+	}
+	return false;
+}
+
+void History::forumTabsChanged(bool forumTabs) {
+	for (auto &block : blocks) {
+		for (auto &view : block->messages) {
+			view->setPendingResize();
+			if (forumTabs || view->Has<HistoryView::ForumThreadBar>()) {
+				view->previousInBlocksChanged();
+			}
+		}
+	}
 }
 
 not_null<History*> History::migrateToOrMe() const {

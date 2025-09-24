@@ -683,7 +683,7 @@ void ShareBox::submit(Api::SendOptions options) {
 	_submitLifetime.destroy();
 
 	auto threads = _inner->selected();
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto field = _comment->entity();
 	auto comment = field->getTextWithAppliedMarkdown();
 	const auto checkPaid = [=] {
@@ -1377,8 +1377,8 @@ void ShareBox::Inner::changeCheckState(Chat *chat) {
 }
 
 void ShareBox::Inner::chooseForumTopic(not_null<Data::Forum*> forum) {
-	const auto guard = Ui::MakeWeak(this);
-	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
+	const auto guard = base::make_weak(this);
+	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 	auto chosen = [=](not_null<Data::ForumTopic*> topic) {
 		if (const auto strong = *weak) {
 			strong->closeBox();
@@ -1425,8 +1425,8 @@ void ShareBox::Inner::chooseForumTopic(not_null<Data::Forum*> forum) {
 
 void ShareBox::Inner::chooseMonoforumSublist(
 		not_null<Data::SavedMessages*> monoforum) {
-	const auto guard = Ui::MakeWeak(this);
-	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
+	const auto guard = base::make_weak(this);
+	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 	auto chosen = [=](not_null<Data::SavedSublist*> sublist) {
 		if (const auto strong = *weak) {
 			strong->closeBox();
@@ -1990,6 +1990,29 @@ void FastShareMessage(
 	}), Ui::LayerOption::CloseOther);
 }
 
+void FastShareMessageToSelf(
+		std::shared_ptr<Main::SessionShow> show,
+		not_null<HistoryItem*> item) {
+	const auto self = show->session().user();
+	const auto donePhraseArgs = ChatHelpers::ForwardedMessagePhraseArgs{
+		.toCount = 1,
+		.singleMessage = true,
+		.to1 = self,
+		.to2 = nullptr,
+	};
+	auto sendAction = Api::SendAction(self->owner().history(self));
+	sendAction.clearDraft = false;
+	show->session().api().forwardMessages(
+		Data::ResolvedForwardDraft{ .items = {item} },
+		std::move(sendAction),
+		[=] {
+			auto phrase = rpl::variable<TextWithEntities>(
+				ChatHelpers::ForwardedMessagePhrase(
+					donePhraseArgs)).current();
+			show->showToast(std::move(phrase));
+		});
+}
+
 void FastShareMessage(
 		not_null<Window::SessionController*> controller,
 		not_null<HistoryItem*> item,
@@ -2008,7 +2031,7 @@ void FastShareLink(
 		std::shared_ptr<Main::SessionShow> show,
 		const QString &url,
 		ShareBoxStyleOverrides st) {
-	const auto box = std::make_shared<QPointer<Ui::BoxContent>>();
+	const auto box = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 	const auto sending = std::make_shared<bool>();
 	auto copyCallback = [=] {
 		QGuiApplication::clipboard()->setText(url);

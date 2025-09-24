@@ -72,7 +72,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/vertical_list.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/label_with_custom_emoji.h"
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/popup_menu.h"
 #include "webview/webview_interface.h"
@@ -223,7 +222,7 @@ void ShowChooseBox(
 		PeerTypes types,
 		Fn<void(not_null<Data::Thread*>)> callback,
 		rpl::producer<QString> titleOverride = nullptr) {
-	const auto weak = std::make_shared<QPointer<Ui::BoxContent>>();
+	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
 	auto done = [=](not_null<Data::Thread*> thread) mutable {
 		if (const auto strong = *weak) {
 			strong->closeBox();
@@ -388,7 +387,7 @@ void FillBotUsepic(
 		not_null<Ui::GenericBox*> box,
 		not_null<PeerData*> bot,
 		base::weak_ptr<Window::SessionController> weak) {
-	auto aboutLabel = Ui::CreateLabelWithCustomEmoji(
+	auto aboutLabel = object_ptr<Ui::FlatLabel>(
 		box->verticalLayout(),
 		tr::lng_allow_bot_webview_details(
 			lt_emoji,
@@ -397,7 +396,6 @@ void FillBotUsepic(
 		) | rpl::map([](TextWithEntities text) {
 			return Ui::Text::Link(std::move(text), u"internal:"_q);
 		}),
-		Core::TextContext({ .session = &bot->session() }),
 		st::defaultFlatLabel);
 	const auto userpic = Ui::CreateChild<Ui::UserpicButton>(
 		box->verticalLayout(),
@@ -515,15 +513,17 @@ void ConfirmEmojiStatusAccessBox(
 	AddSkip(box->verticalLayout(), 2 * st::defaultVerticalListSkip);
 
 	auto name = Ui::Text::Bold(bot->name());
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box,
-		tr::lng_bot_emoji_status_access_text(
-			lt_bot,
-			rpl::single(name),
-			lt_name,
-			rpl::single(name),
-			Ui::Text::RichLangValue),
-		st::botEmojiStatusText));
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			tr::lng_bot_emoji_status_access_text(
+				lt_bot,
+				rpl::single(name),
+				lt_name,
+				rpl::single(name),
+				Ui::Text::RichLangValue),
+			st::botEmojiStatusText),
+		style::al_top);
 
 	box->addButton(tr::lng_bot_emoji_status_access_allow(), [=] {
 		if (!CheckEmojiStatusPremium(bot)) {
@@ -561,19 +561,23 @@ void ConfirmEmojiStatusBox(
 		box->closeBox();
 	});
 
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box,
-		tr::lng_bot_emoji_status_title(),
-		st::botEmojiStatusTitle));
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			tr::lng_bot_emoji_status_title(),
+			st::botEmojiStatusTitle),
+		style::al_top);
 	AddSkip(box->verticalLayout());
 
-	box->addRow(object_ptr<Ui::FlatLabel>(
-		box,
-		tr::lng_bot_emoji_status_text(
-			lt_bot,
-			rpl::single(Ui::Text::Bold(bot->name())),
-			Ui::Text::RichLangValue),
-		st::botEmojiStatusText));
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			tr::lng_bot_emoji_status_text(
+				lt_bot,
+				rpl::single(Ui::Text::Bold(bot->name())),
+				Ui::Text::RichLangValue),
+			st::botEmojiStatusText),
+		style::al_top);
 
 	AddSkip(box->verticalLayout(), 2 * st::defaultVerticalListSkip);
 
@@ -894,7 +898,28 @@ void WebViewInstance::activate() {
 	}
 }
 
+void WebViewInstance::requestFullBot() {
+	if (_bot->isFullLoaded()) {
+		return;
+	}
+	_bot->updateFull();
+	_bot->session().changes().peerUpdates(
+		_bot,
+		Data::PeerUpdate::Flag::FullInfo
+	) | rpl::start_with_next([=] {
+		if (_botFullWaitingArgs.has_value()) {
+			auto args = *base::take(_botFullWaitingArgs);
+			if (args.url.isEmpty()) {
+				showGame();
+			} else {
+				show(std::move(args));
+			}
+		}
+	}, _lifetime);
+}
+
 void WebViewInstance::resolve() {
+	requestFullBot();
 	v::match(_source, [&](WebViewSourceButton data) {
 		confirmOpen([=] {
 			if (data.simple) {
@@ -940,6 +965,8 @@ void WebViewInstance::resolve() {
 				requestMain();
 			});
 		}
+	}, [&](WebViewSourceAgeVerification) {
+		requestMain();
 	});
 }
 
@@ -1314,6 +1341,10 @@ void WebViewInstance::maybeChooseAndRequestButton(PeerTypes supported) {
 }
 
 void WebViewInstance::show(ShowArgs &&args) {
+	if (!_bot->isFullLoaded()) {
+		_botFullWaitingArgs.emplace(std::move(args));
+		return;
+	}
 	auto title = args.title.isEmpty()
 		? Info::Profile::NameValue(_bot)
 		: rpl::single(args.title);
@@ -1380,6 +1411,10 @@ void WebViewInstance::show(ShowArgs &&args) {
 void WebViewInstance::showGame() {
 	Expects(v::is<WebViewSourceGame>(_source));
 
+	if (!_bot->isFullLoaded()) {
+		_botFullWaitingArgs.emplace();
+		return;
+	}
 	const auto game = v::get<WebViewSourceGame>(_source);
 	_panelUrl = QString::fromUtf8(_button.url);
 	_panel = Ui::BotWebView::Show({
@@ -1803,6 +1838,59 @@ void WebViewInstance::botSendPreparedMessage(
 		MTP_string(request.id)
 	)).done([=](const MTPmessages_PreparedInlineMessage &result) {
 		const auto panel = weak.get();
+	cancel();
+
+	_bot = bot;
+	_context = std::make_unique<Context>(context);
+	if (controllerForConfirm) {
+		confirmOpen(controllerForConfirm, [=] {
+			request(button);
+		});
+	} else {
+		request(button);
+	}
+}
+
+void AttachWebView::request(const WebViewButton &button) {
+	Expects(_context != nullptr && _bot != nullptr);
+
+	if (button.fromAttachMenu) {
+		const auto bot = ranges::find(
+			_attachBots,
+			not_null{ _bot },
+			&AttachWebViewBot::user);
+		if (bot == end(_attachBots) || bot->inactive) {
+			requestAddToMenu(_bot, AddToMenuOpenAttach{
+				.startCommand = button.startCommand,
+			});
+			return;
+		}
+	}
+
+	_startCommand = button.startCommand;
+	const auto &action = _context->action;
+
+	using Flag = MTPmessages_RequestWebView::Flag;
+	const auto flags = Flag::f_theme_params
+		| (button.url.isEmpty() ? Flag(0) : Flag::f_url)
+		| (_startCommand.isEmpty() ? Flag(0) : Flag::f_start_param)
+		| (action.replyTo ? Flag::f_reply_to : Flag(0))
+		| (action.options.sendAs ? Flag::f_send_as : Flag(0))
+		| (action.options.silent ? Flag::f_silent : Flag(0));
+	_requestId = _session->api().request(MTPmessages_RequestWebView(
+		MTP_flags(flags),
+		action.history->peer->input,
+		_bot->inputUser,
+		MTP_bytes(button.url),
+		MTP_string(_startCommand),
+		MTP_dataJSON(MTP_bytes(Window::Theme::WebViewParams().json)),
+		MTP_string(WebviewPlatform()),
+		action.mtpReplyTo(),
+		(action.options.sendAs
+			? action.options.sendAs->input
+			: MTP_inputPeerEmpty())
+	)).done([=](const MTPWebViewResult &result) {
+		_requestId = 0;
 		const auto &data = result.data();
 		bot->owner().processUsers(data.vusers());
 		const auto parsed = std::shared_ptr<Result>(Result::Create(
@@ -1823,8 +1911,8 @@ void WebViewInstance::botSendPreparedMessage(
 			.viaBotId = peerToUser(bot->id),
 		});
 		struct State {
-			QPointer<Ui::BoxContent> preview;
-			QPointer<Ui::BoxContent> choose;
+			base::weak_qptr<Ui::BoxContent> preview;
+			base::weak_qptr<Ui::BoxContent> choose;
 			rpl::event_stream<not_null<Data::Thread*>> recipient;
 			Fn<void(Api::SendOptions)> send;
 			SendPaymentHelper sendPayment;
@@ -1844,10 +1932,10 @@ void WebViewInstance::botSendPreparedMessage(
 			const auto weak1 = state->preview;
 			const auto weak2 = state->choose;
 			const auto close = [=] {
-				if (const auto strong = weak1.data()) {
+				if (const auto strong = weak1.get()) {
 					strong->closeBox();
 				}
-				if (const auto strong = weak2.data()) {
+				if (const auto strong = weak2.get()) {
 					strong->closeBox();
 				}
 			};
@@ -1857,9 +1945,9 @@ void WebViewInstance::botSendPreparedMessage(
 				}
 				if (success) {
 					*failed = -1;
-					if (const auto strong2 = weak2.data()) {
+					if (const auto strong2 = weak2.get()) {
 						strong2->showToast({ tr::lng_share_done(tr::now) });
-					} else if (const auto strong1 = weak1.data()) {
+					} else if (const auto strong1 = weak1.get()) {
 						strong1->showToast({ tr::lng_share_done(tr::now) });
 					}
 					base::call_delayed(Ui::Toast::kDefaultDuration, close);
@@ -2004,6 +2092,12 @@ void WebViewInstance::botDownloadFile(
 	}).fail([=] {
 		done(QString());
 	}).send();
+}
+
+void WebViewInstance::botVerifyAge(int age) {
+	if (v::is<WebViewSourceAgeVerification>(_source)) {
+		v::get<WebViewSourceAgeVerification>(_source).done(age);
+	}
 }
 
 void WebViewInstance::botOpenPrivacyPolicy() {
@@ -2387,6 +2481,256 @@ void AttachWebView::open(WebViewDescriptor &&descriptor) {
 		std::make_unique<WebViewInstance>(std::move(descriptor)));
 	_instances.back()->activate();
 }
+void AttachWebView::requestSimple(
+		not_null<Window::SessionController*> controller,
+		not_null<UserData*> bot,
+		const WebViewButton &button) {
+	cancel();
+	_bot = bot;
+	_context = std::make_unique<Context>(LookupContext(
+		controller,
+		Api::SendAction(bot->owner().history(bot))));
+	_context->fromSwitch = button.fromSwitch;
+	_context->fromMainMenu = button.fromMainMenu;
+	if (button.fromMainMenu) {
+		acceptMainMenuDisclaimer(controller, button);
+	} else {
+		confirmOpen(controller, [=] {
+			requestSimple(button);
+		});
+	}
+}
+
+void AttachWebView::requestSimple(const WebViewButton &button) {
+	using Flag = MTPmessages_RequestSimpleWebView::Flag;
+	_requestId = _session->api().request(MTPmessages_RequestSimpleWebView(
+		MTP_flags(Flag::f_theme_params
+			| (button.fromMainMenu
+				? (Flag::f_from_side_menu
+					| (button.startCommand.isEmpty()
+						? Flag()
+						: Flag::f_start_param))
+				: Flag::f_url)
+			| (button.fromSwitch ? Flag::f_from_switch_webview : Flag())),
+		_bot->inputUser,
+		MTP_bytes(button.url),
+		MTP_string(button.startCommand),
+		MTP_dataJSON(MTP_bytes(Window::Theme::WebViewParams().json)),
+		MTP_string(WebviewPlatform())
+	)).done([=](const MTPWebViewResult &result) {
+		_requestId = 0;
+		const auto &data = result.data();
+		const auto queryId = uint64();
+		show(
+			queryId,
+			qs(data.vurl()),
+			button.text,
+			false,
+			nullptr,
+			button.fromMainMenu);
+	}).fail([=](const MTP::Error &error) {
+		_requestId = 0;
+	}).send();
+}
+
+bool AttachWebView::openAppFromMenuLink(
+		not_null<Window::SessionController*> controller,
+		not_null<UserData*> bot) {
+	Expects(bot->botInfo != nullptr);
+
+	const auto &url = bot->botInfo->botMenuButtonUrl;
+	const auto local = Core::TryConvertUrlToLocal(url);
+	const auto prefix = u"tg://resolve?"_q;
+	if (!local.startsWith(prefix)) {
+		return false;
+	}
+	const auto params = qthelp::url_parse_params(
+		local.mid(prefix.size()),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto domainParam = params.value(u"domain"_q);
+	const auto appnameParam = params.value(u"appname"_q);
+	const auto webChannelPreviewLink = (domainParam == u"s"_q)
+		&& !appnameParam.isEmpty();
+	const auto appname = webChannelPreviewLink ? QString() : appnameParam;
+	if (appname.isEmpty()) {
+		return false;
+	}
+	requestApp(
+		controller,
+		Api::SendAction(bot->owner().history(bot)),
+		bot,
+		appname,
+		params.value(u"startapp"_q),
+		true);
+	return true;
+}
+
+void AttachWebView::requestMenu(
+	not_null<Window::SessionController*> controller,
+		not_null<UserData*> bot) {
+	if (openAppFromMenuLink(controller, bot)) {
+		return;
+	}
+
+	cancel();
+	_bot = bot;
+	_context = std::make_unique<Context>(LookupContext(
+		controller,
+		Api::SendAction(bot->owner().history(bot))));
+	const auto url = bot->botInfo->botMenuButtonUrl;
+	const auto text = bot->botInfo->botMenuButtonText;
+	confirmOpen(controller, [=] {
+		const auto &action = _context->action;
+		using Flag = MTPmessages_RequestWebView::Flag;
+		_requestId = _session->api().request(MTPmessages_RequestWebView(
+			MTP_flags(Flag::f_theme_params
+				| Flag::f_url
+				| Flag::f_from_bot_menu
+				| (action.replyTo? Flag::f_reply_to : Flag(0))
+				| (action.options.sendAs ? Flag::f_send_as : Flag(0))
+				| (action.options.silent ? Flag::f_silent : Flag(0))),
+			action.history->peer->input,
+			_bot->inputUser,
+			MTP_string(url),
+			MTPstring(), // start_param
+			MTP_dataJSON(MTP_bytes(Window::Theme::WebViewParams().json)),
+			MTP_string(WebviewPlatform()),
+			action.mtpReplyTo(),
+			(action.options.sendAs
+				? action.options.sendAs->input
+				: MTP_inputPeerEmpty())
+		)).done([=](const MTPWebViewResult &result) {
+			_requestId = 0;
+			const auto &data = result.data();
+			show(data.vquery_id().value_or_empty(), qs(data.vurl()), text);
+		}).fail([=](const MTP::Error &error) {
+			_requestId = 0;
+			if (error.type() == u"BOT_INVALID"_q) {
+				requestBots();
+			}
+		}).send();
+	});
+}
+
+void AttachWebView::requestApp(
+		not_null<Window::SessionController*> controller,
+		const Api::SendAction &action,
+		not_null<UserData*> bot,
+		const QString &appName,
+		const QString &startParam,
+		bool forceConfirmation) {
+	const auto context = LookupContext(controller, action);
+	if (_requestId
+		&& _bot == bot
+		&& _startCommand == startParam
+		&& _botAppName == appName
+		&& IsSame(_context, context)) {
+		return;
+	}
+	cancel();
+	_bot = bot;
+	_startCommand = startParam;
+	_botAppName = appName;
+	_context = std::make_unique<Context>(context);
+	_context->fromBotApp = true;
+	const auto already = _session->data().findBotApp(_bot->id, appName);
+	_requestId = _session->api().request(MTPmessages_GetBotApp(
+		MTP_inputBotAppShortName(
+			bot->inputUser,
+			MTP_string(appName)),
+		MTP_long(already ? already->hash : 0)
+	)).done([=](const MTPmessages_BotApp &result) {
+		_requestId = 0;
+		if (!_bot || !_context) {
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto allowed = std::make_shared<Ui::Checkbox*>();
+		const auto done = [=](Fn<void()> close) {
+			requestAppView((*allowed) && (*allowed)->checked());
+			close();
+		};
+		Ui::ConfirmBox(box, {
+			tr::lng_allow_bot_webview(
+				tr::now,
+				lt_bot_name,
+				Ui::Text::Bold(_bot->name()),
+				Ui::Text::RichLangValue),
+			done,
+		});
+		if (requestWriteAccess) {
+			(*allowed) = box->addRow(
+				object_ptr<Ui::Checkbox>(
+					box,
+					tr::lng_url_auth_allow_messages(
+						tr::now,
+						lt_bot,
+						Ui::Text::Bold(_bot->name()),
+						Ui::Text::WithEntities),
+					true,
+					st::urlAuthCheckbox),
+				style::margins(
+					st::boxRowPadding.left(),
+					st::boxPhotoCaptionSkip,
+					st::boxRowPadding.right(),
+					st::boxPhotoCaptionSkip));
+			(*allowed)->setAllowTextLines();
+		}
+	}));
+}
+
+void AttachWebView::requestAppView(bool allowWrite) {
+	if (!_context || !_app) {
+		return;
+	}
+	using Flag = MTPmessages_RequestAppWebView::Flag;
+	const auto app = _app;
+	const auto flags = Flag::f_theme_params
+		| (_startCommand.isEmpty() ? Flag(0) : Flag::f_start_param)
+		| (allowWrite ? Flag::f_write_allowed : Flag(0));
+	_requestId = _session->api().request(MTPmessages_RequestAppWebView(
+		MTP_flags(flags),
+		_context->action.history->peer->input,
+		MTP_inputBotAppID(MTP_long(app->id), MTP_long(app->accessHash)),
+		MTP_string(_startCommand),
+		MTP_dataJSON(MTP_bytes(Window::Theme::WebViewParams().json)),
+		MTP_string(WebviewPlatform())
+	)).done([=](const MTPWebViewResult &result) {
+		_requestId = 0;
+		const auto &data = result.data();
+		const auto queryId = uint64();
+		show(queryId, qs(data.vurl()), QString(), false, app);
+	}).fail([=](const MTP::Error &error) {
+		_requestId = 0;
+		if (error.type() == u"BOT_INVALID"_q) {
+			requestBots();
+		}
+	}).send();
+}
+
+void AttachWebView::confirmOpen(
+		not_null<Window::SessionController*> controller,
+		Fn<void()> done) {
+	if (!_bot) {
+		return;
+	} else if (_bot->isVerified()
+		|| _bot->session().local().isBotTrustedOpenWebView(_bot->id)) {
+		done();
+		return;
+	}
+	const auto callback = [=] {
+		_bot->session().local().markBotTrustedOpenWebView(_bot->id);
+		controller->hideLayer();
+		done();
+	};
+	controller->show(Ui::MakeConfirmBox({
+		.text = tr::lng_allow_bot_webview(
+			tr::now,
+			lt_bot_name,
+			Ui::Text::Bold(_bot->name()),
+			Ui::Text::RichLangValue),
+		.confirmed = callback,
+		.confirmText = tr::lng_box_ok(),
+	}));
+
 
 void AttachWebView::acceptMainMenuDisclaimer(
 		std::shared_ptr<Ui::Show> show,

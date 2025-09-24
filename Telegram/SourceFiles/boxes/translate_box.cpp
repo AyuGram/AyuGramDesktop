@@ -212,7 +212,7 @@ void TranslateBox(
 		box,
 		CreateLoadingTextWidget(
 			box,
-			st::aboutLabel,
+			st::aboutLabel.style,
 			std::min(original->entity()->height() / lineHeight, kMaxLines),
 			state->to.value() | rpl::map([=](LanguageId id) {
 				return id.locale().textDirection() == Qt::RightToLeft;
@@ -253,12 +253,9 @@ void TranslateBox(
 				showText(
 					Ui::Text::Italic(tr::lng_translate_box_error(tr::now)));
 			} else {
-				showText(TextWithEntities{
-					.text = qs(list.front().data().vtext()),
-					.entities = Api::EntitiesFromMTP(
-						&peer->session(),
-						list.front().data().ventities().v),
-				});
+				showText(Api::ParseTextWithEntities(
+					&peer->session(),
+					list.front()));
 			}
 		}).fail([=](const MTP::Error &error) {
 			showText(
@@ -312,7 +309,7 @@ object_ptr<BoxContent> EditSkipTranslationLanguages() {
 	auto title = tr::lng_translate_settings_choose();
 	const auto selected = std::make_shared<std::vector<LanguageId>>(
 		Core::App().settings().skipTranslationLanguages());
-	const auto weak = std::make_shared<QPointer<BoxContent>>();
+	const auto weak = std::make_shared<base::weak_qptr<BoxContent>>();
 	const auto check = [=](LanguageId id) {
 		const auto already = ranges::contains(*selected, id);
 		if (already) {
@@ -321,7 +318,7 @@ object_ptr<BoxContent> EditSkipTranslationLanguages() {
 			selected->push_back(id);
 		}
 		if (already && selected->empty()) {
-			if (const auto strong = weak->data()) {
+			if (const auto strong = weak->get()) {
 				strong->showToast(
 					tr::lng_translate_settings_one(tr::now),
 					kSkipAtLeastOneDuration);

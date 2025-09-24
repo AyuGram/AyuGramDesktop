@@ -98,12 +98,80 @@ Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
 Or follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ### Remarks for Windows
+>>>>>>> telegramdesktop-dev
 
+Follow [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-win-x64.md) if you want to
+build by yourself.
+
+### macOS
+
+#### Official
+
+<<<<<<< HEAD
+You can download prebuilt macOS package from [Releases tab](https://github.com/AyuGram/AyuGramDesktop/releases).
+
+#### Homebrew
+
+```bash
+brew install --cask ayugram
+```
+
+### Arch Linux
+
+#### From source (recommended)
+
+Install `ayugram-desktop` from [AUR](https://aur.archlinux.org/packages/ayugram-desktop).
+
+#### Prebuilt binaries
+
+Install `ayugram-desktop-bin` from [AUR](https://aur.archlinux.org/packages/ayugram-desktop-bin).
+
+Note: these binaries aren't officially maintained by us.
+
+### NixOS
+
+See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
+
+### ALT Linux
+
+[Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
+
+### EPM
+
+`epm play ayugram`
+
+### Any other Linux distro
+
+Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
+
+Or follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
+
+### Remarks for Windows
+
+=======
+[//]: # (LINKS)
+[telegram]: https://telegram.org
+[telegram_desktop]: https://desktop.telegram.org
+[telegram_api]: https://core.telegram.org
+[telegram_proto]: https://core.telegram.org/mtproto
+[license]: LICENSE
+[win32]: docs/building-win.md
+[win64]: docs/building-win-x64.md
+[mac]: docs/building-mac.md
+[linux]: docs/building-linux.md
+[preview_image]: https://github.com/telegramdesktop/tdesktop/blob/dev/docs/assets/preview.png "Preview of Telegram Desktop"
+[preview_image_url]: https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/docs/assets/preview.png
+=======
+>>>>>>> telegramdesktop-dev
 Make sure you have these components installed with VS Build Tools:
 
 - C++ MFC latest (x86 & x64)
 - C++ ATL latest (x86 & x64)
 - latest Windows 11 SDK
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> telegramdesktop-dev
 
 ## Donation
 

@@ -393,11 +393,7 @@ object_ptr<Ui::AbstractButton> MakeLinkLabel(
 		const QString &link,
 		const style::InputField *stOverride) {
 	const auto &st = stOverride ? *stOverride : st::dialogsFilter;
-	const auto text = link.startsWith(u"https://"_q)
-		? link.mid(8)
-		: link.startsWith(u"http://"_q)
-		? link.mid(7)
-		: link;
+	const auto text = Ui::Text::StripUrlProtocol(link);
 	const auto margins = st.textMargins;
 	const auto height = st.heightMin;
 	const auto skip = margins.left();
@@ -446,13 +442,12 @@ object_ptr<Ui::BoxContent> StarRefLinkBox(
 			CreateLinkIcon(box, &bot->session(), row.state.users),
 			st::boxRowPadding + st::starrefJoinUserpicsPadding);
 		box->addRow(
-			object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+			object_ptr<Ui::FlatLabel>(
 				box,
-				object_ptr<Ui::FlatLabel>(
-					box,
-					tr::lng_star_ref_link_title(),
-					st::boxTitle)),
-			st::boxRowPadding + st::starrefJoinTitlePadding);
+				tr::lng_star_ref_link_title(),
+				st::boxTitle),
+			st::boxRowPadding + st::starrefJoinTitlePadding,
+			style::al_top);
 		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
@@ -470,7 +465,7 @@ object_ptr<Ui::BoxContent> StarRefLinkBox(
 						FormatForProgramDuration(program.durationMonths),
 						Ui::Text::WithEntities),
 				st::starrefCenteredText),
-			st::boxRowPadding);
+			style::al_top);
 
 		Ui::AddSkip(box->verticalLayout(), st::defaultVerticalListSkip * 3);
 
@@ -478,7 +473,8 @@ object_ptr<Ui::BoxContent> StarRefLinkBox(
 			object_ptr<Ui::FlatLabel>(
 				box,
 				tr::lng_star_ref_link_recipient(),
-				st::starrefCenteredText));
+				st::starrefCenteredText),
+			style::al_top);
 		Ui::AddSkip(box->verticalLayout());
 		box->addRow(object_ptr<Ui::AbstractButton>::fromRaw(
 			MakePeerBubbleButton(box, peer).release()
@@ -549,7 +545,7 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 
 		struct State {
 			rpl::variable<not_null<PeerData*>> recipient;
-			QPointer<Ui::GenericBox> weak;
+			base::weak_qptr<Ui::GenericBox> weak;
 			bool sent = false;
 		};
 		const auto state = std::make_shared<State>(State{
@@ -576,13 +572,12 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 		}, box->lifetime());
 
 		box->addRow(
-			object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+			object_ptr<Ui::FlatLabel>(
 				box,
-				object_ptr<Ui::FlatLabel>(
-					box,
-					tr::lng_star_ref_title(),
-					st::boxTitle)),
-			st::boxRowPadding + st::starrefJoinTitlePadding);
+				tr::lng_star_ref_title(),
+				st::boxTitle),
+			st::boxRowPadding + st::starrefJoinTitlePadding,
+			style::al_top);
 		box->addRow(
 			object_ptr<Ui::FlatLabel>(
 				box,
@@ -596,13 +591,12 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 					FormatForProgramDuration(program.durationMonths),
 					Ui::Text::WithEntities),
 				st::starrefCenteredText),
-			st::boxRowPadding);
+			style::al_top);
 
 		Ui::AddSkip(box->verticalLayout(), st::defaultVerticalListSkip * 3);
 		if (const auto average = program.revenuePerUser) {
 			const auto layout = box->verticalLayout();
-			const auto session = &initialRecipient->session();
-			auto text = Ui::Text::Colorized(Ui::CreditsEmoji(session));
+			auto text = Ui::Text::Colorized(Ui::CreditsEmoji());
 			text.append(Lang::FormatCreditsAmountRounded(average));
 			layout->add(
 				object_ptr<Ui::FlatLabel>(
@@ -613,9 +607,9 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 							Ui::Text::Wrapped(text, EntityType::Bold)),
 						Ui::Text::WithEntities),
 					st::starrefRevenueText,
-					st::defaultPopupMenu,
-					Core::TextContext({ .session = session })),
-				st::boxRowPadding);
+					st::defaultPopupMenu),
+				st::boxRowPadding,
+				style::al_top);
 			Ui::AddSkip(layout, st::defaultVerticalListSkip);
 		}
 
@@ -637,7 +631,8 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 				object_ptr<Ui::FlatLabel>(
 					box,
 					tr::lng_star_ref_link_recipient(),
-					st::starrefCenteredText));
+					st::starrefCenteredText),
+				style::al_top);
 			Ui::AddSkip(box->verticalLayout());
 			const auto recipientWrap = box->addRow(
 				object_ptr<Ui::VerticalLayout>(box),
@@ -709,7 +704,7 @@ object_ptr<Ui::BoxContent> JoinStarRefBox(
 					}
 				}
 				show->show(StarRefLinkBox(info, recipient));
-				if (const auto strong = state->weak.data()) {
+				if (const auto strong = state->weak.get()) {
 					strong->closeBox();
 				}
 			}, [=](const QString &error) {

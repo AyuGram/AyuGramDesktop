@@ -127,7 +127,11 @@ TextState BottomInfo::textState(
 	}
 	const auto textWidth = _authorEditedDate.maxWidth();
 	auto withTicksWidth = textWidth;
+<<<<<<< HEAD
 	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending))) {
+=======
+	if (!AyuFeatures::MessageShot::isTakingShot() && _data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
+>>>>>>> telegramdesktop-dev
 		withTicksWidth += st::historySendStateSpace;
 	}
 	if (!_views.isEmpty()) {
@@ -230,7 +234,11 @@ void BottomInfo::paint(
 
 	auto right = position.x() + width();
 	const auto firstLineBottom = position.y() + st::msgDateFont->height;
+<<<<<<< HEAD
 	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & Data::Flag::OutLayout)) {
+=======
+	if (!AyuFeatures::MessageShot::isTakingShot() && _data.flags & Data::Flag::OutLayout) {
+>>>>>>> telegramdesktop-dev
 		const auto &icon = (_data.flags & Data::Flag::Sending)
 			? (inverted
 				? st->historySendingInvertedIcon()
@@ -446,6 +454,7 @@ void BottomInfo::layoutDateText() {
 			: name.isEmpty()
 			? (deleted + date)
 			: (deleted + name + afterAuthor);
+<<<<<<< HEAD
 		auto marked = TextWithEntities();
 	if (const auto count = _data.stars) {
 		marked.append(
@@ -527,6 +536,81 @@ void BottomInfo::layoutDateText() {
 			Ui::NameTextOptions(),
 			context);
 	}
+=======
+		_authorEditedDate.setText(
+			st::msgDateTextStyle,
+			full,
+			Ui::NameTextOptions());
+	} else {
+		TextWithEntities deleted;
+		if (_data.flags & Data::Flag::AyuDeleted) {
+			const auto &icon = st::deletedIcon;
+			const auto padding = st::deletedIconPadding;
+			const auto owner = &_reactionsOwner->owner();
+			auto added = Ui::Text::SingleCustomEmoji(
+				owner->customEmojiManager().registerInternalEmoji(icon, padding)
+			);
+			deleted = Ui::Text::Colorized(added, 1);
+			if (!(_data.flags & Data::Flag::Edited)) {
+				deleted.append(' ');
+			}
+		}
+
+		TextWithEntities edited;
+		if (_data.flags & Data::Flag::Edited) {
+			const auto &icon = st::editedIcon;
+			const auto padding = st::editedIconPadding;
+			const auto owner = &_reactionsOwner->owner();
+			auto added = Ui::Text::SingleCustomEmoji(
+				owner->customEmojiManager().registerInternalEmoji(icon, padding)
+			);
+			edited = Ui::Text::Colorized(added, 1);
+			edited.append(' ');
+		} else if (_data.flags & Data::Flag::EstimateDate) {
+		    edited = TextWithEntities{ tr::lng_approximate(tr::now) + ' ' };
+		}
+
+		const auto author = _data.author;
+		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
+
+		const auto date = TextWithEntities{}
+			.append(edited)
+			.append(formatMessageTime(_data.date.time()));
+
+		const auto afterAuthor = TextWithEntities{}.append(prefix).append(date);
+		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor.text);
+		const auto authorWidth = st::msgDateFont->width(author);
+		const auto maxWidth = st::maxSignatureSize;
+		_authorElided = !author.isEmpty()
+			&& (authorWidth + afterAuthorWidth > maxWidth);
+		const auto name = _authorElided
+			? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
+			: author;
+
+		auto full = TextWithEntities{};
+		if (_data.flags & Data::Flag::Sponsored) {
+			// ...
+		} else if (_data.flags & Data::Flag::Imported) {
+			full.append(deleted).append(date).append(' ').append(tr::lng_imported(tr::now));
+		} else if (name.isEmpty()) {
+			full.append(deleted).append(date);
+		} else {
+			full.append(deleted).append(name).append(afterAuthor);
+		}
+
+		const auto context = Core::TextContext({
+			.session = &_reactionsOwner->session(),
+			.repaint = [] {},
+			.customEmojiLoopLimit = 0,
+		});
+
+		_authorEditedDate.setMarkedText(
+			st::msgDateTextStyle,
+			full,
+			Ui::NameTextOptions(),
+			context);
+	}
+>>>>>>> telegramdesktop-dev
 }
 
 void BottomInfo::layoutViewsText() {
@@ -568,7 +652,11 @@ QSize BottomInfo::countOptimalSize() {
 		return { st::historyShortcutStateSpace, st::msgDateFont->height };
 	}
 	auto width = 0;
+<<<<<<< HEAD
 	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & (Data::Flag::OutLayout | Data::Flag::Sending))) {
+=======
+	if (!AyuFeatures::MessageShot::isTakingShot() && _data.flags & (Data::Flag::OutLayout | Data::Flag::Sending)) {
+>>>>>>> telegramdesktop-dev
 		width += st::historySendStateSpace;
 	}
 	width += _authorEditedDate.maxWidth();

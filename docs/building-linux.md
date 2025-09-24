@@ -34,6 +34,11 @@ Or, to create a debug build, run
         -D TDESKTOP_API_ID=2040 \
         -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
 
+**P. S. If docker image build takes too long, cherry-pick [this](https://github.com/TDesktop-x64/tdesktop/commit/b99c084862053f441caa6525837a7e193cc671f7) commit.**
+
+If you need a backward compatible binary (running on older OS like the official one), you should build the binary with LTO.
+To do this, add `-D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON` option.
+
 The built files will be in the `out` directory.
 
 You can use `strip` command to reduce binary size.

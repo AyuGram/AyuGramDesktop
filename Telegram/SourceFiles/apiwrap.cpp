@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_forum.h"
 #include "data/data_saved_messages.h"
+#include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_search_controller.h"
 #include "data/data_session.h"
@@ -93,7 +94,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_worker.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/forward/ayu_forward.h"
-
 
 namespace {
 
@@ -243,6 +243,79 @@ void ApiWrap::requestChangelog(
 	//)).done(
 	//	callback
 	//).send();
+}
+
+void ApiWrap::refreshTopPromotion() {
+	const auto now = base::unixtime::now();
+	const auto next = (_topPromotionNextRequestTime != 0)
+		? _topPromotionNextRequestTime
+		: now;
+	if (_topPromotionRequestId) {
+		getTopPromotionDelayed(now, next);
+		return;
+	}
+	const auto key = [&]() -> std::pair<QString, uint32> {
+		if (!Core::App().settings().proxy().isEnabled()) {
+			return {};
+		}
+		const auto &proxy = Core::App().settings().proxy().selected();
+		if (proxy.type != MTP::ProxyData::Type::Mtproto) {
+			return {};
+		}
+		return { proxy.host, proxy.port };
+	}();
+	if (_topPromotionKey == key && now < next) {
+		getTopPromotionDelayed(now, next);
+		return;
+	}
+	_topPromotionKey = key;
+	_topPromotionRequestId = request(MTPhelp_GetPromoData(
+	)).done([=](const MTPhelp_PromoData &result) {
+		_topPromotionRequestId = 0;
+		topPromotionDone(result);
+	}).fail([=] {
+		_topPromotionRequestId = 0;
+		const auto now = base::unixtime::now();
+		const auto next = _topPromotionNextRequestTime = now
+			+ kTopPromotionInterval;
+		if (!_topPromotionTimer.isActive()) {
+			getTopPromotionDelayed(now, next);
+		}
+	}).send();
+}
+
+void ApiWrap::getTopPromotionDelayed(TimeId now, TimeId next) {
+	_topPromotionTimer.callOnce(std::min(
+		std::max(next - now, kTopPromotionMinDelay),
+		kTopPromotionInterval) * crl::time(1000));
+};
+
+void ApiWrap::topPromotionDone(const MTPhelp_PromoData &proxy) {
+	_topPromotionNextRequestTime = proxy.match([&](const auto &data) {
+		return data.vexpires().v;
+	});
+	getTopPromotionDelayed(
+		base::unixtime::now(),
+		_topPromotionNextRequestTime);
+
+	const auto& settings = AyuSettings::getInstance();
+	if (settings.disableAds) {
+		_session->data().setTopPromoted(nullptr, QString(), QString());
+		return;
+	}
+
+	proxy.match([&](const MTPDhelp_promoDataEmpty &data) {
+		_session->data().setTopPromoted(nullptr, QString(), QString());
+	}, [&](const MTPDhelp_promoData &data) {
+		_session->data().processChats(data.vchats());
+		_session->data().processUsers(data.vusers());
+		const auto peerId = peerFromMTP(data.vpeer());
+		const auto history = _session->data().history(peerId);
+		_session->data().setTopPromoted(
+			history,
+			data.vpsa_type().value_or_empty(),
+			data.vpsa_message().value_or_empty());
+	});
 }
 
 void ApiWrap::requestDeepLinkInfo(
@@ -1784,6 +1857,7 @@ void ApiWrap::joinChannel(not_null<ChannelData*> channel) {
 
 		using Flag = ChannelDataFlag;
 		chatParticipants().loadSimilarPeers(channel);
+		chatParticipants().loadSimilarChannels(channel);
 
 		const auto &settings = AyuSettings::getInstance();
 		if (!settings.collapseSimilarChannels) {
@@ -2497,7 +2571,17 @@ void ApiWrap::refreshFileReference(
 	v::match(origin.data, [&](Data::FileOriginMessage data) {
 		if (const auto item = _session->data().message(data)) {
 			const auto media = item->media();
-			const auto storyId = media ? media->storyId() : FullStoryId();
+			const auto mediaStory = media ? media->storyId() : FullStoryId();
+			const auto storyId = mediaStory
+				? mediaStory
+				: FullStoryId{
+					(IsStoryMsgId(item->id)
+						? item->history()->peer->id
+						: PeerId()),
+					(IsStoryMsgId(item->id)
+						? StoryIdFromMsgId(item->id)
+						: StoryId())
+				};
 			if (storyId) {
 				request(MTPstories_GetStoriesByID(
 					_session->data().peer(storyId.peer)->input,
@@ -2508,6 +2592,17 @@ void ApiWrap::refreshFileReference(
 				request(MTPmessages_GetScheduledMessages(
 					item->history()->peer->input,
 					MTP_vector<MTPint>(1, MTP_int(realId))));
+			} else if (item->isSavedMusicItem()) {
+				const auto user = item->history()->peer->asUser();
+				const auto media = item->media();
+				const auto document = media ? media->document() : nullptr;
+				if (user && document) {
+					request(MTPusers_GetSavedMusicByID(
+						user->inputUser,
+						MTP_vector<MTPInputDocument>(1, document->mtpInput())));
+				} else {
+					fail();
+				}
 			} else if (item->isBusinessShortcut()) {
 				const auto &shortcuts = _session->data().shortcutMessages();
 				const auto realId = shortcuts.lookupId(item);
@@ -3379,8 +3474,8 @@ void ApiWrap::finishForwarding(const SendAction &action) {
 			return;
 		}
 
-		forwardMessages(std::move(toForward), action);
 		history->setForwardDraft(topicRootId, monoforumPeerId, {});
+		forwardMessages(std::move(toForward), action);
 	}
 
 	_session->data().sendHistoryChangeNotifications();
@@ -3416,6 +3511,22 @@ void ApiWrap::forwardMessages(
 	}
 
 	auto &histories = _session->data().histories();
+
+	for (auto i = begin(draft.items); i != end(draft.items);) {
+		const auto item = *i;
+		if (item->isSavedMusicItem()) {
+			SendExistingDocument(MessageToSend(action), item->media()->document());
+			i = draft.items.erase(i);
+		} else {
+			++i;
+		}
+	}
+	if (draft.items.empty()) {
+		if (successCallback) {
+			successCallback();
+		}
+		return;
+	}
 
 	struct SharedCallback {
 		int requestsLeft = 0;

@@ -379,7 +379,7 @@ void Step::fillSentCodeData(const MTPDauth_sentCode &data) {
 	}, [&](const MTPDauth_sentCodeTypeSmsPhrase &) {
 		bad("SmsPhrase");
 	}, [&](const MTPDauth_sentCodeTypeSetUpEmailRequired &) {
-		bad("SetUpEmailRequired");
+		getData()->emailStatus = EmailStatus::SetupRequired;
 	});
 }
 

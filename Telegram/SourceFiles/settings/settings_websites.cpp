@@ -112,45 +112,29 @@ void InfoBox(
 	});
 
 	const auto userpic = box->addRow(
-		object_ptr<Ui::CenterWrap<Ui::UserpicButton>>(
+		object_ptr<Ui::UserpicButton>(
 			box,
-			object_ptr<Ui::UserpicButton>(
-				box,
-				data.bot,
-				st::websiteBigUserpic)),
-		st::sessionBigCoverPadding)->entity();
+			data.bot,
+			st::websiteBigUserpic),
+		st::sessionBigCoverPadding,
+		style::al_top);
 	userpic->overrideShape(Ui::PeerUserpicShape::Forum);
 	userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-	const auto nameWrap = box->addRow(
-		object_ptr<Ui::FixedHeightWidget>(
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			st::sessionBigName.maxHeight));
-	const auto name = Ui::CreateChild<Ui::FlatLabel>(
-		nameWrap,
-		rpl::single(data.bot->name()),
-		st::sessionBigName);
-	nameWrap->widthValue(
-	) | rpl::start_with_next([=](int width) {
-		name->resizeToWidth(width);
-		name->move((width - name->width()) / 2, 0);
-	}, name->lifetime());
+			rpl::single(data.bot->name()),
+			st::sessionBigName),
+		style::al_top);
 
-	const auto domainWrap = box->addRow(
-		object_ptr<Ui::FixedHeightWidget>(
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
 			box,
-			st::sessionDateLabel.style.font->height),
-		style::margins(0, 0, 0, st::sessionDateSkip));
-	const auto domain = Ui::CreateChild<Ui::FlatLabel>(
-		domainWrap,
-		rpl::single(data.domain),
-		st::sessionDateLabel);
-	rpl::combine(
-		domainWrap->widthValue(),
-		domain->widthValue()
-	) | rpl::start_with_next([=](int outer, int inner) {
-		domain->move((outer - inner) / 2, 0);
-	}, domain->lifetime());
+			rpl::single(data.domain),
+			st::sessionDateLabel),
+		style::margins(0, 0, 0, st::sessionDateSkip),
+		style::al_top);
 
 	using namespace Settings;
 	const auto container = box->verticalLayout();
@@ -182,7 +166,7 @@ void InfoBox(
 	box->addButton(tr::lng_about_done(), [=] { box->closeBox(); });
 	if (const auto hash = data.hash) {
 		box->addLeftButton(tr::lng_settings_disconnect(), [=] {
-			const auto weak = Ui::MakeWeak(box.get());
+			const auto weak = base::make_weak(box.get());
 			terminate(hash);
 			if (weak) {
 				box->closeBox();
@@ -334,7 +318,7 @@ private:
 	Api::Websites::List _data;
 
 	object_ptr<Inner> _inner;
-	QPointer<Ui::BoxContent> _terminateBox;
+	base::weak_qptr<Ui::BoxContent> _terminateBox;
 
 	base::Timer _shortPollTimer;
 
@@ -492,7 +476,7 @@ void Content::terminate(
 		rpl::producer<QString> title,
 		rpl::producer<QString> text,
 		QString blockText) {
-	if (const auto strong = _terminateBox.data()) {
+	if (const auto strong = _terminateBox.get()) {
 		strong->deleteLater();
 	}
 	auto box = Box([=](not_null<Ui::GenericBox*> box) {
@@ -517,12 +501,12 @@ void Content::terminate(
 			*block = box->addRow(object_ptr<Ui::Checkbox>(box, blockText));
 		}
 	});
-	_terminateBox = Ui::MakeWeak(box.data());
+	_terminateBox = base::make_weak(box.data());
 	_controller->show(std::move(box));
 }
 
 void Content::terminateOne(uint64 hash) {
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	const auto i = ranges::find(_data, hash, &EntryData::hash);
 	if (i == end(_data)) {
 		return;
@@ -552,7 +536,7 @@ void Content::terminateOne(uint64 hash) {
 }
 
 void Content::terminateAll() {
-	const auto weak = Ui::MakeWeak(this);
+	const auto weak = base::make_weak(this);
 	auto callback = [=](bool block) {
 		const auto reset = crl::guard(weak, [=] {
 			_websites->cancelCurrentRequest();

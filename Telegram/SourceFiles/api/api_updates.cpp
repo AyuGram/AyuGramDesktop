@@ -2221,6 +2221,10 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 		}
 	} break;
 
+	case mtpc_updateNewAuthorization: {
+		session().api().authorizations().apply(update);
+	} break;
+
 	case mtpc_updateServiceNotification: {
 		const auto &d = update.c_updateServiceNotification();
 		const auto text = TextWithEntities {

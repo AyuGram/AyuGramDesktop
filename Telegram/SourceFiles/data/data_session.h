@@ -66,12 +66,14 @@ class GroupCall;
 class NotifySettings;
 class CustomEmojiManager;
 class Stories;
+class SavedMusic;
 class SavedMessages;
 class Chatbots;
 class BusinessInfo;
 struct ReactionId;
 struct UnavailableReason;
 struct CreditsStatusSlice;
+struct StarsRatingPending;
 struct UniqueGift;
 
 struct RepliesReadTillUpdate {
@@ -102,6 +104,12 @@ struct GiftUpdate {
 	Data::SavedStarGiftId id;
 	QString slug;
 	Action action = {};
+};
+struct GiftsUpdate {
+	not_null<PeerData*> peer;
+	int collectionId = 0;
+	std::vector<Data::SavedStarGiftId> added;
+	std::vector<Data::SavedStarGiftId> removed;
 };
 
 struct SentToScheduled {
@@ -176,6 +184,9 @@ public:
 	}
 	[[nodiscard]] Stories &stories() const {
 		return *_stories;
+	}
+	[[nodiscard]] SavedMusic &savedMusic() const {
+		return *_savedMusic;
 	}
 	[[nodiscard]] SavedMessages &savedMessages() const {
 		return *_savedMessages;
@@ -334,6 +345,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> newItemAdded() const;
 	void notifyGiftUpdate(GiftUpdate &&update);
 	[[nodiscard]] rpl::producer<GiftUpdate> giftUpdates() const;
+	void notifyGiftsUpdate(GiftsUpdate &&update);
+	[[nodiscard]] rpl::producer<GiftsUpdate> giftsUpdates() const;
 	void requestItemRepaint(not_null<const HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRepaintRequest() const;
 	void requestViewRepaint(not_null<const ViewElement*> view);
@@ -366,6 +379,11 @@ public:
 
 	void notifyPinnedDialogsOrderUpdated();
 	[[nodiscard]] rpl::producer<> pinnedDialogsOrderUpdated() const;
+
+	void nextForUpgradeGiftInvalidate(not_null<PeerData*> owner);
+	void nextForUpgradeGiftRequest(
+		not_null<PeerData*> owner,
+		Fn<void(std::optional<Data::SavedStarGift>)> done);
 
 	using CreditsSubsRebuilder = rpl::event_stream<CreditsStatusSlice>;
 	using CreditsSubsRebuilderPtr = std::shared_ptr<CreditsSubsRebuilder>;
@@ -864,10 +882,20 @@ public:
 	[[nodiscard]] int commonStarsPerMessage(
 		not_null<const ChannelData*> channel) const;
 
+	void setPendingStarsRating(StarsRatingPending value);
+	[[nodiscard]] StarsRatingPending pendingStarsRating() const;
+
 	void clearLocalStorage();
 
 private:
 	using Messages = std::unordered_map<MsgId, not_null<HistoryItem*>>;
+
+	struct NextToUpgradeGift {
+		std::optional<Data::SavedStarGift> gift;
+		Fn<void(std::optional<Data::SavedStarGift>)> done;
+		crl::time received = 0;
+		mtpRequestId requestId = 0;
+	};
 
 	void suggestStartExport();
 
@@ -1008,7 +1036,7 @@ private:
 	Storage::DatabasePointer _bigFileCache;
 
 	TimeId _exportAvailableAt = 0;
-	QPointer<Ui::BoxContent> _exportSuggestion;
+	base::weak_qptr<Ui::BoxContent> _exportSuggestion;
 
 	rpl::variable<bool> _contactsLoaded = false;
 	rpl::variable<int> _groupFreeTranscribeLevel;
@@ -1022,6 +1050,7 @@ private:
 	rpl::event_stream<not_null<const ViewElement*>> _viewLayoutChanges;
 	rpl::event_stream<not_null<HistoryItem*>> _newItemAdded;
 	rpl::event_stream<GiftUpdate> _giftUpdates;
+	rpl::event_stream<GiftsUpdate> _giftsUpdates;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRepaintRequest;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRepaintRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemResizeRequest;
@@ -1210,12 +1239,19 @@ private:
 	const std::unique_ptr<NotifySettings> _notifySettings;
 	const std::unique_ptr<CustomEmojiManager> _customEmojiManager;
 	const std::unique_ptr<Stories> _stories;
+	const std::unique_ptr<SavedMusic> _savedMusic;
 	const std::unique_ptr<SavedMessages> _savedMessages;
 	const std::unique_ptr<Chatbots> _chatbots;
 	const std::unique_ptr<BusinessInfo> _businessInfo;
 	std::unique_ptr<ShortcutMessages> _shortcutMessages;
 
 	MsgId _nonHistoryEntryId = ShortcutMaxMsgId;
+
+	std::unique_ptr<StarsRatingPending> _pendingStarsRating;
+
+	base::flat_map<
+		not_null<PeerData*>,
+		NextToUpgradeGift> _nextForUpgradeGifts;
 
 	rpl::lifetime _lifetime;
 

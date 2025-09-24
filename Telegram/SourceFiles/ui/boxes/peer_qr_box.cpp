@@ -843,14 +843,7 @@ void FillPeerQrBox(
 		if (state->saveButtonBusy.current()) {
 			return;
 		}
-		const auto buttonWidth = state->saveButton
-			? state->saveButton->width()
-			: 0;
 		state->saveButtonBusy = true;
-		if (state->saveButton) {
-			state->saveButton->resizeToWidth(buttonWidth);
-		}
-
 		const auto userpicToggled = state->userpicToggled.current();
 		const auto backgroundToggled = state->backgroundToggled.current();
 		const auto scale = style::kScaleDefault
@@ -897,7 +890,7 @@ void FillPeerQrBox(
 		const auto top = photoSize
 			? userpicMedia->image(photoSize)
 			: QImage();
-		const auto weak = Ui::MakeWeak(box);
+		const auto weak = base::make_weak(box);
 
 		crl::async([=] {
 			const auto qrImage = TelegramQr(
@@ -973,13 +966,6 @@ void FillPeerQrBox(
 		loadingAnimation->showOn(state->saveButtonBusy.value());
 	}
 
-	const auto buttonWidth = box->width()
-		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
-	state->saveButton->widthValue() | rpl::filter([=] {
-		return (state->saveButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=] {
-		state->saveButton->resizeToWidth(buttonWidth);
-	}, state->saveButton->lifetime());
 	box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 }
 
