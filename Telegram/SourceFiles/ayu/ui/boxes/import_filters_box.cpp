@@ -19,7 +19,6 @@
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 
-
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
 #include <QtSvg/QSvgRenderer>
@@ -30,6 +29,7 @@
 #include "styles/style_settings.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/wrap/slide_wrap.h"
 
 namespace Ui {
 
@@ -50,10 +50,12 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 			std::move(wrap),
 			QMargins(0, skip, 0, skip)));
 
-	Ui::InputField* importURLField = nullptr;
+	Ui::InputField *importURLField = nullptr;
+	Ui::SlideWrap<Ui::VerticalLayout> *importURLWrap = nullptr;
 
 	const auto intoURL = std::make_shared<RadioenumGroup<bool>>(false);
-	const auto addOption = [&](bool value, const QString &text) {
+	const auto addOption = [&](bool value, const QString &text)
+	{
 		inner->add(
 			object_ptr<Ui::Radioenum<bool>>(
 				inner,
@@ -64,54 +66,69 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 			st::settingsSendTypePadding);
 
 		if (import && value) {
-			const auto clipboardText = QGuiApplication::clipboard()->text();
+			const auto clipboardText = QGuiApplication::clipboard()->text().trimmed();
 			const auto prefill = clipboardText.startsWith("http") ? clipboardText : QString();
 
-			importURLField = container->add(
+			importURLWrap = inner->add(
+				object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+					inner,
+					object_ptr<Ui::VerticalLayout>(inner),
+					st::giveawayGiftCodeBox.buttonPadding
+				)
+			);
+			importURLField = importURLWrap->entity()->add(
 				object_ptr<Ui::InputField>(
 					container,
 					st::defaultInputField,
 					rpl::single(QString("URL")),
 					prefill
-				),
-				st::giveawayGiftCodeBox.buttonPadding
+				)
 			);
-			importURLField->setDisabled(true);
+			importURLWrap->hide(anim::type::instant);
 		}
 	};
 	addOption(false, import ? tr::ayu_FiltersImportClipboard(tr::now) : tr::ayu_FiltersExportClipboard(tr::now));
 	addOption(true, import ? tr::ayu_FiltersImportURL(tr::now) : tr::ayu_FiltersExportURL(tr::now));
 
-	intoURL->setChangedCallback([=](bool value) {
+	intoURL->setChangedCallback([=](bool value)
+	{
 		if (import) {
-			importURLField->setDisabled(!value);
+			importURLWrap->toggle(value, anim::type::normal);
 		}
 	});
 
-	const auto actionButton = box->addButton(import ? tr::ayu_FiltersMenuImport() : tr::ayu_FiltersMenuExport(), [=] {
-		const auto isURL = intoURL.get()->current();
+	const auto actionButton = box->addButton(
+		import ? tr::ayu_FiltersMenuImport() : tr::ayu_FiltersMenuExport(),
+		[=]
+		{
+			const auto isURL = intoURL.get()->current();
 
-		if (import) {
-			if (isURL) {
-				FilterUtils::getInstance().importFromLink(importURLField->getLastText());
+			if (import) {
+				if (isURL) {
+					FilterUtils::getInstance().importFromLink(
+						importURLField->getLastText().trimmed());
+				} else {
+					FilterUtils::getInstance().importFromJson(
+						QGuiApplication::clipboard()->text().toUtf8());
+				}
 			} else {
-				FilterUtils::getInstance().importFromJson(QGuiApplication::clipboard()->text().toUtf8());
+				if (isURL) {
+					FilterUtils::getInstance().exportFilters();
+				} else {
+					FilterUtils::getInstance().exportFilters();
+				}
 			}
-		} else {
-			if (isURL) {
-				FilterUtils::getInstance().exportFilters();
-			} else {
-				FilterUtils::getInstance().exportFilters();
-			}
-		}
-	});
+		});
 	const auto buttonWidth = box->width()
-	- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
-	actionButton->widthValue() | rpl::filter([=] {
+		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
+	actionButton->widthValue() | rpl::filter([=]
+	{
 		return (actionButton->widthNoMargins() != buttonWidth);
-	}) | rpl::start_with_next([=] {
-		actionButton->resizeToWidth(buttonWidth);
-	}, actionButton->lifetime());
+	}) | rpl::start_with_next([=]
+							  {
+								  actionButton->resizeToWidth(buttonWidth);
+							  },
+							  actionButton->lifetime());
 
 	box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 }
