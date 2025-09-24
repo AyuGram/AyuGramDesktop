@@ -29,19 +29,18 @@ GlobalExclusionListRow::GlobalExclusionListRow(PeerId peer)
 }
 
 QString GlobalExclusionListRow::generateName() {
-	if (const auto peerCached = currentSession()->data().peerLoaded(peerId)) {
-		this->setPeer(peerCached);
+	if (const auto from = getPeerFromDialogId(peerId.value & PeerId::kChatTypeMask)) {
+		this->setPeer(from);
 		return PeerListRow::generateName();
 	}
 	return QString("UNKNOWN (ID: %1)").arg(QString::number(peerId.value & PeerId::kChatTypeMask));
 }
 
 PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(bool forceRound) {
-	if (const auto peerCached = currentSession()->data().peerLoaded(peerId)) {
-		this->setPeer(peerCached);
+	if (const auto from = getPeerFromDialogId(peerId.value & PeerId::kChatTypeMask)) {
+		this->setPeer(from);
 		return PeerListRow::generatePaintUserpicCallback(forceRound);
 	}
-
 
 	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable
 	{
@@ -68,7 +67,6 @@ void GlobalExclusionListController::prepare() {
 	const auto filters = AyuDatabase::getAllRegexFilters();
 	const auto exclusions = AyuDatabase::getAllFiltersExclusions();
 
-
 	if (exclusions.empty()) {
 		auto description = object_ptr<Ui::FlatLabel>(
 			nullptr,
@@ -78,13 +76,7 @@ void GlobalExclusionListController::prepare() {
 		return;
 	}
 
-	struct FilterCounts
-	{
-		int filters = 0;
-		int exclusions = 0;
-	};
-	std::unordered_map<ID, FilterCounts> countsByDialogIds;
-
+	countsByDialogIds.clear();
 
 	for (const auto &filter : filters) {
 		if (filter.dialogId.has_value()) {
@@ -95,11 +87,10 @@ void GlobalExclusionListController::prepare() {
 		countsByDialogIds[exclusion.dialogId].exclusions++;
 	}
 
-
 	for (const auto &[id, count] : countsByDialogIds) {
-		PeerId peerId = PeerId(PeerIdHelper(id));
+		PeerId peerId = PeerId(PeerIdHelper(abs(id)));
 
-		auto row = std::make_unique < GlobalExclusionListRow > (peerId);
+		auto row = std::make_unique<GlobalExclusionListRow>(peerId);
 		row->setCustomStatus(QString("%1 filters, %2 excluded").arg(count.filters).arg(count.exclusions), false);
 
 		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
@@ -111,7 +102,18 @@ void GlobalExclusionListController::prepare() {
 }
 
 void GlobalExclusionListController::rowClicked(not_null<PeerListRow*> peer) {
-	_controller->dialogId = peer->id() & PeerId::kChatTypeMask;
+	ID did;
+	if (peer->special()) {
+		const ID pred =  peer->id() & PeerId::kChatTypeMask;
+		if (countsByDialogIds.contains(pred)) {
+			did = pred;
+		} else {
+			did = -pred;
+		}
+	} else {
+		did = getDialogIdFromPeer(peer->peer());
+	}
+	_controller->dialogId = did;
 	_controller->showExclude = true;
 	_controller->showSettings(AyuFiltersList::Id());
 }

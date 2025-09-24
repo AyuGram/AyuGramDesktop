@@ -25,6 +25,7 @@
 #include "ayu/data/ayu_database.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/features/filters/filters_utils.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "data/data_channel.h"
 #include "rpl/mappers.h"
 #include "ui/qt_object_factory.h"
@@ -43,26 +44,19 @@ rpl::producer<QString> AyuFiltersList::title() {
 	}
 
 	const auto did = abs(dialogId.value());
-
-	const PeerData *from = _controller->session().data().userLoaded(did);
-	if (!from) {
-		from = _controller->session().data().channelLoaded(did);
-	}
-	if (!from) {
-		from = reinterpret_cast<PeerData*>(_controller->session().data().chatLoaded(did));
-	}
+	const auto from = getPeerFromDialogId(did);
 
 	// todo: shorten based on available space
 	// because it may break on custom fonts
 	QString res;
 	if (from) {
 		auto name = from->topBarNameText();
-		if (name.length() > 30) {
-			name = name.left(27) + "…";
+		if (name.length() > 18) {
+			name = name.left(17) + "…";
 		}
 		res = name;
 	} else {
-		res = tr::ayu_RegexFilters(tr::now) + " (" + QString::number(did) + ")";
+		res = tr::ayu_RegexFiltersHeader(tr::now) + " (" + QString::number(did) + ")";
 	}
 
 	return rpl::single(res);
@@ -278,6 +272,7 @@ void AyuFiltersList::initializeSharedFilters(
 	}
 
 	if (!filters.empty()) {
+		AddSkip(container);
 		filtersTitle = AddSubsectionTitle(container, tr::ayu_RegexFiltersHeader());
 
 		for (const auto &filter : filters) {
@@ -286,6 +281,12 @@ void AyuFiltersList::initializeSharedFilters(
 	}
 
 	if (!exclusions.empty()) {
+		if (!filters.empty()) {
+			AddSkip(container);
+			AddDivider(container);
+			AddSkip(container);
+		}
+
 		excludedTitle = AddSubsectionTitle(container, tr::ayu_RegexFiltersExcluded());
 
 		for (const auto &exclusion : exclusions) {

@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2025
 #pragma once
 
+#include "ayu/data/entities.h"
 #include "boxes/peer_list_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "data/data_peer.h"
@@ -43,6 +44,13 @@ public:
 	void rowClicked(not_null<PeerListRow*> row) override;
 
 private:
+	struct FilterCounts
+	{
+		int filters = 0;
+		int exclusions = 0;
+	};
+	std::unordered_map<ID, FilterCounts> countsByDialogIds;
+
 	const not_null<Main::Session*> _session;
 	not_null<Window::SessionController*> _controller;
 };

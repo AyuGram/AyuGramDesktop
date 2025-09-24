@@ -840,3 +840,32 @@ void resolveAllChats(const std::map<long long, QString> &peers) {
 not_null<Main::Session *> currentSession() {
 	return &Core::App().domain().active().session();
 }
+
+template<typename T>
+PeerData* getPeerFromDialogId(T id) {
+	for (const auto &[index, account] : Core::App().domain().accounts()) {
+		if (const auto session = account->maybeSession()) {
+			PeerData *from = session->data().userLoaded(id);
+			if (!from) {
+				from = session->data().channelLoaded(id);
+			}
+			if (!from) {
+				from = reinterpret_cast<PeerData*>(session->data().chatLoaded(id));
+			}
+
+			if (from) {
+				return from;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+PeerData* getPeerFromDialogId(ID id) {
+	return getPeerFromDialogId<ID>(id);
+}
+
+PeerData* getPeerFromDialogId(unsigned long long id) {
+	return getPeerFromDialogId<unsigned long long>(id);
+}
