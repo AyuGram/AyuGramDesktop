@@ -28,12 +28,9 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
-
-
 private:
 	void setupContent(not_null<Window::SessionController*> controller);
-	void initializeSharedFilters(not_null<Ui::VerticalLayout *> container);
-
+	void initializeSharedFilters(not_null<Ui::VerticalLayout*> container);
 
 	void addNewFilter(const RegexFilter &filter, bool exclusion = false);
 
@@ -43,8 +40,8 @@ private:
 	std::vector<RegexFilter> filters;
 	std::vector<RegexFilter> exclusions;
 
-	Ui::FlatLabel* filtersTitle = nullptr;
-	Ui::FlatLabel* excludedTitle = nullptr;
+	Ui::FlatLabel *filtersTitle = nullptr;
+	Ui::FlatLabel *excludedTitle = nullptr;
 
 	std::optional<long long> dialogId;
 };

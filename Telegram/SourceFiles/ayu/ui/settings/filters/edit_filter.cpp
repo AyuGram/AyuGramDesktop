@@ -131,7 +131,6 @@
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
 
-
 #include <QtWidgets/QApplication>
 #include <QtCore/QBuffer>
 #include <QtGui/QGuiApplication>
@@ -142,11 +141,9 @@
 
 class PainterHighQualityEnabler;
 
-namespace Settings
-{
+namespace Settings {
 
-std::vector<char> generate_uuid_bytes()
-{
+std::vector<char> generate_uuid_bytes() {
 	// stolen somewhere from Internet
 	std::random_device rd;
 	std::mt19937 gen(rd());
@@ -166,15 +163,13 @@ std::vector<char> generate_uuid_bytes()
 	return std::vector<char>(bytes.begin(), bytes.end());
 }
 
-rpl::producer<QString> AyuEditFilters::title()
-{
+rpl::producer<QString> AyuEditFilters::title() {
 	return tr::ayu_RegexFiltersAdd();
 }
 
-object_ptr<Ui::Checkbox> getCheckBox(not_null<Ui::VerticalLayout *> container,
+object_ptr<Ui::Checkbox> getCheckBox(not_null<Ui::VerticalLayout*> container,
 									 const QString &label,
-									 bool checked)
-{
+									 bool checked) {
 	return object_ptr<Ui::Checkbox>(
 		container,
 		label,
@@ -184,9 +179,8 @@ object_ptr<Ui::Checkbox> getCheckBox(not_null<Ui::VerticalLayout *> container,
 
 AyuEditFilters::AyuEditFilters(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller)
-	: Section(parent)
-{
+	not_null<Window::SessionController*> controller)
+	: Section(parent) {
 	if (!controller->filterId.empty()) {
 		currentFilter = AyuDatabase::getById(controller->filterId);
 	}
@@ -194,10 +188,9 @@ AyuEditFilters::AyuEditFilters(
 }
 
 // unused currently, TODO: need to add this on bad regex pattern
-not_null<Ui::FlatLabel *> AddError(
-	not_null<Ui::VerticalLayout *> content,
-	Ui::PasswordInput *input)
-{
+not_null<Ui::FlatLabel*> AddError(
+	not_null<Ui::VerticalLayout*> content,
+	Ui::PasswordInput *input) {
 	const auto error = content->add(
 		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
 			content,
@@ -219,8 +212,7 @@ not_null<Ui::FlatLabel *> AddError(
 	return error;
 };
 
-void AyuEditFilters::setupSettings(not_null<Ui::VerticalLayout *> container, QWidget *parent)
-{
+void AyuEditFilters::setupSettings(not_null<Ui::VerticalLayout*> container, QWidget *parent) {
 	AddSkip(container);
 
 	const auto add = [&](const QString &label, bool checked, auto &&handle)
@@ -291,13 +283,12 @@ void AyuEditFilters::setupSettings(not_null<Ui::VerticalLayout *> container, QWi
 }
 
 void RegexEditBuilder(
-	not_null<Ui::GenericBox *> box,
+	not_null<Ui::GenericBox*> box,
 	RegexFilter *filter,
 	const Fn<void(RegexFilter)> &onDone,
 	std::optional<long long> dialogId,
 	bool showToast
-)
-{
+) {
 	RegexFilter data;
 
 	if (filter) {
@@ -360,70 +351,72 @@ void RegexEditBuilder(
 		box->closeBox();
 
 		crl::async([=]
-				   {
-					   AyuDatabase::addRegexFilter(newFilter);
-					   FiltersCacheController::rebuildCache();
+		{
+			AyuDatabase::addRegexFilter(newFilter);
+			FiltersCacheController::rebuildCache();
 
-					   crl::on_main([=]
-									{
-										if (onDone) {
-											onDone(newFilter);
-										}
-										AyuSettings::fire_filtersUpdate();
+			crl::on_main([=]
+			{
+				if (onDone) {
+					onDone(newFilter);
+				}
+				AyuSettings::fire_filtersUpdate();
 
-										if (showToast) {
-											const auto onClick = [=](const auto &...) mutable{
-												newFilter.dialogId = dialogId;
+				if (showToast) {
+					const auto onClick = [=](const auto &...) mutable
+					{
+						newFilter.dialogId = dialogId;
 
-												AyuDatabase::updateRegexFilter(newFilter);
-												FiltersCacheController::rebuildCache();
-												AyuSettings::fire_filtersUpdate();
+						AyuDatabase::updateRegexFilter(newFilter);
+						FiltersCacheController::rebuildCache();
+						AyuSettings::fire_filtersUpdate();
 
-												return true;
-											};
-											Ui::Toast::Show(Ui::Toast::Config{
-												// .text = tr::ayu_RegexFilterBulletinText(
-												// 	tr::now,
-												// 	lt_link,
-												// 	Ui::Text::Link(
-												// 		Ui::Text::Bold(
-												// 			tr::ayu_RegexFilterBulletinAction(tr::now))),
-												// 	Ui::Text::RichLangValue),
+						return true;
+					};
+					Ui::Toast::Show(Ui::Toast::Config{
+						// .text = tr::ayu_RegexFilterBulletinText(
+						// 	tr::now,
+						// 	lt_link,
+						// 	Ui::Text::Link(
+						// 		Ui::Text::Bold(
+						// 			tr::ayu_RegexFilterBulletinAction(tr::now))),
+						// 	Ui::Text::RichLangValue),
 
-												// TODO: reconsider
-												.text = tr::ayu_RegexFilterBulletinText(
-													tr::now
-													//,
-//													lt_link,
-//													Ui::Text::Link(
-//														Ui::Text::Bold(
-//															tr::ayu_RegexFilterBulletinAction(tr::now))),
-//													Ui::Text::WithEntities
-													),
-												.filter = onClick,
-												.adaptive = true
-											});
-										}
-									});
-				   });
+						// TODO: reconsider
+						.text = tr::ayu_RegexFilterBulletinText(
+							tr::now
+							//,
+							//													lt_link,
+							//													Ui::Text::Link(
+							//														Ui::Text::Bold(
+							//															tr::ayu_RegexFilterBulletinAction(tr::now))),
+							//													Ui::Text::WithEntities
+						),
+						.filter = onClick,
+						.adaptive = true
+					});
+				}
+			});
+		});
 	};
 
 	name->submits() | rpl::start_with_next(saveAndClose, name->lifetime());
 	box->addButton(tr::lng_settings_save(), saveAndClose);
-	box->addButton(tr::lng_cancel(), [=]
-	{ box->closeBox(); });
+	box->addButton(tr::lng_cancel(),
+				   [=]
+				   {
+					   box->closeBox();
+				   });
 }
 
 object_ptr<Ui::GenericBox> RegexEditBox(RegexFilter *filter,
 										const Fn<void(RegexFilter)> &onDone,
 										std::optional<long long> dialogId,
-										bool showToast)
-{
+										bool showToast) {
 	return Box(RegexEditBuilder, filter, onDone, dialogId, showToast);
 }
 
-void AyuEditFilters::setupContent(not_null<Window::SessionController *> controller, QWidget *parent)
-{
+void AyuEditFilters::setupContent(not_null<Window::SessionController*> controller, QWidget *parent) {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
 	setupSettings(content, parent);

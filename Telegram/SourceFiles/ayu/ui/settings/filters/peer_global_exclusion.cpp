@@ -25,9 +25,7 @@ namespace Settings {
 
 GlobalExclusionListRow::GlobalExclusionListRow(PeerId peer)
 	: PeerListRow(peer.value)
-, peerId(peer)
-{
-
+	  , peerId(peer) {
 }
 
 QString GlobalExclusionListRow::generateName() {
@@ -36,7 +34,6 @@ QString GlobalExclusionListRow::generateName() {
 		return PeerListRow::generateName();
 	}
 	return QString("UNKNOWN (ID: %1)").arg(QString::number(peerId.value & PeerId::kChatTypeMask));
-
 }
 
 PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(bool forceRound) {
@@ -46,8 +43,8 @@ PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(boo
 	}
 
 
-
-	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable {
+	return [=](Painter &p, int x, int y, int outerWidth, int size) mutable
+	{
 		using namespace Ui;
 		const auto realId = peerId.value & PeerId::kChatTypeMask;
 		auto _userpicEmpty = std::make_unique<EmptyUserpic>(
@@ -57,21 +54,17 @@ PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(boo
 	};
 }
 
-GlobalExclusionListController::GlobalExclusionListController(not_null<Main::Session *> session,
-	not_null<Window::SessionController*> controller)
-: _session(session)
-, _controller(controller)
-{
-
+GlobalExclusionListController::GlobalExclusionListController(not_null<Main::Session*> session,
+															 not_null<Window::SessionController*> controller)
+	: _session(session)
+	  , _controller(controller) {
 }
 
 Main::Session &GlobalExclusionListController::session() const {
 	return *_session;
 }
 
-
 void GlobalExclusionListController::prepare() {
-
 	const auto filters = AyuDatabase::getAllRegexFilters();
 	const auto exclusions = AyuDatabase::getAllFiltersExclusions();
 
@@ -85,12 +78,12 @@ void GlobalExclusionListController::prepare() {
 		return;
 	}
 
-	struct FilterCounts {
+	struct FilterCounts
+	{
 		int filters = 0;
 		int exclusions = 0;
 	};
 	std::unordered_map<ID, FilterCounts> countsByDialogIds;
-
 
 
 	for (const auto &filter : filters) {
@@ -103,15 +96,13 @@ void GlobalExclusionListController::prepare() {
 	}
 
 
-
 	for (const auto &[id, count] : countsByDialogIds) {
 		PeerId peerId = PeerId(PeerIdHelper(id));
 
-		auto row = std::make_unique<GlobalExclusionListRow> (peerId);
+		auto row = std::make_unique < GlobalExclusionListRow > (peerId);
 		row->setCustomStatus(QString("%1 filters, %2 excluded").arg(count.filters).arg(count.exclusions), false);
 
-		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow> &&>(row));
-
+		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
 	}
 
 	// sortByName();
@@ -145,14 +136,13 @@ void SelectChatBoxController::rowClicked(not_null<PeerListRow*> row) {
 	}
 }
 
-std::unique_ptr<ChatsListBoxController::Row> SelectChatBoxController::createRow(not_null<History *> history) {
+std::unique_ptr<ChatsListBoxController::Row> SelectChatBoxController::createRow(not_null<History*> history) {
 	const auto peer = history->peer;
 
 	const auto skip =
 		peer->isUser() ||
 		//peer->forum() ||
-		peer->monoforum()
-	;
+		peer->monoforum();
 
 	if (skip) {
 		return nullptr;

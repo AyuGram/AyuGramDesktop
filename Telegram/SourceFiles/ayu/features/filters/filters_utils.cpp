@@ -505,6 +505,4 @@ void FilterUtils::applyChanges(const ApplyChanges &changes) {
 	}
 
 	FiltersCacheController::rebuildCache();
-
 }
-

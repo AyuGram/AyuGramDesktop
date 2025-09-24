@@ -34,21 +34,16 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
-namespace Settings
-{
+namespace Settings {
 
-rpl::producer<QString> AyuFiltersList::title()
-{
+rpl::producer<QString> AyuFiltersList::title() {
 	return tr::ayu_RegexFilters();
 }
 
 AyuFiltersList::AyuFiltersList(
 	QWidget *parent,
-	not_null<Window::SessionController *> controller)
-	: Section(parent), _controller(controller), _content(Ui::CreateChild<Ui::VerticalLayout>(this))
-{
-
-
+	not_null<Window::SessionController*> controller)
+	: Section(parent), _controller(controller), _content(Ui::CreateChild<Ui::VerticalLayout>(this)) {
 	if (_controller->dialogId.has_value()) {
 		dialogId = _controller->dialogId.value();
 	}
@@ -57,9 +52,7 @@ AyuFiltersList::AyuFiltersList(
 	setupContent(controller);
 }
 
-void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion)
-{
-
+void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 	// stolen from EditPrivacyBox
 	auto state = lifetime().make_state<RegexFilter>(filter);
 	auto buttonText = lifetime().make_state<rpl::variable<QString>>(
@@ -90,69 +83,78 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion)
 		auto _contextMenu = new Ui::PopupMenu(this, st::popupMenuWithIcons);
 		_contextMenu->setAttribute(Qt::WA_DeleteOnClose);
 
-		_contextMenu->addAction(tr::lng_theme_edit(tr::now), [=, this]
-		{
-			_controller->show(RegexEditBox(state, [=](const RegexFilter &done) mutable
+		_contextMenu->addAction(tr::lng_theme_edit(tr::now),
+								[=, this]
+								{
+									_controller->show(RegexEditBox(state,
+																   [=](const RegexFilter &done) mutable
+																   {
+																	   buttonText->force_assign(
+																		   QString::fromStdString(done.text));
+																	   *state = done;
+																   }));
+								},
+								&st::menuIconEdit);
+
+		_contextMenu->addAction(
+			state->enabled ? tr::lng_settings_auto_night_disable(tr::now) : tr::lng_sure_enable(tr::now),
+			[=]
 			{
-				buttonText->force_assign(QString::fromStdString(done.text));
-				*state = done;
-			}));
-		}, &st::menuIconEdit);
+				state->enabled = !state->enabled;
+				AyuDatabase::updateRegexFilter(*state);
+				FiltersCacheController::rebuildCache();
 
-		_contextMenu->addAction(state->enabled ? tr::lng_settings_auto_night_disable(tr::now) : tr::lng_sure_enable(tr::now), [=]
-		{
-			state->enabled = !state->enabled;
-			AyuDatabase::updateRegexFilter(*state);
-			FiltersCacheController::rebuildCache();
-
-			AyuSettings::fire_filtersUpdate();
+				AyuSettings::fire_filtersUpdate();
 
 
-			if (!state->enabled) {
-				button->setColorOverride(st::storiesComposeGrayText->c);
-			} else {
-				button->setColorOverride({});
-			}
-			button->update();
-		}, state->enabled ? &st::menuIconBlock : &st::menuIconUnblock);
+				if (!state->enabled) {
+					button->setColorOverride(st::storiesComposeGrayText->c);
+				} else {
+					button->setColorOverride({});
+				}
+				button->update();
+			},
+			state->enabled ? &st::menuIconBlock : &st::menuIconUnblock);
 
 		_contextMenu->addSeparator();
 
-		_contextMenu->addAction(tr::lng_theme_delete(tr::now), [=, this]
-		{
-			AyuDatabase::deleteFilter(state->id);
-			AyuDatabase::deleteExclusionsByFilterId(state->id);
-			FiltersCacheController::rebuildCache();
+		_contextMenu->addAction(tr::lng_theme_delete(tr::now),
+								[=, this]
+								{
+									AyuDatabase::deleteFilter(state->id);
+									AyuDatabase::deleteExclusionsByFilterId(state->id);
+									FiltersCacheController::rebuildCache();
 
-			AyuSettings::fire_filtersUpdate();
+									AyuSettings::fire_filtersUpdate();
 
-			isRemoved->force_assign(true);
+									isRemoved->force_assign(true);
 
-			this->update();
+									this->update();
 
-			updateGeometry();
-			repaint();
+									updateGeometry();
+									repaint();
 
-			// remove headers if there are no more filters left
-			if (filters.empty() && filtersTitle) {
-				filtersTitle->hide();
-			}
-			if (exclusions.empty() && excludedTitle) {
-				excludedTitle->hide();
-			}
+									// remove headers if there are no more filters left
+									if (filters.empty() && filtersTitle) {
+										filtersTitle->hide();
+									}
+									if (exclusions.empty() && excludedTitle) {
+										excludedTitle->hide();
+									}
 
 
-			// resize();
-			// update();
-
-		}, &st::menuIconDelete);
+									// resize();
+									// update();
+								},
+								&st::menuIconDelete);
 
 		_contextMenu->popup(QCursor::pos());
 	};
 
 	// we've opened filters list from top "Exclude" button
 	// on click, close the section
-	auto exclusionsClickHandler = [=, this]() mutable {
+	auto exclusionsClickHandler = [=, this]() mutable
+	{
 		Expects(dialogId.has_value());
 
 		RegexFilterGlobalExclusion exclusion;
@@ -169,35 +171,37 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion)
 
 		_controller->showSettings(AyuFiltersList::Id());
 	};
-	auto deleteExclusionsClickHandler = [=, this]() mutable{
+	auto deleteExclusionsClickHandler = [=, this]() mutable
+	{
 		auto _contextMenu = new Ui::PopupMenu(this, st::popupMenuWithIcons);
 		_contextMenu->setAttribute(Qt::WA_DeleteOnClose);
 
-		_contextMenu->addAction(tr::lng_theme_delete(tr::now), [=, this]
-		{
-			Expects (dialogId.has_value());
+		_contextMenu->addAction(tr::lng_theme_delete(tr::now),
+								[=, this]
+								{
+									Expects(dialogId.has_value());
 
-			AyuDatabase::deleteExclusion(dialogId.value(), state->id);
-			FiltersCacheController::rebuildCache();
+									AyuDatabase::deleteExclusion(dialogId.value(), state->id);
+									FiltersCacheController::rebuildCache();
 
-			AyuSettings::fire_filtersUpdate();
+									AyuSettings::fire_filtersUpdate();
 
-			isRemoved->force_assign(true);
+									isRemoved->force_assign(true);
 
-			this->update();
+									this->update();
 
-			updateGeometry();
-			repaint();
+									updateGeometry();
+									repaint();
 
-			// remove headers if there are no more filters left
-			if (filters.empty() && filtersTitle) {
-				filtersTitle->hide();
-			}
-			if (exclusions.empty() && excludedTitle) {
-				excludedTitle->hide();
-			}
-
-		}, &st::menuIconDelete);
+									// remove headers if there are no more filters left
+									if (filters.empty() && filtersTitle) {
+										filtersTitle->hide();
+									}
+									if (exclusions.empty() && excludedTitle) {
+										excludedTitle->hide();
+									}
+								},
+								&st::menuIconDelete);
 
 		_contextMenu->popup(QCursor::pos());
 	};
@@ -211,17 +215,16 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion)
 	}
 
 
-	crl::on_main(this, [=, this]
-	{
-		adjustSize();
-		updateGeometry();
-	});
+	crl::on_main(this,
+				 [=, this]
+				 {
+					 adjustSize();
+					 updateGeometry();
+				 });
 }
 
 void AyuFiltersList::initializeSharedFilters(
-	not_null<Ui::VerticalLayout *> container)
-{
-
+	not_null<Ui::VerticalLayout*> container) {
 	if (dialogId.has_value() && _controller->showExclude.has_value() && _controller->showExclude.value()) {
 		filters = AyuDatabase::getByDialogId(dialogId.value());
 		exclusions = AyuDatabase::getExcludedByDialogId(dialogId.value());
@@ -233,20 +236,21 @@ void AyuFiltersList::initializeSharedFilters(
 		if (dialogId.has_value() && _controller->showExclude.has_value() && !_controller->showExclude.value()) {
 			const auto excludedForDialogId = AyuDatabase::getExcludedByDialogId(dialogId.value());
 
-			auto rangeToRemove = std::ranges::remove_if(filters, [&](const RegexFilter &filter) {
-				for (const auto &excluded : excludedForDialogId) {
-					if (excluded == filter) {
-						return true;
-					}
-				}
-				return false;
-			});
+			auto rangeToRemove = std::ranges::remove_if(filters,
+														[&](const RegexFilter &filter)
+														{
+															for (const auto &excluded : excludedForDialogId) {
+																if (excluded == filter) {
+																	return true;
+																}
+															}
+															return false;
+														});
 			filters.erase(rangeToRemove.begin(), rangeToRemove.end());
 		}
 	}
 
 	if (!filters.empty()) {
-
 		filtersTitle = AddSubsectionTitle(container, tr::ayu_RegexFiltersHeader());
 
 		for (const auto &filter : filters) {
@@ -261,13 +265,9 @@ void AyuFiltersList::initializeSharedFilters(
 			addNewFilter(exclusion, true);
 		}
 	}
-
-
 }
 
-
-void AyuFiltersList::setupContent(not_null<Window::SessionController *> controller)
-{
+void AyuFiltersList::setupContent(not_null<Window::SessionController*> controller) {
 	initializeSharedFilters(_content);
 
 	ResizeFitChild(this, _content);
