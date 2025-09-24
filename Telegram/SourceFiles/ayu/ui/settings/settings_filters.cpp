@@ -8,21 +8,107 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/data/ayu_database.h"
 #include "ayu/features/filters/filters_cache_controller.h"
+#include "ayu/ui/boxes/import_filters_box.h"
+#include "ayu/utils/telegram_helpers.h"
+#include "boxes/abstract_box.h"
 #include "boxes/peer_list_box.h"
+#include "core/application.h"
 #include "filters/peer_global_exclusion.h"
 #include "filters/settings_filters_list.h"
+#include "inline_bots/bot_attach_web_view.h"
 #include "settings/settings_common.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/wrap/vertical_layout.h"
+#include "window/window_controller.h"
+#include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
 
 namespace Settings {
 
 rpl::producer<QString> AyuFilters::title() {
 	return tr::ayu_CategoryFilters();
+}
+
+void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
+	addAction(
+		tr::ayu_FiltersMenuSelectChat(tr::now),
+		[=]
+		{
+			if (const auto window = Core::App().activeWindow()) {
+				if (const auto controller = window->sessionController()) {
+					auto types = InlineBots::PeerTypes();
+					types |= InlineBots::PeerType::Bot;
+					types |= InlineBots::PeerType::Group;
+					types |= InlineBots::PeerType::Broadcast;
+
+					Window::ShowChooseRecipientBox(
+						controller,
+						[=](not_null<Data::Thread*> thread)
+						{
+							const auto peer = thread->peer();
+							controller->dialogId = getDialogIdFromPeer(peer);
+							controller->showExclude = false;
+							controller->showSettings(AyuFiltersList::Id());
+							return true;
+						},
+						tr::ayu_FiltersMenuSelectChat(),
+						nullptr,
+						types
+					);
+				}
+			}
+
+		},
+		&st::menuIconSearch);
+	addAction({
+		.isSeparator = true
+	});
+	addAction(
+		tr::ayu_FiltersMenuImport(tr::now),
+		[=]
+		{
+			auto box = Box(Ui::FillImportFiltersBox, true);
+			Ui::show(std::move(box));
+		},
+		&st::menuIconArchive);
+	addAction(
+		tr::ayu_FiltersMenuExport(tr::now),
+		[=]
+		{
+			auto box = Box(Ui::FillImportFiltersBox, false);
+			Ui::show(std::move(box));
+		},
+		&st::menuIconUnarchive);
+	addAction({
+		.isSeparator = true
+	});
+	addAction(
+		tr::ayu_FiltersMenuClear(tr::now),
+		[=]
+		{
+			auto callback = [=](Fn<void()> &&close)
+			{
+				AyuDatabase::deleteAllFilters();
+				FiltersCacheController::rebuildCache();
+				AyuSettings::fire_filtersUpdate();
+				close();
+			};
+
+			auto box = Ui::MakeConfirmBox({
+				.text = tr::ayu_FiltersClearPopupText(),
+				.confirmed = callback,
+				.confirmText = tr::ayu_FiltersClearPopupActionText()
+			});
+			Ui::show(std::move(box));
+		},
+		&st::menuIconClear);
 }
 
 AyuFilters::AyuFilters(

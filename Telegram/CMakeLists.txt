@@ -170,6 +170,8 @@ set(ayugram_files
         ayu/ui/boxes/edit_mark_box.h
         ayu/ui/boxes/font_selector.cpp
         ayu/ui/boxes/font_selector.h
+        ayu/ui/boxes/import_filters_box.cpp
+        ayu/ui/boxes/import_filters_box.h
         ayu/ui/boxes/theme_selector_box.cpp
         ayu/ui/boxes/theme_selector_box.h
         ayu/ui/boxes/message_shot_box.cpp

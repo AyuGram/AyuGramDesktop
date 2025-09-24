@@ -25,6 +25,7 @@
 #include "ayu/data/ayu_database.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/features/filters/filters_utils.h"
+#include "data/data_channel.h"
 #include "rpl/mappers.h"
 #include "ui/qt_object_factory.h"
 #include "ui/vertical_list.h"
@@ -37,7 +38,34 @@
 namespace Settings {
 
 rpl::producer<QString> AyuFiltersList::title() {
-	return tr::ayu_RegexFilters();
+	if (!dialogId.has_value()) {
+		return tr::ayu_RegexFilters();
+	}
+
+	const auto did = abs(dialogId.value());
+
+	const PeerData *from = _controller->session().data().userLoaded(did);
+	if (!from) {
+		from = _controller->session().data().channelLoaded(did);
+	}
+	if (!from) {
+		from = reinterpret_cast<PeerData*>(_controller->session().data().chatLoaded(did));
+	}
+
+	// todo: shorten based on available space
+	// because it may break on custom fonts
+	QString res;
+	if (from) {
+		auto name = from->topBarNameText();
+		if (name.length() > 30) {
+			name = name.left(27) + "…";
+		}
+		res = name;
+	} else {
+		res = tr::ayu_RegexFilters(tr::now) + " (" + QString::number(did) + ")";
+	}
+
+	return rpl::single(res);
 }
 
 AyuFiltersList::AyuFiltersList(
@@ -47,7 +75,6 @@ AyuFiltersList::AyuFiltersList(
 	if (_controller->dialogId.has_value()) {
 		dialogId = _controller->dialogId.value();
 	}
-
 
 	setupContent(controller);
 }

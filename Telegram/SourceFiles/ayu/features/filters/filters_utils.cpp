@@ -38,9 +38,6 @@ void FilterUtils::importFromLink(const QString &link) {
 	}
 
 	const auto request = QNetworkRequest(QUrl(link));
-
-
-
 	_reply = _manager->get(request);
 
 	connect(_reply, &QNetworkReply::finished, this, [=]{
@@ -65,11 +62,13 @@ bool FilterUtils::importFromJson(const QByteArray &json) {
 	const auto document = QJsonDocument::fromJson(json, &error);
 
 	if (error.error != QJsonParseError::NoError) {
+		Ui::Toast::Show(tr::ayu_FiltersToastFailImport(tr::now));
 		LOG(("FilterUtils: Failed to parse JSON, error: %1"
 		).arg(error.errorString()));
 		return false;
 	}
 	if (!document.isObject()) {
+		Ui::Toast::Show(tr::ayu_FiltersToastFailImport(tr::now));
 		LOG(("FilterUtils: not an object received in JSON"));
 		return false;
 	}

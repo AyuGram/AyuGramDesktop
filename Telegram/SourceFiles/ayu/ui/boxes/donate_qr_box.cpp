@@ -33,7 +33,7 @@ namespace {
 		const QByteArray &payload,
 		const QString &iconPath,
 		int pixel,
-		int max)	{
+		int max) {
 	Expects(!payload.isEmpty());
 
 	const auto data = Qr::Encode(payload, Qr::Redundancy::Default);

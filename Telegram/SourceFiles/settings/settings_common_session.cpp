@@ -11,12 +11,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_chat.h"
 #include "settings/settings_main.h"
 
+// AyuGram includes
+#include "ayu/ui/settings/settings_filters.h"
+
+
 namespace Settings {
 
 bool HasMenu(Type type) {
 	return (type == ::Settings::CloudPasswordEmailConfirmId())
 		|| (type == Main::Id())
-		|| (type == Chat::Id());
+		|| (type == Chat::Id())
+		|| (type == AyuFilters::Id());
 }
 
 } // namespace Settings
