@@ -24,6 +24,7 @@ struct NestedEntry
 	std::function<void(bool)> callback;
 };
 
+QString asBeta(const QString &text);
 rpl::producer<QString> asBeta(rpl::producer<QString> text);
 
 not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,

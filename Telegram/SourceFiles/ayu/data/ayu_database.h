@@ -42,6 +42,7 @@ void deleteExclusion(ID dialogId, std::vector<char> filterId);
 void deleteAllFilters();
 void deleteAllExclusions();
 
-
+bool hasFilters();
+bool hasPerDialogFilters();
 
 }

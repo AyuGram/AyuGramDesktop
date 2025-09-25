@@ -30,10 +30,11 @@
 
 #include "filters_utils.h"
 #include "shadow_ban_utils.h"
+#include "ayu/utils/telegram_helpers.h"
 
 namespace FiltersController {
 
-bool filterBlocked(const not_null<HistoryItem *> item) {
+bool filterBlocked(const not_null<HistoryItem*> item) {
 	if (item->from() != item->history()->peer) {
 		if (isBlocked(item)) {
 			return true;
@@ -68,8 +69,7 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 	};
 
 	if (const auto &dialogPatterns = FiltersCacheController::getPatternsByDialogId(dialogId);
-			dialogPatterns.has_value() && !dialogPatterns.value().empty()) {
-
+		dialogPatterns.has_value() && !dialogPatterns.value().empty()) {
 		for (const auto &pattern : dialogPatterns.value()) {
 			return matches(pattern);
 		}
@@ -94,7 +94,7 @@ bool isEnabled(not_null<PeerData*> peer) {
 	return settings.filtersEnabled && (settings.filtersEnabledInChats || peer->asChannel());
 }
 
-bool isBlocked(const not_null<HistoryItem *> item) {
+bool isBlocked(const not_null<HistoryItem*> item) {
 	auto &settings = AyuSettings::getInstance();
 
 	ID peer = 0;
@@ -121,14 +121,14 @@ bool isBlocked(const not_null<HistoryItem *> item) {
 	}();
 
 	return settings.filtersEnabled &&
-		(
-			ShadowBanUtils::isShadowBanned(peer) ||
-			settings.hideFromBlocked && blocked
-		);
+	(
+		ShadowBanUtils::isShadowBanned(peer) ||
+		settings.hideFromBlocked && blocked
+	);
 }
 
 // unused, probably need to remove
-bool filteredWithoutCaching(const not_null<HistoryItem *> item) {
+bool filteredWithoutCaching(const not_null<HistoryItem*> item) {
 	auto &settings = AyuSettings::getInstance();
 	if (!settings.filtersEnabled) {
 		return false;
@@ -146,7 +146,7 @@ bool filteredWithoutCaching(const not_null<HistoryItem *> item) {
 	if (cached.has_value()) {
 		return cached.value();
 	}
-	const auto filtered = isFiltered(FilterUtils::extractAllText(item), item->id.bare);
+	const auto filtered = isFiltered(FilterUtils::extractAllText(item), getDialogIdFromPeer(item->history()->peer));
 	if (filtered.has_value()) {
 		return filtered.value();
 	}
@@ -154,7 +154,7 @@ bool filteredWithoutCaching(const not_null<HistoryItem *> item) {
 }
 
 // Main Method
-bool filtered(const not_null<HistoryItem *> item) {
+bool filtered(const not_null<HistoryItem*> item) {
 	auto &settings = AyuSettings::getInstance();
 
 	if (!settings.filtersEnabled) {
@@ -173,7 +173,7 @@ bool filtered(const not_null<HistoryItem *> item) {
 	if (cached.has_value()) {
 		return cached.value();
 	}
-	const auto res = isFiltered(FilterUtils::extractAllText(item), item->history()->peer->id.value & PeerId::kChatTypeMask);
+	const auto res = isFiltered(FilterUtils::extractAllText(item), getDialogIdFromPeer(item->history()->peer));
 
 	// sometimes item has empty text.
 	// so we cache result only if
@@ -183,6 +183,6 @@ bool filtered(const not_null<HistoryItem *> item) {
 		return res.value();
 	}
 	return false;
-
 }
+
 }

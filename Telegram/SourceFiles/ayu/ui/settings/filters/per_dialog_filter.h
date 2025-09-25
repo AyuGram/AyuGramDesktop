@@ -20,10 +20,10 @@ class Session;
 
 namespace Settings {
 
-class GlobalExclusionListRow final : public PeerListRow
+class PerDialogFiltersListRow final : public PeerListRow
 {
 public:
-	explicit GlobalExclusionListRow(PeerId peer);
+	explicit PerDialogFiltersListRow(PeerId peer);
 	QString generateName() override;
 	PaintRoundImageCallback generatePaintUserpicCallback(bool forceRound) override;
 
@@ -31,10 +31,10 @@ private:
 	PeerId peerId;
 };
 
-class GlobalExclusionListController final : public PeerListController
+class PerDialogFiltersListController final : public PeerListController
 {
 public:
-	explicit GlobalExclusionListController(not_null<Main::Session*> session,
+	explicit PerDialogFiltersListController(not_null<Main::Session*> session,
 										   not_null<Window::SessionController*> controller);
 
 	[[nodiscard]] Main::Session &session() const override;

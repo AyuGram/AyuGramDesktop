@@ -15,7 +15,7 @@
 #include "boxes/abstract_box.h"
 #include "boxes/peer_list_box.h"
 #include "core/application.h"
-#include "filters/peer_global_exclusion.h"
+#include "filters/per_dialog_filter.h"
 #include "filters/settings_filters_list.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "settings/settings_common.h"
@@ -54,7 +54,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 						{
 							const auto peer = thread->peer();
 							controller->dialogId = getDialogIdFromPeer(peer);
-							controller->showExclude = false;
+							controller->showExclude = true;
 							controller->showSettings(AyuFiltersList::Id());
 							return true;
 						},
@@ -64,7 +64,6 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 					);
 				}
 			}
-
 		},
 		&st::menuIconSearch);
 	addAction({
@@ -78,14 +77,16 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			Ui::show(std::move(box));
 		},
 		&st::menuIconArchive);
-	addAction(
-		tr::ayu_FiltersMenuExport(tr::now),
-		[=]
-		{
-			auto box = Box(Ui::FillImportFiltersBox, false);
-			Ui::show(std::move(box));
-		},
-		&st::menuIconUnarchive);
+	if (AyuDatabase::hasFilters()) {
+		addAction(
+			tr::ayu_FiltersMenuExport(tr::now),
+			[=]
+			{
+				auto box = Box(Ui::FillImportFiltersBox, false);
+				Ui::show(std::move(box));
+			},
+			&st::menuIconUnarchive);
+	}
 	addAction({
 		.isSeparator = true
 	});
@@ -96,8 +97,14 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			auto callback = [=](Fn<void()> &&close)
 			{
 				AyuDatabase::deleteAllFilters();
+				AyuDatabase::deleteAllExclusions();
 				FiltersCacheController::rebuildCache();
 				AyuSettings::fire_filtersUpdate();
+				if (const auto window = Core::App().activeWindow()) {
+					if (const auto controller = window->sessionController()) {
+						controller->showSettings(AyuFilters::Id());
+					}
+				}
 				close();
 			};
 
@@ -206,29 +213,22 @@ void SetupShared(not_null<Window::SessionController*> controller,
 	});
 }
 
-void SetupExclusions(
+void SetupPerDialog(
 	not_null<Window::SessionController*> controller,
 	not_null<Ui::VerticalLayout*> container
 ) {
-	container->add(object_ptr<Ui::SettingsButton>(
-		container,
-		rpl::single(QString("Exclusions"))
-	))->addClickHandler([=]
-	{
-		auto ctrl = std::make_unique<GlobalExclusionListController>(
-			&controller->session(),
-			controller
-		);
+	auto ctrl = container->lifetime().make_state<PerDialogFiltersListController>(
+		&controller->session(),
+		controller
+	);
 
-		auto box = Box<PeerListBox>(std::move(ctrl),
-									[](not_null<PeerListBox*> box)
-									{
-										box->setTitle(rpl::single(QString("Exclusions")));
-										box->addButton(tr::lng_close(), [=] { box->closeBox(); });
-									});
-
-		controller->show(std::move(box));
-	});
+	auto content = container->add(
+		object_ptr<PeerListContent>(
+			container,
+			ctrl));
+	auto delegate = container->lifetime().make_state<PeerListContentDelegateSimple>();
+	delegate->setContent(content);
+	ctrl->setDelegate(delegate);
 }
 
 void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
@@ -265,7 +265,11 @@ void AyuFilters::setupContent(not_null<Window::SessionController*> controller) {
 
 	SetupShared(controller, content);
 
-	SetupExclusions(controller, content);
+	if (AyuDatabase::hasPerDialogFilters()) {
+		AddSkip(content);
+		AddDivider(content);
+		SetupPerDialog(controller, content);
+	}
 
 	ResizeFitChild(this, content);
 }

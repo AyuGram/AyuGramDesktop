@@ -24,10 +24,14 @@ class PainterHighQualityEnabler;
 
 namespace Settings {
 
+QString asBeta(const QString &text) {
+	return text + QString("  β");
+}
+
 rpl::producer<QString> asBeta(rpl::producer<QString> text) {
 	return std::move(text) | rpl::map([=](const QString &val)
 	{
-		return val + " β";
+		return asBeta(val);
 	});
 }
 

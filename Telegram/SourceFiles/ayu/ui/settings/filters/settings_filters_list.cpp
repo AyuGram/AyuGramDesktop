@@ -40,7 +40,7 @@ namespace Settings {
 
 rpl::producer<QString> AyuFiltersList::title() {
 	if (!dialogId.has_value()) {
-		return tr::ayu_RegexFilters();
+		return tr::ayu_RegexFiltersShared();
 	}
 
 	const auto did = abs(dialogId.value());

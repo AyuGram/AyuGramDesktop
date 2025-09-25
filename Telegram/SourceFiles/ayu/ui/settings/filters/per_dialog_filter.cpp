@@ -4,7 +4,7 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2025
-#include "peer_global_exclusion.h"
+#include "per_dialog_filter.h"
 
 #include "data/data_peer.h"
 #include "main/main_session.h"
@@ -23,12 +23,12 @@
 
 namespace Settings {
 
-GlobalExclusionListRow::GlobalExclusionListRow(PeerId peer)
+PerDialogFiltersListRow::PerDialogFiltersListRow(PeerId peer)
 	: PeerListRow(peer.value)
 	  , peerId(peer) {
 }
 
-QString GlobalExclusionListRow::generateName() {
+QString PerDialogFiltersListRow::generateName() {
 	if (const auto from = getPeerFromDialogId(peerId.value & PeerId::kChatTypeMask)) {
 		this->setPeer(from);
 		return PeerListRow::generateName();
@@ -36,7 +36,7 @@ QString GlobalExclusionListRow::generateName() {
 	return QString("UNKNOWN (ID: %1)").arg(QString::number(peerId.value & PeerId::kChatTypeMask));
 }
 
-PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(bool forceRound) {
+PaintRoundImageCallback PerDialogFiltersListRow::generatePaintUserpicCallback(bool forceRound) {
 	if (const auto from = getPeerFromDialogId(peerId.value & PeerId::kChatTypeMask)) {
 		this->setPeer(from);
 		return PeerListRow::generatePaintUserpicCallback(forceRound);
@@ -53,26 +53,21 @@ PaintRoundImageCallback GlobalExclusionListRow::generatePaintUserpicCallback(boo
 	};
 }
 
-GlobalExclusionListController::GlobalExclusionListController(not_null<Main::Session*> session,
+PerDialogFiltersListController::PerDialogFiltersListController(not_null<Main::Session*> session,
 															 not_null<Window::SessionController*> controller)
 	: _session(session)
 	  , _controller(controller) {
 }
 
-Main::Session &GlobalExclusionListController::session() const {
+Main::Session &PerDialogFiltersListController::session() const {
 	return *_session;
 }
 
-void GlobalExclusionListController::prepare() {
+void PerDialogFiltersListController::prepare() {
 	const auto filters = AyuDatabase::getAllRegexFilters();
 	const auto exclusions = AyuDatabase::getAllFiltersExclusions();
 
-	if (exclusions.empty()) {
-		auto description = object_ptr<Ui::FlatLabel>(
-			nullptr,
-			tr::ayu_RegexFiltersListEmpty(tr::now),
-			computeListSt().about);
-		delegate()->peerListSetDescription(std::move(description));
+	if (filters.empty() && exclusions.empty()) {
 		return;
 	}
 
@@ -90,7 +85,7 @@ void GlobalExclusionListController::prepare() {
 	for (const auto &[id, count] : countsByDialogIds) {
 		PeerId peerId = PeerId(PeerIdHelper(abs(id)));
 
-		auto row = std::make_unique<GlobalExclusionListRow>(peerId);
+		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
 		row->setCustomStatus(QString("%1 filters, %2 excluded").arg(count.filters).arg(count.exclusions), false);
 
 		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
@@ -101,7 +96,7 @@ void GlobalExclusionListController::prepare() {
 	delegate()->peerListRefreshRows();
 }
 
-void GlobalExclusionListController::rowClicked(not_null<PeerListRow*> peer) {
+void PerDialogFiltersListController::rowClicked(not_null<PeerListRow*> peer) {
 	ID did;
 	if (peer->special()) {
 		const ID pred =  peer->id() & PeerId::kChatTypeMask;
