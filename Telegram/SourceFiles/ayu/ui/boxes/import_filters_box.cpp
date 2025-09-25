@@ -113,9 +113,11 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 				}
 			} else {
 				if (isURL) {
-					FilterUtils::getInstance().exportFilters();
+					const auto data = FilterUtils::getInstance().exportFilters();
+					QGuiApplication::clipboard()->setText(data);
 				} else {
-					FilterUtils::getInstance().exportFilters();
+					const auto data = FilterUtils::getInstance().exportFilters();
+					QGuiApplication::clipboard()->setText(data);
 				}
 			}
 		});
