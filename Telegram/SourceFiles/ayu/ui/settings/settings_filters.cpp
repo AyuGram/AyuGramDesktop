@@ -19,6 +19,7 @@
 #include "filters/settings_filters_list.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "settings/settings_common.h"
+#include "styles/style_boxes.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/vertical_list.h"
@@ -100,11 +101,6 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 				AyuDatabase::deleteAllExclusions();
 				FiltersCacheController::rebuildCache();
 				AyuSettings::fire_filtersUpdate();
-				if (const auto window = Core::App().activeWindow()) {
-					if (const auto controller = window->sessionController()) {
-						controller->showSettings(AyuFilters::Id());
-					}
-				}
 				close();
 			};
 
@@ -222,12 +218,17 @@ void SetupPerDialog(
 		controller
 	);
 
-	auto content = container->add(
+	auto list = object_ptr<Ui::PaddingWrap<PeerListContent>>(
+		container,
 		object_ptr<PeerListContent>(
 			container,
-			ctrl));
+			ctrl),
+		QMargins(0, -st::peerListBox.padding.top(), 0, -st::peerListBox.padding.bottom()));
+	AddSkip(container);
+	const auto content = container->add(std::move(list));
+	AddSkip(container);
 	auto delegate = container->lifetime().make_state<PeerListContentDelegateSimple>();
-	delegate->setContent(content);
+	delegate->setContent(content->entity());
 	ctrl->setDelegate(delegate);
 }
 

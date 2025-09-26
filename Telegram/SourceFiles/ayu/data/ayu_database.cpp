@@ -451,11 +451,16 @@ bool hasFilters() {
 
 bool hasPerDialogFilters() {
 	try {
-		return !storage.select(
-			columns(column<RegexFilter>(&RegexFilter::id)),
-			where(is_not_null(column<RegexFilter>(&RegexFilter::dialogId))),
-			limit(1)
-		).empty();
+		return
+			!storage.select(
+				columns(column<RegexFilter>(&RegexFilter::id)),
+				where(is_not_null(column<RegexFilter>(&RegexFilter::dialogId))),
+				limit(1)
+			).empty() ||
+			!storage.select(
+				columns(column<RegexFilterGlobalExclusion>(&RegexFilterGlobalExclusion::fakeId)),
+				limit(1)
+			).empty();
 	} catch (std::exception &ex) {
 		LOG(("Failed to check if there's any filters: %1").arg(ex.what()));
 		return false;

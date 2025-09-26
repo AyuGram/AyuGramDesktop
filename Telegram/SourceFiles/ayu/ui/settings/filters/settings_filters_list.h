@@ -28,6 +28,8 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 
+	void checkBeforeClose(Fn<void()> close) override;
+
 private:
 	void setupContent(not_null<Window::SessionController*> controller);
 	void initializeSharedFilters(not_null<Ui::VerticalLayout*> container);

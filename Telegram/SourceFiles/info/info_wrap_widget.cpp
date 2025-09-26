@@ -54,13 +54,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 
 // AyuGram includes
-#include <styles/style_ayu_icons.h>
-#include <styles/style_settings.h>
+#include "styles/style_ayu_icons.h"
 
-#include "ayu/ui/settings/settings_ayu.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/settings/filters/edit_filter.h"
 #include "ayu/ui/settings/filters/settings_filters_list.h"
-#include "info/info_memento.h"
+
+
 namespace Info {
 namespace {
 
@@ -419,40 +419,16 @@ void WrapWidget::setupTopBarMenuToggle() {
 			}
 		} else if (section.settingsType() == ::Settings::AyuFiltersList::Id()) {
 			const auto controller = _controller->parentController();
-			if (true) {
-				const auto &st = st::ayuFiltersAddIcon;
-				const auto button = _topBar->addButton(
-					base::make_unique_q<Ui::IconButton>(_topBar, st));
+			const auto &st = st::ayuFiltersAddIcon;
+			const auto button = _topBar->addButton(base::make_unique_q<Ui::IconButton>(_topBar, st));
 
-				const auto show = controller->uiShow();
+			const auto show = controller->uiShow();
 
-				button->addClickHandler([=, content = _content.data()]
-										{
-											const auto onDone = [=](const RegexFilter &)
-											{
-												// taken from WrapWidget::createMemento
-
-												// I cant neither update nor redraw filters list (skill issue)
-												// so just close current section and
-												// open new with the same memento
-												auto contentMemento = content->createMemento();
-												if (!contentMemento) {
-													return;
-												}
-
-												std::vector<std::shared_ptr<ContentMemento>> stack;
-												stack.push_back(std::move(contentMemento));
-
-												auto sectionMemento = std::make_shared<Memento>(std::move(stack));
-
-												// close the last section
-												showBackFromStackInternal(Window::SectionShow(Window::SectionShow::Way::Backward, anim::type::normal));
-												// open new section
-												showInternal(gsl::make_not_null(sectionMemento.get()), Window::SectionShow(anim::type::normal));
-											};
-											show->show(::Settings::RegexEditBox(nullptr, onDone, controller->dialogId));
-										});
-			}
+			button->addClickHandler(
+				[=]
+				{
+					show->show(::Settings::RegexEditBox(nullptr, nullptr, controller->dialogId));
+				});
 
 
 			if (controller->showExclude.has_value() && controller->showExclude.value()) {
@@ -461,9 +437,6 @@ void WrapWidget::setupTopBarMenuToggle() {
 				const auto excludeButton = _topBar->addButton(std::move(icon));
 				excludeButton->addClickHandler([=, content = _content.data()]
 				{
-					// close current filters list
-					showBackFromStackInternal(Window::SectionShow(Window::SectionShow::Way::Backward, anim::type::normal));
-
 					// open new
 					controller->showExclude = false;
 					controller->showSettings(::Settings::AyuFiltersList::Id());
@@ -738,6 +711,21 @@ void WrapWidget::finishShowContent() {
 	_content->scrollBottomSkipValue(
 	) | rpl::start_with_next([=] {
 		updateContentGeometry();
+	}, _content->lifetime());
+
+	AyuSettings::get_filtersUpdate() | rpl::start_with_next([=]
+	{
+		auto contentMemento = _content->createMemento();
+		if (!contentMemento) {
+			return;
+		}
+
+		std::vector<std::shared_ptr<ContentMemento>> stack;
+		stack.push_back(std::move(contentMemento));
+		const auto sectionMemento = std::make_shared<Memento>(std::move(stack));
+
+		showBackFromStackInternal(Window::SectionShow(anim::type::instant));
+		showInternal(sectionMemento.get(), Window::SectionShow(anim::type::instant));
 	}, _content->lifetime());
 }
 

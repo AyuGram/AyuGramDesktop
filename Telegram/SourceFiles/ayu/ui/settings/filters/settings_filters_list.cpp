@@ -27,12 +27,11 @@
 #include "ayu/features/filters/filters_utils.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_channel.h"
-#include "rpl/mappers.h"
+#include "info/info_wrap_widget.h"
 #include "ui/qt_object_factory.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -73,27 +72,22 @@ AyuFiltersList::AyuFiltersList(
 	setupContent(controller);
 }
 
-void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
-	// stolen from EditPrivacyBox
-	auto state = lifetime().make_state<RegexFilter>(filter);
-	auto buttonText = lifetime().make_state<rpl::variable<QString>>(
-		QString::fromStdString(state->text).replace("\n", " "));
-	auto isRemoved = lifetime().make_state<rpl::variable<bool>>(false);
+void AyuFiltersList::checkBeforeClose(Fn<void()> close) {
+	if (_controller->showExclude.value_or(false)) {
+		_controller->showExclude = true;
+	}
+	close();
+}
 
-	auto wrap = _content->add(
-		object_ptr<Ui::SlideWrap<Button>>(
+void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
+	const auto state = lifetime().make_state<RegexFilter>(filter);
+	const auto button = _content->add(
+	object_ptr<Button>(
 			_content,
-			object_ptr<Button>(
-				_content,
-				buttonText->value(),
-				st::settingsButtonNoIcon
-			)
+			rpl::single(QString::fromStdString(state->text).replace("\n", " ")),
+			st::settingsButtonNoIcon
 		)
 	);
-
-	const auto button = wrap->entity();
-
-	wrap->toggleOn(isRemoved->value() | rpl::map(!rpl::mappers::_1));
 
 	if (!state->enabled) {
 		button->setColorOverride(st::storiesComposeGrayText->c);
@@ -111,14 +105,8 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 				_controller->show(
 					RegexEditBox(
 						state,
-						[=](const RegexFilter &done) mutable
-						{
-							buttonText->force_assign(
-								QString::fromStdString(done.text)
-								.replace("\n", " ")
-							);
-							*state = done;
-						}));
+						nullptr
+						));
 			},
 			&st::menuIconEdit);
 
@@ -129,16 +117,7 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 				state->enabled = !state->enabled;
 				AyuDatabase::updateRegexFilter(*state);
 				FiltersCacheController::rebuildCache();
-
 				AyuSettings::fire_filtersUpdate();
-
-
-				if (!state->enabled) {
-					button->setColorOverride(st::storiesComposeGrayText->c);
-				} else {
-					button->setColorOverride({});
-				}
-				button->update();
 			},
 			state->enabled ? &st::menuIconBlock : &st::menuIconUnblock);
 
@@ -146,32 +125,12 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 
 		_contextMenu->addAction(
 			tr::lng_theme_delete(tr::now),
-			[=, this]
+			[=]
 			{
 				AyuDatabase::deleteFilter(state->id);
 				AyuDatabase::deleteExclusionsByFilterId(state->id);
 				FiltersCacheController::rebuildCache();
-
 				AyuSettings::fire_filtersUpdate();
-
-				isRemoved->force_assign(true);
-
-				this->update();
-
-				updateGeometry();
-				repaint();
-
-				// remove headers if there are no more filters left
-				if (filters.empty() && filtersTitle) {
-					filtersTitle->hide();
-				}
-				if (exclusions.empty() && excludedTitle) {
-					excludedTitle->hide();
-				}
-
-
-				// resize();
-				// update();
 			},
 			&st::menuIconDelete);
 
@@ -180,9 +139,21 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 
 	// we've opened filters list from top "Exclude" button
 	// on click, close the section
-	auto exclusionsClickHandler = [=, this]() mutable
+	auto exclusionsClickHandler = [=, controller = _controller, dialogId = dialogId]() mutable
 	{
 		Expects(dialogId.has_value());
+
+		/*
+		└── class Info::WrapWidget
+			└── class Info::Settings::Widget
+				└── class Ui::ScrollArea
+					└── class QWidget
+						└── class Ui::PaddingWrap<class Ui::RpWidget>
+							└── class Settings::AyuFiltersList
+		 */
+		// controller->showBackFromStack() doesn't work (closes box completely)
+		// so as a workaround, use WrapWidget
+		const auto wrap = static_cast<Info::WrapWidget*>(parent()->parent()->parent()->parent()->parent());
 
 		RegexFilterGlobalExclusion exclusion;
 		exclusion.filterId = state->id;
@@ -190,13 +161,12 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 
 		AyuDatabase::addRegexExclusion(exclusion);
 		FiltersCacheController::rebuildCache();
-
 		AyuSettings::fire_filtersUpdate();
 
-		_controller->showExclude = true;
-		_controller->dialogId = dialogId;
+		controller->dialogId = dialogId;
+		controller->showExclude = true;
 
-		_controller->showSettings(AyuFiltersList::Id());
+		wrap->showBackFromStackInternal(Window::SectionShow(anim::type::normal));
 	};
 	auto deleteExclusionsClickHandler = [=, this]() mutable
 	{
@@ -211,23 +181,7 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 
 				AyuDatabase::deleteExclusion(dialogId.value(), state->id);
 				FiltersCacheController::rebuildCache();
-
 				AyuSettings::fire_filtersUpdate();
-
-				isRemoved->force_assign(true);
-
-				this->update();
-
-				updateGeometry();
-				repaint();
-
-				// remove headers if there are no more filters left
-				if (filters.empty() && filtersTitle) {
-					filtersTitle->hide();
-				}
-				if (exclusions.empty() && excludedTitle) {
-					excludedTitle->hide();
-				}
 			},
 			&st::menuIconDelete);
 
@@ -259,7 +213,6 @@ void AyuFiltersList::initializeSharedFilters(
 		exclusions = AyuDatabase::getExcludedByDialogId(dialogId.value());
 	} else {
 		filters = AyuDatabase::getShared();
-
 
 		// remove shared filters that already excluded for that peer exclusion
 		if (dialogId.has_value() && _controller->showExclude.has_value() && !_controller->showExclude.value()) {
@@ -301,6 +254,10 @@ void AyuFiltersList::initializeSharedFilters(
 		for (const auto &exclusion : exclusions) {
 			addNewFilter(exclusion, true);
 		}
+	}
+
+	if (filters.empty() && exclusions.empty()) {
+		Ui::AddDividerText(container, tr::ayu_RegexFiltersListEmpty());
 	}
 }
 
