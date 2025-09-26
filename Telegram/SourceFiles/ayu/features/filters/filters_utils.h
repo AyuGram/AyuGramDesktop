@@ -60,6 +60,7 @@ public:
 	void importFromLink(const QString &link);
 	bool importFromJson(const QByteArray &json);
 
+	void publishFilters();
 	static QString exportFilters();
 
 	static QString extractAllText(not_null<HistoryItem *> item);

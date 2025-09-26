@@ -10,6 +10,10 @@
 #include <QJsonArray>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
+#include <QtNetwork/QHttpMultiPart>
+#include <QtNetwork/QHttpPart>
+#include <QGuiApplication>
+#include <QClipboard>
 
 #include "ayu/data/ayu_database.h"
 #include "ui/toast/toast.h"
@@ -41,18 +45,72 @@ void FilterUtils::importFromLink(const QString &link) {
 	_reply = _manager->get(request);
 
 	connect(_reply, &QNetworkReply::finished, this, [=]{
-		const QByteArray response = _reply->readAll();
+		const auto responseData = _reply->readAll();
 
-		if (!handleResponse(response)) {
-			LOG(("Filters import: Error handling response or bad map size: %1").arg(response.size()));
+		const auto jsonString = QString::fromUtf8(responseData);
+
+		if (jsonString.isNull()) {
+			LOG(("FilterUtils: Invalid response."));
+			Ui::Toast::Show(tr::ayu_FiltersToastFailImport(tr::now));
+
+			_reply->deleteLater();
+			return;
 		}
 
+		if (!handleResponse(jsonString.toUtf8())) {
+			LOG(("FilterUtils: Error handling response."));
+		}
 		_reply->deleteLater();
 	});
 
 	connect(_reply, &QNetworkReply::errorOccurred, this, [=](QNetworkReply::NetworkError e) {
 		gotFailure(e);
 
+		_reply->deleteLater();
+	});
+}
+
+void FilterUtils::publishFilters() {
+	const auto exported = exportFilters();
+
+	auto multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+	QHttpPart contentPart;
+	contentPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"content\""));
+	contentPart.setBody(exported.toUtf8());
+
+	QHttpPart syntaxPart;
+	syntaxPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"syntax\""));
+	syntaxPart.setBody("json");
+
+	QHttpPart titlePart;
+	titlePart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"title\""));
+	titlePart.setBody("AyuGram Filters");
+
+	multiPart->append(contentPart);
+	multiPart->append(syntaxPart);
+	multiPart->append(titlePart);
+
+	QNetworkRequest request(QUrl("https://dpaste.com/api/v2/"));
+
+	_reply = _manager->post(request, multiPart);
+	multiPart->setParent(_reply);
+
+	connect(_reply, &QNetworkReply::finished, this, [=] {
+		const auto error = _reply->error();
+		const auto location = _reply->header(QNetworkRequest::LocationHeader);
+
+		if (error == QNetworkReply::NoError && location.isValid()) {
+			auto url = location.toString();
+			url.append(".txt");
+			QGuiApplication::clipboard()->setText(url);
+
+			Ui::Toast::Show(tr::lng_stickers_copied(tr::now));
+		} else {
+			LOG(("Failed to publish filters to dpaste, error: %1").arg(_reply->errorString()));
+
+			Ui::Toast::Show(tr::ayu_FiltersToastFailPublish(tr::now));
+		}
 		_reply->deleteLater();
 	});
 }
@@ -100,7 +158,16 @@ struct BackupExclusion
 	QJsonObject toJson() const {
 		QJsonObject json;
 		json["dialogId"] = dialogId;
-		json["filterId"] = QString::fromUtf8(filterId.data());
+
+		// make it look like java's UUID
+		auto hexId = QString(QByteArray(filterId.data(), filterId.size()).toHex());
+		if (hexId.length() == 32) {
+			hexId.insert(8, '-');
+			hexId.insert(13, '-');
+			hexId.insert(18, '-');
+			hexId.insert(23, '-');
+		}
+		json["filterId"] = hexId;
 		return json;
 	}
 };
@@ -113,11 +180,35 @@ QString FilterUtils::exportFilters() {
 		return jsonArray;
 	};
 
-
+	QJsonArray filtersArray;
 	QJsonObject jsonObject;
 	jsonObject["version"] = BACKUP_VERSION;
 	const auto filters = AyuDatabase::getAllRegexFilters();
-	jsonObject["filters"] = createJsonArray(filters);
+
+	for (const auto &item : filters) {
+		QJsonObject filterJson;
+		filterJson["caseInsensitive"] = item.caseInsensitive;
+		if (item.dialogId.has_value()) {
+			filterJson["dialogId"] = item.dialogId.value();
+		} else {
+			filterJson["dialogId"] = QJsonValue();
+		}
+		filterJson["enabled"] = item.enabled;
+		filterJson["reversed"] = item.reversed;
+		filterJson["text"] = QString::fromStdString(item.text);
+
+		// make it look like java's UUID
+		auto hexId = QString(QByteArray(item.id.data(), item.id.size()).toHex());
+		if (hexId.length() == 32) {
+			hexId.insert(8, '-');
+			hexId.insert(13, '-');
+			hexId.insert(18, '-');
+			hexId.insert(23, '-');
+		}
+		filterJson["id"] = hexId;
+		filtersArray.append(filterJson);
+	}
+	jsonObject["filters"] = filtersArray;
 
 	const auto excl = AyuDatabase::getAllFiltersExclusions();
 
@@ -130,14 +221,16 @@ QString FilterUtils::exportFilters() {
 	}
 
 	jsonObject["exclusions"] = createJsonArray(exclusions);
+	jsonObject["removeFiltersById"] = QJsonValue();
+	jsonObject["removeExclusions"] = QJsonValue();
 
 	QJsonObject peers;
 	for (const auto &item : filters) {
-		const auto &currentSession = Core::App().domain().active().session();
+		const auto &session = currentSession();
 		if (!item.dialogId.has_value()) {
 			continue;
 		}
-		if (const auto peer = currentSession.data().peer(peerFromChat(abs(item.dialogId.value())))) {
+		if (const auto peer = session->data().peer(peerFromChat(abs(item.dialogId.value())))) {
 			if (!peer->username().isEmpty()) {
 				QString key = QString::number(item.dialogId.value());
 				peers[key] = peer->username();
@@ -337,8 +430,11 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 				}
 				regex.enabled = filter.value("enabled").toBool();
 
-				auto byteArray = filter.value("id").toString().toUtf8();
-				regex.id = std::vector(byteArray.constData(), byteArray.constData() + byteArray.size());
+				auto idString = filter.value("id").toString();
+				idString.remove('-');
+
+				auto idBytes = QByteArray::fromHex(idString.toUtf8());
+				regex.id = std::vector(idBytes.constData(), idBytes.constData() + idBytes.size());
 
 				regex.reversed = filter.value("reversed").toBool();
 				regex.text = filter.value("text").toString().toStdString();
@@ -368,8 +464,11 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 
 				regex.dialogId = exclusion.value("dialogId").toVariant().toLongLong();
 
-				auto byteArray = exclusion.value("filterId").toString().toUtf8();
-				regex.filterId = std::vector(byteArray.constData(), byteArray.constData() + byteArray.size());
+				auto filterIdString = exclusion.value("filterId").toString();
+				filterIdString.remove('-');
+
+				auto filterIdBytes = QByteArray::fromHex(filterIdString.toUtf8());
+				regex.filterId = std::vector(filterIdBytes.constData(), filterIdBytes.constData() + filterIdBytes.size());
 
 				auto it = std::ranges::find_if(existingExclusions,
 											   [&regex](const RegexFilterGlobalExclusion &f)

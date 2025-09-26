@@ -113,12 +113,14 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 				}
 			} else {
 				if (isURL) {
-					const auto data = FilterUtils::getInstance().exportFilters();
-					QGuiApplication::clipboard()->setText(data);
+					FilterUtils::getInstance().publishFilters();
 				} else {
 					const auto data = FilterUtils::getInstance().exportFilters();
 					QGuiApplication::clipboard()->setText(data);
+
+					Toast::Show(tr::lng_text_copied(tr::now));
 				}
+				box->closeBox();
 			}
 		});
 	const auto buttonWidth = box->width()
