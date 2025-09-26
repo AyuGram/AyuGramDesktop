@@ -113,8 +113,6 @@ void PerDialogFiltersListController::rowClicked(not_null<PeerListRow*> peer) {
 	_controller->showSettings(AyuFiltersList::Id());
 }
 
-////////////////////////////////////
-
 SelectChatBoxController::SelectChatBoxController(
 	not_null<Window::SessionController*> controller,
 	Fn<void(not_null<PeerData*>)> onSelectedCallback)

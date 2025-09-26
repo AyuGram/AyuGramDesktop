@@ -6,140 +6,31 @@
 // Copyright @Radolyn, 2025
 #include "edit_filter.h"
 
-#include <styles/style_layers.h>
-#include <ui/widgets/fields/masked_input_field.h>
-#include <styles/style_window.h>
-#include <ui/toast/toast.h>
-#include <ui/text/text_utilities.h>
-
-#include "ayu/ayu_settings.h"
-
 #include "lang_auto.h"
-
-#include "boxes/connection_box.h"
-#include "styles/style_boxes.h"
-#include "styles/style_settings.h"
-
+#include "ayu/ayu_settings.h"
 #include "ayu/data/ayu_database.h"
 #include "ayu/features/filters/filters_cache_controller.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "ui/qt_object_factory.h"
+#include "base/event_filter.h"
+#include "base/platform/base_platform_info.h"
+#include "boxes/delete_messages_box.h"
+#include "core/mime_type.h"
+#include "media/audio/media_audio.h"
+#include "media/view/media_view_pip.h"
+#include "styles/style_boxes.h"
+#include "styles/style_layers.h"
+#include "styles/style_settings.h"
+#include "styles/style_window.h"
 #include "ui/ui_utility.h"
-#include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/effects/animations.h"
+#include "ui/text/text.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/labels.h"
 #include "ui/widgets/fields/input_field.h"
-
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
-#include "window/window_session_controller.h"
-#include "ui/widgets/fields/password_input.h"
-#include "ui/widgets/labels.h"
-#include "base/event_filter.h"
-#include "ui/effects/animations.h"
-#include "styles/style_window.h"
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
-#include "ui/text/text.h"
-#include "media/view/media_view_overlay_widget.h"
 
-#include "apiwrap.h"
-#include "api/api_attached_stickers.h"
-#include "api/api_peer_photo.h"
-#include "base/qt/qt_common_adapters.h"
-#include "base/timer_rpl.h"
-#include "lang/lang_keys.h"
-#include "menu/menu_sponsored.h"
-#include "boxes/premium_preview_box.h"
-#include "core/application.h"
-#include "core/click_handler_types.h"
-#include "core/file_utilities.h"
-#include "core/mime_type.h"
-#include "core/ui_integration.h"
-#include "core/crash_reports.h"
-#include "core/sandbox.h"
-#include "core/shortcuts.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/buttons.h"
-#include "ui/layers/layer_manager.h"
-#include "ui/text/text_utilities.h"
-#include "ui/platform/ui_platform_window_title.h"
-#include "ui/toast/toast.h"
-#include "ui/text/format_values.h"
-#include "ui/item_text_options.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/power_saving.h"
-#include "ui/cached_round_corners.h"
-#include "ui/gl/gl_window.h"
-#include "ui/boxes/confirm_box.h"
-#include "ui/ui_utility.h"
-#include "info/info_memento.h"
-#include "info/info_controller.h"
-#include "info/statistics/info_statistics_widget.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/report_messages_box.h"
-#include "media/audio/media_audio.h"
-#include "media/view/media_view_group_thumbs.h"
-#include "media/view/media_view_pip.h"
-#include "media/view/media_view_overlay_raster.h"
-#include "media/view/media_view_overlay_opengl.h"
-#include "media/view/media_view_playback_sponsored.h"
-#include "media/stories/media_stories_share.h"
-#include "media/stories/media_stories_view.h"
-#include "media/streaming/media_streaming_document.h"
-#include "media/streaming/media_streaming_player.h"
-#include "media/player/media_player_instance.h"
-#include "history/history.h"
-#include "history/history_item_helpers.h"
-#include "history/view/media/history_view_media.h"
-#include "history/view/reactions/history_view_reactions_selector.h"
-#include "data/components/sponsored_messages.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_media_rotation.h"
-#include "data/data_photo_media.h"
-#include "data/data_document_media.h"
-#include "data/data_document_resolver.h"
-#include "data/data_file_click_handler.h"
-#include "data/data_download_manager.h"
-#include "window/themes/window_theme_preview.h"
-#include "window/window_peer_menu.h"
-#include "window/window_controller.h"
-#include "base/platform/base_platform_info.h"
-#include "base/power_save_blocker.h"
-#include "base/random.h"
-#include "base/unixtime.h"
-#include "base/qt_signal_producer.h"
-#include "base/event_filter.h"
-#include "main/main_account.h"
-#include "main/main_domain.h" // Domain::activeSessionValue.
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "layout/layout_document_generic_preview.h"
-#include "platform/platform_overlay_widget.h"
-#include "storage/file_download.h"
-#include "storage/storage_account.h"
-#include "calls/calls_instance.h"
-#include "styles/style_media_view.h"
-#include "styles/style_calls.h"
-#include "styles/style_chat.h"
-#include "styles/style_menu_icons.h"
-
-#include <QtWidgets/QApplication>
-#include <QtCore/QBuffer>
-#include <QtGui/QGuiApplication>
-#include <QtGui/QWindow>
-#include <QtGui/QScreen>
-
-#include <kurlmimedata.h>
-
-class PainterHighQualityEnabler;
 
 namespace Settings {
 
@@ -163,124 +54,76 @@ std::vector<char> generate_uuid_bytes() {
 	return std::vector<char>(bytes.begin(), bytes.end());
 }
 
-rpl::producer<QString> AyuEditFilters::title() {
-	return tr::ayu_RegexFiltersAdd();
-}
+bool validateRegex(const icu::UnicodeString& pattern, std::string& errorMsg) {
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError parseError;
 
-object_ptr<Ui::Checkbox> getCheckBox(not_null<Ui::VerticalLayout*> container,
-									 const QString &label,
-									 bool checked) {
-	return object_ptr<Ui::Checkbox>(
-		container,
-		label,
-		checked,
-		st::settingsCheckbox);
-}
+	icu::RegexPattern* regexPattern = icu::RegexPattern::compile(
+		pattern,
+		0, // flags
+		parseError,
+		status
+	);
 
-AyuEditFilters::AyuEditFilters(
-	QWidget *parent,
-	not_null<Window::SessionController*> controller)
-	: Section(parent) {
-	if (!controller->filterId.empty()) {
-		currentFilter = AyuDatabase::getById(controller->filterId);
+	if (U_FAILURE(status)) {
+		auto errorCodeNormalized = std::string(u_errorName(status));
+		errorCodeNormalized = errorCodeNormalized.substr(8); // skip U_REGEX_
+		std::ranges::transform(
+			errorCodeNormalized,
+			errorCodeNormalized.begin(),
+			[](unsigned char c)
+			{
+				if (c == '_') {
+					return std::tolower(' ');
+				}
+				return std::tolower(c);
+			});
+		errorCodeNormalized[0] = std::toupper(errorCodeNormalized[0]);
+		errorMsg = errorCodeNormalized + " at " + std::to_string(parseError.offset);
+
+		if (parseError.preContext[0] != 0 || parseError.postContext[0] != 0) {
+			icu::UnicodeString pre(parseError.preContext);
+			icu::UnicodeString post(parseError.postContext);
+			std::string preStr, postStr;
+			pre.toUTF8String(preStr);
+			post.toUTF8String(postStr);
+			errorMsg += " (near: '" + preStr + "' -> '" + postStr + "')";
+		}
+
+		delete regexPattern;
+		return false;
 	}
-	setupContent(controller, parent);
+
+	delete regexPattern;
+	return true;
 }
 
-// unused currently, TODO: need to add this on bad regex pattern
-not_null<Ui::FlatLabel*> AddError(
+not_null<Ui::SlideWrap<Ui::FlatLabel>*> AddError(
 	not_null<Ui::VerticalLayout*> content,
-	Ui::PasswordInput *input) {
+	Ui::InputField *input) {
+
+	std::string errorText;
+	validateRegex(icu::UnicodeString::fromUTF8("("), errorText);
+
 	const auto error = content->add(
-		object_ptr<Ui::CenterWrap<Ui::FlatLabel>>(
+		object_ptr<Ui::SlideWrap<Ui::FlatLabel>>(
 			content,
 			object_ptr<Ui::FlatLabel>(
 				content,
-				// Set any text to resize.
-				tr::lng_language_name(tr::now),
+				QString::fromStdString(errorText) + QString::fromStdString(errorText),
 				st::settingLocalPasscodeError)),
-		st::changePhoneDescriptionPadding)->entity();
-	error->hide();
+				st::settingsCheckboxPadding);
+	error->hide(anim::type::instant);
 	if (input) {
-		QObject::connect(input,
-						 &Ui::MaskedInputField::changed,
-						 [=]
-						 {
-							 error->hide();
-						 });
+		input->changes() | rpl::start_with_next(
+			[=]
+			{
+				error->hide(anim::type::normal);
+			},
+			input->lifetime());
 	}
 	return error;
 };
-
-void AyuEditFilters::setupSettings(not_null<Ui::VerticalLayout*> container, QWidget *parent) {
-	AddSkip(container);
-
-	const auto add = [&](const QString &label, bool checked, auto &&handle)
-	{
-		auto check = container->add(
-			getCheckBox(container, label, checked),
-			st::settingsCheckboxPadding
-		);
-		check->checkedChanges(
-		) | rpl::start_with_next(
-			std::forward<decltype(handle)>(handle),
-			container->lifetime());
-		return check;
-	};
-
-
-	const auto name = container->add(
-		object_ptr<Ui::InputField>(
-			parent,
-			st::windowFilterNameInput,
-			Ui::InputField::Mode::MultiLine,
-			tr::ayu_RegexFiltersPlaceholder()),
-		st::markdownLinkFieldPadding);
-
-
-	auto enabled = add(
-		QString("Enable Filter"),
-		currentFilter.enabled,
-		[=, this](bool checked)
-		{
-			currentFilter.enabled = checked;
-		});
-
-	auto insensetive = add(
-		QString("Case Insensitive"),
-		currentFilter.caseInsensitive,
-		[=, this](bool checked)
-		{
-			currentFilter.caseInsensitive = checked;
-		});
-
-	auto reversed = add(
-		QString("Reversed"),
-		currentFilter.reversed,
-		[=, this](bool checked)
-		{
-			currentFilter.reversed = checked;
-		});
-
-	name->setText(QString::fromStdString(currentFilter.text));
-	name->submits(
-	) | rpl::start_with_next([=, this]
-							 {
-								 currentFilter.text = name->getTextWithTags().text.toStdString();
-
-								 currentFilter.enabled = enabled->checked();
-								 currentFilter.caseInsensitive = insensetive->checked();
-								 currentFilter.reversed = reversed->checked();
-
-								 if (currentFilter.id.empty()) {
-									 currentFilter.id = generate_uuid_bytes();
-								 }
-								 AyuDatabase::addRegexFilter(currentFilter);
-
-								 FiltersCacheController::rebuildCache();
-							 },
-							 name->lifetime());
-}
 
 void RegexEditBuilder(
 	not_null<Ui::GenericBox*> box,
@@ -299,13 +142,14 @@ void RegexEditBuilder(
 		data.reversed = false;
 	}
 
-	const auto name = box->addRow(
+	const auto regexValue = box->addRow(
 		object_ptr<Ui::InputField>(
 			box->verticalLayout(),
 			st::windowFilterNameInput,
 			Ui::InputField::Mode::MultiLine,
 			tr::ayu_RegexFiltersPlaceholder()),
 		st::markdownLinkFieldPadding);
+	const auto errorText = AddError(box->verticalLayout(), regexValue);
 	const auto enabled = box->addRow(
 		object_ptr<Ui::Checkbox>(
 			box,
@@ -328,12 +172,24 @@ void RegexEditBuilder(
 			st::defaultBoxCheckbox),
 		st::settingsCheckboxPadding);
 
-	name->setText(QString::fromStdString(data.text));
+	regexValue->setText(QString::fromStdString(data.text));
 
 	auto saveAndClose = [=, id = data.id]
 	{
+		const auto text = regexValue->getTextWithTags().text;
+		if (text.isEmpty()) {
+			return;
+		}
+
+		std::string error;
+		if (!validateRegex(icu::UnicodeString::fromUTF8(text.toStdString()), error)) {
+			errorText->entity()->setText(QString::fromStdString(error));
+			errorText->show(anim::type::normal);
+			return;
+		}
+
 		RegexFilter newFilter;
-		newFilter.text = name->getTextWithTags().text.toStdString();
+		newFilter.text = regexValue->getTextWithTags().text.toStdString();
 		newFilter.enabled = enabled->checked();
 		newFilter.caseInsensitive = caseInsensitive->checked();
 		newFilter.reversed = reversed->checked();
@@ -400,13 +256,16 @@ void RegexEditBuilder(
 		});
 	};
 
-	name->submits() | rpl::start_with_next(saveAndClose, name->lifetime());
+	regexValue->submits() | rpl::start_with_next(saveAndClose, regexValue->lifetime());
 	box->addButton(tr::lng_settings_save(), saveAndClose);
 	box->addButton(tr::lng_cancel(),
 				   [=]
 				   {
 					   box->closeBox();
 				   });
+
+	errorText->entity()->resizeToWidth(box->width());
+	errorText->resizeToWidth(box->width());
 }
 
 object_ptr<Ui::GenericBox> RegexEditBox(RegexFilter *filter,
@@ -414,14 +273,6 @@ object_ptr<Ui::GenericBox> RegexEditBox(RegexFilter *filter,
 										std::optional<long long> dialogId,
 										bool showToast) {
 	return Box(RegexEditBuilder, filter, onDone, dialogId, showToast);
-}
-
-void AyuEditFilters::setupContent(not_null<Window::SessionController*> controller, QWidget *parent) {
-	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
-
-	setupSettings(content, parent);
-
-	ResizeFitChild(this, content);
 }
 
 } // namespace Settings
