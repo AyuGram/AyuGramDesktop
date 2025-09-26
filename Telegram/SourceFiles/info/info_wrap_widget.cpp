@@ -54,12 +54,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 
 // AyuGram includes
-#include "styles/style_ayu_icons.h"
-
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/settings/filters/edit_filter.h"
 #include "ayu/ui/settings/filters/settings_filters_list.h"
-
+#include "styles/style_ayu_settings.h"
 
 namespace Info {
 namespace {
@@ -419,7 +417,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 			}
 		} else if (section.settingsType() == ::Settings::AyuFiltersList::Id()) {
 			const auto controller = _controller->parentController();
-			const auto &st = st::ayuFiltersAddIcon;
+			const auto &st = st::filtersAddIcon;
 			const auto button = _topBar->addButton(base::make_unique_q<Ui::IconButton>(_topBar, st));
 
 			const auto show = controller->uiShow();
@@ -432,7 +430,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 
 
 			if (controller->showExclude.has_value() && controller->showExclude.value()) {
-				auto icon = base::make_unique_q<Ui::IconButton>(_topBar, st::ayuFiltersExcludeIcon);
+				auto icon = base::make_unique_q<Ui::IconButton>(_topBar, st::filtersExcludeIcon);
 
 				const auto excludeButton = _topBar->addButton(std::move(icon));
 				excludeButton->addClickHandler([=, content = _content.data()]

@@ -73,9 +73,7 @@ AyuFiltersList::AyuFiltersList(
 }
 
 void AyuFiltersList::checkBeforeClose(Fn<void()> close) {
-	if (_controller->showExclude.value_or(false)) {
-		_controller->showExclude = true;
-	}
+	_controller->showExclude = true;
 	close();
 }
 

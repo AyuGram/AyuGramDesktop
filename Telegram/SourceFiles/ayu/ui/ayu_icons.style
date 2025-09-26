@@ -10,7 +10,6 @@
 using "ui/colors.palette";
 using "ui/widgets/widgets.style";
 using "dialogs/dialogs.style";
-using "info/info.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
 ayuMenuIcon: icon {{ "ayu/ayu_menu", menuIconColor }};
@@ -52,16 +51,4 @@ dialogsExteraSupporterIcon: ThreeStateIcon {
 	icon: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBg }};
 	over: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
 	active: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
-}
-ayuFiltersAddIcon: IconButton(infoLayerTopBarClose) {
-	width: 40px;
-	icon: icon {{ "menu/add", boxTitleCloseFg }};
-	iconOver: icon {{ "menu/add", boxTitleCloseFgOver }};
-	iconPosition: point(8px, -1px);
-}
-ayuFiltersExcludeIcon: IconButton(infoLayerTopBarClose) {
-	width: 40px;
-	icon: icon {{ "ayu/streamer", boxTitleCloseFg }};
-	iconOver: icon {{ "ayu/streamer", boxTitleCloseFgOver }};
-	iconPosition: point(8px, -1px);
 }
