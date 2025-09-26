@@ -18,7 +18,6 @@ void ShadowBanUtils::reloadShadowBan() {
 	loadShadowBanList();
 }
 
-
 void ShadowBanUtils::addShadowBan(ID userId) {
 	if (shadowBanList.insert(userId).second) {
 		setShadowBanList();
@@ -47,9 +46,11 @@ void ShadowBanUtils::loadShadowBanList() {
 		shadowBanList.insert(id.toLongLong());
 	}
 }
+
 const std::unordered_set<ID> &ShadowBanUtils::getShadowBanList() {
 	return shadowBanList;
 }
+
 void ShadowBanUtils::setShadowBanList() {
 	QStringList idStringList;
 	idStringList.reserve(shadowBanList.size());

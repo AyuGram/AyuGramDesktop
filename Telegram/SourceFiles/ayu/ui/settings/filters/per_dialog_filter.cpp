@@ -6,19 +6,15 @@
 // Copyright @Radolyn, 2025
 #include "per_dialog_filter.h"
 
-#include "data/data_peer.h"
-#include "main/main_session.h"
-#include "styles/style_boxes.h"
-#include "ui/painter.h"
-
-#include <lang_auto.h>
-
 #include <utility>
-
+#include "lang_auto.h"
 #include "settings_filters_list.h"
 #include "ayu/data/ayu_database.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "data/data_peer.h"
 #include "data/data_session.h"
+#include "main/main_session.h"
+#include "ui/painter.h"
 #include "window/window_session_controller.h"
 
 namespace Settings {

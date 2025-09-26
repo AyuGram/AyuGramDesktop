@@ -6,32 +6,29 @@
 // Copyright @Radolyn, 2025
 #include "filters_utils.h"
 
-#include <lang_auto.h>
+#include <QByteArray>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QJsonArray>
+#include <qjsondocument.h>
+#include <QString>
+#include <vector>
+#include <QtNetwork/QHttpPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QHttpMultiPart>
-#include <QtNetwork/QHttpPart>
-#include <QGuiApplication>
-#include <QClipboard>
-
-#include "ayu/data/ayu_database.h"
-#include "ui/toast/toast.h"
-#include <QString>
-#include <QByteArray>
-#include <qjsondocument.h>
-#include <vector>
-
 #include "filters_cache_controller.h"
+#include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/data/ayu_database.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_document.h"
+#include "data/data_peer.h"
 #include "data/data_session.h"
 #include "history/history_item.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
-
+#include "ui/toast/toast.h"
 
 constexpr auto BACKUP_VERSION = 2;
 
@@ -44,30 +41,40 @@ void FilterUtils::importFromLink(const QString &link) {
 	const auto request = QNetworkRequest(QUrl(link));
 	_reply = _manager->get(request);
 
-	connect(_reply, &QNetworkReply::finished, this, [=]{
-		const auto responseData = _reply->readAll();
+	connect(
+		_reply,
+		&QNetworkReply::finished,
+		this,
+		[=]
+		{
+			const auto responseData = _reply->readAll();
 
-		const auto jsonString = QString::fromUtf8(responseData);
+			const auto jsonString = QString::fromUtf8(responseData);
 
-		if (jsonString.isNull()) {
-			LOG(("FilterUtils: Invalid response."));
-			Ui::Toast::Show(tr::ayu_FiltersToastFailImport(tr::now));
+			if (jsonString.isNull()) {
+				LOG(("FilterUtils: Invalid response."));
+				Ui::Toast::Show(tr::ayu_FiltersToastFailImport(tr::now));
+
+				_reply->deleteLater();
+				return;
+			}
+
+			if (!handleResponse(jsonString.toUtf8())) {
+				LOG(("FilterUtils: Error handling response."));
+			}
+			_reply->deleteLater();
+		});
+
+	connect(
+		_reply,
+		&QNetworkReply::errorOccurred,
+		this,
+		[=](QNetworkReply::NetworkError e)
+		{
+			gotFailure(e);
 
 			_reply->deleteLater();
-			return;
-		}
-
-		if (!handleResponse(jsonString.toUtf8())) {
-			LOG(("FilterUtils: Error handling response."));
-		}
-		_reply->deleteLater();
-	});
-
-	connect(_reply, &QNetworkReply::errorOccurred, this, [=](QNetworkReply::NetworkError e) {
-		gotFailure(e);
-
-		_reply->deleteLater();
-	});
+		});
 }
 
 void FilterUtils::publishFilters() {
@@ -96,23 +103,28 @@ void FilterUtils::publishFilters() {
 	_reply = _manager->post(request, multiPart);
 	multiPart->setParent(_reply);
 
-	connect(_reply, &QNetworkReply::finished, this, [=] {
-		const auto error = _reply->error();
-		const auto location = _reply->header(QNetworkRequest::LocationHeader);
+	connect(
+		_reply,
+		&QNetworkReply::finished,
+		this,
+		[=]
+		{
+			const auto error = _reply->error();
+			const auto location = _reply->header(QNetworkRequest::LocationHeader);
 
-		if (error == QNetworkReply::NoError && location.isValid()) {
-			auto url = location.toString();
-			url.append(".txt");
-			QGuiApplication::clipboard()->setText(url);
+			if (error == QNetworkReply::NoError && location.isValid()) {
+				auto url = location.toString();
+				url.append(".txt");
+				QGuiApplication::clipboard()->setText(url);
 
-			Ui::Toast::Show(tr::lng_stickers_copied(tr::now));
-		} else {
-			LOG(("Failed to publish filters to dpaste, error: %1").arg(_reply->errorString()));
+				Ui::Toast::Show(tr::lng_stickers_copied(tr::now));
+			} else {
+				LOG(("Failed to publish filters to dpaste, error: %1").arg(_reply->errorString()));
 
-			Ui::Toast::Show(tr::ayu_FiltersToastFailPublish(tr::now));
-		}
-		_reply->deleteLater();
-	});
+				Ui::Toast::Show(tr::ayu_FiltersToastFailPublish(tr::now));
+			}
+			_reply->deleteLater();
+		});
 }
 
 bool FilterUtils::importFromJson(const QByteArray &json) {
@@ -137,7 +149,9 @@ bool FilterUtils::importFromJson(const QByteArray &json) {
 		return false;
 	}
 
-	const auto any = !changes.newFilters.empty() || !changes.removeFiltersById.empty() || !changes.filtersOverrides.empty() || !changes.newExclusions.empty() || !changes.removeExclusions.empty() || !changes.peersToBeResolved.empty();
+	const auto any = !changes.newFilters.empty() || !changes.removeFiltersById.empty() || !changes.filtersOverrides.
+		empty() || !changes.newExclusions.empty() || !changes.removeExclusions.empty() || !changes.peersToBeResolved.
+		empty();
 
 	if (!any) {
 		Ui::Toast::Show(tr::ayu_FiltersToastFailNoChanges(tr::now));
@@ -147,7 +161,6 @@ bool FilterUtils::importFromJson(const QByteArray &json) {
 	applyChanges(changes);
 
 	return true;
-
 }
 
 struct BackupExclusion
@@ -171,8 +184,10 @@ struct BackupExclusion
 		return json;
 	}
 };
+
 QString FilterUtils::exportFilters() {
-	auto createJsonArray = [&](const auto &container) {
+	auto createJsonArray = [&](const auto &container)
+	{
 		QJsonArray jsonArray;
 		for (const auto &item : container) {
 			jsonArray.append(item.toJson());
@@ -236,7 +251,6 @@ QString FilterUtils::exportFilters() {
 				peers[key] = peer->username();
 			}
 		}
-
 	}
 	jsonObject["peers"] = peers;
 
@@ -244,9 +258,7 @@ QString FilterUtils::exportFilters() {
 	QJsonDocument jsonDoc(jsonObject);
 	QByteArray jsonData = jsonDoc.toJson(QJsonDocument::Indented);
 	return QString::fromUtf8(jsonData);
-
 }
-
 
 // for compatibility with Android version
 
@@ -355,7 +367,8 @@ int typeOfMessage(const HistoryItem *item) {
 	}
 	return 0; // TYPE_TEXT
 }
-QString FilterUtils::extractAllText(not_null<HistoryItem *> item) {
+
+QString FilterUtils::extractAllText(not_null<HistoryItem*> item) {
 	QString text(item->originalText().text);
 	if (!item->originalText().entities.empty()) {
 		for (const auto &entity : item->originalText().entities) {
@@ -468,13 +481,17 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 				filterIdString.remove('-');
 
 				auto filterIdBytes = QByteArray::fromHex(filterIdString.toUtf8());
-				regex.filterId = std::vector(filterIdBytes.constData(), filterIdBytes.constData() + filterIdBytes.size());
+				regex.filterId = std::vector(
+					filterIdBytes.constData(),
+					filterIdBytes.constData() + filterIdBytes.size()
+				);
 
-				auto it = std::ranges::find_if(existingExclusions,
-											   [&regex](const RegexFilterGlobalExclusion &f)
-											   {
-												   return f.dialogId == regex.dialogId && f.filterId == regex.filterId;
-											   });
+				auto it = std::ranges::find_if(
+					existingExclusions,
+					[&regex](const RegexFilterGlobalExclusion &f)
+					{
+						return f.dialogId == regex.dialogId && f.filterId == regex.filterId;
+					});
 
 				if (it == existingExclusions.end()) {
 					newExclusions.push_back(std::move(regex));
@@ -483,21 +500,23 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 		}
 	}
 
-	if (const auto removeFiltersByIdJson = root.value("removeFiltersById").toArray(); !removeFiltersByIdJson.isEmpty()) {
+	if (const auto removeFiltersByIdJson = root.value("removeFiltersById").toArray(); !removeFiltersByIdJson.
+		isEmpty()) {
 		for (const auto &filterRef : removeFiltersByIdJson) {
 			const auto filter = filterRef.toString();
 
 			const auto byteArray = filter.toUtf8();
 			const auto filterId = std::vector(byteArray.constData(), byteArray.constData() + byteArray.size());
 
-			const auto exists = std::ranges::any_of(existingFilters,
-											  [&](const RegexFilter &f) {
-												  return f.id == filterId;
-											  });
+			const auto exists = std::ranges::any_of(
+				existingFilters,
+				[&](const RegexFilter &f)
+				{
+					return f.id == filterId;
+				});
 			if (exists) {
 				removeFiltersById.push_back(filter);
 			}
-
 		}
 	}
 
@@ -510,8 +529,10 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 			const auto byteArray = filterIdStr.toUtf8();
 			const auto filterIdVec = std::vector<char>(byteArray.constData(), byteArray.constData() + byteArray.size());
 
-			const bool exists = std::ranges::any_of(existingExclusions,
-				[&](const RegexFilterGlobalExclusion& x) {
+			const bool exists = std::ranges::any_of(
+				existingExclusions,
+				[&](const RegexFilterGlobalExclusion &x)
+				{
 					return x.filterId == filterIdVec && x.dialogId == dialogId;
 				});
 
@@ -526,7 +547,6 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 
 	if (const auto peersJson = root.value("peers").toObject(); !peersJson.isEmpty()) {
 		for (const auto &dialogIdStr : peersJson.keys()) {
-
 			bool parsed;
 			const auto dialogId = dialogIdStr.toLongLong(&parsed);
 			if (!parsed) {
@@ -534,7 +554,7 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 			}
 
 			// almost everytime fails
-			PeerData* peerMaybe = nullptr;
+			PeerData *peerMaybe = nullptr;
 			for (const auto &[index, account] : Core::App().domain().accounts()) {
 				if (const auto session = account->maybeSession()) {
 					if (const auto peer = session->data().peer(peerFromChat(abs(dialogId)))) {
@@ -548,7 +568,6 @@ ApplyChanges FilterUtils::prepareChanges(const QJsonObject &root) {
 				const auto username = peersJson.value(dialogIdStr).toString();
 				peersToBeResolved[dialogId] = username;
 			}
-
 		}
 	}
 

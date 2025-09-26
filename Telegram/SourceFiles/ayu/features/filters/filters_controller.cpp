@@ -15,10 +15,7 @@
 #include "history/history_item.h"
 #include "unicode/regex.h"
 
-#include <functional>
 #include <QTimer>
-
-#include "apiwrap.h"
 
 #include "ayu/data/entities.h"
 #include "core/mime_type.h"

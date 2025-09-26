@@ -11,19 +11,8 @@
 #include "ayu/data/entities.h"
 #include "core/application.h"
 
-#include "api/api_bot.h"
-#include "core/click_handler_types.h"
 #include "data/data_session.h"
-#include "data/data_user.h"
-#include "history/history.h"
 #include "history/history_item_components.h"
-#include "main/main_session.h"
-#include "ui/cached_round_corners.h"
-#include "ui/painter.h"
-#include "ui/ui_utility.h"
-#include "window/window_session_controller.h"
-#include "styles/style_chat.h"
-#include "styles/style_widgets.h"
 
 struct ApplyChanges
 {

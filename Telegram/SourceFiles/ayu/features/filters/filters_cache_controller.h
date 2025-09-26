@@ -4,6 +4,8 @@
 // but be respectful and credit the original author.
 //
 // Copyright @Radolyn, 2025
+#pragma once
+
 #include "filters_controller.h"
 #include "ayu/data/entities.h"
 

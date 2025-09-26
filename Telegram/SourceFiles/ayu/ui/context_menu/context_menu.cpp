@@ -9,7 +9,6 @@
 #include "apiwrap.h"
 #include "lang_auto.h"
 #include "mainwidget.h"
-#include "mainwindow.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
@@ -316,16 +315,17 @@ void AddOpenChannelAction(PeerData *peerData,
 }
 
 void AddShadowBanAction(PeerData *peerData,
-	const Window::PeerMenuCallback &addCallback) {
+						const Window::PeerMenuCallback &addCallback) {
 	const auto &settings = AyuSettings::getInstance();
 	if (!peerData || !peerData->isUser() || !settings.filtersEnabled) {
 		return;
 	}
 
-	const auto realId = peerData->id.value & PeerId::kChatTypeMask;
+	const auto realId = getDialogIdFromPeer(peerData);
+	const auto shadowBanned = ShadowBanUtils::isShadowBanned(realId);
 	const auto toggleShadowBan = [=]
 	{
-		if (ShadowBanUtils::isShadowBanned(realId)) {
+		if (shadowBanned) {
 			ShadowBanUtils::removeShadowBan(realId);
 		} else {
 			ShadowBanUtils::addShadowBan(realId);
@@ -333,12 +333,12 @@ void AddShadowBanAction(PeerData *peerData,
 	};
 
 	addCallback({
-	.text = (ShadowBanUtils::isShadowBanned(realId)
-		? tr::ayu_FiltersQuickUnshadowBan(tr::now)
-		: tr::ayu_FiltersQuickShadowBan(tr::now)),
-	.handler = toggleShadowBan,
-	.icon = &st::menuIconStealth,
-});
+		.text = (shadowBanned
+					 ? tr::ayu_FiltersQuickUnshadowBan(tr::now)
+					 : tr::ayu_FiltersQuickShadowBan(tr::now)),
+		.handler = toggleShadowBan,
+		.icon = shadowBanned ? &st::menuIconShowInChat : &st::menuIconStealth,
+	});
 }
 
 void AddDeleteOwnMessagesAction(PeerData *peerData,

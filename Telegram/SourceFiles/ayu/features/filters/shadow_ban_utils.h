@@ -5,6 +5,7 @@
 //
 // Copyright @Radolyn, 2025
 #pragma once
+
 #include <unordered_set>
 
 class ShadowBanUtils {
