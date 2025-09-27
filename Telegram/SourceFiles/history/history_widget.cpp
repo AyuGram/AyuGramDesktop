@@ -662,9 +662,7 @@ HistoryWidget::HistoryWidget(
 		session().changes().peerUpdates(
 			Data::PeerUpdate::Flag::IsBlocked
 		) | rpl::to_empty,
-		AyuSettings::get_filtersUpdate() | rpl::to_empty,
-		AyuSettings::get_filtersEnabledReactive() | rpl::to_empty,
-		AyuSettings::get_filtersEnabledInChatsReactive() | rpl::to_empty,
+		AyuSettings::get_filtersUpdate(),
 		AyuSettings::get_shadowBanIdsReactive() | rpl::to_empty
 	) | rpl::start_with_next(
 		[=]
@@ -680,6 +678,20 @@ HistoryWidget::HistoryWidget(
 						}
 						updateHistoryGeometry();
 						update();
+
+						for (const auto &item : _history->blocks) {
+							if (!item) {
+								continue;
+							}
+							for (const auto &msg : item->messages) {
+								if (!msg) {
+									continue;
+								}
+
+								_history->owner().requestViewResize(msg.get());
+								_history->owner().requestItemViewRefresh(msg->data());
+							}
+						}
 					}
 				});
 		},

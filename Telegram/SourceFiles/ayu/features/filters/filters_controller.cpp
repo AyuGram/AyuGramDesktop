@@ -65,10 +65,12 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 		return false;
 	};
 
-	if (const auto &dialogPatterns = FiltersCacheController::getPatternsByDialogId(dialogId);
-		dialogPatterns.has_value() && !dialogPatterns.value().empty()) {
+	if (const auto &dialogPatterns = FiltersCacheController::getPatternsByDialogId(dialogId); dialogPatterns.has_value() && !dialogPatterns.value().empty()) {
+
 		for (const auto &pattern : dialogPatterns.value()) {
-			return matches(pattern);
+			if (matches(pattern)) {
+				return true;
+			}
 		}
 	}
 
@@ -88,7 +90,7 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 
 bool isEnabled(not_null<PeerData*> peer) {
 	auto &settings = AyuSettings::getInstance();
-	return settings.filtersEnabled && (settings.filtersEnabledInChats || peer->asChannel());
+	return settings.filtersEnabled && (settings.filtersEnabledInChats || !peer->isMegagroup());
 }
 
 bool isBlocked(const not_null<HistoryItem*> item) {
