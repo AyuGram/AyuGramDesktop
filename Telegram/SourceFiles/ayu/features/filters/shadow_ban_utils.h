@@ -10,7 +10,6 @@
 
 class ShadowBanUtils {
 public:
-	static void reloadShadowBan();
 	static void addShadowBan(long long userId);
 	static void removeShadowBan(long long userId);
 	static bool isShadowBanned(long long userId);
@@ -18,8 +17,5 @@ public:
 private:
 	ShadowBanUtils() = delete;
 
-	static const std::unordered_set<long long> &getShadowBanList();
-	static void loadShadowBanList();
 	static void setShadowBanList();
-	static std::unordered_set<long long> shadowBanList;
 };

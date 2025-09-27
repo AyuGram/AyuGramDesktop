@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2025
 #pragma once
 
+#include <unordered_set>
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
 
@@ -59,7 +60,7 @@ public:
 
 	bool saveForBots;
 
-	QString shadowBanIds;
+	std::unordered_set<long long> shadowBanIds;
 	bool filtersEnabled;
 	bool filtersEnabledInChats;
 	bool hideFromBlocked;
@@ -165,7 +166,6 @@ void set_saveForBots(bool val);
 
 void set_filtersEnabled(bool val);
 void set_filtersEnabledInChats(bool val);
-void set_shadowBanIds(const QString &val);
 void set_hideFromBlocked(bool val);
 
 void set_disableAds(bool val);
@@ -429,11 +429,6 @@ bool isGhostModeActive();
 bool isUseScheduledMessages();
 
 rpl::producer<bool> get_ghostModeEnabledReactive();
-
-rpl::producer<bool> get_filtersEnabledReactive();
-rpl::producer<bool> get_filtersEnabledInChatsReactive();
-rpl::producer<QString> get_shadowBanIdsReactive();
-rpl::producer<bool> get_hideFromBlockedReactive();
 
 void fire_filtersUpdate();
 rpl::producer<> get_filtersUpdate();

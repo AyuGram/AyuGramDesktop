@@ -145,7 +145,6 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 
 			FiltersCacheController::rebuildCache();
-
 			AyuSettings::fire_filtersUpdate();
 		},
 		container->lifetime());
@@ -168,7 +167,6 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 
 			FiltersCacheController::rebuildCache();
-
 			AyuSettings::fire_filtersUpdate();
 		},
 		container->lifetime());
@@ -192,6 +190,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 
 			FiltersCacheController::rebuildCache();
+			AyuSettings::fire_filtersUpdate();
 		},
 		container->lifetime());
 	AddSkip(container);

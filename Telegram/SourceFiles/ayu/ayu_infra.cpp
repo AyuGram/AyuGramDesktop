@@ -53,16 +53,12 @@ void initTranslator() {
 	Ayu::Translator::TranslateManager::init();
 }
 
-void initShadowBan() {
-	ShadowBanUtils::reloadShadowBan();
-}
 void init() {
 	initLang();
 	initDatabase();
 	initUiSettings();
 	initWorker();
 	initRCManager();
-	initShadowBan();
 	initTranslator();
 }
 

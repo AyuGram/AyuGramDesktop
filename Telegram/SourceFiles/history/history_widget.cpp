@@ -658,12 +658,10 @@ HistoryWidget::HistoryWidget(
 	}, lifetime());
 
 	rpl::merge(
-		AyuSettings::get_hideFromBlockedReactive() | rpl::to_empty,
 		session().changes().peerUpdates(
 			Data::PeerUpdate::Flag::IsBlocked
 		) | rpl::to_empty,
-		AyuSettings::get_filtersUpdate(),
-		AyuSettings::get_shadowBanIdsReactive() | rpl::to_empty
+		AyuSettings::get_filtersUpdate()
 	) | rpl::start_with_next(
 		[=]
 		{
