@@ -10,14 +10,14 @@
 #include <vector>
 #include "unicode/regex.h"
 
-
 using namespace icu_78;
+
 namespace FiltersController {
-bool isEnabled(PeerData* peer);
-bool isBlocked(not_null<HistoryItem *> item);
+
+bool isEnabled(PeerData *peer);
+bool isBlocked(not_null<HistoryItem*> item);
 bool filteredWithoutCaching(not_null<HistoryItem*> historyItem);
 bool filtered(not_null<HistoryItem*> historyItem);
-
 
 struct ReversiblePattern
 {
@@ -32,12 +32,9 @@ struct HashablePattern
 
 	bool operator==(const HashablePattern &other) const {
 		return id == other.id;
-			// && pattern.pattern == other.pattern.pattern
-			// && pattern.reversed == other.pattern.reversed;
 	}
 };
 
-// im unable to override std::hash of HashablePattern (skill issue) so use hasher
 struct PatternHasher
 {
 	std::size_t operator()(const HashablePattern &p) const {
@@ -46,7 +43,4 @@ struct PatternHasher
 	}
 };
 
-
-
 }
-

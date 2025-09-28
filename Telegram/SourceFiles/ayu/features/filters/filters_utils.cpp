@@ -622,4 +622,8 @@ void FilterUtils::applyChanges(const ApplyChanges &changes) {
 	}
 
 	FiltersCacheController::rebuildCache();
+	crl::on_main([]
+	{
+		AyuSettings::fire_filtersUpdate();
+	});
 }

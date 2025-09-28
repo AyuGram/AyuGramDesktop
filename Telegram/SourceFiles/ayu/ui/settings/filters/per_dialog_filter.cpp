@@ -82,7 +82,18 @@ void PerDialogFiltersListController::prepare() {
 		PeerId peerId = PeerId(PeerIdHelper(abs(id)));
 
 		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
-		row->setCustomStatus(QString("%1 filters, %2 excluded").arg(count.filters).arg(count.exclusions), false);
+		auto status = QString();
+		if (count.filters > 0) {
+			status += tr::ayu_RegexFiltersAmount(tr::now, lt_count, count.filters);
+			if (count.exclusions > 0) {
+				status += ", ";
+			}
+		}
+		if (count.exclusions > 0) {
+			status += tr::ayu_RegexFiltersExcludedAmount(tr::now, lt_count, count.exclusions);
+		}
+
+		row->setCustomStatus(status, false);
 
 		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
 	}

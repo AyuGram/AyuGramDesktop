@@ -45,7 +45,7 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 		return std::nullopt;
 	}
 
-	auto icuStr = UnicodeString(reinterpret_cast<const UChar*>(str.constData()), str.length());
+	const auto icuStr = UnicodeString(reinterpret_cast<const UChar*>(str.constData()), str.length());
 
 	const auto matches = [&](const ReversiblePattern &pattern)
 	{
@@ -66,7 +66,6 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 	};
 
 	if (const auto &dialogPatterns = FiltersCacheController::getPatternsByDialogId(dialogId); dialogPatterns.has_value() && !dialogPatterns.value().empty()) {
-
 		for (const auto &pattern : dialogPatterns.value()) {
 			if (matches(pattern)) {
 				return true;
@@ -89,17 +88,12 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 }
 
 bool isEnabled(not_null<PeerData*> peer) {
-	auto &settings = AyuSettings::getInstance();
-	return settings.filtersEnabled && (settings.filtersEnabledInChats || !peer->isMegagroup());
+	const auto &settings = AyuSettings::getInstance();
+	return settings.filtersEnabled && (settings.filtersEnabledInChats || !peer->isMegagroup() && !peer->isGigagroup());
 }
 
 bool isBlocked(const not_null<HistoryItem*> item) {
-	auto &settings = AyuSettings::getInstance();
-
-	ID peer = 0;
-	if (const auto user = item->from()->asUser()) {
-		peer = user->id.value & PeerId::kChatTypeMask;
-	}
+	const auto &settings = AyuSettings::getInstance();
 
 	const auto blocked = [&]() -> bool
 	{
@@ -121,41 +115,13 @@ bool isBlocked(const not_null<HistoryItem*> item) {
 
 	return settings.filtersEnabled &&
 	(
-		ShadowBanUtils::isShadowBanned(peer) ||
+		item->from()->isUser() && ShadowBanUtils::isShadowBanned(getDialogIdFromPeer(item->from())) ||
 		settings.hideFromBlocked && blocked
 	);
 }
 
-// unused, probably need to remove
-bool filteredWithoutCaching(const not_null<HistoryItem*> item) {
-	auto &settings = AyuSettings::getInstance();
-	if (!settings.filtersEnabled) {
-		return false;
-	}
-
-	if (item->out()) {
-		return false;
-	}
-
-	if (filterBlocked(item)) return true;
-
-	if (!isEnabled(item->from())) return false;
-
-	const auto cached = FiltersCacheController::isFiltered(item);
-	if (cached.has_value()) {
-		return cached.value();
-	}
-	const auto filtered = isFiltered(FilterUtils::extractAllText(item), getDialogIdFromPeer(item->history()->peer));
-	if (filtered.has_value()) {
-		return filtered.value();
-	}
-	return false;
-}
-
-// Main Method
 bool filtered(const not_null<HistoryItem*> item) {
-	auto &settings = AyuSettings::getInstance();
-
+	const auto &settings = AyuSettings::getInstance();
 	if (!settings.filtersEnabled) {
 		return false;
 	}

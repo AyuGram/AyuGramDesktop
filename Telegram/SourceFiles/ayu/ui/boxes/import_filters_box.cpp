@@ -120,8 +120,8 @@ void FillImportFiltersBox(not_null<Ui::GenericBox*> box, bool import) {
 
 					Toast::Show(tr::lng_text_copied(tr::now));
 				}
-				box->closeBox();
 			}
+			box->closeBox();
 		});
 	const auto buttonWidth = box->width()
 		- rect::m::sum::h(st::giveawayGiftCodeBox.buttonPadding);
