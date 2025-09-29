@@ -24,6 +24,7 @@
 #include "ui/boxes/confirm_box.h"
 #include "ui/effects/animations.h"
 #include "ui/text/text.h"
+#include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
@@ -111,8 +112,7 @@ not_null<Ui::SlideWrap<Ui::FlatLabel>*> AddError(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				QString::fromStdString(errorText) + QString::fromStdString(errorText),
-				st::settingLocalPasscodeError)),
-				st::settingsCheckboxPadding);
+				st::settingLocalPasscodeError), st::settingsCheckboxPadding));
 	error->hide(anim::type::instant);
 	if (input) {
 		input->changes() | rpl::start_with_next(
@@ -229,24 +229,12 @@ void RegexEditBuilder(
 
 						return true;
 					};
+					// todo: custom toast with "Move to shared" button
+					// based on `PaidReactionToast`
 					Ui::Toast::Show(Ui::Toast::Config{
-						// .text = tr::ayu_RegexFilterBulletinText(
-						// 	tr::now,
-						// 	lt_link,
-						// 	Ui::Text::Link(
-						// 		Ui::Text::Bold(
-						// 			tr::ayu_RegexFilterBulletinAction(tr::now))),
-						// 	Ui::Text::RichLangValue),
-
-						// TODO: reconsider
 						.text = tr::ayu_RegexFilterBulletinText(
-							tr::now
-							//,
-							//													lt_link,
-							//													Ui::Text::Link(
-							//														Ui::Text::Bold(
-							//															tr::ayu_RegexFilterBulletinAction(tr::now))),
-							//													Ui::Text::WithEntities
+							tr::now,
+							Ui::Text::RichLangValue
 						),
 						.filter = onClick,
 						.adaptive = true

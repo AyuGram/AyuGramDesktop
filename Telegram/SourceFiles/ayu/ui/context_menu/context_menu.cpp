@@ -26,6 +26,7 @@
 #include "window/window_peer_menu.h"
 
 #include "ayu/ui/message_history/history_section.h"
+#include "ayu/ui/settings/filters/edit_filter.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/call_delayed.h"
 #include "base/random.h"
@@ -744,6 +745,32 @@ void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			item->markContentsRead();
 		},
 		&st::menuIconTTLAny);
+}
+
+void AddCreateFilterAction(not_null<Ui::PopupMenu*> menu,
+						   not_null<Window::SessionController*> controller,
+						   HistoryItem *item,
+						   const QString &selectedText) {
+	const auto &settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showAddFilterInContextMenu) || !settings.filtersEnabled) {
+		return;
+	}
+
+	if (!item || selectedText.isEmpty()) {
+		return;
+	}
+
+	menu->addAction(
+		tr::ayu_RegexFilterQuickAdd(tr::now),
+		[=]
+		{
+			RegexFilter filter;
+			filter.text = selectedText.toStdString();
+			filter.reversed = false;
+
+			controller->show(Settings::RegexEditBox(&filter, {}, getDialogIdFromPeer(item->history()->peer), true));
+		},
+		&st::menuIconAddToFolder);
 }
 
 } // namespace AyuUi

@@ -469,6 +469,21 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::set_showMessageDetailsInContextMenu(index);
 			AyuSettings::save();
 		});
+	if (settings->filtersEnabled) {
+		AddChooseButtonWithIconAndRightText(
+			container,
+			controller,
+			settings->showAddFilterInContextMenu,
+			options,
+			tr::ayu_RegexFilterQuickAdd(),
+			tr::ayu_SettingsContextMenuTitle(),
+			st::menuIconAddToFolder,
+			[=](int index)
+			{
+				AyuSettings::set_showAddFilterInContextMenu(index);
+				AyuSettings::save();
+			});
+	}
 
 	AddSkip(container);
 	AddDividerText(container, tr::ayu_SettingsContextMenuDescription());

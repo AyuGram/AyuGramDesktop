@@ -2990,15 +2990,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						hasCopyRestrictionForSelected()));
 				}, &st::menuIconTranslate);
 			}
-			if (settings.filtersEnabled) {
-				_menu->addAction(tr::ayu_RegexFilterQuickAdd(tr::now), [=] {
-					RegexFilter filter;
-					filter.text = selectedText.rich.text.toStdString();
-					auto dialogId = static_cast<long long>(item->history()->peer->id.value & PeerId::kChatTypeMask);
-
-					_controller->show(Settings::RegexEditBox(&filter, {}, dialogId, true));
-				}, &st::menuIconAddToFolder);
-			}
+			AyuUi::AddCreateFilterAction(_menu, _controller, item, selectedText.rich.text);
 			addItemActions(item, item);
 		} else {
 			addReplyAction(partItemOrLeader);

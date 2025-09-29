@@ -151,13 +151,14 @@ void AyuFiltersList::addNewFilter(const RegexFilter &filter, bool exclusion) {
 		 */
 		// controller->showBackFromStack() doesn't work (closes box completely)
 		// so as a workaround, use WrapWidget
-		const auto wrap = static_cast<Info::WrapWidget*>(parent()->parent()->parent()->parent()->parent());
+		const auto wrap = dynamic_cast<Info::WrapWidget*>(parent()->parent()->parent()->parent()->parent());
 
-		RegexFilterGlobalExclusion exclusion;
-		exclusion.filterId = state->id;
-		exclusion.dialogId = dialogId.value();
+		const RegexFilterGlobalExclusion newExclusion = {
+			.dialogId = dialogId.value(),
+			.filterId = state->id
+		};
 
-		AyuDatabase::addRegexExclusion(exclusion);
+		AyuDatabase::addRegexExclusion(newExclusion);
 		FiltersCacheController::rebuildCache();
 		AyuSettings::fire_filtersUpdate();
 
