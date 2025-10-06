@@ -474,9 +474,9 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 		controller,
 		settings->showRepeaterInContextMenu,
 		options,
-		tr::ayu_Repeater(),
+		tr::ayu_RepeatMessage(),
 		tr::ayu_SettingsContextMenuTitle(),
-		st::menuIconDiscussion,
+		st::menuIconRestore,
 		[=](int index)
 		{
 			AyuSettings::set_showRepeaterInContextMenu(index);

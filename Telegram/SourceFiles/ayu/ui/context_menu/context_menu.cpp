@@ -691,7 +691,7 @@ void AddRepeaterAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto session = &history->session();
 
 	menu->addAction(
-		tr::ayu_Repeater(tr::now),
+		tr::ayu_RepeatMessage(tr::now),
 		[=]
 		{
 			auto sendOptions = Api::SendOptions{
@@ -737,7 +737,7 @@ void AddRepeaterAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 				session->api().forwardMessages(std::move(resolved), action, [] {});
 			}
 		},
-		&st::menuIconDiscussion);
+		&st::menuIconRestore);
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
