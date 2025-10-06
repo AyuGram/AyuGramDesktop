@@ -469,6 +469,19 @@ void SetupContextMenuElements(not_null<Ui::VerticalLayout*> container,
 			AyuSettings::set_showMessageDetailsInContextMenu(index);
 			AyuSettings::save();
 		});
+	AddChooseButtonWithIconAndRightText(
+		container,
+		controller,
+		settings->showRepeaterInContextMenu,
+		options,
+		tr::ayu_Repeater(),
+		tr::ayu_SettingsContextMenuTitle(),
+		st::menuIconDiscussion,
+		[=](int index)
+		{
+			AyuSettings::set_showRepeaterInContextMenu(index);
+			AyuSettings::save();
+		});
 	if (settings->filtersEnabled) {
 		AddChooseButtonWithIconAndRightText(
 			container,

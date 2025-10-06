@@ -9,10 +9,13 @@
 #include "apiwrap.h"
 #include "lang_auto.h"
 #include "mainwidget.h"
+#include "api/api_sending.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/shadow_ban_utils.h"
+#include "ayu/features/forward/ayu_forward.h"
+#include "main/session/send_as_peers.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
@@ -658,6 +661,83 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			}
 		},
 	});
+}
+
+void AddRepeaterAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+	const auto &settings = AyuSettings::getInstance();
+	if (!needToShowItem(settings.showRepeaterInContextMenu)) {
+		return;
+	}
+
+	if (!item || item->isService() || item->id <= 0) {
+		return;
+	}
+
+	const auto history = item->history();
+	const auto peer = history->peer;
+	if (!peer->isUser() && !peer->isChat() && !peer->isMegagroup()) {
+		return;
+	}
+
+	const auto canRepeat = item->allowsForward()
+		|| (!item->emptyText() && !item->isDeleted())
+		|| (item->media() && (item->media()->document() || item->media()->photo()));
+
+	if (!canRepeat) {
+		return;
+	}
+
+	const auto itemId = item->fullId();
+	const auto session = &history->session();
+
+	menu->addAction(
+		tr::ayu_Repeater(tr::now),
+		[=]
+		{
+			auto sendOptions = Api::SendOptions{
+				.sendAs = session->sendAsPeers().resolveChosen(peer),
+			};
+
+			if (peer->isUser() || peer->isChat()) {
+				sendOptions.sendAs = nullptr;
+			}
+
+			auto action = Api::SendAction(history, sendOptions);
+			action.clearDraft = false;
+
+			if (item->topic()) {
+				action.replyTo = FullReplyTo{
+					.messageId = itemId,
+					.topicRootId = item->topicRootId(),
+				};
+			}
+
+			auto forwardDraft = Data::ForwardDraft{
+				.ids = MessageIdsList{ itemId },
+				.options = Data::ForwardOptions::PreserveInfo,
+			};
+
+			const auto needsFullForward = AyuForward::isFullAyuForwardNeeded(not_null<HistoryItem*>{ item });
+			const auto needsIntelligentForward = AyuForward::isAyuForwardNeeded(not_null<HistoryItem*>{ item });
+
+			if (needsFullForward) {
+				crl::async([=]
+				{
+					auto resolved = history->resolveForwardDraft(forwardDraft);
+					AyuForward::forwardMessages(session, action, false, resolved);
+				});
+			} else if (needsIntelligentForward) {
+				crl::async([=]
+				{
+					auto resolved = history->resolveForwardDraft(forwardDraft);
+					AyuForward::intelligentForward(session, action, resolved);
+				});
+			} else {
+				auto resolved = history->resolveForwardDraft(forwardDraft);
+				session->api().forwardMessages(std::move(resolved), action, [] {});
+			}
+		},
+		&st::menuIconDiscussion);
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
