@@ -8,16 +8,52 @@
 
 #include <memory>
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QJsonValue>
 #include <QtCore/QPointer>
+#include <QtCore/QStringList>
 #include <QtCore/QTimer>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
 #include <QtCore/QUrl>
-#include <QtCore/QUrlQuery>
 
 #include "ayu/features/translator/html_parser.h"
 
 namespace Ayu::Translator {
+
+namespace {
+
+constexpr auto kGoogleTranslateUrl = "https://translate-pa.googleapis.com/v1/translateHtml";
+constexpr auto kGoogleContentType = "application/json+protobuf";
+constexpr auto kGoogleDefaultApiKey = "AIzaSyATBXajvzQLTDHEQbcpq0Ihe0vWDHmO520";
+
+QStringList collectStrings(const QJsonValue &value) {
+	QStringList result;
+	if (value.isString()) {
+		result.push_back(value.toString());
+		return result;
+	}
+	if (value.isArray()) {
+		const auto arr = value.toArray();
+		for (const auto &item : arr) {
+			result.append(collectStrings(item));
+		}
+		return result;
+	}
+	if (value.isObject()) {
+		const auto obj = value.toObject();
+		if (obj.contains(QStringLiteral("text"))) {
+			result.append(collectStrings(obj.value(QStringLiteral("text"))));
+		}
+		if (obj.contains(QStringLiteral("trans"))) {
+			result.append(collectStrings(obj.value(QStringLiteral("trans"))));
+		}
+	}
+	return result;
+}
+
+} // namespace
 
 GoogleTranslator &GoogleTranslator::instance() {
 	static GoogleTranslator inst;
@@ -45,24 +81,26 @@ QPointer<QNetworkReply> GoogleTranslator::startSingleTranslation(
 	const auto from = fromLang.trimmed().isEmpty() ? QStringLiteral("auto") : fromLang.trimmed();
 	const auto to = toLang.trimmed();
 
-	QUrl url(QStringLiteral("https://translate.googleapis.com/translate_a/single"));
-	QUrlQuery query;
-	query.addQueryItem(QStringLiteral("dj"), QStringLiteral("1"));
-	query.addQueryItem(QStringLiteral("q"), shouldWrapInHtml() ? Html::entitiesToHtml(text) : text.text);
-	query.addQueryItem(QStringLiteral("sl"), from);
-	query.addQueryItem(QStringLiteral("tl"), to);
-	query.addQueryItem(QStringLiteral("ie"), QStringLiteral("UTF-8"));
-	query.addQueryItem(QStringLiteral("oe"), QStringLiteral("UTF-8"));
-	query.addQueryItem(QStringLiteral("client"), QStringLiteral("at"));
-	query.addQueryItem(QStringLiteral("dt"), QStringLiteral("t"));
-	query.addQueryItem(QStringLiteral("otf"), QStringLiteral("2"));
-	url.setQuery(query);
+	const auto preparedText = shouldWrapInHtml() ? Html::entitiesToHtml(text) : text.text;
+	QJsonArray requestRoot;
+	QJsonArray requestPayload;
+	QJsonArray requestText;
+	requestText.append(preparedText);
+	requestPayload.append(requestText);
+	requestPayload.append(from);
+	requestPayload.append(to);
+	requestRoot.append(requestPayload);
+	requestRoot.append(QStringLiteral("wt_lib"));
+	const auto body = QJsonDocument(requestRoot).toJson(QJsonDocument::Compact);
 
-	QNetworkRequest req(url);
+	QNetworkRequest req(QUrl(QString::fromLatin1(kGoogleTranslateUrl)));
 	const auto userAgent = randomDesktopUserAgent();
 	req.setHeader(QNetworkRequest::UserAgentHeader, userAgent);
+	req.setHeader(QNetworkRequest::ContentTypeHeader, QString::fromLatin1(kGoogleContentType));
+	req.setRawHeader(QByteArrayLiteral("Accept"), QByteArrayLiteral("application/json"));
+	req.setRawHeader(QByteArrayLiteral("X-Goog-Api-Key"), QByteArray(kGoogleDefaultApiKey));
 
-	QPointer<QNetworkReply> reply = _nam.get(req);
+	QPointer<QNetworkReply> reply = _nam.post(req, body);
 
 	auto timer = new QTimer(reply);
 	timer->setSingleShot(true);
@@ -92,15 +130,26 @@ QPointer<QNetworkReply> GoogleTranslator::startSingleTranslation(
 							 return;
 						 }
 						 const auto body = reply->readAll();
-						 bool ok = false;
-						 const auto textOut = parseJsonPath(body, QStringLiteral("sentences"), &ok);
-						 if (!ok) {
+						 QJsonParseError parseError{};
+						 const auto doc = QJsonDocument::fromJson(body, &parseError);
+						 if (parseError.error != QJsonParseError::NoError || !doc.isArray()) {
 							 if (onFail) onFail();
 							 return;
 						 }
+						 const auto root = doc.array();
+						 if (root.isEmpty()) {
+						 	 if (onFail) onFail();
+						 	 return;
+						 }
+						 const auto translatedItems = collectStrings(root.at(0));
+						 const auto textOutCombined = translatedItems.join(QStringLiteral(" "));
+						 if (textOutCombined.trimmed().isEmpty()) {
+						 	 if (onFail) onFail();
+						 	 return;
+						 }
 						 if (onSuccess) onSuccess(shouldWrapInHtml()
-													  ? Html::htmlToEntities(textOut)
-													  : TextWithEntities{textOut});
+						 			  ? Html::htmlToEntities(textOutCombined)
+						 			  : TextWithEntities{textOutCombined});
 					 });
 
 	return reply;
