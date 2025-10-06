@@ -663,9 +663,9 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	});
 }
 
-void AddRepeaterAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!needToShowItem(settings.showRepeaterInContextMenu)) {
+	if (!needToShowItem(settings.showRepeatMessageInContextMenu)) {
 		return;
 	}
 

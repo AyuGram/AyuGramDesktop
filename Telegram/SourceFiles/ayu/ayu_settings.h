@@ -99,7 +99,7 @@ public:
 	int showHideMessageInContextMenu;
 	int showUserMessagesInContextMenu;
 	int showMessageDetailsInContextMenu;
-	int showRepeaterInContextMenu;
+	int showRepeatMessageInContextMenu;
 	int showAddFilterInContextMenu;
 
 	bool showAttachButtonInMessageField;
@@ -206,7 +206,7 @@ void set_showViewsPanelInContextMenu(int val);
 void set_showHideMessageInContextMenu(int val);
 void set_showUserMessagesInContextMenu(int val);
 void set_showMessageDetailsInContextMenu(int val);
-void set_showRepeaterInContextMenu(int val);
+void set_showRepeatMessageInContextMenu(int val);
 void set_showAddFilterInContextMenu(int val);
 
 void set_showAttachButtonInMessageField(bool val);
@@ -299,7 +299,7 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(showHideMessageInContextMenu)
 	NLOHMANN_JSON_TO(showUserMessagesInContextMenu)
 	NLOHMANN_JSON_TO(showMessageDetailsInContextMenu)
-	NLOHMANN_JSON_TO(showRepeaterInContextMenu)
+	NLOHMANN_JSON_TO(showRepeatMessageInContextMenu)
 	NLOHMANN_JSON_TO(showAddFilterInContextMenu)
 	NLOHMANN_JSON_TO(showAttachButtonInMessageField)
 	NLOHMANN_JSON_TO(showCommandsButtonInMessageField)
@@ -384,7 +384,7 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showHideMessageInContextMenu)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showUserMessagesInContextMenu)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showMessageDetailsInContextMenu)
-	NLOHMANN_JSON_FROM_WITH_DEFAULT(showRepeaterInContextMenu)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(showRepeatMessageInContextMenu)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAddFilterInContextMenu)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showAttachButtonInMessageField)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(showCommandsButtonInMessageField)
