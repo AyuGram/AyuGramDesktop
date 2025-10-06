@@ -46,6 +46,8 @@
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
+#include <QtGui/QGuiApplication>
+
 namespace AyuUi {
 
 namespace {
@@ -716,6 +718,16 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 				.ids = MessageIdsList{ itemId },
 				.options = Data::ForwardOptions::PreserveInfo,
 			};
+
+			const auto shiftPressed = QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier);
+			if (shiftPressed) {
+				crl::async([=]
+				{
+					auto resolved = history->resolveForwardDraft(forwardDraft);
+					AyuForward::forwardMessages(session, action, false, resolved);
+				});
+				return;
+			}
 
 			const auto needsFullForward = AyuForward::isFullAyuForwardNeeded(not_null<HistoryItem*>{ item });
 			const auto needsIntelligentForward = AyuForward::isAyuForwardNeeded(not_null<HistoryItem*>{ item });
