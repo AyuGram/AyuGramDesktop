@@ -17,6 +17,7 @@
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkReply>
 #include <QtCore/QUrl>
+#include <QtGui/QTextDocument>
 
 #include "ayu/features/translator/html_parser.h"
 
@@ -27,6 +28,12 @@ namespace {
 constexpr auto kGoogleTranslateUrl = "https://translate-pa.googleapis.com/v1/translateHtml";
 constexpr auto kGoogleContentType = "application/json+protobuf";
 constexpr auto kGoogleDefaultApiKey = "AIzaSyATBXajvzQLTDHEQbcpq0Ihe0vWDHmO520";
+
+QString decodeHtmlEntities(const QString &text) {
+	QTextDocument doc;
+	doc.setHtml(text);
+	return doc.toPlainText();
+}
 
 QStringList collectStrings(const QJsonValue &value) {
 	QStringList result;
@@ -147,9 +154,10 @@ QPointer<QNetworkReply> GoogleTranslator::startSingleTranslation(
 						 	 if (onFail) onFail();
 						 	 return;
 						 }
+						 const auto decodedText = decodeHtmlEntities(textOutCombined);
 						 if (onSuccess) onSuccess(shouldWrapInHtml()
-						 			  ? Html::htmlToEntities(textOutCombined)
-						 			  : TextWithEntities{textOutCombined});
+						 			  ? Html::htmlToEntities(decodedText)
+						 			  : TextWithEntities{decodedText});
 					 });
 
 	return reply;
