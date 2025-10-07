@@ -719,10 +719,12 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 
 			const auto shiftPressed = base::IsShiftPressed();
 			if (shiftPressed) {
+				auto forwardWithoutSource = forwardDraft;
+				forwardWithoutSource.options = Data::ForwardOptions::NoNamesAndCaptions;
 				crl::async([=]
 				{
-					auto resolved = history->resolveForwardDraft(forwardDraft);
-					AyuForward::forwardMessages(session, action, false, resolved);
+					auto resolved = history->resolveForwardDraft(forwardWithoutSource);
+					session->api().forwardMessages(std::move(resolved), action, [] {});
 				});
 				return;
 			}
