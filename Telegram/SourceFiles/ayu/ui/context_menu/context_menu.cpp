@@ -46,8 +46,6 @@
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
-#include <QtGui/QGuiApplication>
-
 namespace AyuUi {
 
 namespace {
@@ -719,7 +717,7 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 				.options = Data::ForwardOptions::PreserveInfo,
 			};
 
-			const auto shiftPressed = QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier);
+			const auto shiftPressed = base::IsShiftPressed();
 			if (shiftPressed) {
 				crl::async([=]
 				{
