@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_top_bar_widget.h"
 
+#include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history.h"
 #include "history/view/history_view_send_action.h"
 #include "boxes/add_contact_box.h"
@@ -147,7 +148,13 @@ TopBarWidget::TopBarWidget(
 		refreshLang();
 	}, lifetime());
 
-	_forward->setClickedCallback([=] { _forwardSelection.fire({}); });
+	_forward->setClickedCallback([=] {
+		if (base::IsShiftPressed()) {
+			_forwardWithoutSourceSelection.fire({});
+		} else {
+			_forwardSelection.fire({});
+		}
+	});
 	_forward->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_sendNow->setClickedCallback([=] { _sendNowSelection.fire({}); });
 	_sendNow->setWidthChangedCallback([=] { updateControlsGeometry(); });

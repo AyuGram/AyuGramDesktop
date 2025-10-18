@@ -2907,7 +2907,19 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
-					_widget->forwardSelected();
+					if (base::IsShiftPressed()) {
+						const auto weak = base::make_weak(_widget);
+						Data::ForwardDraft draft;
+						draft.ids = _widget->getSelectedItems();
+						draft.options = Data::ForwardOptions::NoSenderNames;
+						Window::ShowForwardMessagesBox(_widget->controller(), std::move(draft), [=] {
+							if (const auto strong = weak.get()) {
+								strong->clearSelected();
+							}
+						});
+					} else {
+						_widget->forwardSelected();
+					}
 				}, &st::menuIconForward);
 			}
 			if (selectedState.count > 0 && selectedState.canDeleteCount == selectedState.count) {
@@ -3171,7 +3183,19 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.count == selectedState.canForwardCount) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
-					_widget->forwardSelected();
+					if (base::IsShiftPressed()) {
+						const auto weak = base::make_weak(_widget);
+						Data::ForwardDraft draft;
+						draft.ids = _widget->getSelectedItems();
+						draft.options = Data::ForwardOptions::NoSenderNames;
+						Window::ShowForwardMessagesBox(_widget->controller(), std::move(draft), [=] {
+							if (const auto strong = weak.get()) {
+								strong->clearSelected();
+							}
+						});
+					} else {
+						_widget->forwardSelected();
+					}
 				}, &st::menuIconForward);
 			}
 			if (selectedState.count > 0 && selectedState.count == selectedState.canDeleteCount) {
@@ -4932,14 +4956,26 @@ void HistoryInner::changeSelectionAsGroup(
 }
 
 void HistoryInner::forwardItem(FullMsgId itemId) {
-	Window::ShowForwardMessagesBox(_controller, { 1, itemId });
+	if (base::IsShiftPressed()) {
+		Data::ForwardDraft draft;
+		draft.ids = MessageIdsList{ 1, itemId };
+		draft.options = Data::ForwardOptions::NoSenderNames;
+		Window::ShowForwardMessagesBox(_controller, std::move(draft));
+	} else {
+		Window::ShowForwardMessagesBox(_controller, MessageIdsList{ 1, itemId });
+	}
 }
 
 void HistoryInner::forwardAsGroup(FullMsgId itemId) {
 	if (const auto item = session().data().message(itemId)) {
-		Window::ShowForwardMessagesBox(
-			_controller,
-			session().data().itemOrItsGroup(item));
+		if (base::IsShiftPressed()) {
+			Data::ForwardDraft draft;
+			draft.ids = session().data().itemOrItsGroup(item);
+			draft.options = Data::ForwardOptions::NoSenderNames;
+			Window::ShowForwardMessagesBox(_controller, std::move(draft));
+		} else {
+			Window::ShowForwardMessagesBox(_controller, session().data().itemOrItsGroup(item));
+		}
 	}
 }
 

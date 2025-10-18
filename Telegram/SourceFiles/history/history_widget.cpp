@@ -1040,6 +1040,21 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=] {
 		forwardSelected();
 	}, _topBar->lifetime());
+	_topBar->forwardWithoutSourceSelectionRequest(
+	) | rpl::on_next([=] {
+		if (!_list) {
+			return;
+		}
+		const auto weak = base::make_weak(this);
+		Data::ForwardDraft draft;
+		draft.ids = getSelectedItems();
+		draft.options = Data::ForwardOptions::NoSenderNames;
+		Window::ShowForwardMessagesBox(this->controller(), std::move(draft), [=] {
+			if (const auto strong = weak.get()) {
+				strong->clearSelected();
+			}
+		});
+	}, _topBar->lifetime());
 	_topBar->deleteSelectionRequest(
 	) | rpl::on_next([=] {
 		confirmDeleteSelected();
