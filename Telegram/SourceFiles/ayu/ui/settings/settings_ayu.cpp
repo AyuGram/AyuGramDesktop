@@ -237,6 +237,25 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 		},
 		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		tr::ayu_MessageSavingExcludeBotsInGroups(),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->excludeBotsInGroups)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->excludeBotsInGroups);
+		}) | on_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_excludeBotsInGroups(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
 }
 
 void SetupOther(not_null<Ui::VerticalLayout*> container) {

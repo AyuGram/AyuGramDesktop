@@ -229,6 +229,7 @@ AyuGramSettings::AyuGramSettings() {
 	saveMessagesHistory = true;
 
 	saveForBots = false;
+	excludeBotsInGroups = false;
 
 	// ~ Message filters
 	filtersEnabled = false;
@@ -401,6 +402,10 @@ void set_saveMessagesHistory(bool val) {
 
 void set_saveForBots(bool val) {
 	settings->saveForBots = val;
+}
+
+void set_excludeBotsInGroups(bool val) {
+	settings->excludeBotsInGroups = val;
 }
 
 void set_filtersEnabled(bool val) {

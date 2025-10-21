@@ -7494,6 +7494,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MaximumMediaSizeWiFi" = "Media size limit (WiFi)";
 "ayu_MessageSavingOtherHeader" = "Other";
 "ayu_MessageSavingSaveForBots" = "Save in Bot Dialogs";
+"ayu_MessageSavingExcludeBotsInGroups" = "Exclude Bots in Groups";
 "ayu_MessageSavingSavePath" = "Attachments Folder";
 "ayu_MessageSavingSavePathTitle" = "Choose folder";
 "ayu_SpySaveReadMarks" = "Save Read Date";
@@ -7734,7 +7735,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_PeekOnlineSuccess" = "Peeked via";
 "ayu_OneViewTTL" = "one view";
 "ayu_OnePlayTTL" = "one play";
-"ayu_UserMessagesMenuText" = "User Messages";
+"ayu_UserMessagesMenuText" = "查看历史发言";
 "ayu_ReadUntilMenuText" = "Read Message";
 "ayu_DeleteKeepLocally" = "Keep locally";
 "ayu_BoxActionReset" = "Reset";
