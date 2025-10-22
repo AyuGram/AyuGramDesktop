@@ -43,7 +43,7 @@ jobs:
 
   build-libraries:
     name: Build Libraries
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     outputs:
       cache-hit: ${{ steps.check-cache.outputs.cache-hit }}
@@ -130,7 +130,7 @@ jobs:
   build-desktop:
     name: Build Desktop
     needs: build-libraries
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -186,6 +186,48 @@ jobs:
           fi
           echo "TDESKTOP_BUILD_API=$API" >> $GITHUB_ENV
 
+      - name: Apply performance optimizations
+        shell: cmd
+        run: |
+          cd %TBUILD%\%REPO_NAME%
+
+          REM Create optimization patch file
+          (
+          echo # Release mode optimizations (applied via CI^)
+          echo target_compile_options(common_options
+          echo INTERFACE
+          echo     $^<$^<CONFIG:Release^>:/O2^>      # Maximum speed optimization
+          echo     $^<$^<CONFIG:Release^>:/Oy^>      # Omit frame pointers
+          echo     $^<$^<CONFIG:Release^>:/GS-^>     # Disable buffer security checks
+          echo     $^<$^<CONFIG:Release^>:/Gy^>      # Enable function-level linking
+          echo ^)
+          echo.
+          echo target_link_options(common_options
+          echo INTERFACE
+          echo     $^<$^<CONFIG:Release^>:/OPT:REF^>     # Remove unreferenced functions/data
+          echo     $^<$^<CONFIG:Release^>:/OPT:ICF=5^>   # Identical COMDAT folding
+          echo     $^<$^<CONFIG:Release^>:/MERGE:.rdata=.text^>  # Merge read-only data section
+          echo     $^<$^<CONFIG:Release^>:/DEBUG:NONE^>  # No debug info in Release
+          echo ^)
+          echo.
+          ) > opt_patch.txt
+
+          REM Create PowerShell script to insert optimization
+          (
+          echo $content = Get-Content cmake\options_win.cmake
+          echo $insertLine = $content ^| Where-Object { $_ -match "if \(DESKTOP_APP_SPECIAL_TARGET\)" } ^| Select-Object -First 1
+          echo if ($insertLine^) {
+          echo     $insertIndex = [array]::IndexOf($content, $insertLine^)
+          echo     $beforeContent = $content[0..($insertIndex-1^)]
+          echo     $afterContent = $content[$insertIndex..($content.Length-1^)]
+          echo     $patchContent = Get-Content opt_patch.txt
+          echo     $newContent = $beforeContent + $patchContent + $afterContent
+          echo     $newContent ^| Set-Content cmake\options_win.cmake
+          echo }
+          ) > insert_patch.ps1
+
+          powershell -ExecutionPolicy Bypass -File insert_patch.ps1
+
       - name: Build Desktop
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
@@ -193,8 +235,10 @@ jobs:
           call configure.bat ^
           %TDESKTOP_BUILD_ARCH% ^
           %TDESKTOP_BUILD_API% ^
-          -D CMAKE_C_FLAGS="/WX" ^
-          -D CMAKE_CXX_FLAGS="/WX" ^
+          -D CMAKE_C_FLAGS="/WX /O2 /Oy /GS- /Gy /DNDEBUG" ^
+          -D CMAKE_CXX_FLAGS="/WX /O2 /Oy /GS- /Gy /DNDEBUG" ^
+          -D CMAKE_EXE_LINKER_FLAGS="/OPT:REF /OPT:ICF=5 /MERGE:.rdata=.text /DEBUG:NONE" ^
+          -D CMAKE_BUILD_TYPE=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
           -D DESKTOP_APP_NO_PDB=ON
