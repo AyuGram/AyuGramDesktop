@@ -277,7 +277,6 @@ AyuGramSettings::AyuGramSettings() {
 	showHideMessageInContextMenu = 0;
 	showUserMessagesInContextMenu = 2;
 	showMessageDetailsInContextMenu = 2;
-	showRepeatMessageInContextMenu = 0;
 	showAddFilterInContextMenu = 1;
 
 	showAttachButtonInMessageField = true;
@@ -536,10 +535,6 @@ void set_showUserMessagesInContextMenu(int val) {
 
 void set_showMessageDetailsInContextMenu(int val) {
 	settings->showMessageDetailsInContextMenu = val;
-}
-
-void set_showRepeatMessageInContextMenu(int val) {
-	settings->showRepeatMessageInContextMenu = val;
 }
 
 void set_showAddFilterInContextMenu(int val) {

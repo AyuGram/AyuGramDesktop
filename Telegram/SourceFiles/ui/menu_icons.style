@@ -16,6 +16,7 @@ menuIconPin: icon {{ "menu/pin", menuIconColor }};
 menuIconUnpin: icon {{ "menu/unpin", menuIconColor }};
 menuIconCopy: icon {{ "menu/copy", menuIconColor }};
 menuIconForward: icon {{ "menu/forward", menuIconColor }};
+menuIconRepeat: icon {{ "menu/msg_repeat", menuIconColor }};
 menuIconDelete: icon {{ "menu/delete", menuIconColor }};
 menuIconSelect: icon {{ "menu/select", menuIconColor }};
 menuIconSaveImage: icon {{ "menu/save_image", menuIconColor }};

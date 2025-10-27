@@ -13,7 +13,6 @@
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/shadow_ban_utils.h"
-#include "ayu/features/forward/ayu_forward.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/utils/qt_key_modifiers_extended.h"
 #include "history/history_item_components.h"
@@ -36,7 +35,6 @@
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_forum_topic.h"
-#include "data/data_saved_sublist.h"
 #include "data/data_search_controller.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -45,6 +43,7 @@
 #include "ui/boxes/confirm_box.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "api/api_sending.h"
 
 namespace AyuUi {
 
@@ -462,7 +461,97 @@ void AddUserMessagesAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	}
 }
 
-void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
+
+void SendMessageDirectly(HistoryItem *item, History *history, HistoryView::Context context) {
+	if (item->id <= 0) return;
+
+	const auto api = &item->history()->peer->session().api();
+	const auto peer = history->peer;
+	const auto inTopic = item->topic();
+	const auto inRepliesView = (context == HistoryView::Context::Replies);
+	const auto replyTo = item->replyTo();
+	const auto hasReply = replyTo.messageId.msg != 0;
+	const auto shiftPressed = base::IsShiftPressed();
+
+	const auto useNoQuote = shiftPressed || inRepliesView;
+	const auto preserveReply = inRepliesView ? hasReply : (hasReply && shiftPressed);
+
+	const auto sendAs = (peer->isUser() || peer->isChat())
+		? nullptr
+		: history->session().sendAsPeers().resolveChosen(peer).get();
+
+	if (useNoQuote) {
+		auto message = ApiWrap::MessageToSend(Api::SendAction(history, Api::SendOptions{.sendAs = sendAs}));
+
+		if (inTopic) {
+			message.action.replyTo.topicRootId = item->topicRootId();
+		}
+		if (preserveReply) {
+			message.action.replyTo.messageId = replyTo.messageId;
+		}
+		if (!item->originalText().text.isEmpty()) {
+			message.textWithTags = {item->originalText().text,
+				TextUtilities::ConvertEntitiesToTextTags(item->originalText().entities)};
+		}
+		if (item->media()) {
+			if (auto photo = item->media()->photo()) {
+				Api::SendExistingPhoto(std::move(message), photo);
+			} else if (auto document = item->media()->document()) {
+				Api::SendExistingDocument(std::move(message), document);
+			}
+		} else {
+			api->sendMessage(std::move(message));
+		}
+	} else {
+		auto action = Api::SendAction(history, Api::SendOptions{.sendAs = sendAs});
+		action.clearDraft = false;
+
+		if (inTopic) {
+			action.replyTo.topicRootId = item->topicRootId();
+		}
+
+		api->forwardMessages(
+			history->resolveForwardDraft(Data::ForwardDraft{.ids = MessageIdsList(1, item->fullId())}),
+			action,
+			[] {});
+	}
+}
+
+void AddRepeaterAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item, HistoryView::Context context) {
+	if (!item || item->id <= 0) {
+		return;
+	}
+
+	const auto peer = item->history()->peer;
+	if (!peer->isMegagroup() && !peer->isChat() && !peer->isUser()) {
+		return;
+	}
+
+	const bool canRepeat =
+		item->allowsForward() ||
+		(!item->isService() && !item->emptyText() && !item->media()) ||
+		(item->media() && item->media()->document() && item->media()->document()->sticker());
+
+	if (!canRepeat) {
+		return;
+	}
+
+	const auto history = item->history();
+
+	menu->addAction(
+		QString("复读"),
+		[=] { SendMessageDirectly(item, history, context); },
+		&st::menuIconRepeat);
+}
+
+
+void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item) {
+	AddMessageDetailsAction(menu, item, HistoryView::Context::History);
+}
+
+void AddMessageDetailsAction(not_null<Ui::PopupMenu *> menu, HistoryItem *item, HistoryView::Context context) {
+	AddRepeaterAction(menu, item, context);
+
 	const auto &settings = AyuSettings::getInstance();
 	if (!needToShowItem(settings.showMessageDetailsInContextMenu)) {
 		return;
@@ -671,71 +760,6 @@ void AddMessageDetailsAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			}
 		},
 	});
-}
-
-void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	const auto &settings = AyuSettings::getInstance();
-	if (!needToShowItem(settings.showRepeatMessageInContextMenu)) {
-		return;
-	}
-
-	if (!item || item->isService() || item->isLocal() || !item->allowsForward() || item->id <= 0) {
-		return;
-	}
-
-	const auto history = item->history();
-	const auto peer = history->peer;
-	if (!peer->isUser() && !peer->isChat() && !peer->isMegagroup() && !peer->isGigagroup()) {
-		return;
-	}
-
-	const auto itemId = item->fullId();
-	const auto session = &history->session();
-
-	menu->addAction(
-		tr::ayu_RepeatMessage(tr::now),
-		[=]
-		{
-			auto sendOptions = Api::SendOptions{
-				.sendAs = session->sendAsPeers().resolveChosen(peer),
-			};
-
-			if (peer->isUser() || peer->isChat() || item->history()->peer->isMonoforum()) {
-				sendOptions.sendAs = nullptr;
-			}
-
-			auto action = Api::SendAction(history, sendOptions);
-			action.clearDraft = false;
-
-			if (item->topic()) {
-				action.replyTo.topicRootId = item->topicRootId();
-			}
-
-			if (const auto sublist = item->savedSublist()) {
-				action.replyTo.monoforumPeerId = sublist->monoforumPeerId();
-			}
-
-			const auto forwardDraft = Data::ForwardDraft{
-				.ids = MessageIdsList{ itemId },
-				.options = base::IsShiftPressed() ? Data::ForwardOptions::NoSenderNames : Data::ForwardOptions::PreserveInfo
-			};
-			auto resolvedDraft = history->resolveForwardDraft(forwardDraft);
-
-			if (AyuForward::isFullAyuForwardNeeded(item)) {
-				crl::async([=]
-				{
-					AyuForward::forwardMessages(session, action, false, resolvedDraft);
-				});
-			} else if (AyuForward::isAyuForwardNeeded(item)) {
-				crl::async([=]
-				{
-					AyuForward::intelligentForward(session, action, resolvedDraft);
-				});
-			} else {
-				session->api().forwardMessages(std::move(resolvedDraft), action, [] {});
-			}
-		},
-		&st::menuIconRestore);
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {

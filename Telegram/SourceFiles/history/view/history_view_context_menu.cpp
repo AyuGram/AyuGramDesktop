@@ -1047,11 +1047,11 @@ void AddMessageActions(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	if (request.item) {
+		const auto context = request.view ? request.view->context() : Context::History;
 		AyuUi::AddHistoryAction(menu, request.item);
 		AyuUi::AddHideMessageAction(menu, request.item);
 		AyuUi::AddUserMessagesAction(menu, request.item);
-		AyuUi::AddRepeatMessageAction(menu, request.item);
-		AyuUi::AddMessageDetailsAction(menu, request.item);
+		AyuUi::AddMessageDetailsAction(menu, request.item, context);
 	}
 
 	AddPostLinkAction(menu, request);

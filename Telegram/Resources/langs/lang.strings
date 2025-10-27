@@ -7811,7 +7811,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_IDCopiedToast" = "ID copied to clipboard.";
 "ayu_ContextHideMessage" = "Hide";
 "ayu_ContextCopyCallbackData" = "Copy Callback Data";
-"ayu_RepeatMessage" = "Repeat Message";
 "ayu_RegisterURLScheme" = "Register URL Scheme";
 "ayu_SessionTerminated" = "Session **{item}** was terminated. You may still browse cached messages.";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits.\n**Enjoy the star near your nickname!**";
