@@ -21,10 +21,26 @@ And many more. Check out our [Documentation](https://docs.ayugram.one/desktop/).
 <h3>
   <details>
     <summary>Preferences screenshots</summary>
-    <img src='.github/demos/demo1.png' width='268'>
-    <img src='.github/demos/demo2.png' width='268'>
-    <img src='.github/demos/demo3.png' width='268'>
-    <img src='.github/demos/demo4.png' width='268'>
+    <table>
+      <tr>
+        <td><img src='.github/demos/demo1.jpg' width='268' alt='Demo 1'></td>
+        <td><img src='.github/demos/demo2.jpg' width='268' alt='Demo 2'></td>
+        <td><img src='.github/demos/demo3.jpg' width='268' alt='Demo 3'></td>
+      </tr>
+      <tr>
+        <td><img src='.github/demos/demo4.jpg' width='268' alt='Demo 4'></td>
+        <td><img src='.github/demos/demo5.jpg' width='268' alt='Demo 5'></td>
+        <td><img src='.github/demos/demo6.jpg' width='268' alt='Demo 6'></td>
+      </tr>
+      <tr>
+        <td><img src='.github/demos/demo7.jpg' width='268' alt='Demo 7'></td>
+        <td><img src='.github/demos/demo8.jpg' width='268' alt='Demo 8'></td>
+        <td><img src='.github/demos/demo9.jpg' width='268' alt='Demo 9'></td>
+      </tr>
+      <tr>
+        <td colspan="3" style="text-align: center;"><img src='.github/demos/demo10.jpg' width='268' alt='Demo 10'></td>
+      </tr>
+    </table>
   </details>
 </h3>
 
