@@ -38,7 +38,7 @@ bool isForwarding(const PeerId &id) {
 		return state.state != ForwardState::State::Finished
 			&& state.currentChunk < state.totalChunks
 			&& !state.stopRequested
-			&& ((state.totalChunks && state.totalMessages) || state.state == ForwardState::State::Downloading);
+			&& (state.totalChunks && state.totalMessages || state.state == ForwardState::State::Downloading);
 	}
 	return false;
 }
@@ -399,9 +399,9 @@ void forwardMessages(
 				auto &file = preparedMedia.files[j];
 
 				QFile f(file.path);
-				if (
-                    (groupMedia[j]->photo() && f.size() < groupMedia[j]->photo()->imageByteSize(Data::PhotoSize::Large)) ||
-					(groupMedia[j]->document() && f.size() < groupMedia[j]->document()->size)
+				if (groupMedia[j]->photo() && f.size() < groupMedia[j]->photo()->imageByteSize(Data::PhotoSize::Large)
+					||
+					groupMedia[j]->document() && f.size() < groupMedia[j]->document()->size
 				) {
 					preparedMedia.files.erase(preparedMedia.files.begin() + j);
 				}

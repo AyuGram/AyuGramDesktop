@@ -285,6 +285,12 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 
 void AyuGhost::setupContent(not_null<Window::SessionController*> controller) {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
+	auto settings = &AyuSettings::getInstance();
+
+	auto markReadAfterActionVal = content->lifetime().make_state<rpl::variable<bool>>(
+		settings->markReadAfterAction);
+	auto useScheduledMessagesVal = content->lifetime().make_state<rpl::variable<bool>>(
+		settings->useScheduledMessages);
 
 	const auto settings = &AyuSettings::getInstance();
 	const auto markReadAfterActionVal = content->lifetime().make_state<rpl::variable<bool>>(
