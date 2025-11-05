@@ -60,6 +60,7 @@ usedPrefix = os.path.realpath(os.path.join(libsDir, 'local'))
 optionsList = [
     'qt6',
     'skip-release',
+    'skip-debug',
     'build-stackwalk',
 ]
 options = []
@@ -80,6 +81,8 @@ if not os.path.isdir(os.path.join(libsDir, keysLoc)):
     pathlib.Path(os.path.join(libsDir, keysLoc)).mkdir(parents=True, exist_ok=True)
 if not os.path.isdir(os.path.join(thirdPartyDir, keysLoc)):
     pathlib.Path(os.path.join(thirdPartyDir, keysLoc)).mkdir(parents=True, exist_ok=True)
+if 'skip-debug' in options and 'skip-release' in options:
+    error('Cannot specify both "skip-debug" and "skip-release" at the same time. This would result in building nothing.')
 
 pathPrefixes = [
     'ThirdParty\\msys64\\mingw64\\bin',
@@ -248,6 +251,11 @@ def filterByPlatform(commands):
             #     inscope = True
             if 'release' in scopes:
                 if 'skip-release' in options:
+                    inscope = False
+                elif len(scopes) == 1:
+                    continue
+            if 'debug' in scopes:
+                if 'skip-debug' in options:
                     inscope = False
                 elif len(scopes) == 1:
                     continue
@@ -514,13 +522,14 @@ stage('lzma', """
 win:
     git clone https://github.com/desktop-app/lzma.git
     cd lzma\\C\\Util\\LzmaLib
+win_debug:
     msbuild -m LzmaLib.sln /property:Configuration=Debug /property:Platform="$X8664"
-release:
+win_release:
     msbuild -m LzmaLib.sln /property:Configuration=Release /property:Platform="$X8664"
 """)
 
 stage('xz', """
-!win:
+mac:
     git clone -b v5.4.5 https://github.com/tukaani-project/xz.git
     cd xz
     sed -i '' '\\@check_symbol_exists(futimens "sys/types.h;sys/stat.h" HAVE_FUTIMENS)@d' CMakeLists.txt
@@ -540,8 +549,9 @@ win:
         -DCMAKE_POLICY_DEFAULT_CMP0091=NEW ^
         -DCMAKE_C_FLAGS="/DZLIB_WINAPI" ^
         -DZLIB_BUILD_EXAMPLES=OFF
+win_debug:
     cmake --build . --config Debug
-release:
+win_release:
     cmake --build . --config Release
 mac:
     CFLAGS="$MIN_VER $UNGUARDED" LDFLAGS="$MIN_VER" ./configure \\
@@ -560,8 +570,9 @@ win:
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ^
         -DWITH_JPEG8=ON ^
         -DPNG_SUPPORTED=OFF
+win_debug:
     cmake --build . --config Debug
-release:
+win_release:
     cmake --build . --config Release
 mac:
     CFLAGS="-arch arm64" cmake -B build.arm64 . \\
@@ -592,19 +603,19 @@ mac:
 stage('openssl3', """
     git clone -b openssl-3.2.1 https://github.com/openssl/openssl openssl3
     cd openssl3
-win32:
+win32_debug:
     perl Configure no-shared no-tests debug-VC-WIN32 /FS
-win64:
+win64_debug:
     perl Configure no-shared no-tests debug-VC-WIN64A /FS
-winarm:
+winarm_debug:
     perl Configure no-shared no-tests debug-VC-WIN64-ARM /FS
-win:
+win_debug:
     jom -j%NUMBER_OF_PROCESSORS% build_libs
     mkdir out.dbg
     move libcrypto.lib out.dbg
     move libssl.lib out.dbg
     move ossl_static.pdb out.dbg
-release:
+win_debug_release:
     move out.dbg\\ossl_static.pdb out.dbg\\ossl_static
     jom clean
     move out.dbg\\ossl_static out.dbg\\ossl_static.pdb
@@ -643,7 +654,9 @@ win:
     cmake -B out . ^
         -DCMAKE_INSTALL_PREFIX=%LIBS_DIR%/local ^
         -DOPUS_STATIC_RUNTIME=ON
+win_debug:
     cmake --build out --config Debug
+win:
     cmake --build out --config Release
     cmake --install out --config Release
 mac:
@@ -662,18 +675,20 @@ stage('rnnoise', """
     cd out
 win:
     cmake .. -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+win_debug:
     cmake --build . --config Debug
-release:
+win_release:
     cmake --build . --config Release
-!win:
+mac_debug:
     mkdir Debug
     cd Debug
     cmake ../.. \\
         -D CMAKE_BUILD_TYPE=Debug \\
         -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64"
     cmake --build .
-release:
+mac_debug_release:
     cd ..
+mac_release:
     mkdir Release
     cd Release
     cmake ../.. \\
@@ -744,10 +759,11 @@ win:
 
 depends:python/Scripts/activate.bat
     %THIRDPARTY_DIR%\\python\\Scripts\\activate.bat
+win_debug:
     meson setup --cross-file %FILE% --prefix %LIBS_DIR%/local --default-library=static --buildtype=debug -Denable_tools=false -Denable_tests=false %DAV1D_ASM_DISABLE% -Db_vscrt=mtd builddir-debug
     meson compile -C builddir-debug
     meson install -C builddir-debug
-release:
+win_release:
     meson setup --cross-file %FILE% --prefix %LIBS_DIR%/local --default-library=static --buildtype=release -Denable_tools=false -Denable_tests=false -Db_vscrt=mt builddir-release
     meson compile -C builddir-release
     meson install -C builddir-release
@@ -804,10 +820,11 @@ win:
 
 depends:python/Scripts/activate.bat
     %THIRDPARTY_DIR%\\python\\Scripts\\activate.bat
+win_debug:
     meson setup --cross-file %FILE% --prefix %LIBS_DIR%/local --default-library=static --buildtype=debug -Db_vscrt=mtd builddir-debug
     meson compile -C builddir-debug
     meson install -C builddir-debug
-release:
+win_release:
     meson setup --cross-file %FILE% --prefix %LIBS_DIR%/local --default-library=static --buildtype=release -Db_vscrt=mt builddir-release
     meson compile -C builddir-release
     meson install -C builddir-release
@@ -849,9 +866,10 @@ win:
         -DAVIF_ENABLE_WERROR=OFF ^
         -DAVIF_CODEC_DAV1D=SYSTEM ^
         -DAVIF_LIBYUV=OFF
+win_debug:
     cmake --build . --config Debug
     cmake --install . --config Debug
-release:
+win_release:
     cmake --build . --config Release
     cmake --install . --config Release
 mac:
@@ -880,9 +898,10 @@ win:
         -DBUILD_SHARED_LIBS=OFF ^
         -DENABLE_DECODER=OFF ^
         -DENABLE_ENCODER=OFF
+win_debug:
     cmake --build . --config Debug
     cmake --install . --config Debug
-release:
+win_release:
     cmake --build . --config Release
     cmake --install . --config Release
 mac:
@@ -962,9 +981,10 @@ win:
         -DCMAKE_DISABLE_FIND_PACKAGE_JPEG=TRUE ^
         -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE ^
         -DWITH_EXAMPLES=OFF
+win_debug:
     cmake --build . --config Debug
     cmake --install . --config Debug
-release:
+win_release:
     cmake --build . --config Release
     cmake --install . --config Release
 mac:
@@ -1024,9 +1044,10 @@ win:
         -DCMAKE_C_FLAGS="/DJXL_STATIC_DEFINE /DJXL_THREADS_STATIC_DEFINE /DJXL_CMS_STATIC_DEFINE" ^
         -DCMAKE_CXX_FLAGS="/DJXL_STATIC_DEFINE /DJXL_THREADS_STATIC_DEFINE /DJXL_CMS_STATIC_DEFINE" ^
         %cmake_defines%
+win_debug:
     cmake --build . --config Debug
     cmake --install . --config Debug
-release:
+win_release:
     cmake --build . --config Release
     cmake --install . --config Release
 mac:
@@ -1106,9 +1127,10 @@ stage('liblcms2', """
 win:
 depends:python/Scripts/activate.bat
     %THIRDPARTY_DIR%\\python\\Scripts\\activate.bat
+win_debug:
     meson setup --default-library=static --buildtype=debug -Db_vscrt=mtd out/Debug
     meson compile -C out/Debug
-release:
+win_release:
     meson setup --default-library=static --buildtype=release -Db_vscrt=mt out/Release
     meson compile -C out/Release
 win:
@@ -1336,8 +1358,9 @@ win:
         -D ALSOFT_UTILS=OFF ^
         -D ALSOFT_EXAMPLES=OFF ^
         -D ALSOFT_TESTS=OFF
+win_debug:
     cmake --build build --config Debug
-release:
+win_release:
     cmake --build build --config RelWithDebInfo
 mac:
     git checkout coreaudio_device_uid
@@ -1391,8 +1414,9 @@ depends:python/Scripts/activate.bat
     cd src\\client\\windows
     gyp --no-circular-check breakpad_client.gyp --format=ninja
     cd ..\\..
+win_debug:
     ninja -C out/Debug%FolderPostfix% common crash_generation_client exception_handler
-release:
+win_release:
     ninja -C out/Release%FolderPostfix% common crash_generation_client exception_handler
     cd tools\\windows\\dump_syms
     gyp dump_syms.gyp --format=msvs
@@ -1405,8 +1429,9 @@ mac:
     git checkout e1e7b0ad8e
     cd ../../..
     cd src/client/mac
+mac_debug:
     xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Debug build
-release:
+mac_release:
     xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Release build
     cd ../../tools/mac/dump_syms
     xcodebuild -project dump_syms.xcodeproj -target dump_syms -configuration Release build
@@ -1423,6 +1448,7 @@ mac:
     ZLIB_LIB=$USED_PREFIX/lib/libz.a
     mkdir out
     cd out
+mac_debug:
     mkdir Debug.x86_64
     cd Debug.x86_64
     cmake \
@@ -1446,7 +1472,7 @@ mac:
     mkdir Debug
     lipo -create Debug.arm64/crashpad_handler Debug.x86_64/crashpad_handler -output Debug/crashpad_handler
     lipo -create Debug.arm64/libcrashpad_client.a Debug.x86_64/libcrashpad_client.a -output Debug/libcrashpad_client.a
-release:
+mac_release:
     mkdir Release.x86_64
     cd Release.x86_64
     cmake \
@@ -1482,8 +1508,9 @@ win:
     cmake -B out ^
         -DTG_ANGLE_SPECIAL_TARGET=%SPECIAL_TARGET% ^
         -DTG_ANGLE_ZLIB_INCLUDE_PATH=%LIBS_DIR%/zlib
+win_debug:
     cmake --build out --config Debug
-release:
+win_release:
     cmake --build out --config Release
 """)
 
@@ -1505,8 +1532,11 @@ win:
 
     cd ..
 
+win_release:
+    SET CONFIGURATIONS=-release
+win_debug:
     SET CONFIGURATIONS=-debug
-release:
+win_debug_release:
     SET CONFIGURATIONS=-debug-and-release
 win:
     """ + removeDir('"%LIBS_DIR%\\Qt-' + qt + '"') + """
@@ -1554,9 +1584,12 @@ mac:
     find ../../patches/qtbase_$QT -type f -print0 | sort -z | xargs -0 git apply
     cd ..
 
-    CONFIGURATIONS=-debug
-release:
-    CONFIGURATIONS=-debug-and-release
+mac_release:
+    SET CONFIGURATIONS=-release
+mac_debug:
+    SET CONFIGURATIONS=-debug
+mac_debug_release:
+    SET CONFIGURATIONS=-debug-and-release
 mac:
     ./configure -prefix "$USED_PREFIX/Qt-$QT" \
         $CONFIGURATIONS \
@@ -1589,9 +1622,12 @@ mac:
     cd ..
     sed -i.bak 's/tqtc-//' {qtimageformats,qtsvg}/dependencies.yaml
 
-    CONFIGURATIONS=-debug
-release:
-    CONFIGURATIONS=-debug-and-release
+mac_release:
+    SET CONFIGURATIONS=-release
+mac_debug:
+    SET CONFIGURATIONS=-debug
+mac_debug_release:
+    SET CONFIGURATIONS=-debug-and-release
 mac:
     ./configure -prefix "$USED_PREFIX/Qt-$QT" \
         $CONFIGURATIONS \
@@ -1615,8 +1651,11 @@ win:
     for /r %%i in (..\\..\\patches\\qtbase_%QT%\\*) do git apply %%i -v
     cd ..
 
+win_release:
+    SET CONFIGURATIONS=-release
+win_debug:
     SET CONFIGURATIONS=-debug
-release:
+win_debug_release:
     SET CONFIGURATIONS=-debug-and-release
 win:
     """ + removeDir('"%LIBS_DIR%\\Qt' + qt + '"') + """
@@ -1690,8 +1729,9 @@ win:
         -DTG_OWT_LIBVPX_INCLUDE_PATH=$LIBVPX_PATH \
         -DTG_OWT_OPENH264_INCLUDE_PATH=$OPENH264_PATH \
         -DTG_OWT_FFMPEG_INCLUDE_PATH=$FFMPEG_PATH
+win_debug:
     cmake --build out --config Debug
-release:
+win_release:
     cmake --build out --config Release
 mac:
     MOZJPEG_PATH=$USED_PREFIX/include
@@ -1701,6 +1741,7 @@ mac:
     FFMPEG_PATH=$USED_PREFIX/include
     mkdir out
     cd out
+mac_debug:
     mkdir Debug.x86_64
     cd Debug.x86_64
     cmake \
@@ -1733,7 +1774,7 @@ mac:
     cd ..
     mkdir Debug
     lipo -create Debug.arm64/libtg_owt.a Debug.x86_64/libtg_owt.a -output Debug/libtg_owt.a
-release:
+mac_release:
     mkdir Release.x86_64
     cd Release.x86_64
     cmake \
@@ -1775,7 +1816,9 @@ win:
         -D ADA_TOOLS=OFF ^
         -D ADA_INCLUDE_URL_PATTERN=OFF ^
         -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+win_debug:
     cmake --build out --config Debug
+win_release:
     cmake --build out --config Release
 mac:
     CFLAGS="$UNGUARDED" CPPFLAGS="$UNGUARDED" cmake -B build . \\
@@ -1803,7 +1846,9 @@ win:
         -Dprotobuf_BUILD_LIBPROTOC=ON ^
         -Dprotobuf_WITH_ZLIB_DEFAULT=OFF ^
         -Dprotobuf_DEBUG_POSTFIX=""
+win_release:
     cmake --build . --config Release
+win_debug:
     cmake --build . --config Debug
 """)
 # mac:
@@ -1833,6 +1878,7 @@ win:
     %THIRDPARTY_DIR%\\msys64\\usr\\bin\\sed -i "s/STREQUAL/MATCHES/" td/generate/CMakeLists.txt
     mkdir out
     cd out
+win_debug:
     mkdir Debug
     cd Debug
     cmake ^
@@ -1853,8 +1899,9 @@ win:
         -DTD_E2E_ONLY=ON ^
         ../..
     cmake --build . --config Debug
-release:
+win_debug_release:
     cd ..
+win_release:
     mkdir Release
     cd Release
     cmake ^
@@ -1895,8 +1942,9 @@ mac:
         cd ../..
     }
 
+mac_debug:
     buildTd Debug
-release:
+mac_release:
     buildTd Release
 """)
 
