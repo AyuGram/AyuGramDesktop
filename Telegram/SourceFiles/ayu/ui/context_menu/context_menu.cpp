@@ -321,7 +321,7 @@ void AddOpenChannelAction(PeerData *peerData,
 void AddShadowBanAction(PeerData *peerData,
 						const Window::PeerMenuCallback &addCallback) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!peerData || !peerData->isUser() || !settings.filtersEnabled) {
+	if (!peerData || !peerData->isUser() || !peerData->isChannel() || !settings.filtersEnabled) {
 		return;
 	}
 
