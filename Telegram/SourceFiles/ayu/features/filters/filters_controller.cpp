@@ -115,7 +115,8 @@ bool isBlocked(const not_null<HistoryItem*> item) {
 
 	return settings.filtersEnabled &&
 	(
-		(item->from()->isUser() && ShadowBanUtils::isShadowBanned(getDialogIdFromPeer(item->from()))) ||
+		(item->from()->isUser() &&  ShadowBanUtils::isShadowBanned(getDialogIdFromPeer(item->from()))) || 
+		(item->from()->isChannel() && ShadowBanUtils::isShadowBanned(getDialogIdFromPeer(item->from()))) ||
 		(settings.hideFromBlocked && blocked)
 	);
 }
