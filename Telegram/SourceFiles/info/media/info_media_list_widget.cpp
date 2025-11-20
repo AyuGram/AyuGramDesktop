@@ -1346,6 +1346,7 @@ void ListWidget::showContextMenu(
 			}
 		}
 		if (!_provider->hasSelectRestriction()) {
+			// Commented out: Select option removed from context menu
 			_contextMenu->addAction(
 				tr::lng_context_select_msg(tr::now),
 				crl::guard(this, [=] {

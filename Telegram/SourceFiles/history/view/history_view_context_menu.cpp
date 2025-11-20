@@ -693,8 +693,13 @@ bool AddViewRepliesAction(
 		: 0;
 	const auto repliesCount = item->repliesCount();
 	const auto withReplies = (repliesCount > 0);
+	const auto replyToTopId = item->replyToTop();
+
+	// Check if this is a reply to a channel post in a megagroup
+	const auto isReplyToPost = !withReplies && replyToTopId && item->history()->peer->isMegagroup();
+
 	if (!withReplies || !item->history()->peer->isMegagroup()) {
-		if (!topicRootId) {
+		if (!topicRootId && !isReplyToPost) {
 			return false;
 		}
 	}
@@ -1028,6 +1033,7 @@ void AddSelectionAction(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	if (!AddClearSelectionAction(menu, request, list)) {
+		// Commented out: Select option removed from context menu
 		AddSelectMessageAction(menu, request, list);
 	}
 }
