@@ -228,6 +228,18 @@ jobs:
 
           powershell -ExecutionPolicy Bypass -File insert_patch.ps1
 
+      - name: Replace setSwapInterval value
+        shell: powershell
+        run: |
+          Get-ChildItem -Path "$env:TBUILD\$env:REPO_NAME" -Filter "*.cpp" -Recurse | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -match "format\.setSwapInterval\(0\)") {
+              $content = $content -replace "format\.setSwapInterval\(0\)", "format.setSwapInterval(1)"
+              Set-Content -Path $_.FullName -Value $content -NoNewline
+              Write-Host "Replaced setSwapInterval in $($_.FullName)"
+            }
+          }
+
       - name: Build Desktop
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram

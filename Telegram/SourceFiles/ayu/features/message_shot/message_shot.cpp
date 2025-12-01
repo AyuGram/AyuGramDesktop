@@ -16,6 +16,9 @@
 #include "data/data_forum.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
+#include "data/data_photo.h"
+#include "data/data_document.h"
+#include "data/data_file_origin.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "history/history.h"
 #include "history/history_inner_widget.h"
@@ -309,6 +312,23 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	createdViews.reserve(messages.size());
 	for (const auto &message : messages) {
 		createdViews.emplace(message, message->createView(delegate.get()));
+	}
+
+	// Pre-load all media to ensure high quality screenshots
+	for (const auto &[message, view] : createdViews) {
+		if (!view->media()) continue;
+
+		const auto origin = Data::FileOrigin(message->fullId());
+		if (const auto photo = message->media()->photo()) {
+			photo->load(origin, LoadFromCloudOrLocal, false);
+		} else if (const auto document = message->media()->document()) {
+			document->loadThumbnail(origin);
+		}
+	}
+
+	// Wait for images to load from cache (up to 200ms)
+	for (int i = 0; i < 20; ++i) {
+		QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
 	}
 
 	auto getView = [=](not_null<HistoryItem*> msg)
