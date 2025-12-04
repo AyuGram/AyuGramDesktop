@@ -69,6 +69,8 @@ QColor makeDefaultBackgroundColor();
 
 QImage Make(not_null<QWidget*> box, const ShotConfig &config);
 
+void Show(ShotConfig config, Fn<void()> clearSelected);
+
 void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected);
 
 }

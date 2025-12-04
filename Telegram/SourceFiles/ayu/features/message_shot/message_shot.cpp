@@ -455,6 +455,10 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	return newResult;
 }
 
+void Show(ShotConfig config, Fn<void()> clearSelected) {
+	Ui::show(Box<MessageShotBox>(config, std::move(clearSelected)));
+}
+
 void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected) {
 	const auto items = widget->getSelectedIds();
 	if (items.empty()) {
@@ -474,17 +478,11 @@ void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected
 		})
 		| ranges::to_vector;
 
-	const AyuFeatures::MessageShot::ShotConfig config = {
+	Show({
 		controller,
 		std::make_shared<Ui::ChatStyle>(controller->chatStyle()),
 		messages,
-	};
-	auto box = Box<MessageShotBox>(config);
-	box->boxClosing() | rpl::on_next([=]
-	{
-		clearSelected();
-	}, box->lifetime());
-	Ui::show(std::move(box));
+	}, std::move(clearSelected));
 }
 
 }

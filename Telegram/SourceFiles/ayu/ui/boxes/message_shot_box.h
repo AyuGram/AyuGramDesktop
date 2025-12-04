@@ -12,7 +12,10 @@
 class MessageShotBox : public Ui::BoxContent
 {
 public:
-	MessageShotBox(QWidget *parent, AyuFeatures::MessageShot::ShotConfig config);
+	MessageShotBox(
+		QWidget *parent,
+		AyuFeatures::MessageShot::ShotConfig config,
+		Fn<void()> clearSelected);
 
 protected:
 	void prepare() override;
@@ -22,4 +25,5 @@ private:
 
 	AyuFeatures::MessageShot::ShotConfig _config;
 	std::shared_ptr<style::palette> _selectedPalette;
+	Fn<void()> _clearSelected;
 };

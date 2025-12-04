@@ -27,8 +27,10 @@
 
 MessageShotBox::MessageShotBox(
 	QWidget *parent,
-	AyuFeatures::MessageShot::ShotConfig config)
-	: _config(std::move(config)) {
+	AyuFeatures::MessageShot::ShotConfig config,
+	Fn<void()> clearSelected)
+	: _config(std::move(config))
+	, _clearSelected(std::move(clearSelected)) {
 }
 
 void MessageShotBox::prepare() {
@@ -187,6 +189,7 @@ void MessageShotBox::setupContent() {
 					  image.save(path);
 				  }
 
+				  _clearSelected();
 				  closeBox();
 			  });
 	addButton(tr::ayu_MessageShotCopy(),
@@ -194,6 +197,7 @@ void MessageShotBox::setupContent() {
 			  {
 				  QGuiApplication::clipboard()->setImage(imageView->getImage());
 
+				  _clearSelected();
 				  closeBox();
 			  });
 
