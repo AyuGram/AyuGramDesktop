@@ -1738,6 +1738,12 @@ void Document::hideSpoilers() {
 	}
 }
 
+void Document::revealSpoilers() {
+	if (const auto captioned = Get<HistoryDocumentCaptioned>()) {
+		captioned->caption.setSpoilerRevealed(true, anim::type::instant);
+	}
+}
+
 Ui::Text::String Document::createCaption() const {
 	return File::createCaption(_realParent);
 }

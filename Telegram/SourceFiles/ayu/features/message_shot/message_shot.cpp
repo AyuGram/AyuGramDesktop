@@ -394,6 +394,8 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		const auto &message = messages[i];
 		const auto view = getView(message);
 
+		view->revealSpoilers();
+
 		const auto displayUserpic = view->displayFromPhoto() || message->isPost();
 
 		const auto rect = QRect(0, y, width, view->height());

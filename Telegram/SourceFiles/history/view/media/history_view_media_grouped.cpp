@@ -797,6 +797,12 @@ void GroupedMedia::hideSpoilers() {
 	}
 }
 
+void GroupedMedia::revealSpoilers() {
+	for (const auto &part : _parts) {
+		part.content->revealSpoilers();
+	}
+}
+
 Storage::SharedMediaTypesMask GroupedMedia::sharedMediaTypes() const {
 	return main()->sharedMediaTypes();
 }
