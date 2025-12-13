@@ -1701,6 +1701,13 @@ void Gif::hideSpoilers() {
 	}
 }
 
+void Gif::revealSpoilers() {
+	if (_spoiler) {
+		_spoiler->revealed = true;
+	}
+}
+
+
 bool Gif::needsBubble() const {
 	if (_storyId) {
 		return true;

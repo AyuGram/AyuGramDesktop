@@ -167,6 +167,7 @@ public:
 	[[nodiscard]] bool showDate() const { return _showDate.current(); }
 	[[nodiscard]] bool showReactions() const { return _showReactions.current(); }
 	[[nodiscard]] bool showColorfulReplies() const { return _showColorfulReplies.current(); }
+	[[nodiscard]] bool showSpoiler() const { return _showSpoiler.current(); }
 	[[nodiscard]] int embeddedThemeType() const { return _embeddedThemeType.current(); }
 	[[nodiscard]] uint32 embeddedThemeAccentColor() const { return _embeddedThemeAccentColor.current(); }
 	[[nodiscard]] uint64 cloudThemeId() const { return _cloudThemeId.current(); }
@@ -179,6 +180,7 @@ public:
 	void setShowDate(bool val);
 	void setShowReactions(bool val);
 	void setShowColorfulReplies(bool val);
+	void setShowSpoiler(bool val);
 
 	void setEmbeddedTheme(int type, uint32 accentColor = 0);
 	void setCloudTheme(uint64 accountId, uint64 id, uint64 accessHash, uint64 documentId, const QString &title);
@@ -196,6 +198,7 @@ private:
 	rpl::variable<bool> _showDate = false;
 	rpl::variable<bool> _showReactions = false;
 	rpl::variable<bool> _showColorfulReplies = false;
+	rpl::variable<bool> _showSpoiler = false;
 
 	rpl::variable<int> _embeddedThemeType = -1;
 	rpl::variable<uint32> _embeddedThemeAccentColor = 0;

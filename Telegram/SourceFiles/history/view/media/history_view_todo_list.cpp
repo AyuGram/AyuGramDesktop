@@ -864,6 +864,17 @@ void TodoList::hideSpoilers() {
 	}
 }
 
+void TodoList::revealSpoilers() {
+	if (_title.hasSpoilers()) {
+		_title.setSpoilerRevealed(true, anim::type::instant);
+	}
+	for (auto &task : _tasks) {
+		if (task.text.hasSpoilers()) {
+			task.text.setSpoilerRevealed(true, anim::type::instant);
+		}
+	}
+}
+
 std::vector<Media::TodoTaskInfo> TodoList::takeTasksInfo() {
 	if (_tasks.empty()) {
 		return {};

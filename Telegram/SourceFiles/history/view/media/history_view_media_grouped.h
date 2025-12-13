@@ -74,6 +74,7 @@ public:
 		bool pressed) override;
 
 	void hideSpoilers() override;
+	void revealSpoilers() override;
 	Storage::SharedMediaTypesMask sharedMediaTypes() const override;
 
 	bool overrideEditedDate() const override {

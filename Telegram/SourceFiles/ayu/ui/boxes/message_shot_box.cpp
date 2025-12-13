@@ -234,6 +234,20 @@ void MessageShotBox::setupContent() {
 		},
 		content->lifetime());
 
+	AddButtonWithIcon(
+		content,
+		tr::ayu_MessageShotShowSpoiler(),
+		st::settingsButtonNoIcon
+	)->toggleOn(rpl::single(shotSettings.showSpoiler())
+	)->toggledValue(
+	) | rpl::skip(1) | on_next(
+		[=](bool enabled)
+		{
+			AyuSettings::getInstance().messageShotSettings().setShowSpoiler(enabled);
+			updatePreview();
+		},
+		content->lifetime());
+
 	AddSkip(content);
 
 	addButton(tr::ayu_MessageShotSave(),

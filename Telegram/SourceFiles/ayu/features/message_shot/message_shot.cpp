@@ -315,6 +315,9 @@ void Make(not_null<QWidget*> box, const ShotConfig &config, const Fn<void(QImage
 
 			view->itemDataChanged(); // refresh reactions
 			height += view->resizeGetHeight(width);
+			if (AyuSettings::getInstance().messageShotSettings().showSpoiler()) {
+				view->revealSpoilers();
+			}
 		}
 
 		width *= style::DevicePixelRatio();

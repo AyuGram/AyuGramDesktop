@@ -8078,6 +8078,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageShotShowDate" = "Show date";
 "ayu_MessageShotShowReactions" = "Show reactions";
 "ayu_MessageShotShowColorfulReplies" = "Show colorful replies";
+"ayu_MessageShotShowSpoiler" = "Show spoiler";
 "ayu_SendAsSticker" = "Send as Sticker";
 "ayu_SendWithSound" = "Send With Sound";
 "ayu_AyuForwardStatusPreparing" = "Forwarding messages";

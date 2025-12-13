@@ -220,6 +220,12 @@ void MessageShotSettings::setShowColorfulReplies(bool val) {
 	AyuSettings::save();
 }
 
+void MessageShotSettings::setShowSpoiler(bool val) {
+	if (_showSpoiler.current() == val) return;
+	_showSpoiler = val;
+	AyuSettings::save();
+}
+
 bool MessageShotSettings::isCloudThemeEmpty() const {
 	return !_cloudThemeId.current()
 		&& !_cloudThemeAccessHash.current()
@@ -285,6 +291,7 @@ void to_json(nlohmann::json &j, const MessageShotSettings &s) {
 		{"showDate", s._showDate.current()},
 		{"showReactions", s._showReactions.current()},
 		{"showColorfulReplies", s._showColorfulReplies.current()},
+		{"showSpoiler", s._showSpoiler.current()},
 		{"embeddedThemeType", s._embeddedThemeType.current()},
 		{"embeddedThemeAccentColor", s._embeddedThemeAccentColor.current()},
 		{"cloudThemeId", s._cloudThemeId.current()},
@@ -300,6 +307,7 @@ void from_json(const nlohmann::json &j, MessageShotSettings &s) {
 	s._showDate = j.value("showDate", false);
 	s._showReactions = j.value("showReactions", false);
 	s._showColorfulReplies = j.value("showColorfulReplies", false);
+	s._showSpoiler = j.value("showSpoiler", true);
 	s._embeddedThemeType = j.value("embeddedThemeType", j.value("themeType", -1));
 	s._embeddedThemeAccentColor = j.value("embeddedThemeAccentColor", j.value("themeAccentColor", uint32(0)));
 	s._cloudThemeId = j.value("cloudThemeId", uint64(0));

@@ -61,6 +61,7 @@ public:
 	}
 
 	void hideSpoilers() override;
+	void revealSpoilers() override;
 	bool needsBubble() const override {
 		return true;
 	}

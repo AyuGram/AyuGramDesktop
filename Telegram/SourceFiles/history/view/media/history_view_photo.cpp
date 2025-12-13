@@ -893,6 +893,10 @@ bool Photo::needInfoDisplay() const {
 		return false;
 	}
 
+	if (AyuFeatures::MessageShot::isTakingShot()) {
+		return true;
+	}
+
 	if (_parent->data()->isFakeAboutView()) {
 		return false;
 	}
@@ -1091,6 +1095,12 @@ bool Photo::videoAutoplayEnabled() const {
 void Photo::hideSpoilers() {
 	if (_spoiler) {
 		_spoiler->revealed = false;
+	}
+}
+
+void Photo::revealSpoilers() {
+	if (_spoiler) {
+		_spoiler->revealed = true;
 	}
 }
 
