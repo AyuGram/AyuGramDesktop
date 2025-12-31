@@ -94,6 +94,10 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
+### Gentoo Linux
+
+See [this repository](https://github.com/OverLessArtem/ayugram-ebuild-gentoo) for installation manual.
+
 ### EPM
 
 `epm play ayugram`
