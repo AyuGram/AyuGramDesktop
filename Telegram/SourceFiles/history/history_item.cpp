@@ -3944,12 +3944,16 @@ void HistoryItem::setText(const TextWithEntities &textWithEntities) {
 				const auto emoji = Ui::Emoji::Find(entityText, &emojiLength);
 				if (emoji && emojiLength == entityText.size()) {
 					const auto emojiId = match.captured(1);
-					entity = EntityInText(
-						EntityType::CustomEmoji,
-						entity.offset(),
-						entity.length(),
-						emojiId);
-					entity.setLocal();
+					auto ok = false;
+					emojiId.toULongLong(&ok);
+					if (ok) {
+						entity = EntityInText(
+							EntityType::CustomEmoji,
+							entity.offset(),
+							entity.length(),
+							emojiId);
+						entity.setLocal();
+					}
 				}
 			}
 		}

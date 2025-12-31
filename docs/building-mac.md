@@ -4,8 +4,6 @@
 
 The build has only been tested with Xcode 26.1. Although it may work on lower Xcode versions, this is not guaranteed.
 
-Xcode 26 has deprecated AGL, so you need to remove "AGL" from CMake options [here](https://github.com/desktop-app/cmake_helpers/blob/c7e0493dea2b870fb1b8e26604201fdb9e8c1ee5/options_mac.cmake#L64).
-
 ### Prepare folder
 
 Choose a folder for the future build, for example **/Users/user/TBuild**. It will be named ***BuildPath*** in the rest of this document. All commands will be launched from Terminal.
