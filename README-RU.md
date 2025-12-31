@@ -93,6 +93,10 @@ brew install --cask ayugram
 
 [Sisyphus](https://packages.altlinux.org/en/sisyphus/srpms/ayugram-desktop/)
 
+### Gentoo Linux
+
+Инструкцию по установке можно найти в [этом репозитории](https://github.com/OverLessArtem/ayugram-ebuild-gentoo).
+
 ### EPM
 
 `epm play ayugram`
