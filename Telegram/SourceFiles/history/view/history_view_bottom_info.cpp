@@ -741,6 +741,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	if (item->isScheduled()) {
 		result.scheduleRepeatPeriod = item->scheduleRepeatPeriod();
 	}
+	if (item->isDeleted()) {
+		result.flags |= Flag::AyuDeleted;
+	}
 	if (!forwarded) {
 		return result;
 	}
@@ -753,9 +756,6 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 		&& !item->externalReply()) {
 		result.date = base::unixtime::parse(forwarded->originalDate);
 		result.flags |= Flag::ForwardedDate;
-	}
-	if (item->isDeleted()) {
-		result.flags |= Flag::AyuDeleted;
 	}
 	// We don't want to pass and update it in Data for now.
 	//if (item->unread()) {
