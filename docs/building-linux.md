@@ -6,7 +6,7 @@ Choose a folder for the future build, for example **/home/user/TBuild**. It will
 
 ### Clone source code and prepare libraries
 
-Install [poetry](https://python-poetry.org), go to ***BuildPath*** and run
+Install [poetry](https://python-poetry.org), [docker](https://www.docker.com/) and [docker-buildx](https://docs.docker.com/reference/cli/docker/buildx/), go to ***BuildPath*** and run
 
     git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
     ./tdesktop/Telegram/build/prepare/linux.sh
