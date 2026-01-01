@@ -197,6 +197,8 @@ jobs:
           echo target_compile_options(common_options
           echo INTERFACE
           echo     $^<$^<CONFIG:Release^>:/O2^>      # Maximum speed optimization
+          echo     $^<$^<CONFIG:Release^>:/Gw^>      # Optimize global data
+          echo     $^<$^<CONFIG:Release^>:/Zc:inline^> # Remove unreferenced functions
           echo     $^<$^<CONFIG:Release^>:/Oy^>      # Omit frame pointers
           echo     $^<$^<CONFIG:Release^>:/GS-^>     # Disable buffer security checks
           echo     $^<$^<CONFIG:Release^>:/Gy^>      # Enable function-level linking
@@ -205,7 +207,7 @@ jobs:
           echo target_link_options(common_options
           echo INTERFACE
           echo     $^<$^<CONFIG:Release^>:/OPT:REF^>     # Remove unreferenced functions/data
-          echo     $^<$^<CONFIG:Release^>:/OPT:ICF=5^>   # Identical COMDAT folding
+          echo     $^<$^<CONFIG:Release^>:/OPT:ICF=10^>  # Aggressive COMDAT folding
           echo     $^<$^<CONFIG:Release^>:/MERGE:.rdata=.text^>  # Merge read-only data section
           echo     $^<$^<CONFIG:Release^>:/DEBUG:NONE^>  # No debug info in Release
           echo ^)
@@ -247,9 +249,9 @@ jobs:
           call configure.bat ^
           %TDESKTOP_BUILD_ARCH% ^
           %TDESKTOP_BUILD_API% ^
-          -D CMAKE_C_FLAGS="/WX /O2 /Oy /GS- /Gy /DNDEBUG" ^
-          -D CMAKE_CXX_FLAGS="/WX /O2 /Oy /GS- /Gy /DNDEBUG" ^
-          -D CMAKE_EXE_LINKER_FLAGS="/OPT:REF /OPT:ICF=5 /MERGE:.rdata=.text /DEBUG:NONE" ^
+          -D CMAKE_C_FLAGS="/WX /O2 /Gw /Zc:inline /Oy /GS- /Gy /DNDEBUG" ^
+          -D CMAKE_CXX_FLAGS="/WX /O2 /Gw /Zc:inline /Oy /GS- /Gy /DNDEBUG" ^
+          -D CMAKE_EXE_LINKER_FLAGS="/OPT:REF /OPT:ICF=10 /MERGE:.rdata=.text /DEBUG:NONE" ^
           -D CMAKE_BUILD_TYPE=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
