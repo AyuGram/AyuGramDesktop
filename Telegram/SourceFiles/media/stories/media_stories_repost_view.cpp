@@ -127,7 +127,7 @@ void RepostView::draw(Painter &p, int x, int y, int availableWidth) {
 	cache->bg = rippleColor;
 
 	if (_ripple) {
-		_ripple->paint(p, x, y, w, &cache->bg2);
+		_ripple->paint(p, x, y, w, &cache->bg);
 		if (_ripple->empty()) {
 			_ripple.reset();
 		}

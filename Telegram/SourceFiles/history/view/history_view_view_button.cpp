@@ -161,7 +161,7 @@ void ViewButton::draw(
 	const auto radius = st::historyPagePreview.radius;
 
 	if (_inner->ripple && !_inner->ripple->empty()) {
-		_inner->ripple->paint(p, r.left(), r.top(), r.width(), &cache->bg2);
+		_inner->ripple->paint(p, r.left(), r.top(), r.width(), &cache->bg);
 	}
 
 	PainterHighQualityEnabler hq(p);

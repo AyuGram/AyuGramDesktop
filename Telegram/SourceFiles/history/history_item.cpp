@@ -3974,7 +3974,6 @@ void HistoryItem::setText(const TextWithEntities &textWithEntities) {
 							entity.offset(),
 							entity.length(),
 							emojiId);
-						entity.setLocal();
 					}
 				}
 			}

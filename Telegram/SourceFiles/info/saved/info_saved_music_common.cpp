@@ -94,7 +94,6 @@ void SetupSavedMusic(
 						})));
 
 				musicButton->hide(anim::type::instant);
-				musicButton->ease = anim::easeOutCubic;
 				musicButton->setDuration(250);
 				musicButton->entity()->setAcceptBoth(true);
 				musicButton->entity()->clicks() | rpl::filter([=](Qt::MouseButton mouseButton)

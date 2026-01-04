@@ -382,6 +382,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 			st.get(),
 			viewport,
 			rect,
+			rect,
 			true);
 
 		p.translate(0, y);

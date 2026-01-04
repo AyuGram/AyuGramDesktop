@@ -44,7 +44,6 @@ void EnsureBlockquoteCache(
 	cache = std::make_unique<Text::QuotePaintCache>();
 	const auto &colors = values();
 	cache->bg = colors.bg;
-	cache->bg2 = colors.bg;
 	cache->outlines = colors.outlines;
 	cache->icon = colors.name;
 

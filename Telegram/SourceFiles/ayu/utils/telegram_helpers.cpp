@@ -954,7 +954,7 @@ TextWithEntities reverseLocalPremiumEmoji(const TextWithEntities &text, not_null
 
 	auto result = text;
 	for (auto &entity : result.entities) {
-		if (entity.type() == EntityType::CustomEmoji && entity.isLocal()) {
+		if (entity.type() == EntityType::CustomEmoji) {
 			if (isForQuote || !history->peer->isSelf() && !(history->owner().session().user()->flags() & UserDataFlag::Premium) && !emojiAllowed(entity)) {
 				entity = EntityInText(
 					EntityType::CustomUrl,

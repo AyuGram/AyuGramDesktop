@@ -824,7 +824,7 @@ void Reply::paint(
 	}
 
 	if (_ripple.animation) {
-		_ripple.animation->paint(p, x, y, w, &cache->bg2);
+		_ripple.animation->paint(p, x, y, w, &cache->bg);
 		if (_ripple.animation->empty()) {
 			_ripple.animation.reset();
 		}
