@@ -480,6 +480,9 @@ ChatWidget::~ChatWidget() {
 	}
 	if (_topic) {
 		if (_topic->creating()) {
+			if (controller()->activeChatCurrent().topic() == _topic) {
+				controller()->setActiveChatEntry(Dialogs::Key());
+			}
 			_emptyPainter = nullptr;
 			_topic->discard();
 			_topic = nullptr;
