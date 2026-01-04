@@ -20,6 +20,7 @@
 #include "ayu_worker.h"
 #include "features/translator/ayu_translator.h"
 #include "window/window_controller.h"
+#include "mtproto/mtproto_dc_options.h"
 
 using json = nlohmann::json;
 
@@ -146,6 +147,8 @@ void postinitialize() {
 	if (settings->appIcon == QString("macos")) {
 		settings->appIcon = AyuAssets::DEFAULT_ICON;
 	}
+
+	MTP::DcOptions::SetImproveDC5(settings->improveDC5Connection);
 }
 
 AyuGramSettings &getInstance() {
@@ -338,6 +341,7 @@ AyuGramSettings::AyuGramSettings() {
 	adaptiveCoverColor = true;
 
 	crashReporting = true;
+	improveDC5Connection = false;
 }
 
 void set_sendReadMessages(bool val) {
@@ -693,6 +697,11 @@ void set_adaptiveCoverColor(bool val) {
 
 void set_crashReporting(bool val) {
 	settings->crashReporting = val;
+}
+
+void set_improveDC5Connection(bool val) {
+	settings->improveDC5Connection = val;
+	MTP::DcOptions::SetImproveDC5(val);
 }
 
 bool isUseScheduledMessages() {

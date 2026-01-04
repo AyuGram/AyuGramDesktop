@@ -77,6 +77,19 @@ t6N/byY9Nw9p21Og3AoXSL2q/2IJ1WRUhebgAdGVMlV1fkuOQoEzR7EdpqtQD9Cs\n\
 5+bfo3Nhmcyvk5ftB0WkJ9z6bNZ7yxrP8wIDAQAB\n\
 -----END RSA PUBLIC KEY-----" };
 
+std::atomic<bool> _improveDC5 = false;
+
+const auto kBadDc5Ips = {
+	"91.108.56.100", "91.108.56.101", "91.108.56.104", "91.108.56.107",
+	"91.108.56.109", "91.108.56.110", "91.108.56.113", "91.108.56.145",
+	"91.108.56.120", "91.108.56.125", "91.108.56.126", "91.108.56.128",
+	"91.108.56.134", "91.108.56.138", "91.108.56.143", "91.108.56.156"
+};
+
+const auto kGoodDc5Ips = {
+	"91.108.56.147", "91.108.56.135", "91.108.56.130"
+};
+
 } // namespace
 
 class DcOptions::WriteLocker {
@@ -312,6 +325,14 @@ bool DcOptions::applyOneGuarded(
 	return ApplyOneOption(_data, dcId, flags, ip, port, secret);
 }
 
+void DcOptions::SetImproveDC5(bool enabled) {
+	_improveDC5 = enabled;
+}
+
+bool DcOptions::ShouldImproveDC5() {
+	return _improveDC5;
+}
+
 bool DcOptions::ApplyOneOption(
 		base::flat_map<DcId, std::vector<Endpoint>> &data,
 		DcId dcId,
@@ -319,20 +340,36 @@ bool DcOptions::ApplyOneOption(
 		const std::string &ip,
 		int port,
 		const bytes::vector &secret) {
-	auto i = data.find(dcId);
-	if (i != data.cend()) {
-		for (auto &endpoint : i->second) {
-			if (endpoint.ip == ip && endpoint.port == port) {
-				return false;
+	auto add = [&](const std::string &ip) {
+		auto i = data.find(dcId);
+		if (i != data.cend()) {
+			for (auto &endpoint : i->second) {
+				if (endpoint.ip == ip && endpoint.port == port) {
+					return false;
+				}
 			}
+			i->second.emplace_back(dcId, flags, ip, port, secret);
+		} else {
+			data.emplace(dcId, std::vector<Endpoint>(
+				1,
+				Endpoint(dcId, flags, ip, port, secret)));
 		}
-		i->second.emplace_back(dcId, flags, ip, port, secret);
-	} else {
-		data.emplace(dcId, std::vector<Endpoint>(
-			1,
-			Endpoint(dcId, flags, ip, port, secret)));
+		return true;
+	};
+
+	if (ShouldImproveDC5()) {
+		if (std::any_of(kBadDc5Ips.begin(), kBadDc5Ips.end(), [&](const char *bad) { return ip == bad; })) {
+			auto result = false;
+			for (const auto &goodIp : kGoodDc5Ips) {
+				if (add(goodIp)) {
+					result = true;
+				}
+			}
+			return result;
+		}
 	}
-	return true;
+
+	return add(ip);
 }
 
 std::vector<DcId> DcOptions::CountOptionsDifference(

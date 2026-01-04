@@ -300,6 +300,25 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 			AyuSettings::save();
 		},
 		container->lifetime());
+
+	AddButtonWithIcon(
+		container,
+		rpl::single(QString("Improve DC5 connection")),
+		st::settingsButtonNoIcon
+	)->toggleOn(
+		rpl::single(settings->improveDC5Connection)
+	)->toggledValue(
+	) | rpl::filter(
+		[=](bool enabled)
+		{
+			return (enabled != settings->improveDC5Connection);
+		}) | on_next(
+		[=](bool enabled)
+		{
+			AyuSettings::set_improveDC5Connection(enabled);
+			AyuSettings::save();
+		},
+		container->lifetime());
 }
 
 void AyuGhost::setupContent(not_null<Window::SessionController*> controller) {

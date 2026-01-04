@@ -150,6 +150,8 @@ public:
 	bool adaptiveCoverColor;
 
 	bool crashReporting;
+	
+	bool improveDC5Connection;
 };
 
 void set_sendReadMessages(bool val);
@@ -258,6 +260,7 @@ void set_translationProvider(const QString &val);
 void set_adaptiveCoverColor(bool val);
 
 void set_crashReporting(bool val);
+void set_improveDC5Connection(bool val);
 
 inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nlohmann_json_t) {
 	NLOHMANN_JSON_TO(sendReadMessages)
@@ -342,6 +345,7 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(translationProvider)
 	NLOHMANN_JSON_TO(adaptiveCoverColor)
 	NLOHMANN_JSON_TO(crashReporting)
+	NLOHMANN_JSON_TO(improveDC5Connection)
 }
 
 inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nlohmann_json_t) {
@@ -428,6 +432,7 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(translationProvider)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(adaptiveCoverColor)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(crashReporting)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(improveDC5Connection)
 }
 
 AyuGramSettings &getInstance();
