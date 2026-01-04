@@ -23,6 +23,8 @@
 #include <fstream>
 #include <QApplication>
 
+#include "mtproto/mtproto_dc_options.h"
+
 using json = nlohmann::json;
 
 namespace {
@@ -377,6 +379,8 @@ void AyuSettings::load() {
 	}
 
 	settings.validate();
+
+	MTP::DcOptions::SetImproveDC5(settings.improveDC5Connection());
 }
 
 void AyuSettings::save() {
@@ -977,6 +981,13 @@ void AyuSettings::setCrashReporting(bool val) {
 	save();
 }
 
+void AyuSettings::setImproveDC5Connection(bool val) {
+	if (_improveDC5Connection.current() == val) return;
+	_improveDC5Connection = val;
+	MTP::DcOptions::SetImproveDC5(val);
+	save();
+}
+
 void AyuSettings::setAvatarCorners(int val) {
 	if (_avatarCorners.current() == val) return;
 	_avatarCorners = val;
@@ -1081,6 +1092,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"improveDC5Connection", s._improveDC5Connection.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1179,6 +1191,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._improveDC5Connection = j.value("improveDC5Connection", defaults._improveDC5Connection.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

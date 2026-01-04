@@ -570,6 +570,12 @@ void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::disableAds,
 		.setter = &AyuSettings::setDisableAds,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/improveDC5Connection"_q,
+		.title = rpl::single(QString("Improve DC5 connection")),
+		.getter = &AyuSettings::improveDC5Connection,
+		.setter = &AyuSettings::setImproveDC5Connection,
+	});
 }
 
 const auto kMeta = BuildHelper({

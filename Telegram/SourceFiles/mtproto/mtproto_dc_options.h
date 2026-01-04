@@ -115,6 +115,9 @@ public:
 	bool loadFromFile(const QString &path);
 	bool writeToFile(const QString &path) const;
 
+	static void SetImproveDC5(bool enabled);
+	static bool ShouldImproveDC5();
+
 private:
 	bool applyOneGuarded(
 		DcId dcId,
