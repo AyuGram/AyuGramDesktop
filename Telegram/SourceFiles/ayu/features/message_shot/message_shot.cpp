@@ -345,11 +345,15 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	int width = st::msgMaxWidth + (st::boxPadding.left() + st::boxPadding.right());
 	int height = 0;
 
-	for (int i = 0; i < messages.size(); i++) {
-		const auto &message = messages[i];
+	for (const auto &message : messages) {
 		const auto view = getView(message);
+		view->itemTextUpdated();
+		view->setPendingResize();
+	}
 
-		view->itemDataChanged(); // refresh reactions
+	for (const auto &message : messages) {
+		const auto view = getView(message);
+		view->itemDataChanged();
 		height += view->resizeGetHeight(width);
 	}
 
@@ -376,7 +380,7 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 
 		const auto displayUserpic = view->displayFromPhoto() || message->isPost();
 
-		const auto rect = QRect(0, y, width, view->height());
+		const auto rect = QRect(0, 0, width, view->height());
 
 		auto context = controller->defaultChatTheme()->preparePaintContext(
 			st.get(),
