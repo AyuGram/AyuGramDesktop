@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/utils/telegram_helpers.h"
 #include "core/ui_integration.h"
 #include "styles/style_ayu_icons.h"
+#include "ui/emoji_config.h"
 
 
 namespace HistoryView {
@@ -494,6 +495,21 @@ void BottomInfo::layoutDateText() {
 				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
 			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
 		}
+		if (const auto stake = _data.tonStake) {
+			auto helper = Ui::Text::CustomEmojiHelper(
+				Core::TextContext({ .session = &_reactionsOwner->session() }));
+			marked.append(
+				QString::number(stake / 1e9)
+			).append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
+					Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
+						st::stakeIconEmojiSize * style::DevicePixelRatio(),
+						Qt::SmoothTransformation),
+				.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
+				.textColor = false,
+			})).append("  ");
+		}
 		marked.append(full);
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
@@ -557,6 +573,21 @@ void BottomInfo::layoutDateText() {
 				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
 			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
 		}
+		if (const auto stake = _data.tonStake) {
+			auto helper = Ui::Text::CustomEmojiHelper(
+				Core::TextContext({ .session = &_reactionsOwner->session() }));
+			marked.append(
+				QString::number(stake / 1e9)
+			).append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
+					Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
+						st::stakeIconEmojiSize * style::DevicePixelRatio(),
+						Qt::SmoothTransformation),
+				.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
+				.textColor = false,
+			})).append("  ");
+		}
 		marked.append(full);
 
 		const auto context = Core::TextContext({
@@ -571,61 +602,6 @@ void BottomInfo::layoutDateText() {
 			Ui::NameTextOptions(),
 			context);
 	}
-	const auto edited = (_data.flags & Data::Flag::Edited)
-		? (tr::lng_edited(tr::now) + ' ')
-		: (_data.flags & Data::Flag::EstimateDate)
-		? (tr::lng_approximate(tr::now) + ' ')
-		: _data.scheduleRepeatPeriod
-		? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
-		: QString();
-	const auto author = _data.author;
-	const auto prefix = !author.isEmpty() ? u", "_q : QString();
-	const auto date = edited + ((_data.flags & Data::Flag::ForwardedDate)
-		? Ui::FormatDateTimeSavedFrom(_data.date)
-		: QLocale().toString(_data.date.time(), QLocale::ShortFormat));
-	const auto afterAuthor = prefix + date;
-	const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
-	const auto authorWidth = st::msgDateFont->width(author);
-	const auto maxWidth = st::maxSignatureSize;
-	_authorElided = !author.isEmpty()
-		&& (authorWidth + afterAuthorWidth > maxWidth);
-	const auto name = _authorElided
-		? st::msgDateFont->elided(author, maxWidth - afterAuthorWidth)
-		: author;
-	const auto full = (_data.flags & Data::Flag::Sponsored)
-		? QString()
-		: (_data.flags & Data::Flag::Imported)
-		? (date + ' ' + tr::lng_imported(tr::now))
-		: name.isEmpty()
-		? date
-		: (name + afterAuthor);
-	auto helper = Ui::Text::CustomEmojiHelper(
-		Core::TextContext({ .session = &_reactionsOwner->session() }));
-	auto marked = TextWithEntities();
-	if (const auto count = _data.stars) {
-		marked.append(
-			Ui::Text::IconEmoji(&st::starIconEmojiSmall)
-		).append(Lang::FormatCountToShort(count).string).append(u", "_q);
-	}
-	if (const auto stake = _data.tonStake) {
-		marked.append(
-			QString::number(stake / 1e9)
-		).append(helper.image({
-			.image = Ui::Emoji::SinglePixmap(
-				Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
-				Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
-					st::stakeIconEmojiSize * style::DevicePixelRatio(),
-					Qt::SmoothTransformation),
-			.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
-			.textColor = false,
-		})).append("  ");
-	}
-	marked.append(full);
-	_authorEditedDate.setMarkedText(
-		st::msgDateTextStyle,
-		marked,
-		Ui::NameTextOptions(),
-		helper.context());
 }
 
 void BottomInfo::layoutViewsText() {

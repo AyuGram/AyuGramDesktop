@@ -69,7 +69,8 @@ void GenerateItems(
 	not_null<HistoryView::ElementDelegate*> delegate,
 	not_null<History*> history,
 	AyuMessageBase message,
-	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback) {
+	Fn<void(OwnedItem item, TimeId sentDate, MsgId)> callback,
+	bool isDeleted) {
 	PeerData *from = history->owner().userLoaded(message.fromId);
 	if (!from) {
 		from = history->owner().channelLoaded(message.fromId);
@@ -115,7 +116,11 @@ void GenerateItems(
 
 	const auto addSimpleTextMessage = [&](TextWithEntities &&text)
 	{
-		addPart(makeSimpleTextMessage(std::move(text)));
+		const auto item = makeSimpleTextMessage(std::move(text));
+		if (isDeleted) {
+			item->setDeleted();
+		}
+		addPart(item);
 	};
 
 	const auto text = QString::fromStdString(message.text);

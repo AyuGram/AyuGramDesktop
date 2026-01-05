@@ -7361,6 +7361,9 @@ void HistoryWidget::startItemRevealAnimations() {
 
 void HistoryWidget::startMessageSendingAnimation(
 		not_null<HistoryItem*> item) {
+	if (!item->media()) {
+		return;
+	}
 	if (_list->elementChatMode() == HistoryView::ElementChatMode::Default
 		&& width() > st::columnMaximalWidthLeft
 		&& !item->media()) {

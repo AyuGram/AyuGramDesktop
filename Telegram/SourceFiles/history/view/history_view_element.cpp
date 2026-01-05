@@ -1140,6 +1140,7 @@ Element::Element(
 , _context(delegate->elementContext()) {
 	history()->owner().registerItemView(this);
 	refreshMedia(replacing);
+	validateText();
 	if (_context == Context::History) {
 		history()->setHasPendingResizedItems();
 	}

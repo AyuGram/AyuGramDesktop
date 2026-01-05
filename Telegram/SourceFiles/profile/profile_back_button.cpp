@@ -77,8 +77,10 @@ void BackButton::updateCache() {
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
 		: 0;
+	const auto backIconWidth = st::topBarBack.width() + st::normalFont->spacew;
 	const auto availableWidth = width()
 		- st::historyAdminLogTopBarLeft
+		- backIconWidth
 		- widgetWidth;
 	_cachedElidedText = st::semiboldFont->elided(
 		_text,
@@ -110,7 +112,8 @@ void BackButton::paintEvent(QPaintEvent *e) {
 	const auto widgetWidth = _widget
 		? _widget->width() + st::historyAdminLogTopBarUserpicSkip
 		: 0;
-	const auto textX = st::historyAdminLogTopBarLeft + widgetWidth;
+	const auto backIconWidth = st::topBarBack.width() + st::normalFont->spacew;
+	const auto textX = st::historyAdminLogTopBarLeft + backIconWidth + widgetWidth;
 
 	p.setFont(st::semiboldFont);
 	p.setPen(st::dialogsNameFg);

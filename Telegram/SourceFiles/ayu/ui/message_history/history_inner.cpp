@@ -723,7 +723,8 @@ void InnerWidget::addMessages(Direction direction, const std::vector<AyuMessageB
 			this,
 			_history,
 			message,
-			addOne);
+			addOne,
+			!_item);
 		if (count > 1) {
 			// Reverse the inner order of the added messages, because we load messages
 			// from bottom to top but inside one message they go from top to bottom.
