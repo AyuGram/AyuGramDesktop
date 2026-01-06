@@ -53,7 +53,12 @@ constexpr auto kGiftsPerRow = 3;
 		not_null<PeerData*> peer) {
 	using Type = Api::DisallowedGiftType;
 	const auto user = peer->asUser();
-	if (!user || user->isSelf()) {
+	if (!user) {
+		return gift.resale
+			|| (!gift.info.requirePremium
+				&& !gift.info.auction()
+				&& !gift.info.limitedCount);
+	} else if (user->isSelf()) {
 		return true;
 	}
 	const auto disallowedTypes = user ? user->disallowedGiftTypes() : Type();

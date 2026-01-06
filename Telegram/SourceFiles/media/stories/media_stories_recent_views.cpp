@@ -500,7 +500,7 @@ void RecentViews::showMenu() {
 	_menu->setForcedVerticalOrigin(PopupMenu::VerticalOrigin::Bottom);
 	_menu->popup(QPoint(
 		geometry.x() + (_widget->width() - size.width()) / 2,
-		geometry.y() + _widget->height()));
+		geometry.y()));
 
 	_menuEntriesCount = _menuEntriesCount.current() + added;
 }

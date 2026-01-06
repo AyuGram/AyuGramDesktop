@@ -148,10 +148,7 @@ void PeerListsBox::updateScrollSkips() {
 void PeerListsBox::prepare() {
 	auto rows = setInnerWidget(
 		object_ptr<Ui::VerticalLayout>(this),
-		st::boxScroll,
-		0,
-		0,
-		true /*alwaysKeepDimensionsToInner*/);
+		st::boxScroll);
 	for (auto &list : _lists) {
 		const auto content = rows->add(object_ptr<PeerListContent>(
 			rows,
@@ -181,7 +178,14 @@ void PeerListsBox::prepare() {
 	}
 	rows->resizeToWidth(firstController()->contentWidth());
 
-	setDimensions(firstController()->contentWidth(), st::boxMaxListHeight);
+	{
+		setDimensions(
+			firstController()->contentWidth(),
+			std::clamp(
+				rows->height(),
+				st::boxMaxListHeight,
+				st::boxMaxListHeight * 3));
+	}
 	if (_select) {
 		_select->finishAnimating();
 		Ui::SendPendingMoveResizeEvents(_select);

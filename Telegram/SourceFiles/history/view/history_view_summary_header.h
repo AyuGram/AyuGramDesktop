@@ -53,6 +53,9 @@ public:
 	void unloadHeavyPart();
 
 private:
+	void ensureAnimation() const;
+	void ensureLottie() const;
+
 	[[nodiscard]] QRect iconRect() const;
 	struct Animation {
 		Ui::StarParticles particles;
@@ -61,7 +64,7 @@ private:
 	};
 
 	ClickHandlerPtr _link;
-	std::unique_ptr<Animation> _animation;
+	mutable std::unique_ptr<Animation> _animation;
 	mutable struct {
 		mutable std::unique_ptr<Ui::RippleAnimation> animation;
 		QPoint lastPoint;
@@ -75,7 +78,8 @@ private:
 	mutable int _maxWidth = 0;
 	mutable int _height = 0;
 	mutable int _width = 0;
-	std::unique_ptr<Lottie::Icon> _lottie;
+	mutable std::unique_ptr<Lottie::Icon> _lottie;
+	mutable crl::time _unloadTime = 0;
 
 };
 
