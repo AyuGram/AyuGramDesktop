@@ -36,10 +36,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_media_player.h" // mediaPlayerMenuCheck
 #include "styles/style_menu_icons.h"
 
+#include <QScrollBar>
+
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 
-#include <QScrollBar>
 
 namespace Ui {
 namespace {
@@ -238,24 +239,24 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			rpl::combine(
 				Data::UnreadStateValue(session, list[i].id()),
 				rpl::duplicate(includeMuted)
-		) | rpl::on_next([=](
-				const Dialogs::UnreadState &state,
-				bool includeMuted) {
-			const auto chats = state.chats;
-			const auto chatsMuted = state.chatsMuted;
-			const auto muted = (chatsMuted + state.marksMuted);
-			auto count = (chats + state.marks)
-				- (includeMuted ? 0 : muted);
-			const auto isMuted = includeMuted && (count == muted);
+			) | rpl::on_next([=](
+					const Dialogs::UnreadState &state,
+					bool includeMuted) {
+				const auto chats = state.chats;
+				const auto chatsMuted = state.chatsMuted;
+				const auto muted = (chatsMuted + state.marksMuted);
+				auto count = (chats + state.marks)
+					- (includeMuted ? 0 : muted);
+				const auto isMuted = includeMuted && (count == muted);
 
-			const auto &ayuSettings = AyuSettings::getInstance();
-			if (ayuSettings.hideNotificationCounters) {
-				count = 0;
-			}
+				const auto &settings = AyuSettings::getInstance();
+				if (settings.hideNotificationCounters) {
+					count = 0;
+				}
 
-			slider->setUnreadCount(i, count, isMuted);
-			slider->fitWidthToSections();
-		}, state->reorderLifetime);
+				slider->setUnreadCount(i, count, isMuted);
+				slider->fitWidthToSections();
+			}, state->reorderLifetime);
 		}
 	};
 	if (trackActiveFilterAndUnreadAndReorder) {
