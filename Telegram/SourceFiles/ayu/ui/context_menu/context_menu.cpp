@@ -246,6 +246,10 @@ void AddJumpToBeginningAction(PeerData *peerData,
 			[=](not_null<PeerData*> peer, MsgId id)
 			{
 				if (weak.get()) {
+					// API returns 0 if message "Channel created" (ID: 1) was deleted, which scrolls to the bottom
+					if (id.bare == 0) {
+						id = MsgId(2);
+					}
 					callback(peer, id);
 				}
 			});
