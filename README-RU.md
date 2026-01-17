@@ -87,7 +87,13 @@ brew install --cask ayugram
 
 ### NixOS
 
-Попробуйте [этот репозиторий](https://github.com/ayugram-port/ayugram-desktop).
+#### Флейк (рекомендуется)
+
+Установите `ayugram-desktop` из [ndfined-crp/ayugram-desktop](https://github.com/ndfined-crp/ayugram-desktop)
+
+#### Nixpkgs
+
+Установите `ayugram-desktop` из [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=ayugram-desktop)
 
 ### ALT Linux
 
