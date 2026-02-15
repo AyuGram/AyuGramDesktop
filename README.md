@@ -4,6 +4,8 @@
 
 [ English  |   [Русский](README-RU.md) ]
 
+This repository includes **caching and download APIs** exposed locally for automation (e.g. scripts, bots, integrations). Configure and use them via the in-app settings and `tdata/ayu_settings.json` (e.g. `localApiEnabled`, `localApiPort`, `localApiKey`).
+
 ## Features
 
 - Full ghost mode (flexible)
