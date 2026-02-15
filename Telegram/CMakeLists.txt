@@ -114,6 +114,10 @@ set(ayugram_files
         ayu/ayu_lang.h
         ayu/ayu_infra.cpp
         ayu/ayu_infra.h
+        ayu/local_api/ayu_local_api.cpp
+        ayu/local_api/ayu_local_api.h
+        ayu/local_api/ayu_local_api_server.cpp
+        ayu/local_api/ayu_local_api_server.h
         ayu/utils/ayu_mapper.cpp
         ayu/utils/ayu_mapper.h
         ayu/utils/qt_key_modifiers_extended.h

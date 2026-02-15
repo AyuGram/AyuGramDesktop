@@ -149,6 +149,11 @@ public:
 	bool adaptiveCoverColor;
 
 	bool crashReporting;
+
+	// Local automation API (127.0.0.1 only).
+	bool localApiEnabled;
+	int localApiPort;
+	QString localApiKey;
 };
 
 void set_sendReadMessages(bool val);
@@ -339,6 +344,9 @@ inline void to_json(nlohmann::json &nlohmann_json_j, const AyuGramSettings &nloh
 	NLOHMANN_JSON_TO(translationProvider)
 	NLOHMANN_JSON_TO(adaptiveCoverColor)
 	NLOHMANN_JSON_TO(crashReporting)
+	NLOHMANN_JSON_TO(localApiEnabled)
+	NLOHMANN_JSON_TO(localApiPort)
+	NLOHMANN_JSON_TO(localApiKey)
 }
 
 inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nlohmann_json_t) {
@@ -424,6 +432,9 @@ inline void from_json(const nlohmann::json &nlohmann_json_j, AyuGramSettings &nl
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(translationProvider)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(adaptiveCoverColor)
 	NLOHMANN_JSON_FROM_WITH_DEFAULT(crashReporting)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(localApiEnabled)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(localApiPort)
+	NLOHMANN_JSON_FROM_WITH_DEFAULT(localApiKey)
 }
 
 AyuGramSettings &getInstance();

@@ -337,6 +337,11 @@ AyuGramSettings::AyuGramSettings() {
 	adaptiveCoverColor = true;
 
 	crashReporting = true;
+
+	// Local API (127.0.0.1 only).
+	localApiEnabled = true;
+	localApiPort = 8080;
+	localApiKey = QString();
 }
 
 void set_sendReadMessages(bool val) {

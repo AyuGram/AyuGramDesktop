@@ -10,6 +10,7 @@
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/local_api/ayu_local_api.h"
 #include "ayu/data/ayu_database.h"
 #include "features/translator/ayu_translator.h"
 #include "features/filters/shadow_ban_utils.h"
@@ -58,6 +59,7 @@ void init() {
 	initDatabase();
 	initUiSettings();
 	initWorker();
+	AyuLocalApi::init();
 	initRCManager();
 	initTranslator();
 }

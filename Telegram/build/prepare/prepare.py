@@ -46,7 +46,7 @@ if win and not 'COMSPEC' in os.environ:
 if win and not win32 and not win64 and not winarm:
     nativeToolsError()
 
-os.chdir(scriptPath + '/../../../..')
+os.chdir(scriptPath + '/../../..')
 
 pathSep = ';' if win else ':'
 libsLoc = 'Libraries' if not win64 else (os.path.join('Libraries', 'win64'))
