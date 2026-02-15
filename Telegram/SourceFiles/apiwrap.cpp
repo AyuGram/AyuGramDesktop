@@ -1886,6 +1886,10 @@ void ApiWrap::requestNotifySettings(const MTPInputNotifyPeer &peer) {
 			return peerFromChat(data.vchat_id());
 		}, [](const MTPDinputPeerUser &data) {
 			return peerFromUser(data.vuser_id());
+		}, [](const MTPDinputPeerUserFromMessage &data) {
+			return peerFromUser(data.vuser_id());
+		}, [](const MTPDinputPeerChannelFromMessage &data) {
+			return peerFromChannel(data.vchannel_id());
 		}, [](const auto &) -> PeerId {
 			Unexpected("Type in ApiRequest::requestNotifySettings peer.");
 		});
