@@ -31,15 +31,17 @@
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
 
+#include "ayu/ui/settings/ayu_hant_helper.h"
+
 namespace Settings {
 
 rpl::producer<QString> AyuFilters::title() {
-	return tr::ayu_CategoryFilters();
+	return AYU_T(ayu_CategoryFilters);
 }
 
 void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 	addAction(
-		tr::ayu_FiltersMenuSelectChat(tr::now),
+		AYU_S(ayu_FiltersMenuSelectChat),
 		[=]
 		{
 			if (const auto window = Core::App().activeWindow()) {
@@ -59,7 +61,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 							controller->showSettings(AyuFiltersList::Id());
 							return true;
 						},
-						tr::ayu_FiltersMenuSelectChat(),
+						AYU_T(ayu_FiltersMenuSelectChat),
 						nullptr,
 						types
 					);
@@ -71,7 +73,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		.isSeparator = true
 	});
 	addAction(
-		tr::ayu_FiltersMenuImport(tr::now),
+		AYU_S(ayu_FiltersMenuImport),
 		[=]
 		{
 			auto box = Box(Ui::FillImportFiltersBox, true);
@@ -80,7 +82,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		&st::menuIconArchive);
 	if (AyuDatabase::hasFilters()) {
 		addAction(
-			tr::ayu_FiltersMenuExport(tr::now),
+			AYU_S(ayu_FiltersMenuExport),
 			[=]
 			{
 				auto box = Box(Ui::FillImportFiltersBox, false);
@@ -92,7 +94,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 		.isSeparator = true
 	});
 	addAction(
-		tr::ayu_FiltersMenuClear(tr::now),
+		AYU_S(ayu_FiltersMenuClear),
 		[=]
 		{
 			auto callback = [=](Fn<void()> &&close)
@@ -105,9 +107,9 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			};
 
 			auto box = Ui::MakeConfirmBox({
-				.text = tr::ayu_FiltersClearPopupText(),
+				.text = AYU_T(ayu_FiltersClearPopupText),
 				.confirmed = callback,
-				.confirmText = tr::ayu_FiltersClearPopupActionText()
+				.confirmText = AYU_T(ayu_FiltersClearPopupActionText)
 			});
 			Ui::show(std::move(box));
 		},
@@ -125,11 +127,11 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
-	AddSubsectionTitle(container, tr::ayu_RegexFilters());
+	AddSubsectionTitle(container, AYU_T(ayu_RegexFilters));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_RegexFiltersEnable(),
+		AYU_T(ayu_RegexFiltersEnable),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->filtersEnabled)
@@ -151,7 +153,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_RegexFiltersEnableSharedInChats(),
+		AYU_T(ayu_RegexFiltersEnableSharedInChats),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->filtersEnabledInChats)
@@ -174,7 +176,7 @@ void SetupFiltersSettings(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_FiltersHideFromBlocked(),
+		AYU_T(ayu_FiltersHideFromBlocked),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->hideFromBlocked)
@@ -202,7 +204,7 @@ void SetupShared(not_null<Window::SessionController*> controller,
 
 	auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
-		tr::ayu_RegexFiltersShared()
+		AYU_T(ayu_RegexFiltersShared)
 	));
 	button->addClickHandler([=]
 	{
@@ -216,7 +218,7 @@ void SetupShadowBan(not_null<Window::SessionController*> controller,
 					Ui::VerticalLayout *container) {
 	auto button = container->add(object_ptr<Ui::SettingsButton>(
 		container,
-		tr::ayu_FiltersShadowBan()
+		AYU_T(ayu_FiltersShadowBan)
 	));
 	button->addClickHandler([=]
 	{
@@ -253,11 +255,11 @@ void SetupPerDialog(
 void SetupMessageFilters(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_RegexFilters());
+	AddSubsectionTitle(container, AYU_T(ayu_RegexFilters));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_FiltersHideFromBlocked(),
+		AYU_T(ayu_FiltersHideFromBlocked),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->hideFromBlocked)

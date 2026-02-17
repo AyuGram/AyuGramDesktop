@@ -18,6 +18,8 @@
 #include "settings_general.h"
 #include "settings_other.h"
 
+#include "ayu/ui/settings/ayu_hant_helper.h"
+
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/version.h"
@@ -87,12 +89,12 @@ void SetupCategories(
 	};
 
 	const auto categories = std::vector<CategoryInfo>{
-		{QString("AyuGram"), &st::menuIconGroupReactions, [=] { showOther(AyuGhost::Id()); }},
-		{asBeta(tr::ayu_CategoryFilters(tr::now)), &st::menuIconTagFilter, [=] { showOther(AyuFilters::Id()); }},
-		{tr::ayu_CategoryGeneral(tr::now), &st::menuIconShowAll, [=] { showOther(AyuGeneral::Id()); }},
-		{tr::ayu_CategoryAppearance(tr::now), &st::menuIconPalette, [=] { showOther(AyuAppearance::Id()); }},
-		{tr::ayu_CategoryChats(tr::now), &st::menuIconChatBubble, [=] { showOther(AyuChats::Id()); }},
-		{tr::ayu_CategoryOther(tr::now), &st::menuIconFave, [=] { showOther(AyuOther::Id()); }},
+		{AyuHantHelper(qsl("ayu_CategoryAyuGram"), qsl("AyuGram")), &st::menuIconGroupReactions, [=] { showOther(AyuGhost::Id()); }},
+		{asBeta(AYU_S(ayu_CategoryFilters)), &st::menuIconTagFilter, [=] { showOther(AyuFilters::Id()); }},
+		{AYU_S(ayu_CategoryGeneral), &st::menuIconShowAll, [=] { showOther(AyuGeneral::Id()); }},
+		{AYU_S(ayu_CategoryAppearance), &st::menuIconPalette, [=] { showOther(AyuAppearance::Id()); }},
+		{AYU_S(ayu_CategoryChats), &st::menuIconChatBubble, [=] { showOther(AyuChats::Id()); }},
+		{AYU_S(ayu_CategoryOther), &st::menuIconFave, [=] { showOther(AyuOther::Id()); }},
 	};
 
 	for (const auto &category : categories) {
@@ -205,14 +207,14 @@ void AyuMain::setupContent(not_null<Window::SessionController*> controller) {
 	AddDivider(content);
 	AddSkip(content);
 
-	AddSubsectionTitle(content, tr::ayu_CategoriesHeader());
+	AddSubsectionTitle(content, AYU_T(ayu_CategoriesHeader));
 	SetupCategories(content, controller, showOtherMethod());
 
 	AddSkip(content);
 	AddDivider(content);
 	AddSkip(content);
 
-	AddSubsectionTitle(content, tr::ayu_LinksHeader());
+	AddSubsectionTitle(content, AYU_T(ayu_LinksHeader));
 	SetupLinks(content, controller);
 
 	AddSkip(content);

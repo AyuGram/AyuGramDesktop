@@ -17,10 +17,12 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include "ayu/ui/settings/ayu_hant_helper.h"
+
 namespace Settings {
 
 rpl::producer<QString> AyuGeneral::title() {
-	return tr::ayu_CategoryGeneral();
+	return AYU_T(ayu_CategoryGeneral);
 }
 
 AyuGeneral::AyuGeneral(
@@ -64,7 +66,7 @@ void SetupTranslator(not_null<Ui::VerticalLayout*> container,
 
 	const auto button = AddButtonWithLabel(
 		container,
-		asBeta(tr::ayu_TranslationProvider()),
+		asBeta(AYU_T(ayu_TranslationProvider)),
 		currentVal,
 		st::settingsButtonNoIcon);
 	button->addClickHandler(
@@ -82,7 +84,7 @@ void SetupTranslator(not_null<Ui::VerticalLayout*> container,
 					};
 					SingleChoiceBox(box,
 									{
-										.title = tr::ayu_TranslationProvider(),
+										.title = AYU_T(ayu_TranslationProvider),
 										.options = options,
 										.initialSelection = getIndex(settings->translationProvider),
 										.callback = save,
@@ -96,7 +98,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 	auto *settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
-		QString(tr::ayu_SettingsShowID_Hide(tr::now)),
+		QString(AYU_S(ayu_SettingsShowID_Hide)),
 		QString("Telegram API"),
 		QString("Bot API")
 	};
@@ -109,7 +111,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 
 	const auto button = AddButtonWithLabel(
 		container,
-		tr::ayu_SettingsShowID(),
+		AYU_T(ayu_SettingsShowID),
 		currentVal,
 		st::settingsButtonNoIcon);
 	button->addClickHandler(
@@ -125,7 +127,7 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 					};
 					SingleChoiceBox(box,
 									{
-										.title = tr::ayu_SettingsShowID(),
+										.title = AYU_T(ayu_SettingsShowID),
 										.options = options,
 										.initialSelection = settings->showPeerId,
 										.callback = save,
@@ -142,11 +144,11 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 	AddDivider(container);
 	AddSkip(container);
 
-	AddSubsectionTitle(container, tr::ayu_CategoryGeneral());
+	AddSubsectionTitle(container, AYU_T(ayu_CategoryGeneral));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_DisableStories(),
+		AYU_T(ayu_DisableStories),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->disableStories)
@@ -165,7 +167,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_DisableOpenLinkWarning(),
+		AYU_T(ayu_DisableOpenLinkWarning),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->disableOpenLinkWarning)
@@ -184,14 +186,14 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	std::vector checkboxes = {
 		NestedEntry{
-			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)
+			AYU_S(ayu_CollapseSimilarChannels), settings->collapseSimilarChannels, [=](bool enabled)
 			{
 				AyuSettings::set_collapseSimilarChannels(enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_HideSimilarChannelsTab(tr::now), settings->hideSimilarChannels, [=](bool enabled)
+			AYU_S(ayu_HideSimilarChannelsTab), settings->hideSimilarChannels, [=](bool enabled)
 			{
 				AyuSettings::set_hideSimilarChannels(enabled);
 				AyuSettings::save();
@@ -199,12 +201,12 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		}
 	};
 
-	AddCollapsibleToggle(container, tr::ayu_DisableSimilarChannels(), checkboxes, true);
+	AddCollapsibleToggle(container, AYU_T(ayu_DisableSimilarChannels), checkboxes, true);
 
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_DisableNotificationsDelay(),
+		AYU_T(ayu_DisableNotificationsDelay),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->disableNotificationsDelay)
@@ -225,7 +227,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SettingsShowMessageSeconds(),
+		AYU_T(ayu_SettingsShowMessageSeconds),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->showMessageSeconds)
@@ -248,11 +250,11 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 	AddDivider(container);
 	AddSkip(container);
 
-	AddSubsectionTitle(container, rpl::single(QString("Webview")));
+	AddSubsectionTitle(container, rpl::single(AyuHantHelper(qsl("ayu_WebviewHeader"), qsl("Webview"))));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SettingsSpoofWebviewAsAndroid(),
+		AYU_T(ayu_SettingsSpoofWebviewAsAndroid),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->spoofWebviewAsAndroid)
@@ -271,14 +273,14 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	std::vector webviewCheckboxes = {
 		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewHeight(tr::now), settings->increaseWebviewHeight, [=](bool enabled)
+			AYU_S(ayu_SettingsIncreaseWebviewHeight), settings->increaseWebviewHeight, [=](bool enabled)
 			{
 				AyuSettings::set_increaseWebviewHeight(enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewWidth(tr::now), settings->increaseWebviewWidth, [=](bool enabled)
+			AYU_S(ayu_SettingsIncreaseWebviewWidth), settings->increaseWebviewWidth, [=](bool enabled)
 			{
 				AyuSettings::set_increaseWebviewWidth(enabled);
 				AyuSettings::save();
@@ -286,18 +288,18 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 		}
 	};
 
-	AddCollapsibleToggle(container, tr::ayu_SettingsBiggerWindow(), webviewCheckboxes, false);
+	AddCollapsibleToggle(container, AYU_T(ayu_SettingsBiggerWindow), webviewCheckboxes, false);
 
 	AddSkip(container);
 	AddDivider(container);
 	AddSkip(container);
 
 	// todo: move into a single checkbox with dropdown
-	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
+	AddSubsectionTitle(container, AYU_T(ayu_ConfirmationsTitle));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_StickerConfirmation(),
+		AYU_T(ayu_StickerConfirmation),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->stickerConfirmation)
@@ -316,7 +318,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_GIFConfirmation(),
+		AYU_T(ayu_GIFConfirmation),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->gifConfirmation)
@@ -335,7 +337,7 @@ void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::S
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_VoiceConfirmation(),
+		AYU_T(ayu_VoiceConfirmation),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->voiceConfirmation)

@@ -19,6 +19,8 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include "ayu/ui/settings/ayu_hant_helper.h"
+
 namespace Settings {
 
 rpl::producer<QString> AyuGhost::title() {
@@ -35,39 +37,39 @@ AyuGhost::AyuGhost(
 void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_GhostEssentialsHeader());
+	AddSubsectionTitle(container, AYU_T(ayu_GhostEssentialsHeader));
 
 	std::vector checkboxes{
 		NestedEntry{
-			tr::ayu_DontReadMessages(tr::now), !settings->sendReadMessages, [=](bool enabled)
+			AYU_S(ayu_DontReadMessages), !settings->sendReadMessages, [=](bool enabled)
 			{
 				AyuSettings::set_sendReadMessages(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontReadStories(tr::now), !settings->sendReadStories, [=](bool enabled)
+			AYU_S(ayu_DontReadStories), !settings->sendReadStories, [=](bool enabled)
 			{
 				AyuSettings::set_sendReadStories(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontSendOnlinePackets(tr::now), !settings->sendOnlinePackets, [=](bool enabled)
+			AYU_S(ayu_DontSendOnlinePackets), !settings->sendOnlinePackets, [=](bool enabled)
 			{
 				AyuSettings::set_sendOnlinePackets(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_DontSendUploadProgress(tr::now), !settings->sendUploadProgress, [=](bool enabled)
+			AYU_S(ayu_DontSendUploadProgress), !settings->sendUploadProgress, [=](bool enabled)
 			{
 				AyuSettings::set_sendUploadProgress(!enabled);
 				AyuSettings::save();
 			}
 		},
 		NestedEntry{
-			tr::ayu_SendOfflinePacketAfterOnline(tr::now), settings->sendOfflinePacketAfterOnline, [=](bool enabled)
+			AYU_S(ayu_SendOfflinePacketAfterOnline), settings->sendOfflinePacketAfterOnline, [=](bool enabled)
 			{
 				AyuSettings::set_sendOfflinePacketAfterOnline(enabled);
 				AyuSettings::save();
@@ -75,7 +77,7 @@ void SetupGhostModeToggle(not_null<Ui::VerticalLayout*> container) {
 		},
 	};
 
-	AddCollapsibleToggle(container, tr::ayu_GhostModeToggle(), checkboxes, true);
+	AddCollapsibleToggle(container, AYU_T(ayu_GhostModeToggle), checkboxes, true);
 }
 
 void SetupGhostEssentials(
@@ -88,7 +90,7 @@ void SetupGhostEssentials(
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_MarkReadAfterAction(),
+		AYU_T(ayu_MarkReadAfterAction),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		markReadAfterActionVal->value()
@@ -110,7 +112,7 @@ void SetupGhostEssentials(
 		},
 		container->lifetime());
 	AddSkip(container);
-	AddDividerText(container, tr::ayu_MarkReadAfterActionDescription());
+	AddDividerText(container, AYU_T(ayu_MarkReadAfterActionDescription));
 }
 
 void SetupScheduleMessages(
@@ -121,7 +123,7 @@ void SetupScheduleMessages(
 	AddSkip(container);
 	AddButtonWithIcon(
 		container,
-		tr::ayu_UseScheduledMessages(),
+		AYU_T(ayu_UseScheduledMessages),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		useScheduledMessagesVal->value()
@@ -143,7 +145,7 @@ void SetupScheduleMessages(
 		},
 		container->lifetime());
 	AddSkip(container);
-	AddDividerText(container, tr::ayu_UseScheduledMessagesDescription());
+	AddDividerText(container, AYU_T(ayu_UseScheduledMessagesDescription));
 }
 
 void SetupSendWithoutSound(not_null<Ui::VerticalLayout*> container) {
@@ -152,7 +154,7 @@ void SetupSendWithoutSound(not_null<Ui::VerticalLayout*> container) {
 	AddSkip(container);
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SendWithoutSoundByDefault(),
+		AYU_T(ayu_SendWithoutSoundByDefault),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->sendWithoutSound)
@@ -169,17 +171,17 @@ void SetupSendWithoutSound(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 	AddSkip(container);
-	AddDividerText(container, tr::ayu_SendWithoutSoundByDefaultDescription());
+	AddDividerText(container, AYU_T(ayu_SendWithoutSoundByDefaultDescription));
 }
 
 void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_SpyEssentialsHeader());
+	AddSubsectionTitle(container, AYU_T(ayu_SpyEssentialsHeader));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SaveDeletedMessages(),
+		AYU_T(ayu_SaveDeletedMessages),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveDeletedMessages)
@@ -198,7 +200,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_SaveMessagesHistory(),
+		AYU_T(ayu_SaveMessagesHistory),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveMessagesHistory)
@@ -221,7 +223,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_MessageSavingSaveForBots(),
+		AYU_T(ayu_MessageSavingSaveForBots),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->saveForBots)
@@ -240,7 +242,7 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_MessageSavingExcludeBotsInGroups(),
+		AYU_T(ayu_MessageSavingExcludeBotsInGroups),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->excludeBotsInGroups)
@@ -261,11 +263,11 @@ void SetupSpyEssentials(not_null<Ui::VerticalLayout*> container) {
 void SetupOther(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::ayu_MessageSavingOtherHeader());
+	AddSubsectionTitle(container, AYU_T(ayu_MessageSavingOtherHeader));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_LocalPremium(),
+		AYU_T(ayu_LocalPremium),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->localPremium)
@@ -284,7 +286,7 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_DisableAds(),
+		AYU_T(ayu_DisableAds),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->disableAds)
@@ -303,7 +305,7 @@ void SetupOther(not_null<Ui::VerticalLayout*> container) {
 
 	AddButtonWithIcon(
 		container,
-		rpl::single(QString("Improve DC5 connection")),
+		rpl::single(AyuHantHelper(qsl("ayu_ImproveDC5Connection"), qsl("優化 DC5 連線路徑"))),
 		st::settingsButtonNoIcon
 	)->toggleOn(
 		rpl::single(settings->improveDC5Connection)

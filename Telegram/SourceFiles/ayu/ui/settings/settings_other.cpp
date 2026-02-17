@@ -29,6 +29,8 @@
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+
+#include "ayu/ui/settings/ayu_hant_helper.h"
 #include "window/themes/window_theme.h"
 
 namespace Settings {
@@ -133,7 +135,7 @@ void AddCryptoDonate(const QString &name, const QString &address, not_null<Ui::V
 }
 
 rpl::producer<QString> AyuOther::title() {
-	return tr::ayu_CategoryOther();
+	return AYU_T(ayu_CategoryOther);
 }
 
 AyuOther::AyuOther(
@@ -144,7 +146,7 @@ AyuOther::AyuOther(
 }
 
 void SetupDonations(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
-	AddSubsectionTitle(container, tr::ayu_SupportHeader());
+	AddSubsectionTitle(container, AYU_T(ayu_SupportHeader));
 	AddDonate(
 		AddButtonWithIcon(
 			container,
@@ -177,11 +179,11 @@ void SetupCrashReporting(not_null<Ui::VerticalLayout*> container) {
 	auto *settings = &AyuSettings::getInstance();
 
 	AddSkip(container);
-	AddSubsectionTitle(container, tr::ayu_CategoryOther());
+	AddSubsectionTitle(container, AYU_T(ayu_CategoryOther));
 
 	AddButtonWithIcon(
 		container,
-		tr::ayu_CrashReporting(),
+		AYU_T(ayu_CrashReporting),
 		st::settingsButton,
 		{&st::menuIconReport}
 	)->toggleOn(
@@ -199,14 +201,14 @@ void SetupCrashReporting(not_null<Ui::VerticalLayout*> container) {
 		},
 		container->lifetime());
 	AddSkip(container);
-	AddDividerText(container, tr::ayu_CrashReportingDescription());
+	AddDividerText(container, AYU_T(ayu_CrashReportingDescription));
 }
 
 void SetupOtherThings(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
 	AddSkip(container);
 	AddButtonWithIcon(
 		container,
-		tr::ayu_RegisterURLScheme(),
+		AYU_T(ayu_RegisterURLScheme),
 		st::settingsButton,
 		{&st::menuIconLink}
 	)->setClickedCallback([=]
@@ -216,13 +218,13 @@ void SetupOtherThings(not_null<Ui::VerticalLayout*> container, not_null<Window::
 	});
 	AddButtonWithIcon(
 		container,
-		tr::ayu_ResetSettings(),
+		AYU_T(ayu_ResetSettings),
 		st::settingsButton,
 		{&st::menuIconRestore}
 	)->setClickedCallback([=]
 	{
 		controller->show(Ui::MakeConfirmBox({
-			.text = tr::ayu_ResetSettingsConfirmation(tr::rich),
+			.text = AYU_T(ayu_ResetSettingsConfirmation),
 			.confirmed = [=](Fn<void()> &&close)
 			{
 				AyuSettings::reset();
