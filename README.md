@@ -98,6 +98,9 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 See [this repository](https://github.com/OverLessArtem/ayugram-ebuild-gentoo) for installation manual.
 
+### Void Linux
+See [this repository](https://github.com/OverLessArtem/ayugram-template-void) for installation manual.
+
 ### EPM
 
 `epm play ayugram`
