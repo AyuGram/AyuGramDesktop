@@ -5,10 +5,44 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 '''
-import sys, os, re
+import sys, os, re, subprocess
 
 sys.dont_write_bytecode = True
 scriptPath = os.path.dirname(os.path.realpath(__file__))
+
+def patch(script_path):
+    repo_root = os.path.abspath(os.path.join(script_path, ".."))
+
+    git_patches = [
+        ('patches/smooth_scroll.patch', 'Telegram/lib_ui'),
+    ]
+
+    for patch, target_dir in git_patches:
+        realpath = os.path.normpath(os.path.join(repo_root, patch))
+
+        if not os.path.exists(realpath):
+            print(f"Skipping: Patch file not found at {realpath}.")
+            continue
+
+        common_args = [
+            'git', 'apply',
+            f'--directory={target_dir}',
+            '--ignore-whitespace',
+            realpath
+        ]
+
+        reverse_cmd = common_args[:2] + ['--reverse'] + common_args[2:]
+        subprocess.run(reverse_cmd, cwd=repo_root, capture_output=True)
+
+        result = subprocess.run(common_args, cwd=repo_root, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print(f"Success to apply {patch}.")
+        else:
+            print(f"Failed to apply {patch}:\n{result.stderr}.")
+
+patch(scriptPath)
+
 sys.path.append(scriptPath + '/../cmake')
 import run_cmake
 sys.path.append(scriptPath + '/build')

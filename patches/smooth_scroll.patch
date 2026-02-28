@@ -1,0 +1,125 @@
+diff --git a/ui/widgets/scroll_area.cpp b/ui/widgets/scroll_area.cpp
+index 81d5b58..50ceaee 100644
+--- a/ui/widgets/scroll_area.cpp
++++ b/ui/widgets/scroll_area.cpp
+@@ -10,6 +10,7 @@
+ #include "ui/ui_utility.h"
+ #include "base/qt/qt_common_adapters.h"
+ #include "base/debug_log.h"
++#include "base/event_filter.h"
+ 
+ #include <QtWidgets/QScrollBar>
+ #include <QtWidgets/QApplication>
+@@ -425,6 +426,93 @@ ScrollArea::ScrollArea(
+ 		_touchTimer.setCallback([=] { _touchRightButton = true; });
+ 		_touchScrollTimer.setCallback([=] { touchScrollTimer(); });
+ 	}
++
++	constexpr auto kScrollStepTime = crl::time(260);
++
++	const auto clearScrollState = [=] {
++		_scrollAnimation.stop();
++		_scrollTopFrom = 0;
++		_scrollTopTo = 0;
++		_timeOffset = 0;
++		_lastScrollApplied = 0;
++	};
++
++	_scrollAnimation.init([=](crl::time now) {
++		const auto actualTop = verticalScrollBar()->value();
++		if (_lastScrollApplied != 0 && _lastScrollApplied != actualTop) {
++			const auto shift = actualTop - _lastScrollApplied;
++			_scrollTopFrom += shift;
++			_scrollTopTo += shift;
++		}
++
++		const auto progress = float64(now
++			- _scrollAnimation.started()
++			- _timeOffset) / kScrollStepTime;
++		const auto eased = anim::easeOutQuint(1.0, progress);
++		const auto current = anim::interpolate(
++			_scrollTopFrom,
++			_scrollTopTo,
++			std::clamp(eased, 0., 1.));
++
++		verticalScrollBar()->setValue(current);
++		_lastScrollApplied = current;
++
++		if (progress >= 1.0) {
++			clearScrollState();
++		}
++	});
++
++	base::install_event_filter(verticalScrollBar(), [this](
++			not_null<QEvent*> e) {
++		const auto type = e->type();
++		if (type != QEvent::Wheel) {
++			return base::EventFilterResult::Continue;
++		}
++
++		const auto wheel = static_cast<QWheelEvent*>(e.get());
++		const auto delta = wheel->angleDelta().y();
++		if (std::abs(delta) != 120) {
++			verticalScrollBar()->setValue(verticalScrollBar()->value() - delta);
++			return base::EventFilterResult::Cancel;
++		}
++
++		const auto singleStep = verticalScrollBar()->singleStep()
++			* QApplication::wheelScrollLines() * 2;
++
++		const auto actualTop = verticalScrollBar()->value();
++		const auto animationActive = _scrollAnimation.animating()
++			&& (_lastScrollApplied != _scrollTopTo);
++		const auto top = animationActive
++			? (_lastScrollApplied ? _lastScrollApplied : actualTop)
++			: actualTop;
++
++		const auto diff = (delta > 0) ? -singleStep : singleStep;
++		const auto targetTop = std::clamp(top + diff, 0, scrollTopMax());
++
++		if (animationActive
++			&& ((_scrollTopTo > _scrollTopFrom) != (diff > 0))) {
++
++			_timeOffset = crl::now() - _scrollAnimation.started();
++			_scrollTopFrom = _lastScrollApplied
++				? _lastScrollApplied
++				: top;
++
++			// Try to smoothly reverse direction, same logic as FlexibleScrollHelper
++			_scrollTopTo = targetTop;
++			return base::EventFilterResult::Cancel;
++		}
++
++		_scrollTopFrom = top;
++		if (!animationActive) {
++			_scrollTopTo = targetTop;
++			_scrollAnimation.start();
++		} else {
++			_scrollTopTo = std::clamp(_scrollTopTo + diff, 0, scrollTopMax());
++			_timeOffset = crl::now() - _scrollAnimation.started();
++		}
++
++		return base::EventFilterResult::Cancel;
++	}, _smoothFilterLifetime);
+ }
+ 
+ void ScrollArea::touchDeaccelerate(int32 elapsed) {
+diff --git a/ui/widgets/scroll_area.h b/ui/widgets/scroll_area.h
+index ae56fab..649381d 100644
+--- a/ui/widgets/scroll_area.h
++++ b/ui/widgets/scroll_area.h
+@@ -251,6 +251,14 @@ private:
+ 	rpl::event_stream<> _innerResizes;
+ 	rpl::event_stream<> _geometryChanged;
+ 
++	// Smooth scroll
++	Animations::Basic _scrollAnimation;
++	int _scrollTopFrom = 0;
++	int _scrollTopTo = 0;
++	crl::time _timeOffset = 0;
++	int _lastScrollApplied = 0;
++	rpl::lifetime _smoothFilterLifetime;
++
+ };
+ 
+ } // namespace Ui
