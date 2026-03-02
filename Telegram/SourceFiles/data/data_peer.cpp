@@ -1695,8 +1695,8 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 }
 
 bool PeerData::isAyuNoForwards() const {
-	if (asUser()) {
-		return false;
+	if (const auto user = asUser()) {
+		return user->isAyuNoForwards();
 	} else if (const auto channel = asChannel()) {
 		return channel->isAyuNoForwards();
 	} else if (const auto chat = asChat()) {

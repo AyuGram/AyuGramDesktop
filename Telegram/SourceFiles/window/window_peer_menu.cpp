@@ -1464,7 +1464,7 @@ void Filler::addToggleNoForwards() {
 			}
 		}).send();
 	};
-	const auto disabledNow = !user->allowsForwarding();
+	const auto disabledNow = user->isAyuNoForwards();
 	_addAction(disabledNow
 		? tr::lng_enable_sharing(tr::now)
 		: tr::lng_disable_sharing(tr::now), [=] {
