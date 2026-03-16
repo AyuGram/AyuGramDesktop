@@ -19,6 +19,10 @@ project(Telegram
     HOMEPAGE_URL "https://ayugram.one"
 )
 
+if (WIN32 AND MSVC)
+    set(CMAKE_VS_GLOBALS "VcpkgEnabled=false")
+endif()
+
 if (APPLE)
     enable_language(OBJC OBJCXX)
 endif()
