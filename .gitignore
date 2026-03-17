@@ -67,3 +67,4 @@ settings.local.json
 
 # Project specific
 Telegram/SourceFiles/_other/packer_private.h
+venv/

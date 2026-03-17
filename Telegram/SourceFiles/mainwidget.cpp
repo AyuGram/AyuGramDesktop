@@ -1359,6 +1359,13 @@ void MainWidget::showHistory(
 				showAtMsgId = -showAtMsgId;
 			}
 		}
+		if (peer->isInaccessible()) {
+			if (params.activation != anim::activation::background) {
+				_controller->showToast(
+					tr::lng_channel_not_accessible(tr::now));
+			}
+			return;
+		}
 		const auto unavailable = peer->computeUnavailableReason();
 		if (!unavailable.isEmpty()) {
 			if (!isPrimary()) {

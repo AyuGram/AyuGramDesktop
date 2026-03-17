@@ -1310,7 +1310,20 @@ void SessionNavigation::showRepliesForMessage(
 			|| error.type() == u"USER_BANNED_IN_CHANNEL"_q) {
 			showToast(tr::lng_group_not_accessible(tr::now));
 		} else if (error.type() == u"MSG_ID_INVALID"_q) {
-			showToast(tr::lng_message_not_found(tr::now));
+			if (const auto topic = history->peer->forumTopicFor(rootId)) {
+				using namespace HistoryView;
+				auto memento = std::make_shared<ChatMemento>(
+					ChatViewId{
+						.history = history,
+						.repliesRootId = rootId,
+					},
+					commentId,
+					params.highlight);
+				memento->setFromTopic(topic);
+				showSection(std::move(memento), params);
+			} else {
+				showToast(tr::lng_message_not_found(tr::now));
+			}
 		}
 	}).send();
 }

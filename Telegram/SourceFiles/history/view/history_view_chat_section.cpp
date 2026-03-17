@@ -2132,7 +2132,10 @@ void ChatWidget::checkPinnedBarState() {
 	_pinnedBar->barClicks(
 	) | rpl::on_next([=] {
 		const auto id = _pinnedTracker->currentMessageId();
-		if (const auto item = session().data().message(id.message)) {
+		const auto item = id.message
+			? session().data().message(id.message)
+			: nullptr;
+		if (item) {
 			showAtPosition(item->position());
 			if (const auto group = session().data().groups().find(item)) {
 				// Hack for the case when a non-first item of an album
@@ -2143,6 +2146,9 @@ void ChatWidget::checkPinnedBarState() {
 			}
 			_minPinnedId = std::nullopt;
 			updatePinnedViewer();
+		} else if (id.message) {
+			controller()->showToast(
+				tr::lng_message_not_found(tr::now));
 		}
 	}, _pinnedBar->lifetime());
 

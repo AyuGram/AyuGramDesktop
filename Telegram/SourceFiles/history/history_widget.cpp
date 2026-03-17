@@ -3979,7 +3979,13 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		_preloadDownRequest = 0;
 	} else if (_firstLoadRequest == requestId) {
 		_firstLoadRequest = 0;
-		closeCurrent();
+		if (error.type() == u"MSG_ID_INVALID"_q && _showAtMsgId != ShowAtTheEndMsgId) {
+			_showAtMsgId = ShowAtTheEndMsgId;
+			firstLoadMessages();
+			controller()->showToast(tr::lng_message_not_found(tr::now));
+		} else {
+			closeCurrent();
+		}
 	} else if (_delayedShowAtRequest == requestId) {
 		_delayedShowAtRequest = 0;
 	}

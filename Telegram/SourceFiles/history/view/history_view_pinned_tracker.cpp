@@ -114,6 +114,13 @@ void PinnedTracker::refreshViewer() {
 }
 
 void PinnedTracker::refreshCurrentFromSlice() {
+	if (_slice.ids.empty()
+		&& !_slice.fullCount.value_or(0)
+		&& !_slice.skippedBefore.value_or(0)
+		&& !_slice.skippedAfter.value_or(0)) {
+		_current = PinnedId();
+		return;
+	}
 	const auto proj1 = [](FullMsgId id) {
 		return peerIsChannel(id.peer) ? id.msg : (id.msg - ServerMaxMsgId);
 	};
