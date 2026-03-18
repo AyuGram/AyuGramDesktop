@@ -3988,6 +3988,9 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		}
 	} else if (_delayedShowAtRequest == requestId) {
 		_delayedShowAtRequest = 0;
+		if (error.type() == u"MSG_ID_INVALID"_q) {
+			controller()->showToast(tr::lng_message_not_found(tr::now));
+		}
 	}
 }
 

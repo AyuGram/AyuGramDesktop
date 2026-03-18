@@ -368,7 +368,10 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 		return true;
 	}
 	const auto around = [&] {
-		if (viewer->around != ShowAtUnreadMsgId) {
+		if (viewer->around == ShowAtTheEndMsgId
+			|| viewer->around == Data::MaxMessagePosition.fullId.msg) {
+			return MsgId(ServerMaxMsgId - 1);
+		} else if (viewer->around != ShowAtUnreadMsgId) {
 			return viewer->around;
 		} else if (lookupRoot()) {
 			return computeInboxReadTillFull();
@@ -536,11 +539,16 @@ void RepliesList::loadAround(MsgId id) {
 	histories().cancelRequest(base::take(_beforeId));
 	histories().cancelRequest(base::take(_afterId));
 
+	const auto mtpOffsetId = int(std::clamp(
+		id.bare,
+		int64(0),
+		int64(0x3FFFFFFF)));
+
 	const auto send = [=](Fn<void()> finish) {
 		return _history->session().api().request(MTPmessages_GetReplies(
 			_history->peer->input(),
 			MTP_int(_rootId),
-			MTP_int(id), // offset_id
+			MTP_int(mtpOffsetId), // offset_id
 			MTP_int(0), // offset_date
 			MTP_int(id ? (-kMessagesPerPage / 2) : 0), // add_offset
 			MTP_int(kMessagesPerPage), // limit

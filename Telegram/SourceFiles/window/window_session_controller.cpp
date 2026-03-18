@@ -1211,6 +1211,10 @@ void SessionNavigation::showRepliesForMessage(
 		MsgId rootId,
 		MsgId commentId,
 		const SectionShow &params) {
+	if (history->peer->isForum() && rootId == Data::ForumTopic::kGeneralId) {
+		showPeerHistory(history->peer, params, commentId);
+		return;
+	}
 	if (const auto topic = history->peer->forumTopicFor(rootId)) {
 		auto replies = topic->replies();
 		if (replies->unreadCountKnown()) {
