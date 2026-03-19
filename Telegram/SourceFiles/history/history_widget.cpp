@@ -3979,6 +3979,11 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		_preloadDownRequest = 0;
 	} else if (_firstLoadRequest == requestId) {
 		_firstLoadRequest = 0;
+		LOG(("HistoryWidget::messagesFailed(firstLoad): peer=%1, "
+			"showAtMsgId=%2, error=%3"
+			).arg(_peer ? _peer->id.value : 0
+			).arg(_showAtMsgId.bare
+			).arg(error.type()));
 		if (error.type() == u"MSG_ID_INVALID"_q && _showAtMsgId != ShowAtTheEndMsgId) {
 			_showAtMsgId = ShowAtTheEndMsgId;
 			firstLoadMessages();
@@ -3988,6 +3993,11 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		}
 	} else if (_delayedShowAtRequest == requestId) {
 		_delayedShowAtRequest = 0;
+		LOG(("HistoryWidget::messagesFailed(delayedShow): peer=%1, "
+			"showAtMsgId=%2, error=%3"
+			).arg(_peer ? _peer->id.value : 0
+			).arg(_showAtMsgId.bare
+			).arg(error.type()));
 		if (error.type() == u"MSG_ID_INVALID"_q) {
 			controller()->showToast(tr::lng_message_not_found(tr::now));
 		}
@@ -7012,6 +7022,12 @@ int HistoryWidget::countInitialScrollTop() {
 		const auto item = getItemFromHistoryOrMigrated(_showAtMsgId);
 		const auto itemTop = _list->itemTop(item);
 		if (itemTop < 0) {
+			LOG(("HistoryWidget::countInitialScrollTop: peer=%1, "
+				"showAtMsgId=%2, item=%3, itemTop=%4"
+				).arg(_peer ? _peer->id.value : 0
+				).arg(_showAtMsgId.bare
+				).arg(item ? item->id.bare : 0
+				).arg(itemTop));
 			setMsgId(ShowAtUnreadMsgId);
 			controller()->showToast(tr::lng_message_not_found(tr::now));
 			return countInitialScrollTop();

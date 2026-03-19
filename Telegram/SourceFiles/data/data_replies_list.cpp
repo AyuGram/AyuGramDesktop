@@ -357,6 +357,13 @@ void RepliesList::injectRootDivider(
 bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 	if (_creating
 		|| (_list.empty() && _skippedBefore == 0 && _skippedAfter == 0)) {
+		LOG(("RepliesList::buildFromData(%1): early return empty, "
+			"creating=%2, listEmpty=%3, skippedBefore=%4, skippedAfter=%5"
+			).arg(_rootId.bare
+			).arg(_creating
+			).arg(_list.empty()
+			).arg(_skippedBefore.value_or(-1)
+			).arg(_skippedAfter.value_or(-1)));
 		viewer->slice.ids.clear();
 		viewer->slice.nearestToAround = FullMsgId();
 		viewer->slice.fullCount
@@ -392,6 +399,13 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 		|| (!around && _skippedAfter != 0)
 		|| (around > _list.front() && _skippedAfter != 0)
 		|| (around > 0 && around < _list.back() && _skippedBefore != 0)) {
+		LOG(("RepliesList::buildFromData(%1): need loadAround(%2), "
+			"listSize=%3, skippedBefore=%4, skippedAfter=%5"
+			).arg(_rootId.bare
+			).arg(around.bare
+			).arg(_list.size()
+			).arg(_skippedBefore.value_or(-1)
+			).arg(_skippedAfter.value_or(-1)));
 		loadAround(around);
 		return false;
 	}
@@ -544,6 +558,12 @@ void RepliesList::loadAround(MsgId id) {
 		int64(0),
 		int64(0x3FFFFFFF)));
 
+	LOG(("RepliesList::loadAround(%1): rootId=%2, id=%3, mtpOffsetId=%4"
+		).arg(_history->peer->id.value
+		).arg(_rootId.bare
+		).arg(id.bare
+		).arg(mtpOffsetId));
+
 	const auto send = [=](Fn<void()> finish) {
 		return _history->session().api().request(MTPmessages_GetReplies(
 			_history->peer->input(),
@@ -567,7 +587,15 @@ void RepliesList::loadAround(MsgId id) {
 			}
 			_skippedBefore = std::nullopt;
 			_list.clear();
-			if (processMessagesIsEmpty(result)) {
+			const auto wasEmpty = processMessagesIsEmpty(result);
+			LOG(("RepliesList::loadAround done: rootId=%1, id=%2, "
+				"isEmpty=%3, listSize=%4, fullCount=%5"
+				).arg(_rootId.bare
+				).arg(id.bare
+				).arg(wasEmpty
+				).arg(_list.size()
+				).arg(_fullCount.current().value_or(-1)));
+			if (wasEmpty) {
 				_fullCount = _skippedBefore = _skippedAfter = 0;
 			} else if (id) {
 				Assert(!_list.empty());
@@ -578,10 +606,19 @@ void RepliesList::loadAround(MsgId id) {
 				}
 			}
 			checkReadTillEnd();
-		}).fail([=] {
+		}).fail([=](const MTP::Error &error) {
+			LOG(("RepliesList::loadAround FAILED: rootId=%1, id=%2, "
+				"error=%3"
+				).arg(_rootId.bare
+				).arg(id.bare
+				).arg(error.type()));
 			_beforeId = 0;
 			_loadingAround = std::nullopt;
 			finish();
+			// Fire so the viewer is unblocked and shows at least the root
+			// message instead of staying in an infinite empty/loading state.
+			_skippedBefore = _skippedAfter = 0;
+			_listChanges.fire({});
 		}).send();
 	};
 	_loadingAround = id;

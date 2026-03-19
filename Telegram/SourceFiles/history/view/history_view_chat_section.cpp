@@ -2802,9 +2802,13 @@ void ChatWidget::paintEvent(QPaintEvent *e) {
 }
 
 bool ChatWidget::emptyShown() const {
-	return _topic
-		&& (_inner->isEmpty()
-			|| (_topic->lastKnownServerMessageId() == _repliesRootId));
+	// Use _inner->isEmpty() which returns true only when the message list is
+	// fully loaded (skippedBefore == 0 && skippedAfter == 0) and has no
+	// visible items. Do NOT use lastKnownServerMessageId() == _repliesRootId
+	// as that condition is true for all "short" topics (where the topic was
+	// received in minimal form), causing "Topic started!" to show even for
+	// topics that have messages.
+	return _topic && _inner->isEmpty();
 }
 
 void ChatWidget::onScroll() {

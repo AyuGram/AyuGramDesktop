@@ -1211,25 +1211,47 @@ void SessionNavigation::showRepliesForMessage(
 		MsgId rootId,
 		MsgId commentId,
 		const SectionShow &params) {
+	LOG(("showRepliesForMessage: peer=%1, rootId=%2, commentId=%3, "
+		"isForum=%4"
+		).arg(history->peer->id.value
+		).arg(rootId.bare
+		).arg(commentId.bare
+		).arg(history->peer->isForum()));
 	if (history->peer->isForum() && rootId == Data::ForumTopic::kGeneralId) {
+		LOG(("showRepliesForMessage: General Topic redirect"));
 		showPeerHistory(history->peer, params, commentId);
 		return;
 	}
 	if (const auto topic = history->peer->forumTopicFor(rootId)) {
 		auto replies = topic->replies();
-		if (replies->unreadCountKnown()) {
-			using namespace HistoryView;
-			auto memento = std::make_shared<ChatMemento>(
-				ChatViewId{
-					.history = history,
-					.repliesRootId = rootId,
-				},
-				commentId,
-				params.highlight);
-			memento->setFromTopic(topic);
-			showSection(std::move(memento), params);
-			return;
-		}
+		LOG(("showRepliesForMessage: topic found, unreadCountKnown=%1"
+			).arg(replies->unreadCountKnown()));
+		using namespace HistoryView;
+		auto memento = std::make_shared<ChatMemento>(
+			ChatViewId{
+				.history = history,
+				.repliesRootId = rootId,
+			},
+			commentId,
+			params.highlight);
+		memento->setFromTopic(topic);
+		showSection(std::move(memento), params);
+		return;
+	}
+	// For forum peers, getDiscussionMessage is wrong (topics are not
+	// channel posts). Show the topic section directly even if the topic
+	// object is not yet cached locally.
+	if (history->peer->isForum()) {
+		using namespace HistoryView;
+		auto memento = std::make_shared<ChatMemento>(
+			ChatViewId{
+				.history = history,
+				.repliesRootId = rootId,
+			},
+			commentId,
+			params.highlight);
+		showSection(std::move(memento), params);
+		return;
 	}
 	if (_showingRepliesRequestId
 		&& _showingRepliesHistory == history.get()
