@@ -251,6 +251,7 @@ public:
 	[[nodiscard]] bool disableAds() const { return _disableAds.current(); }
 	[[nodiscard]] bool disableStories() const { return _disableStories.current(); }
 	[[nodiscard]] bool disableCustomBackgrounds() const { return _disableCustomBackgrounds.current(); }
+	[[nodiscard]] bool hidePremiumStatuses() const { return _hidePremiumStatuses.current(); }
 	[[nodiscard]] bool showOnlyAddedEmojisAndStickers() const { return _showOnlyAddedEmojisAndStickers.current(); }
 	[[nodiscard]] bool collapseSimilarChannels() const { return _collapseSimilarChannels.current(); }
 	[[nodiscard]] bool hideSimilarChannels() const { return _hideSimilarChannels.current(); }
@@ -330,6 +331,7 @@ public:
 	void setDisableAds(bool val);
 	void setDisableStories(bool val);
 	void setDisableCustomBackgrounds(bool val);
+	void setHidePremiumStatuses(bool val);
 	void setShowOnlyAddedEmojisAndStickers(bool val);
 	void setCollapseSimilarChannels(bool val);
 	void setHideSimilarChannels(bool val);
@@ -421,6 +423,8 @@ public:
 	[[nodiscard]] rpl::producer<bool> disableStoriesChanges() const { return _disableStories.changes(); }
 	[[nodiscard]] rpl::producer<bool> disableCustomBackgroundsValue() const { return _disableCustomBackgrounds.value(); }
 	[[nodiscard]] rpl::producer<bool> disableCustomBackgroundsChanges() const { return _disableCustomBackgrounds.changes(); }
+	[[nodiscard]] rpl::producer<bool> hidePremiumStatusesValue() const { return _hidePremiumStatuses.value(); }
+	[[nodiscard]] rpl::producer<bool> hidePremiumStatusesChanges() const { return _hidePremiumStatuses.changes(); }
 	[[nodiscard]] rpl::producer<bool> showOnlyAddedEmojisAndStickersValue() const { return _showOnlyAddedEmojisAndStickers.value(); }
 	[[nodiscard]] rpl::producer<bool> showOnlyAddedEmojisAndStickersChanges() const { return _showOnlyAddedEmojisAndStickers.changes(); }
 	[[nodiscard]] rpl::producer<bool> collapseSimilarChannelsValue() const { return _collapseSimilarChannels.value(); }
@@ -626,6 +630,7 @@ private:
 	rpl::variable<bool> _showStreamerToggleInDrawer = false;
 	rpl::variable<bool> _showGhostToggleInTray = true;
 	rpl::variable<bool> _showStreamerToggleInTray = false;
+	rpl::variable<bool> _hidePremiumStatuses = false;
 	rpl::variable<QString> _monoFont;
 	rpl::variable<bool> _hideNotificationCounters = false;
 	rpl::variable<bool> _hideNotificationBadge = false;

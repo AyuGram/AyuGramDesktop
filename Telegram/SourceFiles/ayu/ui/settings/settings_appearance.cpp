@@ -213,6 +213,13 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setDisableCustomBackgrounds,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/hidePremiumStatuses"_q,
+		.title = tr::ayu_HidePremiumStatuses(),
+		.getter = &AyuSettings::hidePremiumStatuses,
+		.setter = &AyuSettings::setHidePremiumStatuses,
+	});
+
 	const auto controller = builder.controller();
 	builder.addButton({
 		.id = u"ayu/monoFont"_q,

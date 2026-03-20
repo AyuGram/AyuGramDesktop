@@ -542,6 +542,12 @@ void AyuSettings::setDisableCustomBackgrounds(bool val) {
 	save();
 }
 
+void AyuSettings::setHidePremiumStatuses(bool val) {
+	if (_hidePremiumStatuses.current() == val) return;
+	_hidePremiumStatuses = val;
+	save();
+}
+
 void AyuSettings::setShowOnlyAddedEmojisAndStickers(bool val) {
 	if (_showOnlyAddedEmojisAndStickers.current() == val) return;
 	_showOnlyAddedEmojisAndStickers = val;
