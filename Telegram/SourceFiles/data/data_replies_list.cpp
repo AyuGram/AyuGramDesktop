@@ -406,6 +406,11 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 		|| (around > _list.front() && _skippedAfter != 0)
 		|| (around > 0 && around < _list.back() && _skippedBefore != 0)
 		|| needExactLoad) {
+		// If a request is already in flight, don't cancel it by starting
+		// a new one. Wait for it to complete and re-trigger via _listChanges.
+		if (_loadingAround.has_value()) {
+			return false;
+		}
 		if (needExactLoad) {
 			_lastTriedExactAround = around;
 		}
