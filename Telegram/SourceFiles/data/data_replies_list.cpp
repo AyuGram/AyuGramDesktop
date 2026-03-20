@@ -395,10 +395,20 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 		}
 		return viewer->around;
 	}();
+	const auto needExactLoad = around > 0
+		&& around != MsgId(ServerMaxMsgId - 1)
+		&& viewer->around == around // Not a transformed special value
+		&& around != _lastTriedExactAround
+		&& !_list.empty()
+		&& !ranges::binary_search(_list, around, std::greater<>());
 	if (_list.empty()
 		|| (!around && _skippedAfter != 0)
 		|| (around > _list.front() && _skippedAfter != 0)
-		|| (around > 0 && around < _list.back() && _skippedBefore != 0)) {
+		|| (around > 0 && around < _list.back() && _skippedBefore != 0)
+		|| needExactLoad) {
+		if (needExactLoad) {
+			_lastTriedExactAround = around;
+		}
 		LOG(("RepliesList::buildFromData(%1): need loadAround(%2), "
 			"listSize=%3, skippedBefore=%4, skippedAfter=%5"
 			).arg(_rootId.bare
@@ -448,6 +458,16 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 	slice->fullCount = _fullCount.current();
 
 	injectRootMessageAndReverse(viewer);
+
+	LOG(("RepliesList::buildFromData(%1): built slice, "
+		"ids=%2, injectedForRoot=%3, fullCount=%4, "
+		"skippedBefore=%5, skippedAfter=%6"
+		).arg(_rootId.bare
+		).arg(slice->ids.size()
+		).arg(viewer->injectedForRoot
+		).arg(slice->fullCount.value_or(-1)
+		).arg(slice->skippedBefore.value_or(-1)
+		).arg(slice->skippedAfter.value_or(-1)));
 
 	if (_skippedBefore != 0 && useBefore < viewer->limitBefore + 1) {
 		loadBefore();
@@ -553,15 +573,19 @@ void RepliesList::loadAround(MsgId id) {
 	histories().cancelRequest(base::take(_beforeId));
 	histories().cancelRequest(base::take(_afterId));
 
-	const auto mtpOffsetId = int(std::clamp(
-		id.bare,
-		int64(0),
-		int64(0x3FFFFFFF)));
+	// If id exceeds int32 range (e.g. ServerMaxMsgId - 1 used for
+	// "show end of list"), treat it as 0 which means "get newest messages"
+	// with add_offset=0. Clamping to 0x3FFFFFFF would ask for messages
+	// around a non-existent ID and the server would return 0 results.
+	const auto adjustedId = (id.bare > int64(0x3FFFFFFF)) ? MsgId(0) : id;
+	const auto mtpOffsetId = int(adjustedId.bare);
 
-	LOG(("RepliesList::loadAround(%1): rootId=%2, id=%3, mtpOffsetId=%4"
+	LOG(("RepliesList::loadAround(%1): rootId=%2, id=%3, adjustedId=%4, "
+		"mtpOffsetId=%5"
 		).arg(_history->peer->id.value
 		).arg(_rootId.bare
 		).arg(id.bare
+		).arg(adjustedId.bare
 		).arg(mtpOffsetId));
 
 	const auto send = [=](Fn<void()> finish) {
@@ -570,7 +594,7 @@ void RepliesList::loadAround(MsgId id) {
 			MTP_int(_rootId),
 			MTP_int(mtpOffsetId), // offset_id
 			MTP_int(0), // offset_date
-			MTP_int(id ? (-kMessagesPerPage / 2) : 0), // add_offset
+			MTP_int(adjustedId ? (-kMessagesPerPage / 2) : 0), // add_offset
 			MTP_int(kMessagesPerPage), // limit
 			MTP_int(0), // max_id
 			MTP_int(0), // min_id
@@ -580,7 +604,7 @@ void RepliesList::loadAround(MsgId id) {
 			_loadingAround = std::nullopt;
 			finish();
 
-			if (!id) {
+			if (!adjustedId) {
 				_skippedAfter = 0;
 			} else {
 				_skippedAfter = std::nullopt;
@@ -595,13 +619,25 @@ void RepliesList::loadAround(MsgId id) {
 				).arg(wasEmpty
 				).arg(_list.size()
 				).arg(_fullCount.current().value_or(-1)));
-			if (wasEmpty) {
+			if (wasEmpty && adjustedId) {
+				// The server returned 0 messages for this offset_id,
+				// but the topic may not actually be empty (e.g. the
+				// offset was _inboxReadTillId which is a global channel
+				// message ID beyond this topic's range). Retry with
+				// offset_id=0 to get the newest messages.
+				LOG(("RepliesList::loadAround: retrying with offset 0 "
+					"(rootId=%1, original offset=%2)"
+					).arg(_rootId.bare
+					).arg(adjustedId.bare));
+				loadAround(MsgId(0));
+				return;
+			} else if (wasEmpty) {
 				_fullCount = _skippedBefore = _skippedAfter = 0;
-			} else if (id) {
+			} else if (adjustedId) {
 				Assert(!_list.empty());
-				if (_list.front() <= id) {
+				if (_list.front() <= adjustedId) {
 					_skippedAfter = 0;
-				} else if (_list.back() >= id) {
+				} else if (_list.back() >= adjustedId) {
 					_skippedBefore = 0;
 				}
 			}
@@ -756,7 +792,13 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 		return data.vcount().v;
 	});
 
+	LOG(("RepliesList::processMessagesIsEmpty: rootId=%1, "
+		"listSize=%2, fullCount=%3"
+		).arg(_rootId.bare
+		).arg(list.size()
+		).arg(fullCount));
 	if (list.isEmpty()) {
+		LOG(("RepliesList::processMessagesIsEmpty: server returned 0 messages"));
 		return true;
 	}
 
@@ -779,9 +821,16 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 					_list.push_back(item->id);
 				}
 			} else {
+				LOG(("RepliesList::processMessagesIsEmpty: SKIPPED msg %1, "
+					"replyToTop=%2, topicRootId=%3, rootId=%4"
+					).arg(item->id.bare
+					).arg(item->replyToTop().bare
+					).arg(item->topicRootId().bare
+					).arg(_rootId.bare));
 				++skipped;
 			}
 		} else {
+			LOG(("RepliesList::processMessagesIsEmpty: addNewMessage returned null"));
 			++skipped;
 		}
 	}
@@ -826,6 +875,14 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 			}
 		}
 	}
+
+	LOG(("RepliesList::processMessagesIsEmpty: result - "
+		"listSize=%1, skipped=%2, nowSize=%3, checkedCount=%4, isEmpty=%5"
+		).arg(list.size()
+		).arg(skipped
+		).arg(nowSize
+		).arg(checkedCount
+		).arg(list.size() == skipped));
 
 	Ensures(list.size() >= skipped);
 	return (list.size() == skipped);

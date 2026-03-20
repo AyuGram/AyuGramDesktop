@@ -115,6 +115,7 @@ private:
 	rpl::event_stream<> _listChanges;
 	rpl::event_stream<> _instantChanges;
 	std::optional<MsgId> _loadingAround;
+	MsgId _lastTriedExactAround = 0;
 	rpl::variable<std::optional<int>> _unreadCount;
 	MsgId _inboxReadTillId = 0;
 	MsgId _outboxReadTillId = 0;

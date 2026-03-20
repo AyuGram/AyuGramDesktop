@@ -1217,11 +1217,6 @@ void SessionNavigation::showRepliesForMessage(
 		).arg(rootId.bare
 		).arg(commentId.bare
 		).arg(history->peer->isForum()));
-	if (history->peer->isForum() && rootId == Data::ForumTopic::kGeneralId) {
-		LOG(("showRepliesForMessage: General Topic redirect"));
-		showPeerHistory(history->peer, params, commentId);
-		return;
-	}
 	if (const auto topic = history->peer->forumTopicFor(rootId)) {
 		auto replies = topic->replies();
 		LOG(("showRepliesForMessage: topic found, unreadCountKnown=%1"
