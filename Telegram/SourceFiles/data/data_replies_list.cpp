@@ -406,9 +406,9 @@ bool RepliesList::buildFromData(not_null<Viewer*> viewer) {
 		|| (around > _list.front() && _skippedAfter != 0)
 		|| (around > 0 && around < _list.back() && _skippedBefore != 0)
 		|| needExactLoad) {
-		// If a request is already in flight, don't cancel it by starting
-		// a new one. Wait for it to complete and re-trigger via _listChanges.
-		if (_loadingAround.has_value()) {
+		// If a retry-to-newest is in flight, don't cancel it by starting
+		// a new load. Wait for the retry to complete first.
+		if (_retryingToNewest) {
 			return false;
 		}
 		if (needExactLoad) {
@@ -606,7 +606,9 @@ void RepliesList::loadAround(MsgId id) {
 			MTP_long(0) // hash
 		)).done([=](const MTPmessages_Messages &result) {
 			_beforeId = 0;
-			_loadingAround = std::nullopt;
+			// Don't clear _loadingAround yet — we may need to retry,
+			// and clearing it now would let competing viewers cancel
+			// the retry by starting a new loadAround.
 			finish();
 
 			if (!adjustedId) {
@@ -634,9 +636,13 @@ void RepliesList::loadAround(MsgId id) {
 					"(rootId=%1, original offset=%2)"
 					).arg(_rootId.bare
 					).arg(adjustedId.bare));
+				_retryingToNewest = true;
 				loadAround(MsgId(0));
 				return;
-			} else if (wasEmpty) {
+			}
+			_loadingAround = std::nullopt;
+			_retryingToNewest = false;
+			if (wasEmpty) {
 				_fullCount = _skippedBefore = _skippedAfter = 0;
 			} else if (adjustedId) {
 				Assert(!_list.empty());
@@ -655,6 +661,7 @@ void RepliesList::loadAround(MsgId id) {
 				).arg(error.type()));
 			_beforeId = 0;
 			_loadingAround = std::nullopt;
+			_retryingToNewest = false;
 			finish();
 			// Fire so the viewer is unblocked and shows at least the root
 			// message instead of staying in an infinite empty/loading state.
