@@ -108,6 +108,14 @@ See [this repository](https://github.com/OverLessArtem/ayugram-ebuild-gentoo) fo
 
 `epm play ayugram`
 
+### Fedora
+
+From [RPM Fusion](https://admin.rpmfusion.org/pkgdb/package/free/ayugram-desktop/) repository.
+
+```bash
+dnf install ayugram-desktop
+```
+
 ### Any other Linux distro
 
 Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak

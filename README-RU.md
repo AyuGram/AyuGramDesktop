@@ -107,6 +107,14 @@ brew install --cask ayugram
 
 `epm play ayugram`
 
+### Fedora
+
+Из репозитория [RPM Fusion](https://admin.rpmfusion.org/pkgdb/package/free/ayugram-desktop/).
+
+```bash
+dnf install ayugram-desktop
+```
+
 ### Любой другой Линукс дистрибутив
 
 Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
