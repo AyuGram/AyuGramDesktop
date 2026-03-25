@@ -74,7 +74,7 @@ MTPInputReplyTo ReplyToForMTP(
 			: replyTo.monoforumPeerId
 			? replyTo.monoforumPeerId
 			: history->session().user()->id;
-		const auto replyToMonoforumPeerId = history->peer->amMonoforumAdmin()
+		const auto replyToMonoforumPeerId = (history->peer->amMonoforumAdmin() || history->peer->isMonoforum())
 			? possibleMonoforumPeerId
 			: PeerId();
 		const auto external = replyTo.messageId

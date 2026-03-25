@@ -704,7 +704,7 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, Hi
 			const auto hasReply = replyTo.messageId.msg != 0;
 			const auto shiftPressed = base::IsShiftPressed();
 
-			const auto useNoQuote = shiftPressed || inRepliesView;
+			const auto useNoQuote = shiftPressed || (inRepliesView && !history->peer->isForum());
 			const auto preserveReply = inRepliesView ? hasReply : (hasReply && shiftPressed);
 
 			const auto currentItem = history->owner().message(itemId);
@@ -715,6 +715,7 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, Hi
 			auto action = Api::SendAction(
 				history,
 				Api::SendOptions{ .sendAs = sendAs });
+			action.replyTo.monoforumPeerId = currentItem->sublistPeerId();
 			action.clearDraft = false;
 
 			applyGhostScheduling(session, action.options);

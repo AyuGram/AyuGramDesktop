@@ -3571,7 +3571,7 @@ void ApiWrap::forwardMessages(
 	const auto monoforumPeer = monoforumPeerId
 		? session().data().peer(monoforumPeerId).get()
 		: nullptr;
-	if (monoforumPeer || (action.options.suggest && action.replyTo)) {
+	if (monoforumPeer || (action.options.suggest && action.replyTo) || action.replyTo.messageId) {
 		sendFlags |= SendFlag::f_reply_to;
 	}
 
@@ -3615,7 +3615,7 @@ void ApiWrap::forwardMessages(
 				MTP_vector<MTPlong>(randomIds),
 				history->peer->input(),
 				MTP_int(realTopMsgId),
-				(action.options.suggest
+				((action.options.suggest || replyTo.messageId || replyTo.topicRootId || replyTo.monoforumPeerId)
 					? ReplyToForMTP(history, replyTo)
 					: monoforumPeer
 					? MTP_inputReplyToMonoForum(
@@ -3636,7 +3636,7 @@ void ApiWrap::forwardMessages(
 		};
 		histories.sendPreparedMessage(
 			history,
-			FullReplyTo{ .topicRootId = topicRootId },
+			action.replyTo,
 			uint64(0),
 			std::move(buildMessage),
 			[=](const MTPUpdates &result, const MTP::Response &) {
