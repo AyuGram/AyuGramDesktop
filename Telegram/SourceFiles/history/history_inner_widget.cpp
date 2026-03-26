@@ -574,8 +574,8 @@ void HistoryInner::setupSharingDisallowed() {
 		_sharingDisallowed = rpl::combine(
 			Data::PeerFlagValue(user, UserDataFlag::NoForwardsMyEnabled),
 			Data::PeerFlagValue(user, UserDataFlag::NoForwardsPeerEnabled)
-		) | rpl::map([](bool my, bool peer) {
-			return my || peer;
+		) | rpl::map([](bool, bool) {
+			return false;
 		});
 	} else {
 		const auto chat = _peer->asChat();
