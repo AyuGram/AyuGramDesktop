@@ -2,6 +2,7 @@ name: Windows.
 
 on:
   push:
+    branches: [dev]
     paths-ignore:
       - 'docs/**'
       - '**.md'
@@ -21,6 +22,7 @@ on:
       - 'Telegram/configure.sh'
       - 'Telegram/Telegram.plist'
   pull_request:
+    branches: [dev]
     paths-ignore:
       - 'docs/**'
       - '**.md'
