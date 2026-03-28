@@ -2,6 +2,7 @@ name: Snap.
 
 on:
   push:
+    branches: [dev]
     paths-ignore:
       - 'docs/**'
       - '**.md'
@@ -19,6 +20,7 @@ on:
       - 'Telegram/configure.bat'
       - 'Telegram/Telegram.plist'
   pull_request:
+    branches: [dev]
     paths-ignore:
       - 'docs/**'
       - '**.md'
