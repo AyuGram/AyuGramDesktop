@@ -287,10 +287,10 @@ InnerWidget::InnerWidget(
 		scrollDateHideByTimer();
 	});
 	session().data().viewRepaintRequest(
-	) | rpl::on_next([=](auto view)
+	) | rpl::on_next([=](Data::RequestViewRepaint request)
 							 {
-								 if (view->delegate() == this) {
-									 repaintItem(view);
+								 if (request.view->delegate() == this) {
+									 repaintItem(request.view);
 								 }
 							 },
 							 lifetime());
