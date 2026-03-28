@@ -495,7 +495,11 @@ void ChatBackground::setThemeData(QImage &&themeImage, bool themeTile) {
 void ChatBackground::initialRead() {
 	if (started()) {
 		return;
-	} else if (!Local::readBackground()) {
+	}
+	if (_themeObject.pathAbsolute.isEmpty() && !nightMode()) {
+		applyDefaultThemeAccentColorizer();
+	}
+	if (!Local::readBackground()) {
 		set(Data::ThemeWallPaper());
 	}
 	if (_localStoredTileDayValue) {
@@ -561,6 +565,28 @@ void ChatBackground::start() {
 	}) | rpl::distinct_until_changed(
 	) | rpl::on_next([](bool dark) {
 		Core::App().settings().setSystemDarkMode(dark);
+	}, _lifetime);
+
+	rpl::single(
+		QGuiApplication::palette()
+	) | rpl::then(
+		base::qt_signal_producer(
+			qApp,
+			&QGuiApplication::paletteChanged
+		)
+	) | rpl::on_next([=] {
+		const auto &settings = Core::App().settings();
+		if (!settings.systemAccentColorEnabled()
+			|| _themeObject.cloud.id
+			|| editingTheme()) {
+			return;
+		}
+		const auto path = _themeObject.pathAbsolute;
+		if (!IsEmbeddedTheme(path)) {
+			return;
+		}
+		ApplyDefaultWithPath(path);
+		KeepApplied();
 	}, _lifetime);
 }
 
@@ -1064,13 +1090,17 @@ void ChatBackground::setTestingTheme(Instance &&theme) {
 }
 
 void ChatBackground::setTestingDefaultTheme() {
-	style::main_palette::reset(ColorizerForTheme(QString()));
-	saveAdjustableColors();
+	applyDefaultThemeAccentColorizer();
 
 	saveForRevert();
 	set(Data::details::TestingDefaultWallPaper());
 	setTile(false);
 	_updates.fire({ BackgroundUpdate::Type::TestingTheme, tile() });
+}
+
+void ChatBackground::applyDefaultThemeAccentColorizer() {
+	style::main_palette::reset(ColorizerForTheme(QString()));
+	saveAdjustableColors();
 }
 
 void ChatBackground::keepApplied(const Object &object, bool write) {

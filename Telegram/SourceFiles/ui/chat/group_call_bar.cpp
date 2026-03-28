@@ -191,6 +191,7 @@ void GroupCallBar::refreshScheduledProcess() {
 				_inner.get(),
 				tr::lng_group_call_join(),
 				st::groupCallTopBarJoin);
+			_join->setTextTransform(RoundButton::TextTransform::NoTransform);
 			setupRightButton(_join.get());
 		}
 	} else if (!_scheduledProcess) {

@@ -106,7 +106,6 @@ constexpr auto kPremiumToastDuration = 5 * crl::time(1000);
 			(result->height() - st::toastUndoDiameter) / 2,
 			st::toastUndoDiameter,
 			st::toastUndoDiameter);
-		p.setFont(st::toastUndoFont);
 		state->countdown.paint(
 			p,
 			inner.x() + (inner.width() - state->countdown.countWidth()) / 2,

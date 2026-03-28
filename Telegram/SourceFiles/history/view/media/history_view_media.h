@@ -330,6 +330,12 @@ public:
 	[[nodiscard]] virtual bool enforceBubbleWidth() const {
 		return false;
 	}
+	[[nodiscard]] virtual bool allowsNarrowBubble() const {
+		return false;
+	}
+	[[nodiscard]] virtual int minBubbleWidthForNarrowBubble() const {
+		return 0;
+	}
 
 	// Sometimes click on media in message is overloaded by the message:
 	// (for example it can open a link or a game instead of opening media)
@@ -353,6 +359,9 @@ public:
 	}
 	[[nodiscard]] virtual QMargins bubbleRollRepaintMargins() const {
 		return QMargins();
+	}
+	virtual bool updateItemData() {
+		return false;
 	}
 	virtual void paintBubbleFireworks(
 		Painter &p,

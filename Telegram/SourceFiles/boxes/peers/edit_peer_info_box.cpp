@@ -662,7 +662,8 @@ object_ptr<Ui::RpWidget> Controller::createTitleEdit() {
 	result->entity()->setMaxLength(Ui::EditPeer::kMaxGroupChannelTitle);
 	result->entity()->setInstantReplaces(Ui::InstantReplaces::Default());
 	result->entity()->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue());
+		Core::App().settings().replaceEmojiValue(),
+		Core::App().settings().systemTextReplaceValue());
 	Ui::Emoji::SuggestionsController::Init(
 		_wrap->window(),
 		result->entity(),
@@ -770,7 +771,8 @@ object_ptr<Ui::RpWidget> Controller::createDescriptionEdit() {
 	result->entity()->setMaxLength(Ui::EditPeer::kMaxChannelDescription);
 	result->entity()->setInstantReplaces(Ui::InstantReplaces::Default());
 	result->entity()->setInstantReplacesEnabled(
-		Core::App().settings().replaceEmojiValue());
+		Core::App().settings().replaceEmojiValue(),
+		Core::App().settings().systemTextReplaceValue());
 	result->entity()->setSubmitSettings(
 		Core::App().settings().sendSubmitWay());
 	Ui::Emoji::SuggestionsController::Init(
@@ -1201,7 +1203,6 @@ void Controller::refreshForumToggleLocked() {
 void Controller::fillColorIndexButton() {
 	Expects(_controls.buttonsLayout != nullptr);
 
-	const auto show = _navigation->uiShow();
 	AddPeerColorButton(
 		_controls.buttonsLayout,
 		_navigation->uiShow(),
@@ -2281,11 +2282,13 @@ void Controller::saveUsernamesOrder() {
 		_api.request(MTPchannels_DeactivateAllUsernames(
 			channel->inputChannel()
 		)).done([=] {
-			channel->setUsernames(channel->editableUsername().isEmpty()
-				? Data::Usernames()
-				: Data::Usernames{
+			if (channel->editableUsername().isEmpty()) {
+				channel->setUsernames({});
+			} else {
+				channel->setUsernames({
 					{ channel->editableUsername(), true, true }
 				});
+			}
 			continueSave();
 		}).send();
 	} else {
@@ -2451,6 +2454,8 @@ void Controller::saveTitle() {
 		_controls.title->showError();
 		if (type == u"NO_CHAT_TITLE"_q) {
 			_box->scrollToWidget(_controls.title);
+		} else {
+			_navigation->showToast(type);
 		}
 		cancelSave();
 	};
@@ -2529,8 +2534,9 @@ void Controller::saveDescription() {
 				MTPstring() // Description.
 			)).done([=] {
 				successCallback();
-			}).fail([=] {
+			}).fail([=](const MTP::Error &error) {
 				_controls.description->showError();
+				_navigation->showToast(error.type());
 				cancelSave();
 			}).send();
 		}).fail([=] {
@@ -2550,6 +2556,7 @@ void Controller::saveDescription() {
 			return;
 		}
 		_controls.description->showError();
+		_navigation->showToast(type);
 		cancelSave();
 	}).send();
 }
@@ -2621,9 +2628,11 @@ void Controller::togglePreHistoryHidden(
 		channel->session().api().applyUpdates(result);
 		apply();
 	}).fail([=](const MTP::Error &error) {
-		if (error.type() == u"CHAT_NOT_MODIFIED"_q) {
+		const auto type = error.type();
+		if (type == u"CHAT_NOT_MODIFIED"_q) {
 			apply();
 		} else {
+			_navigation->showToast(type);
 			fail();
 		}
 	}).send();
@@ -2735,9 +2744,12 @@ void Controller::saveForwards() {
 		|| *_savingData.noForwards == _peer->isAyuNoForwards()) {
 		return continueSave();
 	}
+	using Flag = MTPmessages_ToggleNoForwards::Flag;
 	_api.request(MTPmessages_ToggleNoForwards(
+		MTP_flags(Flag()),
 		_peer->input(),
-		MTP_bool(*_savingData.noForwards)
+		MTP_bool(*_savingData.noForwards),
+		MTPint()
 	)).done([=](const MTPUpdates &result) {
 		_peer->session().api().applyUpdates(result);
 		continueSave();

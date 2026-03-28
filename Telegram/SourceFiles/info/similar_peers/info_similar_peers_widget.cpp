@@ -23,7 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/tooltip.h"
 #include "ui/ui_utility.h"
 #include "lang/lang_keys.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "window/window_session_controller.h"
 #include "styles/style_info.h"
 #include "styles/style_widgets.h"
@@ -128,7 +128,7 @@ rpl::producer<int> ListController::unlockHeightValue() const {
 void ListController::rebuild() {
 	const auto participants = &_peer->session().api().chatParticipants();
 	const auto &list = participants->similar(_peer);
-	for (const auto peer : list.list) {
+	for (const auto &peer : list.list) {
 		if (!delegate()->peerListFindRow(peer->id.value)) {
 			delegate()->peerListAppendRow(createRow(peer));
 		}

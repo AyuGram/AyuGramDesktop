@@ -30,9 +30,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "settings/settings_active_sessions.h"
+#include "settings/sections/settings_active_sessions.h"
 #include "settings/settings_credits_graphics.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/credits_graphics.h"
@@ -97,7 +97,7 @@ void ShowAuthToast(
 				Qt::MouseButton button) {
 			if (const auto controller = FindSessionController(parent)) {
 				session->api().authorizations().reload();
-				controller->showSettings(Settings::Sessions::Id());
+				controller->showSettings(Settings::SessionsId());
 				return false;
 			}
 			return true;
@@ -505,6 +505,9 @@ rpl::producer<Ui::SlideWrap<Ui::RpWidget>*> TopBarSuggestionValue(
 							widget->raise();
 						}, widget->lifetime());
 						for (const auto &id : users) {
+							if (s->inRow.size() >= 3) {
+								break;
+							}
 							if (const auto user = session->data().user(id)) {
 								s->inRow.push_back({ .peer = user });
 							}

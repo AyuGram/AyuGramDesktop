@@ -77,6 +77,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/unread_badge.h"
 #include "boxes/filters/edit_filter_box.h"
 #include "boxes/peers/edit_forum_topic_box.h"
+#include "boxes/peer_list_box.h"
 #include "api/api_chat_filters.h"
 #include "base/qt/qt_common_adapters.h"
 #include "styles/style_dialogs.h"
@@ -89,6 +90,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 
 #include <QtWidgets/QApplication>
+#include <QtCore/QMimeData>
 
 // AyuGram includes
 #include "styles/style_ayu_icons.h"
@@ -97,8 +99,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Dialogs {
 namespace {
 
+constexpr auto kFreezeTimeout = crl::time(5000);
 constexpr auto kHashtagResultsLimit = 5;
 constexpr auto kStartReorderThreshold = 30;
+constexpr auto kStartDragToFilterThresholdX = kStartReorderThreshold;
+constexpr auto kStartDragToFilterThresholdY = 75;
 constexpr auto kQueryPreviewLimit = 32;
 constexpr auto kPreviewPostsLimit = 3;
 
@@ -291,7 +296,8 @@ InnerWidget::InnerWidget(
 , _narrowWidth(st::defaultDialogRow.padding.left()
 	+ st::defaultDialogRow.photoSize
 	+ st::defaultDialogRow.padding.left())
-, _childListShown(std::move(childListShown)) {
+, _childListShown(std::move(childListShown))
+, _freezeTimer([=] { _shownList->unfreeze(); update(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent, true);
 
 	style::PaletteChanged(
@@ -528,17 +534,18 @@ InnerWidget::InnerWidget(
 			RowDescriptor previous,
 			RowDescriptor next) {
 		const auto update = [&](const RowDescriptor &descriptor) {
+			const auto msgId = descriptor.fullId;
 			if (const auto topic = descriptor.key.topic()) {
 				if (_openedForum == topic->forum()) {
 					updateDialogRow(descriptor);
 				} else {
-					updateDialogRow({ { topic->owningHistory() }, {} });
+					updateDialogRow({ { topic->owningHistory() }, msgId });
 				}
 			} else if (const auto sublist = descriptor.key.sublist()) {
 				if (_savedSublists == sublist->parent()) {
 					updateDialogRow(descriptor);
 				} else {
-					updateDialogRow({ { sublist->owningHistory() }, {} });
+					updateDialogRow({ { sublist->owningHistory() }, msgId });
 				}
 			} else {
 				updateDialogRow(descriptor);
@@ -1684,10 +1691,116 @@ void InnerWidget::mouseMoveEvent(QMouseEvent *e) {
 		&& *_lastMousePosition == globalPosition) {
 		return;
 	}
+
+	if (_lastMousePosition && *_lastMousePosition != globalPosition) {
+		if (skipChatsListFreeze()) {
+			unfreezeShownList(true);
+		} else {
+			if (!_freezeTimer.isActive()) {
+				_shownList->freeze();
+			}
+			_freezeTimer.callOnce(kFreezeTimeout);
+		}
+	}
+
+	if (_pressed && (e->buttons() & Qt::LeftButton)) {
+		const auto local = e->pos();
+		const auto outside = _dragging ? false : true;
+		const auto delta = local - _dragStart;
+		const auto thresholdY = _pressed->entry()->isPinnedDialog(_filterId)
+			? kStartDragToFilterThresholdY
+			: kStartDragToFilterThresholdX;
+		const auto distanceExceeded = std::abs(delta.x())
+				>= style::ConvertScale(kStartDragToFilterThresholdX)
+			|| std::abs(delta.y()) >= style::ConvertScale(thresholdY);
+
+		if (!_qdragging && outside && distanceExceeded) {
+			if (_pressed->history()) {
+				unfreezeShownList(true);
+				_dragging = _pressed;
+				_qdragging = _pressed;
+				InvokeQueued(this, [=] { performDrag(); });
+				return;
+			}
+		} else if (!outside && _qdragging) {
+			_qdragging = nullptr;
+		}
+	}
+
 	selectByMouse(globalPosition);
 	if (_chatPreviewScheduled && !isUserpicPress()) {
 		cancelChatPreview();
 	}
+}
+
+bool InnerWidget::skipChatsListFreeze() const {
+	return _dragging != nullptr;
+}
+
+void InnerWidget::unfreezeShownList(bool updateIfWasFrozen) {
+	const auto wasFrozen = _freezeTimer.isActive();
+	_freezeTimer.cancel();
+	_shownList->unfreeze();
+	if (updateIfWasFrozen && wasFrozen) {
+		update();
+	}
+}
+
+void InnerWidget::performDrag() {
+	if (!_qdragging || !session().data().chatsFilters().has()) {
+		return;
+	}
+	const auto history = _qdragging->history();
+	if (!history) {
+		return;
+	}
+
+	auto mimeData = std::make_unique<QMimeData>();
+	auto byteArray = [&] {
+		auto data = QByteArray();
+		auto stream = QDataStream(&data, QIODevice::WriteOnly);
+		stream << history->peer->id.value;
+		stream << history->session().isTestMode();
+		return data;
+	}();
+	mimeData->setData(
+		u"application/x-telegram-dialog"_q,
+		std::move(byteArray));
+
+	if (const auto u = history->peer->username(); !u.isEmpty()) {
+		mimeData->setText(history->peer->session().createInternalLinkFull(u));
+		mimeData->setData(
+			u"application/x-telegram-input-field"_q,
+			('@' + u).toUtf8());
+	}
+
+	const auto &st = st::defaultDialogRow;
+	auto pixmap = QPixmap(Size(st.height * style::DevicePixelRatio()));
+	pixmap.setDevicePixelRatio(style::DevicePixelRatio());
+	pixmap.fill(Qt::transparent);
+	if (const auto draw = PaintUserpicCallback(history->peer, true)) {
+		auto p = Painter(&pixmap);
+		p.setOpacity(0.7);
+		const auto pos = (st.height - st.photoSize) / 2;
+		draw(p, pos, pos, st.height, st.photoSize);
+	}
+
+	Ui::Animations::Manager::SetScheduleWithInvokeQueued(true);
+
+	_controller->cancelScheduledPreview();
+	// This call enters event loop and can destroy any QObject.
+	_controller->widget()->launchDrag(
+		std::move(mimeData),
+		[=, weak = base::make_weak(this)] {
+			Ui::Animations::Manager::SetScheduleWithInvokeQueued(false);
+			if (weak) {
+				_qdragging = nullptr;
+				clearPressed();
+				finishReorderOnRelease();
+				selectByMouse(QCursor::pos());
+			}
+		},
+		pixmap);
 }
 
 void InnerWidget::cancelChatPreview() {
@@ -2195,6 +2308,7 @@ void InnerWidget::checkReorderPinnedStart(QPoint localPosition) {
 			!= Dialogs::Ui::QuickDialogAction::Disabled)) {
 		return;
 	}
+	unfreezeShownList(true);
 	_dragging = _pressed;
 	startReorderPinned(localPosition);
 }
@@ -2265,6 +2379,7 @@ void InnerWidget::finishReorderPinned() {
 		savePinnedOrder();
 		_dragging = nullptr;
 		_touchDragStartGlobal = {};
+		_qdragging = nullptr;
 	}
 
 	_draggingIndex = -1;
@@ -2977,6 +3092,12 @@ void InnerWidget::updateDialogRow(
 
 void InnerWidget::enterEventHook(QEnterEvent *e) {
 	setMouseTracking(true);
+	if (skipChatsListFreeze()) {
+		unfreezeShownList(false);
+	} else {
+		_shownList->freeze();
+		_freezeTimer.callOnce(kFreezeTimeout);
+	}
 }
 
 Row *InnerWidget::shownRowByKey(Key key) {
@@ -3059,6 +3180,7 @@ void InnerWidget::refreshShownList() {
 		? session().data().chatsFilters().chatsList(_filterId)->indexed()
 		: session().data().chatsList(_openedFolder)->indexed();
 	if (_shownList != list) {
+		_shownList->unfreeze();
 		_shownList = list;
 		_shownList->updateHeights(_narrowRatio);
 	}
@@ -3066,12 +3188,16 @@ void InnerWidget::refreshShownList() {
 
 void InnerWidget::leaveEventHook(QEvent *e) {
 	setMouseTracking(false);
+	unfreezeShownList(false);
 	clearSelection();
+	update();
 }
 
 void InnerWidget::dragLeft() {
 	setMouseTracking(false);
+	unfreezeShownList(false);
 	clearSelection();
+	update();
 }
 
 FilterId InnerWidget::filterId() const {
@@ -3408,6 +3534,7 @@ void InnerWidget::dragPinnedFromTouch() {
 		return;
 	}
 	_dragStart = mapFromGlobal(global);
+	unfreezeShownList(true);
 	_dragging = _selected;
 	const auto now = mapFromGlobal(_touchDragNowGlobal.value_or(global));
 	startReorderPinned(now);
@@ -3607,6 +3734,7 @@ void InnerWidget::appendToFiltered(Key key) {
 }
 
 InnerWidget::~InnerWidget() {
+	unfreezeShownList(false);
 	session().data().stories().decrementPreloadingMainSources();
 	clearSearchResults();
 }
@@ -3721,6 +3849,10 @@ void InnerWidget::trackResultsHistory(not_null<History*> history) {
 }
 
 Data::Thread *InnerWidget::updateFromParentDrag(QPoint globalPosition) {
+	if (!_freezeTimer.isActive()) {
+		_shownList->freeze();
+	}
+	_freezeTimer.callOnce(kFreezeTimeout);
 	selectByMouse(globalPosition);
 
 	const auto fromRow = [](Row *row) {

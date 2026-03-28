@@ -105,6 +105,7 @@ settingsPremiumIconBusiness: icon {{ "settings/premium/market", settingsIconFg }
 settingsPremiumIconEffects: icon {{ "settings/premium/effects", settingsIconFg }};
 settingsPremiumIconChecklist: icon {{ "settings/premium/checklist", settingsIconFg }};
 settingsPremiumIconPeerColors: icon {{ "settings/premium/peer_colors-24x24", settingsIconFg }};
+settingsPremiumIconNoForwards: icon {{ "menu/share_off-24x24", settingsIconFg }};
 
 settingsStoriesIconOrder: icon {{ "settings/premium/stories_order", premiumButtonBg1 }};
 settingsStoriesIconStealth: icon {{ "menu/stealth", premiumButtonBg1 }};
@@ -214,6 +215,9 @@ settingsInfoPeerBadge: InfoPeerBadge {
 	premiumFg: dialogsVerifiedIconBg;
 	sizeTag: 0; // Normal
 }
+settingsCoverBadge: InfoPeerBadge(infoPeerBadge) {
+	position: point(4px, 2px);
+}
 
 settingsBio: InputField(defaultInputField) {
 	textBg: transparent;
@@ -233,6 +237,7 @@ settingsBio: InputField(defaultInputField) {
 }
 
 settingsBioMargins: margins(22px, 6px, 22px, 4px);
+settingsBioHighlightMargin: margins(-22px, 0px, -22px, 0px);
 settingsBioCountdown: FlatLabel(defaultFlatLabel) {
 	style: boxTextStyle;
 	textFg: windowSubTextFg;
@@ -313,6 +318,12 @@ settingsFilterIconSize: 74px;
 settingsFilterIconPadding: margins(0px, 17px, 0px, 5px);
 
 settingsFilterTagPreviewSkip: 14px;
+
+settingsFilterAddRecommended: RoundButton(defaultActiveButton) {
+	width: -32px;
+	height: 26px;
+	textTop: 4px;
+}
 
 settingsDeviceName: InputField(defaultInputField) {
 	textBg: transparent;
@@ -427,6 +438,7 @@ websiteBigUserpic: UserpicButton(defaultUserpicButton) {
 settingsPhotoLeft: 22px;
 settingsPhotoTop: 8px;
 settingsPhotoBottom: 16px;
+settingsPhotoHighlightMargin: margins(-4px, -4px, -4px, -4px);
 settingsNameLeft: 112px;
 settingsNameTop: 12px;
 settingsPhoneLeft: settingsNameLeft;
@@ -532,6 +544,21 @@ settingsNotificationType: SettingsButton(settingsButton) {
 settingsNotificationTypeDetails: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
 }
+
+settingsSearchResult: SettingsButton(settingsButton) {
+	height: 40px;
+	padding: margins(60px, 4px, 22px, 4px);
+}
+settingsSearchResultNoIcon: SettingsButton(settingsSearchResult) {
+	padding: margins(22px, 4px, 22px, 4px);
+}
+settingsSearchResultDetails: FlatLabel(settingsNotificationTypeDetails) {
+}
+settingsSearchNoResults: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	align: align(center);
+}
+settingsSearchNoResultsPadding: margins(22px, 32px, 22px, 32px);
 
 powerSavingButton: SettingsButton(settingsButton) {
 	style: boxTextStyle;

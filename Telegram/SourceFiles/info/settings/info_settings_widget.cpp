@@ -8,8 +8,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/settings/info_settings_widget.h"
 
 #include "info/info_memento.h"
-#include "settings/settings_main.h"
-#include "settings/settings_information.h"
+#include "settings/sections/settings_main.h"
+#include "settings/sections/settings_information.h"
+#include "settings/settings_common_session.h"
 #include "ui/ui_utility.h"
 
 // AyuGram includes
@@ -206,8 +207,8 @@ const Ui::RoundRect *Widget::bottomSkipRounding() const {
 }
 
 rpl::producer<bool> Widget::desiredShadowVisibility() const {
-	return (_type == ::Settings::Main::Id()
-		|| _type == ::Settings::Information::Id()
+	return (_type == ::Settings::MainId()
+		|| _type == ::Settings::InformationId()
 		|| _type == ::Settings::AyuMain::Id())
 		? ContentWidget::desiredShadowVisibility()
 		: rpl::single(true);
@@ -261,9 +262,13 @@ void Widget::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 
 void Widget::saveState(not_null<Memento*> memento) {
 	memento->setScrollTop(scrollTopSave());
+	auto sectionState = std::any();
+	_inner->sectionSaveState(sectionState);
+	memento->setSectionState(std::move(sectionState));
 }
 
 void Widget::restoreState(not_null<Memento*> memento) {
+	_inner->sectionRestoreState(memento->sectionState());
 	scrollTopRestore(memento->scrollTop());
 }
 

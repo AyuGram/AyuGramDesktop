@@ -41,7 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "storage/file_upload.h"
 #include "storage/localimageloader.h"
 #include "window/window_session_controller.h"
@@ -958,6 +958,7 @@ void BackgroundPreviewBox::paintTexts(Painter &p, crl::time ms) {
 	const auto height2 = _text2->height();
 	auto context = _controller->defaultChatTheme()->preparePaintContext(
 		_chatStyle.get(),
+		rect(),
 		rect(),
 		rect(),
 		_controller->isGifPausedAtLeastFor(Window::GifPauseReason::Layer));

@@ -205,8 +205,8 @@ PreviewWrap::PreviewWrap(
 
 	const auto session = &_history->session();
 	session->data().viewRepaintRequest(
-	) | rpl::on_next([=](not_null<const Element*> view) {
-		if (_views.contains(view)) {
+	) | rpl::on_next([=](Data::RequestViewRepaint data) {
+		if (_views.contains(data.view)) {
 			update();
 		}
 	}, lifetime());
@@ -442,6 +442,7 @@ void PreviewWrap::paintEvent(QPaintEvent *e) {
 
 	auto context = _theme->preparePaintContext(
 		_style.get(),
+		rect(),
 		rect(),
 		e->rect(),
 		!window()->isActiveWindow());
@@ -898,11 +899,17 @@ void DraftOptionsBox(
 			const auto small = state->webpage.forceSmallMedia
 				|| (!state->webpage.forceLargeMedia
 					&& state->preview->computeDefaultSmallMedia());
+			const auto hasVideo = state->preview->document
+				&& state->preview->document->isVideoFile();
 			Settings::AddButtonWithIcon(
 				bottom,
 				(small
-					? tr::lng_link_enlarge_photo()
-					: tr::lng_link_shrink_photo()),
+					? (hasVideo
+						? tr::lng_link_enlarge_video()
+						: tr::lng_link_enlarge_photo())
+					: (hasVideo
+						? tr::lng_link_shrink_video()
+						: tr::lng_link_shrink_photo())),
 				st::settingsButton,
 				{ small ? &st::menuIconEnlarge : &st::menuIconShrink }
 			)->setClickedCallback([=] {

@@ -176,6 +176,9 @@ void History::itemRemoved(not_null<HistoryItem*> item) {
 	if (const auto sublist = item->savedSublist()) {
 		sublist->applyItemRemoved(item->id);
 	}
+	if (const auto streamed = _streamedDrafts.get()) {
+		streamed->applyItemRemoved(item);
+	}
 	if (const auto chat = peer->asChat()) {
 		if (const auto to = chat->getMigrateToChannel()) {
 			if (const auto history = owner().historyLoaded(to)) {
@@ -648,7 +651,7 @@ void History::destroyMessagesByDates(TimeId minDate, TimeId maxDate) {
 			toDestroy.push_back(message.get());
 		}
 	}
-	for (const auto item : toDestroy) {
+	for (const auto &item : toDestroy) {
 		item->destroy();
 	}
 }
@@ -661,7 +664,7 @@ void History::destroyMessagesByTopic(MsgId topicRootId) {
 			toDestroy.push_back(message.get());
 		}
 	}
-	for (const auto item : toDestroy) {
+	for (const auto &item : toDestroy) {
 		item->destroy();
 	}
 }
@@ -675,7 +678,7 @@ void History::destroyMessagesBySublist(not_null<PeerData*> sublistPeer) {
 			toDestroy.push_back(message.get());
 		}
 	}
-	for (const auto item : toDestroy) {
+	for (const auto &item : toDestroy) {
 		item->destroy();
 	}
 }
@@ -1306,9 +1309,7 @@ void History::applyServiceChanges(
 					.text = tr::lng_payments_success(
 						tr::now,
 						lt_amount,
-						Ui::Text::Wrapped(
-							payment->amount,
-							EntityType::Bold),
+						Ui::Text::Wrapped(payment->amount, EntityType::Bold),
 						lt_title,
 						tr::bold(paid->title),
 						tr::marked),
@@ -1393,6 +1394,13 @@ void History::applyServiceChanges(
 			data.vgift().match([&](const MTPDstarGift &data) {
 				peer->owner().notifyGiftAuctionGot({ data.vid().v, to });
 			}, [](const auto &) {});
+		}
+	}, [&](const MTPDmessageActionNoForwardsToggle &data) {
+		if (const auto user = peer->asUser()) {
+			const auto enabled = mtpIsTrue(data.vnew_value());
+			user->setNoForwardsFlags(
+				enabled && item->out(),
+				enabled && !item->out());
 		}
 	}, [](const auto &) {
 	});
@@ -1565,6 +1573,19 @@ void History::addItemToBlock(not_null<HistoryItem*> item) {
 	block->messages.push_back(item->createView(_delegateMixin->delegate()));
 	const auto view = block->messages.back().get();
 	view->attachToBlock(block, block->messages.size() - 1);
+
+	if (item->Has<HistoryServiceNoForwardsToggle>()) {
+		if (const auto prev = view->previousInBlocks()) {
+			if (const auto nfr = prev->data()->Get<HistoryServiceNoForwardsRequest>()) {
+				if (!nfr->actionTaken) {
+					nfr->actionTaken = true;
+					if (nfr->expired) {
+						owner().requestItemViewRefresh(prev->data());
+					}
+				}
+			}
+		}
+	}
 
 	if (isBuildingFrontBlock() && _buildingFrontBlock->expectedItemsCount > 0) {
 		--_buildingFrontBlock->expectedItemsCount;
@@ -2583,6 +2604,18 @@ void History::finishBuildingFrontBlock() {
 			// we've added a new front block, so previous item for
 			// the old first item of a first block was changed
 			first->previousInBlocksChanged();
+
+			if (first->data()->Has<HistoryServiceNoForwardsToggle>()) {
+				const auto last = block->messages.back()->data();
+				if (const auto nfr = last->Get<HistoryServiceNoForwardsRequest>()) {
+					if (!nfr->actionTaken) {
+						nfr->actionTaken = true;
+						if (nfr->expired) {
+							owner().requestItemViewRefresh(last);
+						}
+					}
+				}
+			}
 		} else {
 			block->messages.back()->nextInBlocksRemoved();
 		}
@@ -3983,9 +4016,11 @@ void History::clear(ClearType type, bool markEmpty) {
 				_lastMessage = std::nullopt;
 			}
 		}
-		const auto tillId = (_lastMessage && *_lastMessage)
+		const auto tillId = (_lastMessage
+			&& (*_lastMessage)
+			&& (*_lastMessage)->isRegular())
 			? (*_lastMessage)->id
-			: std::numeric_limits<MsgId>::max();
+			: MsgId(std::numeric_limits<int64>::max());
 		clearUpTill(tillId);
 		if (blocks.empty() && _lastMessage && *_lastMessage) {
 			addItemToBlock(*_lastMessage);
@@ -4022,7 +4057,7 @@ void History::clearUpTill(MsgId availableMinId) {
 			remove.push_back(item.get());
 		}
 	}
-	for (const auto item : remove) {
+	for (const auto &item : remove) {
 		item->destroy();
 	}
 	requestChatListMessage();

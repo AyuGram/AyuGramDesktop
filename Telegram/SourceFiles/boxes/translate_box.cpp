@@ -6,8 +6,9 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/translate_box.h"
+#include "boxes/translate_box_content.h"
+#include "lang/translate_provider.h"
 
-#include "api/api_text_entities.h" // Api::EntitiesToMTP / EntitiesFromMTP.
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/ui_integration.h"
@@ -17,26 +18,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "mtproto/sender.h"
 #include "spellcheck/platform/platform_language.h"
 #include "ui/boxes/choose_language_box.h"
-#include "ui/effects/loading_element.h"
 #include "ui/layers/generic_box.h"
-#include "ui/text/text_utilities.h"
-#include "ui/vertical_list.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
 #include "ui/widgets/multi_select.h"
-#include "ui/wrap/fade_wrap.h"
-#include "ui/wrap/slide_wrap.h"
-#include "styles/style_boxes.h"
-#include "styles/style_chat_helpers.h"
-#include "styles/style_info.h" // inviteLinkListItem.
-#include "styles/style_layers.h"
-
-#include <QLocale>
+#include "ui/text/text_utilities.h"
 
 // AyuGram includes
 #include "ayu/features/translator/ayu_translator.h"
@@ -47,53 +33,6 @@ namespace {
 
 constexpr auto kSkipAtLeastOneDuration = 3 * crl::time(1000);
 
-class ShowButton final : public RpWidget {
-public:
-	ShowButton(not_null<Ui::RpWidget*> parent);
-
-	[[nodiscard]] rpl::producer<Qt::MouseButton> clicks() const;
-
-protected:
-	void paintEvent(QPaintEvent *e) override;
-
-private:
-	LinkButton _button;
-
-};
-
-ShowButton::ShowButton(not_null<Ui::RpWidget*> parent)
-: RpWidget(parent)
-, _button(this, tr::lng_usernames_activate_confirm(tr::now)) {
-	_button.sizeValue(
-	) | rpl::on_next([=](const QSize &s) {
-		resize(
-			s.width() + st::defaultEmojiSuggestions.fadeRight.width(),
-			s.height());
-		_button.moveToRight(0, 0);
-	}, lifetime());
-	_button.show();
-}
-
-void ShowButton::paintEvent(QPaintEvent *e) {
-	auto p = QPainter(this);
-	const auto clip = e->rect();
-
-	const auto &icon = st::defaultEmojiSuggestions.fadeRight;
-	const auto fade = QRect(0, 0, icon.width(), height());
-	if (fade.intersects(clip)) {
-		icon.fill(p, fade);
-	}
-	const auto fill = clip.intersected(
-		{ icon.width(), 0, width() - icon.width(), height() });
-	if (!fill.isEmpty()) {
-		p.fillRect(fill, st::boxBg);
-	}
-}
-
-rpl::producer<Qt::MouseButton> ShowButton::clicks() const {
-	return _button.clicks();
-}
-
 } // namespace
 
 void TranslateBox(
@@ -102,19 +41,22 @@ void TranslateBox(
 		MsgId msgId,
 		TextWithEntities text,
 		bool hasCopyRestriction) {
-	box->setWidth(st::boxWideWidth);
-	box->addButton(tr::lng_box_ok(), [=] { box->closeBox(); });
-	const auto container = box->verticalLayout();
-
 	struct State {
-		State(not_null<Main::Session*> session) : api(&session->mtp()) {
+		State(not_null<Main::Session*> session)
+		: provider(CreateTranslateProvider(session)) {
 		}
 
-		MTP::Sender api;
+		std::unique_ptr<TranslateProvider> provider;
 		rpl::variable<LanguageId> to;
 	};
 	const auto state = box->lifetime().make_state<State>(&peer->session());
 	state->to = ChooseTranslateTo(peer->owner().history(peer));
+	const auto request = std::make_shared<TranslateProviderRequest>(
+		PrepareTranslateProviderRequest(
+			state->provider.get(),
+			peer,
+			msgId,
+			std::move(text)));
 
 	if (!IsServerMsgId(msgId)) {
 		msgId = 0;
@@ -123,7 +65,7 @@ void TranslateBox(
 	using Flag = MTPmessages_TranslateText::Flag;
 	const auto flags = msgId
 		? (Flag::f_peer | Flag::f_id)
-		: !text.text.isEmpty()
+		: !request->text.text.isEmpty()
 		? Flag::f_text
 		: Flag(0);
 
@@ -131,9 +73,6 @@ void TranslateBox(
 	const auto lineHeight = stLabel.style.lineHeight;
 
 	Ui::AddSkip(container);
-	// Ui::AddSubsectionTitle(
-	// 	container,
-	// 	tr::lng_translate_box_original());
 
 	const auto animationsPaused = [] {
 		using Which = FlatLabel::WhichAnimationsPaused;
@@ -153,7 +92,7 @@ void TranslateBox(
 		}
 		original->entity()->setAnimationsPausedCallback(animationsPaused);
 		original->entity()->setMarkedText(
-			text,
+			request->text,
 			Core::TextContext({ .session = &peer->session() }));
 		original->setMinimalHeight(lineHeight);
 		original->hide(anim::type::instant);
@@ -218,10 +157,10 @@ void TranslateBox(
 				return id.locale().textDirection() == Qt::RightToLeft;
 			}))));
 
-	const auto showText = [=](TextWithEntities text) {
+	const auto showText = [=](TextWithEntities textResult) {
 		const auto label = translated->entity();
 		label->setMarkedText(
-			text,
+			textResult,
 			Core::TextContext({ .session = &peer->session() }));
 		translated->show(anim::type::instant);
 		loading->hide(anim::type::instant);
@@ -240,10 +179,10 @@ void TranslateBox(
 			(msgId
 				? MTPVector<MTPTextWithEntities>()
 				: MTP_vector<MTPTextWithEntities>(1, MTP_textWithEntities(
-					MTP_string(text.text),
+					MTP_string(request->text.text),
 					Api::EntitiesToMTP(
 						&peer->session(),
-						text.entities,
+						request->text.entities,
 						Api::ConvertOption::SkipLocal)))),
 			MTP_string(to.twoLetterCode())
 		).done([=](const MTPmessages_TranslatedText &result) {

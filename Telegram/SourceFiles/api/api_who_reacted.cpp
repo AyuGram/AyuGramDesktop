@@ -682,12 +682,7 @@ QString FormatReadDate(TimeId date, const QDateTime &now) {
 	return tr::lng_mediaview_date_time(
 		tr::now,
 		lt_date,
-		tr::lng_month_day(
-			tr::now,
-			lt_month,
-			Lang::MonthDay(readDate.month())(tr::now),
-			lt_day,
-			QString::number(readDate.day())),
+		langDayOfMonthShort(readDate),
 		lt_time,
 		QLocale().toString(parsed.time(), "HH:mm:ss"));
 }

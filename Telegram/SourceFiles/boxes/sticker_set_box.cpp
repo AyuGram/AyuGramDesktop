@@ -33,7 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/clip/media_clip_reader.h"
 #include "menu/menu_send.h"
 #include "mtproto/sender.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "storage/storage_account.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/cached_round_corners.h"
@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
+#include "window/window_session_controller.h"
 #include "styles/style_layers.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
@@ -296,6 +297,7 @@ public:
 	[[nodiscard]] uint64 setId() const;
 
 	void install();
+	void showPreviewForDocument(DocumentId documentId);
 	[[nodiscard]] rpl::producer<uint64> setInstalled() const;
 	[[nodiscard]] rpl::producer<uint64> setArchived() const;
 	[[nodiscard]] rpl::producer<> updateControls() const;
@@ -474,6 +476,8 @@ private:
 
 	base::Timer _previewTimer;
 	int _previewShown = -1;
+	DocumentId _previewDocumentId = 0;
+	bool _previewLocked = false;
 
 	base::unique_qptr<Ui::PopupMenu> _menu;
 
@@ -488,11 +492,13 @@ StickerSetBox::StickerSetBox(
 	QWidget *parent,
 	std::shared_ptr<ChatHelpers::Show> show,
 	const StickerSetIdentifier &set,
-	Data::StickersType type)
+	Data::StickersType type,
+	DocumentId previewDocumentId)
 : _show(std::move(show))
 , _session(&_show->session())
 , _set(set)
-, _type(type) {
+, _type(type)
+, _previewDocumentId(previewDocumentId) {
 }
 
 StickerSetBox::StickerSetBox(
@@ -504,13 +510,15 @@ StickerSetBox::StickerSetBox(
 
 base::weak_qptr<Ui::BoxContent> StickerSetBox::Show(
 		std::shared_ptr<ChatHelpers::Show> show,
-		not_null<DocumentData*> document) {
+		not_null<DocumentData*> document,
+		DocumentId previewDocumentId) {
 	if (const auto sticker = document->sticker()) {
 		if (sticker->set) {
 			auto box = Box<StickerSetBox>(
 				show,
 				sticker->set,
-				sticker->setType);
+				sticker->setType,
+				previewDocumentId);
 			const auto result = base::make_weak(box.data());
 			show->showBox(std::move(box));
 			return result;
@@ -525,6 +533,9 @@ void StickerSetBox::prepare() {
 	_inner = setInnerWidget(
 		object_ptr<Inner>(this, _show, _set, _type),
 		st::stickersScroll);
+	if (const auto previewId = base::take(_previewDocumentId)) {
+		_inner->showPreviewForDocument(previewId);
+	}
 	_session->data().stickers().updated(
 		_type
 	) | rpl::on_next([=] {
@@ -594,6 +605,13 @@ void StickerSetBox::prepare() {
 		_session->data().stickers().notifyUpdated(type);
 
 		closeBox();
+	}, lifetime());
+
+	boxClosing(
+	) | rpl::on_next([show = _show] {
+		if (const auto window = show->resolveWindow()) {
+			window->widget()->hideMediaPreview();
+		}
 	}, lifetime());
 }
 
@@ -1103,6 +1121,9 @@ void StickerSetBox::Inner::applySet(const TLStickerSet &set) {
 		_padding.top() + _rowsCount * _singleSize.height() + _padding.bottom());
 
 	_loaded = true;
+	if (const auto previewId = base::take(_previewDocumentId)) {
+		showPreviewForDocument(previewId);
+	}
 	updateSelected();
 	_updateControls.fire({});
 }
@@ -1219,6 +1240,14 @@ void StickerSetBox::Inner::installDone(
 }
 
 void StickerSetBox::Inner::mousePressEvent(QMouseEvent *e) {
+	if (_previewLocked) {
+		_previewLocked = false;
+		_previewShown = -1;
+		if (const auto window = _show->resolveWindow()) {
+			window->widget()->hideMediaPreview();
+		}
+		return;
+	}
 	if (e->button() != Qt::LeftButton) {
 		return;
 	}
@@ -1320,7 +1349,7 @@ void StickerSetBox::Inner::mouseMoveEvent(QMouseEvent *e) {
 		}
 		update();
 	}
-	if (_previewShown >= 0) {
+	if (_previewShown >= 0 && !_previewLocked) {
 		showPreviewAt(e->globalPos());
 	}
 }
@@ -1334,6 +1363,27 @@ void StickerSetBox::Inner::showPreviewAt(QPoint globalPos) {
 		_show->showMediaPreview(
 			Data::FileOriginStickerSet(_setId, _setAccessHash),
 			_pack[_previewShown]);
+	}
+}
+
+void StickerSetBox::Inner::showPreviewForDocument(DocumentId documentId) {
+	if (!_loaded) {
+		_previewDocumentId = documentId;
+		return;
+	}
+	const auto it = ranges::find(
+		_pack,
+		documentId,
+		&DocumentData::id);
+	if (it != _pack.end()) {
+		const auto index = int(it - _pack.begin());
+		if (index != _previewShown) {
+			_previewShown = index;
+			_previewLocked = true;
+			_show->showMediaPreview(
+				Data::FileOriginStickerSet(_setId, _setAccessHash),
+				_pack[index]);
+		}
 	}
 }
 
@@ -1422,6 +1472,12 @@ void StickerSetBox::Inner::mouseReleaseEvent(QMouseEvent *e) {
 			kStickerMoveDuration);
 	}
 	if (_previewShown >= 0) {
+		if (_previewLocked) {
+			_previewLocked = false;
+			if (const auto window = _show->resolveWindow()) {
+				window->widget()->hideMediaPreview();
+			}
+		}
 		_previewShown = -1;
 		return;
 	}

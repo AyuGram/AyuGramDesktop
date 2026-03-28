@@ -252,6 +252,7 @@ void SendExistingMedia(
 		.postAuthor = NewMessagePostAuthor(action),
 		.effectId = action.options.effectId,
 		.suggest = HistoryMessageSuggestInfo(action.options),
+		.mediaSpoiler = action.options.mediaSpoiler,
 	}, media, caption);
 
 	const auto performRequest = [=](const auto &repeatRequest) -> void {
@@ -307,7 +308,9 @@ void SendExistingDocument(
 		std::optional<MsgId> localMessageId) {
 	const auto inputMedia = [=] {
 		return MTP_inputMediaDocument(
-			MTP_flags(0),
+			MTP_flags(message.action.options.mediaSpoiler
+				? MTPDinputMediaDocument::Flag::f_spoiler
+				: MTPDinputMediaDocument::Flags(0)),
 			document->mtpInput(),
 			MTPInputPhoto(), // video_cover
 			MTPint(), // ttl_seconds
@@ -377,7 +380,6 @@ bool SendDice(MessageToSend &message) {
 	message.action.clearDraft = false;
 	message.action.generateLocal = true;
 
-
 	auto &action = message.action;
 	api->sendAction(action);
 
@@ -433,6 +435,11 @@ bool SendDice(MessageToSend &message) {
 
 	session->data().registerMessageRandomId(randomId, newId);
 
+	auto seed = QByteArray(32, Qt::Uninitialized);
+	base::RandomFill(bytes::make_detached_span(seed));
+	const auto stake = action.options.stakeSeedHash.isEmpty()
+		? 0
+		: action.options.stakeNanoTon;
 	history->addNewLocalMessage({
 		.id = newId.msg,
 		.flags = flags,
@@ -445,8 +452,15 @@ bool SendDice(MessageToSend &message) {
 		.effectId = action.options.effectId,
 		.suggest = HistoryMessageSuggestInfo(action.options),
 	}, TextWithEntities(), MTP_messageMediaDice(
+		MTP_flags(stake
+			? MTPDmessageMediaDice::Flag::f_game_outcome
+			: MTPDmessageMediaDice::Flag()),
 		MTP_int(0),
-		MTP_string(emoji)));
+		MTP_string(emoji),
+		MTP_messages_emojiGameOutcome(
+			MTP_bytes(seed),
+			MTP_long(stake),
+			MTP_long(0))));
 	histories.sendPreparedMessage(
 		history,
 		action.replyTo,
@@ -455,7 +469,12 @@ bool SendDice(MessageToSend &message) {
 			MTP_flags(sendFlags),
 			peer->input(),
 			Data::Histories::ReplyToPlaceholder(),
-			MTP_inputMediaDice(MTP_string(emoji)),
+			(stake
+				? MTP_inputMediaStakeDice(
+					MTP_bytes(action.options.stakeSeedHash),
+					MTP_long(stake),
+					MTP_bytes(seed))
+				: MTP_inputMediaDice(MTP_string(emoji))),
 			MTP_string(),
 			MTP_long(randomId),
 			MTPReplyMarkup(),

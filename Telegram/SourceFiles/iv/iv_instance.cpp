@@ -829,7 +829,6 @@ void Instance::show(
 		not_null<Window::SessionController*> controller,
 		not_null<Data*> data,
 		QString hash) {
-	_delegate->ivSetLastSourceWindow(controller->widget());
 	show(controller->uiShow(), data, hash);
 }
 
@@ -847,6 +846,10 @@ void Instance::show(
 	if (Platform::IsMac()) {
 		// Otherwise IV is not visible under the media viewer.
 		Core::App().hideMediaView();
+	}
+
+	if (Core::App().settings().normalizeIvZoom()) {
+		Core::App().saveSettingsDelayed();
 	}
 
 	const auto guard = gsl::finally([&] {

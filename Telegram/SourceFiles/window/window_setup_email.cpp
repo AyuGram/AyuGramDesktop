@@ -657,6 +657,7 @@ void SetupEmailLockWidget::showAccountsMenu() {
 			user,
 			st::lockSetupEmailUserpicSmall);
 		userpic->move(st.menu.itemIconPosition);
+		userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
 		_accountsMenu->addAction(std::move(owned));
 	}
 

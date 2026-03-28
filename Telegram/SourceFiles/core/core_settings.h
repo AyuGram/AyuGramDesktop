@@ -396,6 +396,9 @@ public:
 	[[nodiscard]] Window::Theme::AccentColors &themesAccentColors() {
 		return _themesAccentColors;
 	}
+	[[nodiscard]] const Window::Theme::AccentColors &themesAccentColors() const {
+		return _themesAccentColors;
+	}
 	void setThemesAccentColors(Window::Theme::AccentColors &&colors) {
 		_themesAccentColors = std::move(colors);
 	}
@@ -472,6 +475,18 @@ public:
 	[[nodiscard]] rpl::producer<bool> replaceEmojiChanges() const {
 		return _replaceEmoji.changes();
 	}
+	void setSystemTextReplace(bool value) {
+		_systemTextReplace = value;
+	}
+	[[nodiscard]] bool systemTextReplace() const {
+		return _systemTextReplace.current();
+	}
+	[[nodiscard]] rpl::producer<bool> systemTextReplaceValue() const {
+		return _systemTextReplace.value();
+	}
+	[[nodiscard]] rpl::producer<bool> systemTextReplaceChanges() const {
+		return _systemTextReplace.changes();
+	}
 	[[nodiscard]] bool suggestEmoji() const {
 		return _suggestEmoji;
 	}
@@ -499,8 +514,14 @@ public:
 	[[nodiscard]] rpl::producer<bool> cornerReactionValue() const {
 		return _cornerReaction.value();
 	}
-	[[nodiscard]] rpl::producer<bool> cornerReactionChanges() const {
-		return _cornerReaction.changes();
+	void setCornerReply(bool value) {
+		_cornerReply = value;
+	}
+	[[nodiscard]] bool cornerReply() const {
+		return _cornerReply.current();
+	}
+	[[nodiscard]] rpl::producer<bool> cornerReplyValue() const {
+		return _cornerReply.value();
 	}
 
 	void setSpellcheckerEnabled(bool value) {
@@ -703,6 +724,12 @@ public:
 	[[nodiscard]] rpl::producer<bool> systemDarkModeEnabledChanges() const {
 		return _systemDarkModeEnabled.changes();
 	}
+	void setSystemAccentColorEnabled(bool value) {
+		_systemAccentColorEnabled = value;
+	}
+	[[nodiscard]] bool systemAccentColorEnabled() const {
+		return _systemAccentColorEnabled;
+	}
 	[[nodiscard]] WindowTitleContent windowTitleContent() const {
 		return _windowTitleContent.current();
 	}
@@ -848,6 +875,8 @@ public:
 
 	void setTranslateButtonEnabled(bool value);
 	[[nodiscard]] bool translateButtonEnabled() const;
+	void setUsePlatformTranslation(bool value);
+	[[nodiscard]] bool usePlatformTranslation() const;
 	void setTranslateChatEnabled(bool value);
 	[[nodiscard]] bool translateChatEnabled() const;
 	[[nodiscard]] rpl::producer<bool> translateChatEnabledValue() const;
@@ -909,6 +938,13 @@ public:
 		_ivPosition = position;
 	}
 
+	[[nodiscard]] const WindowPosition &callPanelPosition() const {
+		return _callPanelPosition;
+	}
+	void setCallPanelPosition(const WindowPosition &position) {
+		_callPanelPosition = position;
+	}
+
 	[[nodiscard]] QString customFontFamily() const {
 		return _customFontFamily;
 	}
@@ -940,6 +976,7 @@ public:
 	[[nodiscard]] int ivZoom() const;
 	[[nodiscard]] rpl::producer<int> ivZoomValue() const;
 	void setIvZoom(int value);
+	bool normalizeIvZoom();
 
 	[[nodiscard]] bool chatFiltersHorizontal() const;
 	[[nodiscard]] rpl::producer<bool> chatFiltersHorizontalChanges() const;
@@ -1030,9 +1067,11 @@ private:
 	bool _loopAnimatedStickers = true;
 	rpl::variable<bool> _largeEmoji = true;
 	rpl::variable<bool> _replaceEmoji = true;
+	rpl::variable<bool> _systemTextReplace = true;
 	bool _suggestEmoji = true;
 	bool _suggestStickersByEmoji = true;
 	bool _suggestAnimatedEmoji = true;
+	rpl::variable<bool> _cornerReply = true;
 	rpl::variable<bool> _cornerReaction = true;
 	rpl::variable<bool> _spellcheckerEnabled = true;
 	PlaybackSpeed _videoPlaybackSpeed;
@@ -1060,6 +1099,7 @@ private:
 	rpl::variable<bool> _nativeWindowFrame = false;
 	rpl::variable<std::optional<bool>> _systemDarkMode = std::nullopt;
 	rpl::variable<bool> _systemDarkModeEnabled = true;
+	bool _systemAccentColorEnabled = false;
 	rpl::variable<WindowTitleContent> _windowTitleContent;
 	WindowPosition _windowPosition; // per-window
 	bool _disableOpenGL = false;
@@ -1080,6 +1120,7 @@ private:
 	HistoryView::DoubleClickQuickAction _chatQuickAction
 		= HistoryView::DoubleClickQuickAction();
 	bool _translateButtonEnabled = false;
+	bool _usePlatformTranslation = false;
 	rpl::variable<bool> _translateChatEnabled = true;
 	rpl::variable<int> _translateToRaw = 0;
 	rpl::variable<std::vector<LanguageId>> _skipTranslationLanguages;
@@ -1091,11 +1132,12 @@ private:
 	rpl::variable<bool> _storiesClickTooltipHidden = false;
 	rpl::variable<bool> _ttlVoiceClickTooltipHidden = false;
 	WindowPosition _ivPosition;
+	WindowPosition _callPanelPosition;
 	QString _customFontFamily;
 	bool _systemUnlockEnabled = false;
 	std::optional<bool> _weatherInCelsius;
 	QByteArray _tonsiteStorageToken;
-	rpl::variable<int> _ivZoom = 100;
+	rpl::variable<int> _ivZoom = 0;
 	Media::VideoQuality _videoQuality;
 	rpl::variable<bool> _chatFiltersHorizontal = false;
 

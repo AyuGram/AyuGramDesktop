@@ -214,6 +214,15 @@ void PeerListBox::prepare() {
 	if (_init) {
 		_init(this);
 	}
+
+	{
+		setDimensions(
+			_controller->contentWidth(),
+			std::clamp(
+				content()->height(),
+				st::boxMaxListHeight,
+				st::boxMaxListHeight * 3));
+	}
 }
 
 void PeerListBox::keyPressEvent(QKeyEvent *e) {
@@ -351,6 +360,16 @@ const style::PeerList &PeerListController::computeListSt() const {
 
 const style::MultiSelect &PeerListController::computeSelectSt() const {
 	return _selectSt ? *_selectSt : st::defaultMultiSelect;
+}
+
+void PeerListController::showFinished() {
+	if (const auto onstack = _showFinished) {
+		onstack();
+	}
+}
+
+void PeerListController::setShowFinishedCallback(Fn<void()> callback) {
+	_showFinished = std::move(callback);
 }
 
 bool PeerListController::hasComplexSearch() const {

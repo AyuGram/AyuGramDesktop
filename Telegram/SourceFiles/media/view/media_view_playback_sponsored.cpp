@@ -179,7 +179,6 @@ void Close::paintEvent(QPaintEvent *e) {
 			(height() - st::mediaSponsoredCloseDiameter) / 2,
 			st::mediaSponsoredCloseDiameter,
 			st::mediaSponsoredCloseDiameter);
-		p.setFont(st::mediaSponsoredCloseFont);
 		_countdown.paint(
 			p,
 			inner.x() + (inner.width() - _countdown.countWidth()) / 2,
@@ -487,6 +486,7 @@ void PlaybackSponsored::Message::mouseReleaseEvent(QMouseEvent *e) {
 int PlaybackSponsored::Message::resizeGetHeight(int newWidth) {
 	const auto &padding = st::mediaSponsoredPadding;
 	const auto userpic = st::mediaSponsoredThumb;
+	_left = padding.left() + (_photo ? (userpic + padding.left()) : 0);
 	const auto innerWidth = newWidth - _left - _close->width();
 	const auto titleWidth = innerWidth - _about->width() - padding.right();
 	_titleHeight = _title.countHeight(titleWidth);
@@ -495,7 +495,6 @@ int PlaybackSponsored::Message::resizeGetHeight(int newWidth) {
 	const auto use = std::max(_titleHeight + _textHeight, userpic);
 
 	const auto height = padding.top() + use + padding.bottom();
-	_left = padding.left() + (_photo ? (userpic + padding.left()) : 0);
 	_top = padding.top() + (use - _titleHeight - _textHeight) / 2;
 
 	_about->move(

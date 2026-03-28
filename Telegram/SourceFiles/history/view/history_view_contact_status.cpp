@@ -37,7 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_peer_values.h"
 #include "data/stickers/data_custom_emoji.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "window/window_peer_menu.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -261,6 +261,9 @@ ContactStatus::Bar::Bar(
 		st::historyContactStatusMinSkip,
 		st::topBarArrowPadding.top()))
 , _emojiStatusShadow(this) {
+	_close->setAccessibleName(tr::lng_cancel(tr::now));
+	_unarchiveIcon->setAccessibleName(tr::lng_new_contact_unarchive(tr::now));
+	_reportIcon->setAccessibleName(tr::lng_report_spam(tr::now));
 	_requestChatInfo->setAttribute(Qt::WA_TransparentForMouseEvents);
 	_emojiStatusInfo->paintRequest(
 	) | rpl::on_next([=, raw = _emojiStatusInfo.data()](QRect clip) {

@@ -83,7 +83,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/toast/toast.h"
 #include "support/support_helper.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "storage/localimageloader.h"
 #include "storage/download_manager_mtproto.h"
 #include "storage/file_upload.h"
@@ -542,6 +542,8 @@ void ApiWrap::sendMessageFail(
 	} else if (show && error == u"CHAT_FORWARDS_RESTRICTED"_q) {
 		show->showToast(peer->isBroadcast()
 			? tr::lng_error_noforwards_channel(tr::now)
+			: peer->isUser()
+			? tr::lng_error_noforwards_user(tr::now)
 			: tr::lng_error_noforwards_group(tr::now), kJoinErrorDuration);
 	} else if (error == u"PREMIUM_ACCOUNT_REQUIRED"_q) {
 		Settings::ShowPremium(&session(), "premium_stickers");
@@ -566,6 +568,8 @@ void ApiWrap::sendMessageFail(
 			}
 		}
 		peer->updateFull();
+	} else if (show) {
+		show->showToast(error);
 	}
 	if (const auto item = _session->data().message(itemId)) {
 		Assert(randomId != 0);
@@ -1882,12 +1886,14 @@ void ApiWrap::requestNotifySettings(const MTPInputNotifyPeer &peer) {
 			return PeerId(0);
 		}, [](const MTPDinputPeerChannel &data) {
 			return peerFromChannel(data.vchannel_id());
+		}, [](const MTPDinputPeerChannelFromMessage &data) {
+			return peerFromChannel(data.vchannel_id());
 		}, [](const MTPDinputPeerChat &data) {
 			return peerFromChat(data.vchat_id());
 		}, [](const MTPDinputPeerUser &data) {
 			return peerFromUser(data.vuser_id());
-		}, [](const auto &) -> PeerId {
-			Unexpected("Type in ApiRequest::requestNotifySettings peer.");
+		}, [](const MTPDinputPeerUserFromMessage &data) {
+			return peerFromUser(data.vuser_id());
 		});
 	};
 	const auto key = peer.match([](const MTPDinputNotifyUsers &) {
@@ -1962,7 +1968,7 @@ void ApiWrap::updateNotifySettingsDelayed(Data::DefaultNotify type) {
 
 void ApiWrap::sendNotifySettingsUpdates() {
 	_updateNotifyQueueLifetime.destroy();
-	for (const auto topic : base::take(_updateNotifyTopics)) {
+	for (const auto &topic : base::take(_updateNotifyTopics)) {
 		request(MTPaccount_UpdateNotifySettings(
 			MTP_inputNotifyForumTopic(
 				topic->peer()->input(),
@@ -1970,7 +1976,7 @@ void ApiWrap::sendNotifySettingsUpdates() {
 			topic->notify().serialize()
 		)).afterDelay(kSmallDelayMs).send();
 	}
-	for (const auto peer : base::take(_updateNotifyPeers)) {
+	for (const auto &peer : base::take(_updateNotifyPeers)) {
 		request(MTPaccount_UpdateNotifySettings(
 			MTP_inputNotifyPeer(peer->input()),
 			peer->notify().serialize()
@@ -3578,7 +3584,6 @@ void ApiWrap::forwardMessages(
 		if (shared) {
 			++shared->requestsLeft;
 		}
-		const auto requestType = Data::Histories::RequestType::Send;
 		const auto idsCopy = localIds;
 		const auto scheduled = action.options.scheduled;
 		const auto starsPaid = std::min(
@@ -3589,32 +3594,56 @@ void ApiWrap::forwardMessages(
 			action.options.starsApproved -= starsPaid;
 			oneFlags |= SendFlag::f_allow_paid_stars;
 		}
-		histories.sendRequest(history, requestType, [=](Fn<void()> finish) {
-			history->sendRequestId = request(MTPmessages_ForwardMessages(
-				MTP_flags(oneFlags),
+		auto buildMessage = [=](
+				not_null<History*> history,
+				FullReplyTo replyTo)
+			-> Data::Histories::PreparedMessage {
+			const auto kGeneralId = Data::ForumTopic::kGeneralId;
+			const auto realTopMsgId = (replyTo.topicRootId == kGeneralId)
+				? MsgId(0)
+				: replyTo.topicRootId;
+			auto flags = oneFlags;
+			if (realTopMsgId) {
+				flags |= SendFlag::f_top_msg_id;
+			} else {
+				flags &= ~SendFlag::f_top_msg_id;
+			}
+			return MTPmessages_ForwardMessages(
+				MTP_flags(flags),
 				forwardFrom->input(),
 				MTP_vector<MTPint>(ids),
 				MTP_vector<MTPlong>(randomIds),
-				peer->input(),
-				MTP_int(topMsgId),
+				history->peer->input(),
+				MTP_int(realTopMsgId),
 				(action.options.suggest
-					? ReplyToForMTP(history, action.replyTo)
+					? ReplyToForMTP(history, replyTo)
 					: monoforumPeer
-					? MTP_inputReplyToMonoForum(monoforumPeer->input())
+					? MTP_inputReplyToMonoForum(
+						monoforumPeer->input())
 					: MTPInputReplyTo()),
 				MTP_int(action.options.scheduled),
 				MTP_int(action.options.scheduleRepeatPeriod),
-				(sendAs ? sendAs->input() : MTP_inputPeerEmpty()),
-				Data::ShortcutIdToMTP(_session, action.options.shortcutId),
+				(sendAs
+					? sendAs->input()
+					: MTP_inputPeerEmpty()),
+				Data::ShortcutIdToMTP(
+					&history->session(),
+					action.options.shortcutId),
 				MTP_long(action.options.effectId),
-				MTPint(), // video_timestamp
+				MTPint(),
 				MTP_long(starsPaid),
-				Api::SuggestToMTP(action.options.suggest)
-			)).done([=](const MTPUpdates &result) {
+				Api::SuggestToMTP(action.options.suggest));
+		};
+		histories.sendPreparedMessage(
+			history,
+			FullReplyTo{ .topicRootId = topicRootId },
+			uint64(0),
+			std::move(buildMessage),
+			[=](const MTPUpdates &result, const MTP::Response &) {
 				if (!scheduled) {
-					this->updates().checkForSentToScheduled(result);
+					_session->api().updates().checkForSentToScheduled(
+						result);
 				}
-				applyUpdates(result);
 				if (shared && !--shared->requestsLeft) {
 					shared->callback();
 				}
@@ -3625,28 +3654,27 @@ void ApiWrap::forwardMessages(
 					readHistory(history->lastMessage());
 				}
 
-				finish();
-				if (peer->isSelf() && session().premium()) {
+				if (peer->isSelf() && _session->premium()) {
 					ProcessRecentSelfForwards(
 						_session,
 						result,
 						peer->id,
 						forwardFrom->id);
 				}
-			}).fail([=](const MTP::Error &error) {
+			},
+			[=](const MTP::Error &error, const MTP::Response &) {
 				if (idsCopy) {
 					for (const auto &[randomId, itemId] : *idsCopy) {
-						sendMessageFail(error, peer, randomId, itemId);
+						_session->api().sendMessageFail(
+							error,
+							peer,
+							randomId,
+							itemId);
 					}
 				} else {
-					sendMessageFail(error, peer);
+					_session->api().sendMessageFail(error, peer);
 				}
-				finish();
-			}).afterRequest(
-				history->sendRequestId
-			).send();
-			return history->sendRequestId;
-		});
+			});
 
 		ids.resize(0);
 		randomIds.resize(0);
@@ -3655,7 +3683,7 @@ void ApiWrap::forwardMessages(
 
 	ids.reserve(count);
 	randomIds.reserve(count);
-	for (const auto item : draft.items) {
+	for (const auto &item : draft.items) {
 		const auto randomId = base::RandomValue<uint64>();
 		if (genClientSideMessage) {
 			const auto newId = FullMsgId(
@@ -3799,14 +3827,16 @@ void ApiWrap::sendVoiceMessage(
 		const SendAction &action) {
 	const auto caption = TextWithTags();
 	const auto to = FileLoadTaskOptions(action);
-	_fileLoader->addTask(std::make_unique<FileLoadTask>(
-		&session(),
-		result,
-		duration,
-		waveform,
-		video,
-		to,
-		caption));
+	_fileLoader->addTask(
+		std::make_unique<FileLoadTask>(FileLoadTask::VoiceArgs{
+			.session = &session(),
+			.voice = result,
+			.duration = duration,
+			.waveform = waveform,
+			.video = video,
+			.to = to,
+			.caption = caption,
+		}));
 }
 
 void ApiWrap::editMedia(
@@ -3830,46 +3860,45 @@ void ApiWrap::editMedia(
 		to.replyTo.monoforumPeerId = existing->sublistPeerId();
 		to.replaceMediaOf = MsgId();
 	}
-	_fileLoader->addTask(std::make_unique<FileLoadTask>(
-		&session(),
-		file.path,
-		file.content,
-		std::move(file.information),
-		(file.videoCover
-			? std::make_unique<FileLoadTask>(
-				&session(),
-				file.videoCover->path,
-				file.videoCover->content,
-				std::move(file.videoCover->information),
-				nullptr,
-				SendMediaType::Photo,
-				to,
-				TextWithTags(),
-				false)
+	const auto forceFile = (type == SendMediaType::File)
+		&& (file.type == Ui::PreparedFile::Type::Video);
+	_fileLoader->addTask(std::make_unique<FileLoadTask>(FileLoadTask::Args{
+		.session = &session(),
+		.filepath = file.path,
+		.content = file.content,
+		.information = std::move(file.information),
+		.videoCover = (file.videoCover
+			? std::make_unique<FileLoadTask>(FileLoadTask::Args{
+				.session = &session(),
+				.filepath = file.videoCover->path,
+				.content = file.videoCover->content,
+				.information = std::move(file.videoCover->information),
+				.videoCover = nullptr,
+				.type = SendMediaType::Photo,
+				.to = to,
+				.caption = TextWithTags(),
+				.spoiler = false,
+				.album = nullptr,
+				.forceFile = false,
+				.idOverride = 0,
+			})
 			: nullptr),
-		type,
-		to,
-		caption,
-		file.spoiler));
+		.type = type,
+		.to = to,
+		.caption = caption,
+		.spoiler = file.spoiler,
+		.album = nullptr,
+		.forceFile = forceFile,
+		.idOverride = 0,
+		.displayName = file.displayName,
+	}));
 }
 
 void ApiWrap::sendFiles(
 		Ui::PreparedList &&list,
 		SendMediaType type,
-		TextWithTags &&caption,
 		std::shared_ptr<SendingAlbum> album,
 		const SendAction &action) {
-	const auto haveCaption = !caption.text.isEmpty();
-	if (haveCaption
-		&& !list.canAddCaption(
-			album != nullptr,
-			type == SendMediaType::Photo)) {
-		auto message = MessageToSend(action);
-		message.textWithTags = base::take(caption);
-		message.action.clearDraft = false;
-		sendMessage(std::move(message));
-	}
-
 	const auto to = FileLoadTaskOptions(action);
 	if (album) {
 		album->options = to.options;
@@ -3883,30 +3912,38 @@ void ApiWrap::sendFiles(
 				&& type != SendMediaType::File)
 			? SendMediaType::Photo
 			: SendMediaType::File;
-		tasks.push_back(std::make_unique<FileLoadTask>(
-			&session(),
-			file.path,
-			file.content,
-			std::move(file.information),
-			(file.videoCover
-				? std::make_unique<FileLoadTask>(
-					&session(),
-					file.videoCover->path,
-					file.videoCover->content,
-					std::move(file.videoCover->information),
-					nullptr,
-					SendMediaType::Photo,
-					to,
-					TextWithTags(),
-					false,
-					nullptr)
+		const auto forceFile = (type == SendMediaType::File)
+			&& (file.type == Ui::PreparedFile::Type::Video);
+		tasks.push_back(std::make_unique<FileLoadTask>(FileLoadTask::Args{
+			.session = &session(),
+			.filepath = file.path,
+			.content = file.content,
+			.information = std::move(file.information),
+			.videoCover = (file.videoCover
+				? std::make_unique<FileLoadTask>(FileLoadTask::Args{
+					.session = &session(),
+					.filepath = file.videoCover->path,
+					.content = file.videoCover->content,
+					.information = std::move(file.videoCover->information),
+					.videoCover = nullptr,
+					.type = SendMediaType::Photo,
+					.to = to,
+					.caption = TextWithTags(),
+					.spoiler = false,
+					.album = nullptr,
+					.forceFile = false,
+					.idOverride = 0,
+				})
 				: nullptr),
-			uploadWithType,
-			to,
-			caption,
-			file.spoiler,
-			album));
-		caption = TextWithTags();
+			.type = uploadWithType,
+			.to = to,
+			.caption = std::move(file.caption),
+			.spoiler = file.spoiler,
+			.album = album,
+			.forceFile = forceFile,
+			.idOverride = 0,
+			.displayName = file.displayName,
+		}));
 	}
 	if (album) {
 		_sendingAlbums.emplace(album->groupId, album);
@@ -3925,18 +3962,20 @@ void ApiWrap::sendFile(
 	const auto to = FileLoadTaskOptions(action);
 	auto caption = TextWithTags();
 	const auto spoiler = false;
-	const auto information = nullptr;
-	const auto videoCover = nullptr;
-	_fileLoader->addTask(std::make_unique<FileLoadTask>(
-		&session(),
-		QString(),
-		fileContent,
-		information,
-		videoCover,
-		type,
-		to,
-		caption,
-		spoiler));
+	_fileLoader->addTask(std::make_unique<FileLoadTask>(FileLoadTask::Args{
+		.session = &session(),
+		.filepath = QString(),
+		.content = fileContent,
+		.information = nullptr,
+		.videoCover = nullptr,
+		.type = type,
+		.to = to,
+		.caption = caption,
+		.spoiler = spoiler,
+		.album = nullptr,
+		.forceFile = false,
+		.idOverride = 0
+	}));
 }
 
 void ApiWrap::sendUploadedPhoto(

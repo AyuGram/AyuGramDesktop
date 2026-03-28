@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_credits_graphics.h"
 #include "storage/storage_account.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/boxes/emoji_stake_box.h" // InsufficientTonBox
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
@@ -183,7 +184,7 @@ Data::SendError GetErrorForSending(
 Data::SendErrorWithThread GetErrorForSending(
 		const std::vector<not_null<Data::Thread*>> &threads,
 		SendingErrorRequest request) {
-	for (const auto thread : threads) {
+	for (const auto &thread : threads) {
 		const auto error = GetErrorForSending(thread, request);
 		if (error) {
 			return Data::SendErrorWithThread{ error, thread };
@@ -520,10 +521,12 @@ bool SendPaymentHelper::check(
 			done);
 		return false;
 	}
+	const auto session = &peer->session();
 	if (checkSuggestPriceTon
-		&& checkSuggestPriceTon > peer->session().credits().tonBalance()) {
+		&& checkSuggestPriceTon > session->credits().tonBalance()) {
 		using namespace HistoryView;
-		show->show(Box(InsufficientTonBox, peer, checkSuggestPriceTon));
+		show->show(
+			Box(Ui::InsufficientTonBox, session, checkSuggestPriceTon));
 		return false;
 	}
 	return true;
@@ -747,9 +750,10 @@ ClickHandlerPtr JumpToMessageClickHandler(
 			: peer->session().tryResolveWindow(peer);
 		if (controller) {
 			auto params = Window::SectionShow{
-				Window::SectionShow::Way::Forward
+				Window::SectionShow::Way::Forward,
 			};
 			params.highlight = highlight;
+			params.allowDuplicateInStack = true;
 			params.origin = Window::SectionShow::OriginMessage{
 				returnToId
 			};
@@ -859,6 +863,9 @@ MessageFlags FlagsFromMTP(
 			? Flag::TonPaidSuggested
 			: (flags & MTP::f_paid_suggested_post_stars)
 			? Flag::StarsPaidSuggested
+			: Flag())
+		| ((flags & MTP::f_summary_from_language)
+			? Flag::CanBeSummarized
 			: Flag());
 }
 
@@ -897,6 +904,8 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 			: replyTo.messageId.peer;
 		const auto replyToTop = LookupReplyToTop(action.history, replyTo);
 		const auto quoteNormalized = reverseLocalPremiumEmoji(replyTo.quote, action.history, true);
+		const auto topicPost = replyTo.topicRootId
+			&& (replyTo.topicRootId != Data::ForumTopic::kGeneralId);
 		auto quoteEntities = Api::EntitiesToMTP(
 			&action.history->session(),
 			quoteNormalized.entities,
@@ -913,7 +922,8 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 				| (quoteEntities.v.empty()
 					? Flag()
 					: Flag::f_quote_entities)
-				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())),
+				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())
+				| (topicPost ? Flag::f_forum_topic : Flag())),
 			MTP_int(replyTo.messageId.msg),
 			peerToMTP(externalPeerId),
 			MTPMessageFwdHeader(), // reply_from

@@ -46,9 +46,14 @@ struct ButtonParameters;
 class InlineList;
 } // namespace HistoryView::Reactions
 
+namespace HistoryView::ReplyButton {
+struct ButtonParameters;
+} // namespace HistoryView::ReplyButton
+
 namespace HistoryView {
 
 using PaintContext = Ui::ChatPaintContext;
+enum class BadgeRole : uchar;
 enum class PointState : char;
 enum class InfoDisplayType : char;
 struct StateRequest;
@@ -317,7 +322,8 @@ struct ServicePreMessage : RuntimeComponent<ServicePreMessage, Element> {
 		not_null<Element*> view,
 		PreparedServiceText string,
 		ClickHandlerPtr fullClickHandler,
-		std::unique_ptr<Media> media = nullptr);
+		std::unique_ptr<Media> media,
+		bool below);
 
 	int resizeToWidth(int newWidth, ElementChatMode mode);
 
@@ -336,6 +342,7 @@ struct ServicePreMessage : RuntimeComponent<ServicePreMessage, Element> {
 	ClickHandlerPtr handler;
 	int width = 0;
 	int height = 0;
+	bool below = false;
 
 };
 
@@ -395,6 +402,7 @@ public:
 		TopicRootReply           = 0x0400,
 		MediaOverriden           = 0x0800,
 		HeavyCustomEmoji         = 0x1000,
+		SummaryShown             = 0x2000,
 	};
 	using Flags = base::flags<Flag>;
 	friend inline constexpr auto is_flag_type(Flag) { return true; }
@@ -483,6 +491,10 @@ public:
 		PreparedServiceText text,
 		ClickHandlerPtr fullClickHandler = nullptr,
 		std::unique_ptr<Media> media = nullptr);
+	void setServicePostMessage(
+		PreparedServiceText text,
+		ClickHandlerPtr fullClickHandler = nullptr,
+		std::unique_ptr<Media> media = nullptr);
 
 	bool computeIsAttachToPrevious(not_null<Element*> previous);
 
@@ -534,6 +546,9 @@ public:
 	[[nodiscard]] virtual auto reactionButtonParameters(
 		QPoint position,
 		const TextState &reactionState) const -> Reactions::ButtonParameters;
+	[[nodiscard]] virtual auto replyButtonParameters(
+		QPoint position,
+		const TextState &replyState) const -> ReplyButton::ButtonParameters;
 	[[nodiscard]] virtual int reactionsOptimalWidth() const;
 
 	// ClickHandlerHost interface.
@@ -634,7 +649,7 @@ public:
 		const Reactions::InlineList &reactions) const;
 	void clearCustomEmojiRepaint() const;
 	void hideSpoilers();
-	void repaint() const;
+	void repaint(QRect r = QRect()) const;
 
 	[[nodiscard]] ClickHandlerPtr fromPhotoLink() const {
 		return fromLink();
@@ -654,6 +669,7 @@ public:
 	-> std::unique_ptr<Ui::ReactionFlyAnimation>;
 
 	void overrideMedia(std::unique_ptr<Media> media);
+	void overrideRightBadge(const QString &text, BadgeRole role);
 
 	[[nodiscard]] not_null<PurchasedTag*> enforcePurchasedTag();
 
@@ -691,7 +707,7 @@ protected:
 	virtual void refreshDataIdHook();
 
 	[[nodiscard]] const Ui::Text::String &text() const;
-	[[nodiscard]] int textHeightFor(int textWidth);
+	[[nodiscard]] int textHeightFor(int textWidth) const;
 	void validateText();
 	void validateTextSkipBlock(bool has, int width, int height);
 	void validateInlineKeyboard(HistoryMessageReplyMarkup *markup);
@@ -727,8 +743,11 @@ private:
 
 	virtual QSize performCountOptimalSize() = 0;
 	virtual QSize performCountCurrentSize(int newWidth) = 0;
+	virtual void invalidateTextDependentCache() {
+	}
 
 	void refreshMedia(Element *replacing);
+	void invalidateTextSizeCache();
 	void setTextWithLinks(
 		const TextWithEntities &text,
 		const std::vector<ClickHandlerPtr> &links = {});

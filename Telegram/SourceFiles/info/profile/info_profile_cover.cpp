@@ -7,55 +7,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_cover.h"
 
-#include "api/api_user_privacy.h"
-#include "base/timer_rpl.h"
-#include "data/data_peer_values.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_emoji_statuses.h"
-#include "data/data_peer.h"
-#include "data/data_user.h"
+#include "main/main_session.h"
+#include "data/data_forum_topic.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
-#include "data/data_changes.h"
 #include "data/data_session.h"
-#include "data/data_forum_topic.h"
 #include "data/stickers/data_custom_emoji.h"
-#include "info/profile/info_profile_badge.h"
-#include "info/profile/info_profile_badge_tooltip.h"
-#include "info/profile/info_profile_emoji_status_panel.h"
-#include "info/profile/info_profile_status_label.h"
-#include "info/profile/info_profile_values.h"
-#include "info/info_controller.h"
-#include "info/info_memento.h"
-#include "boxes/peers/edit_forum_topic_box.h"
-#include "boxes/report_messages_box.h"
 #include "history/view/media/history_view_sticker_player.h"
-#include "lang/lang_keys.h"
-#include "ui/boxes/show_or_premium_box.h"
-#include "ui/controls/stars_rating.h"
-#include "ui/controls/userpic_button.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/text/text_utilities.h"
-#include "ui/basic_click_handlers.h"
-#include "ui/ui_utility.h"
-#include "ui/painter.h"
-#include "base/event_filter.h"
-#include "base/unixtime.h"
-#include "window/window_controller.h"
-#include "window/window_session_controller.h"
-#include "main/main_app_config.h"
-#include "main/main_session.h"
-#include "settings/settings_premium.h"
+#include "info/profile/info_profile_values.h"
 #include "chat_helpers/stickers_lottie.h"
-#include "apiwrap.h"
-#include "api/api_peer_photo.h"
-#include "styles/style_boxes.h"
+#include "window/window_session_controller.h"
+#include "ui/painter.h"
 #include "styles/style_info.h"
 #include "styles/style_dialogs.h"
-#include "styles/style_menu_icons.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -66,27 +30,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 
 namespace Info::Profile {
-namespace {
-
-constexpr auto kWaitBeforeGiftBadge = crl::time(1000);
-constexpr auto kGiftBadgeGlares = 3;
-constexpr auto kGlareDurationStep = crl::time(320);
-constexpr auto kGlareTimeout = crl::time(1000);
-
-[[nodiscard]] const style::InfoProfileCover &CoverStyle(
-		not_null<PeerData*> peer,
-		Data::ForumTopic *topic,
-		Cover::Role role) {
-	return (role == Cover::Role::EditContact)
-		? st::infoEditContactCover
-		: topic
-		? st::infoTopicCover
-		: peer->isMegagroup()
-		? st::infoProfileMegagroupCover
-		: st::infoProfileCover;
-}
-
-} // namespace
 
 QMargins LargeCustomEmojiMargins() {
 	const auto ratio = style::DevicePixelRatio();
@@ -121,7 +64,7 @@ TopicIconView::TopicIconView(
 	setup(topic);
 }
 
-void TopicIconView::paintInRect(QPainter &p, QRect rect) {
+void TopicIconView::paintInRect(QPainter &p, QRect rect, QColor textColor) {
 	const auto paint = [&](const QImage &image) {
 		const auto size = image.size() / style::DevicePixelRatio();
 		p.drawImage(
@@ -133,7 +76,9 @@ void TopicIconView::paintInRect(QPainter &p, QRect rect) {
 			image);
 	};
 	if (_player && _player->ready()) {
-		const auto colored = _playerUsesTextColor
+		const auto colored = (textColor.alpha() > 0)
+			? textColor
+			: _playerUsesTextColor
 			? st::windowFg->c
 			: QColor(0, 0, 0, 0);
 		paint(_player->frame(

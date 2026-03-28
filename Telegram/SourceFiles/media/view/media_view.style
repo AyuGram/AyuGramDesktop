@@ -119,6 +119,7 @@ mediaviewShare: icon {{ "mediaview/viewer_share", mediaviewControlFg }};
 mediaviewRotate: icon {{ "mediaview/rotate", mediaviewControlFg }};
 mediaviewMore: icon {{ "title_menu_dots", mediaviewControlFg }};
 mediaviewRecognize: icon {{ "mediaview/recognize", mediaviewControlFg }};
+mediaviewDraw: icon {{ "mediaview/draw", mediaviewControlFg }};
 
 mediaviewFileRed: icon {
 	{ size(25px, 25px), mediaviewFileBg },
@@ -215,6 +216,7 @@ mediaviewTextStyle: defaultTextStyle;
 
 mediaviewTextLeft: 14px;
 mediaviewTextSkip: 10px;
+mediaviewTextSkipHalf: 5px;
 mediaviewHeaderTop: 47px;
 mediaviewTextTop: 26px;
 
@@ -222,8 +224,8 @@ mediaviewControlSize: 90px;
 mediaviewIconSize: size(46px, 54px);
 mediaviewIconOver: 36px;
 
-mediaviewWaitHide: 2000;
-mediaviewHideDuration: 1000;
+mediaviewWaitHide: 1100;
+mediaviewHideDuration: 600;
 mediaviewShowDuration: 200;
 mediaviewFadeDuration: 150;
 
@@ -368,6 +370,7 @@ mediaviewSpeedButton: MediaSpeedButton(mediaPlayerSpeedButton) {
 	rippleRadius: 16px;
 	menu: mediaviewSpeedMenu;
 	menuAlign: align(bottomright);
+	menuPosition: point(-2px, 31px);
 }
 
 themePreviewSize: size(903px, 584px);
@@ -492,10 +495,6 @@ storiesLike: IconButton(storiesAttach) {
 	icon: icon {{ "chat/input_like", storiesComposeGrayIcon }};
 	iconOver: icon {{ "chat/input_like", storiesComposeGrayIcon }};
 }
-storiesRecordVoice: icon {{ "chat/input_record", storiesComposeGrayIcon }};
-storiesRecordVoiceOver: icon {{ "chat/input_record", storiesComposeGrayIcon }};
-storiesRecordRound: icon {{ "chat/input_video", storiesComposeGrayIcon }};
-storiesRecordRoundOver: icon {{ "chat/input_video", storiesComposeGrayIcon }};
 storiesEditStars: IconButton(storiesAttach) {
 	icon: icon{{ "chat/input_paid", storiesComposeGrayIcon }};
 	iconOver: icon{{ "chat/input_paid", storiesComposeGrayIcon }};
@@ -727,11 +726,8 @@ storiesComposeControls: ComposeControls(defaultComposeControls) {
 			rippleAreaSize: 40px;
 			rippleAreaPosition: point(1px, 1px);
 		}
-		record: storiesRecordVoice;
-		recordOver: storiesRecordVoiceOver;
-		round: storiesRecordRound;
-		roundOver: storiesRecordRoundOver;
 		sendDisabledFg: storiesComposeGrayText;
+		sendIconFg: windowFgActive;
 	}
 	attach: storiesAttach;
 	emoji: storiesAttachEmoji;
@@ -1110,10 +1106,12 @@ storiesStealthStyle: StealthBoxStyle {
 
 storiesViewsPosition: point(4px, 29px);
 storiesViewsIcon: icon{{ "mediaview/views", storiesComposeGrayText }};
+storiesViewsIconTop: 11px;
 storiesViewsText: FlatLabel(defaultFlatLabel) {
 	textFg: storiesComposeGrayText;
 }
 storiesViewsTextPosition: point(26px, 14px);
+storiesChannelReactionsTextTop: 16px;
 
 storiesLikesPosition: point(0px, 29px);
 storiesLikesIcon: icon {{ "chat/input_like", storiesComposeWhiteText }};

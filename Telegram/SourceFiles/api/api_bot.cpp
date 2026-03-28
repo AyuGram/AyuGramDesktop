@@ -482,7 +482,7 @@ void ActivateBotCommand(ClickHandlerContext context, int row, int column) {
 	} break;
 
 	case ButtonType::Auth:
-		UrlAuthBox::Activate(item, row, column);
+		UrlAuthBox::ActivateButton(controller->uiShow(), item, row, column);
 		break;
 
 	case ButtonType::UserProfile: {

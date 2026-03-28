@@ -7,23 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "info/profile/info_profile_badge.h"
-#include "ui/wrap/padding_wrap.h"
 #include "ui/abstract_button.h"
-#include "base/timer.h"
 
 namespace Window {
 class SessionController;
 } // namespace Window
-
-namespace Ui {
-class UserpicButton;
-class FlatLabel;
-template <typename Widget>
-class SlideWrap;
-class RoundButton;
-class StarsRating;
-} // namespace Ui
 
 namespace HistoryView {
 class StickerPlayer;
@@ -33,21 +21,7 @@ namespace Data {
 class ForumTopic;
 } // namespace Data
 
-namespace Info {
-class Controller;
-class Section;
-} // namespace Info
-
-namespace style {
-struct InfoProfileCover;
-} // namespace style
-
 namespace Info::Profile {
-
-class BadgeTooltip;
-class EmojiStatusPanel;
-class Badge;
-class StatusLabel;
 
 [[nodiscard]] QMargins LargeCustomEmojiMargins();
 
@@ -63,7 +37,10 @@ public:
 		Fn<void()> update,
 		const style::color &generalIconFg);
 
-	void paintInRect(QPainter &p, QRect rect);
+	void paintInRect(
+		QPainter &p,
+		QRect rect,
+		QColor textColor = QColor(0, 0, 0, 0));
 
 private:
 	using StickerPlayer = HistoryView::StickerPlayer;
@@ -184,5 +161,6 @@ private:
 	rpl::event_stream<Section> _showSection;
 
 };
+
 
 } // namespace Info::Profile

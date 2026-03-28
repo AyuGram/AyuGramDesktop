@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/gift_premium_box.h"
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
+#include "boxes/star_gift_craft_box.h"
 #include "boxes/star_gift_resale_box.h"
 #include "boxes/transfer_gift_box.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
@@ -62,7 +63,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "payments/payments_form.h"
 #include "payments/payments_non_panel_process.h"
 #include "settings/settings_common_session.h"
-#include "settings/settings_credits.h"
+#include "settings/sections/settings_credits.h"
 #include "statistics/widgets/chart_header_widget.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/button_labels.h"
@@ -214,7 +215,9 @@ void ToggleStarGiftSaved(
 		if (const auto onstack = done) {
 			onstack(false);
 		}
-		show->showToast(error.type());
+		if (!Ui::ShowGiftErrorToast(show, error)) {
+			show->showToast(error.type());
+		}
 	}).send();
 }
 
@@ -270,7 +273,9 @@ void ConvertStarGift(
 				tr::rich));
 		done(true);
 	}).fail([=](const MTP::Error &error) {
-		show->showToast(error.type());
+		if (!Ui::ShowGiftErrorToast(show, error)) {
+			show->showToast(error.type());
+		}
 		done(false);
 	}).send();
 }
@@ -963,6 +968,25 @@ void ProcessReceivedSubscriptions(
 	// (owner->isChannel() && owner->asChannel()->canTransferGifts());
 }
 
+[[nodiscard]] bool CanCraftGift(
+		not_null<Main::Session*> session,
+		const Data::CreditsHistoryEntry &e) {
+	const auto unique = e.uniqueGift.get();
+	if (!unique || !unique->craftChancePermille) {
+		return false;
+	}
+	const auto owner = (unique && unique->ownerId)
+		? session->data().peer(unique->ownerId).get()
+		: nullptr;
+	return !owner
+		? false
+		: owner->isSelf()
+		? e.in
+		: false;
+	// Currently we're not crafting channel gifts.
+	// (owner->isChannel() && owner->asChannel()->canTransferGifts());
+}
+
 [[nodiscard]] bool ShowOfferBuyButton(
 		not_null<Main::Session*> session,
 		const Data::CreditsHistoryEntry &e) {
@@ -1109,6 +1133,21 @@ void FillUniqueGiftMenu(
 	if (!host) {
 		return;
 	}
+	if (CanCraftGift(&show->session(), e)) {
+		menu->addAction(tr::lng_gift_craft_menu_button(tr::now), [=] {
+			const auto unique = e.uniqueGift;
+			if (Ui::ShowCraftLaterError(show, unique)) {
+				return;
+			}
+			if (Ui::ShowCraftAddressError(show, unique)) {
+				return;
+			}
+			const auto savedId = EntryToSavedStarGiftId(&show->session(), e);
+			if (const auto window = show->resolveWindow()) {
+				Ui::ShowGiftCraftInfoBox(window, unique, savedId);
+			}
+		}, st.craft ? st.craft : &st::menuIconCraft);
+	}
 	const auto transfer = savedId
 		&& (savedId.isUser() ? e.in : savedId.chat()->canTransferGifts())
 		&& (unique->starsForTransfer >= 0);
@@ -1204,6 +1243,7 @@ CreditsEntryBoxStyleOverrides DarkCreditsEntryBoxStyle() {
 		.share = &st::darkGiftShare,
 		.theme = &st::darkGiftTheme,
 		.transfer = &st::darkGiftTransfer,
+		.craft = &st::darkGiftCraft,
 		.wear = &st::darkGiftNftWear,
 		.takeoff = &st::darkGiftNftTakeOff,
 		.resell = &st::darkGiftNftResell,
@@ -1323,13 +1363,17 @@ void GenericCreditsEntryCover(
 			}
 			: Fn<void()>();
 		AddUniqueGiftCover(content, rpl::single(cover), {
+			.numberText = (uniqueGift->number > 0)
+				? rpl::single(u"#"_q + Lang::FormatCountDecimal(uniqueGift->number))
+				: rpl::producer<QString>(),
 			.resalePrice = UniqueGiftResalePrice(e.uniqueGift, forceTon),
 			.resaleClick = resaleClick,
 		});
 		if (e.bareGiftOwnerId == session->userPeerId().value) {
 			if (const auto fromId = PeerId(e.barePeerId)) {
 				const auto from = session->data().peer(fromId);
-				AttachGiftSenderBadge(box, show, from, e.date);
+				const auto crafted = uniqueGift->crafted;
+				AttachGiftSenderBadge(box, show, from, e.date, crafted);
 			}
 		}
 	} else if (const auto callback = Ui::PaintPreviewCallback(session, e)) {
@@ -1471,6 +1515,13 @@ void GenericCreditsEntryBox(
 void GenericCreditsEntryBody(
 		not_null<Ui::GenericBox*> box,
 		std::shared_ptr<ChatHelpers::Show> show,
+		const Data::CreditsHistoryEntry &e) {
+	GenericCreditsEntryBody(box, std::move(show), e, {}, nullptr, {});
+}
+
+void GenericCreditsEntryBody(
+		not_null<Ui::GenericBox*> box,
+		std::shared_ptr<ChatHelpers::Show> show,
 		const Data::CreditsHistoryEntry &e,
 		const Data::SubscriptionEntry &s,
 		std::shared_ptr<Data::GiftUpgradeSpinner> upgradeSpinner,
@@ -1554,10 +1605,24 @@ void GenericCreditsEntryBody(
 	if (uniqueGift) {
 		AddSkip(content, st::defaultVerticalListSkip * 2);
 
-		AddUniqueCloseButton(box, st, [=](not_null<Ui::PopupMenu*> menu) {
+		const auto canCraft = CanCraftGift(session, e);
+		const auto craft = canCraft ? [=] {
+			const auto unique = e.uniqueGift;
+			if (Ui::ShowCraftLaterError(show, unique)) {
+				return;
+			}
+			if (Ui::ShowCraftAddressError(show, unique)) {
+				return;
+			}
+			const auto savedId = EntryToSavedStarGiftId(&show->session(), e);
+			if (const auto window = show->resolveWindow()) {
+				Ui::ShowGiftCraftInfoBox(window, unique, savedId);
+			}
+		} : Fn<void()>();
+		AddUniqueCloseMoreButton(box, st, [=](not_null<Ui::PopupMenu*> menu) {
 			const auto type = SavedStarGiftMenuType::View;
 			FillUniqueGiftMenu(show, menu, e, type, st);
-		});
+		}, craft);
 
 		if (CanResellGift(session, e)) {
 			Ui::PreloadUniqueGiftResellPrices(session);
@@ -1606,7 +1671,9 @@ void GenericCreditsEntryBody(
 					: (isStarGift && !starGiftCanManage)
 					? tr::lng_gift_link_label_gift(tr::now)
 					: giftToSelf
-					? tr::lng_action_gift_self_subtitle(tr::now)
+					? ((uniqueGift && uniqueGift->crafted)
+						? tr::lng_action_gift_crafted_subtitle(tr::now)
+						: tr::lng_action_gift_self_subtitle(tr::now))
 					: e.gift
 					? tr::lng_credits_box_history_entry_gift_name(tr::now)
 					: (peer && !e.reaction)
@@ -2230,6 +2297,8 @@ void GenericCreditsEntryBody(
 			? tr::lng_credits_subscription_off_button()
 			: toRejoin
 			? tr::lng_credits_subscription_off_rejoin_button()
+			: e.craftAnotherCallback
+			? tr::lng_gift_craft_another_button()
 			: canUpgradeFree
 			? tr::lng_gift_upgrade_free()
 			: canUpgrade
@@ -2293,6 +2362,9 @@ void GenericCreditsEntryBody(
 				const auto close = crl::guard(box, [=] { box->closeBox(); });
 				showNextToUpgrade();
 				close();
+				return;
+			} else if (e.craftAnotherCallback) {
+				e.craftAnotherCallback();
 				return;
 			} else if (state->confirmButtonBusy.current()
 				|| state->convertButtonBusy.current()) {
@@ -3570,6 +3642,71 @@ void MaybeRequestBalanceIncrease(
 			}
 		}
 	}, state->lifetime);
+}
+
+void AddUniqueCloseMoreButton(
+		not_null<Ui::GenericBox*> box,
+		Settings::CreditsEntryBoxStyleOverrides st,
+		Fn<void(not_null<Ui::PopupMenu*>)> fillMenu,
+		Fn<void()> launchCraft) {
+	const auto close = Ui::CreateChild<Ui::IconButton>(
+		box,
+		st::uniqueCloseButton);
+	const auto menu = fillMenu
+		? Ui::CreateChild<Ui::IconButton>(box, st::uniqueMenuButton)
+		: nullptr;
+	const auto craft = launchCraft
+		? Ui::CreateChild<Ui::IconButton>(box, st::uniqueCraftButton)
+		: nullptr;
+	close->show();
+	close->raise();
+	if (menu) {
+		menu->show();
+		menu->raise();
+	}
+	if (craft) {
+		craft->show();
+		craft->raise();
+	}
+	box->widthValue() | rpl::on_next([=](int width) {
+		auto right = 0;
+		close->moveToRight(right, 0, width);
+		close->raise();
+		right += close->width();
+		if (menu) {
+			menu->moveToRight(right, 0, width);
+			menu->raise();
+			right += menu->width();
+		}
+		if (craft) {
+			craft->moveToRight(right, 0, width);
+			craft->raise();
+		}
+	}, close->lifetime());
+	close->setClickedCallback([=] {
+		box->closeBox();
+	});
+	if (menu) {
+		const auto state = menu->lifetime().make_state<
+			base::unique_qptr<Ui::PopupMenu>
+		>();
+		menu->setClickedCallback([=] {
+			if (*state) {
+				*state = nullptr;
+				return;
+			}
+			*state = base::make_unique_q<Ui::PopupMenu>(
+				menu,
+				st.menu ? *st.menu : st::popupMenuWithIcons);
+			fillMenu(state->get());
+			if (!(*state)->empty()) {
+				(*state)->popup(QCursor::pos());
+			}
+		});
+	}
+	if (craft) {
+		craft->setClickedCallback(std::move(launchCraft));
+	}
 }
 
 } // namespace Settings

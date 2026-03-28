@@ -94,3 +94,6 @@
 [submodule "Telegram/lib_icu"]
 	path = Telegram/lib_icu
 	url = https://github.com/AyuGram/lib_icu.git
+[submodule "Telegram/lib_translate"]
+	path = Telegram/lib_translate
+	url = https://github.com/desktop-app/lib_translate
