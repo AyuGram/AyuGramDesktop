@@ -61,6 +61,7 @@ struct MediaGenericDescriptor {
 	int maxWidth = 0;
 	MediaGenericPart::PaintBgFactory paintBgFactory;
 	ClickHandlerPtr fullAreaLink;
+	bool expandCurrentWidth = false;
 	bool service = false;
 	bool hideServiceText = false;
 };
@@ -133,6 +134,7 @@ private:
 	int _maxWidthCap = 0;
 	int _marginTop = 0;
 	int _marginBottom = 0;
+	bool _expandCurrentWidth : 1 = false;
 	bool _service : 1 = false;
 	bool _hideServiceText : 1 = false;
 
@@ -191,6 +193,35 @@ public:
 private:
 	Ui::Text::String _text;
 	QMargins _margins;
+
+};
+
+class LambdaGenericPart final : public MediaGenericPart {
+public:
+	LambdaGenericPart(
+		QSize size,
+		Fn<void(
+			Painter &p,
+			not_null<const MediaGeneric*> owner,
+			const PaintContext &context,
+			int outerWidth)> draw);
+
+	void draw(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth) const override;
+
+	QSize countOptimalSize() override;
+	QSize countCurrentSize(int newWidth) override;
+
+private:
+	QSize _size;
+	Fn<void(
+		Painter &p,
+		not_null<const MediaGeneric*> owner,
+		const PaintContext &context,
+		int outerWidth)> _draw;
 
 };
 

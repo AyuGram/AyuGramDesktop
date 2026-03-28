@@ -271,7 +271,10 @@ bool WebPageData::applyChanges(
 	const auto hasSiteName = !resultSiteName.isEmpty() ? 1 : 0;
 	const auto hasTitle = !resultTitle.isEmpty() ? 1 : 0;
 	const auto hasDescription = !newDescription.text.isEmpty() ? 1 : 0;
-	if (newDocument
+	const auto allowLargeMediaDocument = newDocument
+		&& newDocument->isVideoFile()
+		&& newPhoto;
+	if ((!allowLargeMediaDocument && newDocument)
 		|| !newCollage.items.empty()
 		|| !newPhoto
 		|| (hasSiteName + hasTitle + hasDescription < 2)) {

@@ -14,6 +14,7 @@ class Show;
 namespace Ui {
 struct PreparedList;
 struct PreparedFile;
+struct PreparedBundle;
 } // namespace Ui
 
 namespace Window {
@@ -37,6 +38,7 @@ enum class ChatAdminRight {
 	EditStories = (1 << 15),
 	DeleteStories = (1 << 16),
 	ManageDirect = (1 << 17),
+	ManageRanks = (1 << 18),
 };
 inline constexpr bool is_flag_type(ChatAdminRight) { return true; }
 using ChatAdminRights = base::flags<ChatAdminRight>;
@@ -63,6 +65,7 @@ enum class ChatRestriction {
 	AddParticipants = (1 << 15),
 	PinMessages = (1 << 17),
 	CreateTopics = (1 << 18),
+	EditRank = (1 << 26),
 };
 inline constexpr bool is_flag_type(ChatRestriction) { return true; }
 using ChatRestrictions = base::flags<ChatRestriction>;
@@ -105,6 +108,7 @@ struct AdminRightsSetOptions {
 
 struct RestrictionsSetOptions {
 	bool isForum = false;
+	bool isUserSpecific = false;
 };
 
 [[nodiscard]] std::vector<ChatRestrictions> ListOfRestrictions(
@@ -255,5 +259,17 @@ void ShowSendErrorToast(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<PeerData*> peer,
 	SendError error);
+
+bool ShowSendError(
+	std::shared_ptr<ChatHelpers::Show> show,
+	not_null<PeerData*> peer,
+	const Ui::PreparedList &list,
+	std::optional<bool> compress,
+	bool ignoreSlowmodeLeft = false);
+bool ShowSendError(
+	std::shared_ptr<ChatHelpers::Show> show,
+	not_null<PeerData*> peer,
+	const Ui::PreparedBundle &bundle,
+	bool ignoreSlowmodeLeft = false);
 
 } // namespace Data

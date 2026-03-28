@@ -14,6 +14,28 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace {
 
+[[nodiscard]] HistoryMessageMarkupButton::Visual ParseVisual(
+		const tl::conditional<MTPKeyboardButtonStyle> &style) {
+	if (!style) {
+		return {};
+	}
+	using Color = HistoryMessageMarkupButton::Color;
+	const auto &data = style->data();
+	if (data.vicon()) {
+		[[maybe_unused]] int a = 0;
+	}
+	return {
+		.iconId = data.vicon().value_or_empty(),
+		.color = (data.is_bg_danger()
+			? Color::Danger
+			: data.is_bg_primary()
+			? Color::Primary
+			: data.is_bg_success()
+			? Color::Success
+			: Color::Normal),
+	};
+}
+
 [[nodiscard]] RequestPeerQuery RequestPeerQueryFromTL(
 		const MTPDkeyboardButtonRequestPeer &query) {
 	using Type = RequestPeerQuery::Type;
@@ -79,10 +101,12 @@ InlineBots::PeerTypes PeerTypesFromMTP(
 HistoryMessageMarkupButton::HistoryMessageMarkupButton(
 	Type type,
 	const QString &text,
+	Visual visual,
 	const QByteArray &data,
 	const QString &forwardText,
 	int64 buttonId)
 : type(type)
+, visual(visual)
 , text(text)
 , forwardText(forwardText)
 , data(data)
@@ -122,23 +146,34 @@ void HistoryMessageMarkupData::fillRows(
 			row.reserve(data.vbuttons().v.size());
 			for (const auto &button : data.vbuttons().v) {
 				button.match([&](const MTPDkeyboardButton &data) {
-					row.emplace_back(Type::Default, qs(data.vtext()));
+					row.emplace_back(
+						Type::Default,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()));
 				}, [&](const MTPDkeyboardButtonCallback &data) {
 					row.emplace_back(
 						(data.is_requires_password()
 							? Type::CallbackWithPassword
 							: Type::Callback),
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						qba(data.vdata()));
 				}, [&](const MTPDkeyboardButtonRequestGeoLocation &data) {
-					row.emplace_back(Type::RequestLocation, qs(data.vtext()));
+					row.emplace_back(
+						Type::RequestLocation,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()));
 				}, [&](const MTPDkeyboardButtonRequestPhone &data) {
-					row.emplace_back(Type::RequestPhone, qs(data.vtext()));
+					row.emplace_back(
+						Type::RequestPhone,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()));
 				}, [&](const MTPDkeyboardButtonRequestPeer &data) {
 					const auto query = RequestPeerQueryFromTL(data);
 					row.emplace_back(
 						Type::RequestPeer,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						QByteArray(
 							reinterpret_cast<const char*>(&query),
 							sizeof(query)),
@@ -148,12 +183,17 @@ void HistoryMessageMarkupData::fillRows(
 					row.emplace_back(
 						Type::Url,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						qba(data.vurl()));
 				}, [&](const MTPDkeyboardButtonSwitchInline &data) {
 					const auto type = data.is_same_peer()
 						? Type::SwitchInlineSame
 						: Type::SwitchInline;
-					row.emplace_back(type, qs(data.vtext()), qba(data.vquery()));
+					row.emplace_back(
+						type,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
+						qba(data.vquery()));
 					if (type == Type::SwitchInline) {
 						// Optimization flag.
 						// Fast check on all new messages if there is a switch button to auto-click it.
@@ -163,13 +203,20 @@ void HistoryMessageMarkupData::fillRows(
 						}
 					}
 				}, [&](const MTPDkeyboardButtonGame &data) {
-					row.emplace_back(Type::Game, qs(data.vtext()));
+					row.emplace_back(
+						Type::Game,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()));
 				}, [&](const MTPDkeyboardButtonBuy &data) {
-					row.emplace_back(Type::Buy, qs(data.vtext()));
+					row.emplace_back(
+						Type::Buy,
+						qs(data.vtext()),
+						ParseVisual(data.vstyle()));
 				}, [&](const MTPDkeyboardButtonUrlAuth &data) {
 					row.emplace_back(
 						Type::Auth,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						qba(data.vurl()),
 						qs(data.vfwd_text().value_or_empty()),
 						data.vbutton_id().v);
@@ -187,11 +234,13 @@ void HistoryMessageMarkupData::fillRows(
 					row.emplace_back(
 						Type::RequestPoll,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						quiz);
 				}, [&](const MTPDkeyboardButtonUserProfile &data) {
 					row.emplace_back(
 						Type::UserProfile,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						QByteArray::number(data.vuser_id().v));
 				}, [&](const MTPDinputKeyboardButtonUrlAuth &data) {
 					LOG(("API Error: inputKeyboardButtonUrlAuth."));
@@ -203,16 +252,19 @@ void HistoryMessageMarkupData::fillRows(
 					row.emplace_back(
 						Type::WebView,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						data.vurl().v);
 				}, [&](const MTPDkeyboardButtonSimpleWebView &data) {
 					row.emplace_back(
 						Type::SimpleWebView,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						data.vurl().v);
 				}, [&](const MTPDkeyboardButtonCopy &data) {
 					row.emplace_back(
 						Type::CopyText,
 						qs(data.vtext()),
+						ParseVisual(data.vstyle()),
 						data.vcopy_text().v);
 				}, [&](const MTPDinputKeyboardButtonRequestPeer &data) {
 					LOG(("API Error: inputKeyboardButtonRequestPeer."));
@@ -283,6 +335,7 @@ void HistoryMessageMarkupData::fillForwardedData(
 			row.emplace_back(
 				newType,
 				text,
+				button.visual,
 				button.data,
 				QString(),
 				button.buttonId);

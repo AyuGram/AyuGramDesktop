@@ -655,8 +655,8 @@ proxyCheckingAnimation: InfiniteRadialAnimation(defaultInfiniteRadialAnimation) 
 	thickness: 1px;
 	size: size(8px, 8px);
 }
-proxyDropdownDownPosition: point(-2px, 35px);
-proxyDropdownUpPosition: point(-2px, 20px);
+proxyDropdownDownPosition: point(2px, 35px);
+proxyDropdownUpPosition: point(2px, 20px);
 
 proxyAboutPadding: margins(22px, 7px, 22px, 14px);
 proxyAboutSponsorPadding: margins(22px, 7px, 22px, 0px);
@@ -686,7 +686,7 @@ themesMenuToggle: IconButton(defaultIconButton) {
 	rippleAreaSize: 36px;
 	ripple: defaultRippleAnimationBgOver;
 }
-themesMenuPosition: point(-2px, 25px);
+themesMenuPosition: point(2px, 25px);
 
 createPollField: InputField(defaultInputField) {
 	textMargins: margins(0px, 4px, 0px, 4px);
@@ -806,8 +806,37 @@ backgroundConfirmCancel: RoundButton(backgroundConfirm) {
 		color: shadowFg;
 	}
 }
+urlAuthBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 12px);
+	buttonHeight: 0px;
+}
 urlAuthCheckbox: Checkbox(defaultBoxCheckbox) {
 	width: 240px;
+}
+urlAuthCodesTitle: FlatLabel(defaultPeerListAbout) {
+	textFg: boxTitleFg;
+	style: TextStyle(defaultTextStyle) {
+		font: boxTitleFont;
+	}
+}
+urlAuthCheckboxAbout: FlatLabel(defaultPeerListAbout) {
+	style: TextStyle(boxTextStyle) {
+		font: font(12px);
+	}
+}
+urlAuthCodesButton: RoundButton(defaultLightButton) {
+	height: 58px;
+	textTop: 19px;
+	style: TextStyle(semiboldTextStyle) {
+		font: font(20px semibold);
+	}
+}
+urlAuthBoxRowTopLabel: FlatLabel(boxLabel) {
+	maxHeight: 30px;
+}
+urlAuthBoxRowBottomLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	maxHeight: 30px;
 }
 
 addContactFieldMargin: margins(19px, 0px, 19px, 10px);
@@ -828,7 +857,7 @@ boostsUnrestrictLabel: FlatLabel(defaultFlatLabel) {
 }
 
 customBadgeField: InputField(defaultInputField) {
-	textMargins: margins(2px, 7px, 2px, 0px);
+	textMargins: margins(2px, 0px, 2px, 0px);
 
 	placeholderFg: placeholderFg;
 	placeholderFgActive: placeholderFgActive;
@@ -837,8 +866,15 @@ customBadgeField: InputField(defaultInputField) {
 	placeholderScale: 0.;
 	placeholderFont: normalFont;
 
+	border: 0px;
+	borderActive: 0px;
+
 	heightMin: 32px;
 }
+
+tagPreviewLineHeight: 8px;
+tagPreviewLineSpacing: 4px;
+tagPreviewInputSkip: 16px;
 
 pollResultsQuestion: FlatLabel(defaultFlatLabel) {
 	minWidth: 320px;
@@ -864,6 +900,11 @@ pollResultsShowMore: SettingsButton(defaultSettingsButton) {
 
 	ripple: defaultRippleAnimation;
 }
+pollResultsVoteTimeFont: font(fsize);
+pollResultsVoteTimeDateFont: font(fsize);
+pollResultsVoteTimeRightSkip: 16px;
+pollResultsVoteTimeLeftSkip: 8px;
+pollResultsVoteTimeGap: 2px;
 
 inviteViaLinkButton: SettingsButton(defaultSettingsButton) {
 	textFg: lightButtonFg;
@@ -1164,4 +1205,33 @@ fakeUserpicButton: UserpicButton(defaultUserpicButton) {
 	photoSize: 1px;
 	changeIcon: icon {{ "settings/photo", transparent }};
 	uploadBg: transparent;
+}
+
+moderateCommonGroupsCheckbox: RoundImageCheckbox(defaultPeerListCheckbox) {
+	imageRadius: 12px;
+	imageSmallRadius: 11px;
+	selectWidth: 2px;
+	check: RoundCheckbox(defaultPeerListCheck) {
+		size: 16px;
+		sizeSmall: 0.3;
+		bgInactive: overviewCheckBg;
+		bgActive: overviewCheckBgActive;
+		check: icon {{
+			"default_checkbox_check",
+			overviewCheckFgActive,
+			point(1px, 4px)
+		}};
+	}
+}
+
+futureOwnerBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 14px);
+	buttonHeight: 0px;
+}
+futureOwnerBoxSelect: collectibleBox;
+
+disableSharingIconPadding: margins(12px, 12px, 12px, 8px);
+disableSharingButtonLock: IconEmoji {
+	icon: icon {{ "emoji/premium_lock", activeButtonFg }};
+	padding: margins(-2px, 1px, 0px, 0px);
 }

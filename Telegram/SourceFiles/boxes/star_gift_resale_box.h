@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Data {
 struct UniqueGift;
+struct ResaleGiftsDescriptor;
 } // namespace Data
 
 namespace Info::PeerGifts {
@@ -26,6 +27,8 @@ class SessionController;
 
 namespace Ui {
 
+class VerticalLayout;
+
 void ShowResaleGiftBoughtToast(
 	std::shared_ptr<Main::SessionShow> show,
 	not_null<PeerData*> to,
@@ -37,5 +40,14 @@ void ShowResaleGiftBoughtToast(
 	uint64 giftId,
 	QString title,
 	Fn<void()> finishRequesting);
+
+void AddResaleGiftsList(
+	not_null<Window::SessionController*> window,
+	not_null<PeerData*> peer,
+	not_null<VerticalLayout*> container,
+	Data::ResaleGiftsDescriptor descriptor,
+	rpl::producer<bool> forceTon,
+	Fn<void(std::shared_ptr<Data::UniqueGift>)> bought = nullptr,
+	bool forCraft = false);
 
 } // namespace Ui

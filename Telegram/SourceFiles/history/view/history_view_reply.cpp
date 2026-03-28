@@ -428,6 +428,7 @@ void Reply::setLinkFrom(
 		not_null<HistoryMessageReply*> data) {
 	const auto weak = base::make_weak(view);
 	const auto &fields = data->fields();
+	const auto isAdminLogEntry = view->data()->isAdminLogEntry();
 	const auto externalChannelId = peerToChannel(fields.externalPeerId);
 	const auto messageId = fields.messageId;
 	const auto highlight = MessageHighlightId{
@@ -477,7 +478,9 @@ void Reply::setLinkFrom(
 	};
 	const auto message = data->resolvedMessage.get();
 	const auto story = data->resolvedStory.get();
-	_link = message
+	_link = isAdminLogEntry
+		? std::make_shared<LambdaClickHandler>(externalLink)
+		: message
 		? JumpToMessageClickHandler(message, returnToId, highlight)
 		: story
 		? JumpToStoryClickHandler(story)
@@ -824,9 +827,11 @@ void Reply::paint(
 	}
 
 	if (_ripple.animation) {
-		_ripple.animation->paint(p, x, y, w, &cache->bg2);
+		_ripple.lastPaintedPoint = inBubble ? QPoint(x, y) : QPoint();
+		_ripple.animation->paint(p, x, y, w, &rippleColor);
 		if (_ripple.animation->empty()) {
 			_ripple.animation.reset();
+			_ripple.lastPaintedPoint = {};
 		}
 	}
 
@@ -988,7 +993,11 @@ void Reply::createRippleAnimation(
 		Ui::RippleAnimation::RoundRectMask(
 			size,
 			st::messageQuoteStyle.radius),
-		[=] { view->repaint(); });
+		[=] {
+			view->repaint(_ripple.lastPaintedPoint.isNull()
+				? QRect()
+				: QRect(_ripple.lastPaintedPoint, size));
+		});
 }
 
 void Reply::saveRipplePoint(QPoint point) const {

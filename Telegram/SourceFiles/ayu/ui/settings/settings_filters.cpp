@@ -117,7 +117,7 @@ void AyuFilters::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 AyuFilters::AyuFilters(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller)
-	: Section(parent) {
+	: Section(parent, controller) {
 	setupContent(controller);
 }
 

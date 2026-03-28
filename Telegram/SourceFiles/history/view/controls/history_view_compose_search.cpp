@@ -926,10 +926,10 @@ ComposeSearch::Inner::Inner(
 		}
 		search.topMsgId = _topMsgId;
 		_apiSearch.clear();
-		_apiSearch.search(search);
 
 		_list.controller->addItems({}, true);
-		_list.controller->setQuery(_apiSearch.request().query);
+		_list.controller->setQuery(search.query);
+		_apiSearch.search(search);
 	}, _topBar->lifetime());
 
 	_topBar->queryChanges(
@@ -1015,7 +1015,7 @@ ComposeSearch::Inner::Inner(
 	_bottomBar->showCalendarRequests(
 	) | rpl::on_next([=] {
 		hideList();
-		_window->showCalendar({ _history }, QDate());
+		_window->showCalendar({ Dialogs::Key(_history) });
 	}, _bottomBar->lifetime());
 
 	_bottomBar->showBoxFromRequests(

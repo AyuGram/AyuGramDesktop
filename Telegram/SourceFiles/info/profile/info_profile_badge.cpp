@@ -88,6 +88,26 @@ void Badge::setContent(Content content) {
 		return;
 	}
 	_view.create(_parent);
+	_view->setAccessibleName([&] {
+		switch (_content.badge) {
+		case BadgeType::Verified:
+			return tr::lng_sr_verified_badge(tr::now);
+		case BadgeType::BotVerified:
+			return tr::lng_sr_bot_verified_badge(tr::now);
+		case BadgeType::Premium:
+			if (_content.emojiStatusId) {
+				return tr::lng_profile_bot_emoji_status_access(tr::now);
+			}
+			return tr::lng_premium_summary_title(tr::now);
+		case BadgeType::Scam:
+			return tr::lng_scam_badge(tr::now);
+		case BadgeType::Fake:
+			return tr::lng_fake_badge(tr::now);
+		case BadgeType::Direct:
+			return tr::lng_direct_badge(tr::now);
+		}
+		Unexpected("badge type");
+	}());
 	_view->show();
 	switch (_content.badge) {
 	case BadgeType::ExteraCustom:
@@ -188,9 +208,11 @@ void Badge::setContent(Content content) {
 				p,
 				badge->rect().marginsRemoved({ skip, skip, skip, skip }),
 				badge->width(),
-				(type == Ui::TextBadgeType::Direct
-					? st::windowSubTextFg
-					: st::attentionButtonFg));
+				_overrideSt
+					? _overrideSt->premiumFg
+					: (type == Ui::TextBadgeType::Direct
+						? st::windowSubTextFg
+						: st::attentionButtonFg));
 			}, _view->lifetime());
 	} break;
 	case BadgeType::Extera:
@@ -284,7 +306,7 @@ rpl::producer<Badge::Content> BadgeContentForPeer(not_null<PeerData*> peer) {
 		BadgeValue(peer),
 		EmojiStatusIdValue(peer)
 	) | rpl::map([=](BadgeType badge, EmojiStatusId emojiStatusId) {
-		if (emojiStatusId.collectible) {
+		if (emojiStatusId.collectible && (badge == BadgeType::Verified)) {
 			return Badge::Content{ BadgeType::Premium, emojiStatusId };
 		}
 		if (badge == BadgeType::Verified) {

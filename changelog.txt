@@ -1,3 +1,79 @@
+6.6.4 beta (16.03.26)
+
+- Fix launch on Linux.
+
+6.6.3 beta (12.03.26)
+
+- Drawing tools in image editor (brush, marker, eraser, arrow).
+- Draw-to-reply button in media viewer.
+- Trim recorded voice messages.
+- Per-file captions when sending multiple files.
+- Audio sharing in calls on Linux.
+- Ripple effects for reactions, send and reply buttons.
+- Fix saved music shuffled playing.
+
+6.6.2 (03.03.26)
+
+- Fix editing of media files.
+- Fix admin rights in legacy groups for tag editing.
+- Fix opening emoji packs from custom emoji click.
+
+6.6.1 (02.03.26)
+
+- Fix crash in legacy groups members list.
+- Fix display of member tags in legacy groups.
+- Make fast reply button appear instantly.
+- Allow hiding fast reply button.
+
+6.6 (01.03.26)
+
+- Member Tags in groups.
+- Disable Sharing in Private Chats.
+- Timestamps for Polls.
+- Log In With Telegram.
+- Time and Date Formatting.
+
+6.5.1 (09.02.26)
+
+- Drag-n-drop chats to folders.
+- Fix crash in adding Recommended folders.
+- Fix crash in crafting gifts selection layer.
+- Fix disappeared Login Email button in Settings.
+- Fix Tab focusing chats search when autocompleting hashtags or mentions.
+
+6.5 (06.02.26)
+
+- Leaving Groups to a New Admin.
+- Log In With Telegram.
+- Gift Crafting.
+- Colored Buttons for Bots.
+- Search in Settings.
+
+6.4.4 beta (29.01.26)
+
+- Fix crash in topic group opening.
+- Show correct profile colors preview when edit.
+- Strip quote entities in media viewer.
+
+6.4.3 beta (28.01.26)
+
+- Search in Settings.
+
+6.4.2 (08.01.26)
+
+- Fix non-closing popup menu items.
+- Fix crash in my profile section resize.
+- Fix some text glitches because of render optimizations.
+
+6.4.1 (05.01.26)
+
+- Fix context menu double activations.
+- Fix text rendering in animating bubbles.
+
+6.4 (03.01.26)
+
+- AI Summaries for posts in channels.
+
 6.3.10 beta (22.12.25)
 
 - Fix user info showing from large group messages.

@@ -408,7 +408,7 @@ void FillSponsored(
 			};
 			for (const auto &i : info) {
 				auto item = base::make_unique_q<Ui::Menu::MultilineAction>(
-					menu,
+					menu->menu(),
 					dark ? st::storiesMenu : st::defaultMenu,
 					(dark
 						? st::historySponsorInfoItemDark

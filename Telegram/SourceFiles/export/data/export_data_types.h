@@ -738,6 +738,23 @@ struct ActionSuggestBirthday {
 	Birthday birthday;
 };
 
+struct ActionNoForwardsToggle {
+	bool newValue = false;
+};
+
+struct ActionNoForwardsRequest {
+	bool expired = false;
+	bool newValue = false;
+};
+
+struct ActionNewCreatorPending {
+	UserId newCreatorId = 0;
+};
+
+struct ActionChangeCreator {
+	UserId newCreatorId = 0;
+};
+
 struct ServiceAction {
 	std::variant<
 		v::null_t,
@@ -791,7 +808,11 @@ struct ServiceAction {
 		ActionSuggestedPostApproval,
 		ActionSuggestedPostSuccess,
 		ActionSuggestedPostRefund,
-		ActionSuggestBirthday> content;
+		ActionSuggestBirthday,
+		ActionNoForwardsToggle,
+		ActionNoForwardsRequest,
+		ActionNewCreatorPending,
+		ActionChangeCreator> content;
 };
 
 ServiceAction ParseServiceAction(

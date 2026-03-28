@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "tray.h"
+#include "tray_accounts_menu.h"
 
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -56,6 +57,10 @@ void Tray::create() {
 	) | rpl::on_next([=] {
 		rebuildMenu();
 	}, _tray.lifetime());
+
+	TrayAccountsMenu::SetupChangesSubscription(
+		[=] { rebuildMenu(); },
+		_tray.lifetime());
 
 	_tray.iconClicks(
 	) | rpl::on_next([=] {
@@ -155,6 +160,8 @@ void Tray::rebuildMenu() {
 		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
 	});
 	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
+
+	TrayAccountsMenu::Fill(_tray);
 
 	updateMenuText();
 }

@@ -63,7 +63,10 @@ public:
 		Fn<void()> update,
 		const style::color &generalIconFg);
 
-	void paintInRect(QPainter &p, QRect rect);
+	void paintInRect(
+		QPainter &p,
+		QRect rect,
+		QColor textColor = QColor(0, 0, 0, 0));
 
 private:
 	using StickerPlayer = HistoryView::StickerPlayer;
@@ -125,7 +128,7 @@ public:
 
 	Cover *setOnlineCount(rpl::producer<int> &&count);
 
-	[[nodiscard]] rpl::producer<Section> showSection() const {
+	[[nodiscard]] rpl::producer<Info::Section> showSection() const {
 		return _showSection.events();
 	}
 	[[nodiscard]] std::optional<QImage> updatedPersonalPhoto() const;
@@ -181,8 +184,9 @@ private:
 	object_ptr<Ui::RoundButton> _showLastSeen = { nullptr };
 	//object_ptr<CoverDropArea> _dropArea = { nullptr };
 
-	rpl::event_stream<Section> _showSection;
+	rpl::event_stream<Info::Section> _showSection;
 
 };
+
 
 } // namespace Info::Profile

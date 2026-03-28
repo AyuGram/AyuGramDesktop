@@ -132,9 +132,9 @@ void NotifySettings::apply(
 		}, [](const MTPDinputPeerChannel &data) {
 			return peerFromChannel(data.vchannel_id());
 		}, [](const MTPDinputPeerUserFromMessage &data) -> PeerId {
-			Unexpected("From message peer in NotifySettings::apply.");
+			return peerFromUser(data.vuser_id());
 		}, [](const MTPDinputPeerChannelFromMessage &data) -> PeerId {
-			Unexpected("From message peer in NotifySettings::apply.");
+			return peerFromChannel(data.vchannel_id());
 		}, [](const MTPDinputPeerEmpty &) -> PeerId {
 			Unexpected("Empty peer in NotifySettings::apply.");
 		});

@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
+#include "settings/settings_faq_suggestions.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_user.h"
@@ -199,6 +200,7 @@ Session::Session(
 	}
 }))
 , _passkeys(std::make_unique<Data::Passkeys>(this))
+, _faqSuggestions(std::make_unique<Settings::FaqSuggestions>(this))
 , _cachedReactionIconFactory(std::make_unique<ReactionIconFactory>())
 , _supportHelper(Support::Helper::Create(this))
 , _fastButtonsBots(std::make_unique<Support::FastButtonsBots>(this))
@@ -221,7 +223,7 @@ Session::Session(
 		_selfUserpicView = view.cloud;
 	}, lifetime());
 
-	crl::on_main(this, [=] {
+	crl::on_main_queue(this, { [=] {
 		using Flag = Data::PeerUpdate::Flag;
 		changes().peerUpdates(
 			_user,
@@ -250,24 +252,36 @@ Session::Session(
 				});
 			saveSettingsDelayed();
 		}
-
+	}, [=] {
 		// Storage::Account uses Main::Account::session() in those methods.
 		// So they can't be called during Main::Session construction.
+		//
+		// They are deferred via crl::on_main which fires after the
+		// constructor returns and _session is set.
+		//
+		// Steps are chained via crl::on_main so that paint events
+		// can be processed between heavy file reads.
 		local().readInstalledStickers();
+	}, [=] {
 		local().readInstalledMasks();
+	}, [=] {
 		local().readInstalledCustomEmoji();
+	}, [=] {
 		local().readFeaturedStickers();
+	}, [=] {
 		local().readFeaturedCustomEmoji();
+	}, [=] {
 		local().readRecentStickers();
 		local().readRecentMasks();
 		local().readFavedStickers();
 		local().readSavedGifs();
+	}, [=] {
 		data().stickers().notifyUpdated(Data::StickersType::Stickers);
 		data().stickers().notifyUpdated(Data::StickersType::Masks);
 		data().stickers().notifyUpdated(Data::StickersType::Emoji);
 		data().stickers().notifySavedGifsUpdated();
 		DEBUG_LOG(("Init: Account stored data load finished."));
-	});
+	} }).dispatch();
 
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
 	Spellchecker::Start(this);

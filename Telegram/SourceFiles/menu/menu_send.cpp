@@ -50,7 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "window/themes/window_theme.h"
 #include "window/section_widget.h"
 #include "styles/style_chat.h"
@@ -456,6 +456,7 @@ void EffectPreview::repaintBackground() {
 		auto rect = QRect(0, 0, st::windowMinWidth, _inner.height());
 		auto context = _theme->preparePaintContext(
 			_chatStyle.get(),
+			rect,
 			rect,
 			rect,
 			false);

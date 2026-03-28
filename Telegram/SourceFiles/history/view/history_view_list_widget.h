@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 #include "ui/dragging_scroll_manager.h"
+#include "ui/widgets/middle_click_autoscroll.h"
 #include "ui/widgets/tooltip.h"
 #include "mtproto/sender.h"
 #include "data/data_messages.h"
@@ -52,6 +53,11 @@ struct ChosenReaction;
 struct ButtonParameters;
 } // namespace HistoryView::Reactions
 
+namespace HistoryView::ReplyButton {
+class Manager;
+struct ButtonParameters;
+} // namespace HistoryView::ReplyButton
+
 namespace Window {
 struct SectionShow;
 } // namespace Window
@@ -70,6 +76,7 @@ enum class CopyRestrictionType : char {
 	None,
 	Group,
 	Channel,
+	User,
 };
 
 struct SelectedItem {
@@ -386,6 +393,10 @@ public:
 		not_null<const Element*> view,
 		QPoint position,
 		const TextState &reactionState) const;
+	[[nodiscard]] ReplyButton::ButtonParameters replyButtonParameters(
+		not_null<const Element*> view,
+		QPoint position,
+		const TextState &replyState) const;
 	void toggleFavoriteReaction(not_null<Element*> view) const;
 
 
@@ -569,8 +580,10 @@ private:
 	int itemTop(not_null<const Element*> view) const;
 	void repaintItem(FullMsgId itemId);
 	void repaintItem(const Element *view);
+	void repaintItem(const Element *view, QRect rect);
 	void resizeItem(not_null<Element*> view);
 	void refreshItem(not_null<const Element*> view);
+	void showItemHighlight(not_null<HistoryItem*> item);
 	void itemRemoved(not_null<const HistoryItem*> item);
 	QPoint mapPointToItem(QPoint point, const Element *view) const;
 
@@ -775,7 +788,10 @@ private:
 
 	std::unique_ptr<HistoryView::Reactions::Manager> _reactionsManager;
 	rpl::variable<HistoryItem*> _reactionsItem;
+	bool _useCornerReply = false;
 	bool _useCornerReaction = false;
+
+	std::unique_ptr<ReplyButton::Manager> _replyButtonManager;
 
 	std::unique_ptr<TranslateTracker> _translateTracker;
 
@@ -865,6 +881,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	rpl::event_stream<FullMsgId> _requestedToEditMessage;
 	rpl::event_stream<ReplyToMessageRequest> _requestedToReplyToMessage;

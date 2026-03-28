@@ -16,17 +16,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/info_top_bar.h"
 #include "settings/cloud_password/settings_cloud_password_email_confirm.h"
-#include "settings/settings_chat.h"
-#include "settings/settings_information.h"
-#include "settings/settings_main.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_chat.h"
+#include "settings/sections/settings_information.h"
+#include "settings/sections/settings_main.h"
+#include "settings/sections/settings_premium.h"
+#include "settings/settings_search.h"
 #include "ui/effects/ripple_animation.h" // MaskByDrawer.
 #include "ui/widgets/menu/menu_add_action_callback.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/discrete_sliders.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/search_field_controller.h"
 #include "ui/ui_utility.h"
@@ -171,15 +173,30 @@ WrapWidget::WrapWidget(
 }
 
 void WrapWidget::setupShortcuts() {
+	const auto isSettings = [=] {
+		return _controller->section().type() == Section::Type::Settings;
+	};
+	const auto isSearchSettings = [=] {
+		return isSettings()
+			&& (_controller->section().settingsType()
+				== ::Settings::Search::Id());
+	};
+
 	Shortcuts::Requests(
 	) | rpl::filter([=] {
-		return requireTopBarSearch()
-			&& (Core::App().activeWindow()
-				== &_controller->parentController()->window());
+		return (Core::App().activeWindow()
+				== &_controller->parentController()->window())
+			&& (requireTopBarSearch() || isSettings());
 	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
 		using Command = Shortcuts::Command;
 		request->check(Command::Search) && request->handle([=] {
-			_topBar->showSearch();
+			if (requireTopBarSearch()) {
+				_topBar->showSearch();
+			} else if (isSearchSettings()) {
+				_content->setInnerFocus();
+			} else if (isSettings()) {
+				_controller->showSettings(::Settings::Search::Id());
+			}
 			return true;
 		});
 	}, lifetime());
@@ -371,6 +388,7 @@ void WrapWidget::createTopBar() {
 			base::make_unique_q<Ui::IconButton>(
 				_topBar,
 				st::infoTopBarClose));
+		close->setAccessibleName(tr::lng_sr_close_panel(tr::now));
 		close->addClickHandler([this] {
 			_controller->parentController()->closeThirdSection();
 		});
@@ -385,6 +403,7 @@ void WrapWidget::createTopBar() {
 			base::make_unique_q<Ui::IconButton>(
 				_topBar,
 				st::infoLayerTopBarClose));
+		close->setAccessibleName(tr::lng_sr_close_panel(tr::now));
 		close->addClickHandler([this] {
 			checkBeforeClose([=] {
 				_controller->parentController()->hideSpecialLayer();
@@ -419,8 +438,17 @@ void WrapWidget::setupTopBarMenuToggle() {
 		addProfileCallsButton();
 	} else if (section.type() == Section::Type::Settings) {
 		addTopBarMenuButton();
-		if (section.settingsType() == ::Settings::Information::Id()
-			|| section.settingsType() == ::Settings::Main::Id()) {
+		if (section.settingsType() == ::Settings::MainId()) {
+			const auto &st = (wrap() == Wrap::Layer)
+				? st::infoLayerTopBarSearch
+				: st::infoTopBarSearch;
+			const auto button = _topBar->addButton(
+				base::make_unique_q<Ui::IconButton>(_topBar, st));
+			button->setAccessibleName(tr::lng_dlg_filter(tr::now));
+			button->addClickHandler([=] {
+				_controller->showSettings(::Settings::Search::Id());
+			});
+		} else if (section.settingsType() == ::Settings::InformationId()) {
 			const auto controller = _controller->parentController();
 			const auto self = controller->session().user();
 			if (!self->username().isEmpty()) {
@@ -430,6 +458,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 					: st::infoTopBarQr;
 				const auto button = _topBar->addButton(
 					base::make_unique_q<Ui::IconButton>(_topBar, st));
+				button->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
 				button->addClickHandler([show, self] {
 					Ui::DefaultShowFillPeerQrBoxCallback(show, self);
 				});
@@ -482,6 +511,7 @@ void WrapWidget::setupTopBarMenuToggle() {
 				});
 			}
 		}
+		setupShortcuts();
 	} else if (key.storiesPeer()
 		&& key.storiesPeer()->isSelf()
 		&& key.storiesAlbumId() != Stories::ArchiveId()) {
@@ -491,8 +521,10 @@ void WrapWidget::setupTopBarMenuToggle() {
 		const auto button = _topBar->addButton(
 			base::make_unique_q<Ui::IconButton>(_topBar, st));
 		button->addClickHandler([=] {
-			_controller->showSettings(::Settings::Information::Id());
+			_controller->showSettings(::Settings::InformationId());
 		});
+	} else if (section.type() == Section::Type::Media) {
+		addTopBarMenuButton();
 	} else if (section.type() == Section::Type::Downloads) {
 		auto &manager = Core::App().downloadManager();
 		rpl::merge(
@@ -560,6 +592,7 @@ void WrapWidget::addTopBarMenuButton() {
 			(wrap() == Wrap::Layer
 				? st::infoLayerTopBarMenu
 				: st::infoTopBarMenu))));
+	_topBarMenuToggle->setAccessibleName(tr::lng_sr_profile_menu(tr::now));
 	_topBarMenuToggle->addClickHandler([this] {
 		showTopBarMenu(false);
 	});
@@ -606,7 +639,7 @@ void WrapWidget::addProfileCallsButton() {
 					? st::infoLayerTopBarCall
 					: st::infoTopBarCall))
 		)->addClickHandler([=] {
-			Core::App().calls().startOutgoingCall(user, false);
+			Core::App().calls().startOutgoingCall(user, {});
 		});
 	}, _topBar->lifetime());
 
@@ -640,8 +673,9 @@ void WrapWidget::showTopBarMenu(bool check) {
 	}
 	_topBarMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 	_topBarMenuToggle->setForceRippled(true);
-	_topBarMenu->popup(_topBarMenuToggle->mapToGlobal(
-		st::infoLayerTopBarMenuPosition));
+	_topBarMenu->popup(Ui::PopupMenu::ConstrainToParentScreen(
+		_topBarMenu,
+		_topBarMenuToggle->mapToGlobal(st::infoLayerTopBarMenuPosition)));
 }
 
 bool WrapWidget::requireTopBarSearch() const {
@@ -856,6 +890,36 @@ void WrapWidget::showFinishedHook() {
 	_bottomShadow->toggle(_bottomShadow->toggled(), anim::type::instant);
 	_topBarSurrogate.destroy();
 	_content->showFinished();
+
+	if (_topBarMenuToggle
+		&& _controller->section().type() == Section::Type::Settings) {
+		const auto controller = _controller->parentController();
+		const auto settingsType = _controller->section().settingsType();
+		const auto highlightId = [&]() -> QString {
+			if (settingsType == ::Settings::MainId()) {
+				return u"settings/log-out"_q;
+			} else if (settingsType == ::Settings::ChatId()) {
+				return u"chat/themes-create"_q;
+			}
+			return QString();
+		}();
+		if (!highlightId.isEmpty()
+			&& controller->takeHighlightControlId(highlightId)) {
+			showTopBarMenu(false);
+			if (_topBarMenu) {
+				const auto menu = _topBarMenu->menu();
+				for (const auto &action : menu->actions()) {
+					const auto controlId = "highlight-control-id";
+					if (action->property(controlId).toString() == highlightId) {
+						if (const auto item = menu->itemForAction(action)) {
+							::Settings::HighlightWidget(item);
+						}
+						break;
+					}
+				}
+			}
+		}
+	}
 }
 
 bool WrapWidget::showInternal(

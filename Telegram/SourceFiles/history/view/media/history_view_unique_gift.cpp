@@ -361,7 +361,9 @@ auto GenerateUniqueGiftMedia(
 		const auto peer = parent->history()->peer;
 		pushText(
 			tr::bold(peer->isSelf()
-				? tr::lng_action_gift_self_subtitle(tr::now)
+				? (gift->crafted
+					? tr::lng_action_gift_crafted_subtitle(tr::now)
+					: tr::lng_action_gift_self_subtitle(tr::now))
 				: peer->isServiceUser()
 				? tr::lng_gift_link_label_gift(tr::now)
 				: (outgoing
@@ -493,11 +495,16 @@ auto UniqueGiftBg(
 			? QMargins()
 			: st::chatUniqueGiftBadgePadding;
 		p.setClipRect(inner.marginsAdded(padding));
+
+		const auto burned = gift->burned;
+		const auto burnedBg = Info::PeerGifts::BurnedBadgeBg();
 		auto badge = Info::PeerGifts::GiftBadge{
-			.text = tr::lng_gift_collectible_tag(tr::now),
-			.bg1 = gift->backdrop.edgeColor,
-			.bg2 = gift->backdrop.patternColor,
-			.fg = gift->backdrop.textColor,
+			.text = (burned
+				? tr::lng_gift_burned_tag(tr::now)
+				: tr::lng_gift_collectible_tag(tr::now)),
+			.bg1 = (burned ? burnedBg : gift->backdrop.edgeColor),
+			.bg2 = (burned ? burnedBg : gift->backdrop.patternColor),
+			.fg = (burned ? st::white->c : gift->backdrop.textColor),
 		};
 		if (state->badgeCache.isNull() || state->badgeKey != badge) {
 			state->badgeKey = badge;
@@ -659,20 +666,7 @@ auto AuctionBg(
 
 		if (state->particles) {
 			p.setClipRect(full);
-			if (context.paused) {
-				if (!state->pausedAt) {
-					state->pausedAt = crl::now();
-				}
-				const auto diff = state->pausedAt - state->pauseOffset;
-				state->particles->paint(p, full, diff);
-			} else {
-				if (state->pausedAt) {
-					state->pauseOffset += crl::now() - state->pausedAt;
-					state->pausedAt = 0;
-				}
-				const auto diff = context.now - state->pauseOffset;
-				state->particles->paint(p, full, diff);
-			}
+			state->particles->paint(p, full, context.now, context.paused);
 			p.setClipping(false);
 		}
 

@@ -50,7 +50,7 @@ constexpr auto kSpeedStickedValues
 class SpeedSliderItem final : public Ui::Menu::ItemBase {
 public:
 	SpeedSliderItem(
-		not_null<RpWidget*> parent,
+		not_null<Ui::Menu::Menu*> parent,
 		const style::MediaSpeedMenu &st,
 		rpl::producer<float64> value);
 
@@ -84,7 +84,7 @@ private:
 };
 
 SpeedSliderItem::SpeedSliderItem(
-	not_null<RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	const style::MediaSpeedMenu &st,
 	rpl::producer<float64> value)
 : Ui::Menu::ItemBase(parent, st.dropdown.menu)
@@ -95,7 +95,7 @@ SpeedSliderItem::SpeedSliderItem(
 	+ st.dropdown.menu.itemStyle.font->height
 	+ st.sliderPadding.bottom())
 , _debounceTimer([=] { _debounced.fire(current()); }) {
-	initResizeHook(parent->sizeValue());
+	fitToMenuWidth();
 	enableMouseSelecting();
 	enableMouseSelecting(_slider.get());
 
@@ -382,7 +382,7 @@ void Dropdown::paintEvent(QPaintEvent *e) {
 	// draw shadow
 	auto shadowedRect = rect().marginsRemoved(getMargin());
 	auto shadowedSides = RectPart::Left | RectPart::Right | RectPart::Bottom;
-	Ui::Shadow::paint(p, shadowedRect, width(), st::defaultRoundShadow, shadowedSides);
+	Ui::Shadow::paint(p, shadowedRect, width(), st::roundShadowRadius8px, shadowedSides);
 	const auto &corners = Ui::CachedCornerPixmaps(Ui::MenuCorners);
 	const auto fill = Ui::CornersPixmaps{
 		.p = { QPixmap(), QPixmap(), corners.p[2], corners.p[3] },
@@ -495,11 +495,13 @@ WithDropdownController::WithDropdownController(
 	not_null<QWidget*> menuParent,
 	const style::DropdownMenu &menuSt,
 	Qt::Alignment menuAlign,
+	QPoint menuPosition,
 	Fn<void(bool)> menuOverCallback)
 : _button(button)
 , _menuParent(menuParent)
 , _menuSt(menuSt)
 , _menuAlign(menuAlign)
+, _menuPosition(menuPosition)
 , _menuOverCallback(std::move(menuOverCallback)) {
 	button->events(
 	) | rpl::filter([=](not_null<QEvent*> e) {
@@ -534,8 +536,8 @@ void WithDropdownController::updateDropdownGeometry() {
 	const auto mwidth = _menu->width();
 	const auto mheight = _menu->height();
 	const auto padding = _menuSt.wrap.padding;
-	const auto x = st::mediaPlayerMenuPosition.x();
-	const auto y = st::mediaPlayerMenuPosition.y();
+	const auto x = _menuPosition.x();
+	const auto y = _menuPosition.y();
 	const auto position = _menu->parentWidget()->mapFromGlobal(
 		_button->mapToGlobal(QPoint())
 	) + [&] {
@@ -636,6 +638,7 @@ OrderController::OrderController(
 	menuParent,
 	st::mediaPlayerMenu,
 	style::al_topright,
+	st::mediaPlayerMenuPosition,
 	std::move(menuOverCallback))
 , _button(button)
 , _appOrder(std::move(value))
@@ -677,7 +680,7 @@ void OrderController::fillMenu(not_null<Ui::DropdownMenu*> menu) {
 			Unexpected("Order mode in addOrderAction.");
 		}();
 		menu->addAction(base::make_unique_q<Ui::Menu::Action>(
-			menu,
+			menu->menu(),
 			(active
 				? st::mediaPlayerOrderMenuActive
 				: st::mediaPlayerOrderMenu),
@@ -724,6 +727,7 @@ SpeedController::SpeedController(
 	menuParent,
 	st.menu.dropdown,
 	st.menuAlign,
+	st.menuPosition,
 	std::move(menuOverCallback))
 , _st(st)
 , _lookup(std::move(value))
