@@ -64,7 +64,7 @@ rpl::producer<QString> AyuFiltersList::title() {
 AyuFiltersList::AyuFiltersList(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller)
-	: Section(parent), _controller(controller), _content(Ui::CreateChild<Ui::VerticalLayout>(this)),
+	: Section(parent, controller), _controller(controller), _content(Ui::CreateChild<Ui::VerticalLayout>(this)),
 	  shadowBan(_controller->shadowBan) {
 	if (_controller->dialogId.has_value()) {
 		dialogId = _controller->dialogId.value();
