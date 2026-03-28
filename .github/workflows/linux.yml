@@ -150,4 +150,4 @@ jobs:
         name: Upload artifact.
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: out/Debug/artifact/
+          path: out/Release/artifact/

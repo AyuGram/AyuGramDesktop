@@ -90,7 +90,7 @@ jobs:
 
       - name: Libraries.
         run: |
-          ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+          ./$REPO_NAME/Telegram/build/prepare/mac.sh silent
 
       - name: Free up some disk space.
         run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
