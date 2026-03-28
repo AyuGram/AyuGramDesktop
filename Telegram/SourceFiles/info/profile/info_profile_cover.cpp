@@ -57,8 +57,30 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ui/components/saved_music.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ui/toast/toast.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
 
+namespace {
+
+constexpr auto kWaitBeforeGiftBadge = crl::time(1000);
+constexpr auto kGiftBadgeGlares = 3;
+constexpr auto kGlareDurationStep = crl::time(320);
+constexpr auto kGlareTimeout = crl::time(1000);
+
+[[nodiscard]] const style::InfoProfileCover &CoverStyle(
+		not_null<PeerData*> peer,
+		Data::ForumTopic *topic,
+		Info::Profile::Cover::Role role) {
+	return (role == Info::Profile::Cover::Role::EditContact)
+		? st::infoEditContactCover
+		: topic
+		? st::infoTopicCover
+		: peer->isMegagroup()
+		? st::infoProfileMegagroupCover
+		: st::infoProfileCover;
+}
+
+} // namespace
 
 namespace Info::Profile {
 
