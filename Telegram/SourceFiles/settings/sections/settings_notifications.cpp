@@ -70,61 +70,6 @@ int CurrentNotificationsCount() {
 		kMaxNotificationsCount);
 }
 
-using ChangeType = Window::Notifications::ChangeType;
-
-class NotificationsCount : public Ui::RpWidget {
-public:
-	NotificationsCount(
-		QWidget *parent,
-		not_null<Window::SessionController*> controller);
-
-	void setCount(int count);
-
-	~NotificationsCount();
-
-protected:
-	void paintEvent(QPaintEvent *e) override;
-	void mousePressEvent(QMouseEvent *e) override;
-	void mouseMoveEvent(QMouseEvent *e) override;
-	void leaveEventHook(QEvent *e) override;
-	void mouseReleaseEvent(QMouseEvent *e) override;
-
-	int resizeGetHeight(int newWidth) override;
-
-private:
-	using ScreenCorner = Core::Settings::ScreenCorner;
-	void setOverCorner(ScreenCorner corner);
-	void clearOverCorner();
-
-	class SampleWidget;
-	void removeSample(SampleWidget *widget);
-
-	QRect getScreenRect() const;
-	QRect getScreenRect(int width) const;
-	int getContentLeft() const;
-	void prepareNotificationSampleSmall();
-	void prepareNotificationSampleLarge();
-	void prepareNotificationSampleUserpic();
-
-	const not_null<Window::SessionController*> _controller;
-
-	QPixmap _notificationSampleUserpic;
-	QPixmap _notificationSampleSmall;
-	QPixmap _notificationSampleLarge;
-	ScreenCorner _chosenCorner;
-	std::vector<Ui::Animations::Simple> _sampleOpacities;
-
-	bool _isOverCorner = false;
-	ScreenCorner _overCorner = ScreenCorner::TopLeft;
-	bool _isDownCorner = false;
-	ScreenCorner _downCorner = ScreenCorner::TopLeft;
-
-	int _oldCount;
-
-	std::vector<SampleWidget*> _cornerSamples[5];
-
-};
-
 
 class NotificationsCount::SampleWidget : public QWidget {
 public:
