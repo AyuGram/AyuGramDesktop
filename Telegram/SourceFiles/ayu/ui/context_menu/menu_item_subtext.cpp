@@ -97,8 +97,8 @@ ActionWithSubText::ActionWithSubText(
 		  + st::ttlItemTimerFont->height
 		  + st::ttlItemPadding.bottom()) {
 	setAcceptBoth(true);
-	initResizeHook(parent->sizeValue());
-	setClickedCallback(std::move(callback));
+	fitToMenuWidth();
+	setActionTriggered(std::move(callback));
 
 	paintRequest(
 	) | rpl::on_next([=]
@@ -239,7 +239,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 
 			if (username.isEmpty() && !user) {
 				strong->_subText = QString(tr::ayu_MessageDetailsPackOwnerNotFoundPC(tr::now));
-				strong->setClickedCallback(
+				strong->setActionTriggered(
 					[authorId, session]
 					{
 						QGuiApplication::clipboard()->setText(QString::number(authorId));
@@ -274,7 +274,7 @@ void ActionStickerPackAuthor::searchAuthor(ID authorId) {
 				}
 			};
 
-			strong->setClickedCallback(callback);
+			strong->setActionTriggered(callback);
 			strong->_subText = QString(title);
 			crl::on_main(
 				[weak]
