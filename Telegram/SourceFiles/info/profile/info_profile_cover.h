@@ -7,11 +7,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "info/profile/info_profile_badge.h"
+#include "ui/wrap/padding_wrap.h"
 #include "ui/abstract_button.h"
+#include "base/timer.h"
 
 namespace Window {
 class SessionController;
 } // namespace Window
+
+namespace Ui {
+class UserpicButton;
+class FlatLabel;
+template <typename Widget>
+class SlideWrap;
+class RoundButton;
+class StarsRating;
+} // namespace Ui
 
 namespace HistoryView {
 class StickerPlayer;
@@ -21,7 +33,21 @@ namespace Data {
 class ForumTopic;
 } // namespace Data
 
+namespace Info {
+class Controller;
+class Section;
+} // namespace Info
+
+namespace style {
+struct InfoProfileCover;
+} // namespace style
+
 namespace Info::Profile {
+
+class BadgeTooltip;
+class EmojiStatusPanel;
+class Badge;
+class StatusLabel;
 
 [[nodiscard]] QMargins LargeCustomEmojiMargins();
 
@@ -102,7 +128,7 @@ public:
 
 	Cover *setOnlineCount(rpl::producer<int> &&count);
 
-	[[nodiscard]] rpl::producer<Section> showSection() const {
+	[[nodiscard]] rpl::producer<Info::Section> showSection() const {
 		return _showSection.events();
 	}
 	[[nodiscard]] std::optional<QImage> updatedPersonalPhoto() const;
@@ -158,7 +184,7 @@ private:
 	object_ptr<Ui::RoundButton> _showLastSeen = { nullptr };
 	//object_ptr<CoverDropArea> _dropArea = { nullptr };
 
-	rpl::event_stream<Section> _showSection;
+	rpl::event_stream<Info::Section> _showSection;
 
 };
 
