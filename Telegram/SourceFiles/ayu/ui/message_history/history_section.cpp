@@ -73,10 +73,8 @@ FixedBar::FixedBar(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer)
 	: Ui::RpWidget(parent), _controller(controller), _peer(peer), _backButton(
-		  this,
-		  &controller->session(),
-		  tr::lng_terms_back(tr::now),
-		  controller->adaptive().oneColumnValue()), _cancel(this, st::historyAdminLogCancelSearch) {
+		  this), _cancel(this, st::historyAdminLogCancelSearch) {
+	_backButton->setText(tr::lng_terms_back(tr::now));
 	_backButton->moveToLeft(0, 0);
 	_backButton->setClickedCallback([=]
 	{

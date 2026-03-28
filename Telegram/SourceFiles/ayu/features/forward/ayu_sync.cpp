@@ -271,7 +271,10 @@ void sendDocumentSync(not_null<Main::Session*> session,
 	crl::on_main([=, lst = std::move(group.list), caption = std::move(caption)]() mutable
 	{
 		auto size = lst.files.size();
-		session->api().sendFiles(std::move(lst), type, std::move(caption), size > 1 ? groupId : nullptr, action);
+		if (!lst.files.empty()) {
+			lst.files.back().caption = caption;
+		}
+		session->api().sendFiles(std::move(lst), type, size > 1 ? groupId : nullptr, action);
 	});
 
 	waitForMsgSync(session, action);
@@ -304,13 +307,15 @@ void sendVoiceSync(not_null<Main::Session*> session,
 			action.replyTo,
 			action.replaceMediaOf);
 		session->api().fileLoader()->addTask(std::make_unique<FileLoadTask>(
-			session,
-			data,
-			duration,
-			QVector<signed char>(),
-			video,
-			to,
-			message.textWithTags));
+			FileLoadTask::VoiceArgs{
+				.session = session,
+				.voice = data,
+				.duration = duration,
+				.waveform = {},
+				.video = video,
+				.to = to,
+				.caption = message.textWithTags,
+			}));
 	});
 	waitForMsgSync(session, action);
 }
