@@ -119,8 +119,8 @@ jobs:
           -v $PWD:/usr/src/tdesktop \
           $IMAGE_TAG \
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
-          -D TDESKTOP_API_ID=2040 \
-          -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
+          -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
+          -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} \
           $DEFINE
 
       - name: Check.
