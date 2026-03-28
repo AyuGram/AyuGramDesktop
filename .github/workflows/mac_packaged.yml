@@ -50,7 +50,7 @@ jobs:
     env:
       GIT: "https://github.com"
       CMAKE_GENERATOR: "Ninja"
-      CMAKE_BUILD_TYPE: "Debug"
+      CMAKE_BUILD_TYPE: "Release"
       CMAKE_BUILD_PARALLEL_LEVEL: ""
       CMAKE_PREFIX_PATH: "/opt/homebrew/opt/ffmpeg@6:/opt/homebrew/opt/openal-soft"
       TDE2E: "51743dfd01dff6179e2d8f7095729caa4e2222e9"
@@ -165,7 +165,7 @@ jobs:
             echo "ARTIFACT_NAME=Telegram" >> $GITHUB_ENV
           fi
 
-          cmake -Bbuild . -DTDESKTOP_API_TEST=ON $DEFINE
+          cmake -Bbuild . -DTDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} -DTDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} $DEFINE
           cmake --build build
           macdeployqt build/Telegram.app
           codesign --remove-signature build/Telegram.app

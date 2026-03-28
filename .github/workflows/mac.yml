@@ -108,20 +108,18 @@ jobs:
           fi
 
           ./configure.sh \
-          -D CMAKE_CONFIGURATION_TYPES=Debug \
-          -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
+          -D CMAKE_CONFIGURATION_TYPES=Release \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
-          -D TDESKTOP_API_TEST=ON \
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
-          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
+          -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
+          -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} \
           $DEFINE
 
-          cmake --build ../out --config Debug --parallel
+          cmake --build ../out --config Release --parallel
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd $REPO_NAME/out/Debug
+          cd $REPO_NAME/out/Release
           mkdir artifact
           mv Telegram.app artifact/
           mv Updater artifact/
@@ -130,4 +128,4 @@ jobs:
         name: Upload artifact.
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.REPO_NAME }}/out/Debug/artifact/
+          path: ${{ env.REPO_NAME }}/out/Release/artifact/
