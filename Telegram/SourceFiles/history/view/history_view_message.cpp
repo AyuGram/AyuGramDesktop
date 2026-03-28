@@ -330,7 +330,7 @@ void Message::refreshRightBadge() {
 				}
 			}
 		} else if (data()->history()->peer->isMegagroup() && data()->author()->isChannel() && !data()->out()) {
-			return tr::lng_channel_badge(tr::now);
+			return { tr::lng_channel_badge(tr::now), BadgeRole::User, true };
 		}
 		const auto channel = item->history()->peer->asMegagroup();
 		const auto user = item->author()->asUser();
