@@ -13,7 +13,7 @@
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "main/main_session.h"
-#include "settings/settings_chat.h"
+#include "settings/sections/settings_chat.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 #include "ui/vertical_list.h"

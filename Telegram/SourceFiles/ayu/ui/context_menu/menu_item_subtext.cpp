@@ -30,7 +30,7 @@ class ActionWithSubText : public Menu::ItemBase
 {
 public:
 	ActionWithSubText(
-		not_null<RpWidget*> parent,
+		not_null<Menu::Menu*> parent,
 		const style::Menu &st,
 		const style::icon &icon,
 		Fn<void()> callback,
@@ -81,7 +81,7 @@ TextParseOptions MenuTextOptions = {
 };
 
 ActionWithSubText::ActionWithSubText(
-	not_null<RpWidget*> parent,
+	not_null<Menu::Menu*> parent,
 	const style::Menu &st,
 	const style::icon &icon,
 	Fn<void()> callback,
