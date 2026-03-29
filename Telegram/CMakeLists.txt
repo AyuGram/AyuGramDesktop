@@ -2265,6 +2265,7 @@ endif()
 set_target_properties(Telegram PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
 if (MSVC)
+    target_compile_options(Telegram PRIVATE /FS) # Force synchronous PDB writes to prevent C1090 with /MP.
     target_link_libraries(Telegram
     PRIVATE
         delayimp
