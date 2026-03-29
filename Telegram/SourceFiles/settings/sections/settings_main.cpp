@@ -494,6 +494,14 @@ void BuildInterfaceScale(SectionBuilder &builder) {
 	builder.addSkip();
 }
 
+[[nodiscard]] QString CreditsAmountToLabel(CreditsAmount c) {
+	return c ? Lang::FormatCreditsAmountToShort(c).string : QString();
+}
+
+[[nodiscard]] bool CreditsAmountNonEmpty(CreditsAmount c) {
+	return !c.empty();
+}
+
 void BuildPremiumSection(SectionBuilder &builder) {
 	const auto session = builder.session();
 	const auto controller = builder.controller();
@@ -521,11 +529,7 @@ void BuildPremiumSection(SectionBuilder &builder) {
 		.id = u"main/credits"_q,
 		.title = tr::lng_settings_credits(),
 		.label = session->credits().balanceValue(
-		) | rpl::map([](CreditsAmount c) -> QString {
-			return c
-				? Lang::FormatCreditsAmountToShort(c).string
-				: QString();
-		}),
+		) | rpl::map(&CreditsAmountToLabel),
 		.credits = true,
 		.onClick = [=] {
 			controller->setPremiumRef("settings");
@@ -540,16 +544,14 @@ void BuildPremiumSection(SectionBuilder &builder) {
 		.title = tr::lng_settings_currency(),
 		.icon = { &st::menuIconTon },
 		.label = session->credits().tonBalanceValue(
-		) | rpl::map([](CreditsAmount c) -> QString {
-			return c ? Lang::FormatCreditsAmountToShort(c).string : u""_q;
-		}),
+		) | rpl::map(&CreditsAmountToLabel),
 		.onClick = [=] {
 			controller->setPremiumRef("settings");
 			showOther(CurrencyId());
 		},
 		.keywords = { u"ton"_q, u"crypto"_q, u"wallet"_q },
 		.shown = session->credits().tonBalanceValue(
-		) | rpl::map([](CreditsAmount c) -> bool { return !c.empty(); }),
+		) | rpl::map(&CreditsAmountNonEmpty),
 	});
 
 	builder.addButton({
