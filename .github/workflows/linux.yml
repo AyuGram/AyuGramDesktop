@@ -128,7 +128,7 @@ jobs:
       - name: Check.
         if: env.ONLY_CACHE == 'false'
         run: |
-          filePath="out/Release/Telegram"
+          filePath="out/Release/AyuGram"
           if test -f "$filePath"; then
             echo "Build successfully done! :)"
 
@@ -144,7 +144,7 @@ jobs:
         run: |
           cd out/Release
           mkdir artifact
-          mv {Telegram,Updater} artifact/
+          mv {AyuGram,Updater} artifact/
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.

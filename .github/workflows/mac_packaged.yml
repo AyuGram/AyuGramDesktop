@@ -169,15 +169,15 @@ jobs:
 
           cmake -Bbuild . -DTDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} -DTDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} $DEFINE
           cmake --build build
-          macdeployqt build/Telegram.app
-          codesign --remove-signature build/Telegram.app
+          macdeployqt build/AyuGram.app
+          codesign --remove-signature build/AyuGram.app
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           cd $REPO_NAME/build
           mkdir artifact
-          mv Telegram.app artifact/
+          mv AyuGram.app artifact/
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.

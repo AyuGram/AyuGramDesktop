@@ -123,8 +123,7 @@ jobs:
         run: |
           cd $REPO_NAME/out/Build/Products/Release
           mkdir artifact
-          mv Telegram.app artifact/
-          mv Updater artifact/
+          mv AyuGram.app artifact/
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
