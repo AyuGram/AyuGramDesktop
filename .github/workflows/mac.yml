@@ -121,7 +121,7 @@ jobs:
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd $REPO_NAME/out/Release
+          cd $REPO_NAME/out/Build/Products/Release
           mkdir artifact
           mv Telegram.app artifact/
           mv Updater artifact/
@@ -130,4 +130,4 @@ jobs:
         name: Upload artifact.
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.REPO_NAME }}/out/Release/artifact/
+          path: ${{ env.REPO_NAME }}/out/Build/Products/Release/artifact/
