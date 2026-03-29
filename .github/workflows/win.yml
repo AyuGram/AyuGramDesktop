@@ -46,16 +46,13 @@ jobs:
 
   windows:
     name: Windows
-    runs-on: ${{ matrix.arch == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
+    runs-on: windows-latest
 
     strategy:
       matrix:
-        arch: [x64_x86, x64, arm64]
+        arch: [x64_x86, x64]
         qt: ["", qt6]
-        generator: ["", "Ninja Multi-Config"]
         exclude:
-          - arch: arm64
-            qt: ""
           - arch: x64_x86
             qt: qt6
 
@@ -161,27 +158,16 @@ jobs:
           if [ -n "${{ matrix.arch }}" ]; then
             case "${{ matrix.arch }}" in
               x64_x86) ARCH="x86";;
-              arm64) ARCH="arm";;
               *) ARCH="${{ matrix.arch }}";;
             esac
             echo "Architecture from matrix: $ARCH"
             ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.arch }}"
           fi
+          echo "TDESKTOP_BUILD_ARCH=$ARCH" >> $GITHUB_ENV
 
           if [ -n "${{ matrix.qt }}" ]; then
             ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.qt }}"
           fi
-
-          GENERATOR=""
-          if [ -n "${{ matrix.generator }}" ]; then
-            GENERATOR="-G \"${{ matrix.generator }}\""
-            echo "Generator from matrix: $GENERATOR"
-            ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.generator }}"
-          fi
-          echo "TDESKTOP_BUILD_GENERATOR=$GENERATOR" >> $GITHUB_ENV
-
-          [ -n "$GENERATOR" ] && ARCH=""
-          echo "TDESKTOP_BUILD_ARCH=$ARCH" >> $GITHUB_ENV
 
           DEFINE=""
           if [ -n "${{ matrix.defines }}" ]; then
@@ -206,7 +192,6 @@ jobs:
           cd %TBUILD%\%REPO_NAME%\Telegram
 
           call configure.bat ^
-          %TDESKTOP_BUILD_GENERATOR% ^
           %TDESKTOP_BUILD_ARCH% ^
           ${{ matrix.qt }} ^
           %TDESKTOP_BUILD_API% ^
