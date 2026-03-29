@@ -6,6 +6,13 @@
 
 cmake_minimum_required(VERSION 3.25...3.31)
 
+# Use /Z7 (embedded debug info) instead of /Zi (centralized PDB) on MSVC
+# to avoid C1090 PDB API failures during parallel builds.
+if (POLICY CMP0141)
+    cmake_policy(SET CMP0141 NEW)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+endif()
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 include(cmake/validate_special_target.cmake)
