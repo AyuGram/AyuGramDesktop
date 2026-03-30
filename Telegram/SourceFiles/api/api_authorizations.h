@@ -23,6 +23,7 @@ public:
 
 		bool incomplete = false;
 		bool callsDisabled = false;
+		bool officialApp = false;
 		int apiId = 0;
 		TimeId activeTime = 0;
 		QString name, active, info, ip, location, system, platform;
