@@ -27,13 +27,18 @@ constexpr auto kCircleDuration = crl::time(200);
 
 constexpr auto kMax = 1.0;
 
+constexpr auto kColorDistanceTolerance = 3;
+
 ColorPicker::OutlinedStop FindOutlinedStop(
 		const QColor &color,
 		const QGradientStops &stops,
 		int width) {
 	for (auto i = 0; i < stops.size(); i++) {
 		const auto &current = stops[i];
-		if (current.second == color) {
+		const auto dr = current.second.red() - color.red();
+		const auto dg = current.second.green() - color.green();
+		const auto db = current.second.blue() - color.blue();
+		if (dr * dr + dg * dg + db * db <= kColorDistanceTolerance * kColorDistanceTolerance) {
 			const auto prev = ((i - 1) < 0)
 				? std::nullopt
 				: std::make_optional<int>(stops[i - 1].first * width);
@@ -81,6 +86,10 @@ inline float64 InterpolationRatio(int from, int to, int result) {
 	return (result - from) / float64(to - from);
 };
 
+inline float64 InterpolationRatioF(float64 from, float64 to, float64 result) {
+	return (result - from) / (to - from);
+};
+
 } // namespace
 
 ColorPicker::ColorPicker(
@@ -113,7 +122,7 @@ ColorPicker::ColorPicker(
 	_down.pos = QPoint(colorToPosition(savedBrush.color), 0);
 
 	_colorLine->paintRequest(
-	) | rpl::on_next([=] {
+	) | rpl::on_next([this] {
 		auto p = QPainter(_colorLine);
 		PainterHighQualityEnabler hq(p);
 
@@ -125,13 +134,13 @@ ColorPicker::ColorPicker(
 	}, _colorLine->lifetime());
 
 	_canvasForCircle->paintRequest(
-	) | rpl::on_next([=] {
+	) | rpl::on_next([this] {
 		auto p = QPainter(_canvasForCircle);
 		paintCircle(p);
 	}, _canvasForCircle->lifetime());
 
 	_colorLine->events(
-	) | rpl::on_next([=](not_null<QEvent*> event) {
+	) | rpl::on_next([this](not_null<QEvent*> event) {
 		const auto type = event->type();
 		const auto isPress = (type == QEvent::MouseButtonPress)
 			|| (type == QEvent::MouseButtonDblClick);
@@ -149,7 +158,7 @@ ColorPicker::ColorPicker(
 			_circleAnimation.stop();
 
 			_circleAnimation.start(
-				[=] { _canvasForCircle->update(); },
+				[this] { _canvasForCircle->update(); },
 				from,
 				to,
 				kCircleDuration * std::abs(to - from),
@@ -311,10 +320,25 @@ rpl::producer<Brush> ColorPicker::saveBrushRequests() const {
 }
 
 int ColorPicker::colorToPosition(const QColor &color) const {
-	const auto step = 1. / kPrecision;
-	for (auto i = 0.; i <= 1.; i += step) {
-		if (positionToColor(i * _width) == color) {
-			return i * _width;
+	for (auto i = 1; i < _gradientStops.size(); i++) {
+		const auto &prev = _gradientStops[i - 1];
+		const auto &curr = _gradientStops[i];
+		const auto dr = curr.second.red() - color.red();
+		const auto dg = curr.second.green() - color.green();
+		const auto db = curr.second.blue() - color.blue();
+		if (dr * dr + dg * dg + db * db <= kColorDistanceTolerance * kColorDistanceTolerance) {
+			return curr.first * _width;
+		}
+		const auto prevR = prev.second.redF();
+		const auto currR = curr.second.redF();
+		const auto targetR = color.redF();
+		const auto minR = std::min(prevR, currR);
+		const auto maxR = std::max(prevR, currR);
+		if (targetR >= minR && targetR <= maxR) {
+			const auto range = maxR - minR;
+			const auto ratio = (range > 0) ? (targetR - minR) / range : 0.;
+			const auto pos = prev.first + ratio * (curr.first - prev.first);
+			return pos * _width;
 		}
 	}
 	return 0;
