@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include <optional>
+
 #include "base/unique_qptr.h"
 #include "editor/photo_editor_inner_common.h"
 #include "ui/effects/animations.h"
@@ -31,7 +33,7 @@ public:
 	void setVisible(bool visible);
 	bool preventHandleKeyPress() const;
 
-	rpl::producer<Brush> saveBrushRequests() const;
+	[[nodiscard]] rpl::producer<Brush> saveBrushRequests() const;
 
 private:
 	void paintCircle(QPainter &p);
@@ -52,7 +54,7 @@ private:
 	const OutlinedStop _outlinedStop;
 	const QBrush _gradientBrush;
 
-	struct {
+	struct MouseState {
 		QPoint pos;
 		bool pressed = false;
 	} _down;
