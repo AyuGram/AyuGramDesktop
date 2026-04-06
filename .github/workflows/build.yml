@@ -11,6 +11,7 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      BUILD_CONFIG: "Release"
 
     defaults:
       run:
@@ -73,7 +74,7 @@ jobs:
             !${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\*
             !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+          key: ${{ runner.OS }}-x64-libs-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}
           restore-keys: ${{ runner.OS }}-x64-libs-
 
       - name: Qt cache.
@@ -83,7 +84,7 @@ jobs:
           path: |
             ${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-qt6-${{ env.CACHE_KEY }}
+          key: ${{ runner.OS }}-x64-qt6-${{ env.BUILD_CONFIG }}-${{ env.CACHE_KEY }}
           restore-keys: ${{ runner.OS }}-x64-qt6-
 
       - name: Libraries.
@@ -91,7 +92,7 @@ jobs:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
           GYP_MSVS_VERSION: 2022
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent qt6
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
       - name: Free up disk space.
         shell: bash
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
@@ -103,15 +104,15 @@ jobs:
           x64 ^
           qt6 ^
           -D TDESKTOP_API_TEST=ON ^
-          -D CMAKE_CONFIGURATION_TYPES=Debug ^
+          -D CMAKE_CONFIGURATION_TYPES=%BUILD_CONFIG% ^
           -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
-          cmake --build ..\out --config Debug --parallel
+          cmake --build ..\out --config %BUILD_CONFIG% --parallel
       - name: Move artifact.
         run: |
-          set OUT=%TBUILD%\%REPO_NAME%\out\Debug
+          set OUT=%TBUILD%\%REPO_NAME%\out\%BUILD_CONFIG%
           mkdir artifact
           move %OUT%\AyuGram.exe artifact\
           move %OUT%\Updater.exe artifact\
