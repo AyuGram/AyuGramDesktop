@@ -33,10 +33,7 @@ jobs:
       - name: Configure project
         shell: cmd
         run: |
-          cd Telegram
-          configure.bat x64 ^
-            -D TDESKTOP_API_ID=20978459 ^
-            -D TDESKTOP_API_HASH=0e413a0c0c0810eac6a0213c5fe54883
+          Telegram\configure.bat
       - name: Build Debug
         shell: cmd
         run: |
