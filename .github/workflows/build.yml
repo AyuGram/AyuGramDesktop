@@ -1,50 +1,282 @@
-name: Build AyuGram Windows
+name: Windows.
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - dev
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win2.yml'
+      - 'lib/xdg/**'
+      - 'snap/**'
+      - 'Telegram/build/docker/**'
+      - 'Telegram/Resources/uwp/**'
+      - 'Telegram/SourceFiles/platform/linux/**'
+      - 'Telegram/SourceFiles/platform/mac/**'
+      - 'Telegram/Telegram/**'
+      - 'Telegram/configure.sh'
+      - 'Telegram/Telegram.plist'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win2.yml'
+      - 'lib/xdg/**'
+      - 'snap/**'
+      - 'Telegram/build/docker/**'
+      - 'Telegram/Resources/uwp/**'
+      - 'Telegram/SourceFiles/platform/linux/**'
+      - 'Telegram/SourceFiles/platform/mac/**'
+      - 'Telegram/Telegram/**'
+      - 'Telegram/configure.sh'
+      - 'Telegram/Telegram.plist'
 
 jobs:
-  build:
+
+  build-libraries:
+    name: Build Libraries
     runs-on: windows-2022
 
+    outputs:
+      cache-hit: ${{ steps.check-cache.outputs.cache-hit }}
+      cache-key: ${{ env.CACHE_KEY }}
+
+    defaults:
+      run:
+        shell: cmd
+
     steps:
-      - name: Checkout code with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Prepare directories
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo REPO_NAME=${{ github.event.repository.name }}>>%GITHUB_ENV%
 
-      - name: Setup Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Setup MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
         with:
           arch: x64
 
-      - name: Prepare dependencies (Telegram libraries, Qt, vcpkg и т.д.)
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Calculate cache key
+        shell: bash
+        run: |
+          echo "$(sha256sum $TBUILD/$REPO_NAME/Telegram/build/prepare/prepare.py | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$(find $TBUILD/$REPO_NAME/Telegram/ThirdParty -name "*.cmake" -o -name "*.py" | sort | xargs sha256sum | sha256sum | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "x64" >> CACHE_KEY.txt
+          echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+
+      - name: Check if exact cache exists
+        id: check-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+          lookup-only: true
+
+      - name: NuGet sources
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: Restore partial cache
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-libs-
+
+      - name: Build Libraries
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_VERSION: 2022
+        run: |
+          cd %TBUILD%
+          %REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Clean temporary files
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        run: |
+          cd %TBUILD%
+          del /S Libraries\*.pdb
+          del /S Libraries\*.pch
+          del /S Libraries\*.obj
+
+      - name: Save Libraries cache
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ env.CACHE_KEY }}
+
+  build-desktop:
+    name: Build Desktop
+    needs: build-libraries
+    runs-on: windows-2022
+
+    env:
+      UPLOAD_ARTIFACT: "true"
+
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Prepare directories
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo REPO_NAME=${{ github.event.repository.name }}>>%GITHUB_ENV%
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
+
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: Restore Libraries cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.TBUILD }}\Libraries
+          key: ${{ runner.OS }}-x64-libs-${{ needs.build-libraries.outputs.cache-key }}
+          restore-keys: ${{ runner.OS }}-x64-libs-
+          fail-on-cache-miss: true
+
+      - name: Setup environment
+        env:
+          GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\'
+          GYP_MSVS_VERSION: 2022
+        run: |
+          cd %TBUILD%
+          %REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Configure build
+        shell: bash
+        run: |
+          echo "TDESKTOP_BUILD_ARCH=x64" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=Telegram_x64" >> $GITHUB_ENV
+
+          API="-D TDESKTOP_API_TEST=ON"
+          if [ $GITHUB_REF == 'refs/heads/nightly' ]; then
+            API="-D TDESKTOP_API_ID=611335 -D TDESKTOP_API_HASH=d524b414d21f4d37f08684c1df41ac9c"
+          fi
+          echo "TDESKTOP_BUILD_API=$API" >> $GITHUB_ENV
+
+      - name: Apply performance optimizations
         shell: cmd
         run: |
-          Telegram\build\prepare\win.bat
-      - name: Configure project
-        shell: cmd
+          cd %TBUILD%\%REPO_NAME%
+
+          REM Create optimization patch file
+          (
+          echo # Release mode optimizations (applied via CI^)
+          echo target_compile_options(common_options
+          echo INTERFACE
+          echo     $^<$^<CONFIG:Release^>:/O2^>      # Maximum speed optimization
+          echo     $^<$^<CONFIG:Release^>:/Gw^>      # Optimize global data
+          echo     $^<$^<CONFIG:Release^>:/Zc:inline^> # Remove unreferenced functions
+          echo     $^<$^<CONFIG:Release^>:/Oy^>      # Omit frame pointers
+          echo     $^<$^<CONFIG:Release^>:/GS-^>     # Disable buffer security checks
+          echo     $^<$^<CONFIG:Release^>:/Gy^>      # Enable function-level linking
+          echo     /FS                               # Force Synchronous PDB Writes
+          echo ^)
+          echo.
+          echo target_link_options(common_options
+          echo INTERFACE
+          echo     $^<$^<CONFIG:Release^>:/OPT:REF^>     # Remove unreferenced functions/data
+          echo     $^<$^<CONFIG:Release^>:/OPT:ICF=10^>  # Aggressive COMDAT folding
+          echo     $^<$^<CONFIG:Release^>:/MERGE:.rdata=.text^>  # Merge read-only data section
+          echo     $^<$^<CONFIG:Release^>:/DEBUG:NONE^>  # No debug info in Release
+          echo ^)
+          echo.
+          ) > opt_patch.txt
+
+          REM Create PowerShell script to insert optimization
+          (
+          echo $content = Get-Content cmake\options_win.cmake
+          echo $insertLine = $content ^| Where-Object { $_ -match "if \(DESKTOP_APP_SPECIAL_TARGET\)" } ^| Select-Object -First 1
+          echo if ($insertLine^) {
+          echo     $insertIndex = [array]::IndexOf($content, $insertLine^)
+          echo     $beforeContent = $content[0..($insertIndex-1^)]
+          echo     $afterContent = $content[$insertIndex..($content.Length-1^)]
+          echo     $patchContent = Get-Content opt_patch.txt
+          echo     $newContent = $beforeContent + $patchContent + $afterContent
+          echo     $newContent ^| Set-Content cmake\options_win.cmake
+          echo }
+          ) > insert_patch.ps1
+
+          powershell -ExecutionPolicy Bypass -File insert_patch.ps1
+
+      - name: Replace setSwapInterval value
+        shell: powershell
         run: |
-          Telegram\configure.bat
-      - name: Build Debug
-        shell: cmd
+          Get-ChildItem -Path "$env:TBUILD\$env:REPO_NAME" -Filter "*.cpp" -Recurse | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            if ($content -match "format\.setSwapInterval\(0\)") {
+              $content = $content -replace "format\.setSwapInterval\(0\)", "format.setSwapInterval(1)"
+              Set-Content -Path $_.FullName -Value $content -NoNewline
+              Write-Host "Replaced setSwapInterval in $($_.FullName)"
+            }
+          }
+
+      - name: Apply Smooth Scroll Patch
+        shell: powershell
         run: |
-          msbuild out\Telegram.sln ^
-            /p:Configuration=Debug ^
-            /p:Platform=x64 ^
-            /m ^
-            /verbosity:normal
-      - name: Upload Debug artifact
+          cd "$env:TBUILD\$env:REPO_NAME"
+          Write-Host "Applying smooth scroll patch..."
+          git apply --directory=Telegram/lib_ui --ignore-whitespace patches/smooth_scroll.patch
+
+      - name: Build Desktop
+        run: |
+          cd %TBUILD%\%REPO_NAME%\Telegram
+
+          call configure.bat ^
+          %TDESKTOP_BUILD_ARCH% ^
+          %TDESKTOP_BUILD_API% ^
+          -D CMAKE_C_FLAGS="/WX /O2 /Gw /Zc:inline /Oy /GS- /Gy /FS /DNDEBUG" ^
+          -D CMAKE_CXX_FLAGS="/WX /O2 /Gw /Zc:inline /Oy /GS- /Gy /FS /DNDEBUG" ^
+          -D CMAKE_EXE_LINKER_FLAGS="/OPT:REF /OPT:ICF=10 /MERGE:.rdata=.text /DEBUG:NONE" ^
+          -D CMAKE_BUILD_TYPE=Release ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON ^
+          -D "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT="
+
+          cmake --build ..\out --config Release --parallel
+
+      - name: Move artifacts
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
+        run: |
+          set OUT=%TBUILD%\%REPO_NAME%\out\Release
+          mkdir artifact
+          move %OUT%\AyuGram.exe artifact/
+
+      - name: Upload artifacts
+        if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         uses: actions/upload-artifact@v4
         with:
-          name: AyuGram-Windows-Debug
-          path: out\Debug\*
-          retention-days: 7
+          name: ${{ env.ARTIFACT_NAME }}
+          path: artifact\
