@@ -1754,7 +1754,7 @@ ShareBox::SubmitCallback ShareBox::DefaultForwardCallback(
 			}
 		};
 
-		if (AyuForward::isFullAyuForwardNeeded(items.front())) {
+		if (AyuForward::isFullAyuForwardNeeded(items)) {
 			crl::async([=]{
 				for (const auto thread : result) {
 					AyuForward::forwardMessages(
