@@ -101,10 +101,10 @@ brew install --cask ayugram
 
 ### Gentoo Linux
 
-Инструкцию по установке можно найти в [этом репозитории](https://github.com/OverLessArtem/ayugram-ebuild-gentoo).
+Инструкцию по установке можно найти в [этом репозитории](https://codeberg.org/OverLessArtem/ayugram-ebuild-gentoo).
 
 ### Void Linux
-Инструкцию по установке можно найти в [этом репозитории](https://github.com/OverLessArtem/ayugram-template-void)
+Инструкцию по установке можно найти в [этом репозитории](https://codeberg.org/OverLessArtem/ayugram-template-void)
 
 ### EPM
 

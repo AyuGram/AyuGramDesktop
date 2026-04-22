@@ -102,10 +102,10 @@ Install `ayugram-desktop` from [nixpkgs](https://search.nixos.org/packages?chann
 
 ### Gentoo Linux
 
-See [this repository](https://github.com/OverLessArtem/ayugram-ebuild-gentoo) for installation manual.
+See [this repository](https://codeberg.org/OverLessArtem/ayugram-ebuild-gentoo) for installation manual.
 
 ### Void Linux
-See [this repository](https://github.com/OverLessArtem/ayugram-template-void) for installation manual.
+See [this repository](https://codeberg.org/OverLessArtem/ayugram-template-void) for installation manual.
 
 ### EPM
 
