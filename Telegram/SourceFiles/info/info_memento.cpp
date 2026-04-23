@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/reactions_list/info_reactions_list_widget.h"
 #include "info/requests_list/info_requests_list_widget.h"
 #include "info/peer_gifts/info_peer_gifts_widget.h"
+#include "info/polls/info_polls_list_widget.h"
 #include "info/polls/info_polls_results_widget.h"
 #include "info/info_section_widget.h"
 #include "info/info_layer_widget.h"
@@ -197,6 +198,11 @@ std::shared_ptr<ContentMemento> Memento::DefaultContent(
 			peer,
 			migratedPeerId);
 	case Section::Type::Media:
+		if (section.mediaType() == Storage::SharedMediaType::Poll) {
+			return std::make_shared<Polls::ListMemento>(
+				peer,
+				migratedPeerId);
+		}
 		return std::make_shared<Media::Memento>(
 			peer,
 			migratedPeerId,
@@ -231,6 +237,9 @@ std::shared_ptr<ContentMemento> Memento::DefaultContent(
 	case Section::Type::Profile:
 		return std::make_shared<Profile::Memento>(topic);
 	case Section::Type::Media:
+		if (section.mediaType() == Storage::SharedMediaType::Poll) {
+			return std::make_shared<Polls::ListMemento>(topic);
+		}
 		return std::make_shared<Media::Memento>(topic, section.mediaType());
 	case Section::Type::Members:
 		return std::make_shared<Members::Memento>(peer, migratedPeerId);
@@ -245,6 +254,9 @@ std::shared_ptr<ContentMemento> Memento::DefaultContent(
 	case Section::Type::Profile:
 		return std::make_shared<Profile::Memento>(sublist);
 	case Section::Type::Media:
+		if (section.mediaType() == Storage::SharedMediaType::Poll) {
+			return std::make_shared<Polls::ListMemento>(sublist);
+		}
 		return std::make_shared<Media::Memento>(
 			sublist,
 			section.mediaType());

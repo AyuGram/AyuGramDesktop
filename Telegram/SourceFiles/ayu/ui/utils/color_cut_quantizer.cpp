@@ -3,10 +3,11 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 //
 // Code is based on https://github.com/androidx/androidx/blob/androidx-main/palette/palette/src/main/java/androidx/palette/graphics/ColorCutQuantizer.java
-#include "color_cut_quantizer.h"
+#include "ayu/ui/utils/color_cut_quantizer.h"
+
 #include "color_utils.h"
 
 #include <algorithm>

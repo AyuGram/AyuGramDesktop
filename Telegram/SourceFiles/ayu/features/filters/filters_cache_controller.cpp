@@ -3,22 +3,33 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "filters_cache_controller.h"
+// Copyright @Radolyn, 2026
+#include "ayu/features/filters/filters_cache_controller.h"
 
-#include <unordered_set>
-
-#include "filters_controller.h"
 #include "ayu/data/ayu_database.h"
+#include "ayu/features/filters/filters_controller.h"
 #include "data/data_groups.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "rpl/event_stream.h"
+
+#include <unordered_set>
 
 static std::mutex mutex;
 
 namespace FiltersCacheController {
+
+rpl::event_stream<> filtersUpdateStream;
+
+void fireUpdate() {
+	filtersUpdateStream.fire({});
+}
+
+rpl::producer<> updates() {
+	return filtersUpdateStream.events();
+}
 
 std::optional<std::vector<HashablePattern>> sharedPatterns;
 std::optional<std::unordered_map<long long, std::vector<ReversiblePattern>>> patternsByDialogId;

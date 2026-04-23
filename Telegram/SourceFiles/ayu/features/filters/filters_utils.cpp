@@ -3,8 +3,23 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "filters_utils.h"
+// Copyright @Radolyn, 2026
+#include "ayu/features/filters/filters_utils.h"
+
+#include "lang_auto.h"
+#include "ayu/ayu_settings.h"
+#include "ayu/data/ayu_database.h"
+#include "ayu/features/filters/filters_cache_controller.h"
+#include "ayu/utils/telegram_helpers.h"
+#include "data/data_document.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
+#include "ui/toast/toast.h"
 
 #include <QByteArray>
 #include <QClipboard>
@@ -16,20 +31,6 @@
 #include <QtNetwork/QHttpPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
-#include "filters_cache_controller.h"
-#include "lang_auto.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/data/ayu_database.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "data/data_document.h"
-#include "data/data_peer.h"
-#include "data/data_session.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "main/main_account.h"
-#include "main/main_domain.h"
-#include "main/main_session.h"
-#include "ui/toast/toast.h"
 
 constexpr auto BACKUP_VERSION = 2;
 
@@ -641,6 +642,6 @@ void FilterUtils::applyChanges(const ApplyChanges &changes) {
 	FiltersCacheController::rebuildCache();
 	crl::on_main([]
 	{
-		AyuSettings::fire_filtersUpdate();
+		FiltersCacheController::fireUpdate();
 	});
 }

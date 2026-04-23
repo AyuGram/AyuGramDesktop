@@ -11,15 +11,12 @@ using "ui/basic.style";
 using "ui/colors.palette";
 using "ui/widgets/widgets.style";
 using "info/info.style";
+using "settings/settings.style";
 
-/* Icon Picker */
-cpPadding: 14px;
-cpSelectedPadding: 2px;
-cpSelectedRounding: 12px;
-cpImagePadding: 4px;
-cpSpacingX: 16px;
-cpSpacingY: 8px;
-cpIconSize: 64px;
+iconPickerSelectedPadding: 2px;
+iconPickerSelectedRounding: 12px;
+iconPickerImagePadding: 4px;
+iconPickerIconSize: 64px;
 
 recentStickersLimitPadding: margins(22px, 4px, 22px, 8px);
 imageViewPadding: margins(22px, 10px, 22px, 10px);
@@ -66,8 +63,10 @@ exteraBadgeToast: Toast(defaultToast) {
 	minWidth: 40px;
 	maxWidth: 480px;
 	padding: margins(54px, 13px, 19px, 12px);
-	icon: icon {{ "ayu/extera_badge", toastFg }};
-	iconPosition: point(13px, 13px);
+}
+
+exteraBadgeToastBadge: InfoPeerBadge(infoPeerBadge) {
+	premiumFg: toastFg;
 }
 
 supportLogoSize: 96px;
@@ -88,3 +87,40 @@ registrationDateImportantTooltipLabel: FlatLabel(defaultImportantTooltipLabel) {
 		font: font(12px);
 	}
 }
+
+pluginShowInFolderIcon: icon {{ "menu/show_in_folder", boxTitleCloseFg }};
+pluginShowInFolderIconOver: icon {{ "menu/show_in_folder", boxTitleCloseFgOver }};
+pluginShowInFolder: IconButton(defaultIconButton) {
+	width: boxTitleHeight;
+	height: boxTitleHeight;
+
+	icon: pluginShowInFolderIcon;
+	iconOver: pluginShowInFolderIconOver;
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: defaultRippleAnimationBgOver;
+}
+maxPluginDescriptionHeight: 400px;
+pluginVersionAuthorLabel: FlatLabel(boxLabel) {
+    align: align(center);
+}
+pluginChipSkip: 6px;
+
+ghostPickerArrow: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+
+ghostPickerButton: LinkButton(defaultLinkButton) {
+	color: windowActiveTextFg;
+	overColor: windowActiveTextFg;
+	font: font(boxFontSize);
+	overFont: font(boxFontSize);
+}
+
+ayuBetaBadgePadding: margins(4px, 1px, 4px, 1px);
+
+ayuServiceTimeBadgeFont: font(11px semibold);
+ayuServiceTimeBadgeHorizontalPadding: 7px;
+ayuServiceTimeBadgeVerticalPadding: 2px;
+ayuServiceTimeBadgeGap: 8px;
+ayuServiceTimeBadgeTrailingInset: 3px;
+ayuServiceTimeBadgeLastLineWidthAdd: 9px;

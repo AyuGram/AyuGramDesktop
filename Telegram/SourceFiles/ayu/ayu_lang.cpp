@@ -3,17 +3,17 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_lang.h"
-
-#include <QDir>
-#include <QFile>
+// Copyright @Radolyn, 2026
+#include "ayu/ayu_lang.h"
 
 #include "qjsondocument.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "lang/lang_instance.h"
 #include "storage/localstorage.h"
+
+#include <QDir>
+#include <QFile>
 
 // hard-coded languages
 std::map<QString, QString> langMapping = {

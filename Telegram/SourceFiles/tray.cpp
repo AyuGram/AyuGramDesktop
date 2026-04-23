@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "tray.h"
+#include "tray_accounts_menu.h"
 
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -18,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
+#include "window/window_controller.h"
 #include "lang_auto.h"
 
 
@@ -56,6 +58,10 @@ void Tray::create() {
 	) | rpl::on_next([=] {
 		rebuildMenu();
 	}, _tray.lifetime());
+
+	TrayAccountsMenu::SetupChangesSubscription(
+		[=] { rebuildMenu(); },
+		_tray.lifetime());
 
 	_tray.iconClicks(
 	) | rpl::on_next([=] {
@@ -103,30 +109,31 @@ void Tray::rebuildMenu() {
 
 	const auto &settings = AyuSettings::getInstance();
 
-	if (settings.showGhostToggleInTray) {
-		auto turnGhostModeText = _textUpdates.events(
-		) | rpl::map(
-			[=]
-			{
-				bool ghostModeEnabled = AyuSettings::isGhostModeActive();
+	if (settings.showGhostToggleInTray()) {
+		auto ghostActiveChanges = AyuSettings::getInstance().useGlobalGhostModeValue()
+			| rpl::map([](bool) {
+				return AyuSettings::ghost().ghostModeActiveValue();
+			})
+			| rpl::flatten_latest();
 
-				return ghostModeEnabled
-						   ? tr::ayu_DisableGhostModeTray(tr::now)
-						   : tr::ayu_EnableGhostModeTray(tr::now);
-			});
+		auto turnGhostModeText = rpl::combine(
+			_textUpdates.events_starting_with({}),
+			std::move(ghostActiveChanges)
+		) | rpl::map([=](auto, bool active) {
+			return active
+				? tr::ayu_DisableGhostModeTray(tr::now)
+				: tr::ayu_EnableGhostModeTray(tr::now);
+		});
 		_tray.addAction(
 			std::move(turnGhostModeText),
 			[=]
 			{
-				bool ghostMode = AyuSettings::isGhostModeActive();
-
-				AyuSettings::set_ghostModeEnabled(!ghostMode);
-
-				AyuSettings::save();
+				auto &ghost = AyuSettings::ghost();
+				ghost.setGhostModeEnabled(!ghost.isGhostModeActive());
 			});
 	}
 
-	if (settings.showStreamerToggleInTray) {
+	if (settings.showStreamerToggleInTray()) {
 		auto turnStreamerModeText = _textUpdates.events(
 		) | rpl::map(
 			[=]
@@ -155,6 +162,8 @@ void Tray::rebuildMenu() {
 		return tr::lng_quit_from_tray(tr::now).replace("Telegram", "AyuGram");
 	});
 	_tray.addAction(std::move(quitText), [] { Core::Quit(); });
+
+	TrayAccountsMenu::Fill(_tray);
 
 	updateMenuText();
 }

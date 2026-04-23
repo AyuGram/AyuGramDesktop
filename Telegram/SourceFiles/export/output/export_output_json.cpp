@@ -711,6 +711,14 @@ QByteArray SerializeMessage(
 			return result;
 		}) | ranges::to_vector;
 		pushBare("items", SerializeArray(context, items));
+	}, [&](const ActionPollAppendAnswer &data) {
+		pushActor();
+		pushAction("poll_append_answer");
+		push("option", data.option);
+	}, [&](const ActionPollDeleteAnswer &data) {
+		pushActor();
+		pushAction("poll_delete_answer");
+		push("option", data.option);
 	}, [&](const ActionSuggestedPostApproval &data) {
 		pushActor();
 		pushAction("process_suggested_post");
@@ -743,6 +751,27 @@ QByteArray SerializeMessage(
 		if (const auto year = data.birthday.year()) {
 			push("year", year);
 		}
+	}, [&](const ActionNoForwardsToggle &data) {
+		pushActor();
+		pushAction("no_forwards_toggle");
+		push("new_value", data.newValue);
+	}, [&](const ActionNoForwardsRequest &data) {
+		pushActor();
+		pushAction("no_forwards_request");
+		push("expired", data.expired);
+		push("new_value", data.newValue);
+	}, [&](const ActionNewCreatorPending &data) {
+		pushActor();
+		pushAction("new_creator_pending");
+		pushBare("new_creator", wrapUserName(data.newCreatorId));
+	}, [&](const ActionChangeCreator &data) {
+		pushActor();
+		pushAction("change_creator");
+		pushBare("new_creator", wrapUserName(data.newCreatorId));
+	}, [&](const ActionManagedBotCreated &data) {
+		pushActor();
+		pushAction("managed_bot_created");
+		pushBare("bot", wrapUserName(data.botId));
 	}, [](v::null_t) {});
 
 	if (v::is_null(message.action.content)) {

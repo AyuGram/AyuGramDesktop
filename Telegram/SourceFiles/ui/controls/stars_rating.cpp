@@ -326,7 +326,7 @@ void AboutRatingBox(
 			const QString &text,
 			const style::RoundButton &st) {
 		return helper.paletteDependent(
-			Text::CustomEmojiTextBadge(text, st));
+			Text::CustomEmojiTextBadge(text.toUpper(), st));
 	};
 	const auto makeActive = [&](const QString &text) {
 		return makeBadge(text, st::customEmojiTextBadge);
@@ -467,6 +467,7 @@ void StarsRating::updateData(Data::StarsRating rating) {
 		_currentLevel = rating.level;
 	}
 	updateWidth();
+	_widget->setAccessibleName(tr::lng_boost_level(tr::now, lt_count, rating.level));
 }
 
 void StarsRating::updateWidth() {

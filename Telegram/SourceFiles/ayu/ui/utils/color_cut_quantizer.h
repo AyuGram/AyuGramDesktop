@@ -3,13 +3,14 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
-#include "palette.h"
-#include <vector>
-#include <queue>
+#include "ayu/ui/utils/palette.h"
+
 #include <functional>
+#include <queue>
+#include <vector>
 
 namespace Ayu::Ui {
 

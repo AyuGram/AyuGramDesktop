@@ -205,12 +205,12 @@ using BigNumContext = openssl::Context;
 			S("\x44\xcd\x00\x05\x00\x03\x02\x68\x32"_q);
 		}
 		StartPermutationElement(); {
-			S("\xfe\x02"_q);
+			S("\xfe\x0d"_q);
 			OpenScope();
 			S("\x00\x00\x01\x00\x01"_q);
 			R(1);
 			S("\x00\x20"_q);
-			R(20);
+			R(32);
 			OpenScope();
 			E();
 			CloseScope();

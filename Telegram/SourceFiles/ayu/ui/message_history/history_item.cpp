@@ -3,14 +3,14 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/ui/message_history/history_item.h"
-#include "ayu/data/entities.h"
 
-#include "api/api_chat_participants.h"
+#include "history/history_item.h"
 #include "api/api_text_entities.h"
-#include "ayu/utils/ayu_mapper.h"
+#include "ayu/data/entities.h"
 #include "ayu/ui/message_history/history_inner.h"
+#include "ayu/utils/ayu_mapper.h"
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
@@ -20,11 +20,7 @@
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_item_helpers.h"
 #include "history/view/history_view_element.h"
-#include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/text/text_utilities.h"
 

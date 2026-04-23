@@ -42,6 +42,7 @@ struct WriteRestriction;
 } // namespace HistoryView::Controls
 
 namespace Ui {
+class ChatStyle;
 class GenericBox;
 class PopupMenu;
 class Show;
@@ -73,18 +74,19 @@ struct MessageFieldHandlersArgs {
 	const style::InputField *fieldStyle = nullptr;
 	base::flat_set<QString> allowMarkdownTags;
 };
-void InitMessageFieldHandlers(MessageFieldHandlersArgs &&args);
+auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
+-> std::shared_ptr<Ui::ChatStyle>;
 
 void InitMessageFieldHandlers(
 	not_null<Window::SessionController*> controller,
 	not_null<Ui::InputField*> field,
 	ChatHelpers::PauseReason pauseReasonLevel,
 	Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji = nullptr);
-void InitMessageField(
+std::shared_ptr<Ui::ChatStyle> InitMessageField(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::InputField*> field,
 	Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji);
-void InitMessageField(
+std::shared_ptr<Ui::ChatStyle> InitMessageField(
 	not_null<Window::SessionController*> controller,
 	not_null<Ui::InputField*> field,
 	Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji);
@@ -219,3 +221,7 @@ void FrozenInfoBox(
 	not_null<Ui::GenericBox*> box,
 	not_null<Main::Session*> session,
 	FreezeInfoStyleOverride st);
+
+[[nodiscard]] Ui::InputField::MimeDataHook WrappedMessageFieldMimeHook(
+	Ui::InputField::MimeDataHook original,
+	not_null<Ui::InputField*> field);

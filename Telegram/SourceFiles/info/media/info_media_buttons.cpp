@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/media/info_media_buttons.h"
 
 #include "base/call_delayed.h"
+#include "base/platform/base_platform_info.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "core/application.h"
 #include "core/ui_integration.h"
@@ -50,7 +51,8 @@ namespace {
 		|| (type == Type::MusicFile)
 		|| (type == Type::Link)
 		|| (type == Type::RoundVoiceFile)
-		|| (type == Type::GIF);
+		|| (type == Type::GIF)
+		|| (type == Type::Poll);
 }
 
 [[nodiscard]] Window::SeparateId SeparateId(
@@ -110,6 +112,7 @@ tr::phrase<lngtag_count> MediaTextPhrase(Type type) {
 	case Type::MusicFile: return tr::lng_profile_songs;
 	case Type::Link: return tr::lng_profile_shared_links;
 	case Type::RoundVoiceFile: return tr::lng_profile_audios;
+	case Type::Poll: return tr::lng_profile_polls;
 	}
 	Unexpected("Type in MediaTextPhrase()");
 };
@@ -173,6 +176,11 @@ not_null<Ui::SettingsButton*> AddButton(
 	const auto openInWindow = separateId
 		? [=] { navigation->parentController()->showInNewWindow(separateId); }
 		: Fn<void()>(nullptr);
+	Ui::InstallTooltip(result, [=] {
+		return Platform::IsMac()
+			? tr::lng_new_window_tooltip_cmd(tr::now)
+			: tr::lng_new_window_tooltip_ctrl(tr::now);
+	});
 	AddContextMenuToButton(result, openInWindow);
 	result->addClickHandler([=](Qt::MouseButton mouse) {
 		if (mouse == Qt::RightButton) {
@@ -324,6 +332,7 @@ not_null<Ui::SettingsButton*> AddPeerGiftsButton(
 		rpl::event_stream<> textRefreshed;
 		QPointer<Ui::SettingsButton> button;
 		rpl::lifetime appearedLifetime;
+		bool giftsLoaded = false;
 	};
 	const auto state = parent->lifetime().make_state<State>();
 
@@ -364,7 +373,13 @@ not_null<Ui::SettingsButton*> AddPeerGiftsButton(
 					.customEmojiLoopLimit = 1,
 				}))));
 	wrap->setDuration(st::infoSlideDuration);
-	wrap->toggleOn(rpl::duplicate(forked) | rpl::map(rpl::mappers::_1 > 0));
+	wrap->toggleOn(
+		rpl::combine(
+			rpl::duplicate(forked),
+			state->textRefreshed.events_starting_with({})
+		) | rpl::map([=](int count, auto) {
+			return count > 0 && state->giftsLoaded;
+		}));
 	tracker.track(wrap);
 
 	rpl::duplicate(forked) | rpl::filter(
@@ -380,6 +395,7 @@ not_null<Ui::SettingsButton*> AddPeerGiftsButton(
 						gift.info.document->id,
 						refresh));
 			}
+			state->giftsLoaded = true;
 			state->textRefreshed.fire({});
 		});
 		navigation->session().recentSharedGifts().request(peer, requestDone);

@@ -364,10 +364,11 @@ int Selector::effectPreviewHeight() const {
 	if (_listMode != ChatHelpers::EmojiListMode::MessageEffects) {
 		return 0;
 	}
-	return st::previewMenu.shadow.extend.top()
+	const auto extend = Ui::BoxShadow::ExtendFor(st::previewMenu.shadow);
+	return extend.top()
 		+ HistoryView::Sticker::MessageEffectSize().height()
 		+ st::effectPreviewSend.height
-		+ st::previewMenu.shadow.extend.bottom();
+		+ extend.bottom();
 }
 
 QMargins Selector::marginsForShadow() const {
@@ -807,7 +808,7 @@ void Selector::paintNonTransparentExpandRect(
 		inner.y() + inner.height(),
 		inner.width(),
 		st::lineWidth,
-		st::defaultPopupMenu.shadow.fallback);
+		st::defaultPopupMenu.shadowFallback);
 }
 
 void Selector::paintExpanded(QPainter &p) {
@@ -915,8 +916,17 @@ void Selector::mousePressEvent(QMouseEvent *e) {
 }
 
 void Selector::mouseReleaseEvent(QMouseEvent *e) {
-	if (!_strip || _pressed != lookupSelectedIndex(e->pos())) {
+	if (!_strip) {
 		return;
+	}
+	if (_pressed != lookupSelectedIndex(e->pos())) {
+#ifdef Q_OS_UNIX
+		if (!_over || e->button() != Qt::RightButton) {
+			return;
+		}
+#else
+		return;
+#endif // !Q_OS_UNIX
 	}
 	_pressed = -1;
 	const auto selected = _strip->selected();
@@ -1235,7 +1245,7 @@ bool AdjustMenuGeometryForSelector(
 		selector->effectPreviewHeight());
 	const auto willBeHeightWithoutBottomPadding = fullTop
 		+ height
-		- menu->st().shadow.extend.top();
+		- Ui::BoxShadow::ExtendFor(menu->st().shadow).top();
 	const auto additionalPaddingBottom
 		= (willBeHeightWithoutBottomPadding >= minimalHeight
 			? 0
@@ -1379,13 +1389,14 @@ AttachSelectorResult AttachSelectorToMenu(
 		TextWithEntities about,
 		IconFactory iconFactory) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
+	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu())) {
 		return AttachSelectorResult::Skipped;
 	}
 
 	const auto peer = item->history()->peer;
-	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions)
-		|| (peer->isMegagroup() && !settings.showGroupReactions)) {
+	if ((peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions())
+		|| (peer->isMegagroup() && !settings.showGroupReactions())
+		|| (peer->isUser() && !settings.showPrivateChatReactions())) {
 		return AttachSelectorResult::Skipped;
 	}
 
@@ -1437,7 +1448,7 @@ auto AttachSelectorToMenu(
 	Fn<bool()> paused)
 -> base::expected<not_null<Selector*>, AttachSelectorResult> {
 	const auto &settings = AyuSettings::getInstance();
-	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu)) {
+	if (!AyuUi::needToShowItem(settings.showReactionsPanelInContextMenu())) {
 		return base::make_unexpected(AttachSelectorResult::Skipped);
 	}
 

@@ -90,7 +90,13 @@ Note: these binaries aren't officially maintained by us.
 
 ### NixOS
 
-See [this repository](https://github.com/ayugram-port/ayugram-desktop) for installation manual.
+#### Flake (recommended)
+
+Install `ayugram-desktop` from [ndfined-crp/ayugram-desktop](https://github.com/ndfined-crp/ayugram-desktop)
+
+#### Nixpkgs
+
+Install `ayugram-desktop` from [nixpkgs](https://search.nixos.org/packages?channel=unstable&show=ayugram-desktop)
 
 ### ALT Linux
 
@@ -100,9 +106,20 @@ See [this repository](https://github.com/ayugram-port/ayugram-desktop) for insta
 
 See [this repository](https://github.com/OverLessArtem/ayugram-ebuild-gentoo) for installation manual.
 
+### Void Linux
+See [this repository](https://github.com/OverLessArtem/ayugram-template-void) for installation manual.
+
 ### EPM
 
 `epm play ayugram`
+
+### Fedora
+
+From [RPM Fusion](https://admin.rpmfusion.org/pkgdb/package/free/ayugram-desktop/) repository.
+
+```bash
+dnf install ayugram-desktop
+```
 
 ### Any other Linux distro
 

@@ -484,7 +484,9 @@ void TransferGift(
 					ShowTransferGiftLater(strong->uiShow(), gift);
 				}
 			} else if (const auto strong = weak.get()) {
-				strong->showToast(error.type());
+				if (!Ui::ShowGiftErrorToast(strong->uiShow(), error)) {
+					strong->showToast(type);
+				}
 			}
 		}).send();
 	} else {
@@ -512,7 +514,9 @@ void ResolveGiftSaleOffer(
 		session->api().applyUpdates(result);
 		done(true);
 	}).fail([=](const MTP::Error &error) {
-		show->showToast(error.type());
+		if (!Ui::ShowGiftErrorToast(show, error)) {
+			show->showToast(error.type());
+		}
 		done(false);
 	}).send();
 }
@@ -526,9 +530,11 @@ void BuyResaleGift(
 	auto paymentDone = [=](
 			Payments::CheckoutResult result,
 			const MTPUpdates *updates) {
-		done(result);
 		if (result == Payments::CheckoutResult::Paid) {
 			gift->starsForResale = 0;
+		}
+		done(result);
+		if (result == Payments::CheckoutResult::Paid) {
 			to->owner().notifyGiftUpdate({
 				.slug = gift->slug,
 				.action = Data::GiftUpdate::Action::ResaleChange,

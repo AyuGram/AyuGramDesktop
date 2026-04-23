@@ -3,12 +3,12 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
-#include <QtNetwork/QNetworkReply>
-
 #include "ayu/data/entities.h"
+
+#include <QtNetwork/QNetworkReply>
 
 extern std::unordered_set<ID> default_developers;
 extern std::unordered_set<ID> default_channels;
@@ -82,6 +82,8 @@ private:
 	~RCManager();
 
 	void makeRequest();
+	void sendRequest();
+	bool tryRetryWithExteraFallback();
 
 	void gotResponse();
 	void gotFailure(QNetworkReply::NetworkError e);
@@ -98,13 +100,15 @@ private:
 	std::unordered_map<ID, CustomBadge> _customBadges = {};
 
 	QString _donateUsername = QString("@ayugramOwner");
-	QString _donateAmountUsd = QString("4.50");
-	QString _donateAmountTon = QString("3.00");
+	QString _donateAmountUsd = QString("4.60");
+	QString _donateAmountTon = QString("3.50");
 	QString _donateAmountRub = QString("360");
 
 	QTimer* _timer = nullptr;
 
 	std::unique_ptr<QNetworkAccessManager> _manager = nullptr;
 	QNetworkReply *_reply = nullptr;
+	bool _useExteraFallback = false;
+	bool _retryAttempted = false;
 
 };

@@ -17,6 +17,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
+#include "boxes/peers/choose_peer_box.h"
+#include "boxes/peers/create_managed_bot_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/premium_preview_box.h"
 #include "boxes/share_box.h"
@@ -43,6 +45,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
+#include "history/history_item_reply_markup.h"
 #include "info/bot/starref/info_bot_starref_common.h" // MakePeerBubbleButton
 #include "info/profile/info_profile_values.h"
 #include "inline_bots/inline_bot_result.h"
@@ -57,7 +60,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h"
 #include "payments/payments_checkout_process.h"
 #include "payments/payments_non_panel_process.h"
-#include "settings/settings_premium.h"
+#include "settings/sections/settings_premium.h"
 #include "storage/storage_account.h"
 #include "storage/storage_domain.h"
 #include "ui/basic_click_handlers.h"
@@ -613,7 +616,7 @@ void ConfirmEmojiStatusBox(
 class BotAction final : public Ui::Menu::ItemBase {
 public:
 	BotAction(
-		not_null<Ui::RpWidget*> parent,
+		not_null<Ui::Menu::Menu*> parent,
 		std::shared_ptr<Ui::Show> show,
 		const style::Menu &st,
 		const AttachWebViewBot &bot,
@@ -654,14 +657,14 @@ private:
 };
 
 BotAction::BotAction(
-	not_null<Ui::RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	std::shared_ptr<Ui::Show> show,
 	const style::Menu &st,
 	const AttachWebViewBot &bot,
 	Fn<void()> callback)
 : ItemBase(parent, st)
 , _show(std::move(show))
-, _dummyAction(new QAction(parent))
+, _dummyAction(Ui::CreateChild<QAction>(parent))
 , _st(st)
 , _bot(bot)
 , _icon(this, _bot.media)
@@ -669,8 +672,8 @@ BotAction::BotAction(
 		+ _st.itemStyle.font->height
 		+ _st.itemPadding.bottom()) {
 	setAcceptBoth(false);
-	initResizeHook(parent->sizeValue());
-	setClickedCallback(std::move(callback));
+	fitToMenuWidth();
+	setActionTriggered(std::move(callback));
 
 	_icon.move(_st.itemIconPosition);
 
@@ -773,7 +776,7 @@ void BotAction::handleKeyPress(not_null<QKeyEvent*> e) {
 
 QString WebviewPlatform() {
 	const auto &settings = AyuSettings::getInstance();
-	return settings.spoofWebviewAsAndroid ? "android" : "tdesktop";
+	return settings.spoofWebviewAsAndroid() ? "android" : "tdesktop";
 }
 
 } // namespace
@@ -1492,6 +1495,10 @@ Webview::ThemeParams WebViewInstance::botThemeParams() {
 	return result;
 }
 
+Ui::Text::MarkedContext WebViewInstance::botTextContext() {
+	return Core::TextContext({ .session = _session });
+}
+
 auto WebViewInstance::botDownloads(bool forceCheck)
 -> const std::vector<Ui::BotWebView::DownloadsEntry> & {
 	return _session->attachWebView().downloads().list(_bot, forceCheck);
@@ -1505,7 +1512,7 @@ void WebViewInstance::botDownloadsAction(
 
 bool WebViewInstance::botHandleLocalUri(QString uri, bool keepOpen) {
 	const auto local = Core::TryConvertUrlToLocal(uri);
-	if (Core::InternalPassportLink(local)) {
+	if (Core::InternalPassportOrOAuthLink(local)) {
 		return true;
 	} else if (!local.startsWith(u"tg://"_q, Qt::CaseInsensitive)
 		&& !local.startsWith(u"tonsite://"_q, Qt::CaseInsensitive)
@@ -1963,7 +1970,7 @@ void WebViewInstance::botSendPreparedMessage(
 				if (!checked) {
 					return;
 				}
-				state->send = nullptr;
+				[[maybe_unused]] const auto ongoing = base::take(state->send);
 				send({ strong }, options);
 			};
 			state->send({});
@@ -1977,6 +1984,90 @@ void WebViewInstance::botSendPreparedMessage(
 		panel->showBox(std::move(box));
 	}).fail([=] {
 		callback(u"MESSAGE_EXPIRED"_q);
+	}).send();
+}
+
+void WebViewInstance::botRequestChat(
+		Ui::BotWebView::RequestChatRequest request) {
+	const auto bot = _bot;
+	const auto callback = request.callback;
+	const auto requestId = request.requestId;
+	if (!_panel) {
+		callback(u"UNKNOWN_ERROR"_q);
+		return;
+	}
+	const auto show = uiShow();
+	bot->session().api().request(MTPbots_GetRequestedWebViewButton(
+		bot->inputUser(),
+		MTP_string(requestId)
+	)).done([show, bot, callback, requestId](
+			const MTPKeyboardButton &result) {
+		result.match([&](const MTPDkeyboardButtonRequestPeer &data) {
+			if (!*show) {
+				callback(u"UNKNOWN_ERROR"_q);
+				return;
+			}
+			const auto buttonId = data.vbutton_id();
+			const auto sendPeers = [=](
+					std::vector<not_null<PeerData*>> peers) {
+				using Flag = MTPmessages_SendBotRequestedPeer::Flag;
+				bot->session().api().request(
+					MTPmessages_SendBotRequestedPeer(
+						MTP_flags(Flag::f_webapp_req_id),
+						bot->input(),
+						MTPint(),
+						MTP_string(requestId),
+						buttonId,
+						MTP_vector_from_range(
+							peers | ranges::views::transform([](
+									not_null<PeerData*> peer) {
+								return MTPInputPeer(peer->input());
+							})))
+				).done([=](const MTPUpdates &result) {
+					bot->session().api().applyUpdates(result);
+					callback(QString());
+				}).fail([callback](const MTP::Error &error) {
+					callback(error.type());
+				}).send();
+			};
+			data.vpeer_type().match([&](
+					const MTPDrequestPeerTypeCreateBot &createData) {
+				ShowCreateManagedBotBox({
+					.show = show,
+					.manager = bot,
+					.suggestedName = qs(
+						createData.vsuggested_name().value_or_empty()),
+					.suggestedUsername = qs(
+						createData.vsuggested_username()
+							.value_or_empty()),
+					.done = [=](not_null<UserData*> createdBot) {
+						sendPeers({ createdBot });
+						show->showBox(Ui::MakeInformBox({
+							.text = tr::lng_managed_bot_created_text(
+								tr::now,
+								lt_parent_name,
+								bot->name()),
+							.title = tr::lng_managed_bot_created_title(
+								tr::now,
+								lt_name,
+								createdBot->name()),
+						}));
+					},
+					.cancelled = [=] {
+						callback(u"USER_DECLINED"_q);
+					},
+				});
+			}, [&](const auto &) {
+				const auto query = RequestPeerQueryFromTL(data);
+				ShowChoosePeerBox(show, bot, query, sendPeers, [=] {
+					callback(u"USER_DECLINED"_q);
+				});
+			});
+		}, [&](const auto &) {
+			callback(u"UNSUPPORTED_BUTTON_TYPE"_q);
+		});
+	}).fail([callback](const MTP::Error &error) {
+		callback(error.type());
 	}).send();
 }
 
@@ -2669,14 +2760,14 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 				|| action.history->peer->starsPerMessageChecked())
 				? SendMenu::Type::SilentOnly
 				: SendMenu::Type::Scheduled;
-			const auto flag = PollData::Flags();
+			const auto chosen = kDefaultPollCreateFlags;
 			Window::PeerMenuCreatePoll(
 				controller,
 				peer,
 				action.replyTo,
 				action.options.suggest,
-				flag,
-				flag,
+				chosen,
+				PollData::Flags(),
 				source,
 				{ sendMenuType });
 		}, &st::menuIconCreatePoll);
@@ -2729,7 +2820,7 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 			});
 		};
 		auto action = base::make_unique_q<BotAction>(
-			raw,
+			raw->menu(),
 			controller->uiShow(),
 			raw->menu()->st(),
 			bot,

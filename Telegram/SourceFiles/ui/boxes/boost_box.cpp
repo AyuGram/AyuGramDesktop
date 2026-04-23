@@ -485,7 +485,7 @@ void BoostBox(
 			+ QMargins(0, st::boostTextSkip, 0, st::boostBottomSkip)));
 
 	const auto current = state->data.current();
-	box->setTitle(rpl::single(QString()));
+	box->setTitle(QString());
 	AddFeaturesList(
 		box->verticalLayout(),
 		data.features,

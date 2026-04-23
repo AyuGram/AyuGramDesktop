@@ -210,6 +210,13 @@ int PremiumLimits::maxBoostLevel() const {
 		_session->isTestMode() ? 9 : 99);
 }
 
+int PremiumLimits::botsCreateDefault() const {
+	return appConfigLimit("bots_create_limit_default", 20);
+}
+int PremiumLimits::botsCreatePremium() const {
+	return appConfigLimit("bots_create_limit_premium", 40);
+}
+
 int PremiumLimits::appConfigLimit(
 		const QString &key,
 		int fallback) const {

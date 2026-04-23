@@ -98,7 +98,7 @@ void PeerSearch::requestSponsored() {
 			const MTPcontacts_SponsoredPeers &result,
 			mtpRequestId requestId) {
 		const auto &settings = AyuSettings::getInstance();
-		if (settings.disableAds) {
+		if (settings.disableAds()) {
 			finishSponsored(requestId, PeerSearchResult{});
 			return;
 		}

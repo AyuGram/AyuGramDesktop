@@ -31,6 +31,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/features/filters/filters_controller.h"
+
+
 namespace Api {
 namespace {
 
@@ -441,6 +446,8 @@ bool UpdateUserpics(
 		};
 	}) | ranges::views::filter([](ResolvedPeer resolved) {
 		return resolved.peer != nullptr;
+	}) | ranges::views::filter([](const ResolvedPeer &resolved) {
+		return !FiltersController::isBlocked(resolved.peer);
 	}) | ranges::to_vector;
 
 	const auto same = ranges::equal(
@@ -601,9 +608,29 @@ rpl::producer<Ui::WhoReadContent> WhoReacted(
 				});
 				return;
 			}
+			auto &owner = item->history()->owner();
+			auto blockedReactionsCount = 0;
+			const auto &settings = AyuSettings::getInstance();
+			if (settings.filtersEnabled()) {
+				peers.list.erase(ranges::remove_if(peers.list, [&](const PeerWithReaction &p) {
+					const auto peer = owner.peerLoaded(p.peerWithDate.peer);
+					if (peer && FiltersController::isBlocked(peer)) {
+						if (!p.reaction.empty()) {
+							++blockedReactionsCount;
+						}
+						return true;
+					}
+					return false;
+				}), end(peers.list));
+				peers.read.erase(ranges::remove_if(peers.read, [&](const WhoReadPeer &p) {
+					const auto peer = owner.peerLoaded(p.peer);
+					return peer && FiltersController::isBlocked(peer);
+				}), end(peers.read));
+			}
+
 			state->current.state = peers.state;
 			state->current.fullReadCount = int(peers.read.size());
-			state->current.fullReactionsCount = peers.fullReactionsCount;
+			state->current.fullReactionsCount = peers.fullReactionsCount - blockedReactionsCount;
 			if (whoReadIds) {
 				const auto reacted = peers.list.size() - ranges::count(
 					peers.list,
@@ -652,6 +679,7 @@ QString FormatReadDate(TimeId date, const QDateTime &now) {
 	const auto parsed = base::unixtime::parse(date);
 	const auto readDate = parsed.date();
 	const auto nowDate = now.date();
+	const auto &settings = AyuSettings::getInstance();
 
 	if (readDate.year() < nowDate.year()) {
 		return tr::lng_mediaview_date_time(
@@ -666,30 +694,25 @@ QString FormatReadDate(TimeId date, const QDateTime &now) {
 				lt_year,
 				QString::number(readDate.year())),
 			lt_time,
-			QLocale().toString(parsed.time(), "HH:mm:ss"));
+			QLocale().toString(parsed.time(), settings.showMessageSeconds() ? "HH:mm:ss" : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	}
 	if (readDate == nowDate) {
 		return tr::lng_mediaview_today(
 			tr::now,
 			lt_time,
-			QLocale().toString(parsed.time(), "HH:mm:ss"));
+			QLocale().toString(parsed.time(), settings.showMessageSeconds() ? "HH:mm:ss" : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	} else if (readDate.addDays(1) == nowDate) {
 		return tr::lng_mediaview_yesterday(
 			tr::now,
 			lt_time,
-			QLocale().toString(parsed.time(), "HH:mm:ss"));
+			QLocale().toString(parsed.time(), settings.showMessageSeconds() ? "HH:mm:ss" : QLocale::system().timeFormat(QLocale::ShortFormat)));
 	}
 	return tr::lng_mediaview_date_time(
 		tr::now,
 		lt_date,
-		tr::lng_month_day(
-			tr::now,
-			lt_month,
-			Lang::MonthDay(readDate.month())(tr::now),
-			lt_day,
-			QString::number(readDate.day())),
+		langDayOfMonthShort(readDate),
 		lt_time,
-		QLocale().toString(parsed.time(), "HH:mm:ss"));
+		QLocale().toString(parsed.time(), settings.showMessageSeconds() ? "HH:mm:ss" : QLocale::system().timeFormat(QLocale::ShortFormat)));
 }
 
 bool WhoReadExists(not_null<HistoryItem*> item) {

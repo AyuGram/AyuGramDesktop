@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "menu/menu_item_download_files.h"
 
+#include "base/base_file_utilities.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
@@ -161,7 +162,9 @@ void AddAction(
 	const auto saveDocuments = [=](const QString &folderPath) {
 		for (const auto &[document, origin] : documents) {
 			if (!folderPath.isEmpty()) {
-				document->save(origin, folderPath + document->filename());
+				const auto name =
+					base::FileNameFromUserString(document->filename());
+				document->save(origin, folderPath + name);
 			} else {
 				DocumentSaveClickHandler::SaveAndTrack(origin, document);
 			}

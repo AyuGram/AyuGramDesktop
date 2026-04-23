@@ -231,7 +231,6 @@ void Widget::setupBottomButton(int wasBottomHeight) {
 		bottom,
 		rpl::single(QString()),
 		st::collectionEditBox.button);
-	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	button->setText(tr::lng_stories_album_add_button(
 	) | rpl::map([](const QString &text) {
 		return Ui::Text::IconEmoji(&st::collectionAddIcon).append(text);

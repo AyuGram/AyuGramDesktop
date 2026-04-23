@@ -323,6 +323,18 @@ void UserData::setPersonalChannel(ChannelId channelId, MsgId messageId) {
 	}
 }
 
+UserId UserData::botManagerId() const {
+	return _botManagerId;
+}
+
+void UserData::setBotManagerId(UserId managerId) {
+	const auto changed = (_botManagerId != managerId);
+	_botManagerId = managerId;
+	if (changed) {
+		session().changes().peerUpdated(this, UpdateFlag::ManagedBot);
+	}
+}
+
 MTPInputUser UserData::inputUser() const {
 	const auto item = isLoaded() ? nullptr : owner().messageWithPeer(id);
 	if (item) {
@@ -346,17 +358,26 @@ void UserData::setName(
 		const QString &newLastName,
 		const QString &newPhoneName,
 		const QString &newUsername) {
-	bool changeName = !newFirstName.isEmpty() || !newLastName.isEmpty();
+	auto filteredFirstName = newFirstName;
+	auto filteredLastName = newLastName;
+
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.filterZalgo()) {
+		filteredFirstName = filterZalgo(filteredFirstName);
+		filteredLastName = filterZalgo(filteredLastName);
+	}
+
+	bool changeName = !filteredFirstName.isEmpty() || !filteredLastName.isEmpty();
 
 	QString newFullName;
-	if (changeName && newFirstName.trimmed().isEmpty()) {
-		firstName = newLastName;
+	if (changeName && filteredFirstName.trimmed().isEmpty()) {
+		firstName = filteredLastName;
 		lastName = QString();
 		newFullName = firstName;
 	} else {
 		if (changeName) {
-			firstName = newFirstName;
-			lastName = newLastName;
+			firstName = filteredFirstName;
+			lastName = filteredLastName;
 		}
 		newFullName = lastName.isEmpty()
 			? firstName
@@ -598,7 +619,7 @@ bool UserData::isFake() const {
 bool UserData::isPremium() const {
 	if (id) {
 		const auto &settings = AyuSettings::getInstance();
-		if (settings.localPremium) {
+		if (settings.localPremium()) {
 			if (getSession(id.value)) {
 				return true;
 			}
@@ -658,6 +679,25 @@ bool UserData::canSendIgnoreMoneyRestrictions() const {
 
 bool UserData::readDatesPrivate() const {
 	return (flags() & UserDataFlag::ReadDatesPrivate);
+}
+
+bool UserData::allowsForwarding() const {
+	return true;
+}
+
+bool UserData::isAyuNoForwards() const {
+	return (flags() & Flag::NoForwardsMyEnabled)
+		|| (flags() & Flag::NoForwardsPeerEnabled);
+}
+
+void UserData::setNoForwardsFlags(bool myEnabled, bool peerEnabled) {
+	const auto mask = Flag::NoForwardsMyEnabled | Flag::NoForwardsPeerEnabled;
+	setFlags((flags() & ~mask)
+		| (myEnabled ? Flag::NoForwardsMyEnabled : Flag())
+		| (peerEnabled ? Flag::NoForwardsPeerEnabled : Flag()));
+	if (!myEnabled && !peerEnabled) {
+		owner().clearSharingDisabledTime(this);
+	}
 }
 
 int UserData::starsPerMessage() const {
@@ -879,7 +919,8 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 			: Flag())
 		| (user->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
 		| Flag::MessageMoneyRestrictionsKnown
-		| Flag::RequiresPremiumToWrite;
+		| Flag::RequiresPremiumToWrite
+		| Flag::UnofficialSecurityRisk;
 	user->setFlags((user->flags() & ~mask)
 		| (update.is_phone_calls_private()
 			? Flag::PhoneCallsPrivate
@@ -895,6 +936,9 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 		| Flag::MessageMoneyRestrictionsKnown
 		| (update.is_contact_require_premium()
 			? (Flag::RequiresPremiumToWrite | Flag::HasRequirePremiumToWrite)
+			: Flag())
+		| (update.is_unofficial_security_risk()
+			? Flag::UnofficialSecurityRisk
 			: Flag()));
 	user->setIsBlocked(update.is_blocked());
 	user->setCallsStatus(update.is_phone_calls_private()
@@ -992,6 +1036,7 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	user->setPersonalChannel(
 		update.vpersonal_channel_id().value_or_empty(),
 		update.vpersonal_channel_message().value_or_empty());
+	user->setBotManagerId(update.vbot_manager_id().value_or_empty());
 	if (user->isSelf()) {
 		user->owner().businessInfo().applyAwaySettings(
 			FromMTP(&user->owner(), update.vbusiness_away_message()));
@@ -1049,6 +1094,10 @@ void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update) {
 	} else {
 		user->setNote(TextWithEntities());
 	}
+
+	user->setNoForwardsFlags(
+		update.is_noforwards_my_enabled(),
+		update.is_noforwards_peer_enabled());
 
 	user->fullUpdated();
 }

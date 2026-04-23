@@ -15,8 +15,10 @@
     <update_contact>helpdesk_at_radolyn.com</update_contact>
     <developer_name>Radolyn Labs</developer_name>
     <url type="homepage">https://ayugram.one/</url>
+    <url type="faq">https://t.me/AyuGramFAQ</url>
     <url type="bugtracker">https://t.me/ayugramchat/1262</url>
     <url type="translate">https://crowdin.com/project/ayugram</url>
+    <url type="vcs-browser">https://github.com/AyuGram/AyuGramDesktop</url>
     <url type="contribute">https://github.com/AyuGram/AyuGramDesktop/blob/dev/.github/CONTRIBUTING.md</url>
     <screenshots>
       <screenshot type="default">

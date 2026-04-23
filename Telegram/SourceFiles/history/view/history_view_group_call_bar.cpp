@@ -22,6 +22,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
+// AyuGram includes
+#include "ayu/ui/ayu_userpic.h"
+
+
 namespace HistoryView {
 
 void GenerateUserpicsInRow(
@@ -60,9 +64,46 @@ void GenerateUserpicsInRow(
 		q.setCompositionMode(QPainter::CompositionMode_Source);
 		q.setBrush(Qt::NoBrush);
 		q.setPen(pen);
-		q.drawEllipse(x, 0, single, single);
+		AyuUserpic::PaintShape(q, QRectF(x, 0, single, single));
 		x -= single - shift;
 	}
+}
+
+bool NeedRegenerateUserpics(
+		const QImage &image,
+		const std::vector<UserpicInRow> &list) {
+	if (image.isNull()) {
+		return true;
+	}
+	for (auto &entry : list) {
+		const auto peer = entry.peer;
+		auto &view = entry.view;
+		const auto wasView = view.cloud.get();
+		if (peer->userpicUniqueKey(view) != entry.uniqueKey
+			|| view.cloud.get() != wasView) {
+			return true;
+		}
+	}
+	return false;
+}
+
+PreparedUserpicsInRow PrepareUserpicsInRow(
+		const std::vector<not_null<PeerData*>> &peers,
+		const style::GroupCallUserpics &st,
+		int limit) {
+	auto rows = std::vector<UserpicInRow>();
+	rows.reserve(peers.size());
+	for (const auto &peer : peers) {
+		rows.push_back({ .peer = peer });
+	}
+	auto result = PreparedUserpicsInRow();
+	if (!rows.empty()) {
+		GenerateUserpicsInRow(result.image, rows, st, limit);
+	}
+	result.width = result.image.isNull()
+		? 0
+		: (result.image.width() / style::DevicePixelRatio());
+	return result;
 }
 
 rpl::producer<Ui::GroupCallBarContent> GroupCallBarContentByCall(

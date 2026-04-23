@@ -3,8 +3,8 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "itunes_search.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ui/utils/itunes_search.h"
 
 #include <QtCore/QCache>
 #include <QtCore/QEventLoop>

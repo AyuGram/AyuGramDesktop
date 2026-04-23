@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "api/api_common.h"
+#include "ui/text/text_entity.h"
 
 namespace Api {
 enum class SendProgressType;
@@ -76,6 +77,7 @@ struct SetHistoryArgs {
 	PeerId monoforumPeerId = 0;
 	Fn<bool()> showSlowmodeError;
 	Fn<Api::SendAction()> sendActionFactory;
+	Fn<void(TextWithEntities, Api::SendOptions, Fn<void()>)> sendWithText;
 	rpl::producer<int> slowmodeSecondsLeft;
 	rpl::producer<bool> sendDisabledBySlowmode;
 	rpl::producer<bool> liked;

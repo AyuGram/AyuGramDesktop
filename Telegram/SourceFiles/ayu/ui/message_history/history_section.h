@@ -3,7 +3,7 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
 #include "window/section_widget.h"
@@ -139,6 +139,14 @@ public:
 		return _downLoaded;
 	}
 
+	void setSearchQuery(QString &&query) {
+		_searchQuery = std::move(query);
+	}
+
+	QString takeSearchQuery() {
+		return std::move(_searchQuery);
+	}
+
 private:
 	not_null<PeerData*> _peer;
 	HistoryItem *_item;
@@ -148,6 +156,7 @@ private:
 	std::set<uint64> _messageIds;
 	bool _upLoaded = false;
 	bool _downLoaded = true;
+	QString _searchQuery;
 };
 
 } // namespace MessageHistory

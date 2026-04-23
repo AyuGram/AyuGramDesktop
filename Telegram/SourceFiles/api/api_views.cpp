@@ -87,7 +87,7 @@ void ViewsManager::pollExtendedMedia(
 }
 
 void ViewsManager::viewsIncrement() {
-	const auto &settings = AyuSettings::getInstance();
+	const auto &ghost = AyuSettings::ghost(_session);
 
 	for (auto i = _toIncrement.begin(); i != _toIncrement.cend();) {
 		if (_incrementRequests.contains(i->first)) {
@@ -103,7 +103,7 @@ void ViewsManager::viewsIncrement() {
 		const auto requestId = _api.request(MTPmessages_GetMessagesViews(
 			i->first->input(),
 			MTP_vector<MTPint>(ids),
-			MTP_bool(settings.sendReadMessages)
+			MTP_bool(ghost.sendReadMessages())
 		)).done([=](
 				const MTPmessages_MessageViews &result,
 				mtpRequestId requestId) {

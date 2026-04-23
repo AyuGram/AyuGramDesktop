@@ -3,12 +3,8 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "saved_music.h"
-
-#include "info/profile/info_profile_music_button.h"
-
-#include <QSvgRenderer>
+// Copyright @Radolyn, 2026
+#include "ayu/ui/components/saved_music.h"
 
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/utils/color_utils.h"
@@ -18,6 +14,7 @@
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
+#include "info/profile/info_profile_music_button.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "styles/palette.h"
@@ -27,6 +24,8 @@
 #include "ui/image/image.h"
 #include "ui/widgets/labels.h"
 #include "window/themes/window_theme.h"
+
+#include <QSvgRenderer>
 
 namespace Info::Profile {
 
@@ -274,7 +273,7 @@ void AyuMusicButton::makeCover() {
 			}
 
 			QColor bgColor;
-			if (cover.noCover || !settings.adaptiveCoverColor) {
+			if (cover.noCover || !settings.adaptiveCoverColor()) {
 				bgColor = GetNoCoverBgColor(overrideBg);
 			} else {
 				if (const auto extractedColor = ExtractColorFromCover(cover.pixToBg)) {
@@ -302,7 +301,7 @@ void AyuMusicButton::makeCover() {
 				const auto &settings2 = AyuSettings::getInstance();
 				const auto &cover2 = *strong->_currentCover;
 
-				if (!cover2.noCover && settings2.adaptiveCoverColor && !cover2.pix.isNull()) {
+				if (!cover2.noCover && settings2.adaptiveCoverColor() && !cover2.pix.isNull()) {
 					strong->_title->setTextColorOverride(Qt::white);
 					strong->_performer->setTextColorOverride(performerColor);
 				} else {
@@ -333,7 +332,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	const auto &settings = AyuSettings::getInstance();
 	const auto cover = _currentCover.value();
-	if (cover.noCover || !settings.adaptiveCoverColor) {
+	if (cover.noCover || !settings.adaptiveCoverColor()) {
 		p.fillRect(e->rect(), cover.bg);
 		paintRipple(p, QPoint());
 	} else {

@@ -105,11 +105,9 @@ void ShowReportMessageBox(
 			}
 			if (!result.options.empty() || result.commentOption) {
 				show->show(Box([=](not_null<Ui::GenericBox*> box) {
-					box->setTitle(
-						rpl::single(
-							result.title.isEmpty()
-								? reportInput.optionText
-								: result.title));
+					box->setTitle(result.title.isEmpty()
+						? reportInput.optionText
+						: result.title);
 
 					for (const auto &option : result.options) {
 						const auto button = Ui::AddReportOptionButton(

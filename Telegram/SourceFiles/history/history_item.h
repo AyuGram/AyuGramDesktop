@@ -32,6 +32,10 @@ class ReplyKeyboard;
 struct LanguageId;
 enum class SuggestionActions : uchar;
 
+namespace Api {
+struct SummaryEntry;
+} // namespace Api
+
 namespace base {
 template <typename Enum>
 class enum_mask;
@@ -92,6 +96,7 @@ struct HistoryItemCommonFields {
 	HistoryMessageSuggestInfo suggest;
 	bool ignoreForwardFrom = false;
 	bool ignoreForwardCaptions = false;
+	bool mediaSpoiler = false;
 };
 
 enum class HistoryReactionSource : char {
@@ -214,6 +219,8 @@ public:
 	void setFactcheck(MessageFactcheck info);
 	[[nodiscard]] bool hasUnrequestedFactcheck() const;
 	[[nodiscard]] TextWithEntities factcheckText() const;
+	[[nodiscard]] const Api::SummaryEntry &summaryEntry() const;
+	void setHasSummaryEntry();
 
 	[[nodiscard]] not_null<Data::Thread*> notificationThread() const;
 	[[nodiscard]] Data::Thread *maybeNotificationThread() const;
@@ -255,12 +262,15 @@ public:
 	[[nodiscard]] bool mentionsMe() const;
 	[[nodiscard]] bool isUnreadMention() const;
 	[[nodiscard]] bool hasUnreadReaction() const;
+	[[nodiscard]] bool hasUnreadPollVote() const;
+	void setHasUnreadPollVote();
 	[[nodiscard]] bool hasUnwatchedEffect() const;
 	bool markEffectWatched();
 	[[nodiscard]] bool isUnreadMedia() const;
 	[[nodiscard]] bool isIncomingUnreadMedia() const;
 	[[nodiscard]] bool hasUnreadMediaFlag() const;
 	void markReactionsRead();
+	void markPollVotesRead();
 	void markMediaAndMentionRead();
 	bool markContentsRead(bool fromThisClient = false);
 	void setIsPinned(bool isPinned);
@@ -331,6 +341,12 @@ public:
 	}
 	[[nodiscard]] bool showSimilarChannels() const {
 		return _flags & MessageFlag::ShowSimilarChannels;
+	}
+	[[nodiscard]] bool canBeSummarized() const {
+		return _flags & MessageFlag::CanBeSummarized;
+	}
+	[[nodiscard]] bool isTextAppearing() const {
+		return _flags & MessageFlag::TextAppearing;
 	}
 	[[nodiscard]] bool hasRealFromId() const;
 	[[nodiscard]] bool isPostHidingAuthor() const;
@@ -426,7 +442,10 @@ public:
 		bool isForumPost);
 	void setPostAuthor(const QString &author);
 	void setDeleted();
-	bool isDeleted() const;
+	[[nodiscard]] bool isDeleted() const;
+	[[nodiscard]] bool isBurnt() const;
+	[[nodiscard]] bool wasDeletedAnimated() const;
+	void markDeletedAnimated();
 	void applyTTL(TimeId destroyAt);
 	void setAyuHint(const QString &hint);
 	void setRealId(MsgId newId);
@@ -493,6 +512,8 @@ public:
 	[[nodiscard]] std::vector<Data::ReactionId> chosenReactions() const;
 	[[nodiscard]] Data::ReactionId lookupUnreadReaction(
 		not_null<UserData*> from) const;
+	[[nodiscard]] QByteArray lookupUnreadPollVote(
+		not_null<PeerData*> from) const;
 	[[nodiscard]] crl::time lastReactionsRefreshTime() const;
 
 	[[nodiscard]] bool reactionsAreTags() const;
@@ -510,6 +531,7 @@ public:
 	}
 	[[nodiscard]] bool computeDropForwardedInfo() const;
 	void setText(const TextWithEntities &textWithEntities);
+	void setTextStreaming(TextWithEntities text);
 
 	[[nodiscard]] MsgId replyToId() const;
 	[[nodiscard]] FullMsgId replyToFullId() const;
@@ -599,10 +621,13 @@ public:
 	[[nodiscard]] int unsupportedTTL() const {
 		return _unsupportedTTL;
 	}
+	void removeTranslationBit();
 
 	[[nodiscard]] int boostsApplied() const {
 		return _boostsApplied;
 	}
+
+	[[nodiscard]] QString fromRank() const;
 
 	MsgId id;
 
@@ -621,6 +646,7 @@ private:
 	[[nodiscard]] bool generateLocalEntitiesByReply() const;
 	[[nodiscard]] TextWithEntities withLocalEntities(
 		const TextWithEntities &textWithEntities) const;
+	void detectTextLinks(const TextWithEntities &textWithEntities);
 	void setTextValue(TextWithEntities text, bool force = false);
 	[[nodiscard]] bool isTooOldForEdit(TimeId now) const;
 	[[nodiscard]] bool isLegacyMessage() const {
@@ -681,7 +707,7 @@ private:
 	void setReactions(const MTPMessageReactions *reactions);
 	[[nodiscard]] bool changeReactions(const MTPMessageReactions *reactions);
 	void setServiceMessageByAction(const MTPmessageAction &action);
-	void applyAction(const MTPMessageAction &action);
+	void processAction(const MTPMessageAction &action);
 	void refreshMedia(const MTPMessageMedia *media);
 	void refreshSentMedia(const MTPMessageMedia *media);
 	void createServiceFromMtp(const MTPDmessage &message);
@@ -704,6 +730,8 @@ private:
 		TimeId scheduleDate);
 	[[nodiscard]] PreparedServiceText prepareTodoCompletionsText();
 	[[nodiscard]] PreparedServiceText prepareTodoAppendTasksText();
+	[[nodiscard]] PreparedServiceText preparePollAppendAnswerText();
+	[[nodiscard]] PreparedServiceText preparePollDeleteAnswerText();
 
 	[[nodiscard]] PreparedServiceText composeTodoIncompleted(
 		not_null<HistoryServiceTodoCompletions*> done);
@@ -729,6 +757,7 @@ private:
 	crl::time _reactionsLastRefreshed = 0;
 
 	bool _deleted = false;
+	bool _deletedAnimated = false;
 	int _unsupportedTTL = 0;
 
 	TimeId _date = 0;

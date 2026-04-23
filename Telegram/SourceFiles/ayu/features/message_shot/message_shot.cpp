@@ -3,18 +3,21 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "message_shot.h"
-
-#include "styles/style_ayu_styles.h"
-#include "styles/style_layers.h"
+// Copyright @Radolyn, 2026
+#include "ayu/features/message_shot/message_shot.h"
 
 #include "qguiapplication.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/boxes/message_shot_box.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "boxes/abstract_box.h"
-#include "data/data_cloud_themes.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
 #include "data/data_forum.h"
 #include "data/data_peer.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "history/history.h"
@@ -24,7 +27,9 @@
 #include "history/view/history_view_element.h"
 #include "history/view/media/history_view_media.h"
 #include "main/main_session.h"
+#include "styles/style_ayu_styles.h"
 #include "styles/style_chat.h"
+#include "styles/style_layers.h"
 #include "ui/painter.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/effects/path_shift_gradient.h"
@@ -33,21 +38,10 @@
 
 namespace AyuFeatures::MessageShot {
 
-ShotConfig *config;
-
-Window::Theme::EmbeddedType defaultSelected = Window::Theme::EmbeddedType(-1);
-std::optional<QColor> defaultSelectedColor;
-
-std::optional<Data::CloudTheme> customSelected;
-
-rpl::event_stream<> resetDefaultSelectedStream;
-rpl::event_stream<> resetCustomSelectedStream;
+ShotConfig *config = nullptr;
 
 bool takingShot = false;
 bool choosingTheme = false;
-
-rpl::event_stream<Data::CloudTheme> themeChosenStream;
-rpl::event_stream<style::palette> paletteChosenStream;
 
 void setShotConfig(ShotConfig &config) {
 	MessageShot::config = &config;
@@ -61,62 +55,15 @@ ShotConfig getShotConfig() {
 	return *config;
 }
 
-void setDefaultSelected(const Window::Theme::EmbeddedType type) {
-	resetCustomSelected();
-	defaultSelected = type;
-}
-
-Window::Theme::EmbeddedType getSelectedFromDefault() {
-	return defaultSelected;
-}
-
-void setDefaultSelectedColor(const QColor color) {
-	resetCustomSelected();
-	defaultSelectedColor = color;
-}
-
-std::optional<QColor> getSelectedColorFromDefault() {
-	return defaultSelectedColor;
-}
-
-void setCustomSelected(const Data::CloudTheme theme) {
-	resetDefaultSelected();
-	customSelected = theme;
-}
-
-std::optional<Data::CloudTheme> getSelectedFromCustom() {
-	return customSelected;
-}
-
-void resetDefaultSelected() {
-	defaultSelected = Window::Theme::EmbeddedType(-1);
-	resetDefaultSelectedStream.fire({});
-}
-
-void resetCustomSelected() {
-	customSelected = std::nullopt;
-	resetCustomSelectedStream.fire({});
-}
-
-rpl::producer<> resetDefaultSelectedEvents() {
-	return resetDefaultSelectedStream.events();
-}
-
-rpl::producer<> resetCustomSelectedEvents() {
-	return resetCustomSelectedStream.events();
-}
-
 bool ignoreRender(RenderPart part) {
 	if (!config) {
 		return false;
 	}
 
-	const auto ignoreDate = !config->showDate;
-	const auto ignoreReactions = !config->showReactions;
-
-	return isTakingShot() &&
-	((part == RenderPart::Date && ignoreDate) ||
-		(part == RenderPart::Reactions && ignoreReactions));
+	const auto &s = AyuSettings::getInstance().messageShotSettings();
+	return isTakingShot()
+		&& ((part == RenderPart::Date && !s.showDate())
+			|| (part == RenderPart::Reactions && !s.showReactions()));
 }
 
 bool isTakingShot() {
@@ -130,22 +77,6 @@ bool setChoosingTheme(bool val) {
 
 bool isChoosingTheme() {
 	return choosingTheme;
-}
-
-rpl::producer<Data::CloudTheme> themeChosen() {
-	return themeChosenStream.events();
-}
-
-void setTheme(Data::CloudTheme theme) {
-	themeChosenStream.fire(std::move(theme));
-}
-
-void setPalette(style::palette &palette) {
-	paletteChosenStream.fire(std::move(palette));
-}
-
-rpl::producer<style::palette> paletteChosen() {
-	return paletteChosenStream.events();
 }
 
 class MessageShotDelegate final : public HistoryView::DefaultElementDelegate
@@ -270,18 +201,16 @@ QColor makeDefaultBackgroundColor() {
 	return st::boxBg->c.darker(110);
 }
 
-QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
+void Make(not_null<QWidget*> box, const ShotConfig &config, const Fn<void(QImage&,bool)>& callback) {
 	const auto controller = config.controller;
 	const auto st = config.st;
 	auto messages = config.messages;
 
 	if (messages.empty()) {
-		return {};
+		return;
 	}
 
-	takingShot = true;
-
-	auto delegate = std::make_unique<MessageShotDelegate>(
+	auto delegate = std::make_shared<MessageShotDelegate>(
 		box,
 		st.get(),
 		[=]
@@ -302,18 +231,18 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 	);
 
 	if (messages.empty()) {
-		return {};
+		return;
 	}
 
-	std::unordered_map<not_null<HistoryItem*>, std::shared_ptr<HistoryView::Element>> createdViews;
-	createdViews.reserve(messages.size());
+	auto createdViews = std::make_shared<std::unordered_map<not_null<HistoryItem*>, std::shared_ptr<HistoryView::Element>>>();
+	createdViews->reserve(messages.size());
 	for (const auto &message : messages) {
-		createdViews.emplace(message, message->createView(delegate.get()));
+		createdViews->emplace(message, message->createView(delegate.get()));
 	}
 
-	auto getView = [=](not_null<HistoryItem*> msg)
+	auto getView = [createdViews](not_null<HistoryItem*> msg)
 	{
-		return createdViews.at(msg).get();
+		return createdViews->at(msg).get();
 	};
 
 	// recalculate blocks
@@ -341,102 +270,225 @@ QImage Make(not_null<QWidget*> box, const ShotConfig &config) {
 		getView(messages[0])->setAttachToNext(false);
 	}
 
-	// calculate the size of the image
-	int width = st::msgMaxWidth + (st::boxPadding.left() + st::boxPadding.right());
-	int height = 0;
+	struct MediaPreload {
+		std::vector<std::shared_ptr<Data::PhotoMedia>> photos;
+		std::vector<std::shared_ptr<Data::DocumentMedia>> documents;
+	};
+	auto preload = std::make_shared<MediaPreload>();
 
-	for (int i = 0; i < messages.size(); i++) {
-		const auto &message = messages[i];
-		const auto view = getView(message);
-
-		view->itemDataChanged(); // refresh reactions
-		height += view->resizeGetHeight(width);
+	for (const auto &message : messages) {
+		if (!message->media()) continue;
+		const auto origin = Data::FileOrigin(message->fullId());
+		if (const auto photo = message->media()->photo()) {
+			auto media = photo->activeMediaView()
+				? photo->activeMediaView()
+				: photo->createMediaView();
+			if (!media->loaded()) {
+				photo->load(origin, LoadFromCloudOrLocal, false);
+			}
+			preload->photos.push_back(std::move(media));
+		} else if (const auto document = message->media()->document()) {
+			if (document->hasThumbnail()) {
+				auto media = document->activeMediaView()
+					? document->activeMediaView()
+					: document->createMediaView();
+				if (!media->thumbnail()) {
+					document->loadThumbnail(origin);
+				}
+				preload->documents.push_back(std::move(media));
+			}
+		}
 	}
 
-	width *= style::DevicePixelRatio();
-	height *= style::DevicePixelRatio();
+	const auto showBackground = AyuSettings::getInstance().messageShotSettings().showBackground();
+	auto render = [=, messages = std::move(messages), delegate = std::move(delegate)](bool final)
+	{
+		takingShot = true;
 
-	// create the image
-	QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
-	image.setDevicePixelRatio(style::DevicePixelRatio());
-	image.fill(Qt::transparent);
+		// calculate the size of the image
+		int width = st::msgMaxWidth + (st::boxPadding.left() + st::boxPadding.right());
+		int height = 0;
 
-	const auto viewport = QRect(0, 0, width, height);
+		for (int i = 0; i < messages.size(); i++) {
+			const auto &message = messages[i];
+			const auto view = getView(message);
 
-	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> userpics;
-	base::flat_map<MsgId, Ui::PeerUserpicView> hiddenSenderUserpics;
-
-	Painter p(&image);
-
-	// draw the messages
-	int y = 0;
-	for (int i = 0; i < messages.size(); i++) {
-		const auto &message = messages[i];
-		const auto view = getView(message);
-
-		const auto displayUserpic = view->displayFromPhoto() || message->isPost();
-
-		const auto rect = QRect(0, y, width, view->height());
-
-		auto context = controller->defaultChatTheme()->preparePaintContext(
-			st.get(),
-			viewport,
-			rect,
-			true);
-
-		p.translate(0, y);
-		view->draw(p, context);
-		p.translate(0, -y);
-
-		if (displayUserpic) {
-			const auto picX = st::msgMargin.left();
-			const auto picY = y + view->height() - st::msgPhotoSize;
-
-			if (const auto from = message->displayFrom()) {
-				Dialogs::Ui::PaintUserpic(
-					p,
-					from,
-					nullptr,
-					userpics[from],
-					picX,
-					picY,
-					width,
-					st::msgPhotoSize,
-					context.paused);
-			} else if (const auto info = message->displayHiddenSenderInfo()) {
-				if (info->customUserpic.empty()) {
-					info->emptyUserpic.paintCircle(
-						p,
-						picX,
-						picY,
-						width,
-						st::msgPhotoSize);
-				}
+			view->itemDataChanged(); // refresh reactions
+			height += view->resizeGetHeight(width);
+			if (AyuSettings::getInstance().messageShotSettings().revealSpoilers()) {
+				view->revealSpoilers();
 			}
 		}
 
-		y += view->height();
+		width *= style::DevicePixelRatio();
+		height *= style::DevicePixelRatio();
+
+		// create the image
+		QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
+		image.setDevicePixelRatio(style::DevicePixelRatio());
+		image.fill(Qt::transparent);
+
+		const auto viewport = QRect(0, 0, width, height);
+
+		base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> userpics;
+		base::flat_map<MsgId, Ui::PeerUserpicView> hiddenSenderUserpics;
+
+		Painter p(&image);
+
+		// draw the messages
+		int y = 0;
+		for (int i = 0; i < messages.size(); i++) {
+			const auto &message = messages[i];
+			const auto view = getView(message);
+
+			const auto displayUserpic = view->displayFromPhoto() || message->isPost();
+
+			const auto rect = QRect(0, 0, width, view->height());
+
+			auto context = controller->defaultChatTheme()->preparePaintContext(
+				st.get(),
+				viewport,
+				rect,
+				rect,
+				true);
+
+			p.translate(0, y);
+			view->draw(p, context);
+			p.translate(0, -y);
+
+			if (displayUserpic) {
+				const auto picX = st::msgMargin.left();
+				const auto picY = y + view->height() - st::msgPhotoSize;
+
+				if (const auto from = message->displayFrom()) {
+					Dialogs::Ui::PaintUserpic(
+						p,
+						from,
+						nullptr,
+						userpics[from],
+						picX,
+						picY,
+						width,
+						st::msgPhotoSize,
+						context.paused);
+				} else if (const auto info = message->displayHiddenSenderInfo()) {
+					if (info->customUserpic.empty()) {
+						info->emptyUserpic.paintCircle(
+							p,
+							picX,
+							picY,
+							width,
+							st::msgPhotoSize);
+					}
+				}
+			}
+
+			y += view->height();
+		}
+
+		takingShot = false;
+
+		auto result = addPadding(removeEmptySpaceAround(image));
+		if (!showBackground) {
+			callback(result, final);
+			return;
+		}
+
+		auto newResult = QImage(result.size(), QImage::Format_ARGB32_Premultiplied);
+		newResult.setDevicePixelRatio(style::DevicePixelRatio());
+		newResult.fill(makeDefaultBackgroundColor());
+
+		Painter painter(&newResult);
+		painter.drawImage(0, 0, result);
+
+		callback(newResult, final);
+	};
+
+	if (!preload->documents.empty() || !preload->photos.empty()) {
+		render(false); // render immediately to give box width
+
+		auto lifetime = std::make_shared<rpl::lifetime>();
+		auto latch = std::make_shared<TimedCountDownLatch>(1);
+		rpl::single() | rpl::then(
+			config.controller->session().downloaderTaskFinished()
+		) | rpl::filter([=]
+			{
+				for (const auto &media : preload->photos) {
+					if (media->owner()->loading()) return false;
+				}
+				for (const auto &media : preload->documents) {
+					if (media->owner()->thumbnailLoading()) return false;
+				}
+				return true;
+			}
+		) | rpl::take(1) | rpl::on_next([=]
+		{
+			latch->countDown();
+		}, *lifetime);
+
+		crl::async([=, render = std::move(render)]
+		{
+			latch->await(std::chrono::seconds(3));
+			crl::on_main([=]
+			{
+				lifetime->destroy();
+				render(true);
+			});
+		});
+	} else {
+		render(true);
 	}
-
-	takingShot = false;
-
-	auto result = addPadding(removeEmptySpaceAround(image));
-	if (!config.showBackground) {
-		return result;
-	}
-
-	auto newResult = QImage(result.size(), QImage::Format_ARGB32_Premultiplied);
-	newResult.setDevicePixelRatio(style::DevicePixelRatio());
-	newResult.fill(makeDefaultBackgroundColor());
-
-	Painter painter(&newResult);
-	painter.drawImage(0, 0, result);
-
-	return newResult;
 }
 
-void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected) {
-	const auto items = widget->getSelectedIds();
+namespace {
+
+// 🥀🥀🥀
+
+std::shared_ptr<Ui::ChatStyle> BuildShotChatStyle(
+		not_null<Window::SessionController*> controller) {
+	const auto &shot = AyuSettings::getInstance().messageShotSettings();
+	const auto hasSavedTheme = shot.embeddedThemeType() != -1
+		|| shot.cloudThemeId() != 0;
+	const auto persistedPalette = getPersistedPalette();
+	if (hasSavedTheme && persistedPalette) {
+		return std::make_shared<Ui::ChatStyle>(persistedPalette.get());
+	}
+	return std::make_shared<Ui::ChatStyle>(controller->chatStyle());
+}
+
+template <typename ResolveMessage>
+void ShowMessageShotBox(
+		ResolveMessage resolveMessage,
+		not_null<Window::SessionController*> controller,
+		const MessageIdsList &ids,
+		Fn<void()> clearSelected) {
+	const auto messages = ranges::views::all(ids)
+		| ranges::views::transform([=](const auto item)
+		{
+			return resolveMessage(item);
+		})
+		| ranges::to_vector;
+
+	const AyuFeatures::MessageShot::ShotConfig config = {
+		controller,
+		BuildShotChatStyle(controller),
+		messages,
+	};
+	auto box = Box<MessageShotBox>(config);
+	const auto raw = box.data();
+	raw->boxClosing() | rpl::on_next([=]
+	{
+		if (raw->tookShot()) clearSelected();
+	}, raw->lifetime());
+	Ui::show(std::move(box));
+}
+
+template <typename Widget, typename GetIds>
+void WrapperImpl(
+		not_null<Widget*> widget,
+		GetIds getIds,
+		Fn<void()> clearSelected) {
+	const auto items = getIds(widget);
 	if (items.empty()) {
 		return;
 	}
@@ -447,24 +499,27 @@ void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected
 		return;
 	}
 
-	const auto messages = ranges::views::all(items)
-		| ranges::views::transform([=](const auto item)
-		{
-			return gsl::not_null(session->data().message(item));
-		})
-		| ranges::to_vector;
-
-	const AyuFeatures::MessageShot::ShotConfig config = {
+	ShowMessageShotBox(
+		[=](const auto item) { return gsl::not_null(session->data().message(item)); },
 		controller,
-		std::make_shared<Ui::ChatStyle>(controller->chatStyle()),
-		messages,
-	};
-	auto box = Box<MessageShotBox>(config);
-	box->boxClosing() | rpl::on_next([=]
-	{
-		clearSelected();
-	}, box->lifetime());
-	Ui::show(std::move(box));
+		items,
+		std::move(clearSelected));
+}
+
+}
+
+void Wrapper(not_null<HistoryView::ListWidget*> widget, Fn<void()> clearSelected) {
+	WrapperImpl(
+		widget,
+		[](const auto widget) { return widget->getSelectedIds(); },
+		std::move(clearSelected));
+}
+
+void Wrapper(not_null<HistoryInner*> widget, Fn<void()> clearSelected) {
+	WrapperImpl(
+		widget,
+		[](const auto widget) { return widget->getSelectedItems(); },
+		std::move(clearSelected));
 }
 
 }

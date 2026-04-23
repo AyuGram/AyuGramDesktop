@@ -80,7 +80,7 @@ MTPInputReplyTo ReplyToForMTP(
 		const auto external = replyTo.messageId
 			&& (replyTo.messageId.peer != history->peer->id
 				|| replyingToTopicId != replyToTopicId);
-		const auto textNormalized = reverseLocalPremiumEmoji(replyTo.quote, history);
+		const auto textNormalized = reverseLocalPremiumEmoji(replyTo.quote, history, true);
 		const auto quoteEntities = Api::EntitiesToMTP(
 			&history->session(),
 			textNormalized.entities,
@@ -98,19 +98,23 @@ MTPInputReplyTo ReplyToForMTP(
 				| (quoteEntities.v.isEmpty()
 					? Flag()
 					: Flag::f_quote_entities)
-				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())),
+				| (replyTo.todoItemId ? Flag::f_todo_item_id : Flag())
+			| (replyTo.pollOption.isEmpty()
+				? Flag()
+				: Flag::f_poll_option)),
 			MTP_int(replyTo.messageId ? replyTo.messageId.msg : 0),
 			MTP_int(replyTo.topicRootId),
 			(external
 				? owner->peer(replyTo.messageId.peer)->input()
 				: MTPInputPeer()),
-			MTP_string(replyTo.quote.text),
+			MTP_string(textNormalized.text),
 			quoteEntities,
 			MTP_int(replyTo.quoteOffset),
 			(replyToMonoforumPeerId
 				? history->owner().peer(replyToMonoforumPeerId)->input()
 				: MTPInputPeer()),
-			MTP_int(replyTo.todoItemId));
+			MTP_int(replyTo.todoItemId),
+			MTP_bytes(replyTo.pollOption));
 	} else if (history->peer->amMonoforumAdmin()
 		&& replyTo.monoforumPeerId) {
 		const auto replyToMonoforumPeer = replyTo.monoforumPeerId
@@ -125,11 +129,12 @@ MTPInputMedia WebPageForMTP(
 		const Data::WebPageDraft &draft,
 		bool required) {
 	using Flag = MTPDinputMediaWebPage::Flag;
+	const auto url = getBetterLinkPreview(draft.url);
 	return MTP_inputMediaWebPage(
-		MTP_flags(((false && required) ? Flag() : Flag::f_optional)
+		MTP_flags((draft.previewChanged ? Flag() : Flag::f_optional)
 			| (draft.forceLargeMedia ? Flag::f_force_large_media : Flag())
 			| (draft.forceSmallMedia ? Flag::f_force_small_media : Flag())),
-		MTP_string(draft.url));
+		MTP_string(url));
 }
 
 Histories::Histories(not_null<Session*> owner)
@@ -675,8 +680,8 @@ void Histories::sendReadRequests() {
 	DEBUG_LOG(("Reading: send requests with count %1.").arg(_states.size()));
 
 	// AyuGram sendReadMessages
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadMessages) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadMessages()) {
 		DEBUG_LOG(("[AyuGram] Don't read messages"));
 		_states.clear();
 		return;
@@ -1003,7 +1008,7 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 		document->owner().savedMusic().remove(document);
 	}
 
-	for (const auto item : remove) {
+	for (const auto &item : remove) {
 		const auto history = item->history();
 		const auto wasLast = (history->lastMessage() == item);
 		const auto wasInChats = (history->chatListMessage() == item);
@@ -1104,6 +1109,7 @@ int Histories::sendPreparedMessage(
 		Fn<PreparedMessage(not_null<History*>, FullReplyTo)> message,
 		Fn<void(const MTPUpdates&, const MTP::Response&)> done,
 		Fn<void(const MTP::Error&, const MTP::Response&)> fail) {
+	markReadAfterAction(history);
 	if (isCreatingTopic(history, replyTo.topicRootId)) {
 		const auto id = ++_requestAutoincrement;
 		const auto creatingId = FullMsgId(

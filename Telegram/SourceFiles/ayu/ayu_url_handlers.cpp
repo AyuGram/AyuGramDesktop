@@ -3,26 +3,25 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/ayu_url_handlers.h"
-
-#include "base/qthelp_url.h"
 
 #include "lang_auto.h"
 #include "mainwindow.h"
+#include "ayu/ui/settings/settings_main.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "base/qthelp_url.h"
 #include "boxes/abstract_box.h"
 #include "core/application.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "main/main_session.h"
+#include "settings/settings_builder.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/boxes/donate_info_box.h"
+#include "window/window_controller.h"
 
 #include <QDesktopServices>
-
-#include "main/main_session.h"
-#include "ui/boxes/donate_info_box.h"
-#include "ui/settings/settings_main.h"
-#include "window/window_controller.h"
 
 namespace AyuUrlHandlers {
 
@@ -143,6 +142,62 @@ bool HandleSupport(
 		Ui::FillDonateInfoBox,
 		controller);
 	Ui::show(std::move(box));
+	return true;
+}
+
+struct ResolvedSetting {
+	QString controlId;
+	::Settings::Type section = ::Settings::AyuMain::Id();
+};
+
+[[nodiscard]] ResolvedSetting ResolveSetting(
+		const QString &controlId,
+		not_null<::Main::Session*> session) {
+	const auto &registry = ::Settings::Builder::SearchRegistry::Instance();
+	const auto entries = registry.collectAll(session);
+	for (const auto &entry : entries) {
+		if (!entry.section) {
+			continue;
+		}
+		if (entry.id == controlId) {
+			return {
+				.controlId = entry.id,
+				.section = entry.section,
+			};
+		}
+		if (entry.altIds.contains(controlId)) {
+			return {
+				.controlId = entry.id,
+				.section = entry.section,
+			};
+		}
+	}
+	return { .controlId = controlId };
+}
+
+bool HandleAyuSettings(
+	Window::SessionController *controller,
+	const Match &match,
+	const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto settingName = params.value(u"s"_q);
+
+	if (settingName.isEmpty()) {
+		controller->showSettings(::Settings::AyuMain::Id());
+	} else {
+		const auto resolved = ResolveSetting(
+			u"ayu/"_q + settingName,
+			&controller->session());
+		controller->window().setHighlightControlId(resolved.controlId);
+		controller->showSettings(resolved.section);
+	}
+	controller->window().activate();
 	return true;
 }
 

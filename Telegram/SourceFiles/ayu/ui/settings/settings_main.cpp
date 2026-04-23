@@ -3,38 +3,204 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "settings_main.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ui/settings/settings_main.h"
 
-#include <QDesktopServices>
-#include <styles/style_ayu_icons.h>
-
+#include "settings/sections/settings_main.h"
 #include "lang_auto.h"
-#include "settings_appearance.h"
-#include "settings_ayu.h"
-#include "settings_ayu_utils.h"
-#include "settings_chats.h"
-#include "settings_filters.h"
-#include "settings_general.h"
-#include "settings_other.h"
-
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_logo.h"
+#include "ayu/ui/settings/settings_appearance.h"
+#include "ayu/ui/settings/settings_ayu.h"
+#include "ayu/ui/settings/settings_chats.h"
+#include "ayu/ui/settings/settings_filters.h"
+#include "ayu/ui/settings/settings_general.h"
+#include "ayu/ui/settings/settings_other.h"
 #include "core/version.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/painter.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
 
+#include <QDesktopServices>
+
 namespace Settings {
+
+using namespace Builder;
+
+namespace {
+
+void BuildLogo(SectionBuilder &builder) {
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		auto logo = object_ptr<Ui::RpWidget>(ctx.container);
+		const auto logoRaw = logo.data();
+		logoRaw->resize(
+			QSize(st::settingsCloudPasswordIconSize,
+				st::settingsCloudPasswordIconSize));
+		logoRaw->setNaturalWidth(st::settingsCloudPasswordIconSize);
+		logoRaw->paintRequest(
+		) | rpl::on_next([=] {
+			auto p = QPainter(logoRaw);
+			const auto image = AyuAssets::currentAppLogoPad();
+			if (!image.isNull()) {
+				const auto size = st::settingsCloudPasswordIconSize;
+				const auto scaled = image.scaled(
+					size * style::DevicePixelRatio(),
+					size * style::DevicePixelRatio(),
+					Qt::KeepAspectRatio,
+					Qt::SmoothTransformation);
+				p.drawImage(QRect(0, 0, size, size), scaled);
+			}
+		}, logoRaw->lifetime());
+		return { .widget = std::move(logo), .align = style::al_top };
+	});
+}
+
+void BuildVersionInfo(SectionBuilder &builder) {
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		return {
+			.widget = object_ptr<Ui::FlatLabel>(
+				ctx.container,
+				rpl::single(
+					QString("AyuGram Desktop v")
+					+ QString::fromLatin1(AppVersionStr)),
+				st::boxTitle),
+			.align = style::al_top,
+		};
+	});
+
+	builder.addSkip();
+
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		return {
+			.widget = object_ptr<Ui::FlatLabel>(
+				ctx.container,
+				tr::ayu_SettingsDescription(),
+				st::centeredBoxLabel),
+			.align = style::al_top,
+		};
+	});
+}
+
+void BuildCategories(SectionBuilder &builder) {
+	builder.addSkip();
+	builder.addSkip();
+	builder.addSkip();
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+
+	builder.addSubsectionTitle(tr::ayu_CategoriesHeader());
+
+	builder.addSectionButton({
+		.title = rpl::single(QString("AyuGram")),
+		.targetSection = AyuGhost::Id(),
+		.icon = { &st::menuIconGroupReactions },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryFilters(),
+		.targetSection = AyuFilters::Id(),
+		.icon = { &st::menuIconTagFilter },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryGeneral(),
+		.targetSection = AyuGeneral::Id(),
+		.icon = { &st::menuIconShowAll },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryAppearance(),
+		.targetSection = AyuAppearance::Id(),
+		.icon = { &st::menuIconPalette },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryChats(),
+		.targetSection = AyuChats::Id(),
+		.icon = { &st::menuIconChatBubble },
+	});
+	builder.addSectionButton({
+		.title = tr::ayu_CategoryOther(),
+		.targetSection = AyuOther::Id(),
+		.icon = { &st::menuIconFave },
+	});
+}
+
+void BuildLinks(SectionBuilder &builder) {
+	builder.addSkip();
+	builder.addDivider();
+	builder.addSkip();
+
+	builder.addSubsectionTitle(tr::ayu_LinksHeader());
+
+	const auto controller = builder.controller();
+
+	builder.addButton({
+		.id = u"ayu/channel"_q,
+		.title = tr::ayu_LinksChannel(),
+		.icon = { &st::menuIconChannel },
+		.label = rpl::single(QString("@ayugram")),
+		.onClick = [=] {
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = QString("ayugram"),
+			});
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/chat"_q,
+		.title = tr::ayu_LinksChats(),
+		.icon = { &st::menuIconChats },
+		.label = rpl::single(QString("@ayugramchat")),
+		.onClick = [=] {
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = QString("ayugramchat"),
+			});
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/crowdin"_q,
+		.title = tr::ayu_LinksTranslate(),
+		.icon = { &st::menuIconTranslate },
+		.label = rpl::single(QString("Crowdin")),
+		.onClick = [=] {
+			QDesktopServices::openUrl(
+				QString("https://translate.ayugram.one"));
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/website"_q,
+		.title = tr::ayu_LinksDocumentation(),
+		.icon = { &st::menuIconIpAddress },
+		.label = rpl::single(QString("docs.ayugram.one")),
+		.onClick = [=] {
+			QDesktopServices::openUrl(
+				QString("https://docs.ayugram.one"));
+		},
+	});
+
+	builder.addSkip();
+}
+
+const auto kMeta = BuildHelper({
+	.id = AyuMain::Id(),
+	.parentId = MainId(),
+	.title = &tr::ayu_AyuPreferences,
+	.icon = &st::menuIconPremium,
+}, [](SectionBuilder &builder) {
+	BuildLogo(builder);
+	builder.addSkip();
+	BuildVersionInfo(builder);
+	BuildCategories(builder);
+	BuildLinks(builder);
+});
+
+} // namespace
 
 rpl::producer<QString> AyuMain::title() {
 	return rpl::single(QString(""));
@@ -43,181 +209,18 @@ rpl::producer<QString> AyuMain::title() {
 AyuMain::AyuMain(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller)
-	: Section(parent) {
-	setupContent(controller);
+: Section(parent, controller) {
+	setupContent();
 }
 
-void SetupAppLogo(not_null<Ui::VerticalLayout*> container) {
-	const auto logo = container->add(
-		object_ptr<Ui::RpWidget>(container),
-		style::al_top);
-
-	logo->resize(QSize(st::settingsCloudPasswordIconSize, st::settingsCloudPasswordIconSize));
-	logo->setNaturalWidth(st::settingsCloudPasswordIconSize);
-
-	logo->paintRequest(
-	) | rpl::on_next([=](QRect clip)
-							 {
-								 auto p = QPainter(logo);
-								 const auto image = AyuAssets::currentAppLogoPad();
-								 if (!image.isNull()) {
-									 const auto size = st::settingsCloudPasswordIconSize;
-									 const auto scaled = image.scaled(
-										 size * style::DevicePixelRatio(),
-										 size * style::DevicePixelRatio(),
-										 Qt::KeepAspectRatio,
-										 Qt::SmoothTransformation);
-									 p.drawImage(
-										 QRect(0, 0, size, size),
-										 scaled);
-								 }
-							 },
-							 logo->lifetime());
-}
-
-void SetupCategories(
-	not_null<Ui::VerticalLayout*> container,
-	not_null<Window::SessionController*> controller,
-	Fn<void(Type)> showOther) {
-	struct CategoryInfo
-	{
-		QString name;
-		const style::icon *icon;
-		std::function<void()> handler;
-	};
-
-	const auto categories = std::vector<CategoryInfo>{
-		{QString("AyuGram"), &st::menuIconGroupReactions, [=] { showOther(AyuGhost::Id()); }},
-		{asBeta(tr::ayu_CategoryFilters(tr::now)), &st::menuIconTagFilter, [=] { showOther(AyuFilters::Id()); }},
-		{tr::ayu_CategoryGeneral(tr::now), &st::menuIconShowAll, [=] { showOther(AyuGeneral::Id()); }},
-		{tr::ayu_CategoryAppearance(tr::now), &st::menuIconPalette, [=] { showOther(AyuAppearance::Id()); }},
-		{tr::ayu_CategoryChats(tr::now), &st::menuIconChatBubble, [=] { showOther(AyuChats::Id()); }},
-		{tr::ayu_CategoryOther(tr::now), &st::menuIconFave, [=] { showOther(AyuOther::Id()); }},
-	};
-
-	for (const auto &category : categories) {
-		AddButtonWithIcon(
-			container,
-			rpl::single(category.name),
-			st::settingsButton,
-			{category.icon}
-		)->setClickedCallback([=]
-		{
-			if (category.handler) {
-				category.handler();
-			}
-		});
-	}
-}
-
-void SetupLinks(
-	not_null<Ui::VerticalLayout*> container,
-	not_null<Window::SessionController*> controller) {
-	struct LinkInfo
-	{
-		QString name;
-		QString value;
-		const style::icon *icon;
-		std::function<void()> handler;
-	};
-
-	const auto links = std::vector<LinkInfo>{
-		{
-			tr::ayu_LinksChannel(tr::now),
-			QString("@ayugram"),
-			&st::menuIconChannel,
-			[=]
-			{
-				controller->showPeerByLink(Window::PeerByLinkInfo{
-					.usernameOrId = QString("ayugram"),
-				});
-			}
-		},
-		{
-			tr::ayu_LinksChats(tr::now),
-			QString("@ayugramchat"),
-			&st::menuIconChats,
-			[=]
-			{
-				controller->showPeerByLink(Window::PeerByLinkInfo{
-					.usernameOrId = QString("ayugramchat"),
-				});
-			}
-		},
-		{
-			tr::ayu_LinksTranslate(tr::now),
-			QString("Crowdin"),
-			&st::menuIconTranslate,
-			[=]
-			{
-				QDesktopServices::openUrl(QString("https://translate.ayugram.one"));
-			}
-		},
-		{
-			tr::ayu_LinksDocumentation(tr::now),
-			QString("docs.ayugram.one"),
-			&st::menuIconIpAddress,
-			[=]
-			{
-				QDesktopServices::openUrl(QString("https://docs.ayugram.one"));
-			}
-		},
-	};
-
-	for (const auto &link : links) {
-		AddButtonWithLabel(
-			container,
-			rpl::single(link.name),
-			rpl::single(link.value),
-			st::settingsButton,
-			{link.icon}
-		)->setClickedCallback(link.handler);
-	}
-}
-
-void AyuMain::setupContent(not_null<Window::SessionController*> controller) {
+void AyuMain::setupContent() {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
+	build(content, kMeta.build);
+	Ui::ResizeFitChild(this, content);
+}
 
-	SetupAppLogo(content);
-
-	AddSkip(content);
-
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			rpl::single(QString("AyuGram Desktop v") + QString::fromLatin1(AppVersionStr)),
-			st::boxTitle),
-		style::al_top);
-
-	AddSkip(content);
-
-	content->add(
-		object_ptr<Ui::FlatLabel>(
-			content,
-			tr::ayu_SettingsDescription(),
-			st::centeredBoxLabel),
-		style::al_top);
-
-	AddSkip(content);
-	AddSkip(content);
-	AddSkip(content);
-	AddSkip(content);
-	AddDivider(content);
-	AddSkip(content);
-
-	AddSubsectionTitle(content, tr::ayu_CategoriesHeader());
-	SetupCategories(content, controller, showOtherMethod());
-
-	AddSkip(content);
-	AddDivider(content);
-	AddSkip(content);
-
-	AddSubsectionTitle(content, tr::ayu_LinksHeader());
-	SetupLinks(content, controller);
-
-	AddSkip(content);
-
-	ResizeFitChild(this, content);
+Type AyuMainId() {
+	return AyuMain::Id();
 }
 
 } // namespace Settings

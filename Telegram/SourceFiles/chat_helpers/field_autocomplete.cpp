@@ -43,7 +43,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/cached_round_corners.h"
 #include "base/unixtime.h"
 #include "base/random.h"
-#include "base/qt/qt_common_adapters.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "boxes/sticker_set_box.h"
 #include "window/window_adaptive.h"
 #include "window/window_session_controller.h"
@@ -412,7 +412,7 @@ FieldAutocomplete::StickerRows FieldAutocomplete::getStickerSuggestions() {
 	auto result = ranges::views::all(
 		list
 	) | ranges::views::filter([&](not_null<DocumentData*> sticker) {
-		return !settings.showOnlyAddedEmojisAndStickers
+		return !settings.showOnlyAddedEmojisAndStickers()
 			|| sticker->isStickerSetInstalled();
 	}) | ranges::views::transform([](not_null<DocumentData*> sticker) {
 		return StickerSuggestion{
@@ -507,7 +507,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					sorted.emplace(byOnline(user), user);
 				}
 			}
-			for (const auto user : _chat->lastAuthors) {
+			for (const auto &user : _chat->lastAuthors) {
 				if (user->isInaccessible()) continue;
 				if (!listAllSuggestions && filterNotPassedByName(user)) continue;
 				if (indexOfInFirstN(mrows, user, recentInlineBots) >= 0) continue;
@@ -524,7 +524,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					_channel->session().api().chatParticipants().requestAdmins(_channel);
 				} else {
 					mrows.reserve(mrows.size() + _channel->mgInfo->admins.size());
-					for (const auto &[userId, rank] : _channel->mgInfo->admins) {
+					for (const auto &userId : _channel->mgInfo->admins) {
 						if (const auto user = _channel->owner().userLoaded(userId)) {
 							if (user->isInaccessible()) continue;
 							if (!listAllSuggestions && filterNotPassedByName(user)) continue;
@@ -538,7 +538,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					_channel);
 			} else {
 				mrows.reserve(mrows.size() + _channel->mgInfo->lastParticipants.size());
-				for (const auto user : _channel->mgInfo->lastParticipants) {
+				for (const auto &user : _channel->mgInfo->lastParticipants) {
 					if (user->isInaccessible()) continue;
 					if (!listAllSuggestions && filterNotPassedByName(user)) continue;
 					if (indexOfInFirstN(mrows, user, recentInlineBots) >= 0) continue;
@@ -592,7 +592,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 			bots.emplace(_user, &_user->botInfo->commands);
 		} else if (_channel && _channel->isMegagroup()) {
 			if (_channel->mgInfo->bots.empty()) {
-				if (!_channel->mgInfo->botStatus) {
+				if (_channel->mgInfo->botStatus == Data::BotStatus::Unknown) {
 					_channel->session().api().chatParticipants().requestBots(
 						_channel);
 				}
@@ -622,7 +622,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 				};
 			};
 			brows.reserve(cnt);
-			int32 botStatus = _chat ? _chat->botStatus : ((_channel && _channel->isMegagroup()) ? _channel->mgInfo->botStatus : -1);
+			const auto botStatus = _chat ? _chat->botStatus : ((_channel && _channel->isMegagroup()) ? _channel->mgInfo->botStatus : Data::BotStatus::NoBots);
 			if (_chat) {
 				for (const auto &user : _chat->lastAuthors) {
 					if (!user->isBot()) {
@@ -634,7 +634,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					}
 					for (const auto &command : *i->second) {
 						if (!listAllSuggestions) {
-							auto toFilter = (hasUsername || botStatus == 0 || botStatus == 2)
+							auto toFilter = (hasUsername || botStatus != Data::BotStatus::NoBots)
 								? command.command + '@' + PrimaryUsername(user)
 								: command.command;
 							if (!toFilter.startsWith(_filter, Qt::CaseInsensitive)/* || toFilter.size() == _filter.size()*/) {
@@ -652,8 +652,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					for (const auto &command : *i->second) {
 						if (!listAllSuggestions) {
 							const auto toFilter = (hasUsername
-									|| botStatus == 0
-									|| botStatus == 2)
+									|| botStatus != Data::BotStatus::NoBots)
 								? command.command + '@' + PrimaryUsername(user)
 								: command.command;
 							if (!toFilter.startsWith(_filter, Qt::CaseInsensitive)/* || toFilter.size() == _filter.size()*/) continue;
@@ -1138,8 +1137,8 @@ void FieldAutocomplete::Inner::paintEvent(QPaintEvent *e) {
 				}
 
 				auto toHighlight = row.command;
-				int32 botStatus = _parent->chat() ? _parent->chat()->botStatus : ((_parent->channel() && _parent->channel()->isMegagroup()) ? _parent->channel()->mgInfo->botStatus : -1);
-				if (hasUsername || botStatus == 0 || botStatus == 2) {
+				const auto botStatus = _parent->chat() ? _parent->chat()->botStatus : ((_parent->channel() && _parent->channel()->isMegagroup()) ? _parent->channel()->mgInfo->botStatus : Data::BotStatus::NoBots);
+				if (hasUsername || botStatus != Data::BotStatus::NoBots) {
 					toHighlight += '@' + PrimaryUsername(user);
 				}
 				user->loadUserpic();
@@ -1307,10 +1306,9 @@ bool FieldAutocomplete::Inner::chooseAtIndex(
 				? _parent->chat()->botStatus
 				: ((_parent->channel() && _parent->channel()->isMegagroup())
 					? _parent->channel()->mgInfo->botStatus
-					: -1);
+					: Data::BotStatus::NoBots);
 
-			const auto insertUsername = (botStatus == 0
-				|| botStatus == 2
+			const auto insertUsername = (botStatus != Data::BotStatus::NoBots
 				|| _parent->filter().indexOf('@') > 0);
 			const auto commandString = QString("/%1%2").arg(
 				command,
@@ -1670,12 +1668,13 @@ void InitFieldAutocomplete(
 	const auto field = descriptor.field;
 
 	field->rawTextEdit()->installEventFilter(raw);
-	field->customTab(true);
 
 	raw->mentionChosen(
 	) | rpl::on_next([=](FieldAutocomplete::MentionChosen data) {
 		const auto user = data.user;
-		if (data.mention.isEmpty()) {
+		const auto ctrlClick = base::IsCtrlPressed()
+			&& data.method == FieldAutocomplete::ChooseMethod::ByClick;
+		if (data.mention.isEmpty() || ctrlClick) {
 			field->insertTag(
 				user->firstName.isEmpty() ? user->name() : user->firstName,
 				PrepareMentionTag(user));
@@ -1735,9 +1734,10 @@ void InitFieldAutocomplete(
 	}
 
 	field->tabbed(
-	) | rpl::on_next([=] {
+	) | rpl::on_next([=](not_null<bool*> handled) {
 		if (!raw->isHidden()) {
 			raw->chooseSelected(FieldAutocomplete::ChooseMethod::ByTab);
+			*handled = true;
 		}
 	}, raw->lifetime());
 

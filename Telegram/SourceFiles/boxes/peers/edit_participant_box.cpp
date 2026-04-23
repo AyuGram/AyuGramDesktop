@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/edit_participant_box.h"
 
+#include "boxes/peers/edit_tag_control.h"
+#include "boxes/peers/edit_participants_box.h"
+#include "history/view/history_view_message.h"
 #include "lang/lang_keys.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/vertical_list.h"
@@ -24,32 +27,90 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/painter.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
-#include "settings/settings_privacy_security.h"
+#include "settings/sections/settings_privacy_security.h"
 #include "ui/boxes/choose_date_time.h"
 #include "ui/boxes/confirm_box.h"
-#include "boxes/passcode_box.h"
+#include "boxes/peers/channel_ownership_transfer.h"
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
+#include "settings/settings_common.h"
 #include "data/data_peer_values.h"
 #include "data/data_channel.h"
+#include "data/data_changes.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
-#include "core/core_cloud_password.h"
 #include "base/unixtime.h"
 #include "apiwrap.h"
-#include "api/api_cloud_password.h"
 #include "main/main_session.h"
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
+#include "styles/style_settings.h"
 
 namespace {
 
 constexpr auto kMaxRestrictDelayDays = 366;
 constexpr auto kSecondsInDay = 24 * 60 * 60;
 constexpr auto kSecondsInWeek = 7 * kSecondsInDay;
-constexpr auto kAdminRoleLimit = 16;
+
+class Cover final : public Ui::FixedHeightWidget {
+public:
+	Cover(QWidget *parent, not_null<UserData*> user, bool hasAdminRights);
+
+private:
+	void setupChildGeometry();
+
+	const style::InfoProfileCover &_st;
+	const not_null<UserData*> _user;
+	object_ptr<Ui::UserpicButton> _userpic;
+	object_ptr<Ui::FlatLabel> _name = { nullptr };
+	object_ptr<Ui::FlatLabel> _status = { nullptr };
+
+};
+
+Cover::Cover(
+	QWidget *parent,
+	not_null<UserData*> user,
+	bool hasAdminRights)
+: FixedHeightWidget(parent, st::infoEditContactCover.height)
+, _st(st::infoEditContactCover)
+, _user(user)
+, _userpic(this, _user, _st.photo) {
+	_userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	_name = object_ptr<Ui::FlatLabel>(this, _st.name);
+	_name->setText(_user->name());
+
+	const auto statusText = [&] {
+		if (_user->isBot()) {
+			const auto seesAllMessages = _user->botInfo->readsAllHistory
+				|| hasAdminRights;
+			return (seesAllMessages
+				? tr::lng_status_bot_reads_all
+				: tr::lng_status_bot_not_reads_all)(tr::now);
+		}
+		return Data::OnlineText(_user->lastseen(), base::unixtime::now());
+	}();
+	_status = object_ptr<Ui::FlatLabel>(this, _st.status);
+	_status->setText(statusText);
+	_status->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+	setupChildGeometry();
+}
+
+void Cover::setupChildGeometry() {
+	widthValue(
+	) | rpl::on_next([this](int newWidth) {
+		_userpic->moveToLeft(_st.photoLeft, _st.photoTop, newWidth);
+		auto nameWidth = newWidth - _st.nameLeft - _st.rightSkip;
+		_name->resizeToNaturalWidth(nameWidth);
+		_name->moveToLeft(_st.nameLeft, _st.nameTop, newWidth);
+		auto statusWidth = newWidth - _st.statusLeft - _st.rightSkip;
+		_status->resizeToNaturalWidth(statusWidth);
+		_status->moveToLeft(_st.statusLeft, _st.statusTop, newWidth);
+	}, lifetime());
+}
 
 } // namespace
 
@@ -68,6 +129,8 @@ public:
 		return _rows;
 	}
 
+	void setCoverMode(bool enabled);
+
 protected:
 	int resizeGetHeight(int newWidth) override;
 	void paintEvent(QPaintEvent *e) override;
@@ -78,6 +141,7 @@ private:
 	object_ptr<Ui::UserpicButton> _userPhoto;
 	Ui::Text::String _userName;
 	bool _hasAdminRights = false;
+	bool _coverMode = false;
 	object_ptr<Ui::VerticalLayout> _rows;
 
 };
@@ -112,7 +176,20 @@ Widget *EditParticipantBox::Inner::addControl(
 	return _rows->add(std::move(widget), margin);
 }
 
+void EditParticipantBox::Inner::setCoverMode(bool enabled) {
+	_coverMode = enabled;
+	if (enabled) {
+		_userPhoto->hide();
+	}
+	resizeToWidth(width());
+}
+
 int EditParticipantBox::Inner::resizeGetHeight(int newWidth) {
+	if (_coverMode) {
+		_rows->resizeToWidth(newWidth);
+		_rows->moveToLeft(0, 0, newWidth);
+		return _rows->heightNoMargins();
+	}
 	_userPhoto->moveToLeft(
 		st::rightsPhotoMargin.left(),
 		st::rightsPhotoMargin.top());
@@ -128,6 +205,10 @@ void EditParticipantBox::Inner::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
 	p.fillRect(e->rect(), st::boxBg);
+
+	if (_coverMode) {
+		return;
+	}
 
 	p.setPen(st::contactsNameFg);
 	auto namex = st::rightsPhotoMargin.left()
@@ -200,6 +281,12 @@ bool EditParticipantBox::amCreator() const {
 	Unexpected("Peer type in EditParticipantBox::Inner::amCreator.");
 }
 
+void EditParticipantBox::setCoverMode(bool enabled) {
+	Expects(_inner != nullptr);
+
+	_inner->setCoverMode(enabled);
+}
+
 EditAdminBox::EditAdminBox(
 	QWidget*,
 	not_null<PeerData*> peer,
@@ -236,7 +323,8 @@ ChatAdminRightsInfo EditAdminBox::defaultRights() const {
 			| Flag::InviteByLinkOrAdd
 			| Flag::ManageTopics
 			| Flag::PinMessages
-			| Flag::ManageCall) }
+			| Flag::ManageCall
+			| Flag::ManageRanks) }
 		: ChatAdminRightsInfo{ (Flag::ChangeInfo
 			| Flag::PostMessages
 			| Flag::EditMessages
@@ -256,6 +344,11 @@ void EditAdminBox::prepare() {
 	using Flags = ChatAdminRights;
 
 	EditParticipantBox::prepare();
+
+	setCoverMode(true);
+	addControl(
+		object_ptr<Cover>(this, user(), hasAdminRights()),
+		style::margins());
 
 	setTitle(_addingBot
 		? (_addingBot->existing
@@ -368,7 +461,7 @@ void EditAdminBox::prepare() {
 		.anyoneCanAddMembers = anyoneCanAddMembers,
 	};
 	Ui::AddSubsectionTitle(inner, tr::lng_rights_edit_admin_header());
-	auto [checkboxes, getChecked, changes] = CreateEditAdminRights(
+	auto [checkboxes, getChecked, changes, highlightWidget] = CreateEditAdminRights(
 		inner,
 		prepareFlags,
 		disabledMessages,
@@ -397,7 +490,6 @@ void EditAdminBox::prepare() {
 		Ui::AddSkip(emptyAboutAddAdminsInner->entity());
 		if (hasRank) {
 			Ui::AddDivider(emptyAboutAddAdminsInner->entity());
-			Ui::AddSkip(emptyAboutAddAdminsInner->entity());
 		}
 		Ui::AddSkip(aboutAddAdminsInner->entity());
 		Ui::AddDividerText(
@@ -435,7 +527,65 @@ void EditAdminBox::prepare() {
 	}
 
 	if (canSave()) {
-		_rank = hasRank ? addRankInput(inner).get() : nullptr;
+		if (hasRank) {
+			const auto role = _oldRights.flags
+				? LookupBadgeRole(peer(), user())
+				: HistoryView::BadgeRole::Admin;
+			_tagControl = inner->add(
+				object_ptr<EditTagControl>(
+					inner,
+					&peer()->session(),
+					user(),
+					_oldRank,
+					role),
+				style::margins());
+		}
+		if (_tagControl) {
+			Ui::AddSkip(inner);
+			Ui::AddDividerText(
+				inner,
+				user()->isSelf()
+					? tr::lng_rights_tag_about_self()
+					: tr::lng_rights_tag_about(
+						lt_name,
+						rpl::single(user()->shortName())));
+		}
+		if (_oldRights.flags && !_addingBot) {
+			const auto isTargetCreator = (LookupBadgeRole(peer(), user())
+				== HistoryView::BadgeRole::Creator);
+			if (!isTargetCreator) {
+				if (!_tagControl) {
+					Ui::AddSkip(inner);
+					inner->add(
+						object_ptr<Ui::BoxContentDivider>(inner),
+						{ 0, st::infoProfileSkip, 0, st::infoProfileSkip });
+				}
+				Ui::AddSkip(inner);
+				const auto dismissButton = Settings::AddButtonWithIcon(
+					inner,
+					tr::lng_rights_dismiss_admin(),
+					st::settingsAttentionButton,
+					{ nullptr });
+				dismissButton->setClickedCallback([=] {
+					if (const auto callback = _saveCallback) {
+						const auto old = _oldRights;
+						const auto confirmed = [=](Fn<void()> close) {
+							callback(old, {}, {});
+							close();
+						};
+						uiShow()->showBox(
+							Ui::MakeConfirmBox({
+								.text = tr::lng_profile_sure_remove_admin(
+									tr::now,
+									lt_user,
+									user()->firstName),
+								.confirmed = confirmed,
+								.confirmText = tr::lng_box_remove(),
+							}));
+					}
+				});
+			}
+		}
 		_finishSave = [=, value = getChecked] {
 			const auto newFlags = (value() | ChatAdminRight::Other)
 				& ((!channel || channel->amCreator())
@@ -444,7 +594,9 @@ void EditAdminBox::prepare() {
 			_saveCallback(
 				_oldRights,
 				ChatAdminRightsInfo(newFlags),
-				_rank ? _rank->getLastText().trimmed() : QString());
+				_tagControl
+					? std::optional<QString>(_tagControl->currentRank())
+					: std::nullopt);
 		};
 		_save = [=] {
 			const auto show = uiShow();
@@ -499,56 +651,6 @@ void EditAdminBox::refreshButtons() {
 	}
 }
 
-not_null<Ui::InputField*> EditAdminBox::addRankInput(
-		not_null<Ui::VerticalLayout*> container) {
-	// Ui::AddDivider(container);
-
-	container->add(
-		object_ptr<Ui::FlatLabel>(
-			container,
-			tr::lng_rights_edit_admin_rank_name(),
-			st::rightsHeaderLabel),
-		st::rightsHeaderMargin);
-
-	const auto isOwner = [&] {
-		if (user()->isSelf() && amCreator()) {
-			return true;
-		} else if (const auto chat = peer()->asChat()) {
-			return chat->creator == peerToUser(user()->id);
-		} else if (const auto channel = peer()->asChannel()) {
-			return channel->mgInfo && channel->mgInfo->creator == user();
-		}
-		Unexpected("Peer type in EditAdminBox::addRankInput.");
-	}();
-	const auto result = container->add(
-		object_ptr<Ui::InputField>(
-			container,
-			st::customBadgeField,
-			(isOwner ? tr::lng_owner_badge : tr::lng_admin_badge)(),
-			TextUtilities::RemoveEmoji(_oldRank)),
-		st::rightsAboutMargin);
-	result->setMaxLength(kAdminRoleLimit);
-	result->setInstantReplaces(Ui::InstantReplaces::TextOnly());
-	result->changes(
-	) | rpl::on_next([=] {
-		const auto text = result->getLastText();
-		const auto removed = TextUtilities::RemoveEmoji(text);
-		if (removed != text) {
-			result->setText(removed);
-		}
-	}, result->lifetime());
-
-	Ui::AddSkip(container);
-	Ui::AddDividerText(
-		container,
-		tr::lng_rights_edit_admin_rank_about(
-			lt_title,
-			(isOwner ? tr::lng_owner_badge : tr::lng_admin_badge)()));
-	Ui::AddSkip(container);
-
-	return result;
-}
-
 bool EditAdminBox::canTransferOwnership() const {
 	if (user()->isInaccessible() || user()->isBot() || user()->isSelf()) {
 		return false;
@@ -587,155 +689,12 @@ not_null<Ui::SlideWrap<Ui::RpWidget>*> EditAdminBox::setupTransferButton(
 }
 
 void EditAdminBox::transferOwnership() {
-	if (_checkTransferRequestId) {
-		return;
-	}
-
-	const auto channel = peer()->isChannel()
-		? peer()->asChannel()->inputChannel()
-		: MTP_inputChannelEmpty();
-	const auto api = &peer()->session().api();
-	api->cloudPassword().reload();
-	_checkTransferRequestId = api->request(MTPchannels_EditCreator(
-		channel,
-		MTP_inputUserEmpty(),
-		MTP_inputCheckPasswordEmpty()
-	)).fail([=](const MTP::Error &error) {
-		_checkTransferRequestId = 0;
-		if (!handleTransferPasswordError(error.type())) {
-			const auto callback = crl::guard(this, [=](Fn<void()> &&close) {
-				transferOwnershipChecked();
-				close();
-			});
-			getDelegate()->show(Ui::MakeConfirmBox({
-				.text = tr::lng_rights_transfer_about(
-					tr::now,
-					lt_group,
-					tr::bold(peer()->name()),
-					lt_user,
-					tr::bold(user()->shortName()),
-					tr::rich),
-				.confirmed = callback,
-				.confirmText = tr::lng_rights_transfer_sure(),
-			}));
-		}
-	}).send();
-}
-
-bool EditAdminBox::handleTransferPasswordError(const QString &error) {
-	const auto session = &user()->session();
-	auto about = tr::lng_rights_transfer_check_about(
-		tr::now,
-		lt_user,
-		tr::bold(user()->shortName()),
-		tr::marked);
-	if (auto box = PrePasswordErrorBox(error, session, std::move(about))) {
-		getDelegate()->show(std::move(box));
-		return true;
-	}
-	return false;
-}
-
-void EditAdminBox::transferOwnershipChecked() {
-	if (const auto chat = peer()->asChatNotMigrated()) {
-		peer()->session().api().migrateChat(chat, crl::guard(this, [=](
-				not_null<ChannelData*> channel) {
-			requestTransferPassword(channel);
-		}));
-	} else if (const auto channel = peer()->asChannelOrMigrated()) {
-		requestTransferPassword(channel);
-	} else {
-		Unexpected("Peer in SaveAdminCallback.");
-	}
-
-}
-
-void EditAdminBox::requestTransferPassword(not_null<ChannelData*> channel) {
-	peer()->session().api().cloudPassword().state(
-	) | rpl::take(
-		1
-	) | rpl::on_next([=](const Core::CloudPasswordState &state) {
-		auto fields = PasscodeBox::CloudFields::From(state);
-		fields.customTitle = tr::lng_rights_transfer_password_title();
-		fields.customDescription
-			= tr::lng_rights_transfer_password_description(tr::now);
-		fields.customSubmitButton = tr::lng_passcode_submit();
-		fields.customCheckCallback = crl::guard(this, [=](
-				const Core::CloudPasswordResult &result,
-				base::weak_qptr<PasscodeBox> box) {
-			sendTransferRequestFrom(box, channel, result);
-		});
-		getDelegate()->show(Box<PasscodeBox>(&channel->session(), fields));
-	}, lifetime());
-}
-
-void EditAdminBox::sendTransferRequestFrom(
-		base::weak_qptr<PasscodeBox> box,
-		not_null<ChannelData*> channel,
-		const Core::CloudPasswordResult &result) {
-	if (_transferRequestId) {
-		return;
-	}
-	const auto weak = base::make_weak(this);
-	const auto user = this->user();
-	const auto api = &channel->session().api();
-	_transferRequestId = api->request(MTPchannels_EditCreator(
-		channel->inputChannel(),
-		user->inputUser(),
-		result.result
-	)).done([=](const MTPUpdates &result) {
-		api->applyUpdates(result);
-		if (!box && !weak) {
-			return;
-		}
-		const auto show = box ? box->uiShow() : weak->uiShow();
-		show->showToast(
-			(channel->isBroadcast()
-				? tr::lng_rights_transfer_done_channel
-				: tr::lng_rights_transfer_done_group)(
-					tr::now,
-					lt_user,
-					user->shortName()));
-		show->hideLayer();
-	}).fail(crl::guard(this, [=](const MTP::Error &error) {
-		if (weak) {
-			_transferRequestId = 0;
-		}
-		if (box && box->handleCustomCheckError(error)) {
-			return;
-		}
-
-		const auto &type = error.type();
-		const auto problem = [&] {
-			if (type == u"CHANNELS_ADMIN_PUBLIC_TOO_MUCH"_q) {
-				return tr::lng_channels_too_much_public_other(tr::now);
-			} else if (type == u"CHANNELS_ADMIN_LOCATED_TOO_MUCH"_q) {
-				return tr::lng_channels_too_much_located_other(tr::now);
-			} else if (type == u"ADMINS_TOO_MUCH"_q) {
-				return (channel->isBroadcast()
-					? tr::lng_error_admin_limit_channel
-					: tr::lng_error_admin_limit)(tr::now);
-			} else if (type == u"CHANNEL_INVALID"_q) {
-				return (channel->isBroadcast()
-					? tr::lng_channel_not_accessible
-					: tr::lng_group_not_accessible)(tr::now);
-			}
-			return Lang::Hard::ServerError();
-		}();
-		const auto recoverable = [&] {
-			return (type == u"PASSWORD_MISSING"_q)
-				|| type.startsWith(u"PASSWORD_TOO_FRESH_"_q)
-				|| type.startsWith(u"SESSION_TOO_FRESH_"_q);
-		}();
-		const auto weak = base::make_weak(this);
-		getDelegate()->show(Ui::MakeInformBox(problem));
-		if (box) {
-			box->closeBox();
-		}
-		if (weak && !recoverable) {
-			closeBox();
-		}
-	})).handleFloodErrors().send();
+	_ownershipTransfer = std::make_unique<ChannelOwnershipTransfer>(
+		peer(),
+		user(),
+		uiShow(),
+		[](std::shared_ptr<Ui::Show> show) { show->hideLayer(); });
+	_ownershipTransfer->start();
 }
 
 EditRestrictedBox::EditRestrictedBox(
@@ -744,10 +703,12 @@ EditRestrictedBox::EditRestrictedBox(
 	not_null<UserData*> user,
 	bool hasAdminRights,
 	ChatRestrictionsInfo rights,
+	const QString &rank,
 	UserData *by,
 	TimeId since)
 : EditParticipantBox(nullptr, peer, user, hasAdminRights)
 , _oldRights(rights)
+, _oldRank(rank)
 , _by(by)
 , _since(since) {
 }
@@ -757,6 +718,11 @@ void EditRestrictedBox::prepare() {
 	using Flags = ChatRestrictions;
 
 	EditParticipantBox::prepare();
+
+	setCoverMode(true);
+	addControl(
+		object_ptr<Cover>(this, user(), hasAdminRights()),
+		style::margins());
 
 	setTitle(tr::lng_rights_user_restrictions());
 
@@ -799,17 +765,40 @@ void EditRestrictedBox::prepare() {
 	Ui::AddSubsectionTitle(
 		verticalLayout(),
 		tr::lng_rights_user_restrictions_header());
-	auto [checkboxes, getRestrictions, changes] = CreateEditRestrictions(
+	auto [checkboxes, getRestrictions, changes, highlightWidget] = CreateEditRestrictions(
 		this,
 		prepareFlags,
 		disabledMessages,
-		{ .isForum = peer()->isForum() });
+		{ .isForum = peer()->isForum(), .isUserSpecific = true });
 	addControl(std::move(checkboxes), QMargins());
 
+	if (canSave() && peer()->canManageRanks()) {
+		Ui::AddSkip(verticalLayout());
+		Ui::AddDivider(verticalLayout());
+		_tagControl = addControl(
+			object_ptr<EditTagControl>(
+				this,
+				&peer()->session(),
+				user(),
+				_oldRank,
+				HistoryView::BadgeRole::User),
+			style::margins());
+		Ui::AddSkip(verticalLayout());
+		Ui::AddDividerText(
+			verticalLayout(),
+			user()->isSelf()
+				? tr::lng_rights_tag_about_self()
+				: tr::lng_rights_tag_about(
+					lt_name,
+					rpl::single(user()->shortName())));
+	}
+
 	_until = prepareRights.until;
-	addControl(
-		object_ptr<Ui::FixedHeightWidget>(this, st::defaultVerticalListSkip));
-	Ui::AddDivider(verticalLayout());
+	if (!_tagControl) {
+		addControl(
+			object_ptr<Ui::FixedHeightWidget>(this, st::defaultVerticalListSkip));
+		Ui::AddDivider(verticalLayout());
+	}
 	addControl(
 		object_ptr<Ui::FlatLabel>(
 			this,
@@ -848,13 +837,133 @@ void EditRestrictedBox::prepare() {
 	}
 
 	if (canSave()) {
+		Ui::AddSkip(verticalLayout());
+		Ui::AddDivider(verticalLayout());
+		Ui::AddSkip(verticalLayout());
+
+		const auto canAddAdmins = (chat && chat->canAddAdmins())
+			|| (channel && channel->canAddAdmins());
+		if (canAddAdmins) {
+			const auto promoteButton = Settings::AddButtonWithIcon(
+				verticalLayout(),
+				tr::lng_rights_promote_member(),
+				st::settingsButtonNoIcon,
+				{ nullptr });
+			promoteButton->setClickedCallback([=] {
+				const auto rank = _tagControl
+					? _tagControl->currentRank()
+					: _oldRank;
+				auto adminBox = Box<EditAdminBox>(
+					peer(),
+					user(),
+					ChatAdminRightsInfo(),
+					rank,
+					TimeId(0),
+					nullptr);
+				const auto adminBoxWeak = QPointer<Ui::BoxContent>(
+					adminBox.data());
+				const auto show = uiShow();
+				const auto restrictWeak = QPointer<EditRestrictedBox>(
+					this);
+				const auto closeBoth = [=] {
+					if (adminBoxWeak) {
+						adminBoxWeak->closeBox();
+					}
+					if (restrictWeak) {
+						restrictWeak->closeBox();
+					}
+				};
+				const auto savedUser = user();
+				const auto savedPeer = peer();
+				const auto done = [=](
+						ChatAdminRightsInfo newRights,
+						const std::optional<QString> &rank) {
+					closeBoth();
+					const auto effectiveRank = rank.value_or([&] {
+						const auto ch = savedPeer->asChannel();
+						if (!ch) {
+							return QString();
+						}
+						const auto info = ch->mgInfo.get();
+						if (!info) {
+							return QString();
+						}
+						const auto i = info->memberRanks.find(
+							peerToUser(savedUser->id));
+						return (i != end(info->memberRanks))
+							? i->second
+							: QString();
+					}());
+					savedUser->session().changes().chatAdminChanged(
+						savedPeer,
+						savedUser,
+						newRights.flags,
+						effectiveRank);
+				};
+				const auto fail = closeBoth;
+				adminBox->setSaveCallback(
+					SaveAdminCallback(
+						show,
+						peer(),
+						user(),
+						done,
+						fail));
+				show->showBox(std::move(adminBox));
+			});
+		}
+
+		const auto removeButton = Settings::AddButtonWithIcon(
+			verticalLayout(),
+			tr::lng_rights_remove_member(),
+			st::settingsAttentionButton,
+			{ nullptr });
+		removeButton->setClickedCallback([=] {
+			if (const auto callback = _saveCallback) {
+				const auto old = _oldRights;
+				const auto confirmed = [=](Fn<void()> close) {
+					callback(
+						old,
+						ChannelData::KickedRestrictedRights(user()));
+					close();
+				};
+				uiShow()->show(
+					Ui::MakeConfirmBox({
+						.text = tr::lng_profile_sure_kick(
+							tr::now,
+							lt_user,
+							user()->firstName),
+						.confirmed = confirmed,
+						.confirmText = tr::lng_box_remove(),
+					}));
+			}
+		});
+
 		const auto save = [=, value = getRestrictions] {
 			if (!_saveCallback) {
 				return;
 			}
+			const auto show = uiShow();
+			const auto rankPeer = peer();
+			const auto rankUser = user();
+			const auto rank = _tagControl
+				? _tagControl->currentRank()
+				: _oldRank;
+			const auto saveRank = (rank != _oldRank);
+
+			// May destroy the box.
 			_saveCallback(
 				_oldRights,
 				ChatRestrictionsInfo{ value(), getRealUntilValue() });
+
+			if (saveRank) {
+				SaveMemberRank(
+					show,
+					rankPeer,
+					rankUser,
+					rank,
+					nullptr,
+					nullptr);
+			}
 		};
 		addButton(tr::lng_settings_save(), save);
 		addButton(tr::lng_cancel(), [=] { closeBox(); });

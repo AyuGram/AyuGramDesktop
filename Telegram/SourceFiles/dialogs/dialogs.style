@@ -524,10 +524,6 @@ dialogsSearchInDownTop: 15px;
 dialogsSearchInDown: icon {{ "intro_country_dropdown", windowBoldFg }};
 dialogsSearchInDownSkip: 4px;
 dialogsSearchInMenu: PopupMenu(defaultPopupMenu) {
-	shadow: boxRoundShadow;
-	animation: PanelAnimation(defaultPanelAnimation) {
-		shadow: boxRoundShadow;
-	}
 	scrollPadding: margins(0px, 0px, 0px, 0px);
 	radius: 8px;
 	menu: menuWithIcons;
@@ -543,6 +539,10 @@ dialogsScamPadding: margins(2px, 0px, 2px, 0px);
 dialogsScamFont: font(9px semibold);
 dialogsScamSkip: 4px;
 dialogsScamRadius: 2px;
+
+dialogsUnreadMediaSize: 5px;
+dialogsUnreadMediaSkip: 4px;
+dialogsUnreadMediaTop: 7px;
 
 dialogsMiniPreviewTop: 1px;
 dialogsMiniPreview: 16px;
@@ -577,15 +577,72 @@ dialogsMiniReplyStory: DialogsMiniIcon {
 }
 
 dialogsUnreadMention: ThreeStateIcon {
-	icon: icon{{ "dialogs/dialogs_mention", dialogsUnreadFg }};
-	over: icon{{ "dialogs/dialogs_mention", dialogsUnreadFgOver }};
-	active: icon{{ "dialogs/dialogs_mention", dialogsUnreadFgActive }};
+	icon: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsMentionIconFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsMentionIconFg }};
+	active: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsNameFgActive }};
+}
+dialogsUnreadMentionMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsUnreadBgMuted }};
+	over: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsUnreadBgMutedOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_mention-18x18", dialogsUnreadBgMutedActive }};
 }
 dialogsUnreadReaction: ThreeStateIcon {
-	icon: icon{{ "dialogs/dialogs_reaction", dialogsUnreadFg }};
-	over: icon{{ "dialogs/dialogs_reaction", dialogsUnreadFgOver }};
-	active: icon{{ "dialogs/dialogs_reaction", dialogsUnreadFgActive }};
+	icon: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsReactionIconFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsReactionIconFg }};
+	active: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsNameFgActive }};
 }
+dialogsUnreadReactionMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsUnreadBgMuted }};
+	over: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsUnreadBgMutedOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_reaction-18x18", dialogsUnreadBgMutedActive }};
+}
+dialogsUnreadPoll: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsPollIconFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsPollIconFg }};
+	active: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsNameFgActive }};
+}
+dialogsUnreadPollMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsUnreadBgMuted }};
+	over: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsUnreadBgMutedOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_poll-18x18", dialogsUnreadBgMutedActive }};
+}
+dialogsUnreadMentionBadge: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFgActive }};
+}
+dialogsUnreadMentionBadgeMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_mention-13x13", dialogsUnreadFgActive }};
+}
+dialogsUnreadReactionBadge: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFgActive }};
+}
+dialogsUnreadReactionBadgeMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_reaction-13x13", dialogsUnreadFgActive }};
+}
+dialogsUnreadPollBadge: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFgActive }};
+}
+dialogsUnreadPollBadgeMuted: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFg }};
+	over: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFgOver }};
+	active: icon{{ "dialogs/dialogs_chatlist_poll-13x13", dialogsUnreadFgActive }};
+}
+
+dialogsMuteIcon: ThreeStateIcon {
+	icon: icon{{ "dialogs/dialogs_mute", dialogsUnreadBgMuted }};
+	over: icon{{ "dialogs/dialogs_mute", dialogsUnreadBgMutedOver }};
+	active: icon{{ "dialogs/dialogs_mute", dialogsUnreadBgMutedActive }};
+}
+dialogsMuteIconSkip: 4px;
 
 downloadBarHeight: 46px;
 downloadArrow: icon{{ "fast_to_original", menuIconFg }};
@@ -781,15 +838,6 @@ dialogsStoriesTooltip: ImportantTooltip(defaultImportantTooltip) {
 }
 dialogsStoriesTooltipLabel: defaultImportantTooltipLabel;
 dialogsStoriesTooltipMaxWidth: 200px;
-dialogsStoriesTooltipHide: IconButton(defaultIconButton) {
-	width: 34px;
-	height: 20px;
-	iconPosition: point(-1px, -1px);
-	icon: icon {{ "calls/video_tooltip", importantTooltipFg }};
-	iconOver: icon {{ "calls/video_tooltip", importantTooltipFg }};
-	ripple: emptyRippleAnimation;
-}
-
 searchedBarHeight: 28px;
 searchedBarFont: normalFont;
 searchedBarPosition: point(14px, 5px);

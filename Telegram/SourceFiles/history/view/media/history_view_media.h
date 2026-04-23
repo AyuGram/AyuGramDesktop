@@ -141,6 +141,9 @@ public:
 		const PaintContext &context,
 		int top) const {
 	}
+	[[nodiscard]] virtual QRect groupItemRect(int index) const {
+		return {};
+	}
 	virtual void draw(Painter &p, const PaintContext &context) const = 0;
 	[[nodiscard]] virtual PointState pointState(QPoint point) const;
 	[[nodiscard]] virtual TextState textState(
@@ -182,6 +185,12 @@ public:
 	virtual void clickHandlerActiveChanged(const ClickHandlerPtr &p, bool active) {
 	}
 	virtual void clickHandlerPressedChanged(const ClickHandlerPtr &p, bool pressed) {
+	}
+
+	[[nodiscard]] virtual QRect addOptionRect(int innerWidth) const {
+		return {};
+	}
+	virtual void setAddOptionActive(bool active) {
 	}
 
 	[[nodiscard]] virtual bool uploading() const {
@@ -265,6 +274,8 @@ public:
 
 	virtual void hideSpoilers() {
 	}
+	virtual void revealSpoilers() {
+	}
 	[[nodiscard]] virtual bool needsBubble() const = 0;
 	[[nodiscard]] virtual bool unwrapped() const {
 		return false;
@@ -330,6 +341,12 @@ public:
 	[[nodiscard]] virtual bool enforceBubbleWidth() const {
 		return false;
 	}
+	[[nodiscard]] virtual bool allowsNarrowBubble() const {
+		return false;
+	}
+	[[nodiscard]] virtual int minBubbleWidthForNarrowBubble() const {
+		return 0;
+	}
 
 	// Sometimes click on media in message is overloaded by the message:
 	// (for example it can open a link or a game instead of opening media)
@@ -353,6 +370,9 @@ public:
 	}
 	[[nodiscard]] virtual QMargins bubbleRollRepaintMargins() const {
 		return QMargins();
+	}
+	virtual bool updateItemData() {
+		return false;
 	}
 	virtual void paintBubbleFireworks(
 		Painter &p,

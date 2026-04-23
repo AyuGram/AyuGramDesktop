@@ -142,7 +142,7 @@ bool DarkTasbarValueValid/* = false*/;
 	}
 
 	const auto &settings = AyuSettings::getInstance();
-	if (settings.hideNotificationBadge) {
+	if (settings.hideNotificationBadge()) {
 		args.count = 0;
 	}
 

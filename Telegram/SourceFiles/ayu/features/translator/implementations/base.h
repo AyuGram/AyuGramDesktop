@@ -3,18 +3,17 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
+#include "apiwrap.h"
+
+#include <functional>
 #include <QtCore/QObject>
 #include <QtCore/QPointer>
 #include <QtCore/QSet>
 #include <QtCore/QString>
 #include <QtNetwork/QNetworkReply>
-
-#include <functional>
-
-#include "apiwrap.h"
 
 namespace Main {
 class Session;
@@ -24,7 +23,6 @@ namespace Ayu::Translator {
 
 using CallbackSuccess = std::function<void(const std::vector<TextWithEntities> &)>;
 using CallbackFail = std::function<void()>;
-using CallbackCancel = std::function<void()>;
 
 using MultiThreadCallbackSuccess = std::function<void(const TextWithEntities &)>;
 
@@ -89,7 +87,7 @@ public:
 
 	[[nodiscard]] virtual QSet<QString> supportedLanguages() const { return {}; }
 
-	[[nodiscard]] virtual CallbackCancel startTranslation(
+	virtual void startTranslation(
 		const StartTranslationArgs &args
 	) = 0;
 };
@@ -109,7 +107,7 @@ public:
 	[[nodiscard]] virtual int getMaxRetries() const { return 3; }
 	[[nodiscard]] virtual int getBaseWaitTimeMs() const { return 1000; }
 
-	[[nodiscard]] CallbackCancel startTranslation(
+	void startTranslation(
 		const StartTranslationArgs &args
 	) override;
 

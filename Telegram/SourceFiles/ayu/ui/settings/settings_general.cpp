@@ -3,96 +3,119 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "settings_general.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ui/settings/settings_general.h"
 
 #include "lang_auto.h"
-#include "settings_ayu_utils.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/ui/settings/ayu_builder.h"
+#include "ayu/ui/settings/settings_ayu_utils.h"
+#include "ayu/ui/settings/settings_main.h"
+#include "base/platform/base_platform_info.h"
+#include "core/application.h"
+#include "lang/lang_text_entity.h"
+#include "platform/platform_translate_provider.h"
+#include "settings/settings_builder.h"
 #include "settings/settings_common.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
-#include "ui/vertical_list.h"
 #include "ui/boxes/single_choice_box.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
 namespace Settings {
 
-rpl::producer<QString> AyuGeneral::title() {
-	return tr::ayu_CategoryGeneral();
-}
+using namespace Builder;
+using namespace AyuBuilder;
 
-AyuGeneral::AyuGeneral(
-	QWidget *parent,
-	not_null<Window::SessionController*> controller)
-	: Section(parent) {
-	setupContent(controller);
-}
+namespace {
 
-void SetupTranslator(not_null<Ui::VerticalLayout*> container,
-					 not_null<Window::SessionController*> controller) {
+void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	builder.addSubsectionTitle(tr::lng_translate_settings_subtitle());
+
 	auto *settings = &AyuSettings::getInstance();
 
-	AddSubsectionTitle(container, tr::lng_translate_settings_subtitle()/*rpl::single(QString("Translate Messages"))*/);
-
 	const auto options = std::vector{
-		QString("Telegram"),
-		QString("Google"),
-		QString("Yandex")
+		std::pair(TranslationProvider::Telegram, QString("Telegram")),
+		std::pair(TranslationProvider::Google, QString("Google")),
+		std::pair(TranslationProvider::Yandex, QString("Yandex")),
+	};
+	const auto nativeAvailable = Platform::IsTranslateProviderAvailable();
+	auto availableOptions = options;
+	if (nativeAvailable) {
+		availableOptions.push_back(std::pair(
+			TranslationProvider::Native,
+			[] {
+				if constexpr (Platform::IsMac()) {
+					return QString("macOS");
+				} else if constexpr (Platform::IsWindows()) {
+					return QString("Windows");
+				} else {
+					return QString("Linux");
+				}
+			}()));
+	}
+	auto optionLabels = std::vector<QString>();
+	optionLabels.reserve(availableOptions.size());
+	for (const auto &option : availableOptions) {
+		optionLabels.push_back(option.second);
+	}
+
+	const auto getIndex = [=](TranslationProvider val) {
+		const auto i = ranges::find(
+			availableOptions,
+			val,
+			&std::pair<TranslationProvider, QString>::first);
+		return (i != end(availableOptions))
+			? int(i - begin(availableOptions))
+			: 0;
 	};
 
-	const auto getIndex = [=](const QString &val)
-	{
-		if (val == "telegram") {
-			return 0;
-		}
-		if (val == "google") {
-			return 1;
-		}
-		if (val == "yandex") {
-			return 2;
-		}
-		return 0;
-	};
+	auto currentVal = AyuSettings::getInstance().translationProviderValue()
+		| rpl::map(getIndex)
+		| rpl::map([=](int val) { return availableOptions[val].second; });
 
-	auto currentVal = AyuSettings::get_translationProviderReactive() | rpl::map(getIndex) | rpl::map(
-		[=](int val)
-		{
-			return options[val];
-		});
+	const auto button = builder.addButton({
+		.id = u"ayu/translationProvider"_q,
+		.title = tr::ayu_TranslationProvider(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(currentVal),
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()->sessionController()) {
+				controller->show(Box(
+						[=](not_null<Ui::GenericBox*> box) {
+							const auto save = [=](int index) {
+								const auto option = availableOptions[index].first;
+								AyuSettings::getInstance().setTranslationProvider(option);
 
-	const auto button = AddButtonWithLabel(
-		container,
-		asBeta(tr::ayu_TranslationProvider()),
-		currentVal,
-		st::settingsButtonNoIcon);
-	button->addClickHandler(
-		[=]
-		{
-			controller->show(Box(
-				[=](not_null<Ui::GenericBox*> box)
-				{
-					const auto save = [=](int index)
-					{
-						const auto provider = (index == 0) ? "telegram" : (index == 1) ? "google" : "yandex";
-
-						AyuSettings::set_translationProvider(provider);
-						AyuSettings::save();
-					};
-					SingleChoiceBox(box,
-									{
-										.title = tr::ayu_TranslationProvider(),
-										.options = options,
-										.initialSelection = getIndex(settings->translationProvider),
-										.callback = save,
-									});
-				}));
-		});
+								if constexpr (Platform::IsMac()) {
+									if (option == TranslationProvider::Native) {
+										controller->showToast(Ui::Toast::Config{
+											.text = tr::lng_translate_settings_use_platform_mac_about(tr::now, tr::rich),
+											.duration = 6 * crl::time(1000)
+										});
+									}
+								}
+							};
+							SingleChoiceBox(box, {
+								.title = tr::ayu_TranslationProvider(),
+								.options = optionLabels,
+								.initialSelection = getIndex(settings->translationProvider()),
+								.callback = save,
+							});
+						}));
+			}
+		},
+	});
+	if (button) {
+		ayu.addBetaBadge(button);
+	}
 }
 
-void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
-					 not_null<Window::SessionController*> controller) {
+void BuildShowPeerId(SectionBuilder &builder) {
 	auto *settings = &AyuSettings::getInstance();
 
 	const auto options = std::vector{
@@ -101,247 +124,211 @@ void SetupShowPeerId(not_null<Ui::VerticalLayout*> container,
 		QString("Bot API")
 	};
 
-	auto currentVal = AyuSettings::get_showPeerIdReactive() | rpl::map(
-		[=](int val)
-		{
-			return options[val];
+	auto currentVal = AyuSettings::getInstance().showPeerIdValue()
+		| rpl::map([=](PeerIdDisplay val) {
+			return options[static_cast<int>(val)];
 		});
 
-	const auto button = AddButtonWithLabel(
-		container,
-		tr::ayu_SettingsShowID(),
-		currentVal,
-		st::settingsButtonNoIcon);
-	button->addClickHandler(
-		[=]
-		{
+	const auto controller = builder.controller();
+	builder.addButton({
+		.id = u"ayu/showPeerId"_q,
+		.altIds = { u"ayu/showIdAndDc"_q },
+		.title = tr::ayu_SettingsShowID(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(currentVal),
+		.onClick = [=] {
 			controller->show(Box(
-				[=](not_null<Ui::GenericBox*> box)
-				{
-					const auto save = [=](int index)
-					{
-						AyuSettings::set_showPeerId(index);
-						AyuSettings::save();
+				[=](not_null<Ui::GenericBox*> box) {
+					const auto save = [=](int index) {
+						AyuSettings::getInstance().setShowPeerId(
+							static_cast<PeerIdDisplay>(index));
 					};
-					SingleChoiceBox(box,
-									{
-										.title = tr::ayu_SettingsShowID(),
-										.options = options,
-										.initialSelection = settings->showPeerId,
-										.callback = save,
-									});
+					SingleChoiceBox(box, {
+						.title = tr::ayu_SettingsShowID(),
+						.options = options,
+						.initialSelection = static_cast<int>(settings->showPeerId()),
+						.callback = save,
+					});
 				}));
-		});
+		},
+	});
 }
 
-void SetupQoLToggles(not_null<Ui::VerticalLayout*> container, not_null<Window::SessionController*> controller) {
+void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	auto *settings = &AyuSettings::getInstance();
 
-	SetupTranslator(container, controller);
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
+	BuildTranslator(builder, ayu);
+	ayu.addSectionDivider();
 
-	AddSubsectionTitle(container, tr::ayu_CategoryGeneral());
+	builder.addSubsectionTitle(tr::ayu_CategoryGeneral());
 
-	AddButtonWithIcon(
-		container,
-		tr::ayu_DisableStories(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->disableStories)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->disableStories);
-		}) | rpl::on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_disableStories(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
+	ayu.addSettingToggle({
+		.id = u"ayu/disableStories"_q,
+		.altIds = { u"ayu/hideStories"_q },
+		.title = tr::ayu_DisableStories(),
+		.getter = &AyuSettings::disableStories,
+		.setter = &AyuSettings::setDisableStories,
+	});
 
-	std::vector checkboxes = {
-		NestedEntry{
-			tr::ayu_CollapseSimilarChannels(tr::now), settings->collapseSimilarChannels, [=](bool enabled)
-			{
-				AyuSettings::set_collapseSimilarChannels(enabled);
-				AyuSettings::save();
+	ayu.addSettingToggle({
+		.id = u"ayu/disableOpenLinkWarning"_q,
+		.title = tr::ayu_DisableOpenLinkWarning(),
+		.getter = &AyuSettings::disableOpenLinkWarning,
+		.setter = &AyuSettings::setDisableOpenLinkWarning,
+	});
+
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/similarChannels"_q,
+		.title = tr::ayu_DisableSimilarChannels(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_CollapseSimilarChannels(tr::now),
+				[] { return AyuSettings::getInstance().collapseSimilarChannels(); },
+				[](bool v) { AyuSettings::getInstance().setCollapseSimilarChannels(v); }
+			},
+			NestedEntry{
+				tr::ayu_HideSimilarChannelsTab(tr::now),
+				[] { return AyuSettings::getInstance().hideSimilarChannels(); },
+				[](bool v) { AyuSettings::getInstance().setHideSimilarChannels(v); }
 			}
 		},
-		NestedEntry{
-			tr::ayu_HideSimilarChannelsTab(tr::now), settings->hideSimilarChannels, [=](bool enabled)
-			{
-				AyuSettings::set_hideSimilarChannels(enabled);
-				AyuSettings::save();
+		.toggledWhenAll = true,
+	});
+
+	ayu.addSettingToggle({
+		.id = u"ayu/disableNotificationsDelay"_q,
+		.title = tr::ayu_DisableNotificationsDelay(),
+		.getter = &AyuSettings::disableNotificationsDelay,
+		.setter = &AyuSettings::setDisableNotificationsDelay,
+	});
+
+	ayu.addSectionDivider();
+
+	const auto controller = builder.controller();
+	const auto zalgoButton = builder.addButton({
+		.id = u"ayu/filterZalgo"_q,
+		.title = tr::ayu_FilterZalgo(),
+		.st = &st::settingsButtonNoIcon,
+		.toggled = rpl::single(settings->filterZalgo()),
+	});
+	if (zalgoButton) {
+		zalgoButton->toggledValue(
+		) | rpl::filter(
+			[=](bool enabled) {
+				return (enabled != settings->filterZalgo());
 			}
-		}
-	};
+		) | on_next(
+			[=](bool enabled) {
+				AyuSettings::getInstance().setFilterZalgo(enabled);
+				ShowRestartPrompt(controller);
+			},
+			zalgoButton->lifetime());
+		ayu.addBetaBadge(zalgoButton);
+	}
 
-	AddCollapsibleToggle(container, tr::ayu_DisableSimilarChannels(), checkboxes, true);
+	ayu.addSettingToggle({
+		.id = u"ayu/improveLinkPreviews"_q,
+		.title = tr::ayu_ImproveLinkPreviews(),
+		.getter = &AyuSettings::improveLinkPreviews,
+		.setter = &AyuSettings::setImproveLinkPreviews,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/showMessageSeconds"_q,
+		.altIds = { u"ayu/formatTimeWithSeconds"_q },
+		.title = tr::ayu_SettingsShowMessageSeconds(),
+		.getter = &AyuSettings::showMessageSeconds,
+		.setter = &AyuSettings::setShowMessageSeconds,
+	});
 
+	BuildShowPeerId(builder);
 
-	AddButtonWithIcon(
-		container,
-		tr::ayu_DisableNotificationsDelay(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->disableNotificationsDelay)
-	)->toggledValue(
-	) | rpl::filter([=](bool enabled)
-	{
-		return (enabled != settings->disableNotificationsDelay);
-	}) | on_next([=](bool enabled)
-						 {
-							 AyuSettings::set_disableNotificationsDelay(enabled);
-							 AyuSettings::save();
-						 },
-						 container->lifetime());
+	ayu.addSectionDivider();
 
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
+	builder.addSubsectionTitle(rpl::single(QString("Webview")));
 
-	AddButtonWithIcon(
-		container,
-		tr::ayu_SettingsShowMessageSeconds(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->showMessageSeconds)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->showMessageSeconds);
-		}) | on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_showMessageSeconds(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
+	ayu.addSettingToggle({
+		.id = u"ayu/spoofWebviewAsAndroid"_q,
+		.title = tr::ayu_SettingsSpoofWebviewAsAndroid(),
+		.getter = &AyuSettings::spoofWebviewAsAndroid,
+		.setter = &AyuSettings::setSpoofWebviewAsAndroid,
+	});
 
-	SetupShowPeerId(container, controller);
-
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
-
-	AddSubsectionTitle(container, rpl::single(QString("Webview")));
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_SettingsSpoofWebviewAsAndroid(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->spoofWebviewAsAndroid)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->spoofWebviewAsAndroid);
-		}) | on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_spoofWebviewAsAndroid(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
-
-	std::vector webviewCheckboxes = {
-		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewHeight(tr::now), settings->increaseWebviewHeight, [=](bool enabled)
-			{
-				AyuSettings::set_increaseWebviewHeight(enabled);
-				AyuSettings::save();
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/biggerWindow"_q,
+		.title = tr::ayu_SettingsBiggerWindow(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_SettingsIncreaseWebviewHeight(tr::now),
+				[] { return AyuSettings::getInstance().increaseWebviewHeight(); },
+				[](bool v) { AyuSettings::getInstance().setIncreaseWebviewHeight(v); }
+			},
+			NestedEntry{
+				tr::ayu_SettingsIncreaseWebviewWidth(tr::now),
+				[] { return AyuSettings::getInstance().increaseWebviewWidth(); },
+				[](bool v) { AyuSettings::getInstance().setIncreaseWebviewWidth(v); }
 			}
 		},
-		NestedEntry{
-			tr::ayu_SettingsIncreaseWebviewWidth(tr::now), settings->increaseWebviewWidth, [=](bool enabled)
-			{
-				AyuSettings::set_increaseWebviewWidth(enabled);
-				AyuSettings::save();
-			}
-		}
-	};
+		.toggledWhenAll = false,
+	});
 
-	AddCollapsibleToggle(container, tr::ayu_SettingsBiggerWindow(), webviewCheckboxes, false);
+	ayu.addSectionDivider();
 
-	AddSkip(container);
-	AddDivider(container);
-	AddSkip(container);
+	builder.addSubsectionTitle(tr::ayu_ConfirmationsTitle());
 
-	// todo: move into a single checkbox with dropdown
-	AddSubsectionTitle(container, tr::ayu_ConfirmationsTitle());
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_StickerConfirmation(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->stickerConfirmation)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->stickerConfirmation);
-		}) | on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_stickerConfirmation(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_GIFConfirmation(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->gifConfirmation)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->gifConfirmation);
-		}) | on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_gifConfirmation(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
-
-	AddButtonWithIcon(
-		container,
-		tr::ayu_VoiceConfirmation(),
-		st::settingsButtonNoIcon
-	)->toggleOn(
-		rpl::single(settings->voiceConfirmation)
-	)->toggledValue(
-	) | rpl::filter(
-		[=](bool enabled)
-		{
-			return (enabled != settings->voiceConfirmation);
-		}) | on_next(
-		[=](bool enabled)
-		{
-			AyuSettings::set_voiceConfirmation(enabled);
-			AyuSettings::save();
-		},
-		container->lifetime());
+	ayu.addSettingToggle({
+		.id = u"ayu/stickerConfirmation"_q,
+		.title = tr::ayu_StickerConfirmation(),
+		.getter = &AyuSettings::stickerConfirmation,
+		.setter = &AyuSettings::setStickerConfirmation,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/gifConfirmation"_q,
+		.title = tr::ayu_GIFConfirmation(),
+		.getter = &AyuSettings::gifConfirmation,
+		.setter = &AyuSettings::setGifConfirmation,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/voiceConfirmation"_q,
+		.title = tr::ayu_VoiceConfirmation(),
+		.getter = &AyuSettings::voiceConfirmation,
+		.setter = &AyuSettings::setVoiceConfirmation,
+	});
 }
 
-void AyuGeneral::setupContent(not_null<Window::SessionController*> controller) {
+const auto kMeta = BuildHelper({
+	.id = AyuGeneral::Id(),
+	.parentId = AyuMain::Id(),
+	.title = &tr::ayu_CategoryGeneral,
+	.icon = &st::menuIconShowAll,
+}, [](SectionBuilder &builder) {
+	auto ayu = AyuSectionBuilder(builder);
+
+	builder.addSkip();
+	BuildQoLToggles(builder, ayu);
+	builder.addSkip();
+});
+
+} // namespace
+
+rpl::producer<QString> AyuGeneral::title() {
+	return tr::ayu_CategoryGeneral();
+}
+
+AyuGeneral::AyuGeneral(
+	QWidget *parent,
+	not_null<Window::SessionController*> controller)
+: Section(parent, controller) {
+	setupContent();
+}
+
+void AyuGeneral::setupContent() {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
+	build(content, kMeta.build);
+	Ui::ResizeFitChild(this, content);
+}
 
-	AddSkip(content);
-	SetupQoLToggles(content, controller);
-	AddSkip(content);
-
-	ResizeFitChild(this, content);
+Type AyuGeneralId() {
+	return AyuGeneral::Id();
 }
 
 } // namespace Settings

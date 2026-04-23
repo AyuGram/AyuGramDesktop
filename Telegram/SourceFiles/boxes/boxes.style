@@ -23,6 +23,8 @@ UserpicButton {
 	uploadBg: color;
 	uploadIcon: icon;
 	uploadIconPosition: point;
+	uploadProgressLine: pixels;
+	uploadProgressMargin: pixels;
 }
 UserpicsRow {
 	button: UserpicButton;
@@ -72,6 +74,8 @@ defaultUserpicButton: UserpicButton {
 	uploadBg: msgDateImgBgOver;
 	uploadIcon: defaultUploadUserpicIcon;
 	uploadIconPosition: point(-1px, 1px);
+	uploadProgressLine: 3px;
+	uploadProgressMargin: 8px;
 }
 uploadUserpicSize: 32px;
 uploadUserpicButton: UserpicButton(defaultUserpicButton) {
@@ -81,6 +85,7 @@ uploadUserpicButton: UserpicButton(defaultUserpicButton) {
 	changeIconPosition: point(4px, 4px);
 }
 uploadUserpicButtonBorder: 2px;
+userpicUploadCancel: icon {{ "history_file_cancel", historyFileThumbIconFg }};
 restoreUserpicIcon: UserpicButton(defaultUserpicButton) {
 	size: size(22px, 22px);
 	photoSize: 22px;
@@ -655,14 +660,49 @@ proxyCheckingAnimation: InfiniteRadialAnimation(defaultInfiniteRadialAnimation) 
 	thickness: 1px;
 	size: size(8px, 8px);
 }
-proxyDropdownDownPosition: point(-2px, 35px);
-proxyDropdownUpPosition: point(-2px, 20px);
+proxyDropdownDownPosition: point(2px, 35px);
+proxyDropdownUpPosition: point(2px, 20px);
 
 proxyAboutPadding: margins(22px, 7px, 22px, 14px);
 proxyAboutSponsorPadding: margins(22px, 7px, 22px, 0px);
 
 proxyApplyBoxLabel : FlatLabel(defaultFlatLabel) {
 	maxHeight: 30px;
+}
+proxyApplyBoxTable: Table(defaultTable) {
+	labelMinWidth: 91px;
+}
+proxyApplyBoxTableMargin: margins(24px, 4px, 24px, 4px);
+proxyApplyBoxTableLabelMargin: margins(13px, 10px, 13px, 10px);
+proxyApplyBoxTableValueMargin: margins(13px, 9px, 13px, 9px);
+proxyApplyBoxValueMultiline: FlatLabel(defaultTableValue) {
+	minWidth: 128px;
+	maxHeight: 100px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(10px);
+		linkUnderline: kLinkUnderlineNever;
+	}
+}
+proxyApplyBoxSponsorLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowBoldFg;
+	minWidth: 100px;
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px);
+	}
+}
+proxyApplyBoxSponsorMargin: margins(13px, 8px, 13px, 8px);
+proxyApplyBoxButton: RoundButton(defaultActiveButton) {
+	height: 38px;
+	textTop: 10px;
+	style: semiboldTextStyle;
+}
+proxyApplyBox: Box(defaultBox) {
+	buttonPadding: margins(22px, 11px, 22px, 22px);
+	buttonHeight: 38px;
+	buttonWide: true;
+	button: proxyApplyBoxButton;
+	shadowIgnoreTopSkip: true;
 }
 
 markdownLinkFieldPadding: margins(22px, 0px, 22px, 10px);
@@ -686,70 +726,7 @@ themesMenuToggle: IconButton(defaultIconButton) {
 	rippleAreaSize: 36px;
 	ripple: defaultRippleAnimationBgOver;
 }
-themesMenuPosition: point(-2px, 25px);
-
-createPollField: InputField(defaultInputField) {
-	textMargins: margins(0px, 4px, 0px, 4px);
-	textAlign: align(left);
-	heightMin: 36px;
-	heightMax: 86px;
-	placeholderFg: placeholderFg;
-	placeholderFgActive: placeholderFgActive;
-	placeholderFgError: placeholderFgActive;
-	placeholderMargins: margins(2px, 0px, 2px, 0px);
-	placeholderAlign: align(topleft);
-	placeholderScale: 0.;
-	placeholderFont: boxTextFont;
-	placeholderShift: -50px;
-	border: 0px;
-	borderActive: 0px;
-	duration: 100;
-}
-createPollFieldPadding: margins(22px, 5px, 22px, 5px);
-createPollOptionField: InputField(createPollField) {
-	textMargins: margins(22px, 11px, 40px, 11px);
-	placeholderMargins: margins(2px, 0px, 2px, 0px);
-	heightMax: 68px;
-}
-createPollOptionFieldPremium: InputField(createPollOptionField) {
-	textMargins: margins(22px, 11px, 68px, 11px);
-}
-createPollOptionFieldPremiumEmojiPosition: point(15px, -1px);
-createPollSolutionField: InputField(createPollField) {
-	textMargins: margins(0px, 4px, 0px, 4px);
-	border: 1px;
-	borderActive: 2px;
-}
-createPollLimitPadding: margins(22px, 10px, 22px, 16px);
-createPollOptionRemove: CrossButton {
-	width: 22px;
-	height: 22px;
-
-	cross: CrossAnimation {
-		size: 22px;
-		skip: 6px;
-		stroke: 1.5;
-		minScale: 0.3;
-	}
-	crossFg: boxTitleCloseFg;
-	crossFgOver: boxTitleCloseFgOver;
-	crossPosition: point(0px, 0px);
-
-	duration: 150;
-	loadingPeriod: 1000;
-	ripple: defaultRippleAnimationBgOver;
-}
-createPollOptionRemovePosition: point(11px, 9px);
-createPollOptionEmojiPositionSkip: 4px;
-createPollWarning: FlatLabel(defaultFlatLabel) {
-	textFg: windowSubTextFg;
-	palette: TextPalette(defaultTextPalette) {
-		linkFg: boxTextFgError;
-	}
-}
-createPollWarningPosition: point(16px, 6px);
-createPollCheckboxMargin: margins(22px, 10px, 22px, 10px);
-createPollFieldTitlePadding: margins(22px, 7px, 10px, 6px);
+themesMenuPosition: point(2px, 25px);
 
 sendGifWithCaptionEmojiPosition: point(-30px, 23px);
 
@@ -806,8 +783,37 @@ backgroundConfirmCancel: RoundButton(backgroundConfirm) {
 		color: shadowFg;
 	}
 }
+urlAuthBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 12px);
+	buttonHeight: 0px;
+}
 urlAuthCheckbox: Checkbox(defaultBoxCheckbox) {
 	width: 240px;
+}
+urlAuthCodesTitle: FlatLabel(defaultPeerListAbout) {
+	textFg: boxTitleFg;
+	style: TextStyle(defaultTextStyle) {
+		font: boxTitleFont;
+	}
+}
+urlAuthCheckboxAbout: FlatLabel(defaultPeerListAbout) {
+	style: TextStyle(boxTextStyle) {
+		font: font(12px);
+	}
+}
+urlAuthCodesButton: RoundButton(defaultLightButton) {
+	height: 58px;
+	textTop: 19px;
+	style: TextStyle(semiboldTextStyle) {
+		font: font(20px semibold);
+	}
+}
+urlAuthBoxRowTopLabel: FlatLabel(boxLabel) {
+	maxHeight: 30px;
+}
+urlAuthBoxRowBottomLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	maxHeight: 30px;
 }
 
 addContactFieldMargin: margins(19px, 0px, 19px, 10px);
@@ -828,7 +834,7 @@ boostsUnrestrictLabel: FlatLabel(defaultFlatLabel) {
 }
 
 customBadgeField: InputField(defaultInputField) {
-	textMargins: margins(2px, 7px, 2px, 0px);
+	textMargins: margins(2px, 0px, 2px, 0px);
 
 	placeholderFg: placeholderFg;
 	placeholderFgActive: placeholderFgActive;
@@ -837,33 +843,15 @@ customBadgeField: InputField(defaultInputField) {
 	placeholderScale: 0.;
 	placeholderFont: normalFont;
 
+	border: 0px;
+	borderActive: 0px;
+
 	heightMin: 32px;
 }
 
-pollResultsQuestion: FlatLabel(defaultFlatLabel) {
-	minWidth: 320px;
-	textFg: windowBoldFg;
-	style: TextStyle(defaultTextStyle) {
-		font: font(16px semibold);
-	}
-}
-pollResultsVotesCount: FlatLabel(defaultFlatLabel) {
-	textFg: windowSubTextFg;
-}
-pollResultsHeaderPadding: margins(22px, 22px, 22px, 8px);
-pollResultsShowMore: SettingsButton(defaultSettingsButton) {
-	textFg: lightButtonFg;
-	textFgOver: lightButtonFgOver;
-	textBg: windowBg;
-	textBgOver: windowBgOver;
-
-	style: semiboldTextStyle;
-
-	height: 20px;
-	padding: margins(71px, 10px, 8px, 8px);
-
-	ripple: defaultRippleAnimation;
-}
+tagPreviewLineHeight: 8px;
+tagPreviewLineSpacing: 4px;
+tagPreviewInputSkip: 16px;
 
 inviteViaLinkButton: SettingsButton(defaultSettingsButton) {
 	textFg: lightButtonFg;
@@ -1164,4 +1152,188 @@ fakeUserpicButton: UserpicButton(defaultUserpicButton) {
 	photoSize: 1px;
 	changeIcon: icon {{ "settings/photo", transparent }};
 	uploadBg: transparent;
+}
+
+moderateCommonGroupsCheckbox: RoundImageCheckbox(defaultPeerListCheckbox) {
+	imageRadius: 12px;
+	imageSmallRadius: 11px;
+	selectWidth: 2px;
+	check: RoundCheckbox(defaultPeerListCheck) {
+		size: 16px;
+		sizeSmall: 0.3;
+		bgInactive: overviewCheckBg;
+		bgActive: overviewCheckBgActive;
+		check: icon {{
+			"default_checkbox_check",
+			overviewCheckFgActive,
+			point(1px, 4px)
+		}};
+	}
+}
+
+futureOwnerBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 14px);
+	buttonHeight: 0px;
+}
+futureOwnerBoxSelect: collectibleBox;
+
+disableSharingIconPadding: margins(12px, 12px, 12px, 8px);
+disableSharingButtonLock: IconEmoji {
+	icon: icon {{ "emoji/premium_lock", activeButtonFg }};
+	padding: margins(-2px, 1px, 0px, 0px);
+}
+
+createBotBox: Box(defaultBox) {
+	shadowIgnoreTopSkip: true;
+}
+createBotUserpicPadding: margins(0px, 16px, 0px, 10px);
+createBotTitlePadding: margins(0px, 0px, 0px, 8px);
+createBotSubtitlePadding: margins(0px, 0px, 0px, 4px);
+createBotCenteredText: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	minWidth: 40px;
+}
+createBotFieldSpacing: 8px;
+createBotUsernameField: InputField(defaultInputField) {
+	textMargins: margins(0px, 28px, 0px, 4px);
+}
+createBotUsernamePrefix: FlatLabel(defaultFlatLabel) {
+	style: boxTextStyle;
+}
+createBotUsernameSuffix: FlatLabel(createBotUsernamePrefix) {
+	textFg: windowSubTextFg;
+}
+
+managedBotIconEmoji: IconEmoji {
+	icon: icon {{ "chat/code_tags", windowSubTextFg }};
+	padding: margins(-2px, -2px, -2px, 0px);
+}
+
+createBotStatusLabel: FlatLabel(aboutRevokePublicLabel) {
+	maxHeight: 20px;
+}
+
+aiComposeBoxSectionSkip: 8px;
+aiComposeBoxStyleTabsSkip: 8px;
+aiComposeContentMargin: margins(16px, 0px, 16px, 0px);
+
+aiComposeButtonBgActive: windowActiveTextFg;
+aiComposeButtonBgActiveOpacity: 0.1;
+aiComposeButtonFg: windowBoldFg;
+aiComposeButtonFgActive: windowActiveTextFg;
+aiComposeButtonRippleInactive: RippleAnimation(defaultRippleAnimation) {
+	color: windowBoldFg;
+}
+aiComposeButtonRippleInactiveOpacity: 0.1;
+aiComposeButtonRippleActive: RippleAnimation(defaultRippleAnimation) {
+	color: windowActiveTextFg;
+}
+aiComposeButtonRippleActiveOpacity: 0.1;
+
+aiComposeTabsBg: boxBg;
+aiComposeTabsHeight: 58px;
+aiComposeTabsRadius: 29px;
+aiComposeTabsPadding: margins(6px, 6px, 6px, 6px);
+aiComposeTabsSkip: 4px;
+aiComposeTabButtonBgActive: aiComposeButtonBgActive;
+aiComposeTabLabelFg: aiComposeButtonFg;
+aiComposeTabLabelFgActive: aiComposeButtonFgActive;
+aiComposeTabLabelFont: font(12px semibold);
+aiComposeTabIconTop: 6px;
+aiComposeTabLabelTop: 26px;
+aiComposeTabTranslateIcon: icon {{ "menu/translate", aiComposeButtonFg }};
+aiComposeTabTranslateIconActive: icon {{ "menu/translate", aiComposeButtonFgActive }};
+aiComposeTabStyleIcon: icon {{ "menu/edit_stars", aiComposeButtonFg }};
+aiComposeTabStyleIconActive: icon {{ "menu/edit_stars", aiComposeButtonFgActive }};
+aiComposeTabFixIcon: icon {{ "menu/search_check", aiComposeButtonFg }};
+aiComposeTabFixIconActive: icon {{ "menu/search_check", aiComposeButtonFgActive }};
+
+aiComposeStyleTabsBg: boxBg;
+aiComposeStyleTabsHeight: 64px;
+aiComposeStyleTabsRadius: 14px;
+aiComposeStyleTabsPadding: margins(6px, 6px, 6px, 6px);
+aiComposeStyleTabsSkip: 4px;
+aiComposeStyleButtonBgActive: aiComposeButtonBgActive;
+aiComposeStyleLabelFg: aiComposeButtonFg;
+aiComposeStyleLabelFgActive: aiComposeButtonFgActive;
+aiComposeStyleEmojiTop: 5px;
+aiComposeStyleLabelTop: 30px;
+aiComposeStyleLabelFont: font(12px semibold);
+aiComposeStyleTabsScroll: ScrollArea(defaultScrollArea) {
+	barHidden: true;
+}
+aiComposeStyleButtonPadding: margins(12px, 0px, 12px, 0px);
+aiComposeStyleFadeWidth: 24px;
+aiComposeBadge: RoundButton(customEmojiTextBadge) {
+	textFg: activeButtonBg;
+	textBg: activeButtonFg;
+	width: -8px;
+	height: 16px;
+	radius: 4px;
+	textTop: 1px;
+	style: TextStyle(semiboldTextStyle) {
+		font: font(10px semibold);
+	}
+}
+aiComposeBadgeMargin: margins(0px, 2px, 0px, 0px);
+
+aiComposeCardBg: boxBg;
+aiComposeCardRadius: 22px;
+aiComposeCardPadding: margins(12px, 16px, 16px, 16px);
+aiComposeCardDivider: shadowFg;
+aiComposeCardSectionSkip: 12px;
+aiComposeCardTextSkip: 0px;
+aiComposeCardControlSkip: 8px;
+aiComposeCardTitle: FlatLabel(defaultSubsectionTitle) {
+	textFg: windowFg;
+	minWidth: 0px;
+	maxHeight: 22px;
+}
+aiComposeEmojifyCheckbox: Checkbox(defaultBoxCheckbox) {
+	width: 0px;
+}
+
+aiComposeExpandIcon: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+aiComposeCollapseIcon: icon{{ "info/edit/expand_arrow_small-flip_vertical", windowActiveTextFg }};
+aiComposeExpandButton: IconButton(defaultIconButton) {
+	width: 32px;
+	height: 32px;
+	icon: aiComposeExpandIcon;
+	iconOver: aiComposeExpandIcon;
+	iconPosition: point(5px, 5px);
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 32px;
+	ripple: defaultRippleAnimationBgOver;
+}
+
+aiComposeCopyIcon: icon{{ "menu/copy", windowActiveTextFg }};
+aiComposeCopyButton: IconButton(aiComposeExpandButton) {
+	icon: aiComposeCopyIcon;
+	iconOver: aiComposeCopyIcon;
+}
+
+aiComposeBoxButton: RoundButton(defaultActiveButton) {
+	height: 42px;
+	textTop: 12px;
+	style: semiboldTextStyle;
+}
+aiComposeBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: aiComposeBoxButton;
+	shadowIgnoreTopSkip: true;
+	bg: boxDividerBg;
+}
+aiComposeBoxWithSend: Box(aiComposeBox) {
+	buttonPadding: margins(16px, 12px, 66px, 12px);
+}
+aiComposeSendButtonSkip: 8px;
+aiComposeBoxClose: IconButton(boxTitleClose) {
+	ripple: defaultRippleAnimation;
+}
+aiComposeBoxInfoButton: IconButton(boxTitleClose) {
+	icon: icon {{ "menu/info", boxTitleCloseFg }};
+	iconOver: icon {{ "menu/info", boxTitleCloseFgOver }};
+	ripple: defaultRippleAnimation;
 }

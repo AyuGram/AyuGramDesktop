@@ -28,6 +28,9 @@ rpl::lifetime PaletteChangedLifetime;
 std::array<std::array<QImage, 4>, kCachedCornerRadiusCount> CachedMasks;
 
 [[nodiscard]] std::array<QImage, 4> PrepareCorners(int32 radius, const QBrush &brush, const style::color *shadow = nullptr) {
+	if (radius <= 0) {
+		return {};
+	}
 	int32 r = radius * style::DevicePixelRatio(), s = st::msgShadow * style::DevicePixelRatio();
 	QImage rect(r * 3, r * 3 + (shadow ? s : 0), QImage::Format_ARGB32_Premultiplied);
 	rect.fill(Qt::transparent);
@@ -76,7 +79,7 @@ void CreateMaskCorners() {
 }
 
 void CreatePaletteCorners() {
-	PrepareCorners(MenuCorners, st::roundRadiusSmall, st::menuBg);
+	PrepareCorners(MenuCorners, st::innerDropdownRadius, st::menuBg);
 	PrepareCorners(BoxCorners, st::boxRadius, st::boxBg);
 	PrepareCorners(DateCorners, st::dateRadius, st::msgDateImgBg);
 	PrepareCorners(OverviewVideoCorners, st::overviewVideoStatusRadius, st::msgDateImgBg);

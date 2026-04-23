@@ -3,49 +3,41 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "font_selector.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ui/boxes/font_selector.h"
 
+#include "ayu/ayu_settings.h"
+#include "ayu/ayu_ui_settings.h"
+#include "boxes/premium_preview_box.h"
+#include "core/application.h"
 #include "data/data_peer_values.h"
+#include "lang/lang_instance.h"
+#include "main/main_session.h"
+#include "settings/settings_common.h"
+#include "storage/localstorage.h"
+#include "styles/style_boxes.h"
+#include "styles/style_chat_helpers.h"
+#include "styles/style_layers.h"
+#include "styles/style_passport.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/painter.h"
+#include "ui/text/text_entity.h"
+#include "ui/text/text_options.h"
+#include "ui/toast/toast.h"
+#include "ui/ui_utility.h"
+#include "ui/widgets/box_content_divider.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/widgets/scroll_area.h"
-#include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/box_content_divider.h"
-#include "ui/text/text_entity.h"
-#include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/toast/toast.h"
-#include "ui/text/text_options.h"
-#include "ui/painter.h"
-#include "storage/localstorage.h"
-#include "boxes/premium_preview_box.h"
-#include "ui/boxes/confirm_box.h"
-#include "main/main_session.h"
-#include "mainwidget.h"
-#include "mainwindow.h"
-#include "core/application.h"
-#include "lang/lang_instance.h"
-#include "lang/lang_cloud_manager.h"
-#include "settings/settings_common.h"
-#include "spellcheck/spellcheck_types.h"
+#include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
-#include "styles/style_layers.h"
-#include "styles/style_boxes.h"
-#include "styles/style_info.h"
-#include "styles/style_passport.h"
-#include "styles/style_chat_helpers.h"
 
-#include <QtGui/QGuiApplication>
-#include <QFontDatabase>
 #include <QApplication>
-
-#include <ayu/ayu_settings.h>
-
-#include "ayu/ayu_ui_settings.h"
-#include "ui/ui_utility.h"
+#include <QFontDatabase>
 
 struct Font
 {

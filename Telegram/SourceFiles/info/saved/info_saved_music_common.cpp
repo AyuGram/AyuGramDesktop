@@ -110,13 +110,12 @@ void SetupSavedMusic(
 											  contextMenu->setAttribute(Qt::WA_DeleteOnClose);
 
 											  contextMenu->addAction(
-												  settings.adaptiveCoverColor
+												  settings.adaptiveCoverColor()
 													  ? tr::ayu_DisableColorfulCover(tr::now)
 													  : tr::ayu_EnableColorfulCover(tr::now),
 												  [=]
 												  {
-													  AyuSettings::set_adaptiveCoverColor(!settings.adaptiveCoverColor);
-													  AyuSettings::save();
+													  AyuSettings::getInstance().setAdaptiveCoverColor(!AyuSettings::getInstance().adaptiveCoverColor());
 
 													  const auto mediaRefreshed = item ? item->media() : nullptr;
 													  const auto documentRefreshed = mediaRefreshed

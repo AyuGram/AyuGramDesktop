@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
+#include "ui/widgets/shadow.h"
 #include "base/timer.h"
 #include "base/object_ptr.h"
 
@@ -124,6 +125,7 @@ private:
 
 	bool _hiding = false;
 	bool _hideAfterSlide = false;
+	Ui::BoxShadow _shadow;
 	QPixmap _cache;
 	Ui::Animations::Simple _a_opacity;
 	base::Timer _hideTimer;

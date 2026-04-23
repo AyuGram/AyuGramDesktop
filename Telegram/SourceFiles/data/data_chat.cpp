@@ -20,6 +20,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_invite_links.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+
+
 namespace {
 
 using UpdateFlag = Data::PeerUpdate::Flag;
@@ -112,7 +117,12 @@ bool ChatData::anyoneCanAddMembers() const {
 }
 
 void ChatData::setName(const QString &newName) {
-	updateNameDelayed(newName.isEmpty() ? name() : newName, {}, {});
+	auto filteredName = newName;
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.filterZalgo()) {
+		filteredName = filterZalgo(filteredName);
+	}
+	updateNameDelayed(filteredName.isEmpty() ? name() : filteredName, {}, {});
 }
 
 void ChatData::applyEditAdmin(not_null<UserData*> user, bool isAdmin) {
@@ -130,7 +140,7 @@ void ChatData::invalidateParticipants() {
 	setAdminRights(ChatAdminRights());
 	//setDefaultRestrictions(ChatRestrictions());
 	invitedByMe.clear();
-	botStatus = 0;
+	botStatus = Data::BotStatus::Unknown;
 	session().changes().peerUpdated(
 		this,
 		UpdateFlag::Members | UpdateFlag::Admins);
@@ -180,10 +190,14 @@ void ChatData::setDefaultRestrictions(ChatRestrictions rights) {
 
 void ChatData::refreshBotStatus() {
 	if (participants.empty()) {
-		botStatus = 0;
+		botStatus = Data::BotStatus::Unknown;
 	} else {
-		const auto bot = ranges::none_of(participants, &UserData::isBot);
-		botStatus = bot ? -1 : 2;
+		const auto noBots = ranges::none_of(
+			participants,
+			&UserData::isBot);
+		botStatus = noBots
+			? Data::BotStatus::NoBots
+			: Data::BotStatus::HasBots;
 	}
 }
 
@@ -350,7 +364,7 @@ void ApplyChatUpdate(
 		if (chat->count > 0) { // If the count is known.
 			++chat->count;
 		}
-		chat->botStatus = 0;
+		chat->botStatus = Data::BotStatus::Unknown;
 	} else {
 		chat->participants.emplace(user);
 		if (UserId(update.vinviter_id()) == session->userId()) {
@@ -360,7 +374,7 @@ void ApplyChatUpdate(
 		}
 		++chat->count;
 		if (user->isBot()) {
-			chat->botStatus = 2;
+			chat->botStatus = Data::BotStatus::HasBots;
 			if (!user->botInfo->inited) {
 				session->api().requestFullPeer(user);
 			}
@@ -390,7 +404,7 @@ void ApplyChatUpdate(
 		if (chat->count > 0) {
 			chat->count--;
 		}
-		chat->botStatus = 0;
+		chat->botStatus = Data::BotStatus::Unknown;
 	} else {
 		chat->participants.erase(user);
 		chat->count--;
@@ -404,7 +418,7 @@ void ApplyChatUpdate(
 				history->clearLastKeyboard();
 			}
 		}
-		if (chat->botStatus > 0 && user->isBot()) {
+		if (chat->botStatus == Data::BotStatus::HasBots && user->isBot()) {
 			chat->refreshBotStatus();
 		}
 	}
@@ -439,6 +453,32 @@ void ApplyChatUpdate(
 		chat->admins.erase(user);
 	}
 	session->changes().peerUpdated(chat, UpdateFlag::Admins);
+}
+
+void ApplyChatUpdate(
+		not_null<ChatData*> chat,
+		const MTPDupdateChatParticipantRank &update) {
+	if (chat->applyUpdateVersion(update.vversion().v)
+		!= ChatData::UpdateStatus::Good) {
+		return;
+	}
+	const auto rank = qs(update.vrank().v);
+	const auto userId = UserId(update.vuser_id().v);
+	if (rank.isEmpty()) {
+		chat->memberRanks.remove(userId);
+	} else {
+		chat->memberRanks[userId] = rank;
+	}
+	if (userId != chat->session().userId()) {
+		if (const auto history = chat->owner().historyLoaded(chat)) {
+			auto changes = base::flat_set<UserId>();
+			changes.emplace(userId);
+			history->applyGroupAdminChanges(changes);
+		}
+	}
+	chat->session().changes().peerUpdated(
+		chat,
+		Data::PeerUpdate::Flag::Members);
 }
 
 void ApplyChatUpdate(
@@ -536,6 +576,7 @@ void ApplyChatUpdate(
 		chat->participants.clear();
 		chat->invitedByMe.clear();
 		chat->admins.clear();
+		chat->memberRanks.clear();
 		chat->setAdminRights(ChatAdminRights());
 		const auto selfUserId = session->userId();
 		for (const auto &participant : list) {
@@ -562,13 +603,25 @@ void ApplyChatUpdate(
 
 			participant.match([&](const MTPDchatParticipantCreator &data) {
 				chat->creator = userId;
+				const auto rank = qs(data.vrank().value_or_empty());
+				if (!rank.isEmpty()) {
+					chat->memberRanks[userId] = rank;
+				}
 			}, [&](const MTPDchatParticipantAdmin &data) {
 				chat->admins.emplace(user);
 				if (user->isSelf()) {
 					chat->setAdminRights(
 						chat->defaultAdminRights(user).flags);
 				}
-			}, [](const MTPDchatParticipant &) {
+				const auto rank = qs(data.vrank().value_or_empty());
+				if (!rank.isEmpty()) {
+					chat->memberRanks[userId] = rank;
+				}
+			}, [&](const MTPDchatParticipant &data) {
+				const auto rank = qs(data.vrank().value_or_empty());
+				if (!rank.isEmpty()) {
+					chat->memberRanks[userId] = rank;
+				}
 			});
 		}
 		if (chat->participants.empty()) {

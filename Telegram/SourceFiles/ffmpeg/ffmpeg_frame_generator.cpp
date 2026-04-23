@@ -182,7 +182,7 @@ FrameGenerator::Frame FrameGenerator::Impl::renderCurrent(
 	const auto withAlpha = bgra || (srcFormat == AV_PIX_FMT_YUVA420P);
 	const auto dstPerLine = storage.bytesPerLine();
 	auto dst = storage.bits() + dx * sizeof(int32) + dy * dstPerLine;
-	if (srcSize == dstSize && bgra) {
+	if (bgra && srcSize == dstSize && frame->linesize[0] > 0) {
 		const auto srcPerLine = frame->linesize[0];
 		const auto perLine = std::min(srcPerLine, int(dstPerLine));
 		auto src = frame->data[0];

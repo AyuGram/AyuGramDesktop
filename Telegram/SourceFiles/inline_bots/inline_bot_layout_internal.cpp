@@ -44,6 +44,21 @@ using TextState = HistoryView::TextState;
 
 constexpr auto kMaxInlineArea = 1280 * 720;
 
+[[nodiscard]] QSize ScaleDown(int w, int h, int maxW, int maxH) {
+	if (w * maxH > h * maxW) {
+		if (maxH < h) {
+			w = w * maxH / h;
+			h = maxH;
+		}
+	} else {
+		if (maxW < w) {
+			h = h * maxW / w;
+			w = maxW;
+		}
+	}
+	return { w, h };
+}
+
 [[nodiscard]] bool CanPlayInline(not_null<DocumentData*> document) {
 	const auto dimensions = document->dimensions;
 	return dimensions.width() * dimensions.height() <= kMaxInlineArea;
@@ -1242,25 +1257,170 @@ void Contact::prepareThumbnail(int width, int height) const {
 			&& (_thumb.height() == height * style::DevicePixelRatio()))) {
 		return;
 	}
-	auto w = qMax(style::ConvertScale(thumb->width()), 1);
-	auto h = qMax(style::ConvertScale(thumb->height()), 1);
-	if (w * height > h * width) {
-		if (height < h) {
-			w = w * height / h;
-			h = height;
-		}
-	} else {
-		if (width < w) {
-			h = h * width / w;
-			w = width;
-		}
-	}
+	const auto scaled = ScaleDown(
+		qMax(style::ConvertScale(thumb->width()), 1),
+		qMax(style::ConvertScale(thumb->height()), 1),
+		width,
+		height);
 	_thumb = Image(base::duplicate(*thumb)).pixNoCache(
-		QSize(w, h) * style::DevicePixelRatio(),
+		scaled * style::DevicePixelRatio(),
 		{
 			.options = Images::Option::TransparentBackground,
 			.outer = { width, height },
 		});
+}
+
+Thumbnail::Thumbnail(
+	not_null<Context*> context,
+	std::shared_ptr<Result> result)
+: ItemBase(context, std::move(result)) {
+}
+
+void Thumbnail::initDimensions() {
+	int w = 0, h = 0;
+	if (const auto photo = getResultPhoto()) {
+		w = photo->width();
+		h = photo->height();
+	} else if (const auto document = getResultDocument()) {
+		w = document->dimensions.width();
+		h = document->dimensions.height();
+	}
+	if (w <= 0 || h <= 0) {
+		w = h = 1;
+	}
+	w = w * st::inlineMediaHeight / h;
+	_maxw = qMax(w, int32(st::inlineResultsMinWidth));
+	_minh = st::inlineMediaHeight + st::inlineResultsSkip;
+}
+
+QSize Thumbnail::countFrameSize() const {
+	int w = 0, h = 0;
+	if (const auto photo = getResultPhoto()) {
+		w = photo->width();
+		h = photo->height();
+	} else if (const auto document = getResultDocument()) {
+		w = document->dimensions.width();
+		h = document->dimensions.height();
+	}
+	if (w <= 0 || h <= 0) {
+		return { _width, st::inlineMediaHeight };
+	}
+	// Aspect-fill: scale so the smaller dimension covers the cell.
+	const auto targetHeight = st::inlineMediaHeight;
+	if (w * targetHeight > h * _width) {
+		w = w * targetHeight / h;
+		h = targetHeight;
+	} else {
+		h = h * _width / w;
+		w = _width;
+	}
+	return { qMax(w, 1), qMax(h, 1) };
+}
+
+void Thumbnail::validateThumbnail(
+		Image *image,
+		QSize size,
+		QSize frame,
+		bool good) const {
+	if (!image || (_thumbGood && !good)) {
+		return;
+	} else if ((_thumb.size() == size * style::DevicePixelRatio())
+		&& (_thumbGood || !good)) {
+		return;
+	}
+	_thumb = image->pixNoCache(
+		frame * style::DevicePixelRatio(),
+		{
+			.options = (Images::Option::TransparentBackground
+				| (good ? Images::Option() : Images::Option::Blur)),
+			.outer = size,
+		});
+	_thumbGood = good;
+}
+
+void Thumbnail::prepareThumbnail(QSize size, QSize frame) const {
+	if (const auto photo = getResultPhoto()) {
+		if (!_photoMedia) {
+			_photoMedia = photo->createMediaView();
+			_photoMedia->wanted(Data::PhotoSize::Thumbnail, fileOrigin());
+		}
+		using PhotoSize = Data::PhotoSize;
+		validateThumbnail(
+			_photoMedia->image(PhotoSize::Thumbnail),
+			size,
+			frame,
+			true);
+		validateThumbnail(
+			_photoMedia->image(PhotoSize::Small),
+			size,
+			frame,
+			false);
+		validateThumbnail(
+			_photoMedia->thumbnailInline(),
+			size,
+			frame,
+			false);
+	} else if (const auto document = getResultDocument()) {
+		if (!_documentMedia) {
+			_documentMedia = document->createMediaView();
+			document->loadThumbnail(fileOrigin());
+		}
+		validateThumbnail(
+			_documentMedia->thumbnail(),
+			size,
+			frame,
+			true);
+		validateThumbnail(
+			_documentMedia->thumbnailInline(),
+			size,
+			frame,
+			false);
+	} else if (const auto thumb = getResultThumb(fileOrigin())) {
+		if (_thumb.isNull()) {
+			const auto scaled = ScaleDown(
+				qMax(style::ConvertScale(thumb->width()), 1),
+				qMax(style::ConvertScale(thumb->height()), 1),
+				frame.width(),
+				frame.height());
+			_thumb = Image(base::duplicate(*thumb)).pixNoCache(
+				scaled * style::DevicePixelRatio(),
+				{
+					.options = Images::Option::TransparentBackground,
+					.outer = size,
+				});
+		}
+	}
+}
+
+void Thumbnail::paint(
+		Painter &p,
+		const QRect &clip,
+		const PaintContext *context) const {
+	const auto height = st::inlineMediaHeight;
+	const auto frame = countFrameSize();
+
+	QRect r(0, 0, _width, height);
+	prepareThumbnail({ _width, height }, frame);
+	if (_thumb.isNull()) {
+		p.fillRect(r, st::overviewPhotoBg);
+	} else {
+		p.drawPixmap(r.topLeft(), _thumb);
+	}
+}
+
+TextState Thumbnail::getState(
+		QPoint point,
+		StateRequest request) const {
+	if (QRect(0, 0, _width, st::inlineMediaHeight).contains(point)) {
+		return { nullptr, _send };
+	}
+	return {};
+}
+
+void Thumbnail::unloadHeavyPart() {
+	_photoMedia = nullptr;
+	_documentMedia = nullptr;
+	ItemBase::unloadHeavyPart();
 }
 
 Article::Article(
@@ -1387,6 +1547,10 @@ TextState Article::getState(
 
 void Article::prepareThumbnail(int width, int height) const {
 	if (!hasResultThumb()) {
+		prepareMediaThumbnail(width, height);
+		if (!_thumb.isNull()) {
+			return;
+		}
 		if ((_thumb.width() != width * style::DevicePixelRatio())
 			|| (_thumb.height() != height * style::DevicePixelRatio())) {
 			_thumb = getResultContactAvatar(width, height);
@@ -1401,25 +1565,71 @@ void Article::prepareThumbnail(int width, int height) const {
 			&& (_thumb.height() == height * style::DevicePixelRatio()))) {
 		return;
 	}
-	auto w = qMax(style::ConvertScale(thumb->width()), 1);
-	auto h = qMax(style::ConvertScale(thumb->height()), 1);
-	if (w * height > h * width) {
-		if (height < h) {
-			w = w * height / h;
-			h = height;
-		}
-	} else {
-		if (width < w) {
-			h = h * width / w;
-			w = width;
-		}
-	}
+	const auto scaled = ScaleDown(
+		qMax(style::ConvertScale(thumb->width()), 1),
+		qMax(style::ConvertScale(thumb->height()), 1),
+		width,
+		height);
 	_thumb = Image(base::duplicate(*thumb)).pixNoCache(
-		QSize(w, h) * style::DevicePixelRatio(),
+		scaled * style::DevicePixelRatio(),
 		{
 			.options = Images::Option::TransparentBackground,
 			.outer = { width, height },
 		});
+}
+
+void Article::prepareMediaThumbnail(int width, int height) const {
+	auto thumbGood = false;
+	const auto make = [&](Image *image, bool good) {
+		if (!image || (thumbGood && !good)) {
+			return;
+		}
+		if (!_thumb.isNull() && !good) {
+			return;
+		}
+		const auto scaled = ScaleDown(
+			qMax(style::ConvertScale(image->width()), 1),
+			qMax(style::ConvertScale(image->height()), 1),
+			width,
+			height);
+		_thumb = image->pixNoCache(
+			scaled * style::DevicePixelRatio(),
+			{
+				.options = (Images::Option::TransparentBackground
+					| (good
+						? Images::Option()
+						: Images::Option::Blur)),
+				.outer = { width, height },
+			});
+		if (good) {
+			thumbGood = true;
+		}
+	};
+	if (const auto photo = getResultPhoto()) {
+		if (!_photoMedia) {
+			_photoMedia = photo->createMediaView();
+			_photoMedia->wanted(Data::PhotoSize::Thumbnail, fileOrigin());
+		}
+		using PhotoSize = Data::PhotoSize;
+		make(_photoMedia->image(PhotoSize::Thumbnail), true);
+		make(_photoMedia->image(PhotoSize::Small), false);
+		make(_photoMedia->thumbnailInline(), false);
+	} else if (const auto document = getResultDocument()) {
+		if (document->hasThumbnail()) {
+			if (!_documentMedia) {
+				_documentMedia = document->createMediaView();
+				document->loadThumbnail(fileOrigin());
+			}
+			make(_documentMedia->thumbnail(), true);
+			make(_documentMedia->thumbnailInline(), false);
+		}
+	}
+}
+
+void Article::unloadHeavyPart() {
+	_photoMedia = nullptr;
+	_documentMedia = nullptr;
+	ItemBase::unloadHeavyPart();
 }
 
 Game::Game(not_null<Context*> context, std::shared_ptr<Result> result)

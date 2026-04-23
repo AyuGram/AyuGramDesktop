@@ -3,11 +3,12 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_forward.h"
+// Copyright @Radolyn, 2026
+#include "ayu/features/forward/ayu_forward.h"
+
 #include "apiwrap.h"
-#include "ayu_sync.h"
 #include "lang_auto.h"
+#include "ayu/features/forward/ayu_sync.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/random.h"
 #include "base/unixtime.h"
@@ -18,7 +19,6 @@
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "history/history_item.h"
-#include "storage/file_download.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_account.h"
 #include "storage/storage_media_prepare.h"
@@ -167,6 +167,10 @@ void sendMedia(
 				return SendMediaType::Audio;
 			} else if (document->isVideoMessage()) {
 				return SendMediaType::Round;
+			} else if (document->isVideoFile() || document->isGifv()) {
+				// to send video as video need to pass it as 'photo'
+				// ref: `void HistoryWidget::sendingFilesConfirmed`
+				return SendMediaType::Photo;
 			}
 			return SendMediaType::File;
 		}
@@ -220,7 +224,7 @@ bool isAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items) {
 }
 
 bool isAyuForwardNeeded(not_null<HistoryItem*> item) {
-	if (item->isDeleted() || item->isAyuNoForwards() || item->unsupportedTTL()) {
+	if (item->isDeleted() || item->isAyuNoForwards() || item->unsupportedTTL() || (item->media() && item->media()->ttlSeconds())) {
 		return true;
 	}
 	return false;
@@ -419,7 +423,6 @@ void forwardMessages(
 			auto bundle = Ui::PrepareFilesBundle(
 				std::move(groups),
 				way,
-				message.textWithTags,
 				false);
 			sendMedia(session, bundle, media, std::move(message), way.sendImagesAsPhotos());
 		}

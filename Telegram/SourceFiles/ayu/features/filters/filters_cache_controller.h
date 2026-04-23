@@ -3,11 +3,12 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
-#include "filters_controller.h"
 #include "ayu/data/entities.h"
+#include "ayu/features/filters/filters_controller.h"
+#include "rpl/producer.h"
 
 namespace Data {
 struct Group;
@@ -16,6 +17,9 @@ struct Group;
 using namespace FiltersController;
 
 namespace FiltersCacheController {
+
+void fireUpdate();
+[[nodiscard]] rpl::producer<> updates();
 
 void rebuildCache();
 

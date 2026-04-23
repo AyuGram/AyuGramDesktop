@@ -1238,8 +1238,8 @@ void Stories::markAsRead(FullStoryId id, bool viewed) {
 		return;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadStories) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadStories()) {
 		return;
 	}
 
@@ -1397,8 +1397,8 @@ void Stories::toggleHidden(
 void Stories::sendMarkAsReadRequest(
 		not_null<PeerData*> peer,
 		StoryId tillId) {
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadStories) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadStories()) {
 		return;
 	}
 
@@ -1432,8 +1432,8 @@ void Stories::checkQuitPreventFinished() {
 void Stories::sendMarkAsReadRequests() {
 	_markReadTimer.cancel();
 
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadStories) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadStories()) {
 		return;
 	}
 
@@ -1456,8 +1456,8 @@ void Stories::sendIncrementViewsRequests() {
 		return;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadStories) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadStories()) {
 		return;
 	}
 
@@ -2274,11 +2274,6 @@ void Stories::togglePinnedList(
 	auto &saved = _saved[peerId];
 	auto list = QVector<MTPint>();
 	list.reserve(maxPinnedCount());
-	for (const auto &id : saved.ids.pinnedToTop) {
-		if (pin || !ranges::contains(ids, FullStoryId{ peerId, id })) {
-			list.push_back(MTP_int(id));
-		}
-	}
 	if (pin) {
 		auto copy = ids;
 		ranges::sort(copy, ranges::greater());
@@ -2287,6 +2282,11 @@ void Stories::togglePinnedList(
 				&& !ranges::contains(saved.ids.pinnedToTop, id.story)) {
 				list.push_back(MTP_int(id.story));
 			}
+		}
+	}
+	for (const auto &id : saved.ids.pinnedToTop) {
+		if (pin || !ranges::contains(ids, FullStoryId{ peerId, id })) {
+			list.push_back(MTP_int(id));
 		}
 	}
 	const auto api = &_owner->session().api();
@@ -2311,8 +2311,8 @@ bool Stories::isQuitPrevent() {
 		sendIncrementViewsRequests();
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendReadStories || _markReadRequests.empty() && _incrementViewsRequests.empty()) {
+	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	if (!ghost.sendReadStories() || (_markReadRequests.empty() && _incrementViewsRequests.empty())) {
 		return false;
 	}
 	LOG(("Stories prevents quit, marking as read..."));

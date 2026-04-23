@@ -3,7 +3,7 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
 #include "settings/settings_common.h"
@@ -15,8 +15,7 @@ class SessionController;
 
 namespace Settings {
 
-class AyuFilters : public Section<AyuFilters>
-{
+class AyuFilters : public Section<AyuFilters> {
 public:
 	AyuFilters(QWidget *parent, not_null<Window::SessionController*> controller);
 
@@ -24,7 +23,9 @@ public:
 	void fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) override;
 
 private:
-	void setupContent(not_null<Window::SessionController*> controller);
+	void setupContent();
 };
+
+[[nodiscard]] Type AyuFiltersId();
 
 } // namespace Settings

@@ -266,7 +266,6 @@ void Controller::Unsupported::setup(not_null<PeerData*> peer) {
 		wrap,
 		tr::ayu_UpdateAyuGram(),
 		st::storiesUnsupportedUpdate);
-	_button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	_button->show();
 
 	rpl::combine(
@@ -566,6 +565,9 @@ void Controller::rebuildActiveAreas(const Layout &layout) const {
 		area.radius = scale.width() * area.radiusOriginal / 100.;
 		if (const auto view = area.view.get()) {
 			view->setAreaGeometry(area.geometry, area.radius);
+			view->setContentRect(
+				layout.content,
+				st::storiesRadius);
 		}
 	}
 }

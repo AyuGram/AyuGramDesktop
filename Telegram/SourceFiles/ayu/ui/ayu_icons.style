@@ -8,23 +8,31 @@
  */
 
 using "ui/colors.palette";
+using "ui/chat/chat.style";
 using "ui/widgets/widgets.style";
 using "dialogs/dialogs.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
-ayuMenuIcon: icon {{ "ayu/ayu_menu", menuIconColor }};
 ayuEditsHistoryIcon: icon {{ "ayu/edits_history", menuIconColor }};
 ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};
 ayuSReadMenuIcon: icon {{ "ayu/sread", menuIconColor }};
 ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};
-
-ayuMenuIconToBeginning: icon {{ "ayu/to_beginning", menuIconColor }};
+ayuToBeginningMenuIcon: icon {{ "ayu/to_beginning", menuIconColor }};
+ayuRepeatMenuIcon: icon {{ "ayu/repeat", menuIconColor }};
+ayuContactsMutualIcon: icon {{ "ayu/contacts_mutual", contactsStatusFg }};
+ayuContactsMutualIconOver: icon {{ "ayu/contacts_mutual", contactsStatusFgOver }};
 
 messageFieldAttachIcon: icon {{ "ayu/message_field/attach", menuIconColor }};
 messageFieldCommandsIcon: icon {{ "ayu/message_field/commands", menuIconColor }};
 messageFieldEmojiIcon: icon {{ "ayu/message_field/emoji", menuIconColor }};
 messageFieldVoiceIcon: icon {{ "ayu/message_field/voice", menuIconColor }};
 messageFieldTTLIcon: icon {{ "ayu/message_field/ttl", menuIconColor }};
+messageFieldCocoonAiIcon: icon{
+	{ size(24px, 24px), transparent },
+	{ "chat/ai_letters-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star1-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star2-20x20", menuIconColor, point(2px, 2px) },
+};
 
 inChannelBadgeIcon: icon {{ "ayu/channel", msgInDateFg }};
 inChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgInDateFgSelected }};
@@ -48,6 +56,12 @@ deletedIcon: IconEmoji{
     useIconColor: false;
 }
 
+burntIcon: IconEmoji{
+    icon: icon{{ "ayu/burnt", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
 dialogsExteraOfficialIcon: ThreeStateIcon {
 	icon: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBg }};
 	over: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBgOver }};
@@ -58,3 +72,8 @@ dialogsExteraSupporterIcon: ThreeStateIcon {
 	over: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
 	active: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
 }
+
+ayuHistoryFileInPlugin: icon {{ "ayu/history_file_plugin", historyFileInIconFg }};
+ayuHistoryFileInPluginSelected: icon {{ "ayu/history_file_plugin", historyFileInIconFgSelected }};
+ayuHistoryFileOutPlugin: icon {{ "ayu/history_file_plugin", historyFileOutIconFg }};
+ayuHistoryFileOutPluginSelected: icon {{ "ayu/history_file_plugin", historyFileOutIconFgSelected }};

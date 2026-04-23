@@ -3,15 +3,14 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_mapper.h"
+// Copyright @Radolyn, 2026
+#include "ayu/utils/ayu_mapper.h"
 
 #include "apiwrap.h"
 #include "api/api_text_entities.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
-#include "main/main_session.h"
 #include "mtproto/connection_abstract.h"
 #include "mtproto/details/mtproto_dump_to_text.h"
 
@@ -120,7 +119,7 @@ int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item) {
 		flags |= kMessageFlagMention;
 	}
 
-	if (item->isUnreadMedia()) {
+	if (item->hasUnreadMediaFlag()) {
 		flags |= kMessageFlagContentUnread;
 	}
 

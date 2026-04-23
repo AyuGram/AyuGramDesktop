@@ -235,7 +235,8 @@ struct List {
 
 List CreateList(
 		not_null<Ui::RpWidget*> parent,
-		not_null<History*> history) {
+		not_null<History*> history,
+		rpl::producer<not_null<QKeyEvent*>> scrollKeys) {
 	auto list = List{
 		base::make_unique_q<Ui::RpWidget>(parent),
 		std::make_unique<ListController>(history),
@@ -275,6 +276,16 @@ List CreateList(
 		auto p = QPainter(weak.get());
 		p.fillRect(r, st::dialogsBg);
 	}, list.container->lifetime());
+
+	std::move(
+		scrollKeys
+	) | rpl::on_next([=](not_null<QKeyEvent*> e) {
+		const auto delta = scroll->height();
+		const auto now = scroll->scrollTop();
+		scroll->scrollToY((e->key() == Qt::Key_PageUp)
+			? (now - delta)
+			: (now + delta));
+	}, scroll->lifetime());
 
 	return list;
 }
@@ -897,7 +908,13 @@ ComposeSearch::Inner::Inner(
 , _history(history)
 , _topBar(base::make_unique_q<TopBar>(parent, window, history, from, query))
 , _bottomBar(base::make_unique_q<BottomBar>(parent, HasChooseFrom(history)))
-, _list(CreateList(parent, history))
+, _list(
+	CreateList(
+		parent,
+		history,
+		_topBar->keyEvents() | rpl::filter([](not_null<QKeyEvent*> e) {
+			return e->key() == Qt::Key_PageDown || e->key() == Qt::Key_PageUp;
+		})))
 , _apiSearch(history) {
 	showAnimated();
 
@@ -926,10 +943,10 @@ ComposeSearch::Inner::Inner(
 		}
 		search.topMsgId = _topMsgId;
 		_apiSearch.clear();
-		_apiSearch.search(search);
 
 		_list.controller->addItems({}, true);
-		_list.controller->setQuery(_apiSearch.request().query);
+		_list.controller->setQuery(search.query);
+		_apiSearch.search(search);
 	}, _topBar->lifetime());
 
 	_topBar->queryChanges(
@@ -1015,7 +1032,7 @@ ComposeSearch::Inner::Inner(
 	_bottomBar->showCalendarRequests(
 	) | rpl::on_next([=] {
 		hideList();
-		_window->showCalendar({ _history }, QDate());
+		_window->showCalendar({ Dialogs::Key(_history) });
 	}, _bottomBar->lifetime());
 
 	_bottomBar->showBoxFromRequests(

@@ -32,10 +32,12 @@ class Error;
 namespace Data {
 class ForumTopic;
 class PhotoMedia;
+struct DrawToReplyRequest;
 struct SendError;
 } // namespace Data
 
 namespace SendMenu {
+struct Action;
 struct Details;
 } // namespace SendMenu
 
@@ -63,6 +65,7 @@ class DropdownMenu;
 class PlainShadow;
 class IconButton;
 class EmojiButton;
+class RpWidget;
 class SendButton;
 class SilentToggle;
 class FlatButton;
@@ -78,6 +81,7 @@ class SpoilerAnimation;
 class ChooseThemeController;
 class ContinuousScroll;
 struct ChatPaintHighlight;
+class ChatStyle;
 template <typename Widget>
 class SlideWrap;
 } // namespace Ui
@@ -123,6 +127,8 @@ class TTLButton;
 class WebpageProcessor;
 class CharactersLimitLabel;
 class PhotoEditSpoilerManager;
+class ComposeAiButton;
+class AiTooltipManager;
 struct VoiceToSend;
 } // namespace HistoryView::Controls
 
@@ -236,6 +242,7 @@ public:
 	void sendBotCommand(const Bot::SendCommandRequest &request);
 	void hideSingleUseKeyboard(FullMsgId replyToId);
 	bool insertBotCommand(const QString &cmd);
+	void insertTextAtCursor(const QString &text);
 
 	bool eventFilter(QObject *obj, QEvent *e) override;
 
@@ -387,7 +394,6 @@ private:
 	void setTabbedPanel(std::unique_ptr<TabbedPanel> panel);
 	void updateField();
 	void fieldChanged();
-	void fieldTabbed();
 	void fieldFocused();
 	void fieldResized();
 
@@ -401,6 +407,9 @@ private:
 	void windowIsVisibleChanged();
 	void saveFieldToHistoryLocalDraft();
 	void fileChosen(ChatHelpers::FileChosen &&data);
+	void setupSendMenu(
+		not_null<Ui::RpWidget*> button,
+		Fn<void(SendMenu::Action, SendMenu::Details)> action);
 
 	void updateFieldSubmitSettings();
 	bool clearMaybeSendStart();
@@ -422,8 +431,17 @@ private:
 	void messageDataReceived(not_null<PeerData*> peer, MsgId msgId);
 
 	[[nodiscard]] Api::SendAction prepareSendAction(
-		Api::SendOptions options) const;
+		Api::SendOptions options);
+	void sendTextWithTags(
+		TextWithTags textWithTags,
+		bool useWebPageDraft,
+		Api::SendOptions options,
+		Fn<void()> done);
 	void sendVoice(const VoiceToSend &data);
+	void sendWithTextOverride(
+		TextWithEntities text,
+		Api::SendOptions options,
+		Fn<void()> done);
 	void send(Api::SendOptions options);
 	void sendWithModifiers(Qt::KeyboardModifiers modifiers);
 	void sendScheduled(Api::SendOptions initialOptions);
@@ -461,7 +479,7 @@ private:
 	void supportInsertText(const QString &text);
 	void supportShareContact(Support::Contact contact);
 
-	auto computeSendButtonType() const;
+	[[nodiscard]] auto computeSendButtonType() const;
 
 	void showFinished();
 	void updateOverStates(QPoint pos);
@@ -469,6 +487,7 @@ private:
 	void sendButtonClicked();
 	void newItemAdded(not_null<HistoryItem*> item);
 	void maybeMarkReactionsRead(not_null<HistoryItem*> item);
+	void handleDrawToReplyRequest(Data::DrawToReplyRequest request);
 
 	bool canSendFiles(not_null<const QMimeData*> data) const;
 	bool confirmSendingFiles(
@@ -487,21 +506,14 @@ private:
 		Ui::PreparedList &&list,
 		const QString &insertTextOnCancel = QString());
 	bool showSendingFilesError(const Ui::PreparedList &list) const;
-	bool showSendingFilesError(
-		const Ui::PreparedList &list,
-		std::optional<bool> compress) const;
+	bool showSendingFilesError(const Ui::PreparedBundle &bundle) const;
+
 	bool showSendMessageError(
 		const TextWithTags &textWithTags,
 		bool ignoreSlowmodeCountdown,
 		Fn<void(int starsApproved)> withPaymentApproved = nullptr,
 		Api::SendOptions options = {});
 
-	void sendingFilesConfirmed(
-		Ui::PreparedList &&list,
-		Ui::SendFilesWay way,
-		TextWithTags &&caption,
-		Api::SendOptions options,
-		bool ctrlShiftEnter);
 	void sendingFilesConfirmed(
 		std::shared_ptr<Ui::PreparedBundle> bundle,
 		Api::SendOptions options);
@@ -517,10 +529,16 @@ private:
 	// like send button, emoji button and others.
 	void moveFieldControls();
 	void updateFieldSize();
+	void initAiButton();
+	void updateAiButtonVisibility();
+	void updateAiButtonGeometry();
+	void showAiComposeBox();
+	[[nodiscard]] bool canSendAiComposeDirect() const;
 
 	[[nodiscard]] MsgId resolveReplyToTopicRootId();
 	[[nodiscard]] Data::ForumTopic *resolveReplyToTopic();
 	[[nodiscard]] bool canWriteMessage() const;
+	[[nodiscard]] bool hasEnoughLinesForAi() const;
 	void orderWidgets();
 
 	[[nodiscard]] InlineBotQuery parseInlineBotQuery() const;
@@ -820,6 +838,7 @@ private:
 	std::unique_ptr<HistoryView::BusinessBotStatus> _businessBotStatus;
 
 	const std::shared_ptr<Ui::SendButton> _send;
+	HistoryView::Controls::ComposeAiButton * const _aiButton = nullptr;
 	object_ptr<Ui::FlatButton> _unblock;
 	object_ptr<Ui::FlatButton> _botStart;
 	object_ptr<Ui::FlatButton> _joinChannel;
@@ -853,6 +872,8 @@ private:
 	std::unique_ptr<HistoryView::SubsectionTabs> _subsectionTabs;
 	rpl::lifetime _subsectionTabsLifetime;
 	rpl::lifetime _subsectionCheckLifetime;
+	std::unique_ptr<HistoryView::Controls::AiTooltipManager> _aiTooltipManager;
+	std::shared_ptr<Ui::ChatStyle> _fieldChatStyle;
 	bool _cmdStartShown = false;
 	object_ptr<Ui::InputField> _field;
 	base::unique_qptr<Ui::RpWidget> _fieldDisabled;

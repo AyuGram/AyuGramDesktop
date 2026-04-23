@@ -8,10 +8,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "mtproto/sender.h"
+#include "ui/text/text_entity.h"
 
 class ApiWrap;
 class HistoryItem;
 struct PollData;
+struct PollMedia;
 
 namespace Main {
 class Session;
@@ -27,12 +29,20 @@ public:
 
 	void create(
 		const PollData &data,
+		const TextWithEntities &text,
 		SendAction action,
 		Fn<void()> done,
-		Fn<void()> fail);
+		Fn<void(bool fileReferenceExpired)> fail);
 	void sendVotes(
 		FullMsgId itemId,
 		const std::vector<QByteArray> &options);
+	void addAnswer(
+		FullMsgId itemId,
+		const TextWithEntities &text,
+		const PollMedia &media,
+		Fn<void()> done,
+		Fn<void(QString)> fail);
+	void deleteAnswer(FullMsgId itemId, const QByteArray &option);
 	void close(not_null<HistoryItem*> item);
 	void reloadResults(not_null<HistoryItem*> item);
 
@@ -41,6 +51,7 @@ private:
 	MTP::Sender _api;
 
 	base::flat_map<FullMsgId, mtpRequestId> _pollVotesRequestIds;
+	base::flat_map<FullMsgId, mtpRequestId> _pollAddAnswerRequestIds;
 	base::flat_map<FullMsgId, mtpRequestId> _pollCloseRequestIds;
 	base::flat_map<FullMsgId, mtpRequestId> _pollReloadRequestIds;
 

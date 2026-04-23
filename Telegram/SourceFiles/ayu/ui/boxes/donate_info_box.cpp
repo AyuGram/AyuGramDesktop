@@ -3,20 +3,16 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/ui/boxes/donate_info_box.h"
-
-#include <QSvgRenderer>
 
 #include "lang_auto.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/ui_integration.h"
 #include "data/data_session.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "info/channel_statistics/earn/earn_icons.h"
-#include "lang/lang_text_entity.h"
-
 #include "info/profile/info_profile_icon.h"
+#include "lang/lang_text_entity.h"
 #include "main/main_session.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_boxes.h"
@@ -36,6 +32,8 @@
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "window/window_session_controller.h"
+
+#include <QSvgRenderer>
 
 namespace Ui {
 namespace {

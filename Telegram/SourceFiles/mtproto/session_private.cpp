@@ -1135,6 +1135,8 @@ void SessionPrivate::onSentSome(uint64 size) {
 	if (!_waitForReceivedTimer.isActive()) {
 		auto remain = static_cast<uint64>(_waitForReceived);
 		if (!_oldConnection) {
+			Assert(remain <= kMaxReceiveTimeout);
+
 			// 8kb / sec, so 512 kb give 64 sec
 			auto remainBySize = size * _waitForReceived / 8192;
 			remain = std::clamp(
@@ -1212,7 +1214,9 @@ void SessionPrivate::waitReceivedFailed() {
 
 	DEBUG_LOG(("MTP Info: bad connection, _waitForReceived: %1ms").arg(_waitForReceived));
 	if (_waitForReceived < kMaxReceiveTimeout) {
-		_waitForReceived *= 2;
+		_waitForReceived = std::min(
+			_waitForReceived * 2,
+			kMaxReceiveTimeout);
 	}
 	doDisconnect();
 	if (_retryTimer.isActive()) {

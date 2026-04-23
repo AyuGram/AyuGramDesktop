@@ -65,6 +65,9 @@ QImage PrepareFrame(
 	if (hasAlpha && request.keepAlpha) {
 		cache.fill(Qt::transparent);
 	}
+	if (!QCoreApplication::instance()) { // fix crash on macOS on exit
+		return cache;
+	}
 	{
 		auto p = QPainter(&cache);
 		const auto framew = request.frame.width();

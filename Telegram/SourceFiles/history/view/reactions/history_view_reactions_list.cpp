@@ -24,6 +24,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer.h"
 #include "lang/lang_keys.h"
 
+// AyuGram includes
+#include "ayu/features/filters/filters_controller.h"
+
+
 namespace HistoryView::Reactions {
 namespace {
 
@@ -138,6 +142,9 @@ private:
 	auto &owner = window->session().data();
 	for (const auto &peerWithDate : whoReadIds->list) {
 		if (const auto peer = owner.peerLoaded(peerWithDate.peer)) {
+			if (FiltersController::isBlocked(peer)) {
+				continue;
+			}
 			result.push_back(peer);
 		}
 	}
@@ -261,7 +268,7 @@ void Controller::showReaction(const ReactionId &reaction) {
 		}) | ranges::views::transform(
 			&AllEntry::first
 		) | ranges::to_vector;
-		for (const auto peer : _filtered) {
+		for (const auto &peer : _filtered) {
 			appendRow(peer, _shownReaction);
 		}
 		_filteredOffset = QString();

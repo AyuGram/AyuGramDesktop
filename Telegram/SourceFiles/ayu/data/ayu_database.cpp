@@ -3,14 +3,11 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/data/ayu_database.h"
 
-#include <ranges>
-
-#include "entities.h"
+#include "ayu/data/entities.h"
 #include "ayu/libs/sqlite/sqlite_orm.h"
-
 #include "base/unixtime.h"
 
 using namespace sqlite_orm;
@@ -296,14 +293,38 @@ void addDeletedMessage(const DeletedMessage &message) {
 	}
 }
 
-std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit) {
+std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicId, ID minId, ID maxId, int totalLimit, const std::string &searchQuery) {
+	if (searchQuery.empty()) {
+		return storage.get_all<DeletedMessage>(
+			where(
+				column<DeletedMessage>(&DeletedMessage::userId) == userId and
+				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
+				(column<DeletedMessage>(&DeletedMessage::topicId) == topicId or topicId == 0) and
+				(column<DeletedMessage>(&DeletedMessage::messageId) > minId or minId == 0) and
+				(column<DeletedMessage>(&DeletedMessage::messageId) < maxId or maxId == 0)
+			),
+			order_by(column<DeletedMessage>(&DeletedMessage::messageId)).desc(),
+			limit(totalLimit)
+		);
+	}
+
+	std::string escaped;
+	escaped.reserve(searchQuery.size());
+	for (const auto c : searchQuery) {
+		if (c == '%' || c == '_' || c == '\\') {
+			escaped += '\\';
+		}
+		escaped += c;
+	}
+	const auto pattern = "%" + escaped + "%";
 	return storage.get_all<DeletedMessage>(
 		where(
 			column<DeletedMessage>(&DeletedMessage::userId) == userId and
 			column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
 			(column<DeletedMessage>(&DeletedMessage::topicId) == topicId or topicId == 0) and
 			(column<DeletedMessage>(&DeletedMessage::messageId) > minId or minId == 0) and
-			(column<DeletedMessage>(&DeletedMessage::messageId) < maxId or maxId == 0)
+			(column<DeletedMessage>(&DeletedMessage::messageId) < maxId or maxId == 0) and
+			like(column<DeletedMessage>(&DeletedMessage::text), pattern, "\\")
 		),
 		order_by(column<DeletedMessage>(&DeletedMessage::messageId)).desc(),
 		limit(totalLimit)

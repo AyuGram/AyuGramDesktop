@@ -49,6 +49,7 @@ PanelAskPassword::PanelAskPassword(
 	tr::lng_passport_password_placeholder())
 , _submit(this, tr::lng_passport_next(), st::passportPasswordSubmit)
 , _forgot(this, tr::lng_signin_recover(tr::now), st::defaultLinkButton) {
+	_submit->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	connect(_password, &Ui::PasswordInput::submitted, this, [=] {
 		submit();
 	});
@@ -229,6 +230,7 @@ void PanelNoPassword::refreshBottom() {
 				tr::lng_passport_password_create(),
 				st::defaultBoxButton),
 			style::al_top);
+		button->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 		button->addClickHandler([=] {
 			_controller->setupPassword();
 		});
@@ -241,8 +243,6 @@ void PanelNoPassword::refreshBottom() {
 			container,
 			tr::lng_cancel(),
 			st::defaultBoxButton);
-		cancel->setTextTransform(
-			Ui::RoundButton::TextTransform::NoTransform);
 		cancel->addClickHandler([=] {
 			_controller->cancelPasswordSubmit();
 		});
@@ -250,8 +250,6 @@ void PanelNoPassword::refreshBottom() {
 			container,
 			tr::lng_passport_email_validate(),
 			st::defaultBoxButton);
-		validate->setTextTransform(
-			Ui::RoundButton::TextTransform::NoTransform);
 		validate->addClickHandler([=] {
 			_controller->validateRecoveryEmail();
 		});

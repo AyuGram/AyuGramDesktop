@@ -31,6 +31,7 @@ public:
 	void applyModifications(PhotoModifications modifications);
 	void applyMode(const PhotoEditorMode &mode);
 	void applyBrush(const Brush &brush);
+	void applyAspectRatio(float64 ratio);
 	void save(PhotoModifications &modifications);
 
 	bool handleKeyPress(not_null<QKeyEvent*> e) const;

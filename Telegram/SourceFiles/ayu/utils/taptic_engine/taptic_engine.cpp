@@ -3,8 +3,8 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "taptic_engine.h"
+// Copyright @Radolyn, 2026
+#include "ayu/utils/taptic_engine/taptic_engine.h"
 
 #if defined Q_OS_MAC
 #include "ayu/utils/taptic_engine/platform/taptic_engine_mac.h"

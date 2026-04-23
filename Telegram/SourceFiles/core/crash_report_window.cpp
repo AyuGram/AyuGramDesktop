@@ -278,7 +278,7 @@ LastCrashedWindow::LastCrashedWindow(
 
 #ifndef TDESKTOP_DISABLE_AUTOUPDATE
 	const auto &settings = AyuSettings::getInstance();
-	if (!settings.crashReporting) {
+	if (!settings.crashReporting()) {
 #else
 	if (true) {
 #endif

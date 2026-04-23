@@ -50,7 +50,8 @@ private:
 	void paintTransformedContent(
 		not_null<QOpenGLShaderProgram*> program,
 		ContentGeometry geometry,
-		bool fillTransparentBackground);
+		bool fillTransparentBackground,
+		QRectF textureRect = QRectF(0., 0., 1., 1.));
 	void paintRadialLoading(
 		QRect inner,
 		bool radial,
@@ -58,6 +59,7 @@ private:
 	void paintThemePreview(QRect outer) override;
 	void paintDocumentBubble(QRect outer, QRect icon) override;
 	void paintSaveMsg(QRect outer) override;
+	void paintChapter(QRect outer) override;
 	void paintControlsStart() override;
 	void paintControl(
 		Over control,
@@ -143,6 +145,7 @@ private:
 	Ui::GL::Image _documentBubbleImage;
 	Ui::GL::Image _themePreviewImage;
 	Ui::GL::Image _saveMsgImage;
+	Ui::GL::Image _chapterImage;
 	Ui::GL::Image _footerImage;
 	Ui::GL::Image _captionImage;
 	Ui::GL::Image _groupThumbsImage;
@@ -151,7 +154,7 @@ private:
 	static constexpr auto kStoriesSiblingPartsCount = 4;
 	Ui::GL::Image _storiesSiblingParts[kStoriesSiblingPartsCount];
 
-	static constexpr auto kControlsCount = 7;
+	static constexpr auto kControlsCount = 8;
 	[[nodiscard]] Control controlMeta(Over control) const;
 
 	// Last one is for the over circle image.

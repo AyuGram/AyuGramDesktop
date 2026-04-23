@@ -25,7 +25,9 @@ public:
 		TimeId when,
 		const MTPDsendMessageTextDraftAction &data);
 
+	[[nodiscard]] bool hasFor(not_null<HistoryItem*> item) const;
 	void applyItemAdded(not_null<HistoryItem*> item);
+	void applyItemRemoved(not_null<HistoryItem*> item);
 
 private:
 	struct Draft {

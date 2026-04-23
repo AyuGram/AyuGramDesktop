@@ -47,8 +47,12 @@ public:
 		const QMap<QString, QString> &fields);
 
 	static object_ptr<Ui::BoxContent> CreateOwningBox(
-		not_null<Main::Account*> account);
-	object_ptr<Ui::BoxContent> create();
+		not_null<Main::Account*> account,
+		const QString &highlightId = QString());
+	static void Show(
+		not_null<Window::SessionController*> controller,
+		const QString &highlightId = QString());
+	object_ptr<Ui::BoxContent> create(const QString &highlightId = QString());
 
 	enum class ItemState {
 		Connecting,
@@ -113,7 +117,6 @@ private:
 	void share(const ProxyData &proxy, bool qr = false);
 	void saveDelayed();
 	void refreshChecker(Item &item);
-	void setupChecker(int id, const Checker &checker);
 
 	void replaceItemWith(
 		std::vector<Item>::iterator which,

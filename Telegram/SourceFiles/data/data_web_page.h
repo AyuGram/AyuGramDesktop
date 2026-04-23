@@ -53,6 +53,7 @@ enum class WebPageType : uint8 {
 	StoryAlbum,
 	GiftCollection,
 	Auction,
+	NewBot,
 
 	Article,
 	ArticleWithIV,

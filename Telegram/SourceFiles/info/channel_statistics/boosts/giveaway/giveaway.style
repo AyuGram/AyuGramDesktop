@@ -230,6 +230,7 @@ darkGiftLink: icon {{ "menu/copy", groupCallMembersFg }};
 darkGiftShare: icon {{ "menu/share", groupCallMembersFg }};
 darkGiftTheme: icon {{ "menu/colors", groupCallMembersFg }};
 darkGiftTransfer: icon {{ "chat/input_replace", groupCallMembersFg }};
+darkGiftCraft: icon {{ "menu/craft_start-24x24", groupCallMembersFg }};
 darkGiftNftWear: icon {{ "menu/nft_wear", groupCallMembersFg }};
 darkGiftNftTakeOff: icon {{ "menu/nft_takeoff", groupCallMembersFg }};
 darkGiftNftResell: icon {{ "menu/tag_sell", groupCallMembersFg }};

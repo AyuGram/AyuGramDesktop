@@ -208,6 +208,21 @@ windowOutdatedClose: IconButton(defaultIconButton) {
 	iconPosition: point(-1px, -1px);
 }
 
+windowScreenReaderLabel: FlatLabel(defaultFlatLabel) {
+	align: align(left);
+	textFg: activeButtonFg;
+	style: semiboldTextStyle;
+}
+windowScreenReaderPadding: margins(12px, 4px, 4px, 4px);
+windowScreenReaderDisableTextStyle: semiboldTextStyle;
+windowScreenReaderButtonPadding: margins(12px, 0px, 12px, 0px);
+windowScreenReaderButtonHeight: 28px;
+windowScreenReaderButtonBorderWidth: 2px;
+windowScreenReaderButtonRadius: 14px;
+windowScreenReaderButtonRipple: RippleAnimation(defaultRippleAnimation) {
+	color: activeButtonBgRipple;
+}
+
 createThemeImportButton: SettingsButton(defaultSettingsButton) {
 	textFg: lightButtonFg;
 	textFgOver: lightButtonFgOver;

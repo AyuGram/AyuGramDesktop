@@ -3,33 +3,25 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/ui/boxes/import_filters_box.h"
-
-#include "qr/qr_generate.h"
-#include "styles/style_boxes.h"
-#include "styles/style_intro.h"
-#include "styles/style_layers.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/rp_widget.h"
-#include "ui/vertical_list.h"
-#include "ui/controls/invite_link_label.h"
-#include "ui/layers/generic_box.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/input_field.h"
-
-#include <QtGui/QClipboard>
-#include <QtGui/QGuiApplication>
-#include <QtSvg/QSvgRenderer>
 
 #include "lang_auto.h"
 #include "ayu/features/filters/filters_utils.h"
 #include "styles/style_giveaway.h"
+#include "styles/style_layers.h"
 #include "styles/style_settings.h"
+#include "ui/rect.h"
+#include "ui/rp_widget.h"
+#include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/slide_wrap.h"
+
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 
 namespace Ui {
 

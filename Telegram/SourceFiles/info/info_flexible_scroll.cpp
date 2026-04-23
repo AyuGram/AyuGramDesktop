@@ -242,7 +242,7 @@ void FlexibleScrollHelper::setupScrollHandlingWithFilter() {
 		}
 		const auto wheel = static_cast<QWheelEvent*>(e.get());
 		const auto delta = wheel->angleDelta().y();
-		if (std::abs(delta) != 120) {
+		if (std::abs(delta) != 120 || (wheel->phase() != Qt::NoScrollPhase)) {
 			scrollToY(_scroll->scrollTop() - delta);
 			return base::EventFilterResult::Cancel;
 		}

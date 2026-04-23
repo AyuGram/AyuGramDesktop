@@ -66,6 +66,12 @@ int AppConfig::stargiftConvertPeriodMax() const {
 		_account->mtp().isTestMode() ? 300 : (90 * 86400));
 }
 
+int AppConfig::noForwardsRequestExpirePeriod() const {
+	return get<int>(
+		u"no_forwards_request_expire_period"_q,
+		_account->mtp().isTestMode() ? 300 : 86400);
+}
+
 const std::vector<QString> &AppConfig::startRefPrefixes() {
 	if (_startRefPrefixes.empty()) {
 		_startRefPrefixes = get<std::vector<QString>>(
@@ -188,6 +194,10 @@ int AppConfig::pollOptionsLimit() const {
 	return get<int>(u"poll_answers_max"_q, 12);
 }
 
+int AppConfig::pollAnswerDeletePeriod() const {
+	return get<int>(u"poll_answer_delete_period"_q, 300);
+}
+
 int AppConfig::todoListItemsLimit() const {
 	return get<int>(
 		u"todo_items_max"_q,
@@ -280,6 +290,27 @@ bool AppConfig::settingsDisplayPasskeys() const {
 	return get<bool>(u"settings_display_passkeys"_q, false);
 }
 
+int64 AppConfig::stakeDiceNanoTonMin() const {
+	return get<int64>(u"ton_stakedice_stake_amount_min"_q, 100'000'000LL);
+}
+
+int64 AppConfig::stakeDiceNanoTonMax() const {
+	return get<int64>(u"ton_stakedice_stake_amount_max"_q, 50'000'000'000LL);
+}
+
+std::vector<int64> AppConfig::stakeDiceNanoTonSuggested() const {
+	return get<std::vector<int64>>(
+		u"ton_stakedice_stake_suggested_amounts"_q,
+		std::vector<int64>{
+			100'000'000LL,
+			1'000'000'000LL,
+			2'000'000'000LL,
+			5'000'000'000LL,
+			10'000'000'000LL,
+			20'000'000'000LL,
+		});
+}
+
 void AppConfig::refresh(bool force) {
 	if (_requestId || !_api) {
 		if (force) {
@@ -310,6 +341,7 @@ void AppConfig::refresh(bool force) {
 			}
 			updateIgnoredRestrictionReasons(std::move(was));
 
+			_aiComposeStyles.reset();
 			_groupCallColorings = {};
 
 			DEBUG_LOG(("getAppConfig result handled."));
@@ -464,10 +496,93 @@ std::vector<int> AppConfig::getIntArray(
 	});
 }
 
+std::vector<std::vector<int>> AppConfig::getIntIntArray(
+		const QString &key,
+		std::vector<std::vector<int>> &&fallback) const {
+	return getValue(key, [&](const MTPJSONValue &value) {
+		return value.match([&](const MTPDjsonArray &data) {
+			auto result = std::vector<std::vector<int>>();
+			result.reserve(data.vvalue().v.size());
+			for (const auto &entry : data.vvalue().v) {
+				if (entry.type() != mtpc_jsonArray) {
+					return std::move(fallback);
+				}
+				const auto &list = entry.c_jsonArray().vvalue().v;
+				auto &last = result.emplace_back();
+				last.reserve(list.size());
+				for (const auto &inner : list) {
+					if (inner.type() != mtpc_jsonNumber) {
+						return std::move(fallback);
+					}
+					last.push_back(
+						int(base::SafeRound(inner.c_jsonNumber().vvalue().v)));
+				}
+			}
+			return result;
+		}, [&](const auto &data) {
+			return std::move(fallback);
+		});
+	});
+}
+
+std::vector<int64> AppConfig::getInt64Array(
+		const QString &key,
+		std::vector<int64> &&fallback) const {
+	return getValue(key, [&](const MTPJSONValue &value) {
+		return value.match([&](const MTPDjsonArray &data) {
+			auto result = std::vector<int64>();
+			result.reserve(data.vvalue().v.size());
+			for (const auto &entry : data.vvalue().v) {
+				if (entry.type() != mtpc_jsonNumber) {
+					return std::move(fallback);
+				}
+				result.push_back(
+					int64(base::SafeRound(entry.c_jsonNumber().vvalue().v)));
+			}
+			return result;
+		}, [&](const auto &data) {
+			return std::move(fallback);
+		});
+	});
+}
+
 bool AppConfig::newRequirePremiumFree() const {
 	return get<bool>(
 		u"new_noncontact_peers_require_premium_without_ownpremium"_q,
 		false);
+}
+
+std::vector<AppConfig::AiComposeStyle> AppConfig::aiComposeStyles() const {
+	if (_aiComposeStyles) {
+		return *_aiComposeStyles;
+	}
+	_aiComposeStyles = getValue(u"ai_compose_styles"_q, [&](const auto &value) {
+		return value.match([&](const MTPDjsonArray &data) {
+			auto result = std::vector<AiComposeStyle>();
+			result.reserve(data.vvalue().v.size());
+			for (const auto &entry : data.vvalue().v) {
+				if (entry.type() != mtpc_jsonArray) {
+					return std::vector<AiComposeStyle>();
+				}
+				const auto &list = entry.c_jsonArray().vvalue().v;
+				if (list.size() < 3
+					|| (list[0].type() != mtpc_jsonString)
+					|| (list[1].type() != mtpc_jsonString)
+					|| (list[2].type() != mtpc_jsonString)) {
+					return std::vector<AiComposeStyle>();
+				}
+				result.push_back({
+					.type = qs(list[0].c_jsonString().vvalue()),
+					.emojiId = qs(list[1].c_jsonString().vvalue()).toULongLong(),
+					.title = qs(list[2].c_jsonString().vvalue()),
+				});
+			}
+			return result;
+		}, [&](const auto &) {
+			return std::vector<AiComposeStyle>();
+		});
+	});
+	return *_aiComposeStyles;
 }
 
 auto AppConfig::groupCallColorings() const -> std::vector<StarsColoring> {
@@ -600,6 +715,17 @@ auto AppConfig::groupCallColorings() const -> std::vector<StarsColoring> {
 		ranges::sort(_groupCallColorings, ranges::less(), proj);
 	}
 	return _groupCallColorings;
+}
+
+std::vector<std::vector<int>> AppConfig::craftAttributePermilles() const {
+	return get<std::vector<std::vector<int>>>(
+		u"stargifts_craft_attribute_permilles"_q,
+		{
+			{ 90 },
+			{ 80, 200 },
+			{ 70, 190, 460 },
+			{ 60, 180, 450, 1000 },
+		});
 }
 
 } // namespace Main

@@ -76,6 +76,8 @@ BadgesState BadgesForUnread(
 		.mention = (state.mentions > 0),
 		.reaction = (state.reactions > 0),
 		.reactionMuted = (state.reactions <= state.reactionsMuted),
+		.poll = (state.polls > 0),
+		.pollMuted = (state.polls <= state.pollsMuted),
 	};
 }
 

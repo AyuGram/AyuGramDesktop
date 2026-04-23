@@ -158,7 +158,9 @@ QImage ConvertFrame(
 
 	const auto format = AV_PIX_FMT_BGRA;
 	const auto hasDesiredFormat = (frame->format == format);
-	if (frameSize == storage.size() && hasDesiredFormat) {
+	if (hasDesiredFormat
+		&& frameSize == storage.size()
+		&& frame->linesize[0] > 0) {
 		static_assert(sizeof(uint32) == FFmpeg::kPixelBytesSize);
 		auto to = reinterpret_cast<uint32*>(storage.bits());
 		auto from = reinterpret_cast<const uint32*>(frame->data[0]);

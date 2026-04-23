@@ -208,6 +208,7 @@ struct UpdatedFileReferences {
 UpdatedFileReferences GetFileReferences(const MTPmessages_Messages &data);
 UpdatedFileReferences GetFileReferences(const MTPphotos_Photos &data);
 UpdatedFileReferences GetFileReferences(const MTPusers_UserFull &data);
+UpdatedFileReferences GetFileReferences(const MTPmessages_ChatFull &data);
 UpdatedFileReferences GetFileReferences(
 	const MTPmessages_RecentStickers &data);
 UpdatedFileReferences GetFileReferences(

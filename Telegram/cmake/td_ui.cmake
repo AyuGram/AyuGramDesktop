@@ -28,6 +28,7 @@ set(style_files
     ui/effects/premium.style
     ui/color_indices.style
     boxes/boxes.style
+    boxes/polls.style
     dialogs/dialogs.style
     chat_helpers/chat_helpers.style
     calls/calls.style
@@ -70,6 +71,11 @@ PRIVATE
     boxes/peers/edit_peer_history_visibility_box.h
     boxes/peers/toggle_topics_box.cpp
     boxes/peers/toggle_topics_box.h
+
+    boxes/url_auth_box_content.cpp
+    boxes/url_auth_box_content.h
+    boxes/translate_box_content.cpp
+    boxes/translate_box_content.h
 
     calls/group/ui/calls_group_recording_box.cpp
     calls/group/ui/calls_group_recording_box.h
@@ -150,6 +156,9 @@ PRIVATE
     editor/scene/scene_item_line.cpp
     editor/scene/scene_item_line.h
 
+    ui/boxes/about_cocoon_box.h
+    ui/boxes/about_cocoon_box.cpp
+
     history/admin_log/history_admin_log_filter_value.h
     history/history_view_top_toast.cpp
     history/history_view_top_toast.h
@@ -216,10 +225,14 @@ PRIVATE
 
     menu/gift_resale_filter.cpp
     menu/gift_resale_filter.h
+    menu/menu_checked_action.cpp
+    menu/menu_checked_action.h
     menu/menu_check_item.cpp
     menu/menu_check_item.h
     menu/menu_item_rate_transcribe.cpp
     menu/menu_item_rate_transcribe.h
+    menu/menu_timecode_action.cpp
+    menu/menu_timecode_action.h
     menu/menu_ttl.cpp
     menu/menu_ttl.h
 
@@ -258,6 +271,9 @@ PRIVATE
     platform/platform_file_bookmark.h
     platform/platform_current_geo_location.h
     platform/platform_text_recognition.h
+
+    profile/profile_back_button.cpp
+    profile/profile_back_button.h
 
     settings/settings_common.cpp
     settings/settings_common.h
@@ -403,6 +419,8 @@ PRIVATE
     ui/controls/delete_message_context_action.h
     ui/controls/download_bar.cpp
     ui/controls/download_bar.h
+    ui/controls/dynamic_images_strip.cpp
+    ui/controls/dynamic_images_strip.h
     ui/controls/emoji_button.cpp
     ui/controls/emoji_button.h
     ui/controls/feature_list.cpp
@@ -415,8 +433,12 @@ PRIVATE
     ui/controls/invite_link_buttons.h
     ui/controls/invite_link_label.cpp
     ui/controls/invite_link_label.h
+    ui/controls/labeled_emoji_tabs.cpp
+    ui/controls/labeled_emoji_tabs.h
     ui/controls/peer_list_dummy.cpp
     ui/controls/peer_list_dummy.h
+    ui/controls/popup_selector.cpp
+    ui/controls/popup_selector.h
     ui/controls/round_video_recorder_data.h
     ui/controls/round_video_recorder.cpp
     ui/controls/round_video_recorder.h
@@ -444,6 +466,8 @@ PRIVATE
     ui/controls/window_outdated_bar.cpp
     ui/controls/window_outdated_bar_dummy.cpp
     ui/controls/window_outdated_bar.h
+    ui/controls/window_screen_reader_bar.cpp
+    ui/controls/window_screen_reader_bar.h
     ui/effects/fireworks_animation.cpp
     ui/effects/fireworks_animation.h
     ui/effects/glare.cpp
@@ -468,12 +492,18 @@ PRIVATE
     ui/effects/round_checkbox.h
     ui/effects/scroll_content_shadow.cpp
     ui/effects/scroll_content_shadow.h
+    ui/effects/skeleton_animation.cpp
+    ui/effects/skeleton_animation.h
     ui/effects/shake_animation.cpp
     ui/effects/shake_animation.h
     ui/effects/snowflakes.cpp
     ui/effects/snowflakes.h
     ui/effects/toggle_arrow.cpp
     ui/effects/toggle_arrow.h
+    ui/effects/upload_progress_overlay.cpp
+    ui/effects/upload_progress_overlay.h
+    ui/effects/ttl_icon.cpp
+    ui/effects/ttl_icon.h
     ui/search_field_controller.cpp
     ui/search_field_controller.h
     ui/text/format_song_name.cpp
@@ -494,6 +524,8 @@ PRIVATE
     ui/widgets/chat_filters_tabs_slider.h
     ui/widgets/chat_filters_tabs_slider_reorder.cpp
     ui/widgets/chat_filters_tabs_slider_reorder.h
+    ui/widgets/cross_fade_label.cpp
+    ui/widgets/cross_fade_label.h
     ui/widgets/color_editor.cpp
     ui/widgets/color_editor.h
     ui/widgets/continuous_sliders.cpp
@@ -506,6 +538,8 @@ PRIVATE
     ui/widgets/horizontal_fit_container.h
     ui/widgets/level_meter.cpp
     ui/widgets/level_meter.h
+    ui/widgets/middle_click_autoscroll.cpp
+    ui/widgets/middle_click_autoscroll.h
     ui/widgets/multi_select.cpp
     ui/widgets/multi_select.h
     ui/widgets/sent_code_field.cpp

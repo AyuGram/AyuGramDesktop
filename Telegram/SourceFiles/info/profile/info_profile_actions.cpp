@@ -56,7 +56,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
-#include "info/profile/info_profile_cover.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_text.h"
@@ -80,6 +79,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
 #include "ui/text/text_variant.h"
 #include "ui/toast/toast.h"
 #include "ui/vertical_list.h"
@@ -96,6 +96,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_controller.h" // Window::Controller::show.
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+#include "styles/style_boxes.h"
 #include "styles/style_channel_earn.h" // st::channelEarnCurrencyCommonMargins
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
@@ -107,7 +108,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 
 // AyuGram includes
-#include "ayu/ayu_settings.h"
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/event_filter.h"
@@ -127,7 +127,6 @@ base::options::toggle ShowPeerIdBelowAbout({
 	.name = "Show Peer IDs in Profile",
 	.description = "Show peer IDs from API below their Bio / Description."
 		" Add contact IDs to exported data.",
-	.scope = static_cast<base::options::details::ScopeFlag>(0),
 });
 
 base::options::toggle ShowChannelJoinedBelowAbout({
@@ -222,26 +221,11 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 	return AboutValue(
 		peer
 	) | rpl::map([=](TextWithEntities &&value) {
-		if (ShowPeerIdBelowAbout.value()) {
-			using namespace Ui::Text;
-			if (!value.empty()) {
-				value.append("\n\n");
-			}
-			value.append(Italic(u"id: "_q));
-			const auto raw = peer->id.value & PeerId::kChatTypeMask;
-			value.append(Link(
-				Italic(Lang::FormatCountDecimal(raw)),
-				"internal:~peer_id~:copy:" + QString::number(raw)));
-		}
 		if (ShowChannelJoinedBelowAbout.value()) {
 			if (const auto channel = peer->asChannel()) {
 				if (!channel->amCreator() && channel->inviteDate) {
 					if (!value.empty()) {
-						if (ShowPeerIdBelowAbout.value()) {
-							value.append("\n");
-						} else {
-							value.append("\n\n");
-						}
+						value.append("\n\n");
 					}
 					using namespace Ui::Text;
 					value.append((channel->isMegagroup()
@@ -407,6 +391,7 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 			st::infoHoursOuter),
 		st::infoProfileLabeledPadding - st::infoHoursOuterMargin);
 	const auto button = result->entity();
+	button->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 	const auto inner = Ui::CreateChild<Ui::VerticalLayout>(button);
 	button->widthValue() | rpl::on_next([=](int width) {
 		const auto margin = st::infoHoursOuterMargin;
@@ -590,6 +575,33 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 		openedWrap->resize(width, std::max(h1, size.height()) - added);
 	}, openedWrap->lifetime());
 
+	rpl::combine(
+		state->opened.value(),
+		state->opensIn.value(),
+		state->expanded.value(),
+		dayHoursTextValue(state->day.value())
+	) | rpl::on_next([=](
+			bool opened,
+			TimeId opensIn,
+			bool expanded,
+			const QString &timing) {
+		const auto status = (opened
+			? tr::lng_info_work_open
+			: tr::lng_info_work_closed)(tr::now);
+		const auto when = (!opensIn || expanded)
+			? timing
+			: (opensIn >= 86400)
+			? tr::lng_info_hours_opens_in_days(tr::now, lt_count, opensIn / 86400)
+			: (opensIn >= 3600)
+			? tr::lng_info_hours_opens_in_hours(tr::now, lt_count, opensIn / 3600)
+			: tr::lng_info_hours_opens_in_minutes(
+				tr::now,
+				lt_count,
+				std::max(opensIn / 60, 1));
+		button->setAccessibleName(
+			tr::lng_info_hours_label(tr::now) + ": " + status + ", " + when);
+	}, inner->lifetime());
+
 	const auto labelWrap = inner->add(object_ptr<Ui::RpWidget>(inner));
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
 		labelWrap,
@@ -616,7 +628,6 @@ base::options::toggle ShowChannelJoinedBelowAbout({
 		labelWrap,
 		std::move(linkText),
 		st::defaultTableSmallButton);
-	link->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 	link->setClickedCallback([=] {
 		state->myTimezone = !state->myTimezone.current();
 		state->expanded = true;
@@ -870,6 +881,7 @@ void DeleteContactNote(
 		st::infoProfileLabeledPadding - st::infoHoursOuterMargin);
 	result->setDuration(st::infoSlideDuration);
 	const auto button = result->entity();
+	button->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 
 	auto outer = Ui::CreateChild<Ui::SlideWrap<Ui::VerticalLayout>>(
 		button,
@@ -913,6 +925,14 @@ void DeleteContactNote(
 		button->clearState();
 		giftIcon->setVisible(!disable);
 	}, result->lifetime());
+
+	BirthdayValueText(
+		rpl::duplicate(birthday),
+		true
+	) | rpl::on_next([=](const QString &accessibleText) {
+		button->setAccessibleName(
+			tr::lng_info_birthday_label(tr::now) + ": " + accessibleText);
+	}, button->lifetime());
 
 	auto nonEmptyText = std::move(
 		text
@@ -1196,7 +1216,7 @@ public:
 private:
 	object_ptr<Ui::RpWidget> setupPersonalChannel(not_null<UserData*> user);
 	object_ptr<Ui::RpWidget> setupInfo();
-	void setupMainApp();
+	void setupMainApp(bool suppressBottom = false);
 	void setupBotPermissions();
 	void addShowTopicsListButton(
 		Ui::MultiSlideTracker &tracker,
@@ -1458,8 +1478,6 @@ void AddRegistrationOrCreationButton(const not_null<Window::SessionController*> 
 }
 
 object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
-	const auto &settings = AyuSettings::getInstance();
-
 	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 		_wrap,
 		object_ptr<Ui::VerticalLayout>(_wrap));
@@ -1746,6 +1764,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 		const auto qrButton = Ui::CreateChild<Ui::IconButton>(
 			usernameLine.text->parentWidget(),
 			st::infoProfileLabeledButtonQr);
+		qrButton->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
 		UsernamesValue(_peer) | rpl::on_next([=](const auto &u) {
 			qrButton->setVisible(!u.empty());
 		}, qrButton->lifetime());
@@ -1789,7 +1808,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			).text->setLinksTrusted();
 		}
 
-		if (settings.showPeerId != 0) {
+		{
 			const auto dataCenter = getPeerDC(_peer);
 			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
 
@@ -1854,6 +1873,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			const auto qr = Ui::CreateChild<Ui::IconButton>(
 				linkLine.text->parentWidget(),
 				st::infoProfileLabeledButtonQr);
+			qr->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
 			UsernamesValue(_peer) | rpl::on_next([=](const auto &u) {
 				qr->setVisible(!u.empty());
 			}, qr->lifetime());
@@ -1922,7 +1942,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			addTranslateToMenu(about.text, AboutWithAdvancedValue(_peer));
 		}
 
-		if (settings.showPeerId != 0 && !_topic) {
+		if (!_topic) {
 			const auto dataCenter = getPeerDC(_peer);
 			const auto idLabel = dataCenter.isEmpty() ? QString("ID") : dataCenter;
 
@@ -1950,7 +1970,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupInfo() {
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
 
-		if (settings.showPeerId != 0 && _topic) {
+		if (_topic) {
 			auto idDrawableText = IDValue(
 				_peer->forumTopicFor(topicRootId)->topicRootId()
 			) | rpl::map([](TextWithEntities &&text)
@@ -2006,12 +2026,14 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 		) | rpl::map([](TextWithEntities &&text, ChannelData *channel) {
 			const auto count = channel ? channel->membersCount() : 0;
 			if (count > 1) {
-				text.append(
-					QString::fromUtf8(" \xE2\x80\xA2 ")
-				).append(tr::lng_chat_status_subscribers(
-					tr::now,
-					lt_count_decimal,
-					count));
+				text.append(' ')
+				.append(Ui::kQBullet)
+				.append(' ')
+				.append(
+					tr::lng_chat_status_subscribers(
+						tr::now,
+						lt_count_decimal,
+						count));
 			}
 			return text;
 		});
@@ -2248,6 +2270,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 				button->lower();
 				inner->lifetime().make_state<base::unique_qptr<Ui::RpWidget>>(
 					button);
+				button->setAccessibleName(tr::lng_profile_view_channel(tr::now));
 			}
 			inner->setAttribute(Qt::WA_TransparentForMouseEvents);
 			Ui::AddSkip(messageChannelWrap->entity());
@@ -2289,7 +2312,7 @@ object_ptr<Ui::RpWidget> DetailsFiller::setupPersonalChannel(
 	return result;
 }
 
-void DetailsFiller::setupMainApp() {
+void DetailsFiller::setupMainApp(bool suppressBottom) {
 	const auto button = _wrap->add(
 		object_ptr<Ui::RoundButton>(
 			_wrap,
@@ -2297,7 +2320,6 @@ void DetailsFiller::setupMainApp() {
 			st::infoOpenApp),
 		st::infoOpenAppMargin,
 		style::al_justify);
-	button->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 
 	const auto user = _peer->asUser();
 	const auto controller = _controller->parentController();
@@ -2313,6 +2335,9 @@ void DetailsFiller::setupMainApp() {
 	});
 
 	const auto url = tr::lng_mini_apps_tos_url(tr::now);
+	const auto parts = suppressBottom
+		? RectPart::Top
+		: (RectPart::Top | RectPart::Bottom);
 	const auto divider = Ui::AddDividerText(
 		_wrap,
 		rpl::combine(
@@ -2328,7 +2353,10 @@ void DetailsFiller::setupMainApp() {
 				text = text.append(u"\n\n"_q).append(verify->description);
 			}
 			return text;
-		}));
+		}),
+		st::defaultBoxDividerLabelPadding,
+		st::defaultDividerLabel,
+		parts);
 	divider->setClickHandlerFilter([=](const auto &...) {
 		UrlClickHandler::Open(url);
 		return false;
@@ -2535,11 +2563,48 @@ object_ptr<Ui::RpWidget> DetailsFiller::fill() {
 		if (const auto info = user->botInfo.get()) {
 			if (info->hasMainApp) {
 				_dividerOverridden.force_assign(true);
-				setupMainApp();
+				const auto managedBotFollows = user->botManagerId()
+					&& !info->canManageEmojiStatus
+					&& user->owner().userLoaded(user->botManagerId());
+				setupMainApp(managedBotFollows);
 			}
 			if (info->canManageEmojiStatus) {
 				_dividerOverridden.force_assign(false);
 				setupBotPermissions();
+			}
+			if (user->botManagerId()) {
+				if (const auto managerUser = user->owner().userLoaded(
+						user->botManagerId())) {
+					if (!info->hasMainApp) {
+						_dividerOverridden.force_assign(true);
+					}
+					const auto botUsername = managerUser->username();
+					const auto linkText = botUsername.isEmpty()
+						? managerUser->name()
+						: (u"@"_q + botUsername);
+					const auto parts = (info->hasMainApp && !info->canManageEmojiStatus)
+						? RectPart::Bottom
+						: (RectPart::Top | RectPart::Bottom);
+					Ui::AddSkip(_wrap);
+					const auto divider = Ui::AddDividerText(
+						_wrap,
+						tr::lng_managed_bot_label(
+							lt_icon,
+							rpl::single(Ui::Text::IconEmoji(&st::managedBotIconEmoji)),
+							lt_bot,
+							rpl::single(tr::link(linkText)),
+							tr::marked),
+						st::defaultBoxDividerLabelPadding,
+						st::defaultDividerLabel,
+						parts);
+					const auto weak = base::make_weak(_controller);
+					divider->setClickHandlerFilter([=](const auto &...) {
+						if (const auto strong = weak.get()) {
+							strong->showPeerInfo(managerUser);
+						}
+						return false;
+					});
+				}
 			}
 		}
 		if (!user->isSelf() && !_sublist) {
@@ -2812,7 +2877,10 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 		tr::lng_profile_bot_help(),
 		u"help"_q,
 		&st::infoIconInformation);
-	addBotCommand(tr::lng_profile_bot_settings(), u"settings"_q);
+	addBotCommand(
+		tr::lng_profile_bot_settings(),
+		u"settings"_q,
+		&st::infoIconSettings);
 	//addBotCommand(tr::lng_profile_bot_privacy(), u"privacy"_q);
 	const auto openUrl = [=](const QString &url) {
 		Core::App().iv().openWithIvPreferred(
@@ -2836,7 +2904,7 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 		tr::lng_profile_bot_privacy(),
 		rpl::single(true),
 		openPrivacyPolicy,
-		nullptr);
+		&st::infoIconPrivacyPolicy);
 }
 
 void ActionsFiller::addReportAction() {
@@ -3071,6 +3139,7 @@ void SetupAddChannelMember(
 	auto add = Ui::CreateChild<Ui::IconButton>(
 		parent.get(),
 		st::infoMembersAddMember);
+	add->setAccessibleName(tr::lng_channel_add_members(tr::now));
 	add->showOn(CanAddMemberValue(channel));
 	add->addClickHandler([=] {
 		Window::PeerMenuAddChannelMembers(navigation, channel);
@@ -3281,33 +3350,6 @@ object_ptr<Ui::RpWidget> SetupChannelMembersAndManage(
 
 	result->entity()->add(CreateSkipWidget(result));
 
-	return result;
-}
-
-Cover *AddCover(
-		not_null<Ui::VerticalLayout*> container,
-		not_null<Controller*> controller,
-		not_null<PeerData*> peer,
-		Data::ForumTopic *topic,
-		Data::SavedSublist *sublist) {
-	const auto shown = sublist ? sublist->sublistPeer() : peer;
-	const auto result = topic
-		? container->add(object_ptr<Cover>(
-			container,
-			controller->parentController(),
-			topic))
-		: container->add(object_ptr<Cover>(
-			container,
-			controller->parentController(),
-			shown,
-			[=] { return controller->wrapWidget(); }));
-	result->showSection(
-	) | rpl::on_next([=](Section section) {
-		controller->showSection(topic
-			? std::make_shared<Info::Memento>(topic, section)
-			: std::make_shared<Info::Memento>(shown, section));
-	}, result->lifetime());
-	result->setOnlineCount(rpl::single(0));
 	return result;
 }
 

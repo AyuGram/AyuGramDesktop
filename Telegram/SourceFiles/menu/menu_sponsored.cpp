@@ -249,6 +249,7 @@ void AboutBox(
 			box,
 			tr::lng_box_ok(),
 			st::defaultActiveButton);
+		button->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 		button->resizeToWidth(box->width()
 			- st.buttonPadding.left()
 			- st.buttonPadding.left());
@@ -318,7 +319,7 @@ void ShowReportSponsoredBox(
 			}
 			if (!result.options.empty()) {
 				show->show(Box([=](not_null<Ui::GenericBox*> box) {
-					box->setTitle(rpl::single(result.title));
+					box->setTitle(result.title);
 
 					for (const auto &option : result.options) {
 						const auto button = Ui::AddReportOptionButton(
@@ -408,7 +409,7 @@ void FillSponsored(
 			};
 			for (const auto &i : info) {
 				auto item = base::make_unique_q<Ui::Menu::MultilineAction>(
-					menu,
+					menu->menu(),
 					dark ? st::storiesMenu : st::defaultMenu,
 					(dark
 						? st::historySponsorInfoItemDark

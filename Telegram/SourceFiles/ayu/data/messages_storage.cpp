@@ -3,22 +3,18 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #include "ayu/data/messages_storage.h"
 
 #include "ayu/data/ayu_database.h"
 #include "ayu/utils/ayu_mapper.h"
 #include "ayu/utils/telegram_helpers.h"
-
 #include "base/unixtime.h"
-
 #include "data/data_forum_topic.h"
 #include "data/data_session.h"
-
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
-
 #include "main/main_session.h"
 
 namespace AyuMessages {
@@ -127,10 +123,10 @@ void addDeletedMessage(not_null<HistoryItem*> item) {
 }
 
 std::vector<AyuMessageBase>
-getDeletedMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit) {
+getDeletedMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit, const QString &searchQuery) {
 	const ID userId = peer->session().userId().bare & PeerId::kChatTypeMask;
 	return convertToBase(
-		AyuDatabase::getDeletedMessages(userId, getDialogIdFromPeer(peer), topicId, minId, maxId, totalLimit));
+		AyuDatabase::getDeletedMessages(userId, getDialogIdFromPeer(peer), topicId, minId, maxId, totalLimit, searchQuery.toStdString()));
 }
 
 bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId) {

@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/shadow.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/effects/radial_animation.h"
 #include "ui/boxes/report_box_graphics.h" // Ui::ReportReason
@@ -58,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_send_action.h"
 #include "dialogs/dialogs_main_list.h"
 #include "chat_helpers/emoji_interactions.h"
+#include "base/call_delayed.h"
 #include "base/unixtime.h"
 #include "support/support_helper.h"
 #include "apiwrap.h"
@@ -142,6 +144,11 @@ TopBarWidget::TopBarWidget(
 , _onlineUpdater([=] { updateOnlineDisplay(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
+	_clear->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_forward->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_sendNow->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+	_delete->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+
 	Lang::Updated(
 	) | rpl::on_next([=] {
 		refreshLang();
@@ -156,9 +163,16 @@ TopBarWidget::TopBarWidget(
 	_messageShot->setClickedCallback([=] { _messageShotSelection.fire({}); });
 	_messageShot->setWidthChangedCallback([=] { updateControlsGeometry(); });
 	_clear->setClickedCallback([=] { _clearSelection.fire({}); });
-	_call->setClickedCallback([=] { call(); });
+	_call->setClickedCallback([=] { call({}); });
+	_call->setAcceptBoth(true, true);
+	_call->addClickHandler([=](Qt::MouseButton button) {
+		if (button == Qt::RightButton) {
+			showCallMenu();
+		}
+	});
 	_groupCall->setClickedCallback([=] { groupCall(); });
-	_menuToggle->setClickedCallback([=] { showPeerMenu(); });
+	_menuToggle->addClickHandler([=](auto) { showPeerMenu(); });
+	_menuToggle->setAcceptBoth(true, true);
 	_infoToggle->setClickedCallback([=] { toggleInfoSection(); });
 
 	_recentActions->setClickedCallback([=]
@@ -174,6 +188,11 @@ TopBarWidget::TopBarWidget(
 			ParticipantsBoxController::Role::Admins
 		);
 	});
+
+	AyuSettings::getInstance().quickAdminShortcutsChanges(
+	) | rpl::on_next([=](bool) {
+		updateControlsVisibility();
+	}, lifetime());
 
 	_back->setAcceptBoth();
 	_back->addClickHandler([=](Qt::MouseButton) {
@@ -268,6 +287,13 @@ TopBarWidget::TopBarWidget(
 	}, lifetime());
 
 	setCursor(style::cur_pointer);
+	_call->setAccessibleName(tr::lng_profile_action_short_call(tr::now));
+	_groupCall->setAccessibleName(tr::lng_group_call_title(tr::now));
+	_search->setAccessibleName(tr::lng_shortcuts_search(tr::now));
+	_infoToggle->setAccessibleName(tr::lng_settings_section_info(tr::now));
+	_menuToggle->setAccessibleName(tr::lng_chat_menu(tr::now));
+	_back->setAccessibleName(tr::lng_go_back(tr::now));
+	_cancelChoose->setAccessibleName(tr::lng_cancel(tr::now));
 }
 
 TopBarWidget::~TopBarWidget() = default;
@@ -305,12 +331,12 @@ void TopBarWidget::refreshLang() {
 	InvokeQueued(this, [this] { updateControlsGeometry(); });
 }
 
-void TopBarWidget::call() {
+void TopBarWidget::call(Calls::StartOutgoingCallArgs args) {
 	if (_controller->showFrozenError()) {
 		return;
 	} else if (const auto peer = _activeChat.key.peer()) {
 		if (const auto user = peer->asUser()) {
-			Core::App().calls().startOutgoingCall(user, false);
+			Core::App().calls().startOutgoingCall(user, std::move(args));
 		}
 	}
 }
@@ -359,13 +385,17 @@ void TopBarWidget::setChooseForReportReason(
 		: style::cur_default);
 }
 
-bool TopBarWidget::createMenu(not_null<Ui::IconButton*> button) {
+bool TopBarWidget::createMenu(
+		not_null<Ui::IconButton*> button,
+		bool withIcons) {
 	if (!_activeChat.key || _menu) {
 		return false;
 	}
 	_menu = base::make_unique_q<Ui::PopupMenu>(
 		this,
-		st::popupMenuExpandedSeparator);
+		withIcons
+			? st::popupMenuExpandedSeparator
+			: st::defaultPopupMenu);
 	_menu->setDestroyedCallback([
 			weak = base::make_weak(this),
 			weakButton = base::make_weak(button),
@@ -391,9 +421,15 @@ void TopBarWidget::showPeerMenu() {
 		_menu = nullptr;
 	} else {
 		_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
-		_menu->popup(mapToGlobal(QPoint(
-			width() + st::topBarMenuPosition.x(),
-			st::topBarMenuPosition.y())));
+		_menu->popup(Ui::PopupMenu::ConstrainToParentScreen(
+			_menu,
+			mapToGlobal(
+				QPoint(
+					width()
+						+ st::topBarMenuPosition.x()
+						+ Ui::BoxShadow::ExtendFor(
+							_menu->st().shadow).right(),
+					st::topBarMenuPosition.y()))));
 	}
 }
 
@@ -407,6 +443,30 @@ void TopBarWidget::showGroupCallMenu(not_null<PeerData*> peer) {
 	_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
 	_menu->popup(mapToGlobal(QPoint(
 		_groupCall->x() + _groupCall->width() + st::topBarMenuGroupCallSkip,
+		st::topBarMenuPosition.y())));
+}
+
+void TopBarWidget::showCallMenu() {
+	const auto created = createMenu(_call, false);
+	if (!created) {
+		return;
+	}
+	const auto perform = [&](bool video) {
+		return [=] {
+			base::call_delayed(st::defaultPopupMenu.showDuration, this, [=] {
+				call({ .video = video, .isConfirmed = true });
+			});
+		};
+	};
+	_menu->addAction(
+		tr::lng_profile_action_short_call(tr::now),
+		perform(false));
+	_menu->addAction(
+		tr::lng_call_start_video(tr::now),
+		perform(true));
+	_menu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
+	_menu->popup(mapToGlobal(QPoint(
+		_call->x() + _call->width() + st::topBarMenuGroupCallSkip,
 		st::topBarMenuPosition.y())));
 }
 
@@ -806,7 +866,7 @@ void TopBarWidget::infoClicked() {
 void TopBarWidget::backClicked() {
 	if (_activeChat.key.folder()) {
 		const auto &settings = AyuSettings::getInstance();
-		if (settings.hideAllChatsFolder) {
+		if (settings.hideAllChatsFolder()) {
 			const auto filters = &_controller->session().data().chatsFilters();
 			const auto lookupId = filters->lookupId(_controller->session().premium() ? 0 : 1);
 			_controller->setActiveChatsFilter(lookupId);
@@ -906,6 +966,7 @@ void TopBarWidget::setActiveChat(
 	updateUnreadBadge();
 	refreshInfoButton();
 	if (_menu) {
+		_menuToggle->setForceRippled(false);
 		_menu = nullptr;
 	}
 	updateOnlineDisplay();
@@ -991,6 +1052,13 @@ void TopBarWidget::refreshInfoButton() {
 	}
 	if (_info) {
 		_info->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_info->setAccessibleName(tr::lng_settings_section_info(tr::now));
+		if (_back && _info) {
+			QWidget::setTabOrder(_back.data(), _info.data());
+		}
+		if (_info && _search) {
+			QWidget::setTabOrder(_info.data(), _search.data());
+		}
 	}
 }
 
@@ -1064,7 +1132,37 @@ void TopBarWidget::updateControlsGeometry() {
 	}
 
 	_messageShot->moveToLeft(buttonsLeft, selectedButtonsTop);
-
+	{
+		const auto large = st::topBarActionButtonLargeRadius;
+		const auto &buttonSt = st::defaultActiveButton;
+		const auto small = buttonSt.radius
+			? buttonSt.radius
+			: st::buttonRadius;
+		const auto buttons = std::array{
+			_forward.data(),
+			_sendNow.data(),
+			_delete.data(),
+			_messageShot.data(),
+		};
+		auto first = (Ui::RoundButton*)(nullptr);
+		auto last = (Ui::RoundButton*)(nullptr);
+		for (const auto button : buttons) {
+			if (!button->isHidden()) {
+				if (!first) {
+					first = button;
+				}
+				last = button;
+			}
+		}
+		for (const auto button : buttons) {
+			if (button->isHidden()) {
+				continue;
+			}
+			const auto left = (button == first) ? large : small;
+			const auto right = (button == last) ? large : small;
+			button->setCornerRadii(left, right, left, right);
+		}
+	}
 	_clear->moveToRight(st::topBarActionSkip, selectedButtonsTop);
 
 	if (!_cancelChoose->isHidden()) {
@@ -1185,11 +1283,13 @@ void TopBarWidget::updateControlsVisibility() {
 
 	const auto &settings = AyuSettings::getInstance();
 
-	_clear->show();
-	_delete->setVisible(_canDelete);
-	_messageShot->setVisible(settings.showMessageShot);
-	_forward->setVisible(_canForward);
-	_sendNow->setVisible(_canSendNow);
+	const auto visible = showSelectedState() || _selectedShown.animating();
+	_clear->setVisible(visible);
+	_delete->setVisible(_canDelete && visible);
+	_messageShot->setVisible(settings.showMessageShot() && visible);
+	_forward->setVisible(_canForward && visible);
+	_sendNow->setVisible(_canSendNow && visible);
+
 
 	const auto isOneColumn = _controller->adaptive().isOneColumn();
 	const auto backVisible = !rootChatsListBar()
@@ -1279,7 +1379,7 @@ void TopBarWidget::updateControlsVisibility() {
 	const auto showRecentActions = [&]
 	{
 		const auto &settings = AyuSettings::getInstance();
-		if (!settings.quickAdminShortcuts) {
+		if (!settings.quickAdminShortcuts()) {
 			return false;
 		}
 		if (_activeChat.section == Section::ChatsList) {
@@ -1297,7 +1397,7 @@ void TopBarWidget::updateControlsVisibility() {
 	const auto showAdmins = [&]
 	{
 		const auto &settings = AyuSettings::getInstance();
-		if (!settings.quickAdminShortcuts) {
+		if (!settings.quickAdminShortcuts()) {
 			return false;
 		}
 		if (_activeChat.section == Section::ChatsList) {
@@ -1387,7 +1487,7 @@ bool TopBarWidget::showSelectedState() const {
 	const auto &settings = AyuSettings::getInstance();
 
 	return (_selectedCount > 0)
-		&& (_canDelete || _canForward || _canSendNow || settings.showMessageShot);
+		&& (_canDelete || _canForward || _canSendNow || settings.showMessageShot());
 }
 
 void TopBarWidget::showSelected(SelectedState state) {
@@ -1396,7 +1496,7 @@ void TopBarWidget::showSelected(SelectedState state) {
 	auto canDelete = (state.count > 0 && state.count == state.canDeleteCount);
 	auto canForward = (state.count > 0 && state.count == state.canForwardCount);
 	auto canSendNow = (state.count > 0 && state.count == state.canSendNowCount);
-	auto count = (!canDelete && !canForward && !canSendNow && !settings.showMessageShot) ? 0 : state.count;
+	auto count = (!canDelete && !canForward && !canSendNow && !settings.showMessageShot()) ? 0 : state.count;
 	if (_selectedCount == count
 		&& _canDelete == canDelete
 		&& _canForward == canForward
@@ -1431,7 +1531,8 @@ void TopBarWidget::showSelected(SelectedState state) {
 			_messageShot->finishNumbersAnimation();
 		}
 	}
-	if (visibilityChanged) {
+	if (visibilityChanged
+		|| (!wasSelectedState && nowSelectedState)) {
 		updateControlsVisibility();
 	}
 	if (wasSelectedState != nowSelectedState && !_chooseForReportReason) {
@@ -1643,6 +1744,9 @@ bool TopBarWidget::showSelectedActions() const {
 }
 
 void TopBarWidget::slideAnimationCallback() {
+	if (!_selectedShown.animating() && !_searchShown.animating()) {
+		updateControlsVisibility();
+	}
 	updateControlsGeometry();
 	update();
 }

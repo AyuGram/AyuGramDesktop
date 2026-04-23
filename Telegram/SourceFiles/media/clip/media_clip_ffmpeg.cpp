@@ -231,7 +231,10 @@ bool FFMpegReaderImplementation::renderFrame(
 		: _frame->format;
 	const auto bgra = (format == AV_PIX_FMT_BGRA);
 	hasAlpha = bgra || (format == AV_PIX_FMT_YUVA420P);
-	if (_frame->width == toSize.width() && _frame->height == toSize.height() && bgra) {
+	if (bgra
+		&& _frame->width == toSize.width()
+		&& _frame->height == toSize.height()
+		&& _frame->linesize[0] > 0) {
 		int32 sbpl = _frame->linesize[0], dbpl = to.bytesPerLine(), bpl = qMin(sbpl, dbpl);
 		uchar *s = _frame->data[0], *d = to.bits();
 		for (int32 i = 0, l = _frame->height; i < l; ++i) {

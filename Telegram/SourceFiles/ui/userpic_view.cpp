@@ -11,6 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/image/image_prepare.h"
 
+// AyuGram includes
+#include "ayu/ui/ayu_userpic.h"
+
+
 namespace Ui {
 
 float64 ForumUserpicRadiusMultiplier() {
@@ -32,8 +36,10 @@ void ValidateUserpicCache(
 	const auto full = QSize(size, size);
 	const auto version = style::PaletteVersion();
 	const auto shapeValue = static_cast<uint32>(shape) & 3;
+	const auto ayuState = AyuUserpic::PackedState();
 	const auto regenerate = (view.cached.size() != QSize(size, size))
 		|| (view.shape != shapeValue)
+		|| (view.ayuState != ayuState)
 		|| (cloud && !view.empty.null())
 		|| (empty && empty != view.empty.get())
 		|| (empty && view.paletteVersion != version);
@@ -43,13 +49,20 @@ void ValidateUserpicCache(
 	view.empty = empty;
 	view.shape = shapeValue;
 	view.paletteVersion = version;
+	view.ayuState = ayuState;
+
+	const auto ayuOverride = AyuUserpic::ShouldOverrideShape(shape);
 
 	if (cloud) {
 		view.cached = cloud->scaled(
 			full,
 			Qt::IgnoreAspectRatio,
 			Qt::SmoothTransformation);
-		if (shape == PeerUserpicShape::Monoforum) {
+		if (ayuOverride) {
+			view.cached = Images::Round(
+				std::move(view.cached),
+				ImageRoundRadius::AyuUserpic);
+		} else if (shape == PeerUserpicShape::Monoforum) {
 			view.cached = Ui::ApplyMonoforumShape(std::move(view.cached));
 		} else if (shape == PeerUserpicShape::Forum) {
 			view.cached = Images::Round(
@@ -67,7 +80,9 @@ void ValidateUserpicCache(
 		view.cached.fill(Qt::transparent);
 
 		auto p = QPainter(&view.cached);
-		if (shape == PeerUserpicShape::Monoforum) {
+		if (ayuOverride) {
+			empty->paintCircle(p, 0, 0, size, size);
+		} else if (shape == PeerUserpicShape::Monoforum) {
 			empty->paintMonoforum(p, 0, 0, size, size);
 		} else if (shape == PeerUserpicShape::Forum) {
 			empty->paintRounded(

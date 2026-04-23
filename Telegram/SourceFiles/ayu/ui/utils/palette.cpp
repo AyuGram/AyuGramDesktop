@@ -3,18 +3,19 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 //
 // Code is based on:
 // - https://github.com/androidx/androidx/blob/androidx-main/palette/palette/src/main/java/androidx/palette/graphics/Palette.java
 // - https://github.com/androidx/androidx/blob/androidx-main/palette/palette/src/main/java/androidx/palette/graphics/Target.java
-#include "palette.h"
-#include "color_utils.h"
-#include "color_cut_quantizer.h"
+#include "ayu/ui/utils/palette.h"
 
-#include <QImage>
+#include "color_cut_quantizer.h"
+#include "color_utils.h"
+
 #include <algorithm>
 #include <cmath>
+#include <QImage>
 
 namespace Ayu::Ui {
 

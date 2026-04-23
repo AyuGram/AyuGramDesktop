@@ -3,10 +3,11 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_sync.h"
-#include "api/api_sending.h"
+// Copyright @Radolyn, 2026
+#include "ayu/features/forward/ayu_sync.h"
+
 #include "apiwrap.h"
+#include "api/api_sending.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -271,7 +272,14 @@ void sendDocumentSync(not_null<Main::Session*> session,
 	crl::on_main([=, lst = std::move(group.list), caption = std::move(caption)]() mutable
 	{
 		auto size = lst.files.size();
-		session->api().sendFiles(std::move(lst), type, std::move(caption), size > 1 ? groupId : nullptr, action);
+		if (!lst.files.empty()) {
+			lst.files.front().caption = std::move(caption);
+		}
+		session->api().sendFiles(
+			std::move(lst),
+			type,
+			size > 1 ? groupId : nullptr,
+			action);
 	});
 
 	waitForMsgSync(session, action);
@@ -303,14 +311,15 @@ void sendVoiceSync(not_null<Main::Session*> session,
 			action.options,
 			action.replyTo,
 			action.replaceMediaOf);
-		session->api().fileLoader()->addTask(std::make_unique<FileLoadTask>(
-			session,
-			data,
-			duration,
-			QVector<signed char>(),
-			video,
-			to,
-			message.textWithTags));
+		session->api().fileLoader()->addTask(std::make_unique<FileLoadTask>(FileLoadTask::VoiceArgs{
+			.session = session,
+			.voice = data,
+			.duration = duration,
+			.waveform = QVector<signed char>(),
+			.video = video,
+			.to = to,
+			.caption = message.textWithTags
+		}));
 	});
 	waitForMsgSync(session, action);
 }

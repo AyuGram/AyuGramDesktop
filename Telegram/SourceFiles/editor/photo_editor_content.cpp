@@ -30,7 +30,19 @@ PhotoEditorContent::PhotoEditorContent(
 	this,
 	modifications,
 	_photoSize,
-	std::move(controllers)))
+	std::move(controllers),
+	[photo](QRect rect) {
+		const auto &img = photo->original();
+		const auto dpr = img.devicePixelRatio();
+		const auto pixelRect = QRect(
+			int(rect.x() * dpr),
+			int(rect.y() * dpr),
+			int(rect.width() * dpr),
+			int(rect.height() * dpr));
+		auto result = img.copy(pixelRect.intersected(img.rect()));
+		result.setDevicePixelRatio(dpr);
+		return result;
+	}))
 , _crop(base::make_unique_q<Crop>(
 	this,
 	modifications,
@@ -89,8 +101,12 @@ PhotoEditorContent::PhotoEditorContent(
 		auto p = QPainter(this);
 
 		p.fillRect(clip, Qt::transparent);
-		p.setTransform(_imageMatrix);
-		p.drawPixmap(_imageRect, _photo->pix(_imageRect.size()));
+		if (_mode.mode == PhotoEditorMode::Mode::Paint) {
+			_paint->paintImage(p, _photo->pix(_photoSize));
+		} else {
+			p.setTransform(_imageMatrix);
+			p.drawPixmap(_imageRect, _photo->pix(_imageRect.size()));
+		}
 	}, lifetime());
 
 	setupDragArea();
@@ -125,6 +141,8 @@ void PhotoEditorContent::applyMode(const PhotoEditorMode &mode) {
 	_paint->setAttribute(Qt::WA_TransparentForMouseEvents, isTransform);
 	if (!isTransform) {
 		_paint->updateUndoState();
+	} else {
+		_paint->resetView();
 	}
 
 	if (mode.action == PhotoEditorMode::Action::Discard) {
@@ -133,6 +151,11 @@ void PhotoEditorContent::applyMode(const PhotoEditorMode &mode) {
 		_paint->keepResult();
 	}
 	_mode = mode;
+	update();
+}
+
+void PhotoEditorContent::applyAspectRatio(float64 ratio) {
+	_crop->setAspectRatio(ratio);
 }
 
 void PhotoEditorContent::applyBrush(const Brush &brush) {

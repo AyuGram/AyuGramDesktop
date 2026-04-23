@@ -138,6 +138,7 @@ public:
 		SearchRequestType type,
 		int fullCount);
 	void peerSearchReceived(Api::PeerSearchResult result);
+	void idSearchReceived(const std::vector<not_null<PeerData*>> &results);
 
 	[[nodiscard]] FilterId filterId() const;
 
@@ -332,6 +333,7 @@ private:
 		bool pressedTopicJump,
 		bool pressedRightButton);
 	void setPeerSearchPressed(int pressed, bool pressedRightButton);
+	void setIdSearchPressed(int pressed);
 	void setPreviewPressed(int pressed);
 	void setSearchedPressed(int pressed);
 	bool isPressed() const {
@@ -339,6 +341,7 @@ private:
 			|| _pressed
 			|| (_hashtagPressed >= 0)
 			|| (_filteredPressed >= 0)
+			|| (_idSearchPressed >= 0)
 			|| (_peerSearchPressed >= 0)
 			|| (_previewPressed >= 0)
 			|| (_searchedPressed >= 0)
@@ -350,6 +353,7 @@ private:
 			|| _selected
 			|| (_hashtagSelected >= 0)
 			|| (_filteredSelected >= 0)
+			|| (_idSearchSelected >= 0)
 			|| (_peerSearchSelected >= 0)
 			|| (_previewSelected >= 0)
 			|| (_searchedSelected >= 0)
@@ -411,6 +415,7 @@ private:
 	[[nodiscard]] int filteredOffset() const;
 	[[nodiscard]] int filteredIndex(int y) const;
 	[[nodiscard]] int filteredHeight(int till = -1) const;
+	[[nodiscard]] int idSearchOffset() const;
 	[[nodiscard]] int peerSearchOffset() const;
 	[[nodiscard]] int searchInChatOffset() const;
 	[[nodiscard]] int previewOffset() const;
@@ -487,6 +492,8 @@ private:
 	void startReorderPinned(QPoint localPosition);
 	int updateReorderIndexGetCount();
 	bool updateReorderPinned(QPoint localPosition);
+	[[nodiscard]] bool skipChatsListFreeze() const;
+	void unfreezeShownList(bool updateIfWasFrozen);
 	void finishReorderPinned();
 	bool finishReorderOnRelease();
 	void stopReorderPinned();
@@ -522,6 +529,8 @@ private:
 		uint8 more,
 		bool active);
 
+	void performDrag();
+
 	const not_null<Window::SessionController*> _controller;
 
 	not_null<IndexedList*> _shownList;
@@ -556,6 +565,8 @@ private:
 	bool _pressedRightButtonSponsored = false;
 	bool _selectedRightButton = false;
 	bool _pressedRightButton = false;
+
+	Row *_qdragging = nullptr;
 
 	Row *_dragging = nullptr;
 	int _draggingIndex = -1;
@@ -595,6 +606,10 @@ private:
 	int _peerSearchSelected = -1;
 	int _peerSearchPressed = -1;
 	int _peerSearchMenu = -1;
+
+	std::vector<std::unique_ptr<PeerSearchResult>> _idSearchResults;
+	int _idSearchSelected = -1;
+	int _idSearchPressed = -1;
 
 	std::vector<std::unique_ptr<FakeRow>> _previewResults;
 	int _previewCount = 0;
@@ -674,6 +689,7 @@ private:
 	rpl::event_stream<> _touchCancelRequests;
 
 	rpl::variable<ChildListShown> _childListShown;
+	base::Timer _freezeTimer;
 	float64 _narrowRatio = 0.;
 	bool _geometryInited = false;
 

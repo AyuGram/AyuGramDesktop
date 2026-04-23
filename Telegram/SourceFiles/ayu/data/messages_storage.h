@@ -3,12 +3,10 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
 
-#include "entities.h"
-
-#include "history/history_item_edition.h"
+#include "ayu/data/entities.h"
 
 namespace AyuMessages {
 
@@ -17,7 +15,7 @@ std::vector<AyuMessageBase> getEditedMessages(not_null<HistoryItem*> item, ID mi
 bool hasRevisions(not_null<HistoryItem*> item);
 
 void addDeletedMessage(not_null<HistoryItem*> item);
-std::vector<AyuMessageBase> getDeletedMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit);
+std::vector<AyuMessageBase> getDeletedMessages(not_null<PeerData*> peer, ID topicId, ID minId, ID maxId, int totalLimit, const QString &searchQuery = QString());
 bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId);
 
 }

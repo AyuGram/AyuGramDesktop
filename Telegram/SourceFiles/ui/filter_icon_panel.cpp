@@ -71,7 +71,8 @@ constexpr auto kIcons = std::array{
 FilterIconPanel::FilterIconPanel(QWidget *parent)
 : RpWidget(parent)
 , _inner(Ui::CreateChild<Ui::RpWidget>(this))
-, _innerBg(ImageRoundRadius::Large, st::dialogsBg) {
+, _innerBg(ImageRoundRadius::Large, st::dialogsBg)
+, _shadow(st::emojiPanAnimation.shadow) {
 	setup();
 }
 
@@ -276,11 +277,7 @@ void FilterIconPanel::paintEvent(QPaintEvent *e) {
 		hideFinished();
 	} else {
 		if (!_cache.isNull()) _cache = QPixmap();
-		Ui::Shadow::paint(
-			p,
-			innerRect(),
-			width(),
-			st::emojiPanAnimation.shadow);
+		_shadow.paint(p, innerRect(), st::emojiPanRadius);
 	}
 }
 
@@ -381,7 +378,8 @@ void FilterIconPanel::startShowAnimation() {
 			std::move(image),
 			QRect(
 				inner.topLeft() * style::DevicePixelRatio(),
-				inner.size() * style::DevicePixelRatio()));
+				inner.size() * style::DevicePixelRatio()),
+			st::emojiPanRadius);
 		_showAnimation->setCornerMasks(Images::CornersMask(ImageRoundRadius::Large));
 		_showAnimation->start();
 	}

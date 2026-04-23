@@ -24,6 +24,10 @@ namespace Data {
 class PhotoMedia;
 } // namespace Data
 
+namespace HistoryView::Controls {
+class ComposeAiButton;
+} // namespace HistoryView::Controls
+
 namespace Ui {
 class AbstractSinglePreview;
 class InputField;
@@ -112,6 +116,9 @@ private:
 
 	[[nodiscard]] int errorTopSkip() const;
 	[[nodiscard]] bool hasSpoiler() const;
+	[[nodiscard]] bool hasSendLargePhotosOption() const;
+	[[nodiscard]] Ui::SendFilesWay currentSendWay() const;
+	void saveSendWaySettings();
 
 	bool setPreparedList(Ui::PreparedList &&list);
 
@@ -125,6 +132,7 @@ private:
 	const base::unique_qptr<Ui::ScrollArea> _scroll;
 	const base::unique_qptr<Ui::InputField> _field;
 	const base::unique_qptr<Ui::EmojiButton> _emojiToggle;
+	HistoryView::Controls::ComposeAiButton *_aiButton = nullptr;
 
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
 
@@ -145,7 +153,9 @@ private:
 
 	base::Timer _checkChangedTimer;
 	bool _isPhoto = false;
+	bool _isVideo = false;
 	bool _asFile = false;
+	bool _sendLargePhotos = false;
 
 	QString _error;
 

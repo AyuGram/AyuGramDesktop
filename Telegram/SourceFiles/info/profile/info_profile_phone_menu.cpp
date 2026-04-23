@@ -26,7 +26,7 @@ namespace {
 class TextItem final : public Ui::Menu::ItemBase {
 public:
 	TextItem(
-		not_null<Ui::RpWidget*> parent,
+		not_null<Ui::Menu::Menu*> parent,
 		const style::Menu &st,
 		rpl::producer<TextWithEntities> &&text);
 
@@ -67,7 +67,7 @@ private:
 }
 
 TextItem::TextItem(
-	not_null<Ui::RpWidget*> parent,
+	not_null<Ui::Menu::Menu*> parent,
 	const style::Menu &st,
 	rpl::producer<TextWithEntities> &&text)
 : ItemBase(parent, st)
@@ -95,7 +95,7 @@ TextItem::TextItem(
 	}, lifetime());
 
 	_label->resizeToWidth(parent->width() - added);
-	initResizeHook(parent->sizeValue());
+	fitToMenuWidth();
 }
 
 not_null<QAction*> TextItem::action() const {

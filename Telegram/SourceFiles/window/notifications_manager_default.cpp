@@ -676,6 +676,8 @@ Notification::Notification(
 , _fromScheduled(fromScheduled)
 , _close(this, st::notifyClose)
 , _reply(this, tr::lng_notification_reply(), st::defaultBoxButton) {
+	_reply->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
+
 	Lang::Updated(
 	) | rpl::on_next([=] {
 		refreshLang();

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 #include "ui/widgets/tooltip.h"
+#include "ui/widgets/scroll_area.h"
 #include "mtproto/sender.h"
 #include "base/timer.h"
 
@@ -108,6 +109,12 @@ public:
 	void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context) override;
+	void elementShowAddPollOption(
+		not_null<HistoryView::Element*> view,
+		not_null<PollData*> poll,
+		FullMsgId context,
+		QRect optionRect) override;
+	void elementSubmitAddPollOption(FullMsgId context) override;
 	void elementOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) override;
@@ -165,6 +172,7 @@ protected:
 	void enterEventHook(QEnterEvent *e) override;
 	void leaveEventHook(QEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
+	bool eventHook(QEvent *e) override;
 
 	// Resizes content and counts natural widget height for the desired width.
 	int resizeGetHeight(int newWidth) override;
@@ -198,6 +206,7 @@ private:
 	void performDrag();
 	int itemTop(not_null<const Element*> view) const;
 	void repaintItem(const Element *view);
+	void repaintItem(const Element *view, QRect rect);
 	void refreshItem(not_null<const Element*> view);
 	void resizeItem(not_null<Element*> view);
 	QPoint mapPointToItem(QPoint point, const Element *view) const;
@@ -213,7 +222,9 @@ private:
 	void copyContextText(FullMsgId itemId);
 	void copySelectedText();
 	TextForMimeData getSelectedText() const;
-	void suggestRestrictParticipant(not_null<PeerData*> participant);
+	void suggestRestrictParticipant(
+		not_null<PeerData*> participant,
+		FullMsgId realId);
 	void restrictParticipant(
 		not_null<PeerData*> participant,
 		ChatRestrictionsInfo oldRights,
@@ -221,6 +232,7 @@ private:
 	void restrictParticipantDone(
 		not_null<PeerData*> participant,
 		ChatRestrictionsInfo rights);
+	[[nodiscard]] bool canRestrict() const;
 
 	void requestAdmins();
 	void checkPreloadMore();
@@ -271,6 +283,14 @@ private:
 	template <typename Method>
 	void enumerateDates(Method method);
 
+	void touchEvent(QTouchEvent *e);
+	void touchScrollUpdated(const QPoint &screenPos);
+	void touchResetSpeed();
+	void touchUpdateSpeed();
+	void touchDeaccelerate(int32 elapsed);
+	void onTouchSelect();
+	void onTouchScrollTimer();
+
 	const not_null<Window::SessionController*> _controller;
 	const not_null<ChannelData*> _channel;
 	const not_null<History*> _history;
@@ -286,6 +306,7 @@ private:
 	base::flat_set<FullMsgId> _animatedStickersPlayed;
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpics;
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpicsCache;
+	base::flat_map<FullMsgId, MsgId> _realIdsForReport;
 	int _itemsTop = 0;
 	int _itemsWidth = 0;
 	int _itemsHeight = 0;
@@ -335,6 +356,22 @@ private:
 
 	QPoint _trippleClickPoint;
 	base::Timer _trippleClickTimer;
+
+	base::Timer _touchSelectTimer;
+	base::Timer _touchScrollTimer;
+
+	// Touch scroll support.
+	bool _touchScroll = false;
+	bool _touchSelect = false;
+	bool _touchInProgress = false;
+	QPoint _touchStart, _touchPrevPos, _touchPos;
+	Ui::TouchScrollState _touchScrollState = Ui::TouchScrollState::Manual;
+	bool _touchPrevPosValid = false;
+	bool _touchWaitingAcceleration = false;
+	QPoint _touchSpeed;
+	crl::time _touchSpeedTime = 0;
+	crl::time _touchAccelerationTime = 0;
+	crl::time _touchTime = 0;
 
 	FilterValue _filter;
 	QString _searchQuery;

@@ -42,6 +42,7 @@ struct WebPageDraft {
 	bool invert : 1 = false;
 	bool manual : 1 = false;
 	bool removed : 1 = false;
+	bool previewChanged : 1 = false;
 
 	friend inline bool operator==(const WebPageDraft&, const WebPageDraft&)
 		= default;

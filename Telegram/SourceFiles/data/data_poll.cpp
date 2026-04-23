@@ -8,17 +8,39 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_poll.h"
 
 #include "api/api_text_entities.h"
+#include "data/data_document.h"
+#include "data/data_photo.h"
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "base/call_delayed.h"
 #include "main/main_session.h"
-#include "api/api_text_entities.h"
 #include "ui/text/text_options.h"
 
 namespace {
 
 constexpr auto kShortPollTimeout = 30 * crl::time(1000);
 constexpr auto kReloadAfterAutoCloseDelay = crl::time(1000);
+
+void ProcessPollMedia(
+		not_null<Data::Session*> owner,
+		const MTPMessageMedia &media) {
+	media.match([&](const MTPDmessageMediaPhoto &media) {
+		if (const auto photo = media.vphoto()) {
+			photo->match([&](const MTPDphoto &) {
+				owner->processPhoto(*photo);
+			}, [](const auto &) {
+			});
+		}
+	}, [&](const MTPDmessageMediaDocument &media) {
+		if (const auto document = media.vdocument()) {
+			document->match([&](const MTPDdocument &) {
+				owner->processDocument(*document);
+			}, [](const auto &) {
+			});
+		}
+	}, [](const auto &) {
+	});
+}
 
 const PollAnswer *AnswerByOption(
 		const std::vector<PollAnswer> &list,
@@ -76,7 +98,14 @@ bool PollData::applyChanges(const MTPDpoll &poll) {
 	const auto newFlags = (poll.is_closed() ? Flag::Closed : Flag(0))
 		| (poll.is_public_voters() ? Flag::PublicVotes : Flag(0))
 		| (poll.is_multiple_choice() ? Flag::MultiChoice : Flag(0))
-		| (poll.is_quiz() ? Flag::Quiz : Flag(0));
+		| (poll.is_quiz() ? Flag::Quiz : Flag(0))
+		| (poll.is_shuffle_answers() ? Flag::ShuffleAnswers : Flag(0))
+		| (poll.is_revoting_disabled() ? Flag::RevotingDisabled : Flag(0))
+		| (poll.is_open_answers() ? Flag::OpenAnswers : Flag(0))
+		| (poll.is_hide_results_until_close()
+			? Flag::HideResultsUntilClose
+			: Flag(0))
+		| (poll.is_creator() ? Flag::Creator : Flag(0));
 	const auto newCloseDate = poll.vclose_date().value_or_empty();
 	const auto newClosePeriod = poll.vclose_period().value_or_empty();
 	auto newAnswers = ranges::views::all(
@@ -88,7 +117,26 @@ bool PollData::applyChanges(const MTPDpoll &poll) {
 			result.text = Api::ParseTextWithEntities(
 				&session(),
 				answer.vtext());
+			if (const auto media = answer.vmedia()) {
+				ProcessPollMedia(_owner, *media);
+				result.media = PollMediaFromMTP(_owner, *media);
+			}
+			if (const auto addedBy = answer.vadded_by()) {
+				result.addedBy = _owner->peer(peerFromMTP(*addedBy));
+				result.addedDate = answer.vdate().value_or_empty();
+			}
 			return result;
+		}, [&](const MTPDinputPollAnswer &answer) {
+			auto result = PollAnswer();
+			result.text = Api::ParseTextWithEntities(
+				&session(),
+				answer.vtext());
+			if (const auto media = answer.vmedia()) {
+				result.media = PollMediaFromInputMTP(_owner, *media);
+			}
+			return result;
+		}, [](const auto &) {
+			return PollAnswer();
 		});
 	}) | ranges::views::take(
 		kMaxOptions
@@ -118,6 +166,7 @@ bool PollData::applyChanges(const MTPDpoll &poll) {
 			}
 		}
 	}
+	hash = poll.vhash().v;
 	++version;
 	return true;
 }
@@ -132,6 +181,15 @@ bool PollData::applyResults(const MTPPollResults &results) {
 		if (const auto list = results.vresults()) {
 			for (const auto &result : list->v) {
 				if (applyResultToAnswers(result, results.is_min())) {
+					changed = true;
+				}
+			}
+		} else if (!results.is_min()
+			&& newTotalVoters == 0
+			&& voted()) {
+			for (auto &answer : answers) {
+				if (answer.chosen) {
+					answer.chosen = false;
 					changed = true;
 				}
 			}
@@ -166,6 +224,14 @@ bool PollData::applyResults(const MTPPollResults &results) {
 			};
 			if (solution != newSolution) {
 				solution = std::move(newSolution);
+				changed = true;
+			}
+		}
+		if (const auto media = results.vsolution_media()) {
+			ProcessPollMedia(_owner, *media);
+			const auto parsed = PollMediaFromMTP(_owner, *media);
+			if (solutionMedia != parsed) {
+				solutionMedia = parsed;
 				changed = true;
 			}
 		}
@@ -206,9 +272,12 @@ bool PollData::applyResultToAnswers(
 		if (!answer) {
 			return false;
 		}
-		auto changed = (answer->votes != voters.vvoters().v);
-		if (changed) {
-			answer->votes = voters.vvoters().v;
+		auto changed = false;
+		if (const auto count = voters.vvoters()) {
+			if (answer->votes != count->v) {
+				answer->votes = count->v;
+				changed = true;
+			}
 		}
 		if (!isMinResults) {
 			if (answer->chosen != voters.is_chosen()) {
@@ -219,6 +288,30 @@ bool PollData::applyResultToAnswers(
 		if (voters.is_correct() && !answer->correct) {
 			answer->correct = voters.is_correct();
 			changed = true;
+		}
+		if (const auto recent = voters.vrecent_voters()) {
+			const auto recentChanged = !ranges::equal(
+				answer->recentVoters,
+				recent->v,
+				ranges::equal_to(),
+				&PeerData::id,
+				peerFromMTP);
+			if (recentChanged) {
+				changed = true;
+				answer->recentVoters = ranges::views::all(
+					recent->v
+				) | ranges::views::transform([&](MTPPeer peerId) {
+					const auto peer = _owner->peer(
+						peerFromMTP(peerId));
+					return peer->isMinimalLoaded()
+						? peer.get()
+						: nullptr;
+				}) | ranges::views::filter([](PeerData *peer) {
+					return peer != nullptr;
+				}) | ranges::views::transform([](PeerData *peer) {
+					return not_null(peer);
+				}) | ranges::to_vector;
+			}
 		}
 		return changed;
 	});
@@ -255,13 +348,171 @@ bool PollData::quiz() const {
 	return (_flags & Flag::Quiz);
 }
 
+bool PollData::shuffleAnswers() const {
+	return (_flags & Flag::ShuffleAnswers);
+}
+
+bool PollData::revotingDisabled() const {
+	return (_flags & Flag::RevotingDisabled);
+}
+
+bool PollData::openAnswers() const {
+	return (_flags & Flag::OpenAnswers);
+}
+
+bool PollData::hideResultsUntilClose() const {
+	return (_flags & Flag::HideResultsUntilClose);
+}
+
+bool PollData::creator() const {
+	return (_flags & Flag::Creator);
+}
+
+QString PollData::debugString() const {
+	auto result = QString();
+	result += u"Poll #"_q + QString::number(id) + u'\n';
+	result += u"Q: "_q + question.text + u'\n';
+	if (quiz()) {
+		result += u"[Quiz]"_q;
+	}
+	if (multiChoice()) {
+		result += u"[MultiChoice]"_q;
+	}
+	if (closed()) {
+		result += u"[Closed]"_q;
+	}
+	if (publicVotes()) {
+		result += u"[PublicVotes]"_q;
+	}
+	if (!result.endsWith(u'\n')) {
+		result += u'\n';
+	}
+	result += u"Total voters: "_q + QString::number(totalVoters) + u'\n';
+	for (const auto &answer : answers) {
+		result += u"  - "_q + answer.text.text
+			+ u" ["_q + QString::number(answer.votes) + u" votes"_q;
+		if (answer.chosen) {
+			result += u", chosen"_q;
+		}
+		if (answer.correct) {
+			result += u", correct"_q;
+		}
+		result += u"]\n"_q;
+	}
+	if (!solution.text.isEmpty()) {
+		result += u"Solution: "_q + solution.text + u'\n';
+	}
+	return result;
+}
+
+MTPInputMedia PollMediaToMTP(const PollMedia &media) {
+	if (media.photo) {
+		return MTP_inputMediaPhoto(
+			MTP_flags(MTPDinputMediaPhoto::Flag(0)),
+			media.photo->mtpInput(),
+			MTP_int(0),
+			MTPInputDocument());
+	} else if (media.document) {
+		return MTP_inputMediaDocument(
+			MTP_flags(MTPDinputMediaDocument::Flag(0)),
+			media.document->mtpInput(),
+			MTPInputPhoto(),
+			MTP_int(0),
+			MTP_int(0),
+			MTPstring());
+	} else if (media.geo) {
+		return MTP_inputMediaGeoPoint(
+			MTP_inputGeoPoint(
+				MTP_flags(0),
+				MTP_double(media.geo->lat()),
+				MTP_double(media.geo->lon()),
+				MTPint())); // accuracy_radius
+	}
+	return MTPInputMedia();
+}
+
+PollMedia PollMediaFromMTP(
+		not_null<Data::Session*> owner,
+		const MTPMessageMedia &media) {
+	auto result = PollMedia();
+	media.match([&](const MTPDmessageMediaPhoto &data) {
+		if (const auto photo = data.vphoto()) {
+			photo->match([&](const MTPDphoto &) {
+				result.photo = owner->processPhoto(*photo);
+			}, [](const auto &) {
+			});
+		}
+	}, [&](const MTPDmessageMediaDocument &data) {
+		if (const auto document = data.vdocument()) {
+			document->match([&](const MTPDdocument &) {
+				result.document = owner->processDocument(*document);
+			}, [](const auto &) {
+			});
+		}
+	}, [&](const MTPDmessageMediaGeo &data) {
+		data.vgeo().match([&](const MTPDgeoPoint &point) {
+			result.geo = Data::LocationPoint(point);
+		}, [](const MTPDgeoPointEmpty &) {
+		});
+	}, [&](const MTPDmessageMediaVenue &data) {
+		data.vgeo().match([&](const MTPDgeoPoint &point) {
+			result.geo = Data::LocationPoint(point);
+		}, [](const MTPDgeoPointEmpty &) {
+		});
+	}, [](const auto &) {
+	});
+	return result;
+}
+
+PollMedia PollMediaFromInputMTP(
+		not_null<Data::Session*> owner,
+		const MTPInputMedia &media) {
+	auto result = PollMedia();
+	media.match([&](const MTPDinputMediaPhoto &data) {
+		data.vid().match([&](const MTPDinputPhoto &photo) {
+			result.photo = owner->photo(photo.vid().v);
+		}, [](const auto &) {
+		});
+	}, [&](const MTPDinputMediaDocument &data) {
+		data.vid().match([&](const MTPDinputDocument &document) {
+			result.document = owner->document(document.vid().v);
+		}, [](const auto &) {
+		});
+	}, [&](const MTPDinputMediaGeoPoint &data) {
+		data.vgeo_point().match([&](const MTPDinputGeoPoint &point) {
+			result.geo.emplace(
+				point.vlat().v,
+				point.vlong().v,
+				Data::LocationPoint::NoAccessHash);
+		}, [](const auto &) {
+		});
+	}, [](const auto &) {
+	});
+	return result;
+}
+
+QByteArray PollOptionFromLink(const QString &value) {
+	return QByteArray::fromBase64(value.toLatin1());
+}
+
+QString PollOptionToLink(const QByteArray &option) {
+	return QString::fromLatin1(
+		option.toBase64(QByteArray::OmitTrailingEquals));
+}
+
 MTPPoll PollDataToMTP(not_null<const PollData*> poll, bool close) {
 	const auto convert = [&](const PollAnswer &answer) {
-		return MTP_pollAnswer(
+		const auto flags = answer.media
+			? MTPDinputPollAnswer::Flag::f_media
+			: MTPDinputPollAnswer::Flag(0);
+		return MTP_inputPollAnswer(
+			MTP_flags(flags),
 			MTP_textWithEntities(
 				MTP_string(answer.text.text),
 				Api::EntitiesToMTP(&poll->session(), answer.text.entities)),
-			MTP_bytes(answer.option));
+			answer.media
+				? PollMediaToMTP(answer.media)
+				: MTPInputMedia());
 	};
 	auto answers = QVector<MTPPollAnswer>();
 	answers.reserve(poll->answers.size());
@@ -274,6 +525,12 @@ MTPPoll PollDataToMTP(not_null<const PollData*> poll, bool close) {
 		| (poll->multiChoice() ? Flag::f_multiple_choice : Flag(0))
 		| (poll->publicVotes() ? Flag::f_public_voters : Flag(0))
 		| (poll->quiz() ? Flag::f_quiz : Flag(0))
+		| (poll->shuffleAnswers() ? Flag::f_shuffle_answers : Flag(0))
+		| (poll->revotingDisabled() ? Flag::f_revoting_disabled : Flag(0))
+		| (poll->openAnswers() ? Flag::f_open_answers : Flag(0))
+		| (poll->hideResultsUntilClose()
+			? Flag::f_hide_results_until_close
+			: Flag(0))
 		| (poll->closePeriod > 0 ? Flag::f_close_period : Flag(0))
 		| (poll->closeDate > 0 ? Flag::f_close_date : Flag(0));
 	return MTP_poll(
@@ -284,7 +541,8 @@ MTPPoll PollDataToMTP(not_null<const PollData*> poll, bool close) {
 			Api::EntitiesToMTP(&poll->session(), poll->question.entities)),
 		MTP_vector<MTPPollAnswer>(answers),
 		MTP_int(poll->closePeriod),
-		MTP_int(poll->closeDate));
+		MTP_int(poll->closeDate),
+		MTP_long(0));
 }
 
 MTPInputMedia PollDataToInputMedia(
@@ -294,10 +552,10 @@ MTPInputMedia PollDataToInputMedia(
 		| (poll->quiz()
 			? MTPDinputMediaPoll::Flag::f_correct_answers
 			: MTPDinputMediaPoll::Flag(0));
-	auto correct = QVector<MTPbytes>();
-	for (const auto &answer : poll->answers) {
-		if (answer.correct) {
-			correct.push_back(MTP_bytes(answer.option));
+	auto correct = QVector<MTPint>();
+	for (auto i = 0, count = int(poll->answers.size()); i < count; ++i) {
+		if (poll->answers[i].correct) {
+			correct.push_back(MTP_int(i));
 		}
 	}
 
@@ -315,10 +573,22 @@ MTPInputMedia PollDataToInputMedia(
 	if (!sentEntities.v.isEmpty()) {
 		inputFlags |= MTPDinputMediaPoll::Flag::f_solution_entities;
 	}
+	if (poll->attachedMedia) {
+		inputFlags |= MTPDinputMediaPoll::Flag::f_attached_media;
+	}
+	if (poll->solutionMedia) {
+		inputFlags |= MTPDinputMediaPoll::Flag::f_solution_media;
+	}
 	return MTP_inputMediaPoll(
 		MTP_flags(inputFlags),
 		PollDataToMTP(poll, close),
-		MTP_vector<MTPbytes>(correct),
+		MTP_vector<MTPint>(correct),
+		poll->attachedMedia
+			? PollMediaToMTP(poll->attachedMedia)
+			: MTPInputMedia(),
 		MTP_string(solution.text),
-		sentEntities);
+		sentEntities,
+		poll->solutionMedia
+			? PollMediaToMTP(poll->solutionMedia)
+			: MTPInputMedia());
 }

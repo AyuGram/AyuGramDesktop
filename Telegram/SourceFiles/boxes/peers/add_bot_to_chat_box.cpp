@@ -217,7 +217,7 @@ void AddBotToGroupBoxController::addBotToGroup(not_null<PeerData*> chat) {
 		controller->hideLayer();
 		controller->showPeerHistory(chat, Way::ClearStack, ShowAtUnreadMsgId);
 	};
-	const auto rights = requestedAddAdmin
+	const auto rights = (requestedAddAdmin && _requestedRights != 0)
 		? _requestedRights
 		: (chat->isBroadcast()
 			&& chat->asBroadcast()->canAddAdmins())
@@ -233,8 +233,8 @@ void AddBotToGroupBoxController::addBotToGroup(not_null<PeerData*> chat) {
 		const auto token = _token;
 		const auto done = [=](
 				ChatAdminRightsInfo newRights,
-				const QString &rank) {
-			if (scope == Scope::GroupAdmin) {
+				const std::optional<QString> &rank) {
+			if (scope == Scope::GroupAdmin && !token.isEmpty()) {
 				chat->session().api().sendBotStart(show, bot, chat, token);
 			}
 			close();

@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animations.h"
 #include "ui/dragging_scroll_manager.h"
+#include "ui/widgets/middle_click_autoscroll.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/userpic_view.h"
@@ -36,9 +37,11 @@ struct StateRequest;
 enum class CursorState : char;
 enum class PointState : char;
 enum class ElementChatMode : char;
+class ElementOverlayHost;
 class EmptyPainter;
 class Element;
 class TranslateTracker;
+class ReadMetricsTracker;
 struct PinnedId;
 struct SelectedQuote;
 class AboutView;
@@ -49,6 +52,11 @@ class Manager;
 struct ChosenReaction;
 struct ButtonParameters;
 } // namespace HistoryView::Reactions
+
+namespace HistoryView::ReplyButton {
+class Manager;
+struct ButtonParameters;
+} // namespace HistoryView::ReplyButton
 
 namespace Window {
 class SessionController;
@@ -129,6 +137,7 @@ public:
 
 	void repaintItem(const HistoryItem *item);
 	void repaintItem(const Element *view);
+	void repaintItem(const Element *view, QRect rect);
 
 	[[nodiscard]] bool canCopySelected() const;
 	[[nodiscard]] bool canDeleteSelected() const;
@@ -147,6 +156,13 @@ public:
 	void elementShowPollResults(
 		not_null<PollData*> poll,
 		FullMsgId context);
+	void elementShowAddPollOption(
+		not_null<HistoryView::Element*> view,
+		not_null<PollData*> poll,
+		FullMsgId context,
+		QRect optionRect);
+	void elementSubmitAddPollOption(FullMsgId context);
+	void hideElementOverlay();
 	void elementOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context);
@@ -249,6 +265,8 @@ protected:
 private:
 	void onTouchSelect();
 	void onTouchScrollTimer();
+	void markReadMetricsStale();
+	void registerReadMetricsActivity();
 
 	[[nodiscard]] static int SelectionViewOffset(
 		not_null<const HistoryInner*> inner,
@@ -437,6 +455,11 @@ private:
 		QPoint position,
 		const HistoryView::TextState &reactionState) const
 	-> HistoryView::Reactions::ButtonParameters;
+	[[nodiscard]] auto replyButtonParameters(
+		not_null<const Element*> view,
+		QPoint position,
+		const HistoryView::TextState &replyState) const
+	-> HistoryView::ReplyButton::ButtonParameters;
 	void toggleFavoriteReaction(not_null<Element*> view) const;
 	void reactionChosen(const ChosenReaction &reaction);
 
@@ -485,6 +508,8 @@ private:
 	std::unique_ptr<HistoryView::AboutView> _aboutView;
 	std::unique_ptr<HistoryView::EmptyPainter> _emptyPainter;
 	std::unique_ptr<HistoryView::TranslateTracker> _translateTracker;
+	std::unique_ptr<HistoryView::ReadMetricsTracker> _readMetricsTracker;
+	bool _readMetricsStale = false;
 	rpl::event_stream<not_null<DocumentData*>> _sendIntroSticker;
 
 	mutable History *_curHistory = nullptr;
@@ -510,6 +535,7 @@ private:
 
 	std::unique_ptr<HistoryView::Reactions::Manager> _reactionsManager;
 	rpl::variable<HistoryItem*> _reactionsItem;
+	std::unique_ptr<HistoryView::ReplyButton::Manager> _replyButtonManager;
 	HistoryItem *_pinnedItem = nullptr;
 
 	MouseAction _mouseAction = MouseAction::None;
@@ -524,6 +550,7 @@ private:
 	bool _dragStateUserpic = false;
 	bool _pressWasInactive = false;
 	bool _recountedAfterPendingResizedItems = false;
+	bool _useCornerReply = false;
 	bool _useCornerReaction = false;
 	bool _acceptsHorizontalScroll = false;
 	bool _horizontalScrollLocked = false;
@@ -559,6 +586,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;
 	Ui::Controls::SwipeBackResult _swipeBackData;
@@ -575,6 +603,9 @@ private:
 	int _scrollDateLastItemTop = 0;
 	ClickHandlerPtr _scrollDateLink;
 	ClickHandlerPtr _forumThreadBarLink;
+
+	[[nodiscard]] HistoryView::ElementOverlayHost &ensureOverlayHost();
+	std::unique_ptr<HistoryView::ElementOverlayHost> _overlayHost;
 
 	bool _wasForceClickPreview = false;
 

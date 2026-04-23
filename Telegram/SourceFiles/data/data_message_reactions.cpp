@@ -1521,8 +1521,8 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 		_sentRequests.remove(id);
 		_owner->session().api().applyUpdates(result);
 
-		const auto &settings = AyuSettings::getInstance();
-		if (!settings.sendReadMessages && settings.markReadAfterAction && item) {
+		const auto &ghost = AyuSettings::ghost(&_owner->session());
+		if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && item) {
 			readHistory(item);
 		}
 	}).fail([=](const MTP::Error &error) {
@@ -1873,6 +1873,7 @@ void Reactions::sendPaidRequest(
 		return;
 	}
 
+	markReadAfterAction(item->history());
 	const auto id = item->fullId();
 	const auto randomId = base::unixtime::mtproto_msg_id();
 	auto &api = _owner->session().api();

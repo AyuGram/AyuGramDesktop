@@ -61,6 +61,7 @@ public:
 	}
 
 	void hideSpoilers() override;
+	void revealSpoilers() override;
 	bool needsBubble() const override {
 		return true;
 	}
@@ -174,6 +175,8 @@ private:
 	mutable TooltipFilename _tooltipFilename;
 
 	TtlPaintCallback _drawTtl;
+
+	mutable float64 _voiceHoverProgress = -1;
 
 	bool _transcribedRound = false;
 

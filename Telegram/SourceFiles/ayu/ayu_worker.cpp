@@ -3,8 +3,8 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_worker.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ayu_worker.h"
 
 #include "apiwrap.h"
 #include "ayu_settings.h"
@@ -54,11 +54,6 @@ void runOnce() {
 		lateInit();
 	}
 
-	const auto &settings = AyuSettings::getInstance();
-	if (!settings.sendOfflinePacketAfterOnline) {
-		return;
-	}
-
 	const auto t = base::unixtime::now();
 
 	for (const auto &[index, account] : Core::App().domain().accounts()) {
@@ -67,6 +62,11 @@ void runOnce() {
 				const auto id = session->userId().bare;
 				if (!state.contains(id)) {
 					state[id] = true;
+				}
+
+				const auto &ghost = AyuSettings::ghost(session);
+				if (!ghost.sendOfflinePacketAfterOnline()) {
+					continue;
 				}
 
 				if (state[id] || session->user()->lastseen().isOnline(t)) {

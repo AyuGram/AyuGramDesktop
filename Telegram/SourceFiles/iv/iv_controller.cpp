@@ -69,11 +69,11 @@ class ItemZoom final
 	, public Ui::AbstractTooltipShower {
 public:
 	ItemZoom(
-		not_null<RpWidget*> parent,
+		not_null<Ui::PopupMenu*> parent,
 		const not_null<Delegate*> delegate,
 		const style::Menu &st)
 	: Ui::Menu::Action(
-		parent,
+		parent->menu(),
 		st,
 		Ui::CreateChild<QAction>(parent),
 		nullptr,
@@ -108,9 +108,8 @@ public:
 			tr::lng_background_reset_default(),
 			st::ivResetZoomLabel);
 		resetLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
-		reset->setTextTransform(Ui::RoundButton::TextTransform::NoTransform);
 		reset->setClickedCallback([this] {
-			_delegate->ivSetZoom(kDefaultZoom);
+			_delegate->ivSetZoom(0);
 		});
 		reset->show();
 		const auto plus = Ui::CreateSimpleCircleButton(
@@ -619,7 +618,7 @@ void Controller::createWindow() {
 		updateTitleGeometry(width);
 	}, _subtitle->lifetime());
 
-	window->setGeometry(_delegate->ivGeometry());
+	window->setGeometry(_delegate->ivGeometry(window));
 	window->setMinimumSize({ st::windowMinWidth, st::windowMinHeight });
 
 	window->geometryValue(
@@ -708,7 +707,7 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 					_delegate->ivSetZoom(_delegate->ivZoom() - kZoomStep);
 					return base::EventFilterResult::Cancel;
 				} else if (event->key() == Qt::Key_0) {
-					_delegate->ivSetZoom(kDefaultZoom);
+					_delegate->ivSetZoom(0);
 					return base::EventFilterResult::Cancel;
 				}
 			}
@@ -1025,7 +1024,7 @@ void Controller::processKey(const QString &key, const QString &modifier) {
 	} else if (key == u"q"_q && modifier == ctrl) {
 		quit();
 	} else if (key == u"0"_q && modifier == ctrl) {
-		_delegate->ivSetZoom(kDefaultZoom);
+		_delegate->ivSetZoom(0);
 	}
 }
 

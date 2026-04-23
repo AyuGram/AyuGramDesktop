@@ -98,6 +98,7 @@ private:
 	Data::SavedSublist * const _sublist = nullptr;
 
 	bool _inResize = false;
+	bool _aboutVerificationAdded = false;
 	rpl::event_stream<Ui::ScrollToRequest> _scrollToRequests;
 	rpl::event_stream<int> _desiredHeight;
 
@@ -115,8 +116,6 @@ private:
 	Members *_members = nullptr;
 	Ui::SlideWrap<RpWidget> *_sharedMediaWrap = nullptr;
 	object_ptr<RpWidget> _content;
-
-	bool _aboutVerificationAdded = false;
 
 };
 

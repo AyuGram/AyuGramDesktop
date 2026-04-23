@@ -361,6 +361,11 @@ enum class MessageFlag : uint64 {
 	SavedMusicItem        = (1ULL << 55),
 
 	HasHiddenLinks        = (1ULL << 56),
+	HasSummaryEntry       = (1ULL << 57),
+	CanBeSummarized       = (1ULL << 58),
+	HasUnreadPollVote     = (1ULL << 59),
+
+	TextAppearing         = (1ULL << 60),
 
 	AyuNoForwards         = (1ULL << 63),
 };

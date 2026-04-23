@@ -3,11 +3,10 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "edit_mark_box.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ui/boxes/edit_mark_box.h"
 
-#include <utility>
-
+#include "ayu/ayu_settings.h"
 #include "boxes/peer_list_controllers.h"
 #include "lang/lang_keys.h"
 #include "styles/style_boxes.h"
@@ -17,7 +16,7 @@
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/special_fields.h"
 
-#include "ayu/ayu_settings.h"
+#include <utility>
 
 EditMarkBox::EditMarkBox(QWidget *,
 						 rpl::producer<QString> title,

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_top_bar_widget.h"
 #include "history/view/history_view_translate_bar.h"
 #include "history/view/history_view_list_widget.h"
+#include "data/data_chat_participant_status.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item.h"
@@ -275,7 +276,8 @@ bool PinnedWidget::cornerButtonsUnreadMayBeShown() {
 }
 
 bool PinnedWidget::cornerButtonsHas(CornerButtonType type) {
-	return (type == CornerButtonType::Down);
+	return (type == CornerButtonType::Down)
+		|| (type == CornerButtonType::PollVotes);
 }
 
 void PinnedWidget::showAtPosition(
@@ -606,7 +608,8 @@ void PinnedWidget::listMarkContentsRead(
 }
 
 MessagesBarData PinnedWidget::listMessagesBar(
-		const std::vector<not_null<Element*>> &elements) {
+		const std::vector<not_null<Element*>> &elements,
+		bool markLastAsRead) {
 	return {};
 }
 
@@ -681,14 +684,23 @@ void PinnedWidget::listShowPremiumToast(not_null<DocumentData*> document) {
 void PinnedWidget::listOpenPhoto(
 		not_null<PhotoData*> photo,
 		FullMsgId context) {
-	controller()->openPhoto(photo, { context });
+	const auto draw = Data::CanSendAnyOf(
+		_thread,
+		Data::FilesSendRestrictions());
+	controller()->openPhoto(photo, { .id = context, .showDrawButton = draw });
 }
 
 void PinnedWidget::listOpenDocument(
 		not_null<DocumentData*> document,
 		FullMsgId context,
 		bool showInMediaView) {
-	controller()->openDocument(document, showInMediaView, { context });
+	const auto draw = Data::CanSendAnyOf(
+		_thread,
+		Data::FilesSendRestrictions());
+	controller()->openDocument(
+		document,
+		showInMediaView,
+		{ .id = context, .showDrawButton = draw });
 }
 
 void PinnedWidget::listPaintEmpty(

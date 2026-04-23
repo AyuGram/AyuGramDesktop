@@ -3,8 +3,8 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "ayu_state.h"
+// Copyright @Radolyn, 2026
+#include "ayu/ayu_state.h"
 
 namespace AyuState {
 

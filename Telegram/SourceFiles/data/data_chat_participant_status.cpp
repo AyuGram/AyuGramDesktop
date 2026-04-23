@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/unixtime.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
+#include "boxes/premium_limits_box.h" // FileSizeLimitBox.
 #include "chat_helpers/compose/compose_show.h"
 #include "data/data_chat.h"
 #include "data/data_channel.h"
@@ -20,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/format_values.h" // FormatDurationWordsSlowmode.
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
@@ -52,6 +54,9 @@ namespace {
 			| (data.is_delete_stories() ? Flag::DeleteStories : Flag())
 			| (data.is_manage_direct_messages()
 				? Flag::ManageDirect
+				: Flag())
+			| (data.is_manage_ranks()
+				? Flag::ManageRanks
 				: Flag());
 	});
 }
@@ -77,7 +82,8 @@ namespace {
 			| (data.is_change_info() ? Flag::ChangeInfo : Flag())
 			| (data.is_invite_users() ? Flag::AddParticipants : Flag())
 			| (data.is_pin_messages() ? Flag::PinMessages : Flag())
-			| (data.is_manage_topics() ? Flag::CreateTopics : Flag());
+			| (data.is_manage_topics() ? Flag::CreateTopics : Flag())
+			| (data.is_edit_rank() ? Flag::EditRank : Flag());
 	});
 }
 
@@ -116,6 +122,9 @@ MTPChatAdminRights AdminRightsToMTP(ChatAdminRightsInfo info) {
 		| ((flags & R::DeleteStories) ? Flag::f_delete_stories : Flag())
 		| ((flags & R::ManageDirect)
 			? Flag::f_manage_direct_messages
+			: Flag())
+		| ((flags & R::ManageRanks)
+			? Flag::f_manage_ranks
 			: Flag())));
 }
 
@@ -147,7 +156,8 @@ MTPChatBannedRights RestrictionsToMTP(ChatRestrictionsInfo info) {
 			| ((flags & R::ChangeInfo) ? Flag::f_change_info : Flag())
 			| ((flags & R::AddParticipants) ? Flag::f_invite_users : Flag())
 			| ((flags & R::PinMessages) ? Flag::f_pin_messages : Flag())
-			| ((flags & R::CreateTopics) ? Flag::f_manage_topics : Flag())),
+			| ((flags & R::CreateTopics) ? Flag::f_manage_topics : Flag())
+			| ((flags & R::EditRank) ? Flag::f_edit_rank : Flag())),
 		MTP_int(info.until));
 }
 
@@ -542,6 +552,74 @@ void ShowSendErrorToast(
 		.text = tr::link(*error),
 		.filter = [=](const auto &...) { boost(); return false; },
 	});
+}
+
+bool ShowSendError(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<PeerData*> peer,
+		const Ui::PreparedList &list,
+		std::optional<bool> compress,
+		bool ignoreSlowmodeLeft) {
+	const auto error = [&]() -> Data::SendError {
+		const auto error = Data::FileRestrictionError(peer, list, compress);
+		if (error) {
+			return error;
+		} else if (const auto left = peer->slowmodeSecondsLeft()) {
+			if (!ignoreSlowmodeLeft) {
+				return tr::lng_slowmode_enabled(
+					tr::now,
+					lt_left,
+					Ui::FormatDurationWordsSlowmode(left));
+			}
+		}
+		using Error = Ui::PreparedList::Error;
+		switch (list.error) {
+		case Error::None: return QString();
+		case Error::EmptyFile:
+		case Error::Directory:
+		case Error::NonLocalUrl: return tr::lng_send_image_empty(
+			tr::now,
+			lt_name,
+			list.errorData);
+		case Error::TooLargeFile: return u"(toolarge)"_q;
+		}
+		return tr::lng_forward_send_files_cant(tr::now);
+	}();
+	if (!error) {
+		return false;
+	} else if (error.text == u"(toolarge)"_q) {
+		const auto max = ranges::max_element(
+			list.files,
+			{},
+			&Ui::PreparedFile::size);
+		const auto session = &show->session();
+		show->show(Box(FileSizeLimitBox, session, max->size, nullptr));
+		return true;
+	}
+	ShowSendErrorToast(show, peer, error);
+	return true;
+}
+
+bool ShowSendError(
+		std::shared_ptr<ChatHelpers::Show> show,
+		not_null<PeerData*> peer,
+		const Ui::PreparedBundle &bundle,
+		bool ignoreSlowmodeLeft) {
+	if (peer->slowmodeApplied() && bundle.groups.size() > 1) {
+		Data::ShowSendErrorToast(
+			show,
+			peer,
+			tr::lng_slowmode_no_many(tr::now));
+		return true;
+	}
+	const auto ignore = ignoreSlowmodeLeft;
+	const auto compress = bundle.way.sendImagesAsPhotos();
+	for (const auto &group : bundle.groups) {
+		if (ShowSendError(show, peer, group.list, compress, ignore)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 } // namespace Data

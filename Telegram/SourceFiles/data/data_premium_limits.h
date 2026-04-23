@@ -83,6 +83,9 @@ public:
 
 	[[nodiscard]] int maxBoostLevel() const;
 
+	[[nodiscard]] int botsCreateDefault() const;
+	[[nodiscard]] int botsCreatePremium() const;
+
 private:
 	[[nodiscard]] int appConfigLimit(
 		const QString &key,

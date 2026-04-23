@@ -9,6 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Ui {
 
+void SetAppliedBubbleRadius(int value);
+void SetBubbleRadiusOverride(int value);
+void ClearBubbleRadiusOverride();
+
 [[nodiscard]] int BubbleRadiusSmall();
 [[nodiscard]] int BubbleRadiusLarge();
 

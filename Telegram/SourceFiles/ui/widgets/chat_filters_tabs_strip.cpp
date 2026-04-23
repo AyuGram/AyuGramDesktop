@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/chat_filters_tabs_strip.h"
 
 #include "api/api_chat_filters_remove_manager.h"
+#include "boxes/choose_filter_box.h"
 #include "boxes/filters/edit_filter_box.h"
 #include "boxes/premium_limits_box.h"
 #include "core/application.h"
@@ -20,7 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "settings/settings_folders.h"
+#include "settings/sections/settings_folders.h"
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
@@ -115,13 +116,13 @@ void ShowMenu(
 		auto openFiltersSettings = [=] {
 			const auto filters = &session->data().chatsFilters();
 			if (filters->suggestedLoaded()) {
-				controller->showSettings(Settings::Folders::Id());
+				controller->showSettings(Settings::FoldersId());
 			} else if (!state->waitingSuggested) {
 				state->waitingSuggested = true;
 				filters->requestSuggested();
 				filters->suggestedUpdated(
 				) | rpl::take(1) | rpl::on_next([=] {
-					controller->showSettings(Settings::Folders::Id());
+					controller->showSettings(Settings::FoldersId());
 				}, parent->lifetime());
 			}
 		};
@@ -168,11 +169,11 @@ void ShowFiltersListMenu(
 			? &st::mediaPlayerMenuCheck
 			: nullptr;
 		const auto action = Ui::Menu::CreateAction(
-			state->menu.get(),
+			state->menu->menu(),
 			text,
 			callback);
 		auto item = base::make_unique_q<Ui::Menu::Action>(
-			state->menu.get(),
+			state->menu->menu(),
 			state->menu->st().menu,
 			action,
 			icon,
@@ -235,13 +236,16 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		state->reorderLifetime.destroy();
 		const auto &list = session->data().chatsFilters().list();
 		auto includeMuted = Data::IncludeMutedCounterFoldersValue();
+		auto hideCounters = AyuSettings::getInstance().hideNotificationCountersValue();
 		for (auto i = 0; i < list.size(); i++) {
 			rpl::combine(
 				Data::UnreadStateValue(session, list[i].id()),
-				rpl::duplicate(includeMuted)
+				rpl::duplicate(includeMuted),
+				rpl::duplicate(hideCounters)
 			) | rpl::on_next([=](
 					const Dialogs::UnreadState &state,
-					bool includeMuted) {
+					bool includeMuted,
+					bool hideCounters) {
 				const auto chats = state.chats;
 				const auto chatsMuted = state.chatsMuted;
 				const auto muted = (chatsMuted + state.marksMuted);
@@ -249,8 +253,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					- (includeMuted ? 0 : muted);
 				const auto isMuted = includeMuted && (count == muted);
 
-				const auto &settings = AyuSettings::getInstance();
-				if (settings.hideNotificationCounters) {
+				if (hideCounters) {
 					count = 0;
 				}
 
@@ -305,6 +308,40 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 				}
 			}
 		}, slider->lifetime());
+
+		SetupFilterDragAndDrop(
+			slider,
+			session,
+			[=](QPoint pos) -> std::optional<FilterId> {
+				const auto local = slider->mapFromGlobal(pos);
+				const auto x = local.x();
+				const auto count = slider->sectionsCount();
+				for (auto i = 0; i < count; ++i) {
+					const auto left = slider->lookupSectionLeft(i);
+					const auto right = (i + 1 < count)
+						? slider->lookupSectionLeft(i + 1)
+						: slider->width();
+					if (x >= left && x < right) {
+						const auto &list
+							= session->data().chatsFilters().list();
+						return (i < list.size())
+							? list[i].id()
+							: FilterId();
+					}
+				}
+				return std::nullopt;
+			},
+			[=] { return state->lastFilterId.value_or(FilterId()); },
+			[=](FilterId id) {
+				const auto &list = session->data().chatsFilters().list();
+				for (auto i = 0; i < list.size(); i++) {
+					if (list[i].id() == id) {
+						slider->selectSection(i);
+						return;
+					}
+				}
+				slider->selectSection(-1);
+			});
 	}
 	wrap->toggle(false, anim::type::instant);
 	scroll->setCustomWheelProcess([=](not_null<QWheelEvent*> e) {

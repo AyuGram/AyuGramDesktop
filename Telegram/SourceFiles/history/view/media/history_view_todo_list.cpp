@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_todo_lists.h"
 #include "window/window_peer_menu.h"
 #include "styles/style_chat.h"
+#include "styles/style_polls.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
@@ -860,6 +861,17 @@ void TodoList::hideSpoilers() {
 	for (auto &task : _tasks) {
 		if (task.text.hasSpoilers()) {
 			task.text.setSpoilerRevealed(false, anim::type::instant);
+		}
+	}
+}
+
+void TodoList::revealSpoilers() {
+	if (_title.hasSpoilers()) {
+		_title.setSpoilerRevealed(true, anim::type::instant);
+	}
+	for (auto &task : _tasks) {
+		if (task.text.hasSpoilers()) {
+			task.text.setSpoilerRevealed(true, anim::type::instant);
 		}
 	}
 }

@@ -84,6 +84,9 @@ using OnStackUsers = std::array<UserData*, kMaxUnreadReactions>;
 void CheckReactionNotificationSchedule(
 	not_null<HistoryItem*> item,
 	const OnStackUsers &wasUsers);
+void CheckPollVoteNotificationSchedule(
+	not_null<HistoryItem*> item,
+	const std::vector<not_null<PeerData*>> &wasRecentVoters);
 [[nodiscard]] MessageFlags NewForwardedFlags(
 	not_null<PeerData*> peer,
 	PeerId from,

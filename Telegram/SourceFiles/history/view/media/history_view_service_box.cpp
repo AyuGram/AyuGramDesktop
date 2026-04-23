@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
+#include "styles/style_polls.h"
 #include "styles/style_premium.h"
 #include "styles/style_layers.h"
 
@@ -420,6 +421,10 @@ bool ServiceBox::customInfoLayout() const {
 
 void ServiceBox::hideSpoilers() {
 	_subtitle.setSpoilerRevealed(false, anim::type::instant);
+}
+
+void ServiceBox::revealSpoilers() {
+	_subtitle.setSpoilerRevealed(true, anim::type::instant);
 }
 
 bool ServiceBox::hasHeavyPart() const {

@@ -55,6 +55,12 @@ struct BotVerifierSettings {
 };
 
 struct BotInfo {
+	enum class SetBotPhotoOpenState : uchar {
+		Unknown,
+		OpenedWithHistory,
+		OpenedEmpty,
+	};
+
 	BotInfo();
 	~BotInfo();
 
@@ -90,6 +96,7 @@ struct BotInfo {
 	int version = 0;
 	int descriptionVersion = 0;
 	int activeUsers = 0;
+	SetBotPhotoOpenState setBotPhotoOpenState = SetBotPhotoOpenState::Unknown;
 	bool inited : 1 = false;
 	bool readsAllHistory : 1 = false;
 	bool cantJoinGroups : 1 = false;
@@ -98,6 +105,9 @@ struct BotInfo {
 	bool canManageEmojiStatus : 1 = false;
 	bool supportsBusiness : 1 = false;
 	bool hasMainApp : 1 = false;
+	bool userCreatesTopics : 1 = false;
+	bool setBotPhotoHidden : 1 = false;
+	bool canManageBots : 1 = false;
 
 private:
 	std::unique_ptr<Data::Forum> _forum;
@@ -120,7 +130,7 @@ enum class UserDataFlag : uint32 {
 	DiscardMinPhoto = (1 << 12),
 	Self = (1 << 13),
 	Premium = (1 << 14),
-	//CanReceiveGifts = (1 << 15),
+	UnofficialSecurityRisk = (1 << 15),
 	VoiceMessagesForbidden = (1 << 16),
 	PersonalPhoto = (1 << 17),
 	StoriesHidden = (1 << 18),
@@ -134,6 +144,8 @@ enum class UserDataFlag : uint32 {
 	StoriesCorrespondent = (1 << 26),
 	Forum = (1 << 27),
 	HasActiveVideoStream = (1 << 28),
+	NoForwardsMyEnabled = (1 << 29),
+	NoForwardsPeerEnabled = (1 << 30),
 };
 inline constexpr bool is_flag_type(UserDataFlag) { return true; };
 using UserDataFlags = base::flags<UserDataFlag>;
@@ -200,6 +212,9 @@ public:
 	[[nodiscard]] bool messageMoneyRestrictionsKnown() const;
 	[[nodiscard]] bool canSendIgnoreMoneyRestrictions() const;
 	[[nodiscard]] bool readDatesPrivate() const;
+	[[nodiscard]] bool allowsForwarding() const;
+	[[nodiscard]] bool isAyuNoForwards() const;
+	void setNoForwardsFlags(bool myEnabled, bool peerEnabled);
 	[[nodiscard]] bool isForum() const {
 		return flags() & Flag::Forum;
 	}
@@ -286,6 +301,13 @@ public:
 	[[nodiscard]] MsgId personalChannelMessageId() const;
 	void setPersonalChannel(ChannelId channelId, MsgId messageId);
 
+	[[nodiscard]] UserId botManagerId() const;
+	void setBotManagerId(UserId managerId);
+
+	[[nodiscard]] bool unofficialSecurityRisk() const {
+		return flags() & Flag::UnofficialSecurityRisk;
+	}
+
 	[[nodiscard]] MTPInputUser inputUser() const;
 
 	QString firstName;
@@ -329,6 +351,7 @@ private:
 
 	ChannelId _personalChannelId = 0;
 	MsgId _personalChannelMessageId = 0;
+	UserId _botManagerId = 0;
 
 	uint64 _accessHash = 0;
 	static constexpr auto kInaccessibleAccessHashOld

@@ -3,21 +3,20 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include <QtCore/QJsonArray>
-#include <QtCore/QJsonDocument>
-#include <QtCore/QJsonObject>
-#include <QtCore/QJsonValue>
-#include <QtCore/QString>
-#include <QtCore/QTimer>
+// Copyright @Radolyn, 2026
+#include "ayu/features/translator/implementations/base.h"
 
 #include "base/random.h"
 
 #include <cmath>
 #include <memory>
 #include <vector>
-
-#include "./base.h"
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QJsonValue>
+#include <QtCore/QString>
+#include <QtCore/QTimer>
 
 namespace Ayu::Translator {
 
@@ -144,15 +143,13 @@ QString parseJsonPath(const QByteArray &body, const QString &jsonPath, bool *ok)
 	return result;
 }
 
-CallbackCancel MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
+void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 	const auto &texts = args.parsedData.texts;
 	const auto &fromLang = args.parsedData.fromLang;
 	const auto &toLang = args.parsedData.toLang;
 	if (texts.empty() || toLang.trimmed().isEmpty()) {
 		if (args.onFail) args.onFail();
-		return []
-		{
-		};
+		return;
 	}
 
 	struct BatchState
@@ -293,11 +290,6 @@ CallbackCancel MultiThreadTranslator::startTranslation(const StartTranslationArg
 	};
 
 	state->pump();
-
-	return [state, finishFail]() mutable
-	{
-		finishFail();
-	};
 }
 
 }

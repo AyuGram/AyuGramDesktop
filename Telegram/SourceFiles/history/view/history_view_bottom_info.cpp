@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/message_bubble.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/reaction_fly_animation.h"
+#include "ui/text/custom_emoji_helper.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
@@ -149,7 +150,8 @@ bool BottomInfo::isWide() const {
 		|| !_data.author.isEmpty()
 		|| !_views.isEmpty()
 		|| !_replies.isEmpty()
-		|| _effect;
+		|| _effect
+		|| _data.tonStake;
 }
 
 TextState BottomInfo::textState(
@@ -454,18 +456,18 @@ void BottomInfo::layout() {
 void BottomInfo::layoutDateText() {
 	const auto &settings = AyuSettings::getInstance();
 
-	if (!settings.replaceBottomInfoWithIcons) {
+	if (!settings.replaceBottomInfoWithIcons()) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
-			? (settings.deletedMark + ' ')
+			? (settings.deletedMark() + ' ')
 			: QString();
 		const auto edited = (_data.flags & Data::Flag::Edited)
-			? (settings.editedMark + ' ')
+			? (settings.editedMark() + ' ')
 			: (_data.flags & Data::Flag::EstimateDate)
 			? (tr::lng_approximate(tr::now) + ' ')
 			: _data.scheduleRepeatPeriod
 			? (SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ')
 			: QString();
-		const auto author = _data.author;
+		const auto author = settings.filterZalgo() ? filterZalgo(_data.author) : _data.author;
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
 		const auto date = edited + ((_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
@@ -486,19 +488,47 @@ void BottomInfo::layoutDateText() {
 			: name.isEmpty()
 			? (deleted + date)
 			: (deleted + name + afterAuthor);
+		auto helper = Ui::Text::CustomEmojiHelper(
+			Core::TextContext({ .session = &_reactionsOwner->session() }));
 		auto marked = TextWithEntities();
 		if (const auto count = _data.stars) {
 			marked.append(
 				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
 			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
 		}
+		if (const auto stake = _data.tonStake) {
+			marked.append(
+				QString::number(stake / 1e9)
+			).append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
+					Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
+						st::stakeIconEmojiSize * style::DevicePixelRatio(),
+						Qt::SmoothTransformation),
+				.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
+				.textColor = false,
+			})).append("  ");
+		}
+		if (_data.flags & Data::Flag::AyuBurnt) {
+			marked.append(Ui::Text::IconEmoji(&st::burntIcon));
+			marked.append(' ');
+		}
 		marked.append(full);
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
 			marked,
 			Ui::NameTextOptions(),
-			Core::TextContext({ .session = &_reactionsOwner->session() }));
+			helper.context());
 	} else {
+		TextWithEntities burnt;
+		if (_data.flags & Data::Flag::AyuBurnt) {
+			burnt = Ui::Text::IconEmoji(&st::burntIcon);
+			if (!(_data.flags & Data::Flag::AyuDeleted)
+				&& !(_data.flags & Data::Flag::Edited)) {
+				burnt.append(' ');
+			}
+		}
+
 		TextWithEntities deleted;
 		if (_data.flags & Data::Flag::AyuDeleted) {
 			deleted = Ui::Text::IconEmoji(&st::deletedIcon);
@@ -517,7 +547,7 @@ void BottomInfo::layoutDateText() {
 			edited = TextWithEntities{ SchedulePeriodText(_data.scheduleRepeatPeriod) + ' ' };
 		}
 
-		const auto author = _data.author;
+		const auto author = settings.filterZalgo() ? filterZalgo(_data.author) : _data.author;
 		const auto prefix = !author.isEmpty() ? (_data.flags & Data::Flag::Edited ? u" "_q : u", "_q) : QString();
 
 		const auto dateStr = (_data.flags & Data::Flag::ForwardedDate)
@@ -542,32 +572,41 @@ void BottomInfo::layoutDateText() {
 		if (_data.flags & Data::Flag::Sponsored) {
 			// ...
 		} else if (_data.flags & Data::Flag::Imported) {
-			full.append(deleted).append(date).append(' ').append(tr::lng_imported(tr::now));
+			full.append(burnt).append(deleted).append(date).append(' ').append(tr::lng_imported(tr::now));
 		} else if (name.isEmpty()) {
-			full.append(deleted).append(date);
+			full.append(burnt).append(deleted).append(date);
 		} else {
-			full.append(deleted).append(name).append(afterAuthor);
+			full.append(burnt).append(deleted).append(name).append(afterAuthor);
 		}
 
+		auto helper = Ui::Text::CustomEmojiHelper(
+			Core::TextContext({ .session = &_reactionsOwner->session() }));
 		auto marked = TextWithEntities();
 		if (const auto count = _data.stars) {
 			marked.append(
 				Ui::Text::IconEmoji(&st::starIconEmojiSmall)
 			).append(Lang::FormatCountToShort(count).string).append(u", "_q);
 		}
+		if (const auto stake = _data.tonStake) {
+			marked.append(
+				QString::number(stake / 1e9)
+			).append(helper.image({
+				.image = Ui::Emoji::SinglePixmap(
+					Ui::Emoji::Find(QString::fromUtf8("\xf0\x9f\x92\x8e")),
+					Ui::Emoji::GetSizeNormal()).toImage().scaledToHeight(
+						st::stakeIconEmojiSize * style::DevicePixelRatio(),
+						Qt::SmoothTransformation),
+				.margin = QMargins(0, st::stakeIconEmojiTop, 0, 0),
+				.textColor = false,
+			})).append("  ");
+		}
 		marked.append(full);
-
-		const auto context = Core::TextContext({
-			.session = &_reactionsOwner->session(),
-			.repaint = [] {},
-			.customEmojiLoopLimit = 0,
-		});
 
 		_authorEditedDate.setMarkedText(
 			st::msgDateTextStyle,
 			marked,
 			Ui::NameTextOptions(),
-			context);
+			helper.context());
 	}
 }
 
@@ -721,14 +760,19 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 		result.flags |= Flag::Sending;
 	}
 	if (!item->history()->peer->isUser()) {
-		const auto media = message->media();
 		const auto mine = PaidInformation{
 			.messages = 1,
 			.stars = item->starsPaid(),
 		};
+		const auto media = message->media();
 		auto info = media ? media->paidInformation().value_or(mine) : mine;
 		if (const auto total = info.stars) {
 			result.stars = total;
+		}
+	}
+	if (const auto media = item->media()) {
+		if (const auto outcome = media->diceGameOutcome()) {
+			result.tonStake = outcome.stakeNanoTon;
 		}
 	}
 	const auto forwarded = item->Get<HistoryMessageForwarded>();
@@ -743,6 +787,9 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (item->isDeleted()) {
 		result.flags |= Flag::AyuDeleted;
+	}
+	if (item->isBurnt()) {
+		result.flags |= Flag::AyuBurnt;
 	}
 	if (!forwarded) {
 		return result;

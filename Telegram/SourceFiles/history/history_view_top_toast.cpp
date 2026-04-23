@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "core/ui_integration.h"
 #include "styles/style_chat.h"
+#include "styles/style_widgets.h"
 
 namespace HistoryView {
 
@@ -35,6 +36,7 @@ void InfoTooltip::show(
 	_topToast = Ui::Toast::Show(parent, Ui::Toast::Config{
 		.text = text,
 		.textContext = Core::TextContext({ .session = session }),
+		.icon = &st::historyInfoToastIcon,
 		.st = &st::historyInfoToast,
 		.attach = RectPart::Top,
 		.duration = CountToastDuration(text),

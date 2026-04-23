@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "data/data_cloud_file.h"
+#include "data/data_poll.h"
 #include "history/history_item.h"
 #include "spellcheck/spellcheck_types.h" // LanguageId.
 #include "ui/empty_userpic.h"
@@ -63,6 +64,7 @@ enum class SuggestionActions : uchar {
 	Decline,
 	AcceptAndDecline,
 	GiftOfferActions,
+	NoForwardsRequest,
 };
 
 struct HistoryMessageVia : RuntimeComponent<HistoryMessageVia, HistoryItem> {
@@ -101,6 +103,11 @@ struct HistoryMessageSigned
 	QString author;
 	UserData *viaBusinessBot = nullptr;
 	bool isAnonymousRank = false;
+};
+
+struct HistoryMessageFromRank
+: RuntimeComponent<HistoryMessageFromRank, HistoryItem> {
+	QString rank;
 };
 
 struct HistoryMessageEdited
@@ -280,6 +287,7 @@ struct ReplyFields {
 	MsgId topMessageId = 0;
 	StoryId storyId = 0;
 	int todoItemId = 0;
+	QByteArray pollOption;
 	uint32 quoteOffset : 30 = 0;
 	uint32 manualQuote : 1 = 0;
 	uint32 topicPost : 1 = 0;
@@ -457,9 +465,6 @@ public:
 		Style(const style::BotKeyboardButton &st) : _st(&st) {
 		}
 
-		virtual void startPaint(
-			QPainter &p,
-			const Ui::ChatStyle *st) const = 0;
 		virtual const style::TextStyle &textStyle() const = 0;
 
 		int buttonSkip() const;
@@ -478,8 +483,13 @@ public:
 			QPainter &p,
 			const Ui::ChatStyle *st,
 			const QRect &rect,
+			HistoryMessageMarkupButton::Color color,
 			Ui::BubbleRounding rounding,
 			float64 howMuchOver) const = 0;
+		virtual void paintButtonStart(
+			QPainter &p,
+			const Ui::ChatStyle *st,
+			HistoryMessageMarkupButton::Color color) const = 0;
 		virtual void paintButtonIcon(
 			QPainter &p,
 			const Ui::ChatStyle *st,
@@ -490,6 +500,7 @@ public:
 			QPainter &p,
 			const Ui::ChatStyle *st,
 			const QRect &rect,
+			HistoryMessageMarkupButton::Color color,
 			int outerWidth,
 			Ui::BubbleRounding rounding) const = 0;
 		virtual int minButtonWidth(
@@ -503,7 +514,8 @@ public:
 			const Ui::ChatStyle *st,
 			int outerWidth,
 			const ReplyKeyboard::Button &button,
-			Ui::BubbleRounding rounding) const;
+			Ui::BubbleRounding rounding,
+			bool paused) const;
 		friend class ReplyKeyboard;
 
 	};
@@ -527,7 +539,8 @@ public:
 		const Ui::ChatStyle *st,
 		Ui::BubbleRounding rounding,
 		int outerWidth,
-		const QRect &clip) const;
+		const QRect &clip,
+		bool paused) const;
 	ClickHandlerPtr getLink(QPoint point) const;
 	ClickHandlerPtr getLinkByIndex(int index) const;
 
@@ -554,12 +567,14 @@ private:
 		QRect rect;
 		int characters = 0;
 		float64 howMuchOver = 0.;
-		HistoryMessageMarkupButton::Type type;
+		HistoryMessageMarkupButton::Type type = {};
+		HistoryMessageMarkupButton::Color color = {};
 		std::shared_ptr<ReplyMarkupClickHandler> link;
 		mutable std::unique_ptr<Ui::RippleAnimation> ripple;
 	};
 	struct ButtonCoords {
-		int i, j;
+		int i = 0;
+		int j = 0;
 	};
 
 	void startAnimation(int i, int j, int direction);
@@ -660,6 +675,11 @@ struct HistoryServicePinned
 , HistoryServiceDependentData {
 };
 
+struct HistoryServiceClearHistory
+: RuntimeComponent<HistoryServiceClearHistory, HistoryItem>
+, HistoryServiceDependentData {
+};
+
 struct HistoryServiceTopicInfo
 : RuntimeComponent<HistoryServiceTopicInfo, HistoryItem>
 , HistoryServiceDependentData {
@@ -702,6 +722,18 @@ struct HistoryServiceTodoAppendTasks
 [[nodiscard]] TextWithEntities ComposeTodoTasksList(
 	not_null<HistoryServiceTodoAppendTasks*> append);
 
+struct HistoryServicePollAppendAnswer
+: RuntimeComponent<HistoryServicePollAppendAnswer, HistoryItem>
+, HistoryServiceDependentData {
+	PollAnswer answer;
+};
+
+struct HistoryServicePollDeleteAnswer
+: RuntimeComponent<HistoryServicePollDeleteAnswer, HistoryItem>
+, HistoryServiceDependentData {
+	PollAnswer answer;
+};
+
 struct HistoryServiceSuggestDecision
 : RuntimeComponent<HistoryServiceSuggestDecision, HistoryItem>
 , HistoryServiceDependentData {
@@ -724,6 +756,18 @@ struct HistoryServiceSuggestFinish
 , HistoryServiceDependentData {
 	CreditsAmount price;
 	SuggestRefundType refundType = SuggestRefundType::None;
+};
+
+struct HistoryServiceNoForwardsRequest
+: RuntimeComponent<HistoryServiceNoForwardsRequest, HistoryItem> {
+	TimeId expiresAt = 0;
+	mtpRequestId requestId = 0;
+	bool expired = false;
+	bool actionTaken = false;
+};
+
+struct HistoryServiceNoForwardsToggle
+: RuntimeComponent<HistoryServiceNoForwardsToggle, HistoryItem> {
 };
 
 struct HistoryServiceGameScore

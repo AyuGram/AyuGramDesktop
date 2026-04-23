@@ -93,7 +93,8 @@ MTPInputMedia PrepareUploadedPhoto(
 		info.file,
 		MTP_vector<MTPInputDocument>(
 			ranges::to<QVector<MTPInputDocument>>(info.attachedStickers)),
-		MTP_int(ttlSeconds));
+		MTP_int(ttlSeconds),
+		MTPInputDocument()); // video
 }
 
 MTPInputMedia PrepareUploadedDocument(
@@ -110,6 +111,7 @@ MTPInputMedia PrepareUploadedDocument(
 	const auto flags = (spoiler ? Flag::f_spoiler : Flag())
 		| (info.thumb ? Flag::f_thumb : Flag())
 		| (item->groupId() ? Flag::f_nosound_video : Flag())
+		| (info.forceFile ? Flag::f_force_file : Flag())
 		| (info.attachedStickers.empty() ? Flag::f_stickers : Flag())
 		| (ttlSeconds ? Flag::f_ttl_seconds : Flag())
 		| (info.videoCover ? Flag::f_video_cover : Flag());

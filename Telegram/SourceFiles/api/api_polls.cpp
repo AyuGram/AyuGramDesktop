@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_polls.h"
 
 #include "api/api_common.h"
+#include "api/api_text_entities.h"
 #include "api/api_updates.h"
 #include "apiwrap.h"
 #include "base/random.h"
@@ -35,9 +36,10 @@ Polls::Polls(not_null<ApiWrap*> api)
 
 void Polls::create(
 		const PollData &data,
+		const TextWithEntities &text,
 		SendAction action,
 		Fn<void()> done,
-		Fn<void()> fail) {
+		Fn<void(bool fileReferenceExpired)> fail) {
 	_session->api().sendAction(action);
 
 	const auto history = action.history;
@@ -87,6 +89,13 @@ void Polls::create(
 	if (sendAs) {
 		sendFlags |= MTPmessages_SendMedia::Flag::f_send_as;
 	}
+	auto sentEntities = Api::EntitiesToMTP(
+		_session,
+		text.entities,
+		Api::ConvertOption::SkipLocal);
+	if (!sentEntities.v.isEmpty()) {
+		sendFlags |= MTPmessages_SendMedia::Flag::f_entities;
+	}
 	auto &histories = history->owner().histories();
 	const auto randomId = base::RandomValue<uint64>();
 	histories.sendPreparedMessage(
@@ -98,10 +107,10 @@ void Polls::create(
 			peer->input(),
 			Data::Histories::ReplyToPlaceholder(),
 			PollDataToInputMedia(&data),
-			MTP_string(),
+			MTP_string(text.text),
 			MTP_long(randomId),
 			MTPReplyMarkup(),
-			MTPVector<MTPMessageEntity>(),
+			sentEntities,
 			MTP_int(action.options.scheduled),
 			MTP_int(action.options.scheduleRepeatPeriod),
 			(sendAs ? sendAs->input() : MTP_inputPeerEmpty()),
@@ -129,7 +138,9 @@ void Polls::create(
 				monoforumPeerId,
 				UnixtimeFromMsgId(response.outerMsgId));
 		}
-		fail();
+		const auto expired = (error.code() == 400)
+			&& error.type().startsWith(u"FILE_REFERENCE_"_q);
+		fail(expired);
 	});
 }
 
@@ -175,14 +186,81 @@ void Polls::sendVotes(
 		hideSending();
 		_session->updates().applyUpdates(result);
 
-		const auto &settings = AyuSettings::getInstance();
-		if (!settings.sendReadMessages && settings.markReadAfterAction && item)
+		const auto &ghost = AyuSettings::ghost(_session);
+		if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && item)
 		{
 			readHistory(item);
 		}
 	}).fail([=] {
 		_pollVotesRequestIds.erase(itemId);
 		hideSending();
+	}).send();
+	_pollVotesRequestIds.emplace(itemId, requestId);
+}
+
+void Polls::addAnswer(
+		FullMsgId itemId,
+		const TextWithEntities &text,
+		const PollMedia &media,
+		Fn<void()> done,
+		Fn<void(QString)> fail) {
+	if (_pollAddAnswerRequestIds.contains(itemId)) {
+		return;
+	}
+	const auto item = _session->data().message(itemId);
+	if (!item) {
+		return;
+	}
+	const auto sentEntities = Api::EntitiesToMTP(
+		_session,
+		text.entities,
+		Api::ConvertOption::SkipLocal);
+	using Flag = MTPDinputPollAnswer::Flag;
+	const auto flags = media
+		? Flag::f_media
+		: Flag();
+	const auto answer = MTP_inputPollAnswer(
+		MTP_flags(flags),
+		MTP_textWithEntities(
+			MTP_string(text.text),
+			sentEntities),
+		media ? PollMediaToMTP(media) : MTPInputMedia());
+	const auto requestId = _api.request(MTPmessages_AddPollAnswer(
+		item->history()->peer->input(),
+		MTP_int(item->id),
+		answer
+	)).done([=](const MTPUpdates &result) {
+		_pollAddAnswerRequestIds.erase(itemId);
+		_session->updates().applyUpdates(result);
+		if (done) {
+			done();
+		}
+	}).fail([=](const MTP::Error &error) {
+		_pollAddAnswerRequestIds.erase(itemId);
+		if (fail) {
+			fail(error.type());
+		}
+	}).send();
+	_pollAddAnswerRequestIds.emplace(itemId, requestId);
+}
+
+void Polls::deleteAnswer(FullMsgId itemId, const QByteArray &option) {
+	if (_pollVotesRequestIds.contains(itemId)) {
+		return;
+	}
+	const auto item = _session->data().message(itemId);
+	if (!item) {
+		return;
+	}
+	const auto requestId = _api.request(MTPmessages_DeletePollAnswer(
+		item->history()->peer->input(),
+		MTP_int(item->id),
+		MTP_bytes(option)
+	)).done([=](const MTPUpdates &result) {
+		_pollVotesRequestIds.erase(itemId);
+		_session->updates().applyUpdates(result);
+	}).fail([=] {
+		_pollVotesRequestIds.erase(itemId);
 	}).send();
 	_pollVotesRequestIds.emplace(itemId, requestId);
 }
@@ -222,9 +300,13 @@ void Polls::reloadResults(not_null<HistoryItem*> item) {
 	if (!item->isRegular() || _pollReloadRequestIds.contains(itemId)) {
 		return;
 	}
+	const auto media = item->media();
+	const auto poll = media ? media->poll() : nullptr;
+	const auto pollHash = poll ? poll->hash : uint64(0);
 	const auto requestId = _api.request(MTPmessages_GetPollResults(
 		item->history()->peer->input(),
-		MTP_int(item->id)
+		MTP_int(item->id),
+		MTP_long(pollHash)
 	)).done([=](const MTPUpdates &result) {
 		_pollReloadRequestIds.erase(itemId);
 		_session->updates().applyUpdates(result);

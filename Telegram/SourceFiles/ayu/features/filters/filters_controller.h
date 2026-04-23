@@ -3,12 +3,13 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #pragma once
+
+#include "unicode/regex.h"
 
 #include <string>
 #include <vector>
-#include "unicode/regex.h"
 
 using namespace icu_78;
 
@@ -16,6 +17,7 @@ namespace FiltersController {
 
 bool isEnabled(PeerData *peer);
 bool isBlocked(not_null<HistoryItem*> item);
+bool isBlocked(not_null<PeerData*> peer);
 bool filtered(not_null<HistoryItem*> historyItem);
 
 void invalidate(not_null<HistoryItem*> item);

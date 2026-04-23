@@ -40,6 +40,7 @@ class ScrollArea;
 class PlainShadow;
 class FlatButton;
 struct PreparedList;
+struct PreparedBundle;
 class SendFilesWay;
 class ImportantTooltip;
 } // namespace Ui
@@ -138,7 +139,8 @@ public:
 	void listMarkContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) override;
 	MessagesBarData listMessagesBar(
-		const std::vector<not_null<Element*>> &elements) override;
+		const std::vector<not_null<Element*>> &elements,
+		bool markLastAsRead) override;
 	void listContentRefreshed() override;
 	void listUpdateDateLink(
 		ClickHandlerPtr &link,
@@ -256,15 +258,11 @@ private:
 		std::optional<bool> overrideSendImagesAsPhotos,
 		const QString &insertTextOnCancel = QString());
 	bool showSendingFilesError(const Ui::PreparedList &list) const;
-	bool showSendingFilesError(
-		const Ui::PreparedList &list,
-		std::optional<bool> compress) const;
+	bool showSendingFilesError(const Ui::PreparedBundle &bundle) const;
+
 	void sendingFilesConfirmed(
-		Ui::PreparedList &&list,
-		Ui::SendFilesWay way,
-		TextWithTags &&caption,
-		Api::SendOptions options,
-		bool ctrlShiftEnter);
+		std::shared_ptr<Ui::PreparedBundle> bundle,
+		Api::SendOptions options);
 
 	bool sendExistingDocument(
 		not_null<DocumentData*> document,

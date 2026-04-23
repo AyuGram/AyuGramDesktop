@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
 #include "ui/round_rect.h"
+#include "ui/widgets/shadow.h"
 
 namespace Ui {
 
@@ -78,6 +79,7 @@ private:
 	std::unique_ptr<Ui::PanelAnimation> _showAnimation;
 	Ui::Animations::Simple _a_show;
 
+	Ui::BoxShadow _shadow;
 	bool _hiding = false;
 	QPixmap _cache;
 	Ui::Animations::Simple _a_opacity;

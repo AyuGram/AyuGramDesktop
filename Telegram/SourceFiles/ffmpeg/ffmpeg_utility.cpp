@@ -691,7 +691,7 @@ QImage CreateFrameStorage(QSize size) {
 		? (widthAlign - (width % widthAlign))
 		: 0);
 	const auto perLine = neededWidth * kPixelBytesSize;
-	const auto buffer = new uchar[perLine * height + kAlignImageBy];
+	const auto buffer = new uchar[size_t(perLine) * height + kAlignImageBy];
 	const auto cleanupData = static_cast<void *>(buffer);
 	const auto address = reinterpret_cast<uintptr_t>(buffer);
 	const auto alignedBuffer = buffer + ((address % kAlignImageBy)

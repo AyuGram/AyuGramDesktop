@@ -3,16 +3,17 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 #ifdef Q_OS_WIN
 
-#include "windows_utils.h"
+#include "ayu/utils/windows_utils.h"
 
+#include "ayu/ui/ayu_logo.h"
 #include "base/platform/win/base_windows_winrt.h"
 #include "platform/win/windows_app_user_model_id.h"
 
-#include <ShlObj_core.h>
 #include <propvarutil.h>
+#include <ShlObj_core.h>
 
 void processIcon(QString shortcut, QString iconPath) {
 	if (!QFile::exists(shortcut)) {
@@ -46,7 +47,8 @@ void processIcon(QString shortcut, QString iconPath) {
 	}
 }
 
-void processLegacy(const QString &appdata, const QString &iconPath) {
+void processLegacy(const QString &iconPath) {
+	const auto appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
 	auto shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram Desktop.lnk";
 	if (!QFile::exists(shortcut)) {
 		shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram.lnk";
@@ -152,12 +154,11 @@ void processNewShortcuts(const QString &iconPath) {
 }
 
 void reloadAppIconFromTaskBar() {
-	QString appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
-	QString iconPath = appdata + "/AyuGram.ico";
+	const auto iconPath = AyuAssets::appIcoPath();
 
 	processNewPinned(iconPath);
 	processNewShortcuts(iconPath);
-	processLegacy(appdata, iconPath);
+	processLegacy(iconPath);
 
 	SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 }

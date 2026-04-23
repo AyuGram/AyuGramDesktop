@@ -56,12 +56,14 @@ public:
 
 	bool needsBubble() const override;
 	bool customInfoLayout() const override {
-		return true;
+		return _title.isEmpty() && _description.isEmpty();
 	}
 	QPoint resolveCustomInfoRightBottom() const override;
 
 	bool skipBubbleTail() const override {
-		return isRoundedInBubbleBottom();
+		return _title.isEmpty()
+			&& _description.isEmpty()
+			&& isRoundedInBubbleBottom();
 	}
 
 	QImage locationTakeImage() override;
@@ -113,6 +115,7 @@ private:
 	Ui::Text::String _title, _description;
 	ClickHandlerPtr _link;
 
+	int _thumbnailHeight = 0;
 	mutable QImage _imageCache;
 	mutable Ui::BubbleRounding _imageCacheRounding;
 

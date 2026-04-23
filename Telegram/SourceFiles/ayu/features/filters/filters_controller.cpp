@@ -3,31 +3,22 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
+// Copyright @Radolyn, 2026
 
-#include "filters_controller.h"
+#include "ayu/features/filters/filters_controller.h"
 
-#include "filters_cache_controller.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/features/filters/filters_cache_controller.h"
+#include "ayu/features/filters/filters_utils.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "data/data_peer.h"
+#include "data/data_peer_id.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "unicode/regex.h"
-
-#include <QTimer>
-
-#include "ayu/data/entities.h"
-#include "core/mime_type.h"
-#include "data/data_channel.h"
-#include "data/data_peer_id.h"
-
-#include "data/data_session.h"
 #include "history/history_item_components.h"
-
-#include "filters_utils.h"
-#include "shadow_ban_utils.h"
-#include "ayu/utils/telegram_helpers.h"
+#include "unicode/regex.h"
 
 namespace FiltersController {
 
@@ -91,7 +82,7 @@ std::optional<bool> isFiltered(const QString &str, uint64 dialogId) {
 
 bool isEnabled(not_null<PeerData*> peer) {
 	const auto &settings = AyuSettings::getInstance();
-	return settings.filtersEnabled && (settings.filtersEnabledInChats || peer->isBroadcast());
+	return settings.filtersEnabled() && (settings.filtersEnabledInChats() || peer->isBroadcast());
 }
 
 bool isBlocked(const not_null<HistoryItem*> item) {
@@ -115,16 +106,25 @@ bool isBlocked(const not_null<HistoryItem*> item) {
 		return false;
 	}();
 
-	return settings.filtersEnabled &&
+	return settings.filtersEnabled() &&
 	(
-		((item->from()->isUser() || item->from()->isBroadcast()) && ShadowBanUtils::isShadowBanned(getDialogIdFromPeer(item->from()))) ||
-		(settings.hideFromBlocked && blocked)
+		((item->from()->isUser() || item->from()->isBroadcast()) && settings.isShadowBanned(getDialogIdFromPeer(item->from()))) ||
+		(settings.hideFromBlocked() && blocked)
+	);
+}
+
+bool isBlocked(const not_null<PeerData*> peer) {
+	const auto &settings = AyuSettings::getInstance();
+	return settings.filtersEnabled() &&
+	(
+		(peer->isUser() && peer->asUser()->isBlocked() && settings.hideFromBlocked()) ||
+		((peer->isUser() || peer->isBroadcast()) && settings.isShadowBanned(getDialogIdFromPeer(peer)))
 	);
 }
 
 bool filtered(const not_null<HistoryItem*> item) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!settings.filtersEnabled) {
+	if (!settings.filtersEnabled()) {
 		return false;
 	}
 
@@ -155,7 +155,7 @@ bool filtered(const not_null<HistoryItem*> item) {
 
 void invalidate(not_null<HistoryItem*> item) {
 	const auto &settings = AyuSettings::getInstance();
-	if (!settings.filtersEnabled) {
+	if (!settings.filtersEnabled()) {
 		return;
 	}
 

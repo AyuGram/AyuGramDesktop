@@ -104,6 +104,7 @@ struct GiftUpdate {
 		Pin,
 		Unpin,
 		ResaleChange,
+		Upgraded,
 	};
 
 	Data::SavedStarGiftId id;
@@ -138,6 +139,17 @@ struct RecentSelfForwards {
 struct RecentJoinChat {
 	PeerId fromPeerId = 0;
 	PeerId joinedPeerId = 0;
+};
+
+struct DrawToReplyRequest {
+	FullMsgId messageId;
+	uint64 photoId = 0;
+	uint64 documentId = 0;
+};
+
+struct RequestViewRepaint {
+	not_null<const HistoryView::Element*> view;
+	QRect rect;
 };
 
 class Session final {
@@ -280,6 +292,11 @@ public:
 	void watchForOffline(not_null<UserData*> user, TimeId now = 0);
 	void maybeStopWatchForOffline(not_null<UserData*> user);
 
+	void recordSharingDisabledTime(not_null<UserData*> user);
+	[[nodiscard]] bool sharingRecentlyDisabledByMe(
+		not_null<UserData*> user) const;
+	void clearSharingDisabledTime(not_null<UserData*> user);
+
 	[[nodiscard]] auto invitedToCallUsers(CallId callId) const
 		-> const base::flat_map<not_null<UserData*>, bool> &;
 	void registerInvitedToCallUser(
@@ -368,17 +385,28 @@ public:
 	[[nodiscard]] rpl::producer<GiftsUpdate> giftsUpdates() const;
 	void notifyGiftAuctionGot(GiftAuctionGot &&update);
 	[[nodiscard]] rpl::producer<GiftAuctionGot> giftAuctionGots() const;
-	void requestItemRepaint(not_null<const HistoryItem*> item);
+	void requestItemRepaint(not_null<const HistoryItem*> item, QRect r = QRect());
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRepaintRequest() const;
-	void requestViewRepaint(not_null<const ViewElement*> view);
-	[[nodiscard]] rpl::producer<not_null<const ViewElement*>> viewRepaintRequest() const;
+	void requestDrawToReply(DrawToReplyRequest request);
+	[[nodiscard]] rpl::producer<DrawToReplyRequest> drawToReplyRequests() const;
+	void requestViewRepaint(not_null<const ViewElement*> view, QRect r = QRect());
+	[[nodiscard]] rpl::producer<RequestViewRepaint> viewRepaintRequest() const;
 	void requestItemResize(not_null<const HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemResizeRequest() const;
 	void requestViewResize(not_null<ViewElement*> view);
 	[[nodiscard]] rpl::producer<not_null<ViewElement*>> viewResizeRequest() const;
+	struct ViewHeightAdjusted {
+		not_null<ViewElement*> view;
+		int delta = 0;
+	};
+	void notifyViewHeightAdjusted(not_null<ViewElement*> view, int delta);
+	[[nodiscard]] rpl::producer<ViewHeightAdjusted> viewHeightAdjusted() const;
+	void requestItemShowHighlight(not_null<HistoryItem*> item);
+	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> itemShowHighlightRequest() const;
 	void requestItemViewRefresh(not_null<const HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemViewRefreshRequest() const;
 	void requestItemTextRefresh(not_null<HistoryItem*> item);
+	void requestItemTextRefreshStreaming(not_null<HistoryItem*> item);
 	void requestUnreadReactionsAnimation(not_null<HistoryItem*> item);
 	void notifyHistoryUnloaded(not_null<const History*> history);
 	[[nodiscard]] rpl::producer<not_null<const History*>> historyUnloaded() const;
@@ -461,6 +489,7 @@ public:
 	void applyUpdate(const MTPDupdateChatParticipantAdd &update);
 	void applyUpdate(const MTPDupdateChatParticipantDelete &update);
 	void applyUpdate(const MTPDupdateChatParticipantAdmin &update);
+	void applyUpdate(const MTPDupdateChatParticipantRank &update);
 	void applyUpdate(const MTPDupdateChatDefaultBannedRights &update);
 
 	void applyDialogs(
@@ -518,6 +547,10 @@ public:
 
 	void registerMessageTTL(TimeId when, not_null<HistoryItem*> item);
 	void unregisterMessageTTL(TimeId when, not_null<HistoryItem*> item);
+
+	void registerFormattedDateUpdate(
+		TimeId when,
+		not_null<HistoryView::Element*> view);
 
 	// Returns true if item found and it is not detached.
 	bool updateExistingMessage(const MTPDmessage &data);
@@ -731,6 +764,9 @@ public:
 		const MTPBotApp &data);
 
 	[[nodiscard]] not_null<PollData*> poll(PollId id);
+	[[nodiscard]] HistoryItem *findItemForPoll(PollId id) const;
+	[[nodiscard]] std::vector<not_null<PeerData*>> pollRecentVoters(
+		PollId id) const;
 	not_null<PollData*> processPoll(const MTPPoll &data);
 	not_null<PollData*> processPoll(const MTPDmessageMediaPoll &data);
 
@@ -823,6 +859,7 @@ public:
 	[[nodiscard]] bool hasPendingWebPageGamePollTodoListNotification() const;
 	void sendWebPageGamePollTodoListNotifications();
 	[[nodiscard]] rpl::producer<not_null<WebPageData*>> webPageUpdates() const;
+	[[nodiscard]] rpl::producer<not_null<PollData*>> pollUpdates() const;
 
 	void channelDifferenceTooLong(not_null<ChannelData*> channel);
 	[[nodiscard]] rpl::producer<not_null<ChannelData*>> channelDifferenceTooLong() const;
@@ -948,6 +985,9 @@ private:
 
 	void scheduleNextTTLs();
 	void checkTTLs();
+
+	void scheduleNextFormattedDateUpdate();
+	void checkFormattedDateUpdates();
 
 	int computeUnreadBadge(const Dialogs::UnreadState &state) const;
 	bool computeUnreadBadgeMuted(const Dialogs::UnreadState &state) const;
@@ -1101,11 +1141,14 @@ private:
 	rpl::event_stream<GiftsUpdate> _giftsUpdates;
 	rpl::event_stream<GiftAuctionGot> _giftAuctionGots;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRepaintRequest;
-	rpl::event_stream<not_null<const ViewElement*>> _viewRepaintRequest;
+	rpl::event_stream<RequestViewRepaint> _viewRepaintRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemResizeRequest;
 	rpl::event_stream<not_null<ViewElement*>> _viewResizeRequest;
+	rpl::event_stream<ViewHeightAdjusted> _viewHeightAdjusted;
+	rpl::event_stream<not_null<HistoryItem*>> _itemShowHighlightRequest;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemViewRefreshRequest;
 	rpl::event_stream<not_null<HistoryItem*>> _itemTextRefreshRequest;
+	rpl::event_stream<DrawToReplyRequest> _drawToReplyRequests;
 	rpl::event_stream<not_null<HistoryItem*>> _itemDataChanges;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRemoved;
@@ -1136,6 +1179,9 @@ private:
 		base::flat_set<not_null<HistoryItem*>>> _dependentMessages;
 	std::map<TimeId, base::flat_set<not_null<HistoryItem*>>> _ttlMessages;
 	base::Timer _ttlCheckTimer;
+
+	std::map<TimeId, std::vector<base::weak_ptr<HistoryView::Element>>> _formattedDateUpdates;
+	base::Timer _formattedDateTimer;
 
 	std::unordered_map<MsgId, not_null<HistoryItem*>> _nonChannelMessages;
 
@@ -1209,6 +1255,7 @@ private:
 	base::flat_set<not_null<TodoListData*>> _todoListsUpdated;
 
 	rpl::event_stream<not_null<WebPageData*>> _webpageUpdates;
+	rpl::event_stream<not_null<PollData*>> _pollUpdates;
 	rpl::event_stream<not_null<ChannelData*>> _channelDifferenceTooLong;
 	rpl::event_stream<not_null<DocumentData*>> _documentLoadProgress;
 	base::flat_set<not_null<ChannelData*>> _suggestToGigagroup;
@@ -1265,6 +1312,7 @@ private:
 
 	base::flat_map<not_null<UserData*>, TimeId> _watchingForOffline;
 	base::Timer _watchForOfflineTimer;
+	base::flat_map<not_null<UserData*>, TimeId> _sharingDisabledTimes;
 
 	base::flat_map<not_null<PeerData*>, MTP::DcId> _peerStatsDcIds;
 

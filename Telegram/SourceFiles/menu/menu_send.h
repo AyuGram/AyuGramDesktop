@@ -51,10 +51,17 @@ enum class CaptionState : uchar {
 	Above,
 };
 
+enum class PhotoQualityState : uchar {
+	None,
+	Standard,
+	High,
+};
+
 struct Details {
 	Type type = Type::Disabled;
 	SpoilerState spoiler = SpoilerState::None;
 	CaptionState caption = CaptionState::None;
+	PhotoQualityState photoQuality = PhotoQualityState::None;
 	TextWithTags commentPreview;
 	QString commentStreamerName;
 	std::optional<uint64> price;
@@ -75,6 +82,8 @@ enum class ActionType : uchar {
 	SpoilerOff,
 	CaptionUp,
 	CaptionDown,
+	PhotoQualityOn,
+	PhotoQualityOff,
 	ChangePrice,
 };
 struct Action {
@@ -115,6 +124,10 @@ void SetupUnreadMentionsMenu(
 	Fn<Data::Thread*()> currentThread);
 
 void SetupUnreadReactionsMenu(
+	not_null<Ui::RpWidget*> button,
+	Fn<Data::Thread*()> currentThread);
+
+void SetupUnreadPollVotesMenu(
 	not_null<Ui::RpWidget*> button,
 	Fn<Data::Thread*()> currentThread);
 

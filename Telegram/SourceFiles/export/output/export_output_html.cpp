@@ -1501,6 +1501,14 @@ auto HtmlWriter::Wrap::pushMessage(
 				+ "&quot;");
 		}
 		return serviceFrom + " added tasks: " + tasks.join(", ");
+	}, [&](const ActionPollAppendAnswer &data) {
+		return serviceFrom + " added &quot;"
+			+ data.option
+			+ "&quot; to the poll.";
+	}, [&](const ActionPollDeleteAnswer &data) {
+		return serviceFrom + " removed &quot;"
+			+ data.option
+			+ "&quot; from the poll.";
 	}, [&](const ActionSuggestedPostApproval &data) {
 		return serviceFrom
 			+ (data.rejected ? " rejected " : " approved ")
@@ -1553,6 +1561,28 @@ auto HtmlWriter::Wrap::pushMessage(
 			}() + (data.birthday.year()
 				? (' ' + QByteArray::number(data.birthday.year()))
 				: QByteArray());
+	}, [&](const ActionNoForwardsToggle &data) {
+		return serviceFrom
+			+ (data.newValue
+				? " disabled sharing in this chat"
+				: " enabled sharing in this chat");
+	}, [&](const ActionNoForwardsRequest &data) {
+		return serviceFrom
+			+ " requested to enable sharing in this chat";
+	}, [&](const ActionNewCreatorPending &data) {
+		return peers.wrapUserName(data.newCreatorId)
+			+ " will become the new main admin in 7 days if "
+			+ serviceFrom
+			+ " does not return";
+	}, [&](const ActionChangeCreator &data) {
+		return serviceFrom
+			+ " made "
+			+ peers.wrapUserName(data.newCreatorId)
+			+ " the new main admin of the group";
+	}, [&](const ActionManagedBotCreated &data) {
+		return serviceFrom
+			+ " created a bot "
+			+ peers.wrapUserName(data.botId);
 	}, [](v::null_t) { return QByteArray(); });
 
 	if (!serviceText.isEmpty()) {

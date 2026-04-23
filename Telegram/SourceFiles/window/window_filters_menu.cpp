@@ -30,8 +30,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
 #include "boxes/filters/edit_filter_box.h"
+#include "boxes/choose_filter_box.h"
 #include "boxes/premium_limits_box.h"
-#include "settings/settings_folders.h"
+#include "settings/sections/settings_folders.h"
 #include "storage/storage_media_prepare.h"
 #include "api/api_chat_filters.h"
 #include "apiwrap.h"
@@ -69,7 +70,9 @@ FiltersMenu::FiltersMenu(
 FiltersMenu::~FiltersMenu() = default;
 
 void FiltersMenu::setup() {
+	setupDragAndDrop();
 	setupMainMenuIcon();
+	_menu.setIsMenuButton(true);
 	_menu.setAccessibleName(tr::lng_main_menu(tr::now));
 
 	_outer.setAttribute(Qt::WA_OpaquePaintEvent);
@@ -131,6 +134,30 @@ void FiltersMenu::setup() {
 	});
 }
 
+void FiltersMenu::setupDragAndDrop() {
+	SetupFilterDragAndDrop(
+		&_outer,
+		&_session->session(),
+		[=](QPoint globalPos) -> std::optional<FilterId> {
+			if (!_list) {
+				return std::nullopt;
+			}
+			const auto localPos = _list->mapFromGlobal(globalPos);
+			for (const auto &[id, button] : _filters) {
+				if (button->geometry().contains(localPos)) {
+					return id;
+				}
+			}
+			return std::nullopt;
+		},
+		[=] { return _activeFilterId; },
+		[=](FilterId filterId) {
+			for (const auto &[id, button] : _filters) {
+				button->setForceRippled(id == filterId);
+			}
+		});
+}
+
 void FiltersMenu::setupMainMenuIcon() {
 	OtherAccountsUnreadState(
 		&_session->session().account()
@@ -142,7 +169,7 @@ void FiltersMenu::setupMainMenuIcon() {
 			: &st::windowFiltersMainMenuUnreadMuted;
 
 		const auto &settings = AyuSettings::getInstance();
-		if (settings.hideNotificationCounters) {
+		if (settings.hideNotificationCounters()) {
 			icon = nullptr;
 		}
 
@@ -195,7 +222,7 @@ void FiltersMenu::refresh() {
 	const auto maxLimit = (reorderAll ? 1 : 0)
 		+ Data::PremiumLimits(&_session->session()).dialogFiltersCurrent();
 	const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
-	if (!reorderAll && !settings.hideAllChatsFolder) {
+	if (!reorderAll && !settings.hideAllChatsFolder()) {
 		_reorder->addPinnedInterval(0, 1);
 	}
 	_reorder->addPinnedInterval(
@@ -230,7 +257,7 @@ void FiltersMenu::refresh() {
 	// Also check for session content existance, because it may be null
 	// and there will be an exception in `Window::SessionController::showPeerHistory`
 	// because `SessionController::content()` == nullptr
-    if (settings.hideAllChatsFolder && _session->widget()->sessionContent()) {
+    if (settings.hideAllChatsFolder() && _session->widget()->sessionContent()) {
         const auto lookupId = filters->lookupId(0);
         _session->setActiveChatsFilter(lookupId);
     }
@@ -304,18 +331,19 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 	if (id >= 0) {
 		rpl::combine(
 			Data::UnreadStateValue(&_session->session(), id),
-			Data::IncludeMutedCounterFoldersValue()
+			Data::IncludeMutedCounterFoldersValue(),
+			AyuSettings::getInstance().hideNotificationCountersValue()
 		) | rpl::on_next([=](
 				const Dialogs::UnreadState &state,
-				bool includeMuted) {
+				bool includeMuted,
+				bool hideCounters) {
 			const auto chats = state.chats;
 			const auto chatsMuted = state.chatsMuted;
 			auto muted = (chatsMuted + state.marksMuted);
 			auto count = (chats + state.marks)
 				- (includeMuted ? 0 : muted);
 
-			const auto &settings = AyuSettings::getInstance();
-			if (settings.hideNotificationCounters) {
+			if (hideCounters) {
 				count = 0;
 				muted = 0;
 			}
@@ -389,13 +417,13 @@ base::unique_qptr<Ui::SideBarButton> FiltersMenu::prepareButton(
 void FiltersMenu::openFiltersSettings() {
 	const auto filters = &_session->session().data().chatsFilters();
 	if (filters->suggestedLoaded()) {
-		_session->showSettings(Settings::Folders::Id());
+		_session->showSettings(Settings::FoldersId());
 	} else if (!_waitingSuggested) {
 		_waitingSuggested = true;
 		filters->requestSuggested();
 		filters->suggestedUpdated(
 		) | rpl::take(1) | rpl::on_next([=] {
-			_session->showSettings(Settings::Folders::Id());
+			_session->showSettings(Settings::FoldersId());
 		}, _outer.lifetime());
 	}
 }
@@ -473,7 +501,7 @@ void FiltersMenu::applyReorder(
 
 	const auto filters = &_session->session().data().chatsFilters();
 	const auto &list = filters->list();
-	if (!settings.hideAllChatsFolder && !premium()) {
+	if (!settings.hideAllChatsFolder() && !premium()) {
 		if (list[0].id() != FilterId()) {
 			filters->moveAllToFront();
 		}

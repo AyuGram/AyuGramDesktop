@@ -40,6 +40,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/unread_badge.h"
 #include "window/notifications_manager.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+
+
 namespace {
 
 using UpdateFlag = Data::PeerUpdate::Flag;
@@ -133,7 +138,12 @@ void ChannelData::setPhoto(const MTPChatPhoto &photo) {
 void ChannelData::setName(
 		const QString &newName,
 		const QString &newUsername) {
-	updateNameDelayed(newName.isEmpty() ? name() : newName, {}, newUsername);
+	auto filteredName = newName;
+	const auto &settings = AyuSettings::getInstance();
+	if (settings.filterZalgo()) {
+		filteredName = filterZalgo(filteredName);
+	}
+	updateNameDelayed(filteredName.isEmpty() ? name() : filteredName, {}, newUsername);
 }
 
 void ChannelData::setUsername(const QString &username) {
@@ -458,8 +468,8 @@ void ChannelData::applyEditAdmin(
 			setMembersCount(membersCount() + 1);
 			if (user->isBot() && !mgInfo->bots.contains(user)) {
 				mgInfo->bots.insert(user);
-				if (mgInfo->botStatus != 0 && mgInfo->botStatus < 2) {
-					mgInfo->botStatus = 2;
+				if (mgInfo->botStatus == Data::BotStatus::NoBots) {
+					mgInfo->botStatus = Data::BotStatus::HasBots;
 				}
 			}
 		}
@@ -510,6 +520,17 @@ void ChannelData::applyEditAdmin(
 	session().changes().peerUpdated(this, UpdateFlag::Admins);
 }
 
+void ChannelData::applyEditMemberRank(
+		not_null<UserData*> user,
+		const QString &rank) {
+	if (!mgInfo) {
+		return;
+	}
+	const auto userId = peerToUser(user->id);
+	Data::ChannelMemberRankChanges changes(this);
+	changes.feed(userId, rank);
+}
+
 void ChannelData::applyEditBanned(
 		not_null<PeerData*> participant,
 		ChatRestrictionsInfo oldRights,
@@ -551,31 +572,29 @@ void ChannelData::applyEditBanned(
 					not_null{ user });
 				if (i != mgInfo->lastParticipants.end()) {
 					mgInfo->lastParticipants.erase(i);
-				}
-				if (membersCount() > 1) {
-					setMembersCount(membersCount() - 1);
+					if (membersCount() > 1) {
+						setMembersCount(membersCount() - 1);
+					} else {
+						mgInfo->lastParticipantsStatus |= MegagroupInfo::LastParticipantsCountOutdated;
+						mgInfo->lastParticipantsCount = 0;
+					}
 				} else {
 					mgInfo->lastParticipantsStatus |= MegagroupInfo::LastParticipantsCountOutdated;
-					mgInfo->lastParticipantsCount = 0;
-				}
-				setKickedCount(kickedCount() + 1);
-				if (mgInfo->bots.contains(user)) {
-					mgInfo->bots.remove(user);
-					if (mgInfo->bots.empty() && mgInfo->botStatus > 0) {
-						mgInfo->botStatus = -1;
-					}
 				}
 				flags |= UpdateFlag::Members;
 				owner().removeMegagroupParticipant(this, user);
+				setKickedCount(kickedCount() + 1);
+				if (mgInfo->bots.contains(user)) {
+					mgInfo->bots.remove(user);
+					if (mgInfo->bots.empty() && mgInfo->botStatus == Data::BotStatus::HasBots) {
+						mgInfo->botStatus = Data::BotStatus::NoBots;
+					}
+				}
 			}
 		}
 		Data::ChannelAdminChanges(this).remove(peerToUser(user->id));
 	} else if (!mgInfo) {
 		if (isKicked) {
-			if (user && membersCount() > 1) {
-				setMembersCount(membersCount() - 1);
-				flags |= UpdateFlag::Members;
-			}
 			setKickedCount(kickedCount() + 1);
 		}
 	}

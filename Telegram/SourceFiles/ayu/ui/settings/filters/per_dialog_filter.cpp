@@ -3,16 +3,13 @@
 // We do not and cannot prevent the use of our code,
 // but be respectful and credit the original author.
 //
-// Copyright @Radolyn, 2025
-#include "per_dialog_filter.h"
-
-#include <utility>
+// Copyright @Radolyn, 2026
+#include "ayu/ui/settings/filters/per_dialog_filter.h"
 
 #include "lang_auto.h"
-#include "settings_filters_list.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/data/ayu_database.h"
-#include "ayu/features/filters/shadow_ban_utils.h"
+#include "ayu/ui/settings/filters/settings_filters_list.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -21,11 +18,18 @@
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
 
+#include <utility>
+
 namespace Settings {
 
-PerDialogFiltersListRow::PerDialogFiltersListRow(PeerId peer)
-	: PeerListRow(peer.value)
-	  , peerId(peer) {
+PerDialogFiltersListRow::PerDialogFiltersListRow(ID dialogId)
+	: PeerListRow(PeerListRowId(dialogId))
+	  , _dialogId(dialogId)
+	  , peerId(PeerId(PeerIdHelper(abs(dialogId)))) {
+}
+
+ID PerDialogFiltersListRow::dialogId() const {
+	return _dialogId;
 }
 
 QString PerDialogFiltersListRow::generateName() {
@@ -67,12 +71,10 @@ Main::Session &PerDialogFiltersListController::session() const {
 
 void PerDialogFiltersListController::prepareShadowBan() {
 	const auto &settings = AyuSettings::getInstance();
-	const auto &shadowBanned = settings.shadowBanIds;
+	const auto &shadowBanned = settings.shadowBanIds();
 
 	for (const auto id : shadowBanned) {
-		auto peerId = PeerId(PeerIdHelper(abs(id)));
-
-		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
+		auto row = std::make_unique<PerDialogFiltersListRow>(id);
 
 		delegate()->peerListAppendRow(reinterpret_cast<std::unique_ptr<PeerListRow>&&>(row));
 	}
@@ -102,9 +104,7 @@ void PerDialogFiltersListController::prepare() {
 	}
 
 	for (const auto &[id, count] : countsByDialogIds) {
-		PeerId peerId = PeerId(PeerIdHelper(abs(id)));
-
-		auto row = std::make_unique<PerDialogFiltersListRow>(peerId);
+		auto row = std::make_unique<PerDialogFiltersListRow>(id);
 		auto status = QString();
 		if (count.filters > 0) {
 			status += tr::ayu_RegexFiltersAmount(tr::now, lt_count, count.filters);
@@ -128,13 +128,11 @@ void PerDialogFiltersListController::prepare() {
 
 void PerDialogFiltersListController::rowClicked(not_null<PeerListRow*> peer) {
 	ID did;
-	if (peer->special()) {
-		const ID pred = peer->id() & PeerId::kChatTypeMask;
-		if (countsByDialogIds.contains(pred)) {
-			did = pred;
-		} else {
-			did = -pred;
-		}
+	if (const auto row = dynamic_cast<PerDialogFiltersListRow*>(peer.get())) {
+		did = row->dialogId();
+	} else if (peer->special()) {
+		const auto pred = static_cast<long long>(peer->id() & PeerId::kChatTypeMask);
+		did = countsByDialogIds.contains(pred) ? pred : -pred;
 	} else {
 		did = getDialogIdFromPeer(peer->peer());
 	}
@@ -146,10 +144,10 @@ void PerDialogFiltersListController::rowClicked(not_null<PeerListRow*> peer) {
 			tr::lng_theme_delete(tr::now),
 			[=]
 			{
-				if (ShadowBanUtils::isShadowBanned(did)) {
-					ShadowBanUtils::removeShadowBan(did);
+				if (AyuSettings::getInstance().isShadowBanned(did)) {
+					AyuSettings::getInstance().removeShadowBan(did);
 				} else {
-					ShadowBanUtils::addShadowBan(did);
+					AyuSettings::getInstance().addShadowBan(did);
 				}
 			},
 			&st::menuIconDelete);

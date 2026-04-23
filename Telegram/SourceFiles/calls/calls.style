@@ -101,6 +101,7 @@ callButtonLabel: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: font(11px);
 	}
+	maxHeight: 16px;
 }
 
 callAnswer: CallButton {
@@ -581,15 +582,14 @@ groupCallMenuShadow: Shadow(defaultEmptyShadow) {
 }
 groupCallPanelAnimation: PanelAnimation(defaultPanelAnimation) {
 	fadeBg: groupCallMenuBg;
-	shadow: groupCallMenuShadow;
 }
 groupCallPopupMenu: PopupMenu(defaultPopupMenu) {
-	shadow: groupCallMenuShadow;
+	shadowFallback: groupCallMenuBg;
 	menu: groupCallMenu;
 	animation: groupCallPanelAnimation;
 }
 groupCallPopupMenuWithIcons: PopupMenu(popupMenuWithIcons) {
-	shadow: groupCallMenuShadow;
+	shadowFallback: groupCallMenuBg;
 	menu: Menu(groupCallMenu, menuWithIcons) {
 		arrow: icon {{ "menu/submenu_arrow", groupCallMemberNotJoinedStatus }};
 	}
@@ -671,7 +671,7 @@ groupCallInnerDropdown: InnerDropdown(defaultInnerDropdown) {
 	animation: groupCallPanelAnimation;
 	bg: groupCallMenuBg;
 	scroll: defaultSolidScroll;
-	scrollPadding: margins(0px, 4px, 0px, 4px);
+	scrollPadding: margins(0px, 7px, 0px, 7px);
 }
 groupCallDropdownMenu: DropdownMenu(defaultDropdownMenu) {
 	wrap: groupCallInnerDropdown;

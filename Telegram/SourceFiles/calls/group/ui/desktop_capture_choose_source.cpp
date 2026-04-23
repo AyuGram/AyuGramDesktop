@@ -272,6 +272,8 @@ ChooseSourceProcess::ChooseSourceProcess(
 		tr::lng_group_call_screen_share_audio(tr::now),
 		false,
 		st::desktopCaptureWithAudio)) {
+	_submit->setTextTransform(RoundButtonTextTransform::ToUpper);
+	_finish->setTextTransform(RoundButtonTextTransform::ToUpper);
 	setupPanel();
 	setupSources();
 	activate();
@@ -370,6 +372,7 @@ void ChooseSourceProcess::setupPanel() {
 		_bottom.get(),
 		tr::lng_cancel(),
 		st::desktopCaptureCancel);
+	cancel->setTextTransform(RoundButtonTextTransform::ToUpper);
 	cancel->setClickedCallback([=] {
 		_window->close();
 	});

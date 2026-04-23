@@ -105,7 +105,7 @@ void ForwardPanel::checkTexts() {
 		? kNameWithCaptionsVersion
 		: kNameNoCaptionsVersion;
 	if (keepNames) {
-		for (const auto item : _data.items) {
+		for (const auto &item : _data.items) {
 			if (const auto from = item->originalSender()) {
 				version += from->nameVersion();
 			} else if (item->originalHiddenSenderInfo()) {
@@ -142,7 +142,7 @@ void ForwardPanel::updateTexts() {
 		auto fullname = QString();
 		auto names = std::vector<QString>();
 		names.reserve(_data.items.size());
-		for (const auto item : _data.items) {
+		for (const auto &item : _data.items) {
 			if (const auto from = item->originalSender()) {
 				if (!insertedPeers.contains(from)) {
 					insertedPeers.emplace(from);
@@ -372,7 +372,7 @@ void EditWebPageOptions(
 		Data::WebPageDraft draft,
 		Fn<void(Data::WebPageDraft)> done) {
 	show->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(rpl::single(u"Link Preview"_q));
+		box->setTitle(u"Link Preview"_q);
 
 		struct State {
 			rpl::variable<Data::WebPageDraft> result;

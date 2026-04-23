@@ -130,7 +130,7 @@ void PromoSuggestions::refreshTopPromotion() {
 			}
 
 			const auto &settings = AyuSettings::getInstance();
-			if (settings.disableAds) {
+			if (settings.disableAds()) {
 				setTopPromoted(nullptr, QString(), QString());
 				return;
 			}

@@ -12,7 +12,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "window/window_session_controller.h"
-#include "mainwindow.h"
+#include "main/main_session.h"
+#include "data/data_session.h"
+#include "data/stickers/data_stickers.h"
 #include "ayu/ayu_settings.h"
 #include "core/application.h"
 #include "base/options.h"
@@ -28,7 +30,6 @@ base::options::toggle TabbedPanelShowOnClick({
 	.id = kOptionTabbedPanelShowOnClick,
 	.name = "Show tabbed panel by click",
 	.description = "Show Emoji / Stickers / GIFs panel only after a click.",
-	.scope = static_cast<base::options::details::ScopeFlag>(0),
 });
 
 } // namespace
@@ -36,7 +37,7 @@ base::options::toggle TabbedPanelShowOnClick({
 const char kOptionTabbedPanelShowOnClick[] = "tabbed-panel-show-on-click";
 
 bool ShowPanelOnClick() {
-	return TabbedPanelShowOnClick.value();
+	return !AyuSettings::getInstance().showEmojiPopup();
 }
 
 TabbedPanel::TabbedPanel(
@@ -70,7 +71,8 @@ TabbedPanel::TabbedPanel(
 	: _ownedSelector.data())
 , _heightRatio(st::emojiPanHeightRatio)
 , _minContentHeight(st::emojiPanMinHeight)
-, _maxContentHeight(st::emojiPanMaxHeight) {
+, _maxContentHeight(st::emojiPanMaxHeight)
+, _shadow(_selector->st().showAnimation.shadow) {
 	Expects(_selector != nullptr);
 
 	_selector->setParent(this);
@@ -115,6 +117,13 @@ TabbedPanel::TabbedPanel(
 	) | rpl::on_next([=] {
 		hideAnimated();
 	}, lifetime());
+
+	if (_regularWindow) {
+		_regularWindow->session().data().stickers().gifWithCaptionSent(
+		) | rpl::on_next([=] {
+			hideAnimated();
+		}, lifetime());
+	}
 
 	_selector->slideFinished(
 	) | rpl::on_next([=] {
@@ -246,7 +255,7 @@ void TabbedPanel::paintEvent(QPaintEvent *e) {
 		hideFinished();
 	} else {
 		if (!_cache.isNull()) _cache = QPixmap();
-		Ui::Shadow::paint(p, innerRect(), width(), _selector->st().showAnimation.shadow);
+		_shadow.paint(p, innerRect(), st::emojiPanRadius);
 	}
 }
 
@@ -382,7 +391,8 @@ void TabbedPanel::startShowAnimation() {
 			std::move(image),
 			QRect(
 				inner.topLeft() * style::DevicePixelRatio(),
-				inner.size() * style::DevicePixelRatio()));
+				inner.size() * style::DevicePixelRatio()),
+			st::emojiPanRadius);
 		_showAnimation->setCornerMasks(Images::CornersMask(st::emojiPanRadius));
 		_showAnimation->start();
 	}
@@ -476,7 +486,7 @@ void TabbedPanel::showStarted() {
 bool TabbedPanel::eventFilter(QObject *obj, QEvent *e) {
 	const auto &settings = AyuSettings::getInstance();
 
-	if (TabbedPanelShowOnClick.value() || !settings.showEmojiPopup) {
+	if (!settings.showEmojiPopup()) {
 		return false;
 	} else if (e->type() == QEvent::Enter) {
 		otherEnter();

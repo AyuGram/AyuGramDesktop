@@ -76,6 +76,8 @@ struct PaintContext {
 	bool displayUnreadInfo = false;
 };
 
+extern const char kOptionDialogsMuteIcon[];
+
 [[nodiscard]] const style::icon *ChatTypeIcon(
 	not_null<PeerData*> peer,
 	const PaintContext &context);
