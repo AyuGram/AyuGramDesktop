@@ -38,6 +38,7 @@ public:
 
 bool isAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items);
 bool isAyuForwardNeeded(not_null<HistoryItem*> item);
+bool isFullAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items);
 bool isFullAyuForwardNeeded(not_null<HistoryItem*> item);
 void intelligentForward(
 	not_null<Main::Session*> session,

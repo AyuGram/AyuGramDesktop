@@ -13,12 +13,14 @@
 #include "base/random.h"
 #include "base/unixtime.h"
 #include "core/application.h"
+#include "data/data_channel.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "history/history_item.h"
+#include "main/main_session.h"
 #include "storage/localimageloader.h"
 #include "storage/storage_account.h"
 #include "storage/storage_media_prepare.h"
@@ -26,7 +28,163 @@
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/text/text_utilities.h"
 
+#include <optional>
+#include <unordered_set>
+
 namespace AyuForward {
+
+namespace {
+
+struct ForwardSource {
+	not_null<ChannelData*> peer;
+	MsgId id = 0;
+};
+
+struct ForwardSourceCacheKey {
+	uint64 sessionUniqueId = 0;
+	FullMsgId fullId;
+
+	friend inline auto operator<=>(ForwardSourceCacheKey, ForwardSourceCacheKey) = default;
+};
+
+struct ForwardSourceCacheKeyHash {
+	size_t operator()(const ForwardSourceCacheKey &value) const noexcept {
+		const auto first = std::hash<uint64>()(value.sessionUniqueId);
+		const auto second = std::hash<FullMsgId>()(value.fullId);
+		return first ^ (second + 0x9e3779b97f4a7c15ULL + (first << 6) + (first >> 2));
+	}
+};
+
+std::unordered_set<ForwardSourceCacheKey, ForwardSourceCacheKeyHash> unavailableForwardSources;
+
+[[nodiscard]] bool canUseForwardSource(not_null<ChannelData*> channel) {
+	return channel->isPublic() || channel->amIn();
+}
+
+[[nodiscard]] bool isSourceForwardRestricted(not_null<HistoryItem*> item) {
+	return item->isAyuNoForwards()
+		|| item->history()->peer->isAyuNoForwards();
+}
+
+[[nodiscard]] ForwardSourceCacheKey forwardSourceCacheKey(
+		not_null<Main::Session*> session,
+		const ForwardSource &source) {
+	return ForwardSourceCacheKey{
+		.sessionUniqueId = session->uniqueId(),
+		.fullId = FullMsgId(source.peer->id, source.id),
+	};
+}
+
+void clearUnavailableForwardSource(
+		not_null<Main::Session*> session,
+		const ForwardSource &source) {
+	unavailableForwardSources.erase(forwardSourceCacheKey(session, source));
+}
+
+void markUnavailableForwardSource(
+		not_null<Main::Session*> session,
+		const ForwardSource &source) {
+	unavailableForwardSources.insert(forwardSourceCacheKey(session, source));
+}
+
+[[nodiscard]] std::optional<ForwardSource> forwardSourceData(
+		not_null<HistoryItem*> item) {
+	if (item->isDeleted()
+		|| item->unsupportedTTL()
+		|| (item->media() && item->media()->ttlSeconds())) {
+		return std::nullopt;
+	}
+	if (!isSourceForwardRestricted(item)) {
+		return std::nullopt;
+	}
+	const auto originalSender = item->originalSender();
+	const auto originalId = item->originalId();
+	const auto originalChannel = originalSender
+		? originalSender->asChannel()
+		: nullptr;
+	if (!originalChannel || !originalId) {
+		return std::nullopt;
+	}
+	if (!canUseForwardSource(originalChannel)) {
+		return std::nullopt;
+	}
+	if (originalSender->isAyuNoForwards()
+		|| !originalSender->allowsForwarding()) {
+		return std::nullopt;
+	}
+	const auto source = ForwardSource{
+		.peer = originalChannel,
+		.id = originalId,
+	};
+	const auto session = &item->history()->session();
+	if (unavailableForwardSources.contains(
+		forwardSourceCacheKey(session, source))) {
+		return std::nullopt;
+	}
+	return source;
+}
+
+[[nodiscard]] HistoryItem *resolveForwardSourceItem(
+		not_null<Main::Session*> session,
+		not_null<HistoryItem*> item) {
+	const auto source = forwardSourceData(item);
+	if (!source) {
+		return item;
+	}
+	if (const auto existing = session->data().message(source->peer, source->id)) {
+		clearUnavailableForwardSource(session, *source);
+		return existing;
+	}
+
+	const auto historyPeer = item->history()->peer;
+	const auto historyInput = historyPeer->input();
+	const auto historyItemId = item->id;
+	const auto sourcePeer = source->peer;
+	const auto sourceId = source->id;
+	auto latch = std::make_shared<TimedCountDownLatch>(1);
+	auto resolved = std::make_shared<bool>(false);
+
+	crl::on_main([=] {
+		session->api().request(MTPchannels_GetMessages(
+			MTP_inputChannelFromMessage(
+				historyInput,
+				MTP_int(historyItemId),
+				MTP_long(peerToChannel(sourcePeer->id).bare)),
+			MTP_vector<MTPInputMessage>(
+				1,
+				MTP_inputMessageID(MTP_int(sourceId)))
+		)).done([=](const MTPmessages_Messages &result) {
+			*resolved = true;
+			session->data().processExistingMessages(sourcePeer, result);
+			latch->countDown();
+		}).fail([=](const MTP::Error &) {
+			latch->countDown();
+		}).send();
+	});
+
+	latch->await(std::chrono::minutes(1));
+	if (const auto existing = session->data().message(sourcePeer, sourceId)) {
+		clearUnavailableForwardSource(session, *source);
+		return existing;
+	}
+	if (*resolved) {
+		markUnavailableForwardSource(session, *source);
+	}
+	return item;
+}
+
+[[nodiscard]] std::vector<not_null<HistoryItem*>> resolveForwardSources(
+		not_null<Main::Session*> session,
+		const std::vector<not_null<HistoryItem*>> &items) {
+	auto result = std::vector<not_null<HistoryItem*>>();
+	result.reserve(items.size());
+	for (const auto &item : items) {
+		result.push_back(resolveForwardSourceItem(session, item));
+	}
+	return result;
+}
+
+}
 
 std::unordered_map<PeerId, std::shared_ptr<ForwardState>> forwardStates;
 
@@ -224,14 +382,24 @@ bool isAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items) {
 }
 
 bool isAyuForwardNeeded(not_null<HistoryItem*> item) {
-	if (item->isDeleted() || item->isAyuNoForwards() || item->unsupportedTTL() || (item->media() && item->media()->ttlSeconds())) {
+	if (item->isDeleted()
+		|| item->unsupportedTTL()
+		|| (item->media() && item->media()->ttlSeconds())) {
 		return true;
 	}
-	return false;
+	return isSourceForwardRestricted(item);
+}
+
+bool isFullAyuForwardNeeded(const std::vector<not_null<HistoryItem*>> &items) {
+	const auto needFullAyuForward = [&](const auto &item)
+	{
+		return isFullAyuForwardNeeded(item);
+	};
+	return !items.empty() && std::ranges::all_of(items, needFullAyuForward);
 }
 
 bool isFullAyuForwardNeeded(not_null<HistoryItem*> item) {
-	return item->from()->isAyuNoForwards() || item->history()->peer->isAyuNoForwards();
+	return isSourceForwardRestricted(item) && !forwardSourceData(item);
 }
 
 struct ForwardChunk
@@ -250,7 +418,7 @@ void intelligentForward(
 		history->setForwardDraft(action.replyTo.topicRootId, action.replyTo.monoforumPeerId, {});
 	});
 
-	const auto items = draft.items;
+	const auto items = resolveForwardSources(session, draft.items);
 	const auto peer = history->peer;
 
 	auto chunks = std::vector<ForwardChunk>();

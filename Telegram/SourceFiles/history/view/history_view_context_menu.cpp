@@ -2394,11 +2394,10 @@ void AddSelectRestrictionAction(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<HistoryItem*> item,
 		bool addIcon) {
-	const auto peer = item->history()->peer;
-	if ((!peer->isAyuNoForwards() && !AyuForward::isAyuForwardNeeded(item))
-		|| item->isSponsored()) {
+	if (!AyuForward::isFullAyuForwardNeeded(item) || item->isSponsored()) {
 		return;
 	}
+	const auto peer = item->history()->peer;
 	if (addIcon && !menu->empty()) {
 		menu->addSeparator();
 	}

@@ -3484,8 +3484,7 @@ void ApiWrap::forwardMessages(
 		FnMut<void()> &&successCallback) {
 	Expects(!draft.items.empty());
 
-	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front());
-	if (fullAyuForward) {
+	if (AyuForward::isFullAyuForwardNeeded(draft.items)) {
 		crl::async([=] {
 			AyuForward::forwardMessages(_session, action, false, draft);
 		});
