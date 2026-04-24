@@ -1,0 +1,91 @@
+name: Build Windows (Stable)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+
+      - name: Fix submodules
+        shell: cmd
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 👉 ускоряет повторные сборки
+      - name: Cache ThirdParty
+        uses: actions/cache@v4
+        with:
+          path: |
+            ThirdParty
+            Telegram/ThirdParty
+          key: thirdparty-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.git/modules/ThirdParty/HEAD') }}
+          restore-keys: |
+            thirdparty-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Prepare build environment
+        shell: cmd
+        run: |
+          cd Telegram\build\prepare
+          win.bat
+
+      - name: Configure project (stable flags)
+        shell: cmd
+        run: |
+          cd Telegram
+          configure.bat x64 ^
+            -B ..\out\win ^
+            -D TDESKTOP_API_ID=2040 ^
+            -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
+            -D TDESKTOP_USE_CRASHPAD=OFF ^
+            -D TDESKTOP_DISABLE_AUTOUPDATE=ON ^
+            -D DESKTOP_APP_USE_PACKAGED=ON ^
+            -D TDESKTOP_USE_PACKAGED_QT=ON ^
+            -D CMAKE_BUILD_TYPE=Release ^
+            -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF ^
+            -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON ^
+            -D CMAKE_UNITY_BUILD=OFF ^
+            -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded ^
+            -D CMAKE_CXX_FLAGS="/bigobj /O2 /DNDEBUG /Z7 /D TDESKTOP_DISABLE_CRASH_REPORTS /D TDESKTOP_DISABLE_UPDATES" ^
+            -D CMAKE_EXE_LINKER_FLAGS="/DEBUG:NONE /LTCG:OFF"
+
+      - name: Build (safe mode)
+        shell: cmd
+        run: |
+          cmake --build out\win --config Release -- /m:1
+
+      - name: Verify build output
+        shell: cmd
+        run: |
+          if not exist out\win\Release (
+            echo Build failed: output folder missing
+            exit /b 1
+          )
+          dir out\win\Release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-Windows
+          path: out\win\Release
