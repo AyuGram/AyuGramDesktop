@@ -14,6 +14,10 @@ namespace Platform {
 inline void IgnoreApplicationActivationRightNow() {
 }
 
+inline bool HasAudioInputDevices() {
+	return true;
+}
+
 inline void WriteCrashDumpDetails() {
 }
 

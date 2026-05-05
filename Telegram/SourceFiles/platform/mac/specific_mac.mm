@@ -161,47 +161,110 @@ void WriteCrashDumpDetails() {
 #endif // TDESKTOP_DISABLE_CRASH_REPORTS
 }
 
+bool HasAudioInputDevices() {
+	@try {
+		@autoreleasepool {
+			if (@available(macOS 10.15, *)) {
+				NSArray<AVCaptureDeviceType> *types = @[
+					AVCaptureDeviceTypeBuiltInMicrophone,
+					AVCaptureDeviceTypeExternalUnknown
+				];
+				AVCaptureDeviceDiscoverySession *session = [AVCaptureDeviceDiscoverySession
+					discoverySessionWithDeviceTypes:types
+					mediaType:AVMediaTypeAudio
+					position:AVCaptureDevicePositionUnspecified];
+				if (session) {
+					return [session.devices count] > 0;
+				}
+			}
+			if ([AVCaptureDevice respondsToSelector:@selector(devicesWithMediaType:)]) {
+				// On macOS, listing devices might return an empty list if permissions are not granted.
+				// If we don't have permission yet, we should assume there might be devices.
+				if ([AVCaptureDevice respondsToSelector:@selector(authorizationStatusForMediaType:)]) {
+					const auto status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+					if (status == AVAuthorizationStatusNotDetermined) {
+						return true;
+					}
+				}
+				NSArray *devices = [AVCaptureDevice devicesWithMediaType:AVMediaTypeAudio];
+				return devices ? ([devices count] > 0) : false;
+			}
+		}
+	} @catch (NSException *exception) {
+		LOG(("Audio Info: Exception in HasAudioInputDevices: %1").arg([[exception reason] UTF8String]));
+	}
+	return true;
+}
+
 // I do check for availability, just not in the exact way clang is content with
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability"
 PermissionStatus GetPermissionStatus(PermissionType type) {
-	switch (type) {
-	case PermissionType::Microphone:
-	case PermissionType::Camera:
-		const auto nativeType = (type == PermissionType::Microphone)
-			? AVMediaTypeAudio
-			: AVMediaTypeVideo;
-		if ([AVCaptureDevice respondsToSelector: @selector(authorizationStatusForMediaType:)]) { // Available starting with 10.14
-			switch ([AVCaptureDevice authorizationStatusForMediaType:nativeType]) {
-				case AVAuthorizationStatusNotDetermined:
-					return PermissionStatus::CanRequest;
-				case AVAuthorizationStatusAuthorized:
-					return PermissionStatus::Granted;
-				case AVAuthorizationStatusDenied:
-				case AVAuthorizationStatusRestricted:
-					return PermissionStatus::Denied;
+	@try {
+		switch (type) {
+		case PermissionType::Microphone:
+		case PermissionType::Camera:
+			const auto nativeType = (type == PermissionType::Microphone)
+				? AVMediaTypeAudio
+				: AVMediaTypeVideo;
+			if ([AVCaptureDevice respondsToSelector: @selector(authorizationStatusForMediaType:)]) { // Available starting with 10.14
+				const auto status = [AVCaptureDevice authorizationStatusForMediaType:nativeType];
+				LOG(("Audio Info: GetPermissionStatus type %1, status %2").arg(int(type)).arg(int(status)));
+				switch (status) {
+					case AVAuthorizationStatusNotDetermined:
+						return PermissionStatus::CanRequest;
+					case AVAuthorizationStatusAuthorized:
+						return PermissionStatus::Granted;
+					case AVAuthorizationStatusDenied:
+					case AVAuthorizationStatusRestricted:
+						return PermissionStatus::Denied;
+				}
 			}
+			break;
 		}
-		break;
+	} @catch (NSException *exception) {
+		LOG(("Audio Info: Exception in GetPermissionStatus: %1").arg([[exception reason] UTF8String]));
 	}
 	return PermissionStatus::Granted;
 }
 
 void RequestPermission(PermissionType type, Fn<void(PermissionStatus)> resultCallback) {
-	switch (type) {
-	case PermissionType::Microphone:
-	case PermissionType::Camera:
-		const auto nativeType = (type == PermissionType::Microphone)
-			? AVMediaTypeAudio
-			: AVMediaTypeVideo;
-		if ([AVCaptureDevice respondsToSelector: @selector(requestAccessForMediaType:completionHandler:)]) { // Available starting with 10.14
-			[AVCaptureDevice requestAccessForMediaType:nativeType completionHandler:^(BOOL granted) {
-				crl::on_main([=] {
-					resultCallback(granted ? PermissionStatus::Granted : PermissionStatus::Denied);
-				});
-			}];
+	static std::set<PermissionType> Pending;
+	if (Pending.contains(type)) {
+		return;
+	}
+
+	const auto status = GetPermissionStatus(type);
+	if (status != PermissionStatus::CanRequest) {
+		resultCallback(status);
+		return;
+	}
+
+	LOG(("Audio Info: RequestPermission type %1").arg(int(type)));
+	@try {
+		switch (type) {
+		case PermissionType::Microphone:
+		case PermissionType::Camera:
+			const auto nativeType = (type == PermissionType::Microphone)
+				? AVMediaTypeAudio
+				: AVMediaTypeVideo;
+			if ([AVCaptureDevice respondsToSelector: @selector(requestAccessForMediaType:completionHandler:)]) { // Available starting with 10.14
+				Pending.insert(type);
+				[AVCaptureDevice requestAccessForMediaType:nativeType completionHandler:^(BOOL granted) {
+					LOG(("Audio Info: RequestPermission result type %1, granted %2").arg(int(type)).arg(granted));
+					crl::on_main([=] {
+						Pending.erase(type);
+						resultCallback(granted ? PermissionStatus::Granted : PermissionStatus::Denied);
+					});
+				}];
+				return;
+			}
+			break;
 		}
-		break;
+	} @catch (NSException *exception) {
+		LOG(("Audio Info: Exception in RequestPermission: %1").arg([[exception reason] UTF8String]));
+		resultCallback(PermissionStatus::Denied);
+		return;
 	}
 	resultCallback(PermissionStatus::Granted);
 }

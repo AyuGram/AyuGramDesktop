@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/audio/media_audio_capture.h"
 
+#include "platform/platform_specific.h"
+#include "data/data_types.h"
 #include "media/audio/media_audio_capture_common.h"
 #include "media/audio/media_audio_ffmpeg_loader.h"
 #include "media/audio/media_audio_track.h"
@@ -317,6 +319,13 @@ void Instance::Inner::start(
 	if (_paused) {
 		_paused = false;
 	}
+
+	if (!Platform::HasAudioInputDevices()) {
+		LOG(("Audio Error: No audio input devices found."));
+		fail();
+		return;
+	}
+
 
 	// Start OpenAL Capture
 	const auto utf = id.isDefault() ? std::string() : id.value.toStdString();

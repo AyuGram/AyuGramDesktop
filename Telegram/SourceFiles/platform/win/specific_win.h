@@ -24,6 +24,10 @@ inline bool SkipTaskbarSupported() {
 	return true;
 }
 
+inline bool HasAudioInputDevices() {
+	return true;
+}
+
 inline bool PreventsQuit(Core::QuitReason reason) {
 	return false;
 }

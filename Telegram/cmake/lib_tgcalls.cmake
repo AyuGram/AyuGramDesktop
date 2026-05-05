@@ -134,6 +134,8 @@ PRIVATE
     platform/android/VideoCapturerInterfaceImpl.h
 
     # iOS / macOS
+    platform/darwin/AudioInitializationMac.h
+    platform/darwin/AudioInitializationMac.mm
     platform/darwin/CustomSimulcastEncoderAdapter.cpp
     platform/darwin/CustomSimulcastEncoderAdapter.h
     platform/darwin/DarwinFFMpeg.h

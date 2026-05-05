@@ -342,3 +342,144 @@ The `Error` template parameter defaults to `rpl::no_error`: `rpl::producer<Type,
 - Pass `rpl::lifetime` to `on_...` methods or store returned lifetime
 - Use `rpl::duplicate(producer)` to reuse a producer multiple times
 - Combined producers automatically unpack tuples in lambdas (works with `rpl::map`, `rpl::filter`, and `rpl::on_next`)
+
+## Lifetime & State Management
+
+### Managing Lifetimes
+
+The `rpl::lifetime` object is central to managing subscriptions and resource cleanup. It should be passed to `on_next`, `on_error`, etc., or stored in a class member.
+
+```cpp
+class MyWidget : public Ui::RpWidget {
+public:
+    MyWidget(QWidget *parent) : RpWidget(parent) {
+        // Subscription will be cancelled when MyWidget is destroyed
+        someProducer() | rpl::on_next([=](int value) {
+            handleValue(value);
+        }, lifetime());
+    }
+};
+```
+
+### State in Lambdas
+
+Avoid multiple `make_state` calls for multiple values. Consolidate them into a single `struct State`:
+
+```cpp
+// BAD - two heap allocations:
+const auto shown = lifetime.make_state<bool>(false);
+const auto count = lifetime.make_state<int>(0);
+
+// GOOD - one allocation:
+struct State {
+    bool shown = false;
+    int count = 0;
+};
+const auto state = lifetime.make_state<State>();
+
+producer | rpl::on_next([=] {
+    state->count++;
+}, lifetime);
+```
+
+### base::take for Read-and-Reset
+
+Use `base::take(var)` to read a value and reset it to default in one step:
+
+```cpp
+if (base::take(_playing)) {
+    _listenedMs += crl::now() - _playStartedAt;
+}
+```
+
+## Threading with CRL
+
+The `crl::` namespace (Context Run Library) is used for threading:
+
+- `crl::async([=] { ... })` - Run on a background thread
+- `crl::on_main([=] { ... })` - Run on the main thread (UI thread)
+- `crl::on_main(weak, [=] { ... })` - Run on main thread only if `weak` pointer is still valid
+
+```cpp
+crl::async([=] {
+    const auto result = PerformHeavyTask();
+    crl::on_main(weak, [=] {
+        HandleResult(result);
+    });
+});
+```
+
+## Common UI Patterns
+
+### Visibility Checks
+
+Always use `!isHidden()` to check if a widget should be accounted for in layout or logic, rather than `isVisible()`. `isVisible()` returns `false` if any parent is hidden, while `isHidden()` reflects the widget's own state.
+
+```cpp
+if (!child->isHidden()) {
+    child->moveToRight(x, y, w);
+}
+```
+
+### Widget Creation
+
+Extract method definitions from local classes to keep the file structure clean:
+
+```cpp
+class MyWidget final : public Ui::RpWidget {
+public:
+    MyWidget(QWidget *parent);
+protected:
+    void paintEvent(QPaintEvent *e) override;
+};
+
+MyWidget::MyWidget(QWidget *parent) : RpWidget(parent) { ... }
+void MyWidget::paintEvent(QPaintEvent *e) { ... }
+
+## Additional Technical Tips
+
+### Pointers and not_null
+
+Prefer `not_null<T*>` when a pointer is guaranteed to be non-null. This adds compile-time and runtime checks.
+
+```cpp
+void HandlePeer(not_null<PeerData*> peer) {
+    // No need to check for null
+    peer->setName(newName);
+}
+```
+
+### std::optional Access
+
+Avoid `std::optional::value()`. Use `has_value()`, `value_or()`, or `operator*` instead.
+
+```cpp
+if (myOptional) {
+    const auto &value = *myOptional;
+}
+```
+
+### RAII and gsl::finally
+
+Use `gsl::finally` for simple RAII cleanup tasks, especially when working with legacy or system APIs.
+
+```cpp
+const auto guard = gsl::finally([&] {
+    CloseHandle(handle);
+});
+```
+
+### Multi-line Expressions
+
+Place operators at the **beginning** of continuation lines.
+
+```cpp
+if (veryLongExpression()
+    && anotherLongExpression()
+    && anotherOne()) {
+    doSomething();
+}
+```
+
+```
+
