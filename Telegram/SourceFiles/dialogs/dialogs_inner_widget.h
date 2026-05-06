@@ -288,6 +288,8 @@ private:
 
 	Main::Session &session() const;
 
+	void applyVisibleTopBottom();
+
 	void dialogRowReplaced(Row *oldRow, Row *newRow);
 
 	void setState(WidgetState state);
@@ -690,6 +692,8 @@ private:
 
 	rpl::variable<ChildListShown> _childListShown;
 	base::Timer _freezeTimer;
+	base::Timer _visibleTopBottomDebounceTimer;
+	bool _visibleTopBottomDebounceScheduled = false;
 	float64 _narrowRatio = 0.;
 	bool _geometryInited = false;
 

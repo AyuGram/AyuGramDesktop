@@ -108,6 +108,7 @@ constexpr auto kStartDragToFilterThresholdX = kStartReorderThreshold;
 constexpr auto kStartDragToFilterThresholdY = 75;
 constexpr auto kQueryPreviewLimit = 32;
 constexpr auto kPreviewPostsLimit = 3;
+constexpr auto kVisibleTopBottomDebounceTimeout = crl::time(50);
 
 [[nodiscard]] InnerWidget::ChatsFilterTagsKey SerializeFilterTagsKey(
 		FilterId filterId,
@@ -299,7 +300,8 @@ InnerWidget::InnerWidget(
 	+ st::defaultDialogRow.photoSize
 	+ st::defaultDialogRow.padding.left())
 , _childListShown(std::move(childListShown))
-, _freezeTimer([=] { _shownList->unfreeze(); update(); }) {
+, _freezeTimer([=] { _shownList->unfreeze(); update(); })
+, _visibleTopBottomDebounceTimer([=] { applyVisibleTopBottom(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent, true);
 
 	style::PaletteChanged(
@@ -4052,6 +4054,18 @@ void InnerWidget::visibleTopBottomUpdated(
 		int visibleBottom) {
 	_visibleTop = visibleTop;
 	_visibleBottom = visibleBottom;
+	if (!_visibleTopBottomDebounceScheduled) {
+		_visibleTopBottomDebounceScheduled = true;
+		_visibleTopBottomDebounceTimer.callOnce(
+			kVisibleTopBottomDebounceTimeout);
+	} else {
+		_visibleTopBottomDebounceTimer.callOnce(
+			kVisibleTopBottomDebounceTimeout);
+	}
+}
+
+void InnerWidget::applyVisibleTopBottom() {
+	_visibleTopBottomDebounceScheduled = false;
 	preloadRowsData();
 	const auto loadTill = _visibleTop
 		+ PreloadHeightsCount * (_visibleBottom - _visibleTop);
