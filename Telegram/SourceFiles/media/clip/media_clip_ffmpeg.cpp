@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/clip/media_clip_ffmpeg.h"
 
 #include "core/file_location.h"
+#include "media/media_common.h"
 #include "logs.h"
 
 namespace Media {
@@ -19,30 +20,10 @@ constexpr auto kSkipInvalidDataPackets = 10;
 constexpr auto kMaxInlineArea = 1280 * 720;
 constexpr auto kMaxSendingArea = 3840 * 2160; // usual 4K
 
-// See https://github.com/telegramdesktop/tdesktop/issues/7225
-constexpr auto kAlignImageBy = 64;
-
-void alignedImageBufferCleanupHandler(void *data) {
-	auto buffer = static_cast<uchar*>(data);
-	delete[] buffer;
-}
-
-// Create a QImage of desired size where all the data is aligned to 16 bytes.
-QImage createAlignedImage(QSize size) {
-	auto width = size.width();
-	auto height = size.height();
-	auto widthalign = kAlignImageBy / 4;
-	auto neededwidth = width + ((width % widthalign) ? (widthalign - (width % widthalign)) : 0);
-	auto bytesperline = neededwidth * 4;
-	auto buffer = new uchar[bytesperline * height + kAlignImageBy];
-	auto cleanupdata = static_cast<void*>(buffer);
-	auto bufferval = reinterpret_cast<uintptr_t>(buffer);
-	auto alignedbuffer = buffer + ((bufferval % kAlignImageBy) ? (kAlignImageBy - (bufferval % kAlignImageBy)) : 0);
-	return QImage(alignedbuffer, width, height, bytesperline, QImage::Format_ARGB32_Premultiplied, alignedImageBufferCleanupHandler, cleanupdata);
-}
-
-bool isAlignedImage(const QImage &image) {
-	return !(reinterpret_cast<uintptr_t>(image.constBits()) % kAlignImageBy) && !(image.bytesPerLine() % kAlignImageBy);
+[[nodiscard]] auto MaxAreaForMode(ReaderImplementation::Mode mode) {
+	return (mode == ReaderImplementation::Mode::Inspecting)
+		? kMaxSendingArea
+		: kMaxInlineArea;
 }
 
 } // namespace
@@ -58,10 +39,8 @@ ReaderImplementation::ReadResult FFMpegReaderImplementation::readNextFrame() {
 	do {
 		int res = avcodec_receive_frame(_codecContext, _frame.get());
 		if (res >= 0) {
-			const auto limit = (_mode == Mode::Inspecting)
-				? kMaxSendingArea
-				: kMaxInlineArea;
-			if (_frame->width * _frame->height > limit) {
+			const auto limit = MaxAreaForMode(_mode);
+			if (!::Media::ValidFrameSize(_frame->width, _frame->height, limit)) {
 				return ReadResult::Error;
 			}
 			processReadFrame();
@@ -223,8 +202,12 @@ bool FFMpegReaderImplementation::renderFrame(
 	if (!size.isEmpty() && rotationSwapWidthHeight()) {
 		toSize.transpose();
 	}
-	if (to.isNull() || to.size() != toSize || !to.isDetached() || !isAlignedImage(to)) {
-		to = createAlignedImage(toSize);
+	if (!FFmpeg::GoodStorageForFrame(to, toSize)) {
+		to = FFmpeg::CreateFrameStorage(toSize);
+		if (to.isNull()) {
+			LOG(("Gif Error: Bad storage size %1").arg(logData()));
+			return false;
+		}
 	}
 	const auto format = (_frame->format == AV_PIX_FMT_NONE)
 		? _codecContext->pix_fmt
@@ -346,6 +329,7 @@ bool FFMpegReaderImplementation::start(Mode mode, crl::time &positionMs) {
 		const auto audioStreamId = av_find_best_stream(_fmtContext, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
 		_hasAudioStream = (audioStreamId >= 0);
 	}
+	_codecContext->max_pixels = MaxAreaForMode(_mode);
 
 	if ((res = avcodec_open2(_codecContext, codec, nullptr)) < 0) {
 		LOG(("Gif Error: Unable to avcodec_open2 %1, error %2, %3").arg(logData()).arg(res).arg(av_make_error_string(err, sizeof(err), res)));

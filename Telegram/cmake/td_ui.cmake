@@ -237,6 +237,7 @@ PRIVATE
     menu/menu_check_item.h
     menu/menu_item_rate_transcribe.cpp
     menu/menu_item_rate_transcribe.h
+    menu/menu_send_details.h
     menu/menu_timecode_action.cpp
     menu/menu_timecode_action.h
     menu/menu_ttl.cpp

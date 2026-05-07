@@ -159,6 +159,24 @@ public:
 	QString takeSearchQuery() {
 		return std::move(_searchQuery);
 	}
+	void setExpandedGroups(std::set<uint64> &&groups) {
+		_expandedGroups = std::move(groups);
+	}
+	std::set<uint64> takeExpandedGroups() {
+		return std::move(_expandedGroups);
+	}
+	void setDeleteEventMeta(
+			base::flat_map<not_null<const HistoryItem*>, uint64> &&itemEventIds,
+			base::flat_map<uint64, UserId> &&eventAdminIds) {
+		_itemEventIds = std::move(itemEventIds);
+		_eventAdminIds = std::move(eventAdminIds);
+	}
+	auto takeItemEventIds() {
+		return std::move(_itemEventIds);
+	}
+	auto takeEventAdminIds() {
+		return std::move(_eventAdminIds);
+	}
 
 private:
 	not_null<ChannelData*> _channel;
@@ -171,6 +189,9 @@ private:
 	bool _downLoaded = true;
 	FilterValue _filter;
 	QString _searchQuery;
+	std::set<uint64> _expandedGroups;
+	base::flat_map<not_null<const HistoryItem*>, uint64> _itemEventIds;
+	base::flat_map<uint64, UserId> _eventAdminIds;
 
 };
 

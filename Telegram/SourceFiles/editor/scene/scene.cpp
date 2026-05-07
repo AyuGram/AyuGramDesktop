@@ -111,7 +111,6 @@ constexpr auto kPaddingFactor = 0.4;
 constexpr auto kMaxWidthFactor = 0.8;
 constexpr auto kMinWidthFactor = 0.16;
 constexpr auto kIdealWidthExtra = 2;
-constexpr auto kDefaultFontSizeDivisor = 15.;
 constexpr auto kScaleThreshold = 0.01;
 
 class TextEditProxy final : public QGraphicsTextItem {
@@ -317,6 +316,12 @@ void Scene::cancelDrawing() {
 		finishTextEditing(false);
 	}
 	_canvas->cancelDrawing();
+}
+
+void Scene::cancelTextEditing() {
+	if (_textEdit.proxy) {
+		finishTextEditing(false, false);
+	}
 }
 
 void Scene::addItem(ItemPtr item) {
@@ -554,12 +559,14 @@ void Scene::restore(SaveState state) {
 	cancelDrawing();
 }
 
-void Scene::setTextEditing(bool editing) {
+void Scene::setTextEditing(bool editing, bool notify) {
 	if (_textEditing == editing) {
 		return;
 	}
 	_textEditing = editing;
-	_textEditStates.fire_copy(editing);
+	if (notify) {
+		_textEditStates.fire_copy(editing);
+	}
 }
 
 void Scene::setupTextProxy(
@@ -585,7 +592,7 @@ void Scene::setupTextProxy(
 	}
 }
 
-void Scene::createTextAtCenter() {
+void Scene::createTextAtCenter(int rotation) {
 	if (_textEdit.proxy) {
 		return;
 	}
@@ -627,9 +634,12 @@ void Scene::createTextAtCenter() {
 			minTextWidth,
 			maxTextWidth);
 		proxy->setTextWidth(width);
-		proxy->setPos(sceneCenter.x() - width / 2., sceneCenter.y());
+		const auto anchor = QPointF(width / 2., 0.);
+		proxy->setTransformOriginPoint(anchor);
+		proxy->setPos(sceneCenter - anchor);
 	};
 	adjustWidth();
+	proxy->setRotation(rotation);
 
 	QObject::connect(emojiDoc, &QTextDocument::contentsChanged, [=] {
 		ReplaceEmoji(emojiDoc);
@@ -750,7 +760,7 @@ void Scene::startTextEditing(ItemText *item) {
 	_textColorRequests.fire_copy(item->color());
 }
 
-void Scene::finishTextEditing(bool save) {
+void Scene::finishTextEditing(bool save, bool notify) {
 	if (!_textEdit.proxy) {
 		return;
 	}
@@ -759,8 +769,8 @@ void Scene::finishTextEditing(bool save) {
 		? RecoverTextFromDocument(_textEdit.proxy->document()).trimmed()
 		: QString();
 	const auto proxyRect = _textEdit.proxy->boundingRect();
-	const auto proxyCenter = _textEdit.proxy->pos()
-		+ QPointF(proxyRect.width() / 2., proxyRect.height() / 2.);
+	const auto proxyCenter = _textEdit.proxy->mapToScene(proxyRect.center());
+	const auto proxyRotation = int(_textEdit.proxy->rotation());
 	const auto lockedItem = _textEdit.item.lock();
 	auto *existingItem = lockedItem
 		? static_cast<ItemText*>(lockedItem.get())
@@ -772,7 +782,7 @@ void Scene::finishTextEditing(bool save) {
 	QGraphicsScene::removeItem(_textEdit.proxy.get());
 	_textEdit.proxy = nullptr;
 	_textEdit.item.reset();
-	setTextEditing(false);
+	setTextEditing(false, notify);
 
 	const auto defaultStyle = static_cast<TextStyle>(_textStyle);
 
@@ -799,6 +809,7 @@ void Scene::finishTextEditing(bool save) {
 				.size = size,
 				.x = int(proxyCenter.x()),
 				.y = int(proxyCenter.y()),
+				.rotation = proxyRotation,
 				.imageSize = imageSize,
 			};
 			auto item = std::make_shared<ItemText>(
@@ -821,15 +832,7 @@ void Scene::finishTextEditing(bool save) {
 
 Scene::~Scene() {
 	disconnect(this, &QGraphicsScene::selectionChanged, nullptr, nullptr);
-	if (_textEdit.proxy) {
-		setTextEditing(false);
-		const auto raw = static_cast<TextEditProxy*>(
-			_textEdit.proxy.get());
-		raw->onFinish = nullptr;
-		raw->onCancel = nullptr;
-		QGraphicsScene::removeItem(_textEdit.proxy.get());
-		_textEdit.proxy = nullptr;
-	}
+	cancelTextEditing();
 	QGraphicsScene::removeItem(_canvas.get());
 	for (const auto &item : items()) {
 		QGraphicsScene::removeItem(item.get());

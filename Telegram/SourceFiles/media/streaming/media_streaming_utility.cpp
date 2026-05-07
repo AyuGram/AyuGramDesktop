@@ -154,6 +154,9 @@ QImage ConvertFrame(
 
 	if (!FFmpeg::GoodStorageForFrame(storage, resize)) {
 		storage = FFmpeg::CreateFrameStorage(resize);
+		if (storage.isNull()) {
+			return QImage();
+		}
 	}
 
 	const auto format = AV_PIX_FMT_BGRA;
@@ -429,6 +432,9 @@ QImage PrepareByRequest(
 		: request.outer;
 	if (!FFmpeg::GoodStorageForFrame(storage, outer)) {
 		storage = FFmpeg::CreateFrameStorage(outer);
+		if (storage.isNull()) {
+			return QImage();
+		}
 	}
 
 	if (hasAlpha && request.keepAlpha) {

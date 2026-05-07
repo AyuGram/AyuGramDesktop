@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "menu/menu_send.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/fields/input_field.h"
@@ -424,6 +425,14 @@ auto ContentWidget::titleStories()
 
 void ContentWidget::saveChanges(FnMut<void()> done) {
 	done();
+}
+
+SendMenu::Details ContentWidget::sendMenuDetails() const {
+	return {};
+}
+
+bool ContentWidget::processChosenSticker(ChatHelpers::FileChosen &&) {
+	return false;
 }
 
 void ContentWidget::refreshSearchField(bool shown) {

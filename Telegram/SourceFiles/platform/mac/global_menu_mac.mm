@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QTextEdit>
 #include <QtGui/QAction>
@@ -123,6 +124,7 @@ void SendKeySequence(
 	const auto focused = QApplication::focusWidget();
 	if (qobject_cast<QLineEdit*>(focused)
 		|| qobject_cast<QTextEdit*>(focused)
+		|| qobject_cast<QLabel*>(focused)
 		|| dynamic_cast<HistoryInner*>(focused)) {
 		QApplication::postEvent(
 			focused,
@@ -287,6 +289,14 @@ void Manager::recomputeState() {
 				markdownState = inputField->markdownEnabledState();
 			}
 		}
+	} else if (const auto label = qobject_cast<QLabel*>(focused)) {
+		const auto flags = label->textInteractionFlags();
+		const auto selectable = flags
+			& (Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+		if (selectable) {
+			canCopy = label->hasSelectedText();
+			canSelectAll = !label->text().isEmpty();
+		}
 	} else if (const auto list = dynamic_cast<HistoryInner*>(focused)) {
 		canCopy = list->canCopySelected();
 		canDelete = list->canDeleteSelected();
@@ -417,27 +427,18 @@ void Manager::buildEditMenu(QMenu *edit) {
 		[] { SendKeySequence(Qt::Key_X, Qt::ControlModifier); },
 		QKeySequence::Cut);
 	_cut->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_cut->setMenuRole(QAction::CutRole);
-#endif // Qt >= 6.8.0
 	_copy = edit->addAction(
 		u"Copy"_q,
 		receiver,
 		[] { SendKeySequence(Qt::Key_C, Qt::ControlModifier); },
 		QKeySequence::Copy);
 	_copy->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_copy->setMenuRole(QAction::CopyRole);
-#endif // Qt >= 6.8.0
 	_paste = edit->addAction(
 		u"Paste"_q,
 		receiver,
 		[] { SendKeySequence(Qt::Key_V, Qt::ControlModifier); },
 		QKeySequence::Paste);
 	_paste->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_paste->setMenuRole(QAction::PasteRole);
-#endif // Qt >= 6.8.0
 	_delete = edit->addAction(
 		u"Delete"_q,
 		receiver,
@@ -512,9 +513,6 @@ void Manager::buildEditMenu(QMenu *edit) {
 		[] { SendKeySequence(Qt::Key_A, Qt::ControlModifier); },
 		QKeySequence::SelectAll);
 	_selectAll->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_selectAll->setMenuRole(QAction::SelectAllRole);
-#endif // Qt >= 6.8.0
 
 	if (!Platform::IsMac26_0OrGreater()) {
 		edit->addSeparator();

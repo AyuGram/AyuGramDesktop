@@ -104,6 +104,25 @@ using UpdateFlag = Data::HistoryUpdate::Flag;
 	return state;
 }
 
+[[nodiscard]] UserData *GuestChatBotForCurrentUser(
+		not_null<HistoryItem*> item) {
+	if (!item->isGuestChatBotMessage()) {
+		return nullptr;
+	}
+	const auto guestChat = item->Get<HistoryMessageGuestChat>();
+	const auto self = item->history()->session().user();
+	if (!guestChat
+		|| !guestChat->visitor
+		|| (guestChat->visitor->id != self->id)) {
+		return nullptr;
+	}
+	const auto bot = item->from()->asUser();
+	return (bot
+		&& bot->isBot()
+		&& bot->botInfo
+		&& bot->botInfo->supportsGuestChat) ? bot : nullptr;
+}
+
 } // namespace
 
 History::History(not_null<Data::Session*> owner, PeerId peerId)
@@ -528,6 +547,11 @@ not_null<HistoryItem*> History::createItem(
 		session().topPeers().increment(peer, result->date());
 		if (result->starsPaid()) {
 			session().credits().load(true);
+		}
+	}
+	if (newMessage && !result->out() && result->isRegular()) {
+		if (const auto bot = GuestChatBotForCurrentUser(result)) {
+			session().topGuestChatBots().increment(bot, result->date());
 		}
 	}
 	return result;
@@ -1033,99 +1057,100 @@ not_null<HistoryItem*> History::addNewToBack(
 			}
 		}
 	}
-	if (item->from()->id) {
-		if (auto user = item->from()->asUser()) {
-			auto getLastAuthors = [this]() -> std::deque<not_null<UserData*>>* {
-				if (auto chat = peer->asChat()) {
-					return &chat->lastAuthors;
-				} else if (auto channel = peer->asMegagroup()) {
-					return channel->canViewMembers()
-						? &channel->mgInfo->lastParticipants
-						: nullptr;
-				}
-				return nullptr;
-			};
-			if (auto megagroup = peer->asMegagroup()) {
-				if (user->isBot()) {
-					auto mgInfo = megagroup->mgInfo.get();
-					Assert(mgInfo != nullptr);
-					mgInfo->bots.insert(user);
-					if (mgInfo->botStatus == Data::BotStatus::NoBots) {
-						mgInfo->botStatus = Data::BotStatus::HasBots;
-					}
-				}
+	const auto from = item->from();
+	const auto guestMessage = item->Has<HistoryMessageGuestChat>();
+	if (const auto user = guestMessage ? from->asUser() : nullptr) {
+		const auto lastAuthors = [&]() -> std::deque<not_null<UserData*>>* {
+			if (auto chat = peer->asChat()) {
+				return &chat->lastAuthors;
+			} else if (auto channel = peer->asMegagroup()) {
+				return channel->canViewMembers()
+					? &channel->mgInfo->lastParticipants
+					: nullptr;
 			}
-			if (auto lastAuthors = getLastAuthors()) {
-				auto prev = ranges::find(
-					*lastAuthors,
-					user,
-					[](not_null<UserData*> user) { return user.get(); });
-				auto index = (prev != lastAuthors->end())
-					? (lastAuthors->end() - prev)
-					: -1;
-				if (index > 0) {
-					lastAuthors->erase(prev);
-				} else if (index < 0 && peer->isMegagroup()) { // nothing is outdated if just reordering
-					// admins information outdated
-				}
-				if (index) {
-					lastAuthors->push_front(user);
-				}
-				if (auto megagroup = peer->asMegagroup()) {
-					session().changes().peerUpdated(
-						peer,
-						Data::PeerUpdate::Flag::Members);
-					owner().addNewMegagroupParticipant(megagroup, user);
+			return nullptr;
+		}();
+		if (const auto megagroup = peer->asMegagroup()) {
+			if (user->isBot()) {
+				const auto mgInfo = megagroup->mgInfo.get();
+				Assert(mgInfo != nullptr);
+				mgInfo->bots.insert(user);
+				if (mgInfo->botStatus == Data::BotStatus::NoBots) {
+					mgInfo->botStatus = Data::BotStatus::HasBots;
 				}
 			}
 		}
-		if (item->definesReplyKeyboard()) {
-			auto markupFlags = item->replyKeyboardFlags();
-			if (!(markupFlags & ReplyMarkupFlag::Selective)
-				|| item->mentionsMe()) {
-				auto getMarkupSenders = [this]() -> base::flat_set<not_null<PeerData*>>* {
-					if (auto chat = peer->asChat()) {
-						return &chat->markupSenders;
-					} else if (auto channel = peer->asMegagroup()) {
-						return &channel->mgInfo->markupSenders;
-					}
-					return nullptr;
-				};
-				if (auto markupSenders = getMarkupSenders()) {
-					markupSenders->insert(item->from());
+		if (lastAuthors) {
+			const auto prev = ranges::find(
+				*lastAuthors,
+				user,
+				[](not_null<UserData*> user) { return user.get(); });
+			const auto index = (prev != lastAuthors->end())
+				? (lastAuthors->end() - prev)
+				: -1;
+			if (index > 0) {
+				// nothing is outdated if just reordering
+				lastAuthors->erase(prev);
+			} else if (index < 0 && peer->isMegagroup()) {
+				// admins information outdated
+			}
+			if (index) {
+				lastAuthors->push_front(user);
+			}
+			if (const auto megagroup = peer->asMegagroup()) {
+				session().changes().peerUpdated(
+					peer,
+					Data::PeerUpdate::Flag::Members);
+				owner().addNewMegagroupParticipant(megagroup, user);
+			}
+		}
+	}
+	if (item->definesReplyKeyboard()) {
+		const auto markupFlags = item->replyKeyboardFlags();
+		if (!(markupFlags & ReplyMarkupFlag::Selective)
+			|| item->mentionsMe()) {
+			const auto markupSenders = [&]() -> base::flat_set<not_null<PeerData*>>* {
+				if (const auto chat = peer->asChat()) {
+					return &chat->markupSenders;
+				} else if (const auto channel = peer->asMegagroup()) {
+					return &channel->mgInfo->markupSenders;
 				}
-				if (markupFlags & ReplyMarkupFlag::None) {
-					// None markup means replyKeyboardHide.
-					if (lastKeyboardFrom == item->from()->id
-						|| (!lastKeyboardInited
-							&& !peer->isChat()
-							&& !peer->isMegagroup()
-							&& !item->out())) {
-						clearLastKeyboard();
-					}
+				return nullptr;
+			}();
+			if (markupSenders) {
+				markupSenders->insert(from);
+			}
+			if (markupFlags & ReplyMarkupFlag::None) {
+				// None markup means replyKeyboardHide.
+				if (lastKeyboardFrom == from->id
+					|| (!lastKeyboardInited
+						&& !peer->isChat()
+						&& !peer->isMegagroup()
+						&& !item->out())) {
+					clearLastKeyboard();
+				}
+			} else {
+				bool botNotInChat = false;
+				if (peer->isChat()) {
+					botNotInChat = from->isUser()
+						&& (!peer->asChat()->participants.empty()
+							|| !Data::CanSendAnything(peer))
+						&& !peer->asChat()->participants.contains(
+							from->asUser());
+				} else if (peer->isMegagroup()) {
+					botNotInChat = from->isUser()
+						&& (peer->asChannel()->mgInfo->botStatus != Data::BotStatus::Unknown
+							|| !Data::CanSendAnything(peer))
+						&& !peer->asChannel()->mgInfo->bots.contains(
+							from->asUser());
+				}
+				if (botNotInChat) {
+					clearLastKeyboard();
 				} else {
-					bool botNotInChat = false;
-					if (peer->isChat()) {
-						botNotInChat = item->from()->isUser()
-							&& (!peer->asChat()->participants.empty()
-								|| !Data::CanSendAnything(peer))
-							&& !peer->asChat()->participants.contains(
-								item->from()->asUser());
-					} else if (peer->isMegagroup()) {
-						botNotInChat = item->from()->isUser()
-							&& (peer->asChannel()->mgInfo->botStatus != Data::BotStatus::Unknown
-								|| !Data::CanSendAnything(peer))
-							&& !peer->asChannel()->mgInfo->bots.contains(
-								item->from()->asUser());
-					}
-					if (botNotInChat) {
-						clearLastKeyboard();
-					} else {
-						lastKeyboardInited = true;
-						lastKeyboardId = item->id;
-						lastKeyboardFrom = item->from()->id;
-						lastKeyboardUsed = false;
-					}
+					lastKeyboardInited = true;
+					lastKeyboardId = item->id;
+					lastKeyboardFrom = from->id;
+					lastKeyboardUsed = false;
 				}
 			}
 		}
@@ -2774,6 +2799,14 @@ bool History::loadedAtBottom() const {
 
 bool History::loadedAtTop() const {
 	return _loadedAtTop;
+}
+
+bool History::hasGuestChatBotMessages() const {
+	return _flags & Flag::HasGuestChatBotMessages;
+}
+
+void History::setHasGuestChatBotMessages() {
+	_flags |= Flag::HasGuestChatBotMessages;
 }
 
 bool History::isReadyFor(MsgId msgId) {

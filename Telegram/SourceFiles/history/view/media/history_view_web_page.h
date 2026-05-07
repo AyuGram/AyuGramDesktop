@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/stickers/data_custom_emoji.h"
 #include "history/view/media/history_view_media.h"
 #include "ui/userpic_view.h"
 
@@ -24,7 +25,9 @@ namespace HistoryView {
 
 class Sticker;
 
-class WebPage : public Media {
+class WebPage final
+	: public Media
+	, private Data::CustomEmojiManager::Listener {
 public:
 	WebPage(
 		not_null<Element*> parent,
@@ -181,6 +184,9 @@ private:
 
 	void setupAdditionalData();
 
+	void customEmojiResolveDone(
+		not_null<DocumentData*> document) override;
+
 	const style::QuoteStyle &_st;
 	const not_null<WebPageData*> _data;
 	const MediaWebPageFlags _flags;
@@ -194,8 +200,9 @@ private:
 	int _dataVersion = -1;
 	int _siteNameLines = 0;
 	int _descriptionLines = 0;
-	uint32 _titleLines : 31 = 0;
+	uint32 _titleLines : 30 = 0;
 	uint32 _asArticle : 1 = 0;
+	uint32 _composeToneListening : 1 = 0;
 
 	Ui::Text::String _siteName;
 	Ui::Text::String _title;

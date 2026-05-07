@@ -242,6 +242,8 @@ public:
 	[[nodiscard]] bool loadedAtBottom() const; // last message is in the list
 	void setNotLoadedAtBottom();
 	[[nodiscard]] bool loadedAtTop() const; // nothing was added after loading history back
+	[[nodiscard]] bool hasGuestChatBotMessages() const;
+	void setHasGuestChatBotMessages();
 	[[nodiscard]] bool isReadyFor(MsgId msgId); // has messages for showing history at msgId
 	void getReadyFor(MsgId msgId);
 
@@ -499,6 +501,7 @@ private:
 		HasPinnedMessages = (1 << 6),
 		ResolveChatListMessage = (1 << 7),
 		MonoAndForumUnreadInvalidatePending = (1 << 8),
+		HasGuestChatBotMessages = (1 << 9),
 	};
 	using Flags = base::flags<Flag>;
 	friend inline constexpr auto is_flag_type(Flag) {

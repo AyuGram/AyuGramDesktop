@@ -40,8 +40,8 @@ mtpRequestId ComposeWithAi::request(
 	if (!request.translateToLang.isEmpty()) {
 		flags |= Flag::f_translate_to_lang;
 	}
-	if (!request.changeTone.isEmpty()) {
-		flags |= Flag::f_change_tone;
+	if (request.tone) {
+		flags |= Flag::f_tone;
 	}
 	if (request.emojify) {
 		flags |= Flag::f_emojify;
@@ -53,9 +53,14 @@ mtpRequestId ComposeWithAi::request(
 		request.translateToLang.isEmpty()
 			? MTPstring()
 			: MTP_string(request.translateToLang),
-		request.changeTone.isEmpty()
-			? MTPstring()
-			: MTP_string(request.changeTone)
+		request.tone
+			? (request.tone->id
+				? MTP_inputAiComposeToneID(
+					MTP_long(request.tone->id),
+					MTP_long(request.tone->accessHash))
+				: MTP_inputAiComposeToneDefault(
+					MTP_string(request.tone->defaultTone)))
+			: MTPInputAiComposeTone()
 	)).done([=, done = std::move(done)](
 			const MTPmessages_ComposedMessageWithAI &result) mutable {
 		const auto &data = result.data();

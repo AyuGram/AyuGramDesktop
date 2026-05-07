@@ -65,7 +65,8 @@ using BoostCallback = Fn<void(const Data::Boost &)>;
 		+ (entry.refunded ? '1' : '0')
 		+ (entry.pending ? '1' : '0')
 		+ (entry.failed ? '1' : '0')
-		+ (entry.in ? '1' : '0'));
+		+ (entry.in ? '1' : '0')
+		+ (entry.giftOffer ? '1' : '0'));
 }
 
 void AddSubtitle(
@@ -458,6 +459,17 @@ public:
 		int availableWidth,
 		int outerWidth,
 		bool selected) override;
+
+	int paintNameIconGetLeadingWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int outerWidth,
+		bool selected) override {
+		return 0;
+	}
 
 	QSize rightActionSize() const override;
 	QMargins rightActionMargins() const override;
@@ -891,6 +903,7 @@ void CreditsRow::init() {
 		? u"%1 #%2"_q.arg(_entry.uniqueGift->title).arg(Lang::FormatCountDecimal(_entry.uniqueGift->number))
 		: ((!_entry.subscriptionUntil.isNull() && !isSpecial)
 			|| (_entry.giftResale && !isSpecial)
+			|| (_entry.giftOffer && !isSpecial)
 			|| _entry.title.isEmpty())
 		? name
 		: _entry.title;

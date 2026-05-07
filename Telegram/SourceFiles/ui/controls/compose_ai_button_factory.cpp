@@ -11,9 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/compose_ai_box.h"
 #include "config.h"
 #include "core/mime_type.h"
+#include "data/data_ai_compose_tones.h"
+#include "data/data_session.h"
 #include "history/view/controls/history_view_compose_ai_button.h"
 #include "lang/lang_keys.h"
-#include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/text/text.h"
@@ -40,7 +41,8 @@ bool HasEnoughLinesForAi(
 		not_null<Main::Session*> session,
 		not_null<Ui::InputField*> field) {
 	if (!AyuSettings::getInstance().showAiEditorButtonInMessageField()
-		|| session->appConfig().aiComposeStyles().empty()) {
+		|| HideAiButtonOption.value()
+		|| session->data().aiComposeTones().list().empty()) {
 		return false;
 	}
 	const auto &style = field->st().style;

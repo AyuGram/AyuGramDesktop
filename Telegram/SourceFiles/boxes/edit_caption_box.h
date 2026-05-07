@@ -32,6 +32,7 @@ namespace Ui {
 class AbstractSinglePreview;
 class InputField;
 class EmojiButton;
+class PopupMenu;
 class VerticalLayout;
 enum class AlbumType;
 } // namespace Ui
@@ -90,6 +91,8 @@ protected:
 private:
 	void rebuildPreview();
 	void setupEditEventHandler();
+	void showMenu(QPoint globalPos, bool forceTopRight);
+	void renameCurrentFile();
 	void setupPhotoEditorEventHandler();
 	void setupEditCoverHandler();
 	void setupClearCoverHandler();
@@ -137,6 +140,7 @@ private:
 	std::unique_ptr<ChatHelpers::FieldAutocomplete> _autocomplete;
 
 	base::unique_qptr<Ui::AbstractSinglePreview> _content;
+	base::unique_qptr<Ui::PopupMenu> _previewMenu;
 	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
 	base::unique_qptr<QObject> _emojiFilter;
 

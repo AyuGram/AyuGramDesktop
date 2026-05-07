@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/bytes.h"
 #include "base/algorithm.h"
 
+#include <cstdint>
 #include <crl/crl_time.h>
 
 #include <QSize>
@@ -153,6 +154,7 @@ using CodecPointer = std::unique_ptr<AVCodecContext, CodecDeleter>;
 struct CodecDescriptor {
 	not_null<AVStream*> stream;
 	bool hwAllowed = false;
+	int64_t videoMaxArea = 0;
 };
 [[nodiscard]] CodecPointer MakeCodecPointer(CodecDescriptor descriptor);
 

@@ -32,6 +32,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Ui {
 namespace {
 
+enum class MediaThumbnailMode {
+	Crop,
+	CenterCrop,
+	Fit,
+};
+
 class PeerUserpic final : public DynamicImage {
 public:
 	PeerUserpic(not_null<PeerData*> peer, bool forceRound);
@@ -70,7 +76,7 @@ public:
 	explicit MediaThumbnail(
 		Data::FileOrigin origin,
 		bool forceRound,
-		bool centerCrop);
+		MediaThumbnailMode mode);
 
 	QImage image(int size) override;
 	void subscribeToUpdates(Fn<void()> callback) override;
@@ -83,7 +89,7 @@ protected:
 
 	[[nodiscard]] Data::FileOrigin origin() const;
 	[[nodiscard]] bool forceRound() const;
-	[[nodiscard]] bool centerCrop() const;
+	[[nodiscard]] MediaThumbnailMode mode() const;
 
 	[[nodiscard]] virtual Main::Session &session() = 0;
 	[[nodiscard]] virtual Thumb loaded(Data::FileOrigin origin) = 0;
@@ -92,7 +98,7 @@ protected:
 private:
 	const Data::FileOrigin _origin;
 	const bool _forceRound;
-	const bool _centerCrop;
+	const MediaThumbnailMode _mode;
 	QImage _full;
 	rpl::lifetime _subscription;
 	QImage _prepared;
@@ -106,7 +112,7 @@ public:
 		not_null<PhotoData*> photo,
 		Data::FileOrigin origin,
 		bool forceRound,
-		bool centerCrop);
+		MediaThumbnailMode mode);
 
 	std::shared_ptr<DynamicImage> clone() override;
 
@@ -126,7 +132,7 @@ public:
 		not_null<DocumentData*> video,
 		Data::FileOrigin origin,
 		bool forceRound,
-		bool centerCrop);
+		MediaThumbnailMode mode);
 
 	std::shared_ptr<DynamicImage> clone() override;
 
@@ -384,23 +390,44 @@ void PeerUserpic::processNewPhoto() {
 MediaThumbnail::MediaThumbnail(
 		Data::FileOrigin origin,
 		bool forceRound,
-		bool centerCrop)
+		MediaThumbnailMode mode)
 : _origin(origin)
 , _forceRound(forceRound)
-, _centerCrop(centerCrop) {
+, _mode(mode) {
 }
 
 QImage MediaThumbnail::image(int size) {
 	const auto ratio = style::DevicePixelRatio();
 	if (_prepared.width() != size * ratio) {
+		const auto full = QSize(size, size) * ratio;
 		if (_full.isNull()) {
 			_prepared = QImage(
-				QSize(size, size) * ratio,
+				full,
 				QImage::Format_ARGB32_Premultiplied);
-			_prepared.fill(Qt::black);
+			_prepared.setDevicePixelRatio(ratio);
+			_prepared.fill(_mode == MediaThumbnailMode::Fit
+				? Qt::transparent
+				: Qt::black);
+		} else if (_mode == MediaThumbnailMode::Fit) {
+			auto scaled = _full.scaled(
+				full,
+				Qt::KeepAspectRatio,
+				Qt::SmoothTransformation);
+			const auto scaledSize = QSizeF(scaled.size()) / ratio;
+			scaled.setDevicePixelRatio(ratio);
+			_prepared = QImage(full, QImage::Format_ARGB32_Premultiplied);
+			_prepared.setDevicePixelRatio(ratio);
+			_prepared.fill(Qt::transparent);
+
+			auto p = QPainter(&_prepared);
+			p.drawImage(
+				QPointF(
+					(size - scaledSize.width()) / 2.,
+					(size - scaledSize.height()) / 2.),
+				scaled);
 		} else {
 			auto source = QRect();
-			if (_centerCrop) {
+			if (_mode == MediaThumbnailMode::CenterCrop) {
 				const auto side = std::min(_full.width(), _full.height());
 				const auto x = (_full.width() - side) / 2;
 				const auto y = (_full.height() - side) / 2;
@@ -461,16 +488,16 @@ bool MediaThumbnail::forceRound() const {
 	return _forceRound;
 }
 
-bool MediaThumbnail::centerCrop() const {
-	return _centerCrop;
+MediaThumbnailMode MediaThumbnail::mode() const {
+	return _mode;
 }
 
 PhotoThumbnail::PhotoThumbnail(
 	not_null<PhotoData*> photo,
 	Data::FileOrigin origin,
 	bool forceRound,
-	bool centerCrop)
-: MediaThumbnail(origin, forceRound, centerCrop)
+	MediaThumbnailMode mode)
+: MediaThumbnail(origin, forceRound, mode)
 , _photo(photo) {
 }
 
@@ -479,7 +506,7 @@ std::shared_ptr<DynamicImage> PhotoThumbnail::clone() {
 		_photo,
 		origin(),
 		forceRound(),
-		centerCrop());
+		mode());
 }
 
 Main::Session &PhotoThumbnail::session() {
@@ -505,8 +532,8 @@ VideoThumbnail::VideoThumbnail(
 	not_null<DocumentData*> video,
 	Data::FileOrigin origin,
 	bool forceRound,
-	bool centerCrop)
-: MediaThumbnail(origin, forceRound, centerCrop)
+	MediaThumbnailMode mode)
+: MediaThumbnail(origin, forceRound, mode)
 , _video(video) {
 }
 
@@ -515,7 +542,7 @@ std::shared_ptr<DynamicImage> VideoThumbnail::clone() {
 		_video,
 		origin(),
 		forceRound(),
-		centerCrop());
+		mode());
 }
 
 Main::Session &VideoThumbnail::session() {
@@ -1063,13 +1090,13 @@ std::shared_ptr<DynamicImage> MakeStoryThumbnail(
 			photo,
 			id,
 			true,
-			false);
+			MediaThumbnailMode::Crop);
 	}, [&](not_null<DocumentData*> video) -> Result {
 		return std::make_shared<VideoThumbnail>(
 			video,
 			id,
 			true,
-			false);
+			MediaThumbnailMode::Crop);
 	});
 }
 
@@ -1098,7 +1125,7 @@ std::shared_ptr<DynamicImage> MakePhotoThumbnail(
 		photo,
 		fullId,
 		false,
-		false);
+		MediaThumbnailMode::Crop);
 }
 
 std::shared_ptr<DynamicImage> MakePhotoThumbnailCenterCrop(
@@ -1108,7 +1135,7 @@ std::shared_ptr<DynamicImage> MakePhotoThumbnailCenterCrop(
 		photo,
 		fullId,
 		false,
-		true);
+		MediaThumbnailMode::CenterCrop);
 }
 
 std::shared_ptr<DynamicImage> MakeDocumentThumbnail(
@@ -1118,7 +1145,7 @@ std::shared_ptr<DynamicImage> MakeDocumentThumbnail(
 		document,
 		fullId,
 		false,
-		false);
+		MediaThumbnailMode::Crop);
 }
 
 std::shared_ptr<DynamicImage> MakeDocumentThumbnail(
@@ -1128,7 +1155,17 @@ std::shared_ptr<DynamicImage> MakeDocumentThumbnail(
 		document,
 		origin,
 		false,
-		false);
+		MediaThumbnailMode::Crop);
+}
+
+std::shared_ptr<DynamicImage> MakeDocumentThumbnailFit(
+		not_null<DocumentData*> document,
+		Data::FileOrigin origin) {
+	return std::make_shared<VideoThumbnail>(
+		document,
+		origin,
+		false,
+		MediaThumbnailMode::Fit);
 }
 
 std::shared_ptr<DynamicImage> MakeDocumentThumbnailCenterCrop(
@@ -1138,7 +1175,7 @@ std::shared_ptr<DynamicImage> MakeDocumentThumbnailCenterCrop(
 		document,
 		fullId,
 		false,
-		true);
+		MediaThumbnailMode::CenterCrop);
 }
 
 std::shared_ptr<DynamicImage> MakeDocumentFilePreviewThumbnail(

@@ -95,6 +95,9 @@ private:
 	QSize countCurrentSize(int newWidth) override;
 
 	[[nodiscard]] bool showVotes() const;
+	[[nodiscard]] PollData::VoteRestriction knownVoteRestriction() const;
+	[[nodiscard]] bool voteRestricted() const;
+	void showVoteRestrictionToast() const;
 	[[nodiscard]] bool canVote() const;
 	[[nodiscard]] bool canSendVotes() const;
 	[[nodiscard]] bool isAuthorNotVoted() const;

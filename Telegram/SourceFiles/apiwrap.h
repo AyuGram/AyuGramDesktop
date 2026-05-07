@@ -25,6 +25,7 @@ class Session;
 } // namespace Main
 
 namespace Data {
+struct ReactionId;
 struct UpdatedFileReferences;
 class WallPaper;
 struct ResolvedForwardDraft;
@@ -237,6 +238,16 @@ public:
 	void deleteAllFromParticipant(
 		not_null<ChannelData*> channel,
 		not_null<PeerData*> from);
+	void deleteAllReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		not_null<PeerData*> participant,
+		MsgId originMsgId,
+		const Data::ReactionId &originReaction);
+	void deleteParticipantReaction(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const Data::ReactionId &reaction);
 	void deleteSublistHistory(
 		not_null<ChannelData*> parentChat,
 		not_null<PeerData*> sublistPeer);

@@ -842,7 +842,8 @@ void ColorPicker::moveSizeControl(const QSize &size) {
 		areaWidth,
 		std::min(areaHeight, size.height()));
 
-	const auto collapsedCenterX = sizeControlCurrentCenterX(0.);
+	const auto collapsedCenterX = sizeControlCurrentCenterX(0.)
+		- st::photoEditorBrushSizeControlLeftSkip;
 	const auto collapsedLeft = collapsedCenterX
 		- (float64(st::photoEditorBrushSizeControlCollapsedWidth) / 2.);
 	const auto y = (_canvasRect.height() > 0)

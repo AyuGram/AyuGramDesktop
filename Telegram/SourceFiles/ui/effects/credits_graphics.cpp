@@ -586,6 +586,8 @@ TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
 		? tr::lng_credits_box_history_entry_api
 		: entry.reaction
 		? tr::lng_credits_box_history_entry_reaction_name
+		: entry.giftOffer
+		? tr::lng_credits_box_history_entry_gift_offer
 		: entry.giftResale
 		? (entry.in
 			? tr::lng_credits_box_history_entry_gift_sold

@@ -1655,6 +1655,8 @@ void GenericCreditsEntryBody(
 					? tr::lng_credits_box_history_entry_posts_search(tr::now)
 					: e.premiumMonthsForStars
 					? tr::lng_premium_summary_title(tr::now)
+					: e.giftOffer
+					? tr::lng_credits_box_history_entry_gift_offer(tr::now)
 					: !e.title.isEmpty()
 					? e.title
 					: e.starrefCommission

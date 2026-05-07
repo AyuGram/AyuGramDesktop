@@ -48,6 +48,14 @@ namespace AdminLog {
 
 class SectionMemento;
 
+struct DeleteGroup {
+	uint64 eventId = 0;
+	UserId adminId;
+	int startIndex = -1;
+	int endIndex = -1;
+	int eventCount = 0;
+};
+
 class InnerWidget final
 	: public Ui::RpWidget
 	, public Ui::AbstractTooltipShower
@@ -238,7 +246,6 @@ private:
 	void checkPreloadMore();
 	void updateVisibleTopItem();
 	void preloadMore(Direction direction);
-	void itemsAdded(Direction direction, int addedCount);
 	void updateSize();
 	void updateMinMaxIds();
 	void updateEmptyText();
@@ -248,6 +255,26 @@ private:
 	void addEvents(
 		Direction direction,
 		const QVector<MTPChannelAdminLogEvent> &events);
+	enum class DisplayPointerScope {
+		Transient,
+		All,
+	};
+	void computeDeleteGroups();
+	void rebuildDisplayItems();
+	void clearDisplayItems(DisplayPointerScope pointerScope);
+	void clearDisplayPointers(DisplayPointerScope pointerScope);
+	[[nodiscard]] bool displayPointerMatches(
+		const Element *view,
+		DisplayPointerScope pointerScope) const;
+	void toggleDeleteGroup(uint64 groupEventId);
+	OwnedItem createGroupSummaryItem(
+		const DeleteGroup &group,
+		bool expanded);
+	void setupExpandButton(
+		not_null<HistoryItem*> item,
+		int hiddenCount,
+		uint64 groupEventId);
+	void clearExpandButtons();
 	[[nodiscard]] Element *viewForItem(const HistoryItem *item);
 	[[nodiscard]] bool myView(
 		not_null<const HistoryView::Element*> view) const;
@@ -258,6 +285,7 @@ private:
 	void scrollDateHide();
 	void scrollDateCheck();
 	void scrollDateHideByTimer();
+	void scrollDateCheckDownward();
 
 	// This function finds all history items that are displayed and calls template method
 	// for each found message (in given direction) in the passed history with passed top offset.
@@ -307,6 +335,18 @@ private:
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpics;
 	base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> _userpicsCache;
 	base::flat_map<FullMsgId, MsgId> _realIdsForReport;
+
+	// Delete event grouping.
+	std::vector<Element*> _displayItems;
+	std::vector<DeleteGroup> _deleteGroups;
+	std::set<uint64> _expandedGroups;
+	std::vector<OwnedItem> _summaryItems;
+	base::flat_map<not_null<const HistoryItem*>, uint64> _itemEventIds;
+	base::flat_map<uint64, UserId> _eventAdminIds;
+	base::flat_set<not_null<HistoryItem*>> _expandMarkupItems;
+	Ui::Animations::Simple _toggleAnimation;
+	bool _skipScrollRestore = false;
+
 	int _itemsTop = 0;
 	int _itemsWidth = 0;
 	int _itemsHeight = 0;
@@ -324,6 +364,7 @@ private:
 	base::Timer _scrollDateHideTimer;
 	Element *_scrollDateLastItem = nullptr;
 	int _scrollDateLastItemTop = 0;
+	bool _scrollDateAfterDayCrossing = false;
 
 	// Up - max, Down - min.
 	uint64 _maxId = 0;

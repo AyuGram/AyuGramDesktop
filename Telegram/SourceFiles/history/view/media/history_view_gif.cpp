@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "media/audio/media_audio.h"
 #include "media/clip/media_clip_reader.h"
+#include "media/media_common.h"
 #include "media/player/media_player_instance.h"
 #include "media/streaming/media_streaming_instance.h"
 #include "media/streaming/media_streaming_player.h"
@@ -75,6 +76,8 @@ constexpr auto kUseNonBlurredThreshold = 240;
 constexpr auto kMaxInlineArea = 1920 * 1080;
 constexpr auto kSeekAnimationDuration = crl::time(200);
 constexpr auto kSeekTrackOpacity = 0.2;
+
+using ::Media::ValidFrameSize;
 
 [[nodiscard]] int GifMaxStatusWidth(not_null<DocumentData*> document) {
 	auto result = st::normalFont->width(
@@ -248,8 +251,7 @@ Gif::~Gif() {
 }
 
 bool Gif::CanPlayInline(not_null<DocumentData*> document) {
-	const auto dimensions = document->dimensions;
-	return dimensions.width() * dimensions.height() <= kMaxInlineArea;
+	return ValidFrameSize(document->dimensions, kMaxInlineArea);
 }
 
 QSize Gif::sizeForAspectRatio() const {
@@ -2302,9 +2304,10 @@ void Gif::repaintStreamedContent() {
 }
 
 void Gif::streamingReady(::Media::Streaming::Information &&info) {
-	if (info.video.size.width() * info.video.size.height()
-		> kMaxInlineArea) {
-		_data->dimensions = info.video.size;
+	if (!ValidFrameSize(info.video.size, kMaxInlineArea)) {
+		if (!info.video.size.isEmpty()) {
+			_data->dimensions = info.video.size;
+		}
 		stopAnimation();
 	} else {
 		history()->owner().requestViewResize(_parent);

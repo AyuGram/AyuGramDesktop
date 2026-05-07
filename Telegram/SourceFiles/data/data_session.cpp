@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/sponsored_messages.h"
 #include "data/stickers/data_stickers.h"
 #include "data/notify/data_notify_settings.h"
+#include "data/data_ai_compose_tones.h"
 #include "data/data_bot_app.h"
 #include "data/data_changes.h"
 #include "data/data_group_call.h"
@@ -249,6 +250,7 @@ Session::Session(not_null<Main::Session*> session)
 , _pollsClosingTimer([=] { checkPollsClosings(); })
 , _watchForOfflineTimer([=] { checkLocalUsersWentOffline(); })
 , _groups(this)
+, _aiComposeTones(std::make_unique<AiComposeTones>(session))
 , _chatsFilters(std::make_unique<ChatFilters>(this))
 , _cloudThemes(std::make_unique<CloudThemes>(session))
 , _sendActionManager(std::make_unique<SendActionManager>())
@@ -447,7 +449,6 @@ void Session::clear() {
 	base::take(_nonChannelMessages);
 	_messageByRandomId.clear();
 	_sentMessagesData.clear();
-	cSetRecentInlineBots(RecentInlineBots());
 	cSetRecentStickers(RecentStickerPack());
 	HistoryView::Element::ClearGlobal();
 	_contactsNoChatsList.clear();
@@ -602,6 +603,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				info->hasMainApp = data.is_bot_has_main_app();
 				info->userCreatesTopics = data.is_bot_forum_can_manage_topics();
 				info->canManageBots = data.is_bot_can_manage_bots();
+				info->supportsGuestChat = data.is_bot_guestchat();
 			}
 		}
 
@@ -2106,6 +2108,14 @@ rpl::producer<not_null<HistoryItem*>> Session::itemDataChanges() const {
 	return _itemDataChanges.events();
 }
 
+void Session::notifyReactionsRemoved(ReactionsRemoved update) {
+	_reactionsRemoved.fire(std::move(update));
+}
+
+rpl::producer<ReactionsRemoved> Session::reactionsRemoved() const {
+	return _reactionsRemoved.events();
+}
+
 void Session::requestItemTextRefresh(not_null<HistoryItem*> item) {
 	const auto call = [&](not_null<HistoryItem*> item) {
 		enumerateItemViews(item, [&](not_null<ViewElement*> view) {
@@ -3096,6 +3106,34 @@ HistoryItem *Session::message(FullMsgId itemId) const {
 	return message(itemId.peer, itemId.msg);
 }
 
+void Session::removeReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const ReactionId &reaction,
+		MsgId originMsgId) {
+	if (msgId) {
+		if (const auto item = message(peer, msgId)) {
+			item->removeReactionsFromParticipant(participant, reaction);
+		}
+	} else if (const auto list = messagesList(peer->id)) {
+		for (const auto &entry : *list) {
+			const auto knownReaction = (originMsgId
+				&& (entry.second->id == originMsgId))
+				? reaction
+				: ReactionId();
+			entry.second->removeReactionsFromParticipant(
+				participant,
+				knownReaction);
+		}
+	}
+	notifyReactionsRemoved({
+		.peer = peer,
+		.msgId = msgId,
+		.participant = participant,
+	});
+}
+
 HistoryItem *Session::nonChannelMessage(MsgId itemId) const {
 	if (!IsServerMsgId(itemId)) {
 		return nullptr;
@@ -3953,6 +3991,7 @@ not_null<WebPageData*> Session::processWebpage(
 		nullptr,
 		nullptr,
 		0,
+		0,
 		QString(),
 		false,
 		false,
@@ -4023,6 +4062,7 @@ not_null<WebPageData*> Session::webpage(
 		std::move(stickerSet),
 		std::move(uniqueGift),
 		nullptr,
+		0,
 		duration,
 		author,
 		hasLargeMedia,
@@ -4074,6 +4114,8 @@ void Session::webpageApplyFields(
 				}, [](const MTPDwebPageAttributeStarGiftCollection &) {
 					return (DocumentData*)nullptr;
 				}, [](const MTPDwebPageAttributeStarGiftAuction &) {
+					return (DocumentData*)nullptr;
+				}, [](const MTPDwebPageAttributeAiComposeTone &) {
 					return (DocumentData*)nullptr;
 				});
 				if (result) {
@@ -4148,6 +4190,21 @@ void Session::webpageApplyFields(
 			}
 		}
 		return nullptr;
+	};
+
+	const auto lookupComposeToneEmojiId = [&]() -> DocumentId {
+		if (const auto attributes = data.vattributes()) {
+			for (const auto &attribute : attributes->v) {
+				const auto result = attribute.match([&](
+						const MTPDwebPageAttributeAiComposeTone &data) {
+					return DocumentId(data.vemoji_id().v);
+				}, [](const auto &) { return DocumentId(0); });
+				if (result) {
+					return result;
+				}
+			}
+		}
+		return 0;
 	};
 
 	auto story = (Data::Story*)nullptr;
@@ -4251,6 +4308,7 @@ void Session::webpageApplyFields(
 		lookupStickerSet(),
 		lookupUniqueGift(),
 		lookupAuction(),
+		lookupComposeToneEmojiId(),
 		data.vduration().value_or_empty(),
 		qs(data.vauthor().value_or_empty()),
 		data.is_has_large_media(),
@@ -4274,6 +4332,7 @@ void Session::webpageApplyFields(
 		std::unique_ptr<WebPageStickerSet> stickerSet,
 		std::shared_ptr<UniqueGift> uniqueGift,
 		std::unique_ptr<WebPageAuction> auction,
+		DocumentId composeToneEmojiId,
 		int duration,
 		const QString &author,
 		bool hasLargeMedia,
@@ -4295,6 +4354,7 @@ void Session::webpageApplyFields(
 		std::move(stickerSet),
 		std::move(uniqueGift),
 		std::move(auction),
+		composeToneEmojiId,
 		duration,
 		author,
 		hasLargeMedia,
@@ -5388,6 +5448,7 @@ void Session::insertCheckedServiceNotification(
 				MTPMessageFwdHeader(),
 				MTPlong(), // via_bot_id
 				MTPlong(), // via_business_bot_id
+				MTPPeer(), // guestchat_via_from
 				MTPMessageReplyHeader(),
 				MTP_int(date),
 				MTP_string(sending.text),

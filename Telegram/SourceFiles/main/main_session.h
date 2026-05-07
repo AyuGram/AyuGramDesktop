@@ -33,6 +33,7 @@ namespace Data {
 class Session;
 class Changes;
 class GiftAuctions;
+class RecentInlineBots;
 class RecentPeers;
 class RecentSharedMediaGifts;
 class ScheduledMessages;
@@ -158,6 +159,12 @@ public:
 	}
 	[[nodiscard]] Data::TopPeers &topBotApps() const {
 		return *_topBotApps;
+	}
+	[[nodiscard]] Data::TopPeers &topGuestChatBots() const {
+		return *_topGuestChatBots;
+	}
+	[[nodiscard]] Data::RecentInlineBots &recentInlineBots() const {
+		return *_recentInlineBots;
 	}
 	[[nodiscard]] Data::Factchecks &factchecks() const {
 		return *_factchecks;
@@ -316,6 +323,8 @@ private:
 	const std::unique_ptr<Data::SponsoredMessages> _sponsoredMessages;
 	const std::unique_ptr<Data::TopPeers> _topPeers;
 	const std::unique_ptr<Data::TopPeers> _topBotApps;
+	const std::unique_ptr<Data::TopPeers> _topGuestChatBots;
+	const std::unique_ptr<Data::RecentInlineBots> _recentInlineBots;
 	const std::unique_ptr<Data::Factchecks> _factchecks;
 	const std::unique_ptr<Data::LocationPickers> _locationPickers;
 	const std::unique_ptr<Data::Credits> _credits;

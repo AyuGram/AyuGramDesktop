@@ -78,6 +78,18 @@ struct HistoryMessageVia : RuntimeComponent<HistoryMessageVia, HistoryItem> {
 	ClickHandlerPtr link;
 };
 
+struct HistoryMessageGuestChat
+: RuntimeComponent<HistoryMessageGuestChat, HistoryItem> {
+	void create(not_null<Data::Session*> owner, PeerId visitorId);
+	void resize(int32 availw) const;
+
+	PeerData *visitor = nullptr;
+	mutable QString text;
+	mutable int width = 0;
+	mutable int maxWidth = 0;
+	ClickHandlerPtr link;
+};
+
 struct HistoryMessageViews
 : RuntimeComponent<HistoryMessageViews, HistoryItem> {
 	static constexpr auto kMaxRecentRepliers = 3;

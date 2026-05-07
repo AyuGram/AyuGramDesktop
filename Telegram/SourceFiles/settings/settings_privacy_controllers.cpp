@@ -186,6 +186,7 @@ AdminLog::OwnedItem GenerateForwardedItem(
 			MTPstring()), // psa_type
 		MTPlong(), // via_bot_id
 		MTPlong(), // via_business_bot_id
+		MTPPeer(), // guestchat_via_from
 		MTPMessageReplyHeader(),
 		MTP_int(base::unixtime::now()), // date
 		MTP_string(text),
@@ -743,6 +744,7 @@ void LastSeenPrivacyController::confirmSave(
 		bool someAreDisallowed,
 		Fn<void()> saveCallback) {
 	if (someAreDisallowed
+		&& !_session->premium()
 		&& !Core::App().settings().lastSeenWarningSeen()) {
 		auto callback = [
 			=,

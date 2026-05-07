@@ -55,6 +55,21 @@ auto MediaGenericPart::stickerTakePlayer(
 	return nullptr;
 }
 
+uint16 MediaGenericPart::fullSelectionLength() const {
+	return 0;
+}
+
+TextSelection MediaGenericPart::adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const {
+	return selection;
+}
+
+TextForMimeData MediaGenericPart::selectedText(
+		TextSelection selection) const {
+	return {};
+}
+
 MediaGeneric::MediaGeneric(
 	not_null<Element*> parent,
 	Fn<void(
@@ -137,12 +152,23 @@ void MediaGeneric::draw(Painter &p, const PaintContext &context) const {
 		}
 	}
 
+	const auto fullSelection = (context.selection == FullSelection);
 	auto translated = 0;
+	auto symbolOffset = uint16(0);
 	for (const auto &entry : _entries) {
 		const auto raw = entry.object.get();
 		const auto height = raw->height();
-		raw->draw(p, this, context, outer);
+		const auto length = raw->fullSelectionLength();
+		if (length > 0 && !fullSelection) {
+			const auto local = UnshiftItemSelection(
+				context.selection,
+				symbolOffset);
+			raw->draw(p, this, context.withSelection(local), outer);
+		} else {
+			raw->draw(p, this, context, outer);
+		}
 		translated += height;
+		symbolOffset = uint16(symbolOffset + length);
 		p.translate(0, height);
 	}
 	p.translate(0, -translated);
@@ -163,16 +189,29 @@ TextState MediaGeneric::textState(
 		return result;
 	}
 
+	auto symbolOffset = uint16(0);
 	for (const auto &entry : _entries) {
 		const auto raw = entry.object.get();
 		const auto height = raw->height();
+		const auto length = raw->fullSelectionLength();
 		if (point.y() >= 0 && point.y() < height) {
 			const auto part = raw->textState(point, request, outer);
 			result.link = part.link;
+			result.cursor = part.cursor;
+			if (length > 0) {
+				result.symbol = uint16(symbolOffset + part.symbol);
+				result.afterSymbol = part.afterSymbol;
+				result.overMessageText
+					= (part.cursor == CursorState::Text);
+			} else {
+				result.symbol = symbolOffset;
+			}
 			return result;
 		}
 		point.setY(point.y() - height);
+		symbolOffset = uint16(symbolOffset + length);
 	}
+	result.symbol = symbolOffset;
 	return result;
 }
 
@@ -187,6 +226,83 @@ void MediaGeneric::clickHandlerPressedChanged(
 	for (const auto &entry : _entries) {
 		entry.object->clickHandlerPressedChanged(p, pressed);
 	}
+}
+
+bool MediaGeneric::hasTextForCopy() const {
+	return fullSelectionLength() > 0;
+}
+
+uint16 MediaGeneric::fullSelectionLength() const {
+	auto total = uint16(0);
+	for (const auto &entry : _entries) {
+		total = uint16(total + entry.object->fullSelectionLength());
+	}
+	return total;
+}
+
+TextForMimeData MediaGeneric::selectedText(TextSelection selection) const {
+	auto offset = uint16(0);
+	auto result = TextForMimeData();
+	for (const auto &entry : _entries) {
+		const auto length = entry.object->fullSelectionLength();
+		if (length > 0) {
+			auto part = entry.object->selectedText(
+				UnshiftItemSelection(selection, offset));
+			if (!part.empty()) {
+				if (result.empty()) {
+					result = std::move(part);
+				} else {
+					result.append('\n').append(std::move(part));
+				}
+			}
+		}
+		offset = uint16(offset + length);
+	}
+	return result;
+}
+
+TextSelection MediaGeneric::adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const {
+	if (selection == FullSelection) {
+		return selection;
+	}
+	auto offset = uint16(0);
+	auto firstFrom = std::optional<uint16>();
+	auto firstOffset = uint16(0);
+	auto lastTo = uint16(0);
+	auto lastOffset = uint16(0);
+	for (const auto &entry : _entries) {
+		const auto length = entry.object->fullSelectionLength();
+		if (length > 0) {
+			const auto end = uint16(offset + length);
+			if (selection.from < end && selection.to > offset) {
+				const auto from = uint16((selection.from > offset)
+					? (selection.from - offset)
+					: 0);
+				const auto to = uint16((selection.to < end)
+					? (selection.to - offset)
+					: length);
+				const auto local = entry.object->adjustSelection(
+					{ from, to },
+					type);
+				if (!firstFrom.has_value()) {
+					firstFrom = local.from;
+					firstOffset = offset;
+				}
+				lastTo = local.to;
+				lastOffset = offset;
+			}
+		}
+		offset = uint16(offset + length);
+	}
+	if (!firstFrom.has_value()) {
+		return selection;
+	}
+	return {
+		uint16(firstOffset + *firstFrom),
+		uint16(lastOffset + lastTo),
+	};
 }
 
 std::unique_ptr<StickerPlayer> MediaGeneric::stickerTakePlayer(
@@ -282,6 +398,7 @@ void MediaGenericTextPart::draw(
 		.now = context.now,
 		.pausedEmoji = context.paused || On(PowerSaving::kEmojiChat),
 		.pausedSpoiler = context.paused || On(PowerSaving::kChatSpoiler),
+		.selection = context.selection,
 		.elisionLines = elisionLines(),
 	});
 }
@@ -311,11 +428,24 @@ TextState MediaGenericTextPart::textState(
 			: _margins.left()),
 		_margins.top(),
 	};
-	auto result = TextState();
 	auto forText = request.forText();
 	forText.align = _align;
-	result.link = _text.getState(point, use, forText).link;
-	return result;
+	return TextState(nullptr, _text.getState(point, use, forText));
+}
+
+uint16 MediaGenericTextPart::fullSelectionLength() const {
+	return _text.length();
+}
+
+TextSelection MediaGenericTextPart::adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const {
+	return _text.adjustSelection(selection, type);
+}
+
+TextForMimeData MediaGenericTextPart::selectedText(
+		TextSelection selection) const {
+	return _text.toTextForMimeData(selection);
 }
 
 QSize MediaGenericTextPart::countOptimalSize() {

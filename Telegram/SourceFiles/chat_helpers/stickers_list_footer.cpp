@@ -63,6 +63,24 @@ void UpdateAnimated(
 
 } // namespace
 
+bool MatchAllPreparedSearchWords(
+		const QStringList &titleWords,
+		const QStringList &searchWords) {
+	for (const auto &searchWord : searchWords) {
+		auto found = false;
+		for (const auto &titleWord : titleWords) {
+			if (titleWord.startsWith(searchWord)) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			return false;
+		}
+	}
+	return true;
+}
+
 uint64 EmojiSectionSetId(EmojiSection section) {
 	Expects(section >= EmojiSection::Recent
 		&& section <= EmojiSection::Symbols);

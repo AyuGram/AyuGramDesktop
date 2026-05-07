@@ -238,6 +238,7 @@ PhotoEditor::PhotoEditor(
 	_brushes,
 	_brushTool)) {
 	_modifications.cropType = data.cropType;
+	_modifications.cropMode = data.cropMode;
 
 	sizeValue(
 	) | rpl::on_next([=](const QSize &size) {

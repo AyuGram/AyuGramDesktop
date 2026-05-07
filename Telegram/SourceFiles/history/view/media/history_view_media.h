@@ -348,6 +348,14 @@ public:
 		return 0;
 	}
 
+	[[nodiscard]] virtual int contributedMaxMonospaceWidth() const {
+		return 0;
+	}
+
+	virtual int widenGroupingMaxWidth(int current, bool last) {
+		return current;
+	}
+
 	// Sometimes click on media in message is overloaded by the message:
 	// (for example it can open a link or a game instead of opening media)
 	// But the overloading click handler should be used only when media

@@ -70,6 +70,7 @@ private:
 
 	void setupHeightConsumers();
 	void setContentHeight(int height);
+	void unregisterActiveLayerSection();
 	[[nodiscard]] QRect countGeometry(int newWidth);
 
 	not_null<Window::SessionController*> _controller;

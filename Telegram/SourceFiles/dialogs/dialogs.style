@@ -531,9 +531,6 @@ dialogsSearchInMenu: PopupMenu(defaultPopupMenu) {
 dialogsSearchInCheck: icon {{ "player/player_check", mediaPlayerActiveFg }};
 dialogsSearchInCheckSkip: 8px;
 dialogsSearchFromStyle: defaultTextStyle;
-dialogsSearchFromPalette: TextPalette(defaultTextPalette) {
-	linkFg: dialogsNameFg;
-}
 
 dialogsScamPadding: margins(2px, 0px, 2px, 0px);
 dialogsScamFont: font(9px semibold);
@@ -575,6 +572,11 @@ dialogsMiniReplyStory: DialogsMiniIcon {
 	}
 	skipText: 4px;
 	skipMedia: 5px;
+}
+
+historyReplyStoryIcon: IconEmoji {
+	icon: icon {{ "mini_reply_story", dialogsTextFg, point(0px, 1px) }};
+	padding: margins(0px, 0px, 4px, 0px);
 }
 
 dialogsUnreadMention: ThreeStateIcon {

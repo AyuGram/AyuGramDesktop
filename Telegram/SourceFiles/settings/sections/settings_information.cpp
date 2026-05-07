@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_main.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common_session.h"
+#include "settings/business/settings_chatbots.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/vertical_layout_reorder.h"
 #include "ui/wrap/padding_wrap.h"
@@ -22,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
+#include "ui/new_badges.h"
 #include "ui/text/text_utilities.h"
 #include "ui/delayed_activation.h"
 #include "ui/painter.h"
@@ -36,6 +38,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/premium_limits_box.h"
 #include "boxes/username_box.h"
 #include "boxes/peers/edit_peer_color_box.h"
+#include "data/business/data_business_chatbots.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "data/data_peer_values.h"
@@ -92,6 +95,7 @@ struct InformationHighlightTargets {
 	QPointer<Ui::RpWidget> phone;
 	QPointer<Ui::RpWidget> username;
 	QPointer<Ui::RpWidget> birthday;
+	QPointer<Ui::RpWidget> chatAutomation;
 };
 
 constexpr auto kSaveBioTimeout = 1000;
@@ -491,6 +495,69 @@ void SetupBirthday(
 			tr::marked)));
 }
 
+void SetupChatAutomation(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Window::SessionController*> controller,
+		not_null<UserData*> self,
+		InformationHighlightTargets *targets) {
+	const auto session = &self->session();
+	session->data().chatbots().preload();
+
+	auto label = session->data().chatbots().value(
+	) | rpl::map([](const Data::ChatbotsSettings &value) {
+		if (!value.bot) {
+			return tr::lng_settings_chat_automation_off(tr::now);
+		}
+		const auto username = value.bot->username();
+		return username.isEmpty()
+			? value.bot->name()
+			: ('@' + username);
+	});
+
+	const auto &st = st::settingsButton;
+	auto title = tr::lng_settings_chat_automation_label();
+	const auto button = AddButtonWithLabel(
+		container,
+		rpl::duplicate(title),
+		std::move(label),
+		st,
+		{ &st::settingsIconChatAutomation });
+
+	button->setClickedCallback([=] {
+		controller->showSettings(Settings::ChatbotsId());
+	});
+
+	{
+		const auto badge = Ui::NewBadge::CreateNewBadge(
+			button,
+			tr::lng_premium_summary_new_badge()).get();
+		rpl::combine(
+			std::move(title),
+			button->widthValue()
+		) | rpl::on_next([=, &st](
+				const QString &text,
+				int width) {
+			const auto space = st.style.font->spacew;
+			const auto left = st.padding.left()
+				+ st.style.font->width(text)
+				+ space;
+			const auto available = width - left - st.padding.right();
+			badge->setVisible(available >= badge->width());
+			if (!badge->isHidden()) {
+				const auto top = st.padding.top()
+					+ st.style.font->ascent
+					- st::settingsPremiumNewBadge.style.font->ascent
+					- st::settingsPremiumNewBadgePadding.top();
+				badge->moveToLeft(left, top, width);
+			}
+		}, badge->lifetime());
+	}
+
+	if (targets) {
+		targets->chatAutomation = button;
+	}
+}
+
 void SetupPersonalChannel(
 		not_null<Ui::VerticalLayout*> container,
 		not_null<Window::SessionController*> controller,
@@ -518,6 +585,8 @@ void SetupPersonalChannel(
 		tr::lng_mediaview_copy(tr::now),
 		edit,
 		{ &st::menuIconChannel });
+
+	SetupChatAutomation(container, controller, self, targets);
 
 	const auto colorButton = AddPeerColorButton(
 		container,
@@ -1199,6 +1268,19 @@ void BuildInformationSection(SectionBuilder &builder) {
 	});
 	builder.add(nullptr, [] {
 		return SearchEntry{
+			.id = u"edit/chat-automation"_q,
+			.title = tr::lng_settings_chat_automation_label(tr::now),
+			.keywords = {
+				u"chat"_q,
+				u"automation"_q,
+				u"bot"_q,
+				u"chatbot"_q,
+				u"chatbots"_q,
+			},
+		};
+	});
+	builder.add(nullptr, [] {
+		return SearchEntry{
 			.id = u"edit/add-account"_q,
 			.title = tr::lng_menu_add_account(tr::now),
 			.keywords = { u"account"_q, u"add"_q, u"switch"_q, u"multiple"_q },
@@ -1228,6 +1310,7 @@ private:
 	QPointer<Ui::RpWidget> _phone;
 	QPointer<Ui::RpWidget> _username;
 	QPointer<Ui::RpWidget> _birthday;
+	QPointer<Ui::RpWidget> _chatAutomation;
 
 };
 
@@ -1259,7 +1342,8 @@ void Information::setupContent() {
 		name = &_name,
 		phone = &_phone,
 		username = &_username,
-		birthday = &_birthday
+		birthday = &_birthday,
+		chatAutomation = &_chatAutomation
 	](
 			not_null<Ui::VerticalLayout*> container,
 			not_null<Window::SessionController*> controller,
@@ -1299,6 +1383,7 @@ void Information::setupContent() {
 		*phone = targets.phone;
 		*username = targets.username;
 		*birthday = targets.birthday;
+		*chatAutomation = targets.chatAutomation;
 
 		if (highlights) {
 			if (*photo) {
@@ -1359,6 +1444,12 @@ void Information::setupContent() {
 				highlights->push_back({
 					u"edit/birthday"_q,
 					{ birthday->data(), { .rippleShape = true } },
+				});
+			}
+			if (*chatAutomation) {
+				highlights->push_back({
+					u"edit/chat-automation"_q,
+					{ chatAutomation->data(), { .rippleShape = true } },
 				});
 			}
 		}

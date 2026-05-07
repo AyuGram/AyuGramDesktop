@@ -86,6 +86,9 @@ public:
 	[[nodiscard]] int botsCreateDefault() const;
 	[[nodiscard]] int botsCreatePremium() const;
 
+	[[nodiscard]] int aiComposeSavedTonesDefault() const;
+	[[nodiscard]] int aiComposeSavedTonesPremium() const;
+
 private:
 	[[nodiscard]] int appConfigLimit(
 		const QString &key,

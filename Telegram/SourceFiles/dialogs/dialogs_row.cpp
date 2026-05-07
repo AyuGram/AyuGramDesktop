@@ -317,7 +317,7 @@ const style::DialogRow &Row::ComputeSt(
 		FilterId filterId) {
 	if (const auto history = entry->asHistory()) {
 		const auto hasTags = entry->hasChatsFilterTags(filterId);
-		const auto wideRow = history->isForum()
+		const auto wideRow = history->peer->displayAsForum()
 			|| history->amMonoforumAdmin();
 		return wideRow
 			? (hasTags ? st::taggedForumDialogRow : st::forumDialogRow)

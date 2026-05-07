@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/file_upload.h"
 #include "main/main_session.h"
 #include "media/audio/media_audio.h"
+#include "media/media_common.h"
 #include "media/player/media_player_instance.h"
 #include "storage/localstorage.h"
 #include "history/history.h"
@@ -65,9 +66,10 @@ TextParseOptions _documentNameOptions = {
 constexpr auto kMaxInlineArea = 1280 * 720;
 constexpr auto kStoryRatio = 1.46;
 
+using ::Media::ValidFrameSize;
+
 [[nodiscard]] bool CanPlayInline(not_null<DocumentData*> document) {
-	const auto dimensions = document->dimensions;
-	return dimensions.width() * dimensions.height() <= kMaxInlineArea;
+	return ValidFrameSize(document->dimensions, kMaxInlineArea);
 }
 
 [[nodiscard]] QImage CropMediaFrame(QImage image, int width, int height) {
@@ -2175,10 +2177,11 @@ void Gif::clipCallback(Media::Clip::Notification notification) {
 			if (_gif->state() == State::Error) {
 				_gif.setBad();
 			} else if (_gif->ready() && !_gif->started()) {
-				if (_gif->width() * _gif->height() > kMaxInlineArea) {
-					_data->dimensions = QSize(
-						_gif->width(),
-						_gif->height());
+				const auto size = QSize(_gif->width(), _gif->height());
+				if (!ValidFrameSize(size, kMaxInlineArea)) {
+					if (!size.isEmpty()) {
+						_data->dimensions = size;
+					}
 					_gif.reset();
 				} else {
 					_gif->start({

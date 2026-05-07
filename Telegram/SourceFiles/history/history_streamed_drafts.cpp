@@ -181,7 +181,7 @@ HistoryItem *HistoryStreamedDrafts::adoptIncoming(
 	}
 	const auto incomingText = qs(data.vmessage());
 	auto best = end(_drafts);
-	auto bestPrefix = 0;
+	auto bestPrefix = -1;
 	for (auto i = begin(_drafts); i != end(_drafts); ++i) {
 		const auto &draft = i->second;
 		if (draft.rootId != rootId) {
@@ -198,7 +198,7 @@ HistoryItem *HistoryStreamedDrafts::adoptIncoming(
 			best = i;
 		}
 	}
-	if (best == end(_drafts) || bestPrefix <= 0) {
+	if (best == end(_drafts)) {
 		return nullptr;
 	}
 	const auto item = best->second.message.get();

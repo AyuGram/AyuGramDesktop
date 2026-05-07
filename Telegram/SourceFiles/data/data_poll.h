@@ -76,9 +76,17 @@ struct PollData {
 		OpenAnswers           = 0x040,
 		HideResultsUntilClose = 0x080,
 		Creator               = 0x100,
+		SubscribersOnly       = 0x200,
+		CanViewStats          = 0x400,
 	};
 	friend inline constexpr bool is_flag_type(Flag) { return true; };
 	using Flags = base::flags<Flag>;
+	enum class VoteRestriction {
+		None,
+		SubscribersOnly,
+		SubscribersJoinedTooRecently,
+		Countries,
+	};
 
 	bool closeByTimer();
 	bool applyChanges(const MTPDpoll &poll);
@@ -101,6 +109,11 @@ struct PollData {
 	[[nodiscard]] bool openAnswers() const;
 	[[nodiscard]] bool hideResultsUntilClose() const;
 	[[nodiscard]] bool creator() const;
+	[[nodiscard]] bool subscribersOnly() const;
+	[[nodiscard]] bool canViewStats() const;
+	void setVoteRestriction(VoteRestriction restriction);
+	[[nodiscard]] VoteRestriction voteRestriction() const;
+	[[nodiscard]] crl::time voteRestrictionUpdated() const;
 
 	[[nodiscard]] QString debugString() const;
 
@@ -112,6 +125,7 @@ struct PollData {
 	TextWithEntities solution;
 	PollMedia attachedMedia;
 	PollMedia solutionMedia;
+	std::vector<QString> countries;
 	TimeId closePeriod = 0;
 	TimeId closeDate = 0;
 	int totalVoters = 0;
@@ -127,6 +141,8 @@ private:
 
 	const not_null<Data::Session*> _owner;
 	Flags _flags = Flags();
+	VoteRestriction _voteRestriction = VoteRestriction::None;
+	crl::time _voteRestrictionUpdated = 0;
 	crl::time _lastResultsUpdate = 0; // < 0 means force reload.
 
 };
@@ -135,6 +151,15 @@ inline constexpr auto kDefaultPollCreateFlags = PollData::Flag::PublicVotes
 	| PollData::Flag::MultiChoice
 	| PollData::Flag::OpenAnswers
 	| PollData::Flag::ShuffleAnswers;
+
+[[nodiscard]] QString JoinPollCountries(
+	const std::vector<QString> &countriesIso2);
+[[nodiscard]] TextWithEntities PollCountriesRestrictionText(
+	const std::vector<QString> &countries);
+[[nodiscard]] TextWithEntities PollVoteRestrictionText(
+	PollData::VoteRestriction restriction,
+	not_null<PeerData*> peer,
+	not_null<const PollData*> poll);
 
 [[nodiscard]] QByteArray PollOptionFromLink(const QString &value);
 [[nodiscard]] QString PollOptionToLink(const QByteArray &option);

@@ -182,6 +182,8 @@ WebPageType ParseWebPageType(
 		return WebPageType::Auction;
 	} else if (type == u"telegram_newbot"_q) {
 		return WebPageType::NewBot;
+	} else if (type == u"telegram_aicomposetone"_q) {
+		return WebPageType::ComposeAiTone;
 	} else if (hasIV) {
 		return WebPageType::ArticleWithIV;
 	} else {
@@ -238,6 +240,7 @@ bool WebPageData::applyChanges(
 		std::unique_ptr<WebPageStickerSet> newStickerSet,
 		std::shared_ptr<Data::UniqueGift> newUniqueGift,
 		std::unique_ptr<WebPageAuction> newAuction,
+		DocumentId newComposeToneEmojiId,
 		int newDuration,
 		const QString &newAuthor,
 		bool newHasLargeMedia,
@@ -301,6 +304,7 @@ bool WebPageData::applyChanges(
 		&& (!stickerSet == !newStickerSet)
 		&& (!uniqueGift == !newUniqueGift)
 		&& (!auction == !newAuction)
+		&& composeToneEmojiId == newComposeToneEmojiId
 		&& duration == newDuration
 		&& author == resultAuthor
 		&& hasLargeMedia == (newHasLargeMedia ? 1 : 0)
@@ -327,6 +331,7 @@ bool WebPageData::applyChanges(
 	stickerSet = std::move(newStickerSet);
 	uniqueGift = std::move(newUniqueGift);
 	auction = std::move(newAuction);
+	composeToneEmojiId = newComposeToneEmojiId;
 	duration = newDuration;
 	author = resultAuthor;
 	pendingTill = newPendingTill;

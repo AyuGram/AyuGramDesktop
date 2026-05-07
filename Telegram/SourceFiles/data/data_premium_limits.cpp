@@ -217,6 +217,13 @@ int PremiumLimits::botsCreatePremium() const {
 	return appConfigLimit("bots_create_limit_premium", 40);
 }
 
+int PremiumLimits::aiComposeSavedTonesDefault() const {
+	return appConfigLimit("aicompose_tone_saved_limit_default", 5);
+}
+int PremiumLimits::aiComposeSavedTonesPremium() const {
+	return appConfigLimit("aicompose_tone_saved_limit_premium", 20);
+}
+
 int PremiumLimits::appConfigLimit(
 		const QString &key,
 		int fallback) const {

@@ -166,6 +166,42 @@ void HistoryMessageVia::resize(int32 availw) const {
 	}
 }
 
+void HistoryMessageGuestChat::create(
+		not_null<Data::Session*> owner,
+		PeerId visitorId) {
+	visitor = owner->peer(visitorId);
+	const auto firstName = visitor->isUser()
+		? visitor->asUser()->firstName
+		: visitor->name();
+	maxWidth = st::msgServiceNameFont->width(
+		tr::lng_guest_chat_for(tr::now, lt_user, firstName));
+	link = std::make_shared<LambdaClickHandler>([peer = this->visitor](
+			ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		if (const auto controller = my.sessionWindow.get()) {
+			controller->showPeerInfo(peer);
+		}
+	});
+}
+
+void HistoryMessageGuestChat::resize(int32 availw) const {
+	if (availw < 0) {
+		text = QString();
+		width = 0;
+	} else {
+		const auto firstName = visitor->isUser()
+			? visitor->asUser()->firstName
+			: visitor->name();
+		text = tr::lng_guest_chat_for(tr::now, lt_user, firstName);
+		if (availw < maxWidth) {
+			text = st::msgServiceNameFont->elided(text, availw);
+			width = st::msgServiceNameFont->width(text);
+		} else if (width < maxWidth) {
+			width = maxWidth;
+		}
+	}
+}
+
 HiddenSenderInfo::HiddenSenderInfo(
 	const QString &name,
 	bool external,
@@ -1075,7 +1111,8 @@ ClickHandlerPtr ReplyKeyboard::getLink(QPoint point) const {
 
 			if (rect.contains(point)) {
 				if (_item->isAdminLogEntry()
-					&& button.type != HistoryMessageMarkupButton::Type::Url) {
+					&& button.type != HistoryMessageMarkupButton::Type::Url
+					&& button.type != HistoryMessageMarkupButton::Type::Callback) {
 					return ClickHandlerPtr();
 				}
 				_savedCoords = point;

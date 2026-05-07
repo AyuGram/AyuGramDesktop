@@ -93,6 +93,11 @@ using SendFilesCheck = Fn<bool(
 [[nodiscard]] SendFilesCheck DefaultCheckForPeer(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<PeerData*> peer);
+void RenameFileBox(
+	not_null<Ui::GenericBox*> box,
+	const QString &currentName,
+	bool allowExtensionEdit,
+	Fn<void(QString)> apply);
 
 using SendFilesConfirmed = Fn<void(
 	std::shared_ptr<Ui::PreparedBundle>,
@@ -180,6 +185,7 @@ private:
 		[[nodiscard]] rpl::producer<int> itemDeleteRequest() const;
 		[[nodiscard]] rpl::producer<int> itemReplaceRequest() const;
 		[[nodiscard]] rpl::producer<int> itemModifyRequest() const;
+		[[nodiscard]] rpl::producer<int> itemRenameRequest() const;
 		[[nodiscard]] rpl::producer<> orderUpdated() const;
 
 		void setSendWay(Ui::SendFilesWay way);
@@ -221,9 +227,10 @@ private:
 	void setSendLargePhotos(bool enabled);
 	void changePrice();
 
-	[[nodiscard]] bool canChangePrice() const;
 	[[nodiscard]] bool hasPrice() const;
 	[[nodiscard]] bool hasSendLargePhotosOption() const;
+	[[nodiscard]] bool canMoveCaptionInCurrentSendWay() const;
+	[[nodiscard]] bool canChangePrice() const;
 	void refreshPriceTag();
 	[[nodiscard]] QImage preparePriceTagBg(QSize size) const;
 
@@ -252,7 +259,10 @@ private:
 	void updateControlsGeometry();
 	void updateCaptionVisibility();
 
-	bool addFiles(not_null<const QMimeData*> data);
+	bool addFiles(
+		not_null<const QMimeData*> data,
+		std::optional<bool> overrideSendImagesAsPhotos = std::nullopt);
+	void applySendImagesAsPhotosOverride(const Ui::PreparedList &list);
 	bool addFiles(Ui::PreparedList list);
 	void addFile(Ui::PreparedFile &&file);
 	void pushBlock(int from, int till);

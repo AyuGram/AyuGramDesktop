@@ -101,6 +101,7 @@ public:
 	}
 	QRect groupItemRect(int index) const override;
 	bool enforceBubbleWidth() const override;
+	int contributedMaxMonospaceWidth() const override;
 
 	void stopAnimation() override;
 	void checkAnimation() override;

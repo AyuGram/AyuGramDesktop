@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #endif // !Q_OS_WIN && !Q_OS_MAC
 
 #include <QImage>
+#include <limits>
+#include <new>
 
 #ifdef LIB_FFMPEG_USE_QT_PRIVATE_API
 #include <private/qdrawhelper_p.h>
@@ -44,6 +46,7 @@ constexpr auto kAlignImageBy = 64;
 constexpr auto kImageFormat = QImage::Format_ARGB32_Premultiplied;
 constexpr auto kMaxScaleByAspectRatio = 16;
 constexpr auto kAvioBlockSize = 4096;
+constexpr auto kMaxFrameStorageBytes = 64 * 1024 * 1024;
 constexpr auto kTimeUnknown = std::numeric_limits<crl::time>::min();
 constexpr auto kDurationMax = crl::time(std::numeric_limits<int>::max());
 
@@ -56,9 +59,45 @@ struct HwAccelDescriptor {
 	AVPixelFormat format = AV_PIX_FMT_NONE;
 };
 
-void AlignedImageBufferCleanupHandler(void* data) {
+struct AlignedFrameStorageLayout {
+	int width = 0;
+	int height = 0;
+	int bytesPerLine = 0;
+	int totalBytes = 0;
+};
+
+void AlignedImageBufferCleanupHandler(void *data) {
 	const auto buffer = static_cast<uchar*>(data);
 	delete[] buffer;
+}
+
+[[nodiscard]] bool ComputeAlignedFrameStorageLayout(
+		QSize size,
+		AlignedFrameStorageLayout *out) {
+	const auto width = size.width();
+	const auto height = size.height();
+	if (width <= 0 || height <= 0) {
+		return false;
+	}
+	const auto widthAlign = kAlignImageBy / kPixelBytesSize;
+	const auto widthRemainder = width % widthAlign;
+	const auto widthPadding = widthRemainder
+		? (widthAlign - widthRemainder)
+		: 0;
+	const auto alignedWidth = int64_t(width) + widthPadding;
+	const auto bytesPerLine = int64_t(alignedWidth) * kPixelBytesSize;
+	if (bytesPerLine > kMaxFrameStorageBytes) {
+		return false;
+	}
+	const auto totalBytes = int64_t(bytesPerLine) * height + kAlignImageBy;
+	if (totalBytes > kMaxFrameStorageBytes) {
+		return false;
+	}
+	out->width = width;
+	out->height = height;
+	out->bytesPerLine = int(bytesPerLine);
+	out->totalBytes = int(totalBytes);
+	return true;
 }
 
 [[nodiscard]] bool IsValidAspectRatio(AVRational aspect) {
@@ -394,6 +433,10 @@ CodecPointer MakeCodecPointer(CodecDescriptor descriptor) {
 		return {};
 	}
 	context->pkt_timebase = stream->time_base;
+	if ((descriptor.videoMaxArea > 0)
+		&& (context->codec_type == AVMEDIA_TYPE_VIDEO)) {
+		context->max_pixels = descriptor.videoMaxArea;
+	}
 	av_opt_set(context, "threads", "auto", 0);
 	av_opt_set_int(context, "refcounted_frames", 1, 0);
 
@@ -684,27 +727,26 @@ bool GoodStorageForFrame(const QImage &storage, QSize size) {
 
 // Create a QImage of desired size where all the data is properly aligned.
 QImage CreateFrameStorage(QSize size) {
-	const auto width = size.width();
-	const auto height = size.height();
-	const auto widthAlign = kAlignImageBy / kPixelBytesSize;
-	const auto neededWidth = width + ((width % widthAlign)
-		? (widthAlign - (width % widthAlign))
-		: 0);
-	const auto perLine = neededWidth * kPixelBytesSize;
-	const auto buffer = new uchar[size_t(perLine) * height + kAlignImageBy];
-	const auto cleanupData = static_cast<void *>(buffer);
+	auto layout = AlignedFrameStorageLayout();
+	if (!ComputeAlignedFrameStorageLayout(size, &layout)) {
+		return {};
+	}
+	const auto buffer = new (std::nothrow) uchar[layout.totalBytes];
+	if (!buffer) {
+		return {};
+	}
 	const auto address = reinterpret_cast<uintptr_t>(buffer);
 	const auto alignedBuffer = buffer + ((address % kAlignImageBy)
 		? (kAlignImageBy - (address % kAlignImageBy))
 		: 0);
 	return QImage(
 		alignedBuffer,
-		width,
-		height,
-		perLine,
+		layout.width,
+		layout.height,
+		layout.bytesPerLine,
 		kImageFormat,
 		AlignedImageBufferCleanupHandler,
-		cleanupData);
+		buffer);
 }
 
 void UnPremultiply(QImage &dst, const QImage &src) {
@@ -712,21 +754,32 @@ void UnPremultiply(QImage &dst, const QImage &src) {
 	// as an image in QImage::Format_ARGB32 format.
 	if (!GoodStorageForFrame(dst, src.size())) {
 		dst = CreateFrameStorage(src.size());
+		if (dst.isNull()) {
+			return;
+		}
 	}
 	const auto srcPerLine = src.bytesPerLine();
 	const auto dstPerLine = dst.bytesPerLine();
 	const auto width = src.width();
 	const auto height = src.height();
+	if (width <= 0 || height <= 0) {
+		return;
+	}
+	const auto packedLine = int64_t(width) * kPixelBytesSize;
+	const auto packedCount = int64_t(width) * height;
+	const auto fast = (srcPerLine == packedLine)
+		&& (dstPerLine == packedLine)
+		&& (packedCount <= kMaxFrameStorageBytes);
 	auto srcBytes = src.bits();
 	auto dstBytes = dst.bits();
-	if (srcPerLine != width * 4 || dstPerLine != width * 4) {
+	if (!fast) {
 		for (auto i = 0; i != height; ++i) {
 			UnPremultiplyLine(dstBytes, srcBytes, width);
 			srcBytes += srcPerLine;
 			dstBytes += dstPerLine;
 		}
 	} else {
-		UnPremultiplyLine(dstBytes, srcBytes, width * height);
+		UnPremultiplyLine(dstBytes, srcBytes, int(packedCount));
 	}
 }
 
@@ -734,14 +787,21 @@ void PremultiplyInplace(QImage &image) {
 	const auto perLine = image.bytesPerLine();
 	const auto width = image.width();
 	const auto height = image.height();
+	if (width <= 0 || height <= 0) {
+		return;
+	}
+	const auto packedLine = int64_t(width) * kPixelBytesSize;
+	const auto packedCount = int64_t(width) * height;
+	const auto fast = (perLine == packedLine)
+		&& (packedCount <= kMaxFrameStorageBytes);
 	auto bytes = image.bits();
-	if (perLine != width * 4) {
+	if (!fast) {
 		for (auto i = 0; i != height; ++i) {
 			PremultiplyLine(bytes, bytes, width);
 			bytes += perLine;
 		}
 	} else {
-		PremultiplyLine(bytes, bytes, width * height);
+		PremultiplyLine(bytes, bytes, int(packedCount));
 	}
 }
 

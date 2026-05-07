@@ -24,6 +24,14 @@ struct SelectedItems;
 enum class SelectionAction;
 } // namespace Info
 
+namespace ChatHelpers {
+struct FileChosen;
+} // namespace ChatHelpers
+
+namespace SendMenu {
+struct Details;
+} // namespace SendMenu
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -126,6 +134,8 @@ public:
 	virtual void sectionSaveChanges(FnMut<void()> done) {
 		done();
 	}
+	virtual SendMenu::Details sendMenuDetails() const;
+	virtual bool processChosenSticker(ChatHelpers::FileChosen &&chosen);
 	virtual void showFinished() {
 		_showFinished.fire({});
 	}

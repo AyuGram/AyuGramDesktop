@@ -133,6 +133,15 @@ public:
 		int outerWidth,
 		bool selected);
 
+	virtual int paintNameIconGetLeadingWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int outerWidth,
+		bool selected);
+
 	virtual QSize rightActionSize() const {
 		return QSize();
 	}

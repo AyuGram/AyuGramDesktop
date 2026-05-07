@@ -119,6 +119,8 @@ public:
 	bool showBackFromStackInternal(const Window::SectionShow &params);
 	void removeFromStack(const std::vector<Section> &sections);
 	std::shared_ptr<Window::SectionMemento> createMemento() override;
+	[[nodiscard]] SendMenu::Details sendMenuDetails() const override;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen) override;
 
 	rpl::producer<int> desiredHeightValue() const override;
 

@@ -100,10 +100,6 @@ typedef QList<QPair<QString, ushort>> RecentHashtagPack;
 DeclareRefSetting(RecentHashtagPack, RecentWriteHashtags);
 DeclareSetting(RecentHashtagPack, RecentSearchHashtags);
 
-class UserData;
-typedef QVector<UserData*> RecentInlineBots;
-DeclareRefSetting(RecentInlineBots, RecentInlineBots);
-
 DeclareSetting(bool, PasswordRecovered);
 
 DeclareSetting(int32, PasscodeBadTries);

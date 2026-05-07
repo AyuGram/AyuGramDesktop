@@ -66,6 +66,7 @@ enum class ChatRestriction {
 	PinMessages = (1 << 17),
 	CreateTopics = (1 << 18),
 	EditRank = (1 << 26),
+	SendReactions = (1 << 27),
 };
 inline constexpr bool is_flag_type(ChatRestriction) { return true; }
 using ChatRestrictions = base::flags<ChatRestriction>;

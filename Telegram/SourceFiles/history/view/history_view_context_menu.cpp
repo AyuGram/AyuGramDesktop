@@ -27,11 +27,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_text.h"
 #include "history/view/history_view_schedule_box.h"
 #include "history/view/media/history_view_media.h"
+#include "history/view/media/menu/history_view_poll_menu.h"
 #include "history/view/media/history_view_save_document_action.h"
 #include "history/view/media/history_view_web_page.h"
 #include "history/view/reactions/history_view_reactions_list.h"
 #include "info/info_memento.h"
-#include "info/profile/info_profile_widget.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_action.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
@@ -918,12 +918,13 @@ bool AddDeleteMessageAction(
 			const auto list = HistoryItemsList{ item };
 			if (CanCreateModerateMessagesBox(list)) {
 				const auto opt = DefaultModerateMessagesBoxOptions();
-				controller->show(
-					Box(CreateModerateMessagesBox, list, nullptr, opt));
+				controller->show(Box(
+					CreateModerateMessagesBox,
+					ModerateMessagesBoxEntry{ .items = list },
+					nullptr,
+					opt));
 			} else {
-				const auto suggestModerateActions = false;
-				controller->show(
-					Box<DeleteMessagesBox>(item, suggestModerateActions));
+				controller->show(Box<DeleteMessagesBox>(item));
 			}
 		}
 	});
@@ -1190,26 +1191,37 @@ void EditTagBox(
 	});
 }
 
-void ShowWhoReadInfo(
+[[nodiscard]] Fn<void(Ui::WhoReadParticipant)> MakeModerateReactionChosen(
 		not_null<Window::SessionController*> controller,
 		FullMsgId itemId,
-		Ui::WhoReadParticipant who) {
-	const auto peer = controller->session().data().peer(itemId.peer);
-	const auto participant = peer->owner().peer(PeerId(who.id));
-	const auto migrated = participant->migrateFrom();
-	const auto origin = who.dateReacted
-		? Info::Profile::Origin{
-			Info::Profile::GroupReactionOrigin{ peer, itemId.msg },
+		not_null<PeerData*> peer,
+		Fn<void()> hideMenu) {
+	if (!Reactions::CanModerateReactionByDeleteMessages(peer)) {
+		return {};
+	}
+	return [=, hideMenu = std::move(hideMenu)](Ui::WhoReadParticipant who) {
+		if (who.id == 0 || who.customEntityData.isEmpty()) {
+			return;
 		}
-		: Info::Profile::Origin();
-	auto memento = std::make_shared<Info::Memento>(
-		std::vector<std::shared_ptr<Info::ContentMemento>>{
-		std::make_shared<Info::Profile::Memento>(
+		const auto item = controller->session().data().message(itemId);
+		if (!item) {
+			return;
+		}
+		const auto participant = item->history()->peer->owner().peer(
+			PeerId(who.id));
+		if (participant->isSelf()) {
+			return;
+		}
+		if (hideMenu) {
+			hideMenu();
+		}
+		Reactions::ShowModerateReactionBox(
+			controller,
+			item->history()->peer,
+			itemId.msg,
 			participant,
-			migrated ? migrated->id : PeerId(),
-			origin),
-	});
-	controller->showSection(std::move(memento));
+			who.reaction);
+	};
 }
 
 [[nodiscard]] rpl::producer<not_null<UserData*>> LookupMessageAuthor(
@@ -1329,22 +1341,74 @@ rpl::producer<QString> VoiceTimecodeUpdates(FullMsgId itemId) {
 	}) | rpl::distinct_until_changed();
 }
 
-void InsertPollHiddenResultsLabel(not_null<Ui::PopupMenu*> menu) {
+void InsertPollMenuLabel(
+		not_null<Ui::PopupMenu*> menu,
+		TextWithEntities text,
+		const style::MenuSeparator &separatorSt) {
 	auto label = base::make_unique_q<Ui::Menu::MultilineAction>(
 		menu->menu(),
 		menu->st().menu,
 		st::historyHasCustomEmoji,
 		st::historyHasCustomEmojiPosition,
-		tr::lng_polls_context_ends(tr::now, tr::rich));
+		std::move(text));
+	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 	menu->insertAction(0, std::move(label));
 	const auto sepAction = new QAction(menu->menu());
 	sepAction->setSeparator(true);
 	auto separator = base::make_unique_q<Ui::Menu::Separator>(
 		menu->menu(),
 		menu->st().menu,
-		menu->st().menu.separator,
+		separatorSt,
 		sepAction);
 	menu->insertAction(1, std::move(separator));
+}
+
+void InsertPollHiddenResultsLabel(not_null<Ui::PopupMenu*> menu) {
+	InsertPollMenuLabel(
+		menu,
+		tr::lng_polls_context_ends(tr::now, tr::rich),
+		menu->st().menu.separator);
+}
+
+[[nodiscard]] TextWithEntities PollVoteRestrictionsLabelText(
+		not_null<HistoryItem*> item,
+		not_null<PollData*> poll) {
+	auto result = TextWithEntities();
+	if (poll->subscribersOnly()) {
+		const auto peer = item->history()->peer.get();
+		const auto channel = peer->isBroadcast()
+			? peer->name()
+			: QString();
+		result = channel.isEmpty()
+			? tr::lng_polls_vote_restricted_subscribers_recent(
+				tr::now,
+				tr::rich)
+			: tr::lng_polls_vote_restricted_subscribers_channel(
+				tr::now,
+				lt_channel,
+				tr::bold(channel),
+				tr::rich);
+	}
+	if (!poll->countries.empty()) {
+		auto countriesText = PollCountriesRestrictionText(poll->countries);
+		if (result.text.isEmpty()) {
+			result = std::move(countriesText);
+		} else {
+			result.append('\n').append(std::move(countriesText));
+		}
+	}
+	return result;
+}
+
+void InsertPollVoteRestrictionsLabel(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<PollData*> poll) {
+	auto text = PollVoteRestrictionsLabelText(item, poll);
+	if (text.text.isEmpty()) {
+		return;
+	}
+	InsertPollMenuLabel(menu, std::move(text), st::expandedMenuSeparator);
 }
 
 ContextMenuRequest::ContextMenuRequest(
@@ -1547,8 +1611,11 @@ base::unique_qptr<Ui::PopupMenu> FillContextMenu(
 	if (item) {
 		const auto media = item->media();
 		const auto poll = media ? media->poll() : nullptr;
-		if (poll && !poll->closed() && poll->hideResultsUntilClose()) {
-			InsertPollHiddenResultsLabel(result.get());
+		if (poll && !poll->closed()) {
+			if (poll->hideResultsUntilClose()) {
+				InsertPollHiddenResultsLabel(result.get());
+			}
+			InsertPollVoteRestrictionsLabel(result.get(), item, poll);
 		}
 	}
 
@@ -1911,10 +1978,15 @@ void AddPollActions(
 		&& (context != Context::ChatPreview)) {
 		return;
 	}
+	const auto itemId = item->fullId();
+	if (poll->canViewStats() && item->isRegular()) {
+		menu->addAction(tr::lng_polls_view_stats(tr::now), [=] {
+			ShowPollStatsBox(controller, itemId);
+		}, &st::menuIconStats);
+	}
 	if (poll->closed()) {
 		return;
 	}
-	const auto itemId = item->fullId();
 	if (!skipRetractVote
 		&& poll->voted()
 		&& !poll->quiz()
@@ -2041,8 +2113,23 @@ void AddWhoReactedAction(
 		if (const auto strong = weak.get()) {
 			strong->hideMenu();
 		}
-		ShowWhoReadInfo(controller, itemId, who);
+		const auto participant = user->owner().peer(PeerId(who.id));
+		Reactions::ShowReactionParticipantInfo(
+			controller,
+			participant,
+			user,
+			itemId.msg,
+			who.dateReacted);
 	};
+	const auto moderateReactionChosen = MakeModerateReactionChosen(
+		controller,
+		itemId,
+		user,
+		[=] {
+			if (const auto strong = weak.get()) {
+				strong->hideMenu();
+			}
+		});
 	const auto showAllChosen = [=, itemId = item->fullId()]{
 		// Pressing on an item that has a submenu doesn't hide it :(
 		if (const auto strong = weak.get()) {
@@ -2077,7 +2164,8 @@ void AddWhoReactedAction(
 			Api::WhoReacted(item, context, st::defaultWhoRead, whoReadIds),
 			Data::ReactedMenuFactory(&controller->session()),
 			participantChosen,
-			showAllChosen));
+			showAllChosen,
+			moderateReactionChosen));
 		AddWhenEditedForwardedAuthorActionHelper(
 			menu,
 			item,
@@ -2232,8 +2320,24 @@ void ShowWhoReactedMenu(
 	};
 	const auto itemId = item->fullId();
 	const auto participantChosen = [=](Ui::WhoReadParticipant who) {
-		ShowWhoReadInfo(controller, itemId, who);
+		const auto originPeer = item->history()->peer;
+		const auto participant = originPeer->owner().peer(PeerId(who.id));
+		Reactions::ShowReactionParticipantInfo(
+			controller,
+			participant,
+			originPeer,
+			itemId.msg,
+			who.dateReacted);
 	};
+	const auto moderateReactionChosen = MakeModerateReactionChosen(
+		controller,
+		itemId,
+		item->history()->peer,
+		[=] {
+			if (*menu) {
+				(*menu)->hideMenu();
+			}
+		});
 	const auto showAllChosen = [=, itemId = item->fullId()]{
 		if (const auto item = controller->session().data().message(itemId)) {
 			controller->showSection(std::make_shared<Info::Memento>(
@@ -2253,7 +2357,8 @@ void ShowWhoReactedMenu(
 	const auto filler = lifetime.make_state<Ui::WhoReactedListMenu>(
 		Data::ReactedMenuFactory(&controller->session()),
 		participantChosen,
-		showAllChosen);
+		showAllChosen,
+		moderateReactionChosen);
 	const auto state = lifetime.make_state<State>();
 	Api::WhoReacted(
 		item,

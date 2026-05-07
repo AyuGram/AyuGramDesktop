@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/recent_inline_bots.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_message_reaction_id.h"
 #include "data/data_premium_limits.h"
@@ -93,6 +94,7 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 	[[nodiscard]] rpl::producer<> sectionShowBack() override;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen) override;
 	void setInnerFocus() override;
 
 	rpl::producer<Info::SelectedItems> selectedListValue() override;
@@ -1234,7 +1236,7 @@ void ShortcutMessages::edit(
 	if (!TextUtilities::CutPart(sending, left, maxCaptionSize)
 		&& !hasMediaWithCaption) {
 		if (item) {
-			_controller->show(Box<DeleteMessagesBox>(item, false));
+			_controller->show(Box<DeleteMessagesBox>(item));
 		} else {
 			doSetInnerFocus();
 		}
@@ -1448,6 +1450,14 @@ void ShortcutMessages::finishSending() {
 	showAtEnd();
 }
 
+bool ShortcutMessages::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	if (!_composeControls) {
+		return false;
+	}
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
+}
+
 void ShortcutMessages::showAtEnd() {
 	showAtPosition(Data::MaxMessagePosition);
 }
@@ -1530,17 +1540,7 @@ void ShortcutMessages::sendInlineResult(
 	//_saveDraftStart = crl::now();
 	//onDraftSave();
 
-	auto &bots = cRefRecentInlineBots();
-	const auto index = bots.indexOf(bot);
-	if (index) {
-		if (index > 0) {
-			bots.removeAt(index);
-		} else if (bots.size() >= RecentInlineBotsLimit) {
-			bots.resize(RecentInlineBotsLimit - 1);
-		}
-		bots.push_front(bot);
-		bot->session().local().writeRecentHashtagsAndBots();
-	}
+	bot->session().recentInlineBots().bump(bot);
 	finishSending();
 }
 

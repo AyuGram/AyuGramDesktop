@@ -65,6 +65,7 @@ struct FileReferenceAccumulator {
 			push(data.vicons());
 		}, [&](const MTPDwebPageAttributeStarGiftAuction &data) {
 			push(data.vgift());
+		}, [](const MTPDwebPageAttributeAiComposeTone &) {
 		});
 	}
 	void push(const MTPStarGift &data) {

@@ -11,7 +11,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "history/view/media/history_view_web_page.h"
 #include "history/history_item.h"
+#include "history/history_item_helpers.h"
 #include "history/history_item_components.h"
+#include "history/history_item_reply_markup.h"
 #include "history/history_item_text.h"
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/admin_log/history_admin_log_filter.h"
@@ -81,6 +83,7 @@ namespace {
 // If we require to support more admins we'll have to rewrite this anyway.
 constexpr auto kMaxChannelAdmins = 200;
 constexpr auto kScrollDateHideTimeout = 1000;
+constexpr auto kScrollDateHideOnDayCrossingTimeout = crl::time(3000);
 constexpr auto kEventsFirstPage = 20;
 constexpr auto kEventsPerPage = 50;
 constexpr auto kClearUserpicsAfter = 50;
@@ -92,14 +95,14 @@ void InnerWidget::enumerateItems(Method method) {
 	constexpr auto TopToBottom = (direction == EnumItemsDirection::TopToBottom);
 
 	// No displayed messages in this history.
-	if (_items.empty()) {
+	if (_displayItems.empty()) {
 		return;
 	}
 	if (_visibleBottom <= _itemsTop || _itemsTop + _itemsHeight <= _visibleTop) {
 		return;
 	}
 
-	auto begin = std::rbegin(_items), end = std::rend(_items);
+	auto begin = std::rbegin(_displayItems), end = std::rend(_displayItems);
 	auto from = TopToBottom ? std::lower_bound(begin, end, _visibleTop, [this](auto &elem, int top) {
 		return this->itemTop(elem) + elem->height() <= top;
 	}) : std::upper_bound(begin, end, _visibleBottom, [this](int bottom, auto &elem) {
@@ -110,13 +113,13 @@ void InnerWidget::enumerateItems(Method method) {
 		--from;
 	}
 	if (TopToBottom) {
-		Assert(itemTop(from->get()) + from->get()->height() > _visibleTop);
+		Assert(itemTop(*from) + (*from)->height() > _visibleTop);
 	} else {
-		Assert(itemTop(from->get()) < _visibleBottom);
+		Assert(itemTop(*from) < _visibleBottom);
 	}
 
 	while (true) {
-		auto item = from->get();
+		auto item = *from;
 		auto itemtop = itemTop(item);
 		auto itembottom = itemtop + item->height();
 
@@ -374,9 +377,10 @@ void InnerWidget::visibleTopBottomUpdated(
 	updateVisibleTopItem();
 	checkPreloadMore();
 	if (scrolledUp) {
+		_scrollDateAfterDayCrossing = false;
 		_scrollDateCheck.call();
 	} else {
-		scrollDateHideByTimer();
+		scrollDateCheckDownward();
 	}
 	_controller->floatPlayerAreaUpdated();
 	session().data().itemVisibilitiesUpdated();
@@ -386,7 +390,7 @@ void InnerWidget::updateVisibleTopItem() {
 	if (_visibleBottom == height()) {
 		_visibleTopItem = nullptr;
 	} else {
-		auto begin = std::rbegin(_items), end = std::rend(_items);
+		auto begin = std::rbegin(_displayItems), end = std::rend(_displayItems);
 		auto from = std::lower_bound(begin, end, _visibleTop, [this](auto &&elem, int top) {
 			return this->itemTop(elem) + elem->height() <= top;
 		});
@@ -420,8 +424,33 @@ void InnerWidget::scrollDateCheck() {
 	}
 }
 
+void InnerWidget::scrollDateCheckDownward() {
+	const auto previousDay = _scrollDateLastItem
+		? _scrollDateLastItem->dateTime().date()
+		: QDate();
+	const auto currentDay = _visibleTopItem
+		? _visibleTopItem->dateTime().date()
+		: QDate();
+	const auto crossedDay = previousDay.isValid()
+		&& currentDay.isValid()
+		&& (previousDay != currentDay);
+	_scrollDateLastItem = _visibleTopItem;
+	_scrollDateLastItemTop = _visibleTopFromItem;
+	if (crossedDay) {
+		if (!_scrollDateShown) {
+			toggleScrollDateShown();
+		}
+		_scrollDateAfterDayCrossing = true;
+		_scrollDateHideTimer.callOnce(
+			kScrollDateHideOnDayCrossingTimeout);
+	} else if (!_scrollDateAfterDayCrossing) {
+		scrollDateHideByTimer();
+	}
+}
+
 void InnerWidget::scrollDateHideByTimer() {
 	_scrollDateHideTimer.cancel();
+	_scrollDateAfterDayCrossing = false;
 	scrollDateHide();
 }
 
@@ -798,7 +827,9 @@ void InnerWidget::saveState(not_null<SectionMemento*> memento) {
 	memento->setAdmins(std::move(_admins));
 	memento->setAdminsCanEdit(std::move(_adminsCanEdit));
 	memento->setSearchQuery(std::move(_searchQuery));
+	memento->setExpandedGroups(std::move(_expandedGroups));
 	if (!_filterChanged) {
+		clearDisplayItems(DisplayPointerScope::All);
 		for (auto &item : _items) {
 			item.clearView();
 		}
@@ -807,6 +838,9 @@ void InnerWidget::saveState(not_null<SectionMemento*> memento) {
 			base::take(_eventIds),
 			_upLoaded,
 			_downLoaded);
+		memento->setDeleteEventMeta(
+			base::take(_itemEventIds),
+			base::take(_eventAdminIds));
 		base::take(_itemsByData);
 	}
 	_upLoaded = _downLoaded = true; // Don't load or handle anything anymore.
@@ -819,7 +853,6 @@ void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 	auto items = memento->takeItems();
 	for (auto &item : items) {
 		item.refreshView(this);
-		_itemsByData.emplace(item->data(), item.get());
 	}
 	_items = std::move(items);
 
@@ -828,11 +861,15 @@ void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 	_adminsCanEdit = memento->takeAdminsCanEdit();
 	_filter = memento->takeFilter();
 	_searchQuery = memento->takeSearchQuery();
+	_expandedGroups = memento->takeExpandedGroups();
+	_itemEventIds = memento->takeItemEventIds();
+	_eventAdminIds = memento->takeEventAdminIds();
 	_upLoaded = memento->upLoaded();
 	_downLoaded = memento->downLoaded();
 	_filterChanged = false;
 	updateMinMaxIds();
-	updateSize();
+	computeDeleteGroups();
+	rebuildDisplayItems();
 }
 
 void InnerWidget::preloadMore(Direction direction) {
@@ -943,6 +980,13 @@ void InnerWidget::addEvents(Direction direction, const QVector<MTPChannelAdminLo
 		}
 		const auto rememberRealMsgId = (antiSpamUserId
 			== peerToUser(peerFromUser(data.vuser_id())));
+		const auto isDeleteAction = (data.vaction().type()
+			== mtpc_channelAdminLogEventActionDeleteMessage);
+		if (isDeleteAction) {
+			_eventAdminIds.emplace(
+				id,
+				peerToUser(peerFromUser(data.vuser_id())));
+		}
 
 		auto count = 0;
 		const auto addOne = [&](
@@ -954,6 +998,7 @@ void InnerWidget::addEvents(Direction direction, const QVector<MTPChannelAdminLo
 			}
 			_eventIds.emplace(id);
 			_itemsByData.emplace(item->data(), item.get());
+			_itemEventIds.emplace(item->data(), id);
 			if (realId) {
 				if (rememberRealMsgId) {
 					_antiSpamValidator.addEventMsgId(
@@ -991,7 +1036,8 @@ void InnerWidget::addEvents(Direction direction, const QVector<MTPChannelAdminLo
 			_items = std::move(newItemsForDownDirection);
 		}
 		updateMinMaxIds();
-		itemsAdded(direction, newItemsCount - oldItemsCount);
+		computeDeleteGroups();
+		rebuildDisplayItems();
 	}
 	update();
 }
@@ -1008,26 +1054,419 @@ void InnerWidget::updateMinMaxIds() {
 	}
 }
 
-void InnerWidget::itemsAdded(Direction direction, int addedCount) {
-	Expects(addedCount >= 0);
-	auto checkFrom = (direction == Direction::Up)
-		? (_items.size() - addedCount)
-		: 1; // Should be ": 0", but zero is skipped anyway.
-	auto checkTo = (direction == Direction::Up) ? (_items.size() + 1) : (addedCount + 1);
-	for (auto i = checkFrom; i != checkTo; ++i) {
-		if (i > 0) {
-			const auto view = _items[i - 1].get();
-			if (i < _items.size()) {
-				const auto previous = _items[i].get();
-				view->setDisplayDate(view->dateTime().date() != previous->dateTime().date());
-				const auto attach = view->computeIsAttachToPrevious(previous);
-				view->setAttachToPrevious(attach, previous);
-				previous->setAttachToNext(attach, view);
-			} else {
-				view->setDisplayDate(true);
+
+void InnerWidget::computeDeleteGroups() {
+	_deleteGroups.clear();
+
+	if (_items.empty()) {
+		return;
+	}
+
+	// Walk _items and find consecutive runs of delete-action items
+	// from the same admin. Each delete event produces exactly 2 items
+	// (content + service). Delete events are identified via _eventAdminIds.
+	auto groupStart = -1;
+	auto groupAdmin = UserId();
+	auto groupEventId = uint64(0);
+	auto groupEventCount = 0;
+	auto currentEventId = uint64(0);
+
+	const auto finalizeGroup = [&](int endIndex) {
+		if (groupEventCount > 0) {
+			Assert(endIndex - groupStart >= groupEventCount * 2);
+			_deleteGroups.push_back({
+				.eventId = groupEventId,
+				.adminId = groupAdmin,
+				.startIndex = groupStart,
+				.endIndex = endIndex,
+				.eventCount = groupEventCount,
+			});
+		}
+		groupStart = -1;
+		groupAdmin = UserId();
+		groupEventId = 0;
+		groupEventCount = 0;
+	};
+
+	for (auto i = 0, count = int(_items.size()); i < count; ++i) {
+		const auto item = _items[i]->data();
+		const auto eit = _itemEventIds.find(item);
+		if (eit == _itemEventIds.end()) {
+			finalizeGroup(i);
+			continue;
+		}
+		const auto eventId = eit->second;
+		const auto adminIt = _eventAdminIds.find(eventId);
+		if (adminIt == _eventAdminIds.end()) {
+			finalizeGroup(i);
+			continue;
+		}
+		const auto adminId = adminIt->second;
+
+		if (eventId != currentEventId) {
+			// New event encountered.
+			if (groupStart < 0 || adminId != groupAdmin) {
+				finalizeGroup(i);
+				groupStart = i;
+				groupAdmin = adminId;
+			}
+			currentEventId = eventId;
+			groupEventId = eventId;
+			++groupEventCount;
+		}
+		// Items within the same event just extend the range.
+	}
+	finalizeGroup(int(_items.size()));
+}
+
+OwnedItem InnerWidget::createGroupSummaryItem(
+		const DeleteGroup &group,
+		bool expanded) {
+	const auto admin = _history->owner().user(group.adminId);
+	const auto fromLink = admin->createOpenLink();
+	const auto fromLinkText = tr::link(admin->name(), QString());
+
+	// Collect unique author names from content messages in the group.
+	constexpr auto kMaxNames = 4;
+	auto authorNames = QStringList();
+	auto seenAuthors = base::flat_set<PeerId>();
+	auto totalAuthors = 0;
+	for (auto i = group.startIndex; i < group.endIndex; ++i) {
+		const auto item = _items[i]->data();
+		if (!item->isService()) {
+			const auto authorId = item->from()->id;
+			if (!seenAuthors.contains(authorId)) {
+				seenAuthors.emplace(authorId);
+				++totalAuthors;
+				if (authorNames.size() < kMaxNames) {
+					authorNames.push_back(item->from()->name());
+				}
 			}
 		}
 	}
+	auto names = authorNames.join(u", "_q);
+	if (totalAuthors > kMaxNames) {
+		names += u", \u2026"_q;
+	}
+
+	const auto toggleText = expanded
+		? tr::lng_admin_log_hide_all(tr::now)
+		: tr::lng_admin_log_show_all(tr::now);
+
+	const auto groupEventId = group.eventId;
+	const auto toggleLink = std::make_shared<LambdaClickHandler>(
+		[weak = QPointer<InnerWidget>(this), groupEventId] {
+			if (const auto strong = weak.data()) {
+				strong->toggleDeleteGroup(groupEventId);
+			}
+		});
+
+	auto text = tr::lng_admin_log_deleted_messages_collapsed(
+		tr::now,
+		lt_count,
+		group.eventCount,
+		lt_from,
+		fromLinkText,
+		lt_names,
+		{ names },
+		lt_link,
+		tr::link(toggleText, QString()),
+		tr::marked);
+
+	auto message = PreparedServiceText{ text };
+	message.links.push_back(fromLink);
+	message.links.push_back(toggleLink);
+
+	const auto date = (group.endIndex > group.startIndex)
+		? _items[group.endIndex - 1]->dateTime().toSecsSinceEpoch()
+		: 0;
+
+	return OwnedItem(this, _history->makeMessage({
+		.id = _history->nextNonHistoryEntryId(),
+		.flags = MessageFlag::AdminLogEntry,
+		.from = peerFromUser(group.adminId),
+		.date = TimeId(date),
+	}, std::move(message)));
+}
+
+void InnerWidget::setupExpandButton(
+		not_null<HistoryItem*> item,
+		int hiddenCount,
+		uint64 groupEventId) {
+	const auto text = tr::lng_admin_log_expand_more(
+		tr::now,
+		lt_count,
+		hiddenCount);
+
+	auto markup = HistoryMessageMarkupData();
+	markup.flags = ReplyMarkupFlag::Inline;
+	markup.rows.push_back({
+		HistoryMessageMarkupButton(
+			HistoryMessageMarkupButton::Type::Callback,
+			text,
+			{},
+			QByteArray()),
+	});
+	item->updateReplyMarkup(std::move(markup));
+	_expandMarkupItems.emplace(item);
+}
+
+void InnerWidget::clearExpandButtons() {
+	const auto hasExpandButton = [&](const Element *view) {
+		if (!view) {
+			return false;
+		}
+		for (const auto &item : _items) {
+			if (item.get() == view) {
+				return _expandMarkupItems.contains(item->data());
+			}
+		}
+		return false;
+	};
+	if (hasExpandButton(_mouseActionItem)) {
+		_mouseActionItem = nullptr;
+		_mouseAction = MouseAction::None;
+	}
+	if (hasExpandButton(Element::Hovered())) {
+		Element::Hovered(nullptr);
+		ClickHandler::clearActive();
+	}
+	if (hasExpandButton(Element::Pressed())) {
+		Element::Pressed(nullptr);
+		ClickHandler::unpressed();
+	}
+	if (hasExpandButton(Element::HoveredLink())) {
+		Element::HoveredLink(nullptr);
+		ClickHandler::clearActive();
+	}
+	if (hasExpandButton(Element::PressedLink())) {
+		Element::PressedLink(nullptr);
+		ClickHandler::unpressed();
+	}
+	if (hasExpandButton(Element::Moused())) {
+		Element::Moused(nullptr);
+	}
+	for (const auto &item : _expandMarkupItems) {
+		item->updateReplyMarkup({});
+	}
+	_expandMarkupItems.clear();
+}
+
+void InnerWidget::toggleDeleteGroup(uint64 groupEventId) {
+	_toggleAnimation.stop();
+
+	const auto scrollBefore = _visibleTop;
+
+	// Find a stable scroll anchor from _items (not a summary item)
+	// near the current visible top position.
+	Element *anchor = nullptr;
+	auto anchorDelta = 0;
+	if (!_displayItems.empty()) {
+		auto begin = std::rbegin(_displayItems);
+		auto end = std::rend(_displayItems);
+		auto from = std::lower_bound(begin, end, _visibleTop,
+			[this](auto &elem, int top) {
+				return this->itemTop(elem) + elem->height() <= top;
+			});
+		for (auto it = from; it != end; ++it) {
+			const auto view = *it;
+			if (_itemEventIds.contains(view->data())) {
+				anchor = view;
+				anchorDelta = _visibleTop - itemTop(view);
+				break;
+			}
+		}
+	}
+
+	// Prepare a fallback anchor: the last item of the toggled group
+	// (always visible in both collapsed and expanded states).
+	Element *fallback = nullptr;
+	for (const auto &group : _deleteGroups) {
+		if (group.eventId == groupEventId && group.endIndex > 0) {
+			fallback = _items[group.endIndex - 1].get();
+			break;
+		}
+	}
+
+	if (_expandedGroups.contains(groupEventId)) {
+		_expandedGroups.erase(groupEventId);
+	} else {
+		_expandedGroups.insert(groupEventId);
+	}
+
+	clearDisplayPointers(DisplayPointerScope::All);
+
+	// Rebuild without triggering scroll restore inside updateSize().
+	_skipScrollRestore = true;
+	rebuildDisplayItems();
+	_skipScrollRestore = false;
+
+	// Compute target scroll position.
+	auto scrollTarget = scrollBefore;
+	if (anchor && _itemsByData.contains(anchor->data())) {
+		scrollTarget = itemTop(anchor) + anchorDelta;
+	} else if (fallback && _itemsByData.contains(fallback->data())) {
+		scrollTarget = itemTop(fallback);
+	}
+
+	// Snap to old position and animate to target.
+	_scrollToSignal.fire_copy(scrollBefore);
+	if (scrollBefore != scrollTarget) {
+		const auto from = scrollBefore;
+		const auto to = scrollTarget;
+		_toggleAnimation.start(
+			[=] { _scrollToSignal.fire_copy(anim::interpolate(
+				from, to, _toggleAnimation.value(1.))); },
+			0.,
+			1.,
+			st::slideDuration,
+			anim::easeOutCubic);
+	}
+}
+
+bool InnerWidget::displayPointerMatches(
+		const Element *view,
+		DisplayPointerScope pointerScope) const {
+	if (!view) {
+		return false;
+	}
+	for (const auto &item : _summaryItems) {
+		if (item.get() == view) {
+			return true;
+		}
+	}
+	if (pointerScope == DisplayPointerScope::All) {
+		for (const auto &item : _items) {
+			if (item.get() == view) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void InnerWidget::clearDisplayPointers(DisplayPointerScope pointerScope) {
+	const auto clearAll = (pointerScope == DisplayPointerScope::All);
+	const auto clearMember = [&](const Element *view) {
+		return clearAll || displayPointerMatches(view, pointerScope);
+	};
+	if (clearMember(_visibleTopItem)) {
+		_visibleTopItem = nullptr;
+		_visibleTopFromItem = 0;
+	}
+	if (clearMember(_scrollDateLastItem)) {
+		_scrollDateLastItem = nullptr;
+		_scrollDateLastItemTop = 0;
+	}
+	if (clearMember(_mouseActionItem)) {
+		_mouseActionItem = nullptr;
+		_mouseAction = MouseAction::None;
+	}
+	if (clearMember(_selectedItem)) {
+		_selectedItem = nullptr;
+		_selectedText = TextSelection();
+	}
+	if (displayPointerMatches(Element::Hovered(), pointerScope)) {
+		Element::Hovered(nullptr);
+		ClickHandler::clearActive();
+	}
+	if (displayPointerMatches(Element::Pressed(), pointerScope)) {
+		Element::Pressed(nullptr);
+		ClickHandler::unpressed();
+	}
+	if (displayPointerMatches(Element::HoveredLink(), pointerScope)) {
+		Element::HoveredLink(nullptr);
+		ClickHandler::clearActive();
+	}
+	if (displayPointerMatches(Element::PressedLink(), pointerScope)) {
+		Element::PressedLink(nullptr);
+		ClickHandler::unpressed();
+	}
+	if (displayPointerMatches(Element::Moused(), pointerScope)) {
+		Element::Moused(nullptr);
+	}
+}
+
+void InnerWidget::clearDisplayItems(DisplayPointerScope pointerScope) {
+	clearExpandButtons();
+	clearDisplayPointers(pointerScope);
+	_summaryItems.clear();
+	_displayItems.clear();
+	_itemsByData.clear();
+}
+
+void InnerWidget::rebuildDisplayItems() {
+	clearDisplayItems(DisplayPointerScope::Transient);
+
+	const auto groupDisplayEnabled = _searchQuery.isEmpty();
+
+	// Build a set of group start indices for quick lookup.
+	auto groupByStart = base::flat_map<int, int>(); // startIndex -> group index
+	for (auto g = 0, gc = int(_deleteGroups.size()); g < gc; ++g) {
+		groupByStart.emplace(_deleteGroups[g].startIndex, g);
+	}
+
+	auto i = 0;
+	const auto count = int(_items.size());
+	while (i < count) {
+		const auto git = groupByStart.find(i);
+		if (groupDisplayEnabled && git != groupByStart.end()) {
+			const auto &group = _deleteGroups[git->second];
+			if (group.eventCount > 3) {
+				const auto expanded = _expandedGroups.contains(group.eventId);
+				if (expanded) {
+					for (auto j = group.startIndex; j < group.endIndex; ++j) {
+						const auto view = _items[j].get();
+						_displayItems.push_back(view);
+						_itemsByData.emplace(view->data(), view);
+					}
+				} else if (group.endIndex >= group.startIndex + 2) {
+					// Collapsed: show only the content message
+					// (skip service header at endIndex-1).
+					const auto contentItem = _items[group.endIndex - 2]->data();
+					setupExpandButton(
+						contentItem,
+						group.eventCount - 1,
+						group.eventId);
+					const auto contentView = _items[group.endIndex - 2].get();
+					_displayItems.push_back(contentView);
+					_itemsByData.emplace(contentView->data(), contentView);
+				}
+				// Add summary item.
+				auto summary = createGroupSummaryItem(group, expanded);
+				const auto summaryView = summary.get();
+				_displayItems.push_back(summaryView);
+				_itemsByData.emplace(summaryView->data(), summaryView);
+				_summaryItems.push_back(std::move(summary));
+
+				i = group.endIndex;
+				continue;
+			}
+		}
+		const auto view = _items[i].get();
+		_displayItems.push_back(view);
+		_itemsByData.emplace(view->data(), view);
+		++i;
+	}
+
+	for (const auto view : _displayItems) {
+		view->setAttachToPrevious(false);
+		view->setAttachToNext(false);
+	}
+	for (auto d = 0, dc = int(_displayItems.size()); d < dc; ++d) {
+		const auto view = _displayItems[d];
+		if (d + 1 < dc) {
+			const auto previous = _displayItems[d + 1];
+			view->setDisplayDate(
+				view->dateTime().date() != previous->dateTime().date());
+			const auto attach = view->computeIsAttachToPrevious(previous);
+			view->setAttachToPrevious(attach, previous);
+			previous->setAttachToNext(attach, view);
+		} else {
+			view->setDisplayDate(true);
+		}
+	}
+
 	updateSize();
 }
 
@@ -1043,12 +1482,13 @@ int InnerWidget::resizeGetHeight(int newWidth) {
 
 	const auto resizeAllItems = (_itemsWidth != newWidth);
 	auto newHeight = 0;
-	for (const auto &item : ranges::views::reverse(_items)) {
-		item->setY(newHeight);
-		if (item->pendingResize() || resizeAllItems) {
-			newHeight += item->resizeGetHeight(newWidth);
+	for (auto it = _displayItems.rbegin(); it != _displayItems.rend(); ++it) {
+		const auto view = *it;
+		view->setY(newHeight);
+		if (view->pendingResize() || resizeAllItems) {
+			newHeight += view->resizeGetHeight(newWidth);
 		} else {
-			newHeight += item->height();
+			newHeight += view->height();
 		}
 	}
 	_itemsWidth = newWidth;
@@ -1058,6 +1498,9 @@ int InnerWidget::resizeGetHeight(int newWidth) {
 }
 
 void InnerWidget::restoreScrollPosition() {
+	if (_skipScrollRestore) {
+		return;
+	}
 	const auto newVisibleTop = _visibleTopItem
 		? (itemTop(_visibleTopItem) + _visibleTopFromItem)
 		: ScrollMax;
@@ -1096,7 +1539,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			width(),
 			std::min(st::msgMaxWidth / 2, width() / 2));
 
-		auto begin = std::rbegin(_items), end = std::rend(_items);
+		auto begin = std::rbegin(_displayItems), end = std::rend(_displayItems);
 		auto from = std::lower_bound(begin, end, clip.top(), [this](auto &elem, int top) {
 			return this->itemTop(elem) + elem->height() <= top;
 		});
@@ -1104,11 +1547,11 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			return this->itemTop(elem) < bottom;
 		});
 		if (from != end) {
-			auto top = itemTop(from->get());
+			auto top = itemTop(*from);
 			context.translate(0, -top);
 			p.translate(0, top);
 			for (auto i = from; i != to; ++i) {
-				const auto view = i->get();
+				const auto view = *i;
 				context.outbg = view->hasOutLayout();
 				context.selection = (view == _selectedItem)
 					? _selectedText
@@ -1191,14 +1634,12 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 }
 
 void InnerWidget::clearAfterFilterChange() {
-	_visibleTopItem = nullptr;
-	_visibleTopFromItem = 0;
-	_scrollDateLastItem = nullptr;
-	_scrollDateLastItemTop = 0;
-	_mouseActionItem = nullptr;
-	_selectedItem = nullptr;
-	_selectedText = TextSelection();
 	_filterChanged = false;
+	clearDisplayItems(DisplayPointerScope::All);
+	_deleteGroups.clear();
+	_expandedGroups.clear();
+	_itemEventIds.clear();
+	_eventAdminIds.clear();
 	_items.clear();
 	_eventIds.clear();
 	_itemsByData.clear();
@@ -1882,6 +2323,20 @@ void InnerWidget::mouseActionFinish(const QPoint &screenPos, Qt::MouseButton but
 	_wasSelectedText = false;
 
 	if (activated) {
+		// Intercept inline keyboard button clicks on items
+		// with our expand button markup.
+		if (_mouseActionItem) {
+			const auto item = _mouseActionItem->data();
+			if (dynamic_cast<ReplyMarkupClickHandler*>(activated.get())
+				&& _expandMarkupItems.contains(item)) {
+				const auto it = _itemEventIds.find(item);
+				if (it != _itemEventIds.end()) {
+					mouseActionCancel();
+					toggleDeleteGroup(it->second);
+					return;
+				}
+			}
+		}
 		mouseActionCancel();
 		ActivateClickHandler(window(), activated, {
 			button,
@@ -1925,13 +2380,13 @@ void InnerWidget::updateSelected() {
 		std::clamp(mousePosition.y(), _visibleTop, _visibleBottom));
 
 	auto itemPoint = QPoint();
-	auto begin = std::rbegin(_items), end = std::rend(_items);
+	auto begin = std::rbegin(_displayItems), end = std::rend(_displayItems);
 	auto from = (point.y() >= _itemsTop && point.y() < _itemsTop + _itemsHeight)
 		? std::lower_bound(begin, end, point.y(), [this](auto &elem, int top) {
 			return this->itemTop(elem) + elem->height() <= top;
 		})
 		: end;
-	const auto view = (from != end) ? from->get() : nullptr;
+	const auto view = (from != end) ? *from : nullptr;
 	const auto item = view ? view->data().get() : nullptr;
 	if (item) {
 		Element::Moused(view);

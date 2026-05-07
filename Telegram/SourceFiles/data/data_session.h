@@ -59,6 +59,7 @@ class SendActionManager;
 class Reactions;
 class EmojiStatuses;
 class ForumIcons;
+class AiComposeTones;
 class ChatFilters;
 class CloudThemes;
 class Streaming;
@@ -147,6 +148,12 @@ struct DrawToReplyRequest {
 	uint64 documentId = 0;
 };
 
+struct ReactionsRemoved {
+	not_null<PeerData*> peer;
+	MsgId msgId = 0;
+	not_null<PeerData*> participant;
+};
+
 struct RequestViewRepaint {
 	not_null<const HistoryView::Element*> view;
 	QRect rect;
@@ -173,6 +180,9 @@ public:
 	}
 	[[nodiscard]] const Groups &groups() const {
 		return _groups;
+	}
+	[[nodiscard]] AiComposeTones &aiComposeTones() const {
+		return *_aiComposeTones;
 	}
 	[[nodiscard]] ChatFilters &chatsFilters() const {
 		return *_chatsFilters;
@@ -411,6 +421,8 @@ public:
 	[[nodiscard]] rpl::producer<not_null<const History*>> historyUnloaded() const;
 	void notifyItemDataChange(not_null<HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> itemDataChanges() const;
+	void notifyReactionsRemoved(ReactionsRemoved update);
+	[[nodiscard]] rpl::producer<ReactionsRemoved> reactionsRemoved() const;
 
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRemoved() const;
 	[[nodiscard]] rpl::producer<not_null<const HistoryItem*>> itemRemoved(
@@ -567,6 +579,13 @@ public:
 	void processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data);
+
+	void removeReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const ReactionId &reaction,
+		MsgId originMsgId);
 
 	[[nodiscard]] MsgId nextLocalMessageId();
 	[[nodiscard]] HistoryItem *message(
@@ -1071,6 +1090,7 @@ private:
 		std::unique_ptr<WebPageStickerSet> stickerSet,
 		std::shared_ptr<UniqueGift> uniqueGift,
 		std::unique_ptr<WebPageAuction> auction,
+		DocumentId composeToneEmojiId,
 		int duration,
 		const QString &author,
 		bool hasLargeMedia,
@@ -1149,6 +1169,7 @@ private:
 	rpl::event_stream<not_null<HistoryItem*>> _itemTextRefreshRequest;
 	rpl::event_stream<DrawToReplyRequest> _drawToReplyRequests;
 	rpl::event_stream<not_null<HistoryItem*>> _itemDataChanges;
+	rpl::event_stream<ReactionsRemoved> _reactionsRemoved;
 	rpl::event_stream<not_null<const HistoryItem*>> _itemRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewRemoved;
 	rpl::event_stream<not_null<const ViewElement*>> _viewPaidReactionSent;
@@ -1325,6 +1346,7 @@ private:
 	mutable base::flat_map<PeerId, std::vector<FullMsgId>> _messagesWithPeer;
 
 	Groups _groups;
+	const std::unique_ptr<AiComposeTones> _aiComposeTones;
 	const std::unique_ptr<ChatFilters> _chatsFilters;
 	const std::unique_ptr<CloudThemes> _cloudThemes;
 	const std::unique_ptr<SendActionManager> _sendActionManager;
