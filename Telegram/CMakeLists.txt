@@ -198,6 +198,10 @@ set(ayugram_files
         ayu/ui/boxes/donate_info_box.h
         ayu/ui/boxes/plugin_info_box.cpp
         ayu/ui/boxes/plugin_info_box.h
+        ayu/ui/boxes/remove_media_box.cpp
+        ayu/ui/boxes/remove_media_box.h
+        ayu/ui/boxes/delete_my_messages_box.cpp
+        ayu/ui/boxes/delete_my_messages_box.h
         ayu/ui/components/image_view.cpp
         ayu/ui/components/image_view.h
         ayu/ui/components/icon_picker.cpp
