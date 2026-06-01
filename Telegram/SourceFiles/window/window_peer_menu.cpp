@@ -968,14 +968,8 @@ void Filler::addTranslate() {
 		|| !Core::App().settings().translateChatEnabled()) {
 		return;
 	}
-	const auto history = _peer->owner().historyLoaded(_peer);
-	if (!history
-		|| !history->translateOfferedFrom()
-		|| history->translatedTo()) {
-		return;
-	}
-	_addAction(tr::lng_context_translate(tr::now), [=] {
-		history->peer->saveTranslationDisabled(false);
+	_addAction(tr::lng_translate_settings_show(tr::now), [=] {
+		_peer->saveTranslationDisabled(false);
 	}, &st::menuIconTranslate);
 }
 
