@@ -3676,6 +3676,8 @@ void HistoryItem::setDeleted() {
 		}
 	}
 
+	removeFromSharedMediaIndex();
+
 	if (isService()) {
 		const auto &settings = AyuSettings::getInstance();
 		setAyuHint(settings.deletedMark());
@@ -3914,7 +3916,7 @@ void HistoryItem::applyTTL(TimeId destroyAt) {
 		const auto session = &_history->session();
 		crl::on_main(session, [session, id = fullId()]{
 			if (const auto item = session->data().message(id)) {
-				item->destroy();
+				processMessageDelete(item);
 			}
 		});
 	} else {
