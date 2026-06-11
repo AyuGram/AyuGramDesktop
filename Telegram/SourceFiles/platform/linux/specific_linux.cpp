@@ -757,6 +757,16 @@ void start() {
 		"PULSE_PROP_application.icon_name",
 		ApplicationIconName().toUtf8());
 
+	// WebKitGTK's DMABUF renderer crashes the web process immediately on the
+	// proprietary NVIDIA driver under Wayland, so Mini Apps open as frozen,
+	// empty windows that can't be closed. Disabling it falls back to a working
+	// buffer-sharing path. The webview helper subprocess inherits this from our
+	// environment, and WebKitGTK is used nowhere else in the app.
+	// https://github.com/AyuGram/AyuGramDesktop/issues/393
+	if (!qEnvironmentVariableIsSet("WEBKIT_DISABLE_DMABUF_RENDERER")) {
+		qputenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+	}
+
 	GLib::set_prgname(cExeName().toStdString());
 	GLib::set_application_name(AppName.data());
 
