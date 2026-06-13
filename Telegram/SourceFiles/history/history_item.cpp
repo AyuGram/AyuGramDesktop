@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "history/history.h"
 #include "iv/iv_data.h"
+#include "iv/iv_rich_page.h"
 #include "mtproto/mtproto_config.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_isolated_emoji.h"
@@ -85,6 +86,7 @@ namespace {
 
 constexpr auto kNotificationTextLimit = 255;
 constexpr auto kPinnedMessageTextLimit = 16;
+constexpr auto kMinLoginCode = 5;
 
 using ItemPreview = HistoryView::ItemPreview;
 
@@ -102,9 +104,14 @@ template <typename T>
 	return PreparedServiceText{ { tr::lng_message_empty(tr::now) } };
 }
 
-[[nodiscard]] TextWithEntities SpoilerLoginCode(TextWithEntities text) {
+[[nodiscard]] TextWithEntities SpoilerLoginCode(
+		TextWithEntities text,
+		int minLength = 4) {
+	const auto innerMin = QString::number(std::max(minLength - 2, 0));
 	const auto r = QRegularExpression(
-		u"(?<![\\w\\-#])(\\d[\\d\\-]{2,6}\\d)(?!\\w\\-)"_q);
+		u"(?<![\\w\\-#])(\\d[\\d\\-]{"_q
+			+ innerMin
+			+ u",6}\\d)(?!\\w\\-)"_q);
 	const auto m = r.match(text.text);
 	if (!m.hasMatch()) {
 		return text;
@@ -142,6 +149,19 @@ template <typename T>
 	return false;
 }
 
+[[nodiscard]] std::shared_ptr<const Iv::RichPage> ParsedRichPage(
+		not_null<Main::Session*> session,
+		const MTPRichMessage *richMessage) {
+	return richMessage ? Iv::ParseRichPage(session, *richMessage) : nullptr;
+}
+
+[[nodiscard]] std::shared_ptr<const Iv::RichPage> BestRichPage(
+		const HistoryMessageRichPageSource *source) {
+	return source
+		? (source->fullPage ? source->fullPage : source->page)
+		: nullptr;
+}
+
 [[nodiscard]] HistoryItemCommonFields ForwardedFields(
 		HistoryItemCommonFields fields,
 		not_null<History*> history,
@@ -163,6 +183,30 @@ template <typename T>
 	return { Ui::FillAmountAndCurrency(amount, currency) };
 }
 
+[[nodiscard]] bool IsNavigableForInstantViewMedia(
+		DocumentData *document) {
+	Expects(document != nullptr);
+	return !document->isVideoMessage()
+		&& (document->isVideoFile() || document->isAnimation());
+}
+
+void UpdateInstantViewMediaCaption(
+		HistoryMessageMediaForInstantView *data,
+		const HistoryMessageMediaForInstantView::Item &item,
+		TextWithEntities caption) {
+	const auto i = ranges::find(data->items, item);
+	if (i == end(data->items)) {
+		return;
+	}
+	const auto index = size_t(i - begin(data->items));
+	if (index >= data->captions.size()) {
+		data->captions.resize(index + 1);
+	}
+	if (!caption.text.isEmpty() && data->captions[index].text.isEmpty()) {
+		data->captions[index] = std::move(caption);
+	}
+}
+
 } // namespace
 
 void HistoryItem::HistoryItem::Destroyer::operator()(HistoryItem *value) {
@@ -176,6 +220,7 @@ struct HistoryItem::CreateConfig {
 
 	UserId viaBotId = 0;
 	UserId viaBusinessBotId = 0;
+	PeerId guestChatViaFrom = 0;
 	int viewsCount = -1;
 	int forwardsCount = -1;
 	int boostsApplied = 0;
@@ -444,7 +489,13 @@ HistoryItem::HistoryItem(
 		_flags &= ~MessageFlag::HasPostAuthor;
 		_flags |= MessageFlag::Legacy;
 		createComponents(data);
-		setText(UnsupportedMessageText());
+		if (const auto richMessage = data.vrich_message()) {
+			const auto richPage = Iv::ParseRichPage(&history->session(), *richMessage);
+			setRichPage(richPage);
+			setText(Iv::FlattenRichPageSummary(richPage));
+		} else {
+			setText(UnsupportedMessageText());
+		}
 		if (!Has<HistoryMessageReplyMarkup>()) {
 			AddComponents(HistoryMessageReplyMarkup::Bit());
 		}
@@ -497,14 +548,20 @@ HistoryItem::HistoryItem(
 					[](const auto &) {});
 			}
 		}
-		auto textWithEntities = TextWithEntities{
-			qs(data.vmessage()),
-			Api::EntitiesFromMTP(
-				&history->session(),
-				data.ventities().value_or_empty())
-		};
 		if (!skipSetText) {
-			setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
+			if (const auto richMessage = data.vrich_message()) {
+				const auto richPage = Iv::ParseRichPage(&history->session(), *richMessage);
+				setRichPage(richPage);
+				setText(Iv::FlattenRichPageSummary(richPage));
+			} else {
+				auto textWithEntities = TextWithEntities{
+					qs(data.vmessage()),
+					Api::EntitiesFromMTP(
+						&history->session(),
+						data.ventities().value_or_empty())
+				};
+				setText(_media ? textWithEntities : EnsureNonEmpty(textWithEntities));
+			}
 		}
 		if (const auto groupedId = data.vgrouped_id()) {
 			setGroupId(
@@ -698,9 +755,15 @@ HistoryItem::HistoryItem(
 	const auto dropText = fields.ignoreForwardCaptions
 		&& _media
 		&& (_media->allowsEditCaption() || _media->poll());
+	const auto forwardRichPage = dropText
+		? std::shared_ptr<const Iv::RichPage>()
+		: original->richPage();
 	const auto forwardText = [&] {
 		if (dropText) {
 			return TextWithEntities();
+		}
+		if (forwardRichPage) {
+			return Iv::FlattenRichPageSummary(forwardRichPage);
 		}
 		const auto &text = original->originalText();
 		if (!text.text.isEmpty()) {
@@ -713,6 +776,9 @@ HistoryItem::HistoryItem(
 		}
 		return TextWithEntities();
 	}();
+	if (forwardRichPage) {
+		setRichPage(forwardRichPage);
+	}
 	setText(forwardText);
 
 	if (fields.groupedId) {
@@ -847,6 +913,9 @@ HistoryItem::HistoryItem(
 	}
 	if (_effectId) {
 		_history->owner().reactions().preloadEffectImageFor(_effectId);
+	}
+	if (isGuestChatBotMessage()) {
+		_history->setHasGuestChatBotMessages();
 	}
 }
 
@@ -1568,6 +1637,64 @@ void HistoryItem::customEmojiRepaint() {
 	}
 }
 
+void HistoryItem::setMediaForInstantView(
+		QString url,
+		DocumentData *document,
+		PhotoData *photo) {
+	AddComponents(HistoryMessageMediaForInstantView::Bit());
+	const auto data = Get<HistoryMessageMediaForInstantView>();
+	data->url = std::move(url);
+	data->documents.clear();
+	data->photos.clear();
+	data->items.clear();
+	data->captions.clear();
+	if (document) {
+		data->documents.emplace(document);
+		if (IsNavigableForInstantViewMedia(document)) {
+			data->items.emplace_back(document);
+			data->captions.emplace_back();
+		}
+	}
+	if (photo) {
+		data->photos.emplace(photo);
+		data->items.emplace_back(photo);
+		data->captions.emplace_back();
+	}
+}
+
+void HistoryItem::addDocumentForInstantView(
+		not_null<DocumentData*> document,
+		TextWithEntities caption) {
+	AddComponents(HistoryMessageMediaForInstantView::Bit());
+	const auto data = Get<HistoryMessageMediaForInstantView>();
+	if (data->documents.emplace(document).second
+		&& IsNavigableForInstantViewMedia(document)) {
+		data->items.emplace_back(document.get());
+		data->captions.push_back(std::move(caption));
+	} else {
+		UpdateInstantViewMediaCaption(
+			data,
+			HistoryMessageMediaForInstantView::Item(document.get()),
+			std::move(caption));
+	}
+}
+
+void HistoryItem::addPhotoForInstantView(
+		not_null<PhotoData*> photo,
+		TextWithEntities caption) {
+	AddComponents(HistoryMessageMediaForInstantView::Bit());
+	const auto data = Get<HistoryMessageMediaForInstantView>();
+	if (data->photos.emplace(photo).second) {
+		data->items.emplace_back(photo.get());
+		data->captions.push_back(std::move(caption));
+	} else {
+		UpdateInstantViewMediaCaption(
+			data,
+			HistoryMessageMediaForInstantView::Item(photo.get()),
+			std::move(caption));
+	}
+}
+
 bool HistoryItem::needsUpdateForVideoQualities(const MTPMessage &data) {
 	// When video gets the converted alt-videos lists, we need to update
 	// the message data even without edit-message update.
@@ -1884,14 +2011,18 @@ ReplyMarkupFlags HistoryItem::replyKeyboardFlags() const {
 void HistoryItem::addLogEntryOriginal(
 		WebPageId localId,
 		const QString &label,
-		const TextWithEntities &content) {
+		const TextWithEntities &content,
+		PhotoData *photo,
+		DocumentData *document) {
 	Expects(isAdminLogEntry());
 
 	AddComponents(HistoryMessageLogEntryOriginal::Bit());
 	Get<HistoryMessageLogEntryOriginal>()->page = _history->owner().webpage(
 		localId,
 		label,
-		content);
+		content,
+		photo,
+		document);
 }
 
 void HistoryItem::setFactcheck(MessageFactcheck info) {
@@ -1955,6 +2086,10 @@ UserData *HistoryItem::viaBot() const {
 		return via->bot;
 	}
 	return nullptr;
+}
+
+bool HistoryItem::isGuestChatBotMessage() const {
+	return (_flags & MessageFlag::GuestChatViaFrom);
 }
 
 UserData *HistoryItem::getMessageBot() const {
@@ -2089,10 +2224,10 @@ void HistoryItem::refreshMainView() {
 	}
 }
 
-void HistoryItem::removeMainView() {
+void HistoryItem::removeMainView(Data::ViewRemovalReason reason) {
 	if (const auto view = mainView()) {
 		_history->owner().notifyHistoryChangeDelayed(_history);
-		view->removeFromBlock();
+		view->removeFromBlock(reason);
 	}
 }
 
@@ -2116,6 +2251,9 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		savePreviousMedia();
 	}
 	Assert(!updatingSavedLocalEdit || !isLocalUpdateMedia());
+
+	const auto wasGrouped = !updatingSavedLocalEdit
+		&& history()->owner().groups().isGrouped(this);
 
 	if (edition.isEditHide) {
 		_flags |= MessageFlag::HideEdited;
@@ -2174,12 +2312,21 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 	const auto &checkedMedia = updatingSavedLocalEdit
 		? Get<HistoryMessageSavedMediaData>()->media
 		: _media;
-	auto updatedText = (mediaCheck == MediaCheckResult::Unsupported)
+	clearFullRichPage();
+	if (edition.richPage) {
+		setRichPage(edition.richPage);
+	} else {
+		clearRichPage();
+	}
+	auto updatedText = edition.richPage
+		? Iv::FlattenRichPageSummary(edition.richPage)
+		: (mediaCheck == MediaCheckResult::Unsupported)
 		? UnsupportedMessageText()
 		: checkedMedia
 		? edition.textWithEntities
 		: EnsureNonEmpty(edition.textWithEntities);
-	auto serviceText = (!checkedMedia
+	auto serviceText = (!edition.richPage
+		&& !checkedMedia
 		&& edition.textWithEntities.empty()
 		&& edition.mtpMedia)
 		? prepareServiceTextForMessage(
@@ -2245,6 +2392,10 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 		Get<HistoryMessageFromRank>()->rank = edition.fromRank;
 	} else {
 		RemoveComponents(HistoryMessageFromRank::Bit());
+	}
+
+	if (wasGrouped && !history()->owner().groups().isGrouped(this)) {
+		history()->owner().groups().unregisterMessage(this);
 	}
 
 	finishEdition(keyboardTop);
@@ -2372,7 +2523,7 @@ void HistoryItem::applySentMessage(const MTPDmessage &data) {
 		Api::EntitiesFromMTP(
 			&_history->session(),
 			data.ventities().value_or_empty())
-	}, data.vmedia());
+	}, data.vmedia(), data.vrich_message());
 	updateReplyMarkup(HistoryMessageMarkupData(data.vreply_markup()));
 	updateForwardedInfo(data.vfwd_from());
 	changeViewsCount(data.vviews().value_or(-1));
@@ -2421,12 +2572,18 @@ void HistoryItem::applySentMessage(
 		const QString &text,
 		const MTPDupdateShortSentMessage &data,
 		bool wasAlready) {
+	const auto existingRichPage = Get<HistoryMessageRichPageSource>();
 	updateSentContent({
 		text,
 		Api::EntitiesFromMTP(
 			&_history->session(),
 			data.ventities().value_or_empty())
-		}, data.vmedia());
+		},
+		data.vmedia(),
+		existingRichPage ? existingRichPage->page : nullptr,
+		(existingRichPage && existingRichPage->page)
+			? existingRichPage->fullPage
+			: nullptr);
 	contributeToSlowmode(data.vdate().v);
 	if (!wasAlready) {
 		addToSharedMediaIndex();
@@ -2442,7 +2599,19 @@ void HistoryItem::applySentMessage(
 
 void HistoryItem::updateSentContent(
 		const TextWithEntities &textWithEntities,
-		const MTPMessageMedia *media) {
+		const MTPMessageMedia *media,
+		const MTPRichMessage *richMessage) {
+	updateSentContent(
+		textWithEntities,
+		media,
+		ParsedRichPage(&_history->session(), richMessage));
+}
+
+void HistoryItem::updateSentContent(
+		const TextWithEntities &textWithEntities,
+		const MTPMessageMedia *media,
+		std::shared_ptr<const Iv::RichPage> richPage,
+		std::shared_ptr<const Iv::RichPage> preservedFullPage) {
 	if (isEditingMedia()) {
 		return;
 	}
@@ -2452,13 +2621,31 @@ void HistoryItem::updateSentContent(
 	if (mediaCheck == MediaCheckResult::Unsupported) {
 		_flags &= ~MessageFlag::HasPostAuthor;
 		_flags |= MessageFlag::Legacy;
-		setText(UnsupportedMessageText());
+		if (richPage) {
+			setRichPage(richPage);
+			if (preservedFullPage) {
+				setFullRichPage(std::move(preservedFullPage));
+			}
+			setText(Iv::FlattenRichPageSummary(richPage));
+		} else {
+			clearRichPage();
+			setText(UnsupportedMessageText());
+		}
 		setReplyMarkup(UnsupportedMessageMarkup());
 	} else {
 		if (_flags & MessageFlag::Legacy) {
 			_flags &= ~MessageFlag::Legacy;
 		}
-		setText(textWithEntities);
+		if (richPage) {
+			setRichPage(richPage);
+			if (preservedFullPage) {
+				setFullRichPage(std::move(preservedFullPage));
+			}
+			setText(Iv::FlattenRichPageSummary(richPage));
+		} else {
+			clearRichPage();
+			setText(textWithEntities);
+		}
 	}
 	if (mediaCheck == MediaCheckResult::Unsupported) {
 		_media = nullptr;
@@ -2865,9 +3052,12 @@ bool HistoryItem::allowsEdit(TimeId now) const {
 		return false;
 	}
 
+	const auto richPageSource = Get<HistoryMessageRichPageSource>();
+	const auto richPage = BestRichPage(richPageSource);
 	return !isService()
 		&& canBeEdited()
 		&& !isTooOldForEdit(now)
+		&& (!richPage || richPageSource->canEdit)
 		&& (!_media || _media->allowsEdit())
 		&& !isLegacyMessage()
 		&& !isEditingMedia()
@@ -2876,6 +3066,7 @@ bool HistoryItem::allowsEdit(TimeId now) const {
 
 bool HistoryItem::allowsEditMedia() const {
 	return !awaitingVideoProcessing()
+		&& !richPage()
 		&& (!_media || _media->allowsEditMedia() || _media->webpage());
 }
 
@@ -3212,7 +3403,10 @@ bool HistoryItem::canReact() const {
 			return (_flags & MessageFlag::ReactionsAllowed);
 		}
 	}
-	return true;
+	const auto peer = history()->peer;
+	return (peer->isChat() || peer->isMegagroup())
+		? !peer->amRestricted(ChatRestriction::SendReactions)
+		: true;
 }
 
 void HistoryItem::addPaidReaction(
@@ -3258,7 +3452,16 @@ void HistoryItem::toggleReaction(
 	Expects(!reaction.paid());
 
 	const auto addToRecent = (source == HistoryReactionSource::Selector);
-	if (!_reactions) {
+	if (_reactions
+		&& ranges::contains(_reactions->chosen(), reaction)) {
+		_reactions->remove(reaction);
+		if (_reactions->empty() && !_reactions->localPaidData()) {
+			_reactions = nullptr;
+			_flags &= ~MessageFlag::CanViewReactions;
+		}
+	} else if (!reactionsAreTags() && !canReact()) {
+		return;
+	} else if (!_reactions) {
 		_reactions = std::make_unique<Data::MessageReactions>(this);
 		const auto canViewReactions = !isDiscussionPost()
 			&& (_history->peer->isChat() || _history->peer->isMegagroup());
@@ -3266,16 +3469,31 @@ void HistoryItem::toggleReaction(
 			_flags |= MessageFlag::CanViewReactions;
 		}
 		_reactions->add(reaction, addToRecent);
-	} else if (ranges::contains(_reactions->chosen(), reaction)) {
-		_reactions->remove(reaction);
-		if (_reactions->empty() && !_reactions->localPaidData()) {
-			_reactions = nullptr;
-			_flags &= ~MessageFlag::CanViewReactions;
-		}
 	} else {
 		_reactions->add(reaction, addToRecent);
 	}
 	_history->owner().notifyItemDataChange(this);
+}
+
+bool HistoryItem::removeReactionsFromParticipant(
+		not_null<PeerData*> participant,
+		const Data::ReactionId &reaction) {
+	if (!_reactions) {
+		return false;
+	}
+	const auto hadUnread = hasUnreadReaction();
+	if (!_reactions->removeFromParticipant(participant, reaction)) {
+		return false;
+	}
+	if (_reactions->empty() && !_reactions->localPaidData()) {
+		_reactions = nullptr;
+		_flags &= ~MessageFlag::CanViewReactions;
+	}
+	if (hadUnread && (!_reactions || !_reactions->hasUnread())) {
+		markReactionsRead();
+	}
+	_history->owner().notifyItemDataChange(this);
+	return true;
 }
 
 void HistoryItem::updateReactionsUnknown() {
@@ -4112,6 +4330,12 @@ FullStoryId HistoryItem::replyToStory() const {
 	return {};
 }
 
+void HistoryItem::resolveAdminLogReplyTo(not_null<HistoryItem*> replyTo) {
+	if (const auto reply = Get<HistoryMessageReply>()) {
+		reply->setInLogReplyTo(this, replyTo);
+	}
+}
+
 FullReplyTo HistoryItem::replyTo() const {
 	const auto monoforumPeerId = _history->peer->amMonoforumAdmin()
 		? sublistPeerId()
@@ -4164,6 +4388,93 @@ void HistoryItem::setText(TextWithEntities textWithEntities) {
 	setTextValue((_media && _media->consumeMessageText(text))
 		? TextWithEntities()
 		: std::move(text));
+}
+
+std::shared_ptr<const Iv::RichPage> HistoryItem::richPage() const {
+	const auto source = Get<HistoryMessageRichPageSource>();
+	return source ? source->page : nullptr;
+}
+
+std::shared_ptr<const Iv::RichPage> HistoryItem::fullRichPage() const {
+	const auto source = Get<HistoryMessageRichPageSource>();
+	return source ? source->fullPage : nullptr;
+}
+
+uint64 HistoryItem::fullRichPageVersion() const {
+	const auto source = Get<HistoryMessageRichPageSource>();
+	return source ? source->fullPageVersion : 0;
+}
+
+void HistoryItem::applyLocalRichPage(std::shared_ptr<const Iv::RichPage> page) {
+	const auto summary = page
+		? Iv::FlattenRichPageSummary(page)
+		: TextWithEntities();
+	applyLocalRichPage(std::move(page), summary);
+}
+
+void HistoryItem::applyLocalRichPage(
+		std::shared_ptr<const Iv::RichPage> page,
+		const TextWithEntities &summary) {
+	if (page) {
+		setRichPage(std::move(page));
+	} else {
+		clearRichPage();
+	}
+	setText(summary);
+	_history->owner().requestItemTextRefresh(this);
+	invalidateChatListEntry();
+}
+
+void HistoryItem::setRichPage(std::shared_ptr<const Iv::RichPage> page) {
+	if (page) {
+		AddComponents(HistoryMessageRichPageSource::Bit()
+			| HistoryMessageMediaForInstantView::Bit());
+		const auto source = Get<HistoryMessageRichPageSource>();
+		const auto media = Get<HistoryMessageMediaForInstantView>();
+		source->page = std::move(page);
+		if (source->fullPage) {
+			++source->fullPageVersion;
+		}
+		source->fullPage = nullptr;
+		source->canEdit = false;
+		media->url = QString();
+		media->documents.clear();
+		media->photos.clear();
+		media->items.clear();
+		media->captions.clear();
+	} else {
+		clearRichPage();
+	}
+}
+
+void HistoryItem::setFullRichPage(std::shared_ptr<const Iv::RichPage> page) {
+	if (page) {
+		AddComponents(HistoryMessageRichPageSource::Bit());
+		const auto source = Get<HistoryMessageRichPageSource>();
+		source->fullPage = std::move(page);
+		source->canEdit = false;
+	} else {
+		clearFullRichPage();
+	}
+}
+
+void HistoryItem::clearFullRichPage() {
+	const auto source = Get<HistoryMessageRichPageSource>();
+	if (!source) {
+		return;
+	}
+	++source->fullPageVersion;
+	source->fullPage = nullptr;
+	if (source->page) {
+		source->canEdit = false;
+	} else {
+		RemoveComponents(HistoryMessageRichPageSource::Bit());
+	}
+}
+
+void HistoryItem::clearRichPage() {
+	RemoveComponents(HistoryMessageRichPageSource::Bit()
+		| HistoryMessageMediaForInstantView::Bit());
 }
 
 void HistoryItem::setTextValue(TextWithEntities text, bool force) {
@@ -4247,6 +4558,7 @@ bool HistoryItem::isEmpty() const {
 
 	return _text.empty()
 		&& !_media
+		&& !Has<HistoryMessageRichPageSource>()
 		&& (!Has<HistoryMessageFactcheck>()
 			|| Get<HistoryMessageFactcheck>()->data.text.empty())
 		&& !Has<HistoryMessageLogEntryOriginal>();
@@ -4316,11 +4628,13 @@ TextWithEntities HistoryItem::notificationText(
 		}
 		return TextWithEntities();
 	}();
-	if (options.spoilerLoginCode
-		&& !out()
-		&& (history()->peer->isNotificationsUser()
-			|| history()->peer->isVerifyCodes())) {
-		result = SpoilerLoginCode(std::move(result));
+	if (options.spoilerLoginCode && !out()) {
+		const auto peer = history()->peer;
+		if (peer->isNotificationsUser()) {
+			result = SpoilerLoginCode(std::move(result), kMinLoginCode);
+		} else if (peer->isVerifyCodes()) {
+			result = SpoilerLoginCode(std::move(result));
+		}
 	}
 	if (result.text.size() <= kNotificationTextLimit) {
 		return result;
@@ -4360,11 +4674,15 @@ ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
 		}
 		return {};
 	}();
-	if (options.spoilerLoginCode
-		&& !out()
-		&& (history()->peer->isNotificationsUser()
-			|| history()->peer->isVerifyCodes())) {
-		result.text = SpoilerLoginCode(std::move(result.text));
+	if (options.spoilerLoginCode && !out()) {
+		const auto peer = history()->peer;
+		if (peer->isNotificationsUser()) {
+			result.text = SpoilerLoginCode(
+			    std::move(result.text),
+				kMinLoginCode);
+		} else if (peer->isVerifyCodes()) {
+			result.text = SpoilerLoginCode(std::move(result.text));
+		}
 	}
 	const auto fromSender = [](not_null<PeerData*> sender) {
 		return sender->isSelf()
@@ -4396,7 +4714,7 @@ ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
 	const auto sender = [&]() -> std::optional<QString> {
 		if (options.hideSender || isPostHidingAuthor() || isEmpty()) {
 			return {};
-		} else if (!_history->peer->isUser()) {
+		} else if (!_history->peer->isUser() || isGuestChatBotMessage()) {
 			if (const auto from = displayFrom()) {
 				return fromSender(from);
 			}
@@ -4452,6 +4770,9 @@ void HistoryItem::createComponents(CreateConfig &&config) {
 	}
 	if (config.viaBotId) {
 		mask |= HistoryMessageVia::Bit();
+	}
+	if (config.guestChatViaFrom) {
+		mask |= HistoryMessageGuestChat::Bit();
 	}
 	if (config.viewsCount >= 0 || !config.replies.isNull) {
 		mask |= HistoryMessageViews::Bit();
@@ -4546,6 +4867,9 @@ void HistoryItem::createComponents(CreateConfig &&config) {
 	}
 	if (const auto via = Get<HistoryMessageVia>()) {
 		via->create(&_history->owner(), config.viaBotId);
+	}
+	if (const auto guestChat = Get<HistoryMessageGuestChat>()) {
+		guestChat->create(&_history->owner(), config.guestChatViaFrom);
 	}
 	if (Has<HistoryMessageViews>()) {
 		changeViewsCount(config.viewsCount);
@@ -4930,6 +5254,9 @@ void HistoryItem::createComponents(const MTPDmessage &data) {
 	}
 	config.viaBotId = data.vvia_bot_id().value_or_empty();
 	config.viaBusinessBotId = data.vvia_business_bot_id().value_or_empty();
+	config.guestChatViaFrom = data.vguestchat_via_from()
+		? peerFromMTP(*data.vguestchat_via_from())
+		: PeerId();
 	config.viewsCount = data.vviews().value_or(-1);
 	config.forwardsCount = data.vforwards().value_or(-1);
 	config.replies = isScheduled()
@@ -6085,9 +6412,10 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareTopicCreate = [&](const MTPDmessageActionTopicCreate &action) {
 		auto result = PreparedServiceText();
-		const auto topicUrl = u"internal:url:https://t.me/c/%1/%2"_q
-			.arg(peerToChannel(_history->peer->id).bare)
-			.arg(id.bare);
+		const auto topicUrl = UrlClickHandler::EncodeInternalWrappedUrl(
+			u"https://t.me/c/%1/%2"_q
+				.arg(peerToChannel(_history->peer->id).bare)
+				.arg(id.bare));
 		result.text = tr::lng_action_topic_created(
 			tr::now,
 			lt_topic,
@@ -6834,14 +7162,20 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto preparePaidMessagesRefunded = [&](const MTPDmessageActionPaidMessagesRefunded &action) {
 		auto result = PreparedServiceText();
-		if (_from->isSelf()) {
-			result.links.push_back(_history->peer->createOpenLink());
+		const auto sublist = _history->amMonoforumAdmin()
+			? savedSublist()
+			: nullptr;
+		const auto recipient = sublist
+			? sublist->sublistPeer().get()
+			: _history->peer.get();
+		if (_from->isSelf() || sublist) {
+			result.links.push_back(recipient->createOpenLink());
 			result.text = tr::lng_action_paid_message_refund_self(
 				tr::now,
 				lt_count,
 				action.vstars().v,
 				lt_name,
-				tr::link(_history->peer->shortName(), 1),
+				tr::link(recipient->shortName(), 1),
 				tr::marked);
 		} else {
 			result.links.push_back(_from->createOpenLink());

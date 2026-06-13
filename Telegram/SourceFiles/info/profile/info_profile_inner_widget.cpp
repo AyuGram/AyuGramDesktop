@@ -57,40 +57,34 @@ namespace Profile {
 
 namespace {
 
-void AddAboutVerification(
+void AddSavedMusic(
 		not_null<Ui::VerticalLayout*> layout,
-		not_null<PeerData*> peer) {
-	const auto inner = layout->add(object_ptr<Ui::VerticalLayout>(layout));
-	peer->session().changes().peerFlagsValue(
+		not_null<Controller*> controller,
+		not_null<PeerData*> peer,
+		rpl::producer<std::optional<QColor>> topBarColor) {
+	const auto wrap = layout->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			layout,
+			object_ptr<Ui::VerticalLayout>(layout)));
+	Info::Saved::SetupSavedMusic(
+		wrap->entity(),
+		controller,
 		peer,
-		Data::PeerUpdate::Flag::VerifyInfo
-	) | rpl::on_next([=] {
-		const auto info = peer->botVerifyDetails();
-		while (inner->count()) {
-			delete inner->widgetAt(0);
-		}
-		if (!info) {
-			Ui::AddDivider(inner);
-		} else {
-			auto hasMainApp = false;
-			if (const auto user = peer->asUser()) {
-				if (user->botInfo) {
-					hasMainApp = user->botInfo->hasMainApp;
-				}
-			}
-			if (!hasMainApp && !info->description.empty()) {
-				Ui::AddDividerText(inner, rpl::single(info->description));
-			}
-		}
-		inner->resizeToWidth(inner->width());
-	}, inner->lifetime());
+		std::move(topBarColor));
+	using namespace rpl::mappers;
+	wrap->toggleOn(
+		wrap->entity()->heightValue() | rpl::map(_1 > 0),
+		anim::type::instant);
 }
 
 void AddUnofficialSecurityRiskWarning(
-		not_null<Ui::VerticalLayout*> container,
+		not_null<Ui::VerticalLayout*> layout,
 		not_null<UserData*> user) {
-	const auto content = container->add(
-		object_ptr<Ui::VerticalLayout>(container));
+	const auto wrap = layout->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			layout,
+			object_ptr<Ui::VerticalLayout>(layout)));
+	const auto content = wrap->entity();
 	user->session().changes().peerFlagsValue(
 		user,
 		Data::PeerUpdate::Flag::FullInfo
@@ -142,10 +136,14 @@ void AddUnofficialSecurityRiskWarning(
 				std::move(label),
 				st::defaultBoxDividerLabelPadding,
 				st::defaultDividerLabel.bar,
-				RectPart::Top | RectPart::Bottom));
+				RectParts()));
 		}
 		content->resizeToWidth(content->width());
 	}, content->lifetime());
+	using namespace rpl::mappers;
+	wrap->toggleOn(
+		content->heightValue() | rpl::map(_1 > 0),
+		anim::type::instant);
 }
 
 } // namespace
@@ -193,78 +191,84 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 	}
 
 	auto result = object_ptr<Ui::VerticalLayout>(parent);
-	setupSavedMusic(result);
+
+	const auto musicPeer = _sublist
+		? _sublist->sublistPeer().get()
+		: _peer.get();
+	AddSavedMusic(
+		result.data(),
+		_controller,
+		musicPeer,
+		_topBarColor.value());
 	if (const auto user = _peer->asUser()) {
 		AddUnofficialSecurityRiskWarning(result.data(), user);
 	}
+
+	auto stack = SectionStack(result.data());
 	if (_topic && _topic->creating()) {
+		stack.finalize();
 		return result;
 	}
 
-	auto mainTracker = Ui::MultiSlideTracker();
-	auto sharedTracker = Ui::MultiSlideTracker();
-	auto dividerOverridden = rpl::variable<bool>(false);
-	AddDetails(
-		result,
+	BuildProfileDetailsSections(
+		stack,
 		_controller,
 		_peer,
 		_topic,
 		_sublist,
-		origin,
-		mainTracker,
-		dividerOverridden);
-	auto showDivider = rpl::combine(
-		mainTracker.atLeastOneShownValue(),
-		dividerOverridden.value()
-	) | rpl::map([](bool main, bool dividerOverridden) {
-		return dividerOverridden ? false : main;
-	}) | rpl::distinct_until_changed();
-	result->add(
-		setupSharedMedia(
+		origin);
+
+	auto sharedTracker = Ui::MultiSlideTracker();
+	{
+		auto sharedMediaWidget = setupSharedMedia(
 			result.data(),
-			rpl::duplicate(showDivider),
-			sharedTracker));
+			sharedTracker);
+		const auto raw = sharedMediaWidget.data();
+		_sharedMediaWrap = raw;
+		stack.addPlainSeparator();
+		stack.add(Section{
+			.widget = std::move(sharedMediaWidget),
+			.shown = raw->toggledValue(),
+		});
+	}
 	if (_topic || _sublist) {
+		stack.finalize();
 		return result;
 	}
-	{
-		auto buttons = SetupChannelMembersAndManage(
+	if (auto manage = SetupChannelMembersAndManage(
 			_controller,
 			result.data(),
-			_peer);
-		if (buttons) {
-			result->add(std::move(buttons));
-		}
+			_peer)) {
+		const auto raw = static_cast<Ui::SlideWrap<Ui::RpWidget>*>(
+			manage.data());
+		stack.addPlainSeparator();
+		stack.add(Section{
+			.widget = std::move(manage),
+			.shown = raw->toggledValue(),
+		});
 	}
-	auto showNext = rpl::combine(
-		std::move(showDivider),
-		sharedTracker.atLeastOneShownValue()
-	) | rpl::map([](bool show, bool shared) {
-		return show || shared;
-	}) | rpl::distinct_until_changed();
 	if (auto actions = SetupActions(_controller, result.data(), _peer)) {
-		addAboutVerificationOrDivider(result, rpl::duplicate(showNext));
-		result->add(std::move(actions));
+		stack.addPlainSeparator();
+		stack.add(Section{
+			.widget = std::move(actions),
+			.shown = rpl::single(true),
+		});
 	}
-	if (!_aboutVerificationAdded) {
-		AddAboutVerification(result, _peer);
+	if ((_peer->isChat() || _peer->isMegagroup())
+		&& !_peer->isMonoforum()) {
+		stack.addPlainSeparator();
+		stack.add(makeMembersSection(result.data()));
 	}
-	if (_peer->isChat() || _peer->isMegagroup()) {
-		if (!_peer->isMonoforum()) {
-			setupMembers(result.data(), rpl::duplicate(showNext));
-		}
-	}
+	stack.finalize();
 	return result;
 }
 
-void InnerWidget::setupMembers(
-		not_null<Ui::VerticalLayout*> container,
-		rpl::producer<bool> showDivider) {
-	auto wrap = container->add(object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-		container,
-		object_ptr<Ui::VerticalLayout>(container)));
-	const auto inner = wrap->entity();
-	addAboutVerificationOrDivider(inner, std::move(showDivider));
+Section InnerWidget::makeMembersSection(not_null<QWidget*> parent) {
+	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+		parent,
+		object_ptr<Ui::VerticalLayout>(parent));
+	const auto raw = wrap.data();
+	const auto inner = raw->entity();
 	_members = inner->add(object_ptr<Members>(inner, _controller));
 	_members->scrollToRequests(
 	) | rpl::on_next([this](Ui::ScrollToRequest request) {
@@ -284,44 +288,17 @@ void InnerWidget::setupMembers(
 	}, _members->lifetime());
 
 	using namespace rpl::mappers;
-	wrap->toggleOn(
+	raw->toggleOn(
 		_members->fullCountValue() | rpl::map(_1 > 0),
 		anim::type::instant);
+	return Section{
+		.widget = std::move(wrap),
+		.shown = raw->toggledValue(),
+	};
 }
 
-void InnerWidget::setupSavedMusic(not_null<Ui::VerticalLayout*> container) {
-	Info::Saved::SetupSavedMusic(
-		container,
-		_controller,
-		_sublist ? _sublist->sublistPeer() : _peer,
-		_topBarColor.value());
-}
-
-void InnerWidget::addAboutVerificationOrDivider(
-		not_null<Ui::VerticalLayout*> content,
-		rpl::producer<bool> showDivider) {
-	if (rpl::variable<bool>(rpl::duplicate(showDivider)).current()) {
-		if (_aboutVerificationAdded) {
-			Ui::AddDivider(content);
-		} else {
-			AddAboutVerification(content, _peer);
-			_aboutVerificationAdded = true;
-		}
-	} else {
-		const auto wrap = content->add(
-			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-				content,
-				object_ptr<Ui::VerticalLayout>(content)));
-		Ui::AddDivider(wrap->entity());
-		wrap->setDuration(
-			st::infoSlideDuration
-		)->toggleOn(rpl::duplicate(showDivider));
-	}
-}
-
-object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
+object_ptr<Ui::SlideWrap<Ui::RpWidget>> InnerWidget::setupSharedMedia(
 		not_null<RpWidget*> parent,
-		rpl::producer<bool> showDivider,
 		Ui::MultiSlideTracker &sharedTracker) {
 	using namespace rpl::mappers;
 	using MediaType = Media::Type;
@@ -456,12 +433,8 @@ object_ptr<Ui::RpWidget> InnerWidget::setupSharedMedia(
 
 	auto layout = result->entity();
 
-	addAboutVerificationOrDivider(layout, std::move(showDivider));
-	Ui::AddSkip(layout, st::infoSharedMediaBottomSkip);
 	layout->add(std::move(content));
-	Ui::AddSkip(layout, st::infoSharedMediaBottomSkip);
 
-	_sharedMediaWrap = result;
 	return result;
 }
 

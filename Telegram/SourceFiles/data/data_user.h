@@ -108,6 +108,8 @@ struct BotInfo {
 	bool userCreatesTopics : 1 = false;
 	bool setBotPhotoHidden : 1 = false;
 	bool canManageBots : 1 = false;
+	bool supportsGuestChat : 1 = false;
+	bool supportsGuard : 1 = false;
 
 private:
 	std::unique_ptr<Data::Forum> _forum;

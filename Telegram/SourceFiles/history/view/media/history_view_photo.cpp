@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
+#include "history/view/history_view_message.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/media/history_view_media_common.h"
 #include "history/view/media/history_view_media_spoiler.h"
@@ -57,6 +58,18 @@ constexpr auto kStoryWidth = 720;
 constexpr auto kStoryHeight = 1280;
 
 using Data::PhotoSize;
+
+[[nodiscard]] bool IsHostedInstantViewMedia(not_null<const Element*> parent) {
+	return parent->Get<InstantViewMediaRuntime>() != nullptr;
+}
+
+[[nodiscard]] QSize PhotoDesiredMediaSize(
+		QSize dimensions,
+		bool hostedInstantView) {
+	return hostedInstantView
+		? NonEmptySize(style::ConvertScale(dimensions))
+		: CountDesiredMediaSize(dimensions);
+}
 
 } // namespace
 
@@ -201,14 +214,18 @@ QSize Photo::countOptimalSize() {
 	if (_serviceWidth > 0) {
 		return { int(_serviceWidth), int(_serviceWidth) };
 	}
+	const auto hostedInstantView = IsHostedInstantViewMedia(_parent);
 	const auto dimensions = photoSize();
-	const auto scaled = CountDesiredMediaSize(dimensions);
+	const auto scaled = PhotoDesiredMediaSize(dimensions, hostedInstantView);
+	const auto maxMediaWidth = hostedInstantView
+		? std::max(scaled.width(), st::maxMediaSize)
+		: st::maxMediaSize;
 	const auto minWidth = std::clamp(
 		_parent->minWidthForMedia(),
 		(_parent->hasBubble()
 			? st::historyPhotoBubbleMinWidth
 			: st::minPhotoSize),
-		st::maxMediaSize);
+		maxMediaWidth);
 	const auto maxActualWidth = qMax(scaled.width(), minWidth);
 	auto maxWidth = qMax(maxActualWidth, scaled.height());
 	auto minHeight = qMax(scaled.height(), st::minPhotoSize);
@@ -230,7 +247,10 @@ QSize Photo::countCurrentSize(int newWidth) {
 	if (_serviceWidth) {
 		return { int(_serviceWidth), int(_serviceWidth) };
 	}
-	const auto thumbMaxWidth = qMin(newWidth, st::maxMediaSize);
+	const auto hostedInstantView = IsHostedInstantViewMedia(_parent);
+	const auto thumbMaxWidth = hostedInstantView
+		? std::max(newWidth, 1)
+		: qMin(newWidth, st::maxMediaSize);
 	const auto minWidth = std::clamp(
 		_parent->minWidthForMedia(),
 		qMin(thumbMaxWidth, _parent->hasBubble()
@@ -238,14 +258,15 @@ QSize Photo::countCurrentSize(int newWidth) {
 			: st::minPhotoSize),
 		thumbMaxWidth);
 	const auto dimensions = photoSize();
+	const auto desired = PhotoDesiredMediaSize(dimensions, hostedInstantView);
 	auto pix = _data->extendedMediaVideoDuration()
 		? CountMediaSize(
-			CountDesiredMediaSize(dimensions),
+			desired,
 			newWidth)
 		: CountPhotoMediaSize(
-			CountDesiredMediaSize(dimensions),
+			desired,
 			newWidth,
-			maxWidth());
+			hostedInstantView ? newWidth : maxWidth());
 	newWidth = qMax(pix.width(), minWidth);
 	auto newHeight = qMax(pix.height(), st::minPhotoSize);
 	if (_parent->hasBubble()) {
@@ -305,6 +326,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	const auto loaded = preview || _dataMedia->loaded();
 	const auto displayLoading = !preview && _data->displayLoading();
 
+	const auto hostedInstantView = IsHostedInstantViewMedia(_parent);
 	auto inWebPage = (_parent->media() != this);
 	auto paintx = 0, painty = 0, paintw = width(), painth = height();
 	auto bubble = _parent->hasBubble();
@@ -321,10 +343,12 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 	if (_serviceWidth > 0) {
 		paintUserpicFrame(p, context, rthumb.topLeft());
 	} else {
-		const auto rounding = inWebPage
+		const auto rounding = hostedInstantView
+			? std::optional<Ui::BubbleRounding>(Ui::BubbleRounding())
+			: inWebPage
 			? std::optional<Ui::BubbleRounding>()
 			: adjustedBubbleRounding();
-		if (!bubble) {
+		if (!bubble && !hostedInstantView) {
 			Assert(rounding.has_value());
 			fillImageShadow(p, rthumb, *rounding, context);
 		}

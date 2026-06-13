@@ -678,7 +678,7 @@ bool PeerData::canPinMessages() const {
 	Unexpected("Peer type in PeerData::canPinMessages.");
 }
 
-bool PeerData::canCreatePolls() const {
+bool PeerData::canCreatePolls(bool forbidInForums) const {
 	if (const auto user = asUser()) {
 		return user->isSelf()
 			|| (user->isBot()
@@ -688,15 +688,16 @@ bool PeerData::canCreatePolls() const {
 	} else if (isMonoforum()) {
 		return false;
 	}
-	return Data::CanSend(this, ChatRestriction::SendPolls);
+	return Data::CanSend(this, ChatRestriction::SendPolls, forbidInForums);
 }
 
-bool PeerData::canCreateTodoLists() const {
+bool PeerData::canCreateTodoLists(bool forbidInForums) const {
 	if (isMonoforum() || isBroadcast()) {
 		return false;
 	}
 	return session().premium()
-		&& (Data::CanSend(this, ChatRestriction::SendPolls) || isUser());
+		&& (Data::CanSend(this, ChatRestriction::SendPolls, forbidInForums)
+			|| isUser());
 }
 
 bool PeerData::canCreateTopics() const {
@@ -1682,6 +1683,23 @@ bool PeerData::useSubsectionTabs() const {
 	return false;
 }
 
+bool PeerData::displayAsForum() const {
+	if (!isForum()) {
+		return false;
+	} else if (Data::IsBotCreatesTopics(this)) {
+		const auto forum = asBot()->botInfo->forum();
+		return forum && !forum->topicsList()->empty();
+	}
+	return true;
+}
+
+bool PeerData::displaySubsectionTabs() const {
+	if (asBot()) {
+		return displayAsForum();
+	}
+	return useSubsectionTabs();
+}
+
 bool PeerData::viewForumAsMessages() const {
 	if (const auto channel = asChannel()) {
 		return channel->viewForumAsMessages();
@@ -2229,6 +2247,13 @@ std::optional<uint8> ColorIndexFromColor(const MTPPeerColor *color) {
 bool IsBotUserCreatesTopics(not_null<PeerData*> peer) {
 	if (const auto user = peer->asUser()) {
 		return user->botInfo && user->botInfo->userCreatesTopics;
+	}
+	return false;
+}
+
+bool IsBotCreatesTopics(not_null<const PeerData*> peer) {
+	if (const auto user = peer->asUser()) {
+		return user->botInfo && !user->botInfo->userCreatesTopics;
 	}
 	return false;
 }

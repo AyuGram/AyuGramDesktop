@@ -118,11 +118,13 @@ Data::ChatFilter ChangedFilter(
 		not_null<History*> history,
 		bool add) {
 	auto always = base::duplicate(filter.always());
+	auto pinned = filter.pinned();
 	auto never = base::duplicate(filter.never());
 	if (add) {
 		never.remove(history);
 	} else {
 		always.remove(history);
+		pinned.erase(ranges::remove(pinned, history), end(pinned));
 	}
 	const auto result = Data::ChatFilter(
 		filter.id(),
@@ -131,7 +133,7 @@ Data::ChatFilter ChangedFilter(
 		filter.colorIndex(),
 		filter.flags(),
 		std::move(always),
-		filter.pinned(),
+		pinned,
 		std::move(never));
 	const auto in = result.contains(history);
 	if (in == add) {
@@ -151,7 +153,7 @@ Data::ChatFilter ChangedFilter(
 		filter.colorIndex(),
 		filter.flags(),
 		std::move(always),
-		filter.pinned(),
+		std::move(pinned),
 		std::move(never));
 }
 

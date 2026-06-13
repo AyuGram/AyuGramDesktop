@@ -214,6 +214,9 @@ private:
 	void setupStories();
 	void setupSwipeBack();
 	void setupTopBarSuggestions();
+#ifdef _DEBUG
+	void setupTopBarSuggestionTestHotkeys();
+#endif // _DEBUG
 	void storiesExplicitCollapse();
 	void collectStoriesUserpicsViews(Data::StorySourcesList list);
 	void storiesToggleExplicitExpand(bool expand);
@@ -332,9 +335,11 @@ private:
 
 	base::unique_qptr<Ui::RpWidget> _chatFilters;
 
-	QPointer<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
+	base::unique_qptr<Ui::SlideWrap<Ui::RpWidget>> _topBarSuggestion;
+	base::unique_qptr<Ui::RpWidget> _topBarSuggestionPlaceholder;
 	rpl::event_stream<int> _topBarSuggestionHeightChanged;
 	rpl::event_stream<bool> _searchStateForTopBarSuggestion;
+	rpl::event_stream<> _prepareTopBarSnapshot;
 	rpl::event_stream<bool> _openedFolderOrForumChanges;
 
 	object_ptr<Ui::ElasticScroll> _scroll;

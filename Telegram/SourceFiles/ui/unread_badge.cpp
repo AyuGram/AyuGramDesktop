@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/power_saving.h"
+#include "ui/text/text_custom_emoji.h"
 #include "ui/unread_badge_paint.h"
 #include "styles/style_dialogs.h"
 
@@ -29,7 +30,92 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Ui {
 namespace {
 
-constexpr auto kPlayStatusLimit = 12;
+constexpr auto kPlayStatusLimit = 2;
+constexpr auto kBotVerifiedScale = 0.88;
+
+class ScaledBotVerifiedEmoji final : public Ui::Text::CustomEmoji {
+public:
+	ScaledBotVerifiedEmoji(
+		std::unique_ptr<Ui::Text::CustomEmoji> wrapped,
+		int innerSize,
+		int outerSize);
+
+	int width() override;
+	QString entityData() override;
+	void paint(QPainter &p, const Context &context) override;
+	void unload() override;
+	bool ready() override;
+	bool readyInDefaultState() override;
+
+private:
+	const std::unique_ptr<Ui::Text::CustomEmoji> _wrapped;
+	const int _innerSize = 0;
+	const int _outerSize = 0;
+	QImage _frame;
+	QColor _frameColor;
+
+};
+
+ScaledBotVerifiedEmoji::ScaledBotVerifiedEmoji(
+	std::unique_ptr<Ui::Text::CustomEmoji> wrapped,
+	int innerSize,
+	int outerSize)
+: _wrapped(std::move(wrapped))
+, _innerSize(innerSize)
+, _outerSize(outerSize) {
+}
+
+int ScaledBotVerifiedEmoji::width() {
+	return _outerSize;
+}
+
+QString ScaledBotVerifiedEmoji::entityData() {
+	return _wrapped->entityData();
+}
+
+void ScaledBotVerifiedEmoji::paint(QPainter &p, const Context &context) {
+	if (_frame.isNull() || _frameColor != context.textColor) {
+		if (!_wrapped->ready()) {
+			return;
+		}
+		const auto ratio = style::DevicePixelRatio();
+		const auto sourcePx = Data::FrameSizeFromTag(
+			Data::CustomEmojiSizeTag::Isolated);
+		_frame = QImage(
+			QSize(sourcePx, sourcePx),
+			QImage::Format_ARGB32_Premultiplied);
+		_frame.setDevicePixelRatio(ratio);
+		_frame.fill(Qt::transparent);
+
+		auto painter = QPainter(&_frame);
+		painter.translate(-context.position);
+		const auto was = context.internal.forceFirstFrame;
+		context.internal.forceFirstFrame = true;
+		_wrapped->paint(painter, context);
+		context.internal.forceFirstFrame = was;
+		painter.end();
+
+		_frame = _frame.scaled(
+			QSize(_innerSize, _innerSize) * ratio,
+			Qt::IgnoreAspectRatio,
+			Qt::SmoothTransformation);
+		_frameColor = context.textColor;
+	}
+	const auto skip = (_outerSize - _innerSize) / 2;
+	p.drawImage(context.position + QPoint(skip, skip), _frame);
+}
+
+void ScaledBotVerifiedEmoji::unload() {
+	_wrapped->unload();
+}
+
+bool ScaledBotVerifiedEmoji::ready() {
+	return !_frame.isNull() || _wrapped->ready();
+}
+
+bool ScaledBotVerifiedEmoji::readyInDefaultState() {
+	return !_frame.isNull() || _wrapped->ready();
+}
 
 } // namespace
 
@@ -347,11 +433,14 @@ int PeerBadge::drawPremiumEmojiStatus(
 		using namespace Ui::Text;
 		auto &manager = peer->session().data().customEmojiManager();
 		_emojiStatus->id = id;
-		_emojiStatus->emoji = std::make_unique<LimitedLoopsEmoji>(
+		_emojiStatus->emoji = MakeWrappedEmoji<LimitedLoopsEmoji>(
 			manager.create(
 				Data::EmojiStatusCustomId(id),
 				descriptor.customEmojiRepaint),
 			kPlayStatusLimit);
+	}
+	if (!_emojiStatus->emoji) {
+		return 0;
 	}
 	_emojiStatus->emoji->paint(p, {
 		.textColor = (*descriptor.premiumFg)->c,
@@ -466,10 +555,15 @@ void PeerBadge::set(
 		_botVerifiedData = std::make_unique<BotVerifiedData>();
 	}
 	if (details->iconId) {
-		_botVerifiedData->icon = std::make_unique<Ui::Text::FirstFrameEmoji>(
+		const auto outer = st::emojiSize;
+		const auto inner = int(base::SafeRound(
+			st::emojiSize * kBotVerifiedScale));
+		_botVerifiedData->icon = MakeWrappedEmoji<ScaledBotVerifiedEmoji>(
 			factory(
 				Data::SerializeCustomEmojiId(details->iconId),
-				{ .repaint = repaint }));
+				{ .repaint = repaint }),
+			inner,
+			outer);
 	}
 }
 
@@ -485,7 +579,7 @@ int PeerBadge::drawVerified(
 		icon->paint(p, {
 			.textColor = st.color->c,
 			.now = crl::now(),
-			.position = position,
+			.position = position + st.position,
 		});
 		return icon->width();
 	}

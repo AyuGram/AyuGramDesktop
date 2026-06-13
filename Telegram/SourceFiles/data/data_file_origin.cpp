@@ -43,6 +43,11 @@ struct FileReferenceAccumulator {
 		push(data.data().vphotos());
 		push(data.data().vdocuments());
 	}
+	void push(const MTPRichMessage &data) {
+		const auto &fields = data.data();
+		push(fields.vphotos());
+		push(fields.vdocuments());
+	}
 	void push(const MTPWallPaper &data) {
 		data.match([&](const MTPDwallPaper &data) {
 			push(data.vdocument());
@@ -65,6 +70,7 @@ struct FileReferenceAccumulator {
 			push(data.vicons());
 		}, [&](const MTPDwebPageAttributeStarGiftAuction &data) {
 			push(data.vgift());
+		}, [](const MTPDwebPageAttributeAiComposeTone &) {
 		});
 	}
 	void push(const MTPStarGift &data) {
@@ -141,6 +147,7 @@ struct FileReferenceAccumulator {
 		data.match([&](const MTPDmessage &data) {
 			push(data.vmedia());
 			push(data.vreply_to());
+			push(data.vrich_message());
 		}, [&](const MTPDmessageService &data) {
 			data.vaction().match(
 			[&](const MTPDmessageActionChatEditPhoto &data) {

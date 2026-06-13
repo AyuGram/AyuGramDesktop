@@ -293,7 +293,7 @@ void Tray::addAction(rpl::producer<QString> text, Fn<void()> &&callback) {
 		using namespace rpl::mappers;
 		_callbackFromTrayLifetime = _menu->shownValue(
 		) | rpl::filter(!_1) | rpl::take(1) | rpl::on_next([=] {
-			callback();
+			crl::on_main([=] { callback(); });
 		});
 	});
 

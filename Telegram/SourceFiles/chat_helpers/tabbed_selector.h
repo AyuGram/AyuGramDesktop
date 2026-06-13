@@ -419,7 +419,8 @@ protected:
 	void scrollTo(int y);
 	void disableScroll(bool disabled);
 
-	void checkHideWithBox(object_ptr<Ui::BoxContent> box);
+	void showBoxPreventHide(object_ptr<Ui::BoxContent> box);
+	void preventHideWithBox(base::weak_qptr<Ui::BoxContent> weak);
 
 	void paintEmptySearchResults(
 		Painter &p,

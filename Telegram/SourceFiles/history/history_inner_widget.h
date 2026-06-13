@@ -12,11 +12,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rp_widget.h"
 #include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animations.h"
+#include "ui/effects/thanos_effect_controller.h"
 #include "ui/dragging_scroll_manager.h"
 #include "ui/widgets/middle_click_autoscroll.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/userpic_view.h"
+#include "history/history_message_selection.h"
+#include "history/history_inner_widget_accessibility.h"
+#include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_top_bar_widget.h"
 
 #include <QtGui/QPainterPath>
@@ -110,12 +114,34 @@ public:
 		not_null<History*> history);
 	~HistoryInner();
 
+	// Accessibility.
+	QAccessible::Role accessibilityRole() override {
+		return QAccessible::Role::List;
+	}
+	Qt::FocusPolicy accessibilityFocusPolicy() override {
+		return Qt::TabFocus;
+	}
+	int accessibilityChildCount() const override;
+	QString accessibilityChildName(int index) const override;
+	QAccessible::State accessibilityChildState(int index) const override;
+	QAccessible::Role accessibilityChildRole() const override;
+	QRect accessibilityChildRect(int index) const override;
+	int accessibilityChildColumnCount(int row) const override;
+	QAccessible::Role accessibilityChildSubItemRole() const override;
+	QString accessibilityChildSubItemName(
+		int row, int column) const override;
+	QString accessibilityChildSubItemValue(
+		int row, int column) const override;
+
 	[[nodiscard]] Main::Session &session() const;
 	[[nodiscard]] not_null<Ui::ChatTheme*> theme() const {
 		return _theme.get();
 	}
 
 	Ui::ChatPaintContext preparePaintContext(const QRect &clip) const;
+
+	using CollapseGap = Ui::CollapseGap;
+	void setCollapseGaps(std::vector<CollapseGap> gaps);
 
 	void messagesReceived(
 		not_null<PeerData*> peer,
@@ -216,6 +242,9 @@ public:
 	[[nodiscard]] int itemTop(const HistoryItem *item) const;
 	[[nodiscard]] int itemTop(const Element *view) const;
 	[[nodiscard]] Element *viewByItem(const HistoryItem *item) const;
+	bool scrollToElementLocalY(
+		not_null<const Element*> view,
+		int localTop);
 
 	// Returns (view, offset-from-top).
 	[[nodiscard]] std::pair<Element*, int> findViewForPinnedTracking(
@@ -247,6 +276,7 @@ public:
 	-> std::unique_ptr<HistoryMainElementDelegateMixin>;
 
 protected:
+	void focusInEvent(QFocusEvent *e) override;
 	bool focusNextPrevChild(bool next) override;
 
 	bool eventHook(QEvent *e) override; // calls touchEvent when necessary
@@ -263,6 +293,15 @@ protected:
 	void contextMenuEvent(QContextMenuEvent *e) override;
 
 private:
+	[[nodiscard]] std::vector<Element*> accessibleElements() const;
+	[[nodiscard]] int accessibilityUnreadBarIndex() const;
+	void toggleMessageSelection();
+	void playPauseFocusedMedia();
+	void setAccessibilityFocusedItem(int index, HistoryItem *item);
+	void announceAccessibilityFocus(int index);
+	[[nodiscard]] auto computeActiveColumns(int row) const
+		-> const std::vector<HistoryView::MessageSubItem> &;
+
 	void onTouchSelect();
 	void onTouchScrollTimer();
 	void markReadMetricsStale();
@@ -274,8 +313,7 @@ private:
 
 	using ChosenReaction = HistoryView::Reactions::ChosenReaction;
 	using VideoUserpic = Dialogs::Ui::VideoUserpic;
-	using SelectedItems
-		= base::flat_map<HistoryItem*, TextSelection, std::less<>>;
+	using SelectedItems = base::flat_set<not_null<HistoryItem*>, std::less<>>;
 	enum class MouseAction {
 		None,
 		PrepareDrag,
@@ -293,9 +331,15 @@ private:
 		BottomToTop,
 	};
 	using CursorState = HistoryView::CursorState;
+	using MessageSelection = HistoryView::MessageSelection;
 	using PointState = HistoryView::PointState;
 	using TextState = HistoryView::TextState;
 	using StateRequest = HistoryView::StateRequest;
+	struct RenderSelectionState {
+		TextSelection selection;
+		bool fullMessageSelected = false;
+		const MessageSelection *messageSelection = nullptr;
+	};
 
 	// This function finds all history items that are displayed and calls template method
 	// for each found message (in given direction) in the passed history with passed top offset.
@@ -343,6 +387,7 @@ private:
 
 	void scrollDateCheck();
 	void scrollDateHideByTimer();
+	void scrollDateCheckDownward();
 	bool canHaveFromUserpics() const;
 	void mouseActionStart(const QPoint &screenPos, Qt::MouseButton button);
 	void mouseActionUpdate();
@@ -360,6 +405,9 @@ private:
 
 	QPoint mapPointToItem(QPoint p, const Element *view) const;
 	QPoint mapPointToItem(QPoint p, const HistoryItem *item) const;
+	[[nodiscard]] not_null<HistoryItem*> lookupItemByPoint(
+		QPoint point,
+		not_null<Element*> view) const;
 	[[nodiscard]] HistoryView::SelectedQuote selectedQuote(
 		not_null<HistoryItem*> item) const;
 
@@ -387,12 +435,26 @@ private:
 	void adjustCurrent(int32 y, History *history) const;
 	Element *prevItem(Element *item);
 	Element *nextItem(Element *item);
+	[[nodiscard]] bool hasSelectedText() const;
+	void clearTextSelection();
+	void setTextSelection(
+		not_null<Element*> view,
+		MessageSelection selection);
+	[[nodiscard]] TextSelection getSelectedTextRange(
+		not_null<HistoryItem*> item) const;
+	[[nodiscard]] MessageSelection getSelectedTextSelection(
+		not_null<HistoryItem*> item) const;
+	[[nodiscard]] bool isPressInSelectedText(
+		not_null<const Element*> view,
+		TextState state) const;
+	[[nodiscard]] auto selectedItemsForExport() const
+		-> std::vector<not_null<HistoryItem*>>;
 	void updateDragSelection(Element *dragSelFrom, Element *dragSelTo, bool dragSelecting);
-	TextSelection itemRenderSelection(
+	RenderSelectionState itemRenderSelection(
 		not_null<Element*> view,
 		int selfromy,
 		int seltoy) const;
-	TextSelection computeRenderSelection(
+	RenderSelectionState computeRenderSelection(
 		not_null<const SelectedItems*> selected,
 		not_null<Element*> view) const;
 
@@ -479,6 +541,11 @@ private:
 	// Does any of the shown histories has this flag set.
 	bool hasPendingResizedItems() const;
 
+	int _accessibilityFocusedIndex = -1;
+	HistoryItem *_accessibilityFocusedItem = nullptr;
+	mutable const HistoryView::Element *_activeColumnsView = nullptr;
+	mutable std::vector<HistoryView::MessageSubItem> _activeColumns;
+
 	const not_null<HistoryWidget*> _widget;
 	const not_null<Ui::ScrollArea*> _scroll;
 	const not_null<Window::SessionController*> _controller;
@@ -518,6 +585,9 @@ private:
 
 	style::cursor _cursor = style::cur_default;
 	SelectedItems _selected;
+	HistoryItem *_selectedTextItem = nullptr;
+	MessageSelection _selectedTextSelection;
+	TextForMimeData _selectedText;
 	std::optional<Data::ReportInput> _chooseForReportReason;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
@@ -545,7 +615,7 @@ private:
 	HistoryItem *_mouseActionItem = nullptr;
 	HistoryItem *_dragStateItem = nullptr;
 	CursorState _mouseCursorState = CursorState();
-	uint16 _mouseTextSymbol = 0;
+	TextState _mouseTextAnchor;
 	bool _mouseActive = false;
 	bool _dragStateUserpic = false;
 	bool _pressWasInactive = false;
@@ -601,6 +671,7 @@ private:
 	base::Timer _scrollDateHideTimer;
 	Element *_scrollDateLastItem = nullptr;
 	int _scrollDateLastItemTop = 0;
+	bool _scrollDateAfterDayCrossing = false;
 	ClickHandlerPtr _scrollDateLink;
 	ClickHandlerPtr _forumThreadBarLink;
 
@@ -608,6 +679,11 @@ private:
 	std::unique_ptr<HistoryView::ElementOverlayHost> _overlayHost;
 
 	bool _wasForceClickPreview = false;
+
+	void setupThanosEffect();
+
+	std::unique_ptr<Ui::ThanosEffectController> _thanosController;
+	std::vector<CollapseGap> _collapseGaps;
 
 };
 

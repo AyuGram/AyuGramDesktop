@@ -202,6 +202,7 @@ public:
 		Fn<void(
 			std::shared_ptr<Ui::PreparedBundle>,
 			Api::SendOptions)> confirmed);
+	void processChosenSticker(FileChosen &&chosen);
 	[[nodiscard]] rpl::producer<FileChosen> fileChosen() const;
 	[[nodiscard]] rpl::producer<PhotoChosen> photoChosen() const;
 	[[nodiscard]] rpl::producer<FullReplyTo> jumpToItemRequests() const;
@@ -370,6 +371,7 @@ private:
 	void createTabbedPanel();
 	void setTabbedPanel(std::unique_ptr<ChatHelpers::TabbedPanel> panel);
 	void showAiComposeBox();
+	void triggerAiApplyInPlace();
 	[[nodiscard]] bool canSendAiComposeDirect() const;
 
 	[[nodiscard]] bool showRecordButton() const;
@@ -545,6 +547,7 @@ private:
 	bool _canAddMedia = false;
 
 	std::unique_ptr<Controls::WebpageProcessor> _preview;
+	bool _previewShown = false;
 
 	rpl::lifetime _historyLifetime;
 	rpl::lifetime _uploaderSubscriptions;

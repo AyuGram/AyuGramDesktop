@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QScreen>
 #include <QThread>
 #include <QDir>
+#include <QtCore/qmath.h>
 
 #include <qpa/qplatformscreen.h>
 
@@ -160,6 +161,14 @@ QString UiIntegration::openglCheckFilePath() {
 
 QString UiIntegration::angleBackendFilePath() {
 	return QDir().currentPath() + "/test/" + name() + "/angle";
+}
+
+void UiIntegration::touchCounterIncrement() {
+	++_touchCounter;
+}
+
+int UiIntegration::touchCounterNow() {
+	return _touchCounter;
 }
 
 } // namespace Test

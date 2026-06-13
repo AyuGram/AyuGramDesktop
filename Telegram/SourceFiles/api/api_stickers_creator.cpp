@@ -153,7 +153,7 @@ void FillChooseOwnedSetMenu(
 		const auto identifier = set->identifier();
 		const auto coverDocument = set->lookupThumbnailDocument();
 		auto thumbnail = coverDocument
-			? Ui::MakeDocumentThumbnail(
+			? Ui::MakeDocumentThumbnailFit(
 				coverDocument,
 				Data::FileOriginStickerSet(set->id, set->accessHash))
 			: nullptr;

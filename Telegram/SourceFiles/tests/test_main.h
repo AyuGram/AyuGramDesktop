@@ -105,6 +105,11 @@ public:
 	QString emojiCacheFolder();
 	QString openglCheckFilePath();
 	QString angleBackendFilePath();
+	void touchCounterIncrement();
+	int touchCounterNow();
+
+private:
+	int _touchCounter = 0;
 };
 
 } // namespace Test

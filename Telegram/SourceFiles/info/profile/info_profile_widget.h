@@ -43,7 +43,7 @@ public:
 		not_null<Controller*> controller,
 		const QRect &geometry) override;
 
-	Section section() const override;
+	Info::Section section() const override;
 
 	[[nodiscard]] Origin origin() const {
 		return _origin;

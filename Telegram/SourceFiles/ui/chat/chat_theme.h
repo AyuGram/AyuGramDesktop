@@ -83,8 +83,9 @@ struct CacheBackgroundRequest {
 	float64 gradientProgress = 1.;
 
 	explicit operator bool() const {
-		return !background.prepared.isNull()
-			|| !background.gradientForFill.isNull();
+		return !area.isEmpty()
+			&& (!background.prepared.isNull()
+				|| !background.gradientForFill.isNull());
 	}
 };
 

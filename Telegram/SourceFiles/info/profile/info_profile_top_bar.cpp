@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/shortcuts.h"
 #include "data/components/recent_shared_media_gifts.h"
+#include "data/data_birthday.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
@@ -50,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/profile/info_profile_badge_tooltip.h"
 #include "info/profile/info_profile_badge.h"
+#include "info/profile/info_profile_birthday_effect.h"
 #include "info/profile/info_profile_cover.h" // LargeCustomEmojiMargins
 #include "info/profile/info_profile_status_label.h"
 #include "info/profile/info_profile_top_bar_action_button.h"
@@ -511,11 +513,39 @@ TopBar::TopBar(
 		descriptor.showFinished
 	) | rpl::take(1) | rpl::on_next([=] {
 		setupPinnedToTopGifts(controller);
+		setupBirthdayEffect();
 	}, lifetime());
 
 	if (_forumButton) {
 		_forumButton->show();
 	}
+}
+
+void TopBar::setupBirthdayEffect() {
+	const auto user = _peer->asUser();
+	if (!user || !Data::IsBirthdayToday(user->birthday())) {
+		return;
+	} else if (_wrap.current() == Wrap::Side) {
+		return;
+	}
+	const auto container = static_cast<Ui::RpWidget*>(parentWidget());
+	if (!container) {
+		return;
+	}
+	StartProfileBirthdayEffect(
+		container,
+		user,
+		[weak = base::make_weak(this)] {
+			const auto strong = weak.get();
+			if (!strong) {
+				return QRect();
+			}
+			const auto geometry = strong->userpicGeometry();
+			return QRect(
+				strong->mapToParent(geometry.topLeft()),
+				geometry.size());
+		},
+		_gifPausedChecker);
 }
 
 void TopBar::adjustColors(const std::optional<QColor> &edgeColor) {
@@ -1169,6 +1199,7 @@ void TopBar::setupUserpicButton(
 			: (user && !user->isSelf() && !_peer->isBot())
 			? &tr::lng_profile_set_personal_sure
 			: nullptr;
+		const auto useForumShape = _peer->isForum() && !_peer->isBot();
 		return Editor::EditorData{
 			.about = (phrase
 				? (*phrase)(
@@ -1180,7 +1211,9 @@ void TopBar::setupUserpicButton(
 			.confirm = ((type == ChosenType::Suggest)
 				? tr::lng_profile_suggest_button(tr::now)
 				: tr::lng_profile_set_photo_button(tr::now)),
-			.cropType = Editor::EditorData::CropType::Ellipse,
+			.cropType = (useForumShape
+				? Editor::EditorData::CropType::RoundedRect
+				: Editor::EditorData::CropType::Ellipse),
 			.keepAspectRatio = true,
 		};
 	};
@@ -2664,6 +2697,10 @@ void TopBar::setupStoryOutline(const QRect &geometry) {
 					| Data::PeerUpdate::Flag::ColorProfile
 			) | rpl::filter([=](const Data::PeerUpdate &update) {
 				return update.peer == _peer;
+			}) | rpl::to_empty,
+			_peer->owner().stories().sourceChanged(
+			) | rpl::filter([=](PeerId peerId) {
+				return peerId == _peer->id;
 			}) | rpl::to_empty)
 	) | rpl::on_next([=](
 			std::optional<QColor> edgeColor,
@@ -2737,9 +2774,10 @@ void TopBar::updateStoryOutline(std::optional<QColor> edgeColor) {
 		return;
 	}
 
-	const auto &stories = _peer->owner().stories();
+	auto &stories = _peer->owner().stories();
 	const auto source = stories.source(_peer->id);
 	if (!source) {
+		stories.requestPeerStories(_peer);
 		return;
 	}
 

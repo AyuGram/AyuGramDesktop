@@ -466,8 +466,16 @@ void Controller::hideSettingsAndLayer(anim::type animated) {
 	_widget.ui_hideSettingsAndLayer(animated);
 }
 
+bool Controller::closeLayerByBackButton() {
+	return _widget.closeLayerByBackButton();
+}
+
 bool Controller::isLayerShown() const {
 	return _widget.ui_isLayerShown();
+}
+
+rpl::producer<bool> Controller::boxShownValue() const {
+	return _widget.ui_boxShownValue();
 }
 
 void Controller::sideBarChanged() {

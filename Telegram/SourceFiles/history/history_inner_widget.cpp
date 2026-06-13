@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_about_view.h"
+#include "history/view/history_view_drag.h"
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
@@ -36,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_element_overlay.h"
 #include "history/view/history_view_emoji_interactions.h"
 #include "history/view/history_view_top_peers_selector.h"
+#include "history/history_inner_widget_accessibility.h"
 #include "history/history_item_components.h"
 #include "history/history_item_text.h"
 #include "payments/payments_reaction_process.h"
@@ -51,11 +53,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/report_box_graphics.h"
 #include "ui/controls/delete_message_context_action.h"
 #include "ui/controls/who_reacted_context_action.h"
-#include "ui/text/format_values.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/inactive_press.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -96,8 +98,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_suggest_post.h"
 #include "api/api_stickers_creator.h"
 #include "api/api_toggling_media.h"
+#include "media/player/media_player_instance.h"
 #include "api/api_who_reacted.h"
 #include "api/api_views.h"
+#include "ui/accessible/ui_accessible_item.h"
 #include "lang/lang_keys.h"
 #include "data/components/factchecks.h"
 #include "data/components/sponsored_messages.h"
@@ -105,17 +109,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_document.h"
+#include "data/data_photo.h"
 #include "data/data_channel.h"
 #include "data/data_forum_topic.h"
 #include "data/data_photo_media.h"
 #include "data/data_peer_values.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
+#include "data/data_message_reaction_id.h"
+#include "data/data_poll.h"
 #include "data/data_file_click_handler.h"
 #include "data/data_histories.h"
 #include "data/data_changes.h"
-#include "data/data_poll.h"
-#include "data/data_todo_list.h"
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -138,6 +143,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace {
 
 constexpr auto kScrollDateHideTimeout = 800;
+constexpr auto kScrollDateHideOnDayCrossingTimeout = crl::time(3000);
 constexpr auto kUnloadHeavyPartsPages = 2;
 constexpr auto kClearUserpicsAfter = 50;
 
@@ -244,6 +250,13 @@ public:
 				context,
 				showInMediaView);
 		}
+	}
+	bool elementScrollToLocalY(
+			not_null<const Element*> view,
+			int localTop) override {
+		return _widget
+			? _widget->scrollToElementLocalY(view, localTop)
+			: false;
 	}
 	void elementCancelUpload(const FullMsgId &context) override {
 		if (_widget) {
@@ -403,6 +416,7 @@ HistoryInner::HistoryInner(
 	refreshAboutView();
 
 	setMouseTracking(true);
+	setAccessibleName(tr::lng_sr_message_list(tr::now));
 	Core::App().inAppKeyPressed(
 	) | rpl::on_next([=] {
 		registerReadMetricsActivity();
@@ -443,6 +457,7 @@ HistoryInner::HistoryInner(
 	) | rpl::on_next(
 		[this](auto item) { itemRemoved(item); },
 		lifetime());
+	setupThanosEffect();
 	session().data().viewRemoved(
 	) | rpl::on_next(
 		[this](auto view) { viewRemoved(view); },
@@ -710,10 +725,38 @@ void HistoryInner::setupSwipeReplyAndBack() {
 		}
 	};
 
+	const auto canConsumeHorizontalScroll = [=](QPoint position, int delta) {
+		auto result = false;
+		enumerateItems<EnumItemsDirection::BottomToTop>([&](
+				not_null<Element*> view,
+				int itemtop,
+				int itembottom) {
+			if ((position.y() < itemtop)
+				|| (position.y() > itembottom)
+				|| !view->data()->isRegular()
+				|| view->data()->isService()) {
+				return true;
+			}
+			result = view->canConsumeHorizontalScroll(
+				mapPointToItem(position, view),
+				delta);
+			return false;
+		});
+		return result;
+	};
+
 	auto init = [=, show = _controller->uiShow()](
-			int cursorTop,
-			Qt::LayoutDirection direction) {
-		if (direction == Qt::RightToLeft) {
+			Ui::Controls::SwipeHandlerInitData data) {
+		auto result = Ui::Controls::SwipeHandlerFinishData();
+		const auto horizontalScrollDelta = (data.direction == Qt::LeftToRight)
+			? 1
+			: -1;
+		if (canConsumeHorizontalScroll(
+				data.cursorPosition,
+				horizontalScrollDelta)) {
+			return result;
+		}
+		if (data.direction == Qt::RightToLeft) {
 			auto good = true;
 			enumerateItems<EnumItemsDirection::BottomToTop>([&](
 					not_null<Element*> view,
@@ -733,7 +776,6 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				return Ui::Controls::SwipeHandlerFinishData();
 			}
 		}
-		auto result = Ui::Controls::SwipeHandlerFinishData();
 		if (inSelectionMode().inSelectionMode
 			|| (peer->isChannel() && !peer->isMegagroup())) {
 			return result;
@@ -742,14 +784,16 @@ void HistoryInner::setupSwipeReplyAndBack() {
 				not_null<Element*> view,
 				int itemtop,
 				int itembottom) {
-			if ((cursorTop < itemtop)
-				|| (cursorTop > itembottom)
+			if ((data.cursorPosition.y() < itemtop)
+				|| (data.cursorPosition.y() > itembottom)
 				|| !view->data()->isRegular()
 				|| view->data()->showSimilarChannels()
 				|| view->data()->isService()) {
 				return true;
 			}
-			const auto item = view->data();
+			const auto item = lookupItemByPoint(
+				data.cursorPosition,
+				view);
 			const auto canSendReply = CanSendReply(item);
 			const auto canReply = canSendReply || item->allowsForward();
 			if (!canReply) {
@@ -758,15 +802,23 @@ void HistoryInner::setupSwipeReplyAndBack() {
 			if (_overlayHost) {
 				_overlayHost->hide();
 			}
-			result.msgBareId = item->fullId().msg.bare;
-			result.callback = [=, itemId = item->fullId()] {
-				const auto still = show->session().data().message(itemId);
-				const auto selected = selectedQuote(still);
-				const auto replyToItemId = (selected.item
+			const auto viewItemId = view->data()->fullId();
+			const auto itemId = item->fullId();
+			result.msgBareId = viewItemId.msg.bare;
+			result.callback = [=] {
+				const auto still = show->session().data().message(viewItemId);
+				const auto selected = still
+					? selectedQuote(still)
+					: HistoryView::SelectedQuote();
+				const auto exact = selected.item
 					? selected.item
-					: still)->fullId();
+					: show->session().data().message(itemId);
+				if (!exact) {
+					return;
+				}
+				Window::ActivateWindow(_controller);
 				_widget->replyToMessage({
-					.messageId = replyToItemId,
+					.messageId = exact->fullId(),
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
 				});
@@ -785,6 +837,15 @@ void HistoryInner::setupSwipeReplyAndBack() {
 		.update = std::move(update),
 		.init = std::move(init),
 		.dontStart = _touchMaybeSelecting.value(),
+		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
+			const auto delta = Ui::ScrollDelta(event);
+			if (std::abs(delta.x()) <= std::abs(delta.y())) {
+				return false;
+			}
+			return canConsumeHorizontalScroll(
+				mapFromGlobal(event->globalPosition().toPoint()),
+				delta.x());
+		},
 	});
 }
 
@@ -880,7 +941,14 @@ void HistoryInner::enumerateItemsInHistory(History *history, int historytop, Met
 		return;
 	}
 
-	auto searchEdge = TopToBottom ? _visibleAreaTop : _visibleAreaBottom;
+	auto collapseGapsTotal = 0;
+	for (const auto &gap : _collapseGaps) {
+		collapseGapsTotal += gap.height;
+	}
+
+	auto searchEdge = TopToBottom
+		? (_visibleAreaTop - collapseGapsTotal)
+		: _visibleAreaBottom;
 
 	// Binary search for blockIndex of the first block that is not completely below the visible area.
 	auto blockIndex = BinarySearchBlocksOrItems<TopToBottom>(history->blocks, searchEdge - historytop);
@@ -891,17 +959,48 @@ void HistoryInner::enumerateItemsInHistory(History *history, int historytop, Met
 	auto blockbottom = blocktop + block->height();
 	auto itemIndex = BinarySearchBlocksOrItems<TopToBottom>(block->messages, searchEdge - blocktop);
 
+	const auto gapCount = int(_collapseGaps.size());
+	auto nextGapIndex = TopToBottom ? 0 : gapCount;
+	auto collapseShift = TopToBottom ? 0 : collapseGapsTotal;
+
 	while (true) {
 		while (true) {
 			auto view = block->messages[itemIndex].get();
-			auto itemtop = blocktop + view->y();
+			auto logicalTop = blocktop + view->y();
+
+			if (TopToBottom) {
+				while (nextGapIndex < gapCount) {
+					const auto &gap = _collapseGaps[nextGapIndex];
+					if (logicalTop < gap.absY) break;
+					collapseShift += gap.height;
+					++nextGapIndex;
+				}
+			} else {
+				while (nextGapIndex > 0) {
+					const auto &gap = _collapseGaps[nextGapIndex - 1];
+					if (logicalTop >= gap.absY) break;
+					collapseShift -= gap.height;
+					--nextGapIndex;
+				}
+			}
+
+			auto itemtop = logicalTop + collapseShift;
 			auto itembottom = itemtop + view->height();
 
-			// Binary search should've skipped all the items that are above / below the visible area.
 			if (TopToBottom) {
-				Assert(itembottom > _visibleAreaTop);
+				if (itembottom <= _visibleAreaTop) {
+					if (++itemIndex >= block->messages.size()) {
+						break;
+					}
+					continue;
+				}
 			} else {
-				Assert(itemtop < _visibleAreaBottom);
+				if (itemtop >= _visibleAreaBottom) {
+					if (--itemIndex < 0) {
+						break;
+					}
+					continue;
+				}
 			}
 
 			if (!method(view, itemtop, itembottom)) {
@@ -966,7 +1065,8 @@ bool HistoryInner::canHaveFromUserpics() const {
 		&& !_peer->isSelf()
 		&& !_peer->isRepliesChat()
 		&& !_peer->isVerifyCodes()
-		&& !_isChatWide) {
+		&& !_isChatWide
+		&& !_history->hasGuestChatBotMessages()) {
 		return false;
 	} else if (const auto channel = _peer->asBroadcast()) {
 		return channel->signatureProfiles();
@@ -1139,60 +1239,140 @@ void HistoryInner::enumerateForumThreadBars(Method method) {
 	enumerateItems<EnumItemsDirection::BottomToTop>(barCallback);
 }
 
-TextSelection HistoryInner::computeRenderSelection(
+auto HistoryInner::computeRenderSelection(
 		not_null<const SelectedItems*> selected,
-		not_null<Element*> view) const {
+		not_null<Element*> view) const -> RenderSelectionState {
+	auto result = RenderSelectionState();
 	if (view->isHiddenByGroup()) {
-		return TextSelection();
+		return result;
 	}
 	const auto item = view->data();
 	const auto itemSelection = [&](not_null<HistoryItem*> item) {
-		auto i = selected->find(item);
-		if (i != selected->end()) {
-			return i->second;
-		}
-		return TextSelection();
+		return selected->contains(item);
 	};
-	const auto result = itemSelection(item);
-	if (result != TextSelection() && result != FullSelection) {
-		return result;
-	}
 	if (const auto group = session().data().groups().find(item)) {
-		auto parts = TextSelection();
 		auto allFullSelected = true;
+		if (group->items.front() != item) {
+			return result;
+		}
 		const auto count = int(group->items.size());
 		for (auto i = 0; i != count; ++i) {
-			const auto part = group->items[i];
-			const auto selection = itemSelection(part);
-			if (part == item
-				&& selection != FullSelection
-				&& selection != TextSelection()) {
-				return selection;
-			} else if (selection == FullSelection) {
-				parts = AddGroupItemSelection(parts, i);
+			if (itemSelection(group->items[i])) {
+				result.selection = AddGroupItemSelection(result.selection, i);
 			} else {
 				allFullSelected = false;
 			}
 		}
-		return allFullSelected ? FullSelection : parts;
+		if (allFullSelected) {
+			result.selection = FullSelection;
+			result.fullMessageSelected = true;
+		}
+		return result;
 	}
-	return itemSelection(item);
+	if (itemSelection(item)) {
+		result.selection = FullSelection;
+		result.fullMessageSelected = true;
+	}
+	return result;
 }
 
-TextSelection HistoryInner::itemRenderSelection(
+auto HistoryInner::itemRenderSelection(
 		not_null<Element*> view,
 		int selfromy,
-		int seltoy) const {
+		int seltoy) const -> RenderSelectionState {
+	auto result = RenderSelectionState();
 	const auto item = view->data();
 	const auto y = view->block()->y() + view->y();
 	if (y >= selfromy && y < seltoy) {
 		if (_dragSelecting && !item->isService() && item->isRegular()) {
-			return FullSelection;
+			result.selection = FullSelection;
+			result.fullMessageSelected = true;
 		}
+		return result;
 	} else if (!_selected.empty()) {
 		return computeRenderSelection(&_selected, view);
+	} else if (item == _selectedTextItem) {
+		result.selection = _selectedTextSelection.flatSelection();
+		result.messageSelection = &_selectedTextSelection;
 	}
-	return TextSelection();
+	return result;
+}
+
+bool HistoryInner::hasSelectedText() const {
+	return (_selectedTextItem != nullptr) && !hasSelectedItems();
+}
+
+void HistoryInner::clearTextSelection() {
+	if (_selectedTextItem) {
+		if (const auto view = viewByItem(_selectedTextItem)) {
+			repaintItem(view);
+		}
+		_selectedTextItem = nullptr;
+		_selectedTextSelection = MessageSelection();
+		_selectedText = TextForMimeData();
+	}
+}
+
+void HistoryInner::setTextSelection(
+		not_null<Element*> view,
+		MessageSelection selection) {
+	if (!selection.empty()) {
+		ClickHandler::unpressed();
+	}
+	if (!_selected.empty()) {
+		_selected.clear();
+		_widget->updateTopBarSelection();
+		_widget->update();
+	}
+	const auto item = view->data();
+	if (_selectedTextItem != item) {
+		clearTextSelection();
+		_selectedTextItem = item;
+	}
+	_selectedTextSelection = selection;
+	_selectedText = !selection.empty()
+		? view->selectedText(selection)
+		: TextForMimeData();
+	repaintItem(view);
+	if (!_wasSelectedText && !_selectedText.empty()) {
+		_wasSelectedText = true;
+		setFocus();
+	}
+}
+
+TextSelection HistoryInner::getSelectedTextRange(
+		not_null<HistoryItem*> item) const {
+	return hasSelectedText() && (_selectedTextItem == item)
+		? _selectedTextSelection.flatRangeForEdit()
+		: TextSelection();
+}
+
+auto HistoryInner::getSelectedTextSelection(
+		not_null<HistoryItem*> item) const -> MessageSelection {
+	return hasSelectedText() && (_selectedTextItem == item)
+		? _selectedTextSelection
+		: MessageSelection();
+}
+
+bool HistoryInner::isPressInSelectedText(
+		not_null<const Element*> view,
+		TextState state) const {
+	return (_selectedTextItem == _mouseActionItem)
+		&& hasSelectedText()
+		&& view->selectionContains(_selectedTextSelection, state);
+}
+
+auto HistoryInner::selectedItemsForExport() const
+-> std::vector<not_null<HistoryItem*>> {
+	auto result = std::vector<not_null<HistoryItem*>>();
+	result.reserve(_selected.size());
+	for (const auto &item : _selected) {
+		result.push_back(item);
+	}
+	ranges::sort(result, {}, [](not_null<HistoryItem*> item) {
+		return item->fullId();
+	});
+	return result;
 }
 
 void HistoryInner::paintEmpty(
@@ -1260,7 +1440,10 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			&& clip.y() + clip.height() > _aboutView->top) {
 			const auto top = _aboutView->top;
 			context.translate(0, -top);
-			context.selection = computeRenderSelection(&_selected, view);
+			const auto selection = computeRenderSelection(&_selected, view);
+			context.selection = selection.selection;
+			context.fullMessageSelected = selection.fullMessageSelected;
+			context.messageSelection = selection.messageSelection;
 			p.translate(0, top);
 			view->draw(p, context);
 			context.translate(0, top);
@@ -1400,10 +1583,13 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			context.reactionInfo
 				= _reactionsManager->currentReactionPaintInfo();
 			context.outbg = view->hasOutLayout();
-			context.selection = itemRenderSelection(
+			const auto selection = itemRenderSelection(
 				view,
 				selfromy - mtop,
 				seltoy - mtop);
+			context.selection = selection.selection;
+			context.fullMessageSelected = selection.fullMessageSelected;
+			context.messageSelection = selection.messageSelection;
 			context.highlight = _widget->itemHighlight(view->data());
 			view->draw(p, context);
 			processPainted(view, top, height);
@@ -1432,12 +1618,32 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		auto iItem = (_curHistory == _history ? _curItem : 0);
 		auto view = block->messages[iItem].get();
 		auto top = htop + block->y() + view->y();
+
+		auto nextGapIndex = 0;
+		auto collapseShift = 0;
+		for (; nextGapIndex < int(_collapseGaps.size()); ++nextGapIndex) {
+			const auto &gap = _collapseGaps[nextGapIndex];
+			if (top < gap.absY) break;
+			collapseShift += gap.height;
+		}
+		top += collapseShift;
+
 		context.clip = clip.intersected(
 			QRect(0, hdrawtop, width(), clip.top() + clip.height()));
 		context.translate(0, -top);
 		p.translate(0, top);
 		const auto &sendingAnimation = _controller->sendingAnimation();
 		while (top < drawToY) {
+			while (nextGapIndex < int(_collapseGaps.size())) {
+				const auto &gap = _collapseGaps[nextGapIndex];
+				if (top - collapseShift < gap.absY) break;
+				top += gap.height;
+				collapseShift += gap.height;
+				context.translate(0, -gap.height);
+				p.translate(0, gap.height);
+				++nextGapIndex;
+			}
+
 			const auto height = view->height();
 			const auto item = view->data();
 			if ((context.clip.y() < height)
@@ -1446,10 +1652,13 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 				context.reactionInfo
 					= _reactionsManager->currentReactionPaintInfo();
 				context.outbg = view->hasOutLayout();
-				context.selection = itemRenderSelection(
+				const auto selection = itemRenderSelection(
 					view,
 					selfromy - htop,
 					seltoy - htop);
+				context.selection = selection.selection;
+				context.fullMessageSelected = selection.fullMessageSelected;
+				context.messageSelection = selection.messageSelection;
 				context.highlight = _widget->itemHighlight(item);
 				view->draw(p, context);
 				processPainted(view, top, height);
@@ -1955,6 +2164,13 @@ QPoint HistoryInner::mapPointToItem(
 	return QPoint();
 }
 
+not_null<HistoryItem*> HistoryInner::lookupItemByPoint(
+		QPoint point,
+		not_null<Element*> view) const {
+	point -= QPoint(SelectionViewOffset(this, view), 0);
+	return HistoryView::LookupItemByPoint(view, mapPointToItem(point, view));
+}
+
 void HistoryInner::mousePressEvent(QMouseEvent *e) {
 	if (_menu) {
 		e->accept();
@@ -2007,77 +2223,56 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 		&& (!Element::Hovered()
 			|| !Element::Hovered()->allowTextSelectionByHandler(pressed))) {
 		_mouseAction = MouseAction::PrepareDrag;
-	} else if (inSelectionMode().inSelectionMode) {
+	} else if (hasSelectedItems()) {
 		if (_dragStateItem
 			&& _selected.find(_dragStateItem) != _selected.cend()
 			&& Element::Hovered()) {
 			_mouseAction = MouseAction::PrepareDrag; // start items drag
-		} else if (!_pressWasInactive) {
+		} else if (!_pressWasInactive && !hasSelectRestriction()) {
 			_mouseAction = MouseAction::PrepareSelect; // start items select
 		}
 	}
 	if (_mouseAction == MouseAction::None && mouseActionView) {
 		TextState dragState;
-		if (_trippleClickTimer.isActive() && (screenPos - _trippleClickPoint).manhattanLength() < QApplication::startDragDistance()) {
-			StateRequest request;
-			request.flags = Ui::Text::StateRequest::Flag::LookupSymbol;
-			dragState = mouseActionView->textState(_dragStartPosition, request);
-			if (dragState.cursor == CursorState::Text) {
-				TextSelection selStatus = { dragState.symbol, dragState.symbol };
-				if (selStatus != FullSelection && (_selected.empty() || _selected.cbegin()->second != FullSelection)) {
-					if (!_selected.empty()) {
-						repaintItem(_selected.cbegin()->first);
-						_selected.clear();
-					}
-					_selected.emplace(_mouseActionItem, selStatus);
-					_mouseTextSymbol = dragState.symbol;
-					_mouseAction = MouseAction::Selecting;
-					_mouseSelectType = TextSelectType::Paragraphs;
-					mouseActionUpdate(_mousePosition);
-					_trippleClickTimer.callOnce(
-						QApplication::doubleClickInterval());
-				}
-			}
-		} else if (Element::Pressed()) {
-			StateRequest request;
-			request.flags = Ui::Text::StateRequest::Flag::LookupSymbol;
-			dragState = mouseActionView->textState(_dragStartPosition, request);
+		const auto validStartPoint = ((screenPos - _trippleClickPoint)
+			.manhattanLength() < QApplication::startDragDistance());
+		StateRequest request;
+		request.flags = Ui::Text::StateRequest::Flag::LookupSymbol;
+		dragState = mouseActionView->textState(_dragStartPosition, request);
+		if (_trippleClickTimer.isActive()
+			&& validStartPoint
+			&& dragState.cursor == CursorState::Text) {
+			_mouseTextAnchor = dragState;
+			_mouseSelectType = TextSelectType::Paragraphs;
+			setTextSelection(
+				mouseActionView,
+				mouseActionView->selectionFromStates(
+					_mouseTextAnchor,
+					dragState,
+					_mouseSelectType));
+			_mouseAction = MouseAction::Selecting;
+			mouseActionUpdate(_mousePosition);
+			_trippleClickTimer.callOnce(
+				QApplication::doubleClickInterval());
 		}
 		if (_mouseSelectType != TextSelectType::Paragraphs) {
 			if (Element::Pressed()) {
-				_mouseTextSymbol = dragState.symbol;
-				bool uponSelected = (dragState.cursor == CursorState::Text);
-				if (uponSelected) {
-					if (_selected.empty()
-						|| _selected.cbegin()->second == FullSelection
-						|| _selected.cbegin()->first != _mouseActionItem) {
-						uponSelected = false;
-					} else {
-						uint16 selFrom = _selected.cbegin()->second.from, selTo = _selected.cbegin()->second.to;
-						if (_mouseTextSymbol < selFrom || _mouseTextSymbol >= selTo) {
-							uponSelected = false;
-						}
-					}
-				}
-				if (uponSelected) {
+				if (isPressInSelectedText(mouseActionView, dragState)) {
 					_mouseAction = MouseAction::PrepareDrag; // start text drag
 				} else if (!_pressWasInactive) {
 					if (_mouseCursorState == CursorState::Date) {
 						_mouseAction = MouseAction::PrepareDrag; // start sticker drag or by-date drag
-					} else {
-						if (dragState.afterSymbol) ++_mouseTextSymbol;
-						TextSelection selStatus = { _mouseTextSymbol, _mouseTextSymbol };
-						if (selStatus != FullSelection && (_selected.empty() || _selected.cbegin()->second != FullSelection)) {
-							if (!_selected.empty()) {
-								repaintItem(_selected.cbegin()->first);
-								_selected.clear();
-							}
-							_selected.emplace(_mouseActionItem, selStatus);
-							_mouseAction = MouseAction::Selecting;
-							repaintItem(_mouseActionItem);
-						} else if (!hasSelectRestriction()) {
-							_mouseAction = MouseAction::PrepareSelect;
-						}
+					} else if (!hasSelectedItems()) {
+						_mouseTextAnchor = dragState;
+						setTextSelection(
+							mouseActionView,
+							mouseActionView->selectionFromStates(
+								_mouseTextAnchor,
+								dragState,
+								_mouseSelectType));
+						_mouseAction = MouseAction::Selecting;
+					} else if (!hasSelectRestriction()) {
+						_mouseAction = MouseAction::PrepareSelect;
 					}
 				}
 			} else if (!_pressWasInactive && !hasSelectRestriction()) {
@@ -2097,8 +2292,10 @@ void HistoryInner::mouseActionCancel() {
 	_mouseActionItem = nullptr;
 	_dragStateItem = nullptr;
 	_mouseAction = MouseAction::None;
+	_mouseTextAnchor = TextState();
 	_dragStartPosition = QPoint(0, 0);
 	_dragSelFrom = _dragSelTo = nullptr;
+	_dragSelecting = false;
 	_wasSelectedText = false;
 	_selectScroll.cancel();
 }
@@ -2117,26 +2314,14 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 	const auto pressedView = viewByItem(_mouseActionItem);
 	bool uponSelected = false;
 	if (pressedView) {
-		if (!_selected.empty() && _selected.cbegin()->second == FullSelection) {
+		if (hasSelectedItems()) {
 			uponSelected = _mouseActionItem
 				&& (_selected.find(_mouseActionItem) != _selected.cend());
 		} else {
 			StateRequest request;
 			request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
 			auto dragState = pressedView->textState(_dragStartPosition, request);
-			uponSelected = (dragState.cursor == CursorState::Text);
-			if (uponSelected) {
-				if (_selected.empty()
-					|| _selected.cbegin()->second == FullSelection
-					|| _selected.cbegin()->first != _mouseActionItem) {
-					uponSelected = false;
-				} else {
-					uint16 selFrom = _selected.cbegin()->second.from, selTo = _selected.cbegin()->second.to;
-					if (dragState.symbol < selFrom || dragState.symbol >= selTo) {
-						uponSelected = false;
-					}
-				}
-			}
+			uponSelected = isPressInSelectedText(pressedView, dragState);
 		}
 	}
 	auto urls = QList<QUrl>();
@@ -2193,6 +2378,7 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 			}
 		}
 
+		auto photoData = HistoryView::PhotoDragData();
 		if (pressedHandler) {
 			const auto lnkDocument = reinterpret_cast<DocumentData*>(
 				pressedHandler->property(
@@ -2203,9 +2389,17 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 					urls.push_back(QUrl::fromLocalFile(filepath));
 				}
 			}
+			const auto lnkPhoto = reinterpret_cast<PhotoData*>(
+				pressedHandler->property(
+					kPhotoLinkMediaProperty).toULongLong());
+			if (lnkPhoto) {
+				photoData = HistoryView::PreparePhotoDragData(lnkPhoto);
+			}
 		}
 
-		if (forwardIds.empty() && urls.isEmpty()) {
+		if (forwardIds.empty()
+			&& urls.isEmpty()
+			&& photoData.image.isNull()) {
 			return nullptr;
 		}
 
@@ -2217,6 +2411,9 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		if (!urls.isEmpty()) {
 			result->setUrls(urls);
 		}
+		HistoryView::FillDragMimeWithPhoto(
+			result.get(),
+			std::move(photoData));
 		return result;
 	}
 	return nullptr;
@@ -2246,6 +2443,11 @@ void HistoryInner::itemRemoved(not_null<const HistoryItem*> item) {
 	_animatedStickersPlayed.remove(item);
 	_reactionsManager->remove(item->fullId());
 	_replyButtonManager->remove(item->fullId());
+
+	if (_selectedTextItem == item) {
+		clearTextSelection();
+		_widget->updateTopBarSelection();
+	}
 
 	auto i = _selected.find(item);
 	if (i != _selected.cend()) {
@@ -2292,32 +2494,36 @@ void HistoryInner::mouseActionFinish(
 		Qt::MouseButton button) {
 	mouseActionUpdate(screenPos);
 
-	auto activated = ClickHandler::unpressed();
-	if (_mouseAction == MouseAction::Dragging) {
-		activated = nullptr;
-	} else if (_mouseActionItem) {
-		// if we are in selecting items mode perhaps we want to
-		// toggle selection instead of activating the pressed link
-		if (_mouseAction == MouseAction::PrepareDrag
-			&& !_pressWasInactive
-			&& inSelectionMode().inSelectionMode
-			&& button != Qt::RightButton) {
-			if (const auto view = viewByItem(_mouseActionItem)) {
-				if (view->toggleSelectionByHandlerClick(activated)) {
-					activated = nullptr;
-				}
-			}
+	const auto toggleByHandler = [&](const ClickHandlerPtr &handler) {
+		if (const auto view = viewByItem(_mouseActionItem)) {
+			return view->toggleSelectionByHandlerClick(handler);
 		}
-	}
+		return false;
+	};
+
+	auto activated = ClickHandler::unpressed();
 	const auto pressedItemView = Element::Pressed();
 	if (pressedItemView) {
 		repaintItem(pressedItemView);
 		Element::Pressed(nullptr);
 	}
 
+	const auto simpleSelectionChange = _mouseActionItem
+		&& !_pressWasInactive
+		&& (button != Qt::RightButton)
+		&& (_mouseAction == MouseAction::PrepareSelect
+			|| _mouseAction == MouseAction::PrepareDrag);
+	const auto needItemSelectionToggle = simpleSelectionChange
+		&& (!activated || toggleByHandler(activated))
+		&& hasSelectedItems();
+	const auto needTextSelectionClear = simpleSelectionChange
+		&& hasSelectedText();
+
 	_wasSelectedText = false;
 
-	if (activated) {
+	if (_mouseAction == MouseAction::Dragging || needItemSelectionToggle) {
+		activated = nullptr;
+	} else if (activated) {
 		const auto pressedItemId = pressedItemView
 			? pressedItemView->data()->fullId()
 			: _mouseActionItem
@@ -2331,7 +2537,25 @@ void HistoryInner::mouseActionFinish(
 			prepareClickContext(button, pressedItemId));
 		return;
 	}
-	if ((_mouseAction == MouseAction::PrepareSelect)
+	if (needItemSelectionToggle) {
+		clearTextSelection();
+		if (_dragStateItem && _selected.contains(_dragStateItem)) {
+			_selected.remove(_dragStateItem);
+			repaintItem(_mouseActionItem);
+		} else if (_dragStateItem
+			&& !_dragStateItem->isService()
+			&& _dragStateItem->isRegular()) {
+			if (_selected.size() < MaxSelectedItems) {
+				_selected.emplace(_dragStateItem);
+				repaintItem(_mouseActionItem);
+			}
+		} else {
+			_selected.clear();
+			update();
+		}
+	} else if (needTextSelectionClear) {
+		clearTextSelection();
+	} else if ((_mouseAction == MouseAction::PrepareSelect)
 		&& !_pressWasInactive
 		&& inSelectionMode().inSelectionMode) {
 		changeSelectionAsGroup(
@@ -2339,43 +2563,25 @@ void HistoryInner::mouseActionFinish(
 			_mouseActionItem,
 			SelectAction::Invert);
 		repaintItem(_mouseActionItem);
-	} else if ((_mouseAction == MouseAction::PrepareDrag)
-		&& !_pressWasInactive
+	} else if (simpleSelectionChange
+		&& _mouseCursorState == CursorState::Date
+		&& !hasSelectRestriction()
 		&& _dragStateItem
-		&& (button != Qt::RightButton)) {
-		auto i = _selected.find(_dragStateItem);
-		if (i != _selected.cend() && i->second == FullSelection) {
-			_selected.erase(i);
-			repaintItem(_mouseActionItem);
-		} else if ((i == _selected.cend())
-			&& !_dragStateItem->isService()
-			&& _dragStateItem->isRegular()
-			&& inSelectionMode().inSelectionMode) {
-			if (_selected.size() < MaxSelectedItems) {
-				_selected.emplace(_dragStateItem, FullSelection);
-				repaintItem(_mouseActionItem);
-			}
-		} else if (_mouseCursorState == CursorState::Date
-			&& !hasSelectRestriction()
-			&& _dragStateItem->isRegular()
-			&& !_dragStateItem->isService()) {
-			changeSelectionAsGroup(
-				&_selected,
-				_dragStateItem,
-				SelectAction::Select);
-			repaintItem(_mouseActionItem);
-		} else {
-			_selected.clear();
-			update();
-		}
+		&& _dragStateItem->isRegular()
+		&& !_dragStateItem->isService()) {
+		clearTextSelection();
+		changeSelectionAsGroup(
+			&_selected,
+			_dragStateItem,
+			SelectAction::Select);
+		repaintItem(_mouseActionItem);
 	} else if (_mouseAction == MouseAction::Selecting) {
 		if (_dragSelFrom && _dragSelTo) {
 			applyDragSelection();
 			_dragSelFrom = _dragSelTo = nullptr;
-		} else if (!_selected.empty() && !_pressWasInactive) {
-			auto sel = _selected.cbegin()->second;
-			if (sel != FullSelection && sel.from == sel.to) {
-				_selected.clear();
+		} else if (_selectedTextItem && !_pressWasInactive) {
+			if (_selectedTextSelection.empty()) {
+				clearTextSelection();
 				_controller->widget()->setInnerFocus();
 			}
 		}
@@ -2383,17 +2589,22 @@ void HistoryInner::mouseActionFinish(
 	_mouseAction = MouseAction::None;
 	_mouseActionItem = nullptr;
 	_mouseSelectType = TextSelectType::Letters;
+	_mouseTextAnchor = TextState();
 	_selectScroll.cancel();
 	_widget->updateTopBarSelection();
 
 	if (QGuiApplication::clipboard()->supportsSelection()
-		&& !_selected.empty()
-		&& _selected.cbegin()->second != FullSelection
-		&& !hasCopyRestriction(_selected.cbegin()->first)) {
-		const auto &[item, selection] = *_selected.cbegin();
-		if (const auto view = viewByItem(item)) {
+		&& hasSelectedText()
+		&& !_selectedTextSelection.empty()
+		&& _selectedTextItem
+		&& !hasCopyRestriction(_selectedTextItem)) {
+		if (const auto view = viewByItem(_selectedTextItem)) {
 			TextUtilities::SetClipboardText(
-				view->selectedText(selection),
+				view->selectedText(_selectedTextSelection),
+				QClipboard::Selection);
+		} else if (!_selectedText.empty()) {
+			TextUtilities::SetClipboardText(
+				_selectedText,
 				QClipboard::Selection);
 		}
 	}
@@ -2427,26 +2638,22 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 	const auto mouseActionView = viewByItem(_mouseActionItem);
 	if (_mouseSelectType == TextSelectType::Letters
 		&& mouseActionView
-		&& ((_mouseAction == MouseAction::Selecting
-			&& !_selected.empty()
-			&& _selected.cbegin()->second != FullSelection)
-			|| (_mouseAction == MouseAction::None
-				&& (_selected.empty()
-					|| _selected.cbegin()->second != FullSelection)))) {
+		&& ((_mouseAction == MouseAction::Selecting && hasSelectedText())
+			|| (_mouseAction == MouseAction::None && !hasSelectedItems()))) {
 		StateRequest request;
 		request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
 		auto dragState = mouseActionView->textState(_dragStartPosition, request);
 		if (dragState.cursor == CursorState::Text) {
-			_mouseTextSymbol = dragState.symbol;
+			_mouseTextAnchor = dragState;
 			_mouseSelectType = TextSelectType::Words;
 			if (_mouseAction == MouseAction::None) {
 				_mouseAction = MouseAction::Selecting;
-				TextSelection selStatus = { dragState.symbol, dragState.symbol };
-				if (!_selected.empty()) {
-					repaintItem(_selected.cbegin()->first);
-					_selected.clear();
-				}
-				_selected.emplace(_mouseActionItem, selStatus);
+				setTextSelection(
+					mouseActionView,
+					mouseActionView->selectionFromStates(
+						_mouseTextAnchor,
+						dragState,
+						_mouseSelectType));
 			}
 			mouseMoveEvent(e);
 
@@ -2479,11 +2686,11 @@ void HistoryInner::mouseDoubleClickEvent(QMouseEvent *e) {
 void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 	const auto item = view->data();
 	const auto favorite = session().data().reactions().favoriteId();
-	if (!ranges::contains(
+	if (Window::ShowReactPremiumError(_controller, item, favorite)
+		|| !ranges::contains(
 			Data::LookupPossibleReactions(item).recent,
 			favorite,
-			&Data::Reaction::id)
-		|| Window::ShowReactPremiumError(_controller, item, favorite)) {
+			&Data::Reaction::id)) {
 		return;
 	} else if (!ranges::contains(item->chosenReactions(), favorite)) {
 		if (const auto top = itemTop(view); top >= 0) {
@@ -2495,16 +2702,14 @@ void HistoryInner::toggleFavoriteReaction(not_null<Element*> view) const {
 
 HistoryView::SelectedQuote HistoryInner::selectedQuote(
 		not_null<HistoryItem*> item) const {
-	if (_selected.size() != 1
-		|| _selected.begin()->first != item
-		|| _selected.begin()->second == FullSelection) {
+	if (!hasSelectedText() || _selectedTextItem != item) {
 		return {};
 	}
 	const auto view = item->mainView();
 	if (!view) {
 		return {};
 	}
-	return view->selectedQuote(_selected.begin()->second);
+	return view->selectedQuote(_selectedTextSelection);
 }
 
 void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
@@ -2514,6 +2719,10 @@ void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
 void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	if (e->reason() == QContextMenuEvent::Mouse) {
 		mouseActionUpdate(e->globalPos());
+	} else if (e->reason() == QContextMenuEvent::Keyboard) {
+		if (_accessibilityFocusedItem) {
+			_dragStateItem = _accessibilityFocusedItem;
+		}
 	}
 
 	const auto link = ClickHandler::getActive();
@@ -2555,27 +2764,26 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	// -2 - has full selected items, but not over, -1 - has selection, but no over, 0 - no selection, 1 - over text, 2 - over full selected items
 	auto isUponSelected = 0;
 	auto hasSelected = 0;
-	if (!_selected.empty()) {
+	if (hasSelectedItems()) {
+		hasSelected = 2;
+		if (_dragStateItem && _selected.contains(_dragStateItem)) {
+			isUponSelected = 2;
+		} else {
+			isUponSelected = -2;
+		}
+	} else if (hasSelectedText()) {
 		isUponSelected = -1;
-		if (_selected.cbegin()->second == FullSelection) {
-			hasSelected = 2;
-			if (_dragStateItem && _selected.find(_dragStateItem) != _selected.cend()) {
-				isUponSelected = 2;
-			} else {
-				isUponSelected = -2;
-			}
-		} else if (Element::Moused()
+		hasSelected = _selectedTextSelection.empty() ? 0 : 1;
+		if (Element::Moused()
 			&& Element::Moused() == Element::Hovered()
-			&& _selected.cbegin()->first == Element::Moused()->data()) {
-			uint16 selFrom = _selected.cbegin()->second.from, selTo = _selected.cbegin()->second.to;
-			hasSelected = (selTo > selFrom) ? 1 : 0;
+			&& _selectedTextItem == Element::Moused()->data()) {
 			auto mousePos = mapPointToItem(mapFromGlobal(_mousePosition), Element::Moused());
 			StateRequest request;
 			request.flags |= Ui::Text::StateRequest::Flag::LookupSymbol;
 			auto dragState = Element::Moused()->textState(mousePos, request);
-			if (dragState.cursor == CursorState::Text
-				&& dragState.symbol >= selFrom
-				&& dragState.symbol < selTo) {
+			if (Element::Moused()->selectionContains(
+					_selectedTextSelection,
+					dragState)) {
 				isUponSelected = 1;
 			}
 		}
@@ -2683,6 +2891,22 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		return;
 	}
 	const auto controller = _controller;
+	const auto canViewMessageStats = [&](HistoryItem *item) {
+		if (!item
+			|| item->isService()
+			|| !peerIsChannel(item->fullId().peer)
+			|| _peer->isMegagroup()) {
+			return false;
+		}
+		const auto channel = _peer->asChannel();
+		if (!channel) {
+			return false;
+		}
+		constexpr auto kMinViewsCount = 10;
+		return ((channel->flags() & ChannelDataFlag::CanGetStatistics)
+			|| (channel->canPostMessages()
+				&& item->viewsCount() >= kMinViewsCount));
+	};
 	const auto addItemActions = [&](
 			HistoryItem *item,
 			HistoryItem *albumPartItem) {
@@ -2731,11 +2955,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			const auto editItemId = editItem->fullId();
 			_menu->addAction(tr::lng_context_edit_msg(tr::now), [=] {
 				if (const auto item = session->data().message(editItemId)) {
-					auto it = _selected.find(item);
-					const auto selection = ((it != _selected.end())
-							&& (it->second != FullSelection))
-						? it->second
-						: TextSelection();
+					const auto selection = getSelectedTextRange(item);
 					if (!selection.empty()) {
 						clearSelected(true);
 					}
@@ -2767,24 +2987,16 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				Window::ToggleMessagePinned(controller, pinItemId, !isPinned);
 			}), isPinned ? &st::menuIconUnpin : &st::menuIconPin);
 		}
-		if (!item->isService()
-			&& peerIsChannel(itemId.peer)
-			&& !_peer->isMegagroup()) {
-			constexpr auto kMinViewsCount = 10;
-			if (const auto channel = _peer->asChannel()) {
-				if ((channel->flags() & ChannelDataFlag::CanGetStatistics)
-					|| (channel->canPostMessages()
-						&& item->viewsCount() >= kMinViewsCount)) {
-					auto callback = crl::guard(controller, [=] {
-						controller->showSection(
-							Info::Statistics::Make(channel, itemId, {}));
-					});
-					_menu->addAction(
-						tr::lng_stats_title(tr::now),
-						std::move(callback),
-						&st::menuIconStats);
-				}
-			}
+		if (canViewMessageStats(item)) {
+			const auto channel = _peer->asChannel();
+			auto callback = crl::guard(controller, [=] {
+				controller->showSection(
+					Info::Statistics::Make(channel, itemId, {}));
+			});
+			_menu->addAction(
+				tr::lng_stats_title(tr::now),
+				std::move(callback),
+				&st::menuIconStats);
 		}
 
 		AyuUi::AddHistoryAction(_menu, item);
@@ -2914,6 +3126,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_menu->addAction(tr::lng_context_select_msg(tr::now), [=] {
 				if (const auto item = session->data().message(itemId)) {
 					if ([[maybe_unused]] const auto view = viewByItem(item)) {
+						clearTextSelection();
 						if (asGroup) {
 							changeSelectionAsGroup(
 								&_selected,
@@ -2966,7 +3179,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				auto nearestItem = (HistoryItem*)(nullptr);
 				{
 					auto minDiff = std::numeric_limits<int>::max();
-					for (const auto &[item, _] : _selected) {
+					for (const auto &item : _selected) {
 						const auto diff = item->fullId().msg.bare
 							- toItem->fullId().msg.bare;
 						if (std::abs(diff) < minDiff) {
@@ -3139,7 +3352,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconDelete);
 			}
 			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
-				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
+				Menu::AddDownloadFilesAction(
+					_menu,
+					controller,
+					selectedItemsForExport(),
+					this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
 				_widget->clearSelected();
@@ -3192,7 +3409,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 		}
 	} else { // maybe cursor on some text history item?
 		const auto albumPartItem = _dragStateItem;
-		const auto item = [&] {
+		const auto item = [&]() -> HistoryItem* {
+			if (e->reason() == QContextMenuEvent::Keyboard
+				&& _dragStateItem) {
+				return groupLeaderOrSelf(_dragStateItem);
+			}
 			const auto result = Element::Hovered()
 				? Element::Hovered()->data().get()
 				: Element::HoveredLink()
@@ -3292,7 +3513,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							item,
 							HistoryView::Context::History,
 							_controller,
-							!pollOptionLink.isEmpty());
+							!pollOptionLink.isEmpty(),
+							canViewMessageStats(item));
 					} else if (const auto contact = media->sharedContact()) {
 						const auto phone = contact->phoneNumber;
 						_menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
@@ -3413,7 +3635,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconDelete);
 			}
 			if (selectedState.count > 0 && !hasCopyRestrictionForSelected()) {
-				Menu::AddDownloadFilesAction(_menu, controller, _selected, this);
+				Menu::AddDownloadFilesAction(
+					_menu,
+					controller,
+					selectedItemsForExport(),
+					this);
 			}
 			_menu->addAction(tr::lng_context_clear_selection(tr::now), [=] {
 				_widget->clearSelected();
@@ -3524,8 +3750,14 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	if (leaderOrSelf && !_menu->empty()) {
 		const auto media = leaderOrSelf->media();
 		const auto poll = media ? media->poll() : nullptr;
-		if (poll && !poll->closed() && poll->hideResultsUntilClose()) {
-			HistoryView::InsertPollHiddenResultsLabel(_menu.get());
+		if (poll && !poll->closed()) {
+			if (poll->hideResultsUntilClose()) {
+				HistoryView::InsertPollHiddenResultsLabel(_menu.get());
+			}
+			HistoryView::InsertPollVoteRestrictionsLabel(
+				_menu.get(),
+				leaderOrSelf,
+				poll);
 		}
 	}
 
@@ -3597,21 +3829,25 @@ bool HistoryInner::hasCopyRestrictionForSelected() const {
 	if (hasCopyRestriction()) {
 		return true;
 	}
-	for (const auto &[item, selection] : _selected) {
+	for (const auto &item : _selected) {
 		if (item && item->forbidsForward()) {
 			return true;
 		}
 	}
-	return false;
+	return hasSelectedText()
+		&& _selectedTextItem
+		&& _selectedTextItem->forbidsForward();
 }
 
 bool HistoryInner::showCopyRestrictionForSelected() {
-	for (const auto &[item, selection] : _selected) {
+	for (const auto &item : _selected) {
 		if (showCopyRestriction(item)) {
 			return true;
 		}
 	}
-	return false;
+	return hasSelectedText()
+		&& _selectedTextItem
+		&& showCopyRestriction(_selectedTextItem);
 }
 
 void HistoryInner::copySelectedText() {
@@ -3739,14 +3975,10 @@ TextForMimeData HistoryInner::getSelectedText() const {
 	}
 
 	if (selected.empty()) {
-		return TextForMimeData();
-	}
-	if (selected.cbegin()->second != FullSelection) {
-		const auto &[item, selection] = *selected.cbegin();
-		if (const auto view = viewByItem(item)) {
-			return view->selectedText(selection);
+		if (const auto view = viewByItem(_selectedTextItem)) {
+			return view->selectedText(_selectedTextSelection);
 		}
-		return TextForMimeData();
+		return _selectedText;
 	}
 
 	struct Part {
@@ -3782,7 +4014,7 @@ TextForMimeData HistoryInner::getSelectedText() const {
 		wrapItem(group->items.back(), HistoryGroupText(group));
 	};
 
-	for (const auto &[item, selection] : selected) {
+	for (const auto &item : selected) {
 		if (const auto group = session().data().groups().find(item)) {
 			if (groups.contains(group)) {
 				continue;
@@ -3818,9 +4050,142 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 		_middleClickAutoscroll.stop();
 		return;
 	}
+
+	const auto count = accessibilityChildCount();
+	if (count > 0 && Ui::ScreenReaderModeActive()) {
+		if (_accessibilityFocusedItem
+			&& _accessibilityFocusedIndex >= 0) {
+			const auto elements = accessibleElements();
+			const auto barIndex
+				= accessibilityUnreadBarIndex();
+			const auto elementIndex = (barIndex >= 0
+				&& _accessibilityFocusedIndex > barIndex)
+				? (_accessibilityFocusedIndex - 1)
+				: _accessibilityFocusedIndex;
+			if (elementIndex < 0
+				|| elementIndex >= int(elements.size())
+				|| elements[elementIndex]->data().get()
+					!= _accessibilityFocusedItem) {
+				// The focused item is still the same message, but
+				// its index in accessibleElements() shifted (the list
+				// was mutated since the last navigation). Repair the
+				// cached index in-place without emitting a focus
+				// change — the framework still thinks the focused
+				// child is _accessibilityFocusedItem and we are only
+				// catching up our bookkeeping.
+				for (auto i = 0, n = int(elements.size());
+					i < n; ++i) {
+					if (elements[i]->data().get()
+						== _accessibilityFocusedItem) {
+						_accessibilityFocusedIndex =
+							(barIndex >= 0 && i >= barIndex)
+							? (i + 1)
+							: i;
+						break;
+					}
+				}
+			}
+		}
+		auto newIndex = _accessibilityFocusedIndex;
+		switch (e->key()) {
+		case Qt::Key_Down:
+			newIndex = std::min(
+				(newIndex < 0) ? (count - 1) : (newIndex + 1),
+				count - 1);
+			break;
+		case Qt::Key_Up:
+			newIndex = std::max(
+				(newIndex < 0) ? (count - 1) : (newIndex - 1),
+				0);
+			break;
+		case Qt::Key_PageDown: {
+			const auto pageHeight = _visibleAreaBottom
+				- _visibleAreaTop;
+			auto remaining = pageHeight;
+			while (newIndex + 1 < count && remaining > 0) {
+				++newIndex;
+				const auto rect = accessibilityChildRect(
+					newIndex);
+				remaining -= rect.height();
+			}
+			break;
+		}
+		case Qt::Key_PageUp: {
+			const auto pageHeight = _visibleAreaBottom
+				- _visibleAreaTop;
+			auto remaining = pageHeight;
+			while (newIndex - 1 >= 0 && remaining > 0) {
+				--newIndex;
+				const auto rect = accessibilityChildRect(
+					newIndex);
+				remaining -= rect.height();
+			}
+			break;
+		}
+		case Qt::Key_Home:
+			newIndex = 0;
+			break;
+		case Qt::Key_End:
+			newIndex = count - 1;
+			break;
+		default:
+			break;
+		}
+		if (newIndex != _accessibilityFocusedIndex
+			&& newIndex >= 0
+			&& newIndex < count) {
+			const auto elements = accessibleElements();
+			const auto barIndex
+				= accessibilityUnreadBarIndex();
+			const auto elementIndex = (barIndex >= 0
+				&& newIndex > barIndex)
+				? (newIndex - 1)
+				: newIndex;
+			const auto item = (elementIndex >= 0
+				&& elementIndex < int(elements.size()))
+				? elements[elementIndex]->data().get()
+				: nullptr;
+			setAccessibilityFocusedItem(newIndex, item);
+
+			const auto rect = accessibilityChildRect(newIndex);
+			if (!rect.isEmpty()) {
+				if (rect.top() < _visibleAreaTop) {
+					_scroll->scrollToY(rect.top());
+				} else if (rect.bottom() > _visibleAreaBottom) {
+					_scroll->scrollToY(
+						rect.bottom()
+							- (_visibleAreaBottom
+								- _visibleAreaTop));
+				}
+			}
+
+			if (_widget->markingMessagesRead()
+				&& (barIndex < 0 || newIndex != barIndex)
+				&& elementIndex >= 0
+				&& elementIndex < int(elements.size())) {
+				session().data().histories().readInboxTill(
+					elements[elementIndex]->data());
+			}
+
+			e->accept();
+			return;
+		}
+
+		if (e->key() == Qt::Key_Space) {
+			if (hasSelectedItems()) {
+				toggleMessageSelection();
+			} else {
+				playPauseFocusedMedia();
+			}
+			e->accept();
+			return;
+		}
+	}
+
 	if (e->key() == Qt::Key_Escape) {
 		_widget->escape();
-	} else if (e == QKeySequence::Copy && !_selected.empty()) {
+	} else if (e == QKeySequence::Copy
+		&& canCopySelected()) {
 		copySelectedText();
 #ifdef Q_OS_MAC
 	} else if (e->key() == Qt::Key_E
@@ -4015,9 +4380,10 @@ void HistoryInner::visibleAreaUpdated(int top, int bottom) {
 		}
 	}
 	if (scrolledUp) {
+		_scrollDateAfterDayCrossing = false;
 		_scrollDateCheck.call();
 	} else {
-		scrollDateHideByTimer();
+		scrollDateCheckDownward();
 	}
 
 	// Unload userpics.
@@ -4074,8 +4440,42 @@ void HistoryInner::scrollDateCheck() {
 	}
 }
 
+void HistoryInner::scrollDateCheckDownward() {
+	const auto current = _history->scrollTopItem
+		? _history->scrollTopItem
+		: (_migrated ? _migrated->scrollTopItem : nullptr);
+	const auto currentTop = _history->scrollTopItem
+		? _history->scrollTopOffset
+		: (_migrated ? _migrated->scrollTopOffset : 0);
+	const auto previous = _scrollDateLastItem;
+	const auto previousDay = previous
+		? previous->dateTime().date()
+		: QDate();
+	const auto currentDay = current
+		? current->dateTime().date()
+		: QDate();
+	const auto crossedDay = previous
+		&& current
+		&& previousDay.isValid()
+		&& currentDay.isValid()
+		&& (previousDay != currentDay);
+	_scrollDateLastItem = current;
+	_scrollDateLastItemTop = currentTop;
+	if (crossedDay) {
+		if (!_scrollDateShown) {
+			toggleScrollDateShown();
+		}
+		_scrollDateAfterDayCrossing = true;
+		_scrollDateHideTimer.callOnce(
+			kScrollDateHideOnDayCrossingTimeout);
+	} else if (!_scrollDateAfterDayCrossing) {
+		scrollDateHideByTimer();
+	}
+}
+
 void HistoryInner::scrollDateHideByTimer() {
 	_scrollDateHideTimer.cancel();
+	_scrollDateAfterDayCrossing = false;
 	if (!_scrollDateLink || ClickHandler::getPressed() != _scrollDateLink) {
 		scrollDateHide();
 	}
@@ -4114,6 +4514,13 @@ void HistoryInner::setItemsRevealHeight(int revealHeight) {
 	_revealHeight = revealHeight;
 }
 
+void HistoryInner::setCollapseGaps(std::vector<CollapseGap> gaps) {
+	if (_collapseGaps != gaps) {
+		_collapseGaps = std::move(gaps);
+		updateSize();
+	}
+}
+
 void HistoryInner::changeItemsRevealHeight(int revealHeight) {
 	if (_revealHeight == revealHeight) {
 		return;
@@ -4124,7 +4531,11 @@ void HistoryInner::changeItemsRevealHeight(int revealHeight) {
 
 void HistoryInner::updateSize() {
 	const auto visibleHeight = _scroll->height();
-	const auto itemsHeight = historyHeight() - _revealHeight;
+	auto collapseGapTotal = 0;
+	for (const auto &gap : _collapseGaps) {
+		collapseGapTotal += gap.height;
+	}
+	const auto itemsHeight = historyHeight() - _revealHeight + collapseGapTotal;
 	const auto aboutAboveHistory = _aboutView && _aboutView->aboveHistory();
 	const auto aboutBelowHistory = _aboutView && !aboutAboveHistory;
 	auto newHistoryMarginBottom = st::historyPaddingBottom;
@@ -4201,6 +4612,50 @@ void HistoryInner::leaveEventHook(QEvent *e) {
 	return RpWidget::leaveEventHook(e);
 }
 
+void HistoryInner::setupThanosEffect() {
+	const auto history = _history;
+	const auto migrated = [=] { return _migrated; };
+	_thanosController = std::make_unique<Ui::ThanosEffectController>(
+		&session(),
+		Ui::ThanosEffectController::Delegate{
+			.viewForItem = [=](not_null<const HistoryItem*> item)
+					-> HistoryView::Element* {
+				if (item->history() != history
+					&& item->history() != migrated()) {
+					return nullptr;
+				}
+				return item->mainView();
+			},
+			.itemTop = [=](not_null<const HistoryView::Element*> view) {
+				return itemTop(view);
+			},
+			.visibleAreaTop = [=] { return _visibleAreaTop; },
+			.visibleAreaBottom = [=] { return _visibleAreaBottom; },
+			.contentWidth = [=] { return width(); },
+			.preparePaintContext = [=](QRect clip) {
+				return preparePaintContext(clip);
+			},
+			.window = [=]() -> QWidget* { return window(); },
+			.scrollArea = [=]() -> not_null<Ui::ScrollArea*> {
+				return _scroll;
+			},
+			.scrollToY = [=](int y) {
+				_widget->synteticScrollToY(y);
+			},
+			.setCollapseGaps = [=](std::vector<CollapseGap> gaps) {
+				setCollapseGaps(std::move(gaps));
+			},
+		},
+		lifetime());
+
+	session().data().viewAboutToBeRemoved(
+	) | rpl::on_next([=](Data::ViewRemoval removal) {
+		if (removal.reason == Data::ViewRemovalReason::Removed) {
+			_thanosController->captureOnRemoval(removal.view->data());
+		}
+	}, lifetime());
+}
+
 HistoryInner::~HistoryInner() {
 	if (_overlayHost) {
 		_overlayHost->hide();
@@ -4222,7 +4677,7 @@ HistoryInner::~HistoryInner() {
 }
 
 bool HistoryInner::focusNextPrevChild(bool next) {
-	if (_selected.empty()) {
+	if (!hasSelectedItems() && !hasSelectedText()) {
 		return RpWidget::focusNextPrevChild(next);
 	} else {
 		clearSelected();
@@ -4231,6 +4686,15 @@ bool HistoryInner::focusNextPrevChild(bool next) {
 }
 
 void HistoryInner::adjustCurrent(int32 y) const {
+	auto gapShift = 0;
+	for (const auto &gap : _collapseGaps) {
+		if (y < gap.absY + gapShift) {
+			break;
+		}
+		gapShift += gap.height;
+	}
+	y -= gapShift;
+
 	int32 htop = historyTop(), hdrawtop = historyDrawTop(), mtop = migratedTop();
 	_curHistory = nullptr;
 	if (mtop >= 0) {
@@ -4300,7 +4764,8 @@ auto HistoryInner::nextItem(Element *view) -> Element* {
 }
 
 bool HistoryInner::canCopySelected() const {
-	return !_selected.empty();
+	return hasSelectedItems()
+		|| (hasSelectedText() && !_selectedTextSelection.empty());
 }
 
 bool HistoryInner::canDeleteSelected() const {
@@ -4518,32 +4983,38 @@ void HistoryInner::elementStartEffect(
 auto HistoryInner::getSelectionState() const
 -> HistoryView::TopBarWidget::SelectedState {
 	auto result = HistoryView::TopBarWidget::SelectedState {};
-	for (auto &selected : _selected) {
-		if (selected.second == FullSelection) {
-			++result.count;
-			if (selected.first->canDelete()) {
-				++result.canDeleteCount;
-			}
-			if (selected.first->allowsForward()) {
-				++result.canForwardCount;
-			}
-		} else if (selected.second.from != selected.second.to) {
-			result.textSelected = true;
+	for (const auto &item : _selected) {
+		++result.count;
+		if (item->canDelete()) {
+			++result.canDeleteCount;
+		}
+		if (item->allowsForward()) {
+			++result.canForwardCount;
 		}
 	}
+	result.textSelected = hasSelectedText()
+		&& !_selectedTextSelection.empty();
 	return result;
 }
 
 void HistoryInner::clearSelected(bool onlyTextSelection) {
-	if (!_selected.empty() && (!onlyTextSelection || _selected.cbegin()->second != FullSelection)) {
+	auto changed = false;
+	if (!onlyTextSelection && !_selected.empty()) {
 		_selected.clear();
+		changed = true;
+	}
+	if (_selectedTextItem) {
+		clearTextSelection();
+		changed = true;
+	}
+	if (changed) {
 		_widget->updateTopBarSelection();
 		_widget->update();
 	}
 }
 
 bool HistoryInner::hasSelectedItems() const {
-	return !_selected.empty() && _selected.cbegin()->second == FullSelection;
+	return !_selected.empty();
 }
 
 MessageIdsList HistoryInner::getSelectedItems() const {
@@ -4556,11 +5027,10 @@ MessageIdsList HistoryInner::getSelectedItems() const {
 	auto result = ranges::make_subrange(
 		_selected.begin(),
 		_selected.end()
-	) | views::filter([](const auto &selected) {
-		const auto item = selected.first;
-		return item && !item->isService() && item->isRegular();
-	}) | views::transform([](const auto &selected) {
-		return selected.first->fullId();
+	) | views::filter([](const auto &item) {
+		return !item->isService() && item->isRegular();
+	}) | views::transform([](const auto &item) {
+		return item->fullId();
 	}) | to_vector;
 
 	result |= actions::sort(less{}, [](const FullMsgId &msgId) {
@@ -4710,8 +5180,8 @@ void HistoryInner::mouseActionUpdate() {
 	auto dragStateUserpic = false;
 	auto selectingText = (item == _mouseActionItem)
 		&& (view == Element::Hovered())
-		&& !_selected.empty()
-		&& (_selected.cbegin()->second != FullSelection);
+		&& (_selectedTextItem == item)
+		&& hasSelectedText();
 	const auto overReaction = reactionView && reactionState.link;
 	const auto overReplyBtn = replyBtnView && replyBtnState.link;
 	if (overReaction) {
@@ -4886,7 +5356,7 @@ void HistoryInner::mouseActionUpdate() {
 		_mouseCursorState = dragState.cursor;
 		if (dragState.link) {
 			cur = style::cur_pointer;
-		} else if (_mouseCursorState == CursorState::Text && (_selected.empty() || _selected.cbegin()->second != FullSelection)) {
+		} else if (_mouseCursorState == CursorState::Text && !hasSelectedItems()) {
 			cur = style::cur_text;
 		} else if (_mouseCursorState == CursorState::Date) {
 			//cur = style::cur_cross;
@@ -4894,28 +5364,12 @@ void HistoryInner::mouseActionUpdate() {
 	} else if (item) {
 		if (_mouseAction == MouseAction::Selecting) {
 			if (selectingText) {
-				uint16 second = dragState.symbol;
-				if (dragState.afterSymbol && _mouseSelectType == TextSelectType::Letters) {
-					++second;
-				}
-				auto selState = TextSelection { qMin(second, _mouseTextSymbol), qMax(second, _mouseTextSymbol) };
-				if (_mouseSelectType != TextSelectType::Letters) {
-					if (const auto view = viewByItem(_mouseActionItem)) {
-						selState = view->adjustSelection(selState, _mouseSelectType);
-					}
-				}
-				if (!selState.empty()) {
-					// We started selecting text in web page preview.
-					ClickHandler::unpressed();
-				}
-				if (_selected[_mouseActionItem] != selState) {
-					_selected[_mouseActionItem] = selState;
-					repaintItem(_mouseActionItem);
-				}
-				if (!_wasSelectedText && (selState == FullSelection || selState.from != selState.to)) {
-					_wasSelectedText = true;
-					setFocus();
-				}
+				setTextSelection(
+					view,
+					view->selectionFromStates(
+						_mouseTextAnchor,
+						dragState,
+						_mouseSelectType));
 				updateDragSelection(nullptr, nullptr, false);
 			} else {
 				auto selectingDown = (itemTop(_mouseActionItem) < itemTop(item)) || (_mouseActionItem == item && _dragStartPosition.y() < m.y());
@@ -4964,8 +5418,7 @@ void HistoryInner::mouseActionUpdate() {
 						: nullptr;
 				}
 				if (dragFirstAffected) {
-					auto i = _selected.find(dragFirstAffected->data());
-					dragSelecting = (i == _selected.cend() || i->second != FullSelection);
+					dragSelecting = !_selected.contains(dragFirstAffected->data());
 				}
 				updateDragSelection(dragSelFrom, dragSelTo, dragSelecting);
 			}
@@ -4975,8 +5428,7 @@ void HistoryInner::mouseActionUpdate() {
 		if (ClickHandler::getPressed()) {
 			cur = style::cur_pointer;
 		} else if ((_mouseAction == MouseAction::Selecting)
-			&& !_selected.empty()
-			&& (_selected.cbegin()->second != FullSelection)) {
+			&& hasSelectedText()) {
 			if (!_dragSelFrom || !_dragSelTo) {
 				cur = style::cur_text;
 			}
@@ -5107,6 +5559,21 @@ int HistoryInner::itemTop(const Element *view) const {
 	return (top < 0) ? top : (top + view->y() + view->block()->y());
 }
 
+bool HistoryInner::scrollToElementLocalY(
+		not_null<const Element*> view,
+		int localTop) {
+	const auto top = itemTop(view);
+	if (top < 0) {
+		return false;
+	}
+	const auto wanted = _scroll->computeScrollToY(top + localTop, -1);
+	if (wanted == _scroll->scrollTop()) {
+		return true;
+	}
+	_widget->animatedScrollToY(wanted, view->data());
+	return true;
+}
+
 auto HistoryInner::findViewForPinnedTracking(int top) const
 -> std::pair<Element*, int> {
 	const auto normalTop = historyTop();
@@ -5204,8 +5671,7 @@ void HistoryInner::applyDragSelection() {
 bool HistoryInner::isSelected(
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item) const {
-	const auto i = toItems->find(item);
-	return (i != toItems->cend()) && (i->second == FullSelection);
+	return toItems->contains(item);
 }
 
 bool HistoryInner::isSelectedGroup(
@@ -5247,25 +5713,13 @@ bool HistoryInner::goodForSelection(
 void HistoryInner::addToSelection(
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item) const {
-	const auto i = toItems->find(item);
-	if (i == toItems->cend()) {
-		if (toItems->size() == 1
-			&& toItems->begin()->second != FullSelection) {
-			toItems->clear();
-		}
-		toItems->emplace(item, FullSelection);
-	} else if (i->second != FullSelection) {
-		i->second = FullSelection;
-	}
+	toItems->emplace(item);
 }
 
 void HistoryInner::removeFromSelection(
 		not_null<SelectedItems*> toItems,
 		not_null<HistoryItem*> item) const {
-	const auto i = toItems->find(item);
-	if (i != toItems->cend()) {
-		toItems->erase(i);
-	}
+	toItems->remove(item);
 }
 
 void HistoryInner::changeSelection(
@@ -5321,6 +5775,83 @@ void HistoryInner::changeSelectionAsGroup(
 	}
 }
 
+void HistoryInner::setAccessibilityFocusedItem(
+		int index,
+		HistoryItem *item) {
+	if (_accessibilityFocusedIndex == index
+		&& _accessibilityFocusedItem == item) {
+		return;
+	}
+	_accessibilityFocusedIndex = index;
+	_accessibilityFocusedItem = item;
+	announceAccessibilityFocus(index);
+}
+
+void HistoryInner::announceAccessibilityFocus(int index) {
+	if (index < 0) {
+		return;
+	}
+	accessibilityChildNameChanged(index);
+	accessibilityChildFocused(index);
+}
+
+void HistoryInner::toggleMessageSelection() {
+	if (!hasSelectedItems() || _accessibilityFocusedIndex < 0) {
+		return;
+	}
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && _accessibilityFocusedIndex == barIndex) {
+		return;
+	}
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0
+		&& _accessibilityFocusedIndex > barIndex)
+		? (_accessibilityFocusedIndex - 1)
+		: _accessibilityFocusedIndex;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		return;
+	}
+	const auto item = elements[elementIndex]->data();
+	clearTextSelection();
+	changeSelectionAsGroup(&_selected, item, SelectAction::Invert);
+	repaintItem(item);
+	_widget->updateTopBarSelection();
+	accessibilityChildStateChanged(
+		_accessibilityFocusedIndex,
+		{ .selected = true });
+	accessibilityChildNameChanged(_accessibilityFocusedIndex);
+}
+
+void HistoryInner::playPauseFocusedMedia() {
+	if (_accessibilityFocusedIndex < 0) {
+		return;
+	}
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && _accessibilityFocusedIndex == barIndex) {
+		return;
+	}
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0
+		&& _accessibilityFocusedIndex > barIndex)
+		? (_accessibilityFocusedIndex - 1)
+		: _accessibilityFocusedIndex;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		return;
+	}
+	const auto item = elements[elementIndex]->data();
+	if (const auto media = item->media()) {
+		if (const auto document = media->document()) {
+			if (document->isVoiceMessage()
+				|| document->isSong()
+				|| document->isAudioFile()
+				|| document->isVideoMessage()) {
+				::Media::Player::instance()->playPause(
+					{ document, item->fullId() });
+			}
+		}
+	}
+}
+
 void HistoryInner::forwardItem(FullMsgId itemId) {
 	Window::ShowForwardMessagesBox(_controller, { 1, itemId });
 }
@@ -5347,10 +5878,13 @@ void HistoryInner::deleteItem(not_null<HistoryItem*> item) {
 	const auto list = HistoryItemsList{ item };
 	if (CanCreateModerateMessagesBox(list)) {
 		const auto opt = DefaultModerateMessagesBoxOptions();
-		_controller->show(Box(CreateModerateMessagesBox, list, nullptr, opt));
+		_controller->show(Box(
+			CreateModerateMessagesBox,
+			ModerateMessagesBoxEntry{ .items = list },
+			nullptr,
+			opt));
 	} else {
-		const auto suggestModerate = false;
-		_controller->show(Box<DeleteMessagesBox>(item, suggestModerate));
+		_controller->show(Box<DeleteMessagesBox>(item));
 	}
 }
 
@@ -5367,7 +5901,7 @@ void HistoryInner::deleteAsGroup(FullMsgId itemId) {
 		} else if (CanCreateModerateMessagesBox(group->items)) {
 			_controller->show(Box(
 				CreateModerateMessagesBox,
-				group->items,
+				ModerateMessagesBoxEntry{ .items = group->items },
 				nullptr,
 				ModerateMessagesBoxOptions{}));
 		} else {
@@ -5440,9 +5974,6 @@ void HistoryInner::applyDragSelection(
 		return;
 	}
 
-	if (!toItems->empty() && toItems->cbegin()->second != FullSelection) {
-		toItems->clear();
-	}
 	const auto botAboutView = _aboutView ? _aboutView->view() : nullptr;
 	if (_dragSelecting) {
 		auto fromblock = (_dragSelFrom != botAboutView)
@@ -5487,11 +6018,11 @@ void HistoryInner::applyDragSelection(
 	} else {
 		auto toRemove = std::vector<not_null<HistoryItem*>>();
 		for (const auto &item : *toItems) {
-			auto iy = itemTop(item.first);
+			auto iy = itemTop(item);
 			if (iy < -1) {
-				toRemove.emplace_back(item.first);
+				toRemove.emplace_back(item);
 			} else if (iy >= 0 && iy >= selfromy && iy < seltoy) {
-				toRemove.emplace_back(item.first);
+				toRemove.emplace_back(item);
 			}
 		}
 		for (const auto &item : toRemove) {
@@ -5627,4 +6158,272 @@ bool CanSendReply(not_null<const HistoryItem*> item) {
 		return channel->amIn();
 	}
 	return true;
+}
+
+// Accessibility.
+
+std::vector<HistoryView::Element*> HistoryInner::accessibleElements() const {
+	std::vector<Element*> result;
+	const auto gather = [&](not_null<History*> history) {
+		for (const auto &block : history->blocks) {
+			for (const auto &message : block->messages) {
+				if (!message->isHidden()) {
+					result.push_back(message.get());
+				}
+			}
+		}
+	};
+	if (_migrated) {
+		gather(_migrated);
+	}
+	gather(_history);
+	return result;
+}
+
+int HistoryInner::accessibilityUnreadBarIndex() const {
+	auto *barElement = _history->unreadBar();
+	if (!barElement && _migrated) {
+		barElement = _migrated->unreadBar();
+	}
+	if (!barElement) {
+		return -1;
+	}
+	const auto elements = accessibleElements();
+	for (auto i = 0, count = int(elements.size()); i < count; ++i) {
+		if (elements[i] == barElement) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+int HistoryInner::accessibilityChildCount() const {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	return int(accessibleElements().size()) + (barIndex >= 0 ? 1 : 0);
+}
+
+QString HistoryInner::accessibilityChildName(int index) const {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && index == barIndex) {
+		auto *barElement = _history->unreadBar();
+		if (!barElement && _migrated) {
+			barElement = _migrated->unreadBar();
+		}
+		return barElement
+			? HistoryView::UnreadBarAccessibilityName(barElement)
+			: tr::lng_unread_bar_some(tr::now);
+	}
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0 && index > barIndex)
+		? (index - 1)
+		: index;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		return {};
+	}
+	return HistoryView::MessageAccessibilityName(
+		elements[elementIndex],
+		_history);
+}
+
+QAccessible::State HistoryInner::accessibilityChildState(int index) const {
+	QAccessible::State state;
+	state.focusable = true;
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex < 0 || index != barIndex) {
+		state.selectable = true;
+		const auto elements = accessibleElements();
+		const auto elementIndex = (barIndex >= 0 && index > barIndex)
+			? (index - 1)
+			: index;
+		if (elementIndex >= 0
+			&& elementIndex < int(elements.size())) {
+			const auto item = elements[elementIndex]->data();
+			if (_selected.contains(item)) {
+				state.selected = true;
+			}
+		}
+	}
+	if (index == _accessibilityFocusedIndex) {
+		state.focused = true;
+		state.active = true;
+	}
+	return state;
+}
+
+QAccessible::Role HistoryInner::accessibilityChildRole() const {
+	return QAccessible::Role::ListItem;
+}
+
+QRect HistoryInner::accessibilityChildRect(int index) const {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && index == barIndex) {
+		auto *barElement = _history->unreadBar();
+		if (!barElement && _migrated) {
+			barElement = _migrated->unreadBar();
+		}
+		if (barElement) {
+			const auto top = itemTop(barElement);
+			if (top >= 0) {
+				return QRect(
+					0,
+					top,
+					width(),
+					HistoryView::UnreadBar::height());
+			}
+		}
+		return QRect();
+	}
+
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0 && index > barIndex)
+		? (index - 1)
+		: index;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		return QRect();
+	}
+	const auto view = elements[elementIndex];
+	const auto top = itemTop(view);
+	if (top < 0) {
+		return QRect();
+	}
+	// When the unread bar is anchored to a message, that message is
+	// exposed at index barIndex + 1 in index-space (the bar itself
+	// is at barIndex). In element-space the same message sits at
+	// elementIndex == barIndex, so we clip the message rect below
+	// the overlay drawn at the top of the element.
+	if (barIndex >= 0 && elementIndex == barIndex) {
+		const auto barHeight = HistoryView::UnreadBar::height();
+		return QRect(0, top + barHeight, width(), view->height() - barHeight);
+	}
+	return QRect(0, top, width(), view->height());
+}
+
+int HistoryInner::accessibilityChildColumnCount(int row) const {
+	return computeActiveColumns(row).size();
+}
+
+QAccessible::Role HistoryInner::accessibilityChildSubItemRole() const {
+	return QAccessible::Cell;
+}
+
+QString HistoryInner::accessibilityChildSubItemName(
+		int row,
+		int column) const {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && row == barIndex) {
+		return {};
+	}
+	const auto &active = computeActiveColumns(row);
+	if (column < 0 || column >= int(active.size())) {
+		return {};
+	}
+	return HistoryView::MessageSubItemLabel(active[column]);
+}
+
+QString HistoryInner::accessibilityChildSubItemValue(
+		int row,
+		int column) const {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && row == barIndex) {
+		return {};
+	}
+	const auto &active = computeActiveColumns(row);
+	if (column < 0 || column >= int(active.size())) {
+		return {};
+	}
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0 && row > barIndex)
+		? (row - 1)
+		: row;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		return {};
+	}
+	return HistoryView::MessageSubItemValue(
+		elements[elementIndex],
+		_history,
+		active[column]);
+}
+
+auto HistoryInner::computeActiveColumns(int row) const
+-> const std::vector<HistoryView::MessageSubItem> & {
+	const auto barIndex = accessibilityUnreadBarIndex();
+	if (barIndex >= 0 && row == barIndex) {
+		_activeColumns.clear();
+		_activeColumnsView = nullptr;
+		return _activeColumns;
+	}
+	const auto elements = accessibleElements();
+	const auto elementIndex = (barIndex >= 0 && row > barIndex)
+		? (row - 1)
+		: row;
+	if (elementIndex < 0 || elementIndex >= int(elements.size())) {
+		_activeColumns.clear();
+		_activeColumnsView = nullptr;
+		return _activeColumns;
+	}
+	const auto view = elements[elementIndex];
+	if (_activeColumnsView == view) {
+		return _activeColumns;
+	}
+	_activeColumnsView = view;
+	_activeColumns = HistoryView::ActiveMessageSubItems(view, _history);
+	return _activeColumns;
+}
+
+void HistoryInner::focusInEvent(QFocusEvent *e) {
+	RpWidget::focusInEvent(e);
+
+	InvokeQueued(this, [=] {
+		if (!hasFocus()) {
+			return;
+		}
+		const auto count = accessibilityChildCount();
+		if (count <= 0) {
+			return;
+		}
+		if (_accessibilityFocusedItem) {
+			const auto elements = accessibleElements();
+			const auto barIndex = accessibilityUnreadBarIndex();
+			auto found = -1;
+			for (auto i = 0, n = int(elements.size()); i < n; ++i) {
+				if (elements[i]->data().get()
+					== _accessibilityFocusedItem) {
+					found = (barIndex >= 0 && i >= barIndex)
+						? (i + 1)
+						: i;
+					break;
+				}
+			}
+			if (found >= 0 && found < count) {
+				_accessibilityFocusedIndex = found;
+				announceAccessibilityFocus(found);
+				return;
+			}
+			// The cached focused item is no longer in the list (it
+			// was removed since we last had focus). Clear the cache
+			// in-place and fall through to the index-still-valid /
+			// auto-select branches below — those will pick a new
+			// focus target and emit the announcement.
+			_accessibilityFocusedItem = nullptr;
+		}
+		if (_accessibilityFocusedIndex >= 0
+			&& _accessibilityFocusedIndex < count) {
+			announceAccessibilityFocus(_accessibilityFocusedIndex);
+			return;
+		}
+		const auto barIndex = accessibilityUnreadBarIndex();
+		const auto index = (barIndex >= 0 && barIndex + 1 < count)
+			? (barIndex + 1)
+			: (count - 1);
+		const auto elements = accessibleElements();
+		const auto elementIndex = (barIndex >= 0
+			&& index > barIndex)
+			? (index - 1)
+			: index;
+		const auto item = (elementIndex >= 0
+			&& elementIndex < int(elements.size()))
+			? elements[elementIndex]->data().get()
+			: nullptr;
+		setAccessibilityFocusedItem(index, item);
+	});
 }

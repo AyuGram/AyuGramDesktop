@@ -16,6 +16,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_type.h"
 #include "window/window_adaptive.h"
 
+#include <QtCore/QDate>
+#include <QtCore/QPointer>
+
 class PhotoData;
 class MainWidget;
 class MainWindow;
@@ -108,6 +111,7 @@ using GifPauseReason = ChatHelpers::PauseReason;
 using GifPauseReasons = ChatHelpers::PauseReasons;
 
 class SectionMemento;
+class SectionWidget;
 class Controller;
 class FiltersMenu;
 class ChatPreviewManager;
@@ -412,6 +416,7 @@ public:
 	[[nodiscard]] SeparateId windowId() const;
 	[[nodiscard]] bool isPrimary() const;
 	[[nodiscard]] not_null<::MainWindow*> widget() const;
+	[[nodiscard]] rpl::producer<> imeCompositionStarts() const;
 	[[nodiscard]] not_null<MainWidget*> content() const;
 	[[nodiscard]] Adaptive &adaptive() const;
 	[[nodiscard]] ChatHelpers::EmojiInteractions &emojiInteractions() const {
@@ -552,6 +557,10 @@ public:
 	}
 	void removeLayerBlackout();
 	[[nodiscard]] bool isLayerShown() const;
+	[[nodiscard]] rpl::producer<bool> boxShownValue() const;
+	void registerActiveLayerSection(SectionWidget *section);
+	void unregisterActiveLayerSection(SectionWidget *section);
+	[[nodiscard]] SectionWidget *activeLayerSection() const;
 
 	struct ShowCalendarDescriptor {
 		Dialogs::Key chat;
@@ -848,6 +857,7 @@ private:
 	rpl::variable<int> _connectingBottomSkip;
 
 	rpl::event_stream<ChatHelpers::FileChosen> _stickerOrEmojiChosen;
+	QPointer<SectionWidget> _activeLayerSection;
 
 	PeerData *_showEditPeer = nullptr;
 	rpl::variable<Data::Folder*> _openedFolder;

@@ -113,6 +113,13 @@ settingsPremiumIconAiCompose: icon{
 	{ "chat/ai_star2-20x20", settingsIconFg, point(2px, 2px) },
 };
 
+settingsIconChatAutomation: icon {
+	{ size(24px, 24px), transparent },
+	{ "chat/ai_letters-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star1-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star2-20x20", menuIconColor, point(2px, 2px) },
+};
+
 settingsStoriesIconOrder: icon {{ "settings/premium/stories_order", premiumButtonBg1 }};
 settingsStoriesIconStealth: icon {{ "menu/stealth", premiumButtonBg1 }};
 settingsStoriesIconViews: icon {{ "menu/show_in_chat", premiumButtonBg1 }};
@@ -182,10 +189,6 @@ settingsPrivacySkip: 14px;
 settingsPrivacySkipTop: 4px;
 settingsPrivacyPremium: icon{{ "profile_premium", premiumButtonFg }};
 
-settingsPrivacyAddBirthday: FlatLabel(defaultFlatLabel) {
-	minWidth: 256px;
-}
-
 settingsCloudPasswordIconSize: 100px;
 
 settingLocalPasscodeInputField: InputField(defaultInputField) {
@@ -194,7 +197,6 @@ settingLocalPasscodeInputField: InputField(defaultInputField) {
 settingLocalPasscodeDescription: FlatLabel(changePhoneDescription) {
 	minWidth: 256px;
 }
-settingLocalPasscodeDescriptionHeight: 53px;
 settingLocalPasscodeError: FlatLabel(changePhoneError) {
 	minWidth: 256px;
 }
@@ -351,8 +353,6 @@ dictionariesSectionButton: SettingsButton(settingsUpdateToggle) {
 	}
 }
 
-sessionsScroll: boxScroll;
-sessionsHeight: 350px;
 sessionLocationTop: 54px;
 sessionCurrentSkip: 8px;
 sessionSubtitleSkip: 14px;
@@ -666,13 +666,17 @@ settingsChatbotsAccess: Checkbox(defaultCheckbox) {
 }
 settingsLocationAddress: InputField(defaultMultiSelectSearchField) {
 }
-settingsChatbotsUsernameMargins: margins(20px, 8px, 20px, 8px);
+settingsChatbotsUsernameMargins: margins(20px, 0px, 20px, 8px);
 settingsChatbotsAccessMargins: margins(22px, 5px, 22px, 9px);
 settingsChatbotsAccessSkip: 4px;
 settingsChatbotsBottomTextMargin: margins(22px, 8px, 22px, 3px);
 settingsChatbotsAdd: SettingsButton(settingsButton) {
 	iconLeft: 22px;
 }
+settingsChatbotsRemove: SettingsButton(settingsAttentionButtonWithIcon, settingsChatbotsAdd) {
+	iconLeft: 16px;
+}
+settingsChatbotsRemoveIcon: infoIconDeleteRed;
 settingsWorkingHoursWeek: SettingsButton(settingsButtonNoIcon) {
 	height: 40px;
 	padding: margins(22px, 4px, 22px, 4px);
@@ -702,8 +706,12 @@ settingsChatbotsNotFound: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
 	align: align(top);
 }
-settingsChatbotsDeleteIcon: icon {{ "dialogs/dialogs_cancel_search", dialogsMenuIconFg }};
-settingsChatbotsDeleteIconOver: icon {{ "dialogs/dialogs_cancel_search", dialogsMenuIconFgOver }};
+settingsChatbotsAddButton: RoundButton(defaultActiveButton) {
+	width: -16px;
+	height: 26px;
+	textTop: 4px;
+}
+settingsChatbotsAddMargin: 14px;
 
 settingsChatIntroField: InputField(defaultMultiSelectSearchField) {
 	textMargins: margins(2px, 0px, 32px, 0px);
@@ -736,8 +744,6 @@ settingsGiftIconEmoji: IconEmoji {
 	icon: icon{{ "settings/mini_gift", windowFg }};
 	padding: margins(1px, 2px, 1px, 0px);
 }
-
-settingsCreditsButtonBuyIcon: icon {{ "settings/add", windowBgActive, point(7px, 0px) }};
 
 settingsCreditsButton: SettingsButton(settingsButton) {
 	padding: margins(62px, 8px, 22px, 8px);
@@ -796,4 +802,3 @@ detailedSettingsButtonStyle: DetailedSettingsButtonStyle {
 }
 
 settingsToastStarIcon: icon {{ "toast/star", toastFg }};
-

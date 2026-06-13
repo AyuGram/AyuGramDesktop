@@ -184,10 +184,6 @@ void Crop::paintFrame(QPainter &p) {
 	p.save();
 	p.setRenderHint(QPainter::Antialiasing, true);
 	p.fillPath(frameShape, st::photoCropPointFg);
-	if (_data.fixedCrop) {
-		p.restore();
-		return;
-	}
 	{
 		const auto cornerLength = std::min(
 			float64(st::photoEditorCropPointSize * 2),
@@ -297,10 +293,6 @@ void Crop::convertCropPaintToOriginal() {
 }
 
 void Crop::updateEdges() {
-	if (_data.fixedCrop) {
-		_edges.clear();
-		return;
-	}
 	const auto &s = _pointSize;
 	const auto &m = _edgePointMargins;
 	const auto &r = _cropPaint;
@@ -353,7 +345,7 @@ Qt::Edges Crop::mouseState(const QPoint &p) {
 }
 
 void Crop::mousePressEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	computeDownState(e->pos());
@@ -363,7 +355,7 @@ void Crop::mousePressEvent(QMouseEvent *e) {
 }
 
 void Crop::mouseReleaseEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	const auto hadEdge = bool(_down.edge);
@@ -495,9 +487,6 @@ void Crop::performMove(const QPoint &pos) {
 }
 
 void Crop::mouseMoveEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
-		return;
-	}
 	const auto pos = e->pos();
 	const auto pressedEdge = _down.edge;
 
@@ -508,6 +497,10 @@ void Crop::mouseMoveEvent(QMouseEvent *e) {
 			performCrop(pos);
 		}
 		update();
+	}
+
+	if (_data.fixedCrop && (e->buttons() & Qt::MiddleButton)) {
+		return;
 	}
 
 	const auto edge = pressedEdge ? pressedEdge : mouseState(pos);

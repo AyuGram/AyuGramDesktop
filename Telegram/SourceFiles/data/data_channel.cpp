@@ -1222,6 +1222,16 @@ TimeId ChannelData::subscriptionUntilDate() const {
 	return _subscriptionUntilDate;
 }
 
+UserData *ChannelData::guardBot() const {
+	return _guardBotId
+		? owner().userLoaded(_guardBotId)
+		: nullptr;
+}
+
+void ChannelData::setGuardBotId(UserId userId) {
+	_guardBotId = userId;
+}
+
 void ChannelData::updateSubscriptionUntilDate(TimeId subscriptionUntilDate) {
 	_subscriptionUntilDate = subscriptionUntilDate;
 }
@@ -1291,6 +1301,7 @@ void ApplyChannelUpdate(
 	channel->setMessagesTTL(update.vttl_period().value_or_empty());
 	channel->setStarsPerMessage(
 		update.vsend_paid_messages_stars().value_or_empty());
+	channel->setGuardBotId(UserId(update.vguard_bot_id().value_or_empty()));
 	using Flag = ChannelDataFlag;
 	const auto mask = Flag::CanSetUsername
 		| Flag::CanViewParticipants

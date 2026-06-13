@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_single_player.h"
 #include "media/audio/media_audio.h"
 #include "media/clip/media_clip_reader.h"
+#include "media/media_common.h"
 #include "media/player/media_player_instance.h"
 #include "history/history_location_manager.h"
 #include "history/view/history_view_cursor_state.h"
@@ -39,10 +40,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace InlineBots {
 namespace Layout {
 namespace internal {
+namespace {
 
 using TextState = HistoryView::TextState;
 
 constexpr auto kMaxInlineArea = 1280 * 720;
+
+using ::Media::ValidFrameSize;
 
 [[nodiscard]] QSize ScaleDown(int w, int h, int maxW, int maxH) {
 	if (w * maxH > h * maxW) {
@@ -60,9 +64,10 @@ constexpr auto kMaxInlineArea = 1280 * 720;
 }
 
 [[nodiscard]] bool CanPlayInline(not_null<DocumentData*> document) {
-	const auto dimensions = document->dimensions;
-	return dimensions.width() * dimensions.height() <= kMaxInlineArea;
+	return ValidFrameSize(document->dimensions, kMaxInlineArea);
 }
+
+} // namespace
 
 FileBase::FileBase(not_null<Context*> context, std::shared_ptr<Result> result)
 : ItemBase(context, std::move(result)) {
@@ -430,10 +435,11 @@ void Gif::clipCallback(Media::Clip::Notification notification) {
 			if (_gif->state() == State::Error) {
 				_gif.setBad();
 			} else if (_gif->ready() && !_gif->started()) {
-				if (_gif->width() * _gif->height() > kMaxInlineArea) {
-					getShownDocument()->dimensions = QSize(
-						_gif->width(),
-						_gif->height());
+				const auto size = QSize(_gif->width(), _gif->height());
+				if (!ValidFrameSize(size, kMaxInlineArea)) {
+					if (!size.isEmpty()) {
+						getShownDocument()->dimensions = size;
+					}
 					_gif.reset();
 				} else {
 					_gif->start({
@@ -1915,10 +1921,11 @@ void Game::clipCallback(Media::Clip::Notification notification) {
 			if (_gif->state() == State::Error) {
 				_gif.setBad();
 			} else if (_gif->ready() && !_gif->started()) {
-				if (_gif->width() * _gif->height() > kMaxInlineArea) {
-					getResultDocument()->dimensions = QSize(
-						_gif->width(),
-						_gif->height());
+				const auto size = QSize(_gif->width(), _gif->height());
+				if (!ValidFrameSize(size, kMaxInlineArea)) {
+					if (!size.isEmpty()) {
+						getResultDocument()->dimensions = size;
+					}
 					_gif.reset();
 				} else {
 					_gif->start({

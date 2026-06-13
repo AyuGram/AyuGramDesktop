@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_service_message.h"
 #include "history/view/media/history_view_document.h"
 #include "core/click_handler_types.h"
+#include "core/local_url_handlers.h"
 #include "core/ui_integration.h"
 #include "layout/layout_position.h"
 #include "media/audio/media_audio.h"
@@ -157,6 +158,42 @@ void HistoryMessageVia::resize(int32 availw) const {
 			lt_inline_bot,
 			'@' + bot->username());
 		maxWidth = st::msgServiceNameFont->width(text);
+		if (availw < maxWidth) {
+			text = st::msgServiceNameFont->elided(text, availw);
+			width = st::msgServiceNameFont->width(text);
+		} else if (width < maxWidth) {
+			width = maxWidth;
+		}
+	}
+}
+
+void HistoryMessageGuestChat::create(
+		not_null<Data::Session*> owner,
+		PeerId visitorId) {
+	visitor = owner->peer(visitorId);
+	const auto firstName = visitor->isUser()
+		? visitor->asUser()->firstName
+		: visitor->name();
+	maxWidth = st::msgServiceNameFont->width(
+		tr::lng_guest_chat_for(tr::now, lt_user, firstName));
+	link = std::make_shared<LambdaClickHandler>([peer = this->visitor](
+			ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		if (const auto controller = my.sessionWindow.get()) {
+			controller->showPeerInfo(peer);
+		}
+	});
+}
+
+void HistoryMessageGuestChat::resize(int32 availw) const {
+	if (availw < 0) {
+		text = QString();
+		width = 0;
+	} else {
+		const auto firstName = visitor->isUser()
+			? visitor->asUser()->firstName
+			: visitor->name();
+		text = tr::lng_guest_chat_for(tr::now, lt_user, firstName);
 		if (availw < maxWidth) {
 			text = st::msgServiceNameFont->elided(text, availw);
 			width = st::msgServiceNameFont->width(text);
@@ -564,6 +601,23 @@ void HistoryMessageReply::updateData(
 	}
 }
 
+void HistoryMessageReply::setInLogReplyTo(
+		not_null<HistoryItem*> holder,
+		not_null<HistoryItem*> message) {
+	if (resolvedMessage.get() == message) {
+		return;
+	} else if (resolvedMessage) {
+		holder->history()->owner().unregisterDependentMessage(
+			holder,
+			resolvedMessage.get());
+		resolvedMessage = nullptr;
+	}
+	_fields.externalPeerId = PeerId();
+	_fields.messageId = message->id;
+	_unavailable = 0;
+	updateData(holder, true);
+}
+
 void HistoryMessageReply::set(ReplyFields fields) {
 	_fields = std::move(fields);
 }
@@ -832,6 +886,10 @@ ReplyKeyboard::ReplyKeyboard(
 						: result;
 				}();
 				button.type = type;
+				button.iconType = (type == Type::Url
+					&& Core::IsMiniAppUrl(QString::fromUtf8(row[j].data)))
+					? Type::WebView
+					: type;
 				button.link = std::make_shared<ReplyMarkupClickHandler>(
 					owner,
 					i,
@@ -886,7 +944,7 @@ void ReplyKeyboard::resize(int width, int height) {
 		auto maxMinButtonWidth = 0;
 		for (const auto &button : row) {
 			widthOfText += qMax(button.text.maxWidth(), 1);
-			int minButtonWidth = _st->minButtonWidth(button.type);
+			int minButtonWidth = _st->minButtonWidth(button.iconType);
 			widthForText -= minButtonWidth;
 			accumulate_max(maxMinButtonWidth, minButtonWidth);
 		}
@@ -897,7 +955,7 @@ void ReplyKeyboard::resize(int width, int height) {
 		auto x = 0.;
 		for (auto &button : row) {
 			int buttonw = qMax(button.text.maxWidth(), 1);
-			float64 textw = buttonw, minw = _st->minButtonWidth(button.type);
+			float64 textw = buttonw, minw = _st->minButtonWidth(button.iconType);
 			float64 w = textw;
 			if (exact) {
 				w += minw;
@@ -960,7 +1018,7 @@ int ReplyKeyboard::naturalWidth() const {
 		for (const auto &button : row) {
 			accumulate_max(
 				maxMinButtonWidth,
-				_st->minButtonWidth(button.type));
+				_st->minButtonWidth(button.iconType));
 		}
 		auto rowMaxButtonWidth = 0;
 		for (const auto &button : row) {
@@ -1075,7 +1133,8 @@ ClickHandlerPtr ReplyKeyboard::getLink(QPoint point) const {
 
 			if (rect.contains(point)) {
 				if (_item->isAdminLogEntry()
-					&& button.type != HistoryMessageMarkupButton::Type::Url) {
+					&& button.type != HistoryMessageMarkupButton::Type::Url
+					&& button.type != HistoryMessageMarkupButton::Type::Callback) {
 					return ClickHandlerPtr();
 				}
 				_savedCoords = point;
@@ -1246,7 +1305,7 @@ void ReplyKeyboard::Style::paintButton(
 			button.ripple.reset();
 		}
 	}
-	paintButtonIcon(p, st, rect, outerWidth, button.type);
+	paintButtonIcon(p, st, rect, outerWidth, button.iconType);
 	if (button.type == HistoryMessageMarkupButton::Type::CallbackWithPassword
 		|| button.type == HistoryMessageMarkupButton::Type::Callback
 		|| button.type == HistoryMessageMarkupButton::Type::Game) {

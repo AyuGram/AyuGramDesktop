@@ -68,8 +68,8 @@ Memento::Memento(not_null<Data::SavedSublist*> sublist)
 : ContentMemento(sublist->owningHistory()->peer, nullptr, sublist, 0) {
 }
 
-Section Memento::section() const {
-	return Section(Section::Type::Profile);
+Info::Section Memento::section() const {
+	return Info::Section(Info::Section::Type::Profile);
 }
 
 object_ptr<ContentWidget> Memento::createWidget(

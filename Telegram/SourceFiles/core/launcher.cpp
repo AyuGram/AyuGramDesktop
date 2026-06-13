@@ -35,7 +35,7 @@ base::options::toggle OptionHighDpiDownscale({
 		" (another approach, likely better quality).",
 	.scope = [] {
 		return !Platform::IsMac()
-			&& QLibraryInfo::version() >= QVersionNumber(6, 4);
+			&& QLibraryInfo::version() >= QVersionNumber(6, 8);
 	},
 	.restartRequired = true,
 });
@@ -361,8 +361,8 @@ void Launcher::initHighDpi() {
 
 	if (OptionHighDpiDownscale.value()) {
 		qputenv("QT_WIDGETS_HIGHDPI_DOWNSCALE", "1");
-		qputenv("QT_WIDGETS_RHI", "1");
-		qputenv("QT_WIDGETS_RHI_BACKEND", "opengl");
+	} else {
+		qunsetenv("QT_WIDGETS_HIGHDPI_DOWNSCALE");
 	}
 
 	if (OptionFractionalScalingEnabled.value()

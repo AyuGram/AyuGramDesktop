@@ -1157,8 +1157,8 @@ void MainMenu::setupSwipe() {
 		}
 	};
 
-	auto init = [=](int, Qt::LayoutDirection direction) {
-		if (direction != Qt::LeftToRight) {
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		if (data.direction != Qt::LeftToRight) {
 			return Ui::Controls::SwipeHandlerFinishData();
 		}
 		if (_emojiStatusPanel && _emojiStatusPanel->hasFocus()) {

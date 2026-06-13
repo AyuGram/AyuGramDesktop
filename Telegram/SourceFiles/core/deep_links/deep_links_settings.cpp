@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_credits.h"
 #include "settings/sections/settings_folders.h"
 #include "settings/sections/settings_global_ttl.h"
+#include "settings/sections/settings_local_storage.h"
 #include "settings/sections/settings_information.h"
 #include "settings/sections/settings_local_passcode.h"
 #include "settings/sections/settings_main.h"
@@ -65,12 +66,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_notifications_type.h"
 #include "settings/settings_power_saving.h"
 #include "settings/settings_search.h"
+#include "settings/settings_experimental.h"
 #include "settings/sections/settings_premium.h"
 #include "ui/power_saving.h"
 #include "settings/sections/settings_privacy_security.h"
 #include "settings/sections/settings_websites.h"
 #include "boxes/connection_box.h"
-#include "boxes/local_storage_box.h"
 #include "mainwindow.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
@@ -531,6 +532,33 @@ void RegisterSettingsHandlers(Router &router) {
 	router.add(u"settings"_q, {
 		.path = u"notifications"_q,
 		.action = SettingsSection{ ::Settings::NotificationsId() },
+	});
+
+	const auto showExperimental = [](const Context &ctx) {
+		if (!ctx.controller) {
+			return Result::NeedsAuth;
+		}
+		const auto slash = ctx.path.indexOf('/');
+		const auto key = (slash >= 0)
+			? ctx.path.mid(slash + 1).trimmed().toLower()
+			: QString();
+		if (!key.isEmpty()) {
+			ctx.controller->setHighlightControlId(u"experimental/"_q + key);
+		}
+		ctx.controller->showSettings(::Settings::Experimental::Id());
+		return Result::Handled;
+	};
+	router.add(u"settings"_q, {
+		.path = u"experimental"_q,
+		.action = CodeBlock{ showExperimental },
+	});
+	router.add(u"settings"_q, {
+		.path = u"experiment"_q,
+		.action = CodeBlock{ showExperimental },
+	});
+	router.add(u"settings"_q, {
+		.path = u"exp"_q,
+		.action = CodeBlock{ showExperimental },
 	});
 
 	router.add(u"settings"_q, {
@@ -1230,33 +1258,21 @@ void RegisterSettingsHandlers(Router &router) {
 
 	router.add(u"settings"_q, {
 		.path = u"data/storage"_q,
-		.action = CodeBlock{ [](const Context &ctx) {
-			if (!ctx.controller) {
-				return Result::NeedsAuth;
-			}
-			LocalStorageBox::Show(ctx.controller);
-			return Result::Handled;
-		}},
+		.action = SettingsControl{ ::Settings::LocalStorageId() },
 	});
 	router.add(u"settings"_q, {
 		.path = u"data/storage/clear-cache"_q,
-		.action = CodeBlock{ [](const Context &ctx) {
-			if (!ctx.controller) {
-				return Result::NeedsAuth;
-			}
-			LocalStorageBox::Show(ctx.controller, u"storage/clear-cache"_q);
-			return Result::Handled;
-		}},
+		.action = SettingsControl{
+			::Settings::LocalStorageId(),
+			u"storage/clear-cache"_q,
+		},
 	});
 	router.add(u"settings"_q, {
 		.path = u"data/max-cache"_q,
-		.action = CodeBlock{ [](const Context &ctx) {
-			if (!ctx.controller) {
-				return Result::NeedsAuth;
-			}
-			LocalStorageBox::Show(ctx.controller, u"storage/max-cache"_q);
-			return Result::Handled;
-		}},
+		.action = SettingsControl{
+			::Settings::LocalStorageId(),
+			u"storage/max-cache"_q,
+		},
 	});
 
 	router.add(u"settings"_q, {

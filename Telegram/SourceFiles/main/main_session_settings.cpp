@@ -158,7 +158,7 @@ QByteArray SessionSettings::serialize() const {
 		for (const auto &[peerId, mode] : _subsectionTabsModes) {
 			stream << SerializePeerId(peerId) << qint32(mode);
 		}
-		stream << qint32(_phoneNumberHidden ? 1 : 0);
+		stream << qint32(_phoneNumberHidden.current() ? 1 : 0);
 	}
 
 	Ensures(result.size() == size);

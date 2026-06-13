@@ -112,6 +112,10 @@ bool SectionWidget::showInternal(
 	return _content->showInternal(memento, params);
 }
 
+bool SectionWidget::showBackInternal() {
+	return _content->closeByBackButton();
+}
+
 std::shared_ptr<Window::SectionMemento> SectionWidget::createMemento() {
 	return _content->createMemento();
 }

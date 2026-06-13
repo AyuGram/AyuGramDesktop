@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "history/history_message_selection.h"
+
 class HistoryItem;
 
 namespace HistoryView {
@@ -54,6 +56,7 @@ struct TextState {
 	ClickHandlerPtr link;
 	uint16 symbol = 0;
 	bool afterSymbol = false;
+	MessageSelectionEndpoint selectionCursor;
 	bool overMessageText = false;
 	bool customTooltip = false;
 	bool horizontalScroll = false;
@@ -76,5 +79,9 @@ enum class InfoDisplayType : char {
 	Image,
 	Background,
 };
+
+[[nodiscard]] not_null<HistoryItem*> LookupItemByPoint(
+	not_null<Element*> view,
+	QPoint itemPoint);
 
 } // namespace HistoryView

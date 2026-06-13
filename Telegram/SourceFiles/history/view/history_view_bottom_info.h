@@ -45,6 +45,7 @@ public:
 			ForwardedDate  = 0x200,
 			AyuDeleted     = 0x400,
 			AyuBurnt       = 0x800,
+			Silent         = 0x1000,
 			//Unread, // We don't want to pass and update it in Date for now.
 		};
 		friend inline constexpr bool is_flag_type(Flag) { return true; };

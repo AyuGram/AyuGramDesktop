@@ -111,6 +111,7 @@ public:
 	[[nodiscard]] int countAppearedWidth(float64 progress) const;
 	void setSpecialExpandTopSkip(int skip);
 	void setBubbleUp(bool bubbleUp);
+	void setExpandDown(bool expandDown);
 	void initGeometry(int innerTop);
 	void beforeDestroy();
 
@@ -247,6 +248,7 @@ private:
 	bool _over = false;
 	bool _low = false;
 	bool _bubbleUp = false;
+	bool _expandDown = false;
 
 };
 
