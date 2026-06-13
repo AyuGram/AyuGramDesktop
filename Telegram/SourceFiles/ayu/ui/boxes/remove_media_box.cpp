@@ -83,11 +83,26 @@ bool MessageIsSticker(const MTPDmessage &data) {
 void WalkMessageIds(
 		const MTPmessages_Messages &response,
 		bool stickersOnly,
+		bool deleteMine,
+		bool deleteTheirs,
 		Fn<void(MsgId)> consume) {
 	const auto handle = [&](const QVector<MTPMessage> &messages) {
 		for (const auto &msg : messages) {
 			msg.match([&](const MTPDmessage &data) {
 				if (stickersOnly && !MessageIsSticker(data)) {
+					return;
+				}
+				// Scope by sender. The batch is already type-filtered, so if
+				// no sender sweep is on, keep everything (all senders).
+				// Otherwise keep only the matching sender's messages, using
+				// the `out` flag — reliable in 1-on-1 chats, where
+				// messages.search ignores from_id. out == true: we sent it;
+				// out == false: the other side did.
+				const auto out = data.is_out();
+				const auto keep = (!deleteMine && !deleteTheirs)
+					|| (deleteMine && out)
+					|| (deleteTheirs && !out);
+				if (!keep) {
 					return;
 				}
 				consume(MsgId(data.vid().v));
@@ -227,6 +242,8 @@ void RunDelete(
 void SearchAndDelete(
 		not_null<PeerData*> peer,
 		std::vector<Selector> selectors,
+		bool deleteMine,
+		bool deleteTheirs,
 		bool revoke,
 		std::shared_ptr<State> state) {
 	const auto session = &peer->session();
@@ -267,7 +284,12 @@ void SearchAndDelete(
 					MTP_long(0)))
 				.done([=](const MTPmessages_Messages &result) {
 					MsgId minId;
-					WalkMessageIds(result, stickersOnly, [&](MsgId id) {
+					WalkMessageIds(
+							result,
+							stickersOnly,
+							deleteMine,
+							deleteTheirs,
+							[&](MsgId id) {
 						if (!id) {
 							return;
 						}
@@ -347,6 +369,37 @@ void FillRemoveMediaBox(
 	const auto isBasicChat = peer->isChat();
 	const auto showRevokeToggle = (user && !isSelf) || isBasicChat;
 
+	// In a 1-on-1 user chat (not Saved Messages) there is a single "other
+	// side", so we can offer two extra sweeps scoped by sender: every media
+	// type the current user sent, or every media type the other user sent.
+	const auto isPrivateChat = user && !isSelf;
+	Ui::Checkbox *myMedia = nullptr;
+	Ui::Checkbox *theirMedia = nullptr;
+	if (isPrivateChat) {
+		Ui::AddSkip(selection, st::boxLittleSkip);
+		Ui::AddDivider(selection);
+		Ui::AddSkip(selection, st::boxLittleSkip);
+
+		const auto pad = st::boxRowPadding
+			+ QMargins(0, st::boxLittleSkip / 2, 0, st::boxLittleSkip / 2);
+		myMedia = selection->add(
+			object_ptr<Ui::Checkbox>(
+				selection,
+				tr::ayu_RemoveMediaMine(),
+				false,
+				st::defaultBoxCheckbox),
+			pad);
+		theirMedia = selection->add(
+			object_ptr<Ui::Checkbox>(
+				selection,
+				tr::ayu_RemoveMediaTheirs(
+					lt_user,
+					rpl::single(peer->shortName())),
+				false,
+				st::defaultBoxCheckbox),
+			pad);
+	}
+
 	Ui::Checkbox *revoke = nullptr;
 	if (showRevokeToggle) {
 		Ui::AddSkip(selection, st::boxLittleSkip);
@@ -417,10 +470,25 @@ void FillRemoveMediaBox(
 	const auto removeButton = box->addButton(
 		tr::ayu_RemoveMediaButton(),
 		[=] {
-			std::vector<Selector> selected;
-			selected.reserve(entries->size());
+			const auto deleteMine = myMedia && myMedia->checked();
+			const auto deleteTheirs = theirMedia && theirMedia->checked();
+			const auto senderScoped = deleteMine || deleteTheirs;
+
+			auto anyType = false;
 			for (const auto &entry : *entries) {
 				if (entry.checkbox->checked()) {
+					anyType = true;
+					break;
+				}
+			}
+
+			// Types to act on come from the ticked type boxes. If none are
+			// ticked but a sender sweep is, act on every media type. The
+			// sender sweep (if any) then narrows each searched type to the
+			// matching sender, client-side in WalkMessageIds.
+			std::vector<Selector> selected;
+			for (const auto &entry : *entries) {
+				if (entry.checkbox->checked() || (!anyType && senderScoped)) {
 					selected.push_back({ entry.filter, entry.stickersOnly });
 				}
 			}
@@ -433,7 +501,13 @@ void FillRemoveMediaBox(
 				: !isSelf;
 			selection->hide();
 			progress->show();
-			SearchAndDelete(peer, std::move(selected), revokeChecked, state);
+			SearchAndDelete(
+				peer,
+				std::move(selected),
+				deleteMine,
+				deleteTheirs,
+				revokeChecked,
+				state);
 		},
 		st::attentionBoxButton);
 	const auto cancelButton = box->addButton(tr::lng_cancel(), [=] {

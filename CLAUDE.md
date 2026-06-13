@@ -14,13 +14,22 @@ A new entry **Remove Media** appears in the 3-dots chat menu (and in the chat-li
 
 ### UX
 
-1. **Selection phase** — six checkboxes, all unchecked by default:
+1. **Selection phase** — six media-type checkboxes, all unchecked by default:
    - Pictures
    - Videos
    - Voice messages
    - Video messages (round videos)
    - GIFs
    - Stickers
+1b. **Sender scope** (1-on-1 user chats only, not Saved Messages) — two extra checkboxes under their own divider:
+   - "My media" — restrict the deletion to media the current user sent.
+   - "{Name}'s media" — restrict the deletion to media the other user sent.
+   These **narrow** the type selection by sender (intersection), they are not standalone sweeps:
+   - Type boxes decide *which* media types; sender boxes decide *whose*.
+   - Neither sender box checked → all senders (original behaviour).
+   - A sender box checked with no type box → all of that person's media (all six types).
+   - e.g. "Pictures + My media" → only your pictures; "Voice + Pics + {Name}'s media" → their voice + their pictures; "My media + {Name}'s media" → everyone's media.
+   Hidden in groups, channels, and Saved Messages (no single "other side").
 2. **Revoke toggle** (visible only where it has a real effect):
    - 1-on-1 user chat (not Saved Messages) → "Remove for Me and {Name}"
    - Basic legacy group → "Remove for everyone"
@@ -34,6 +43,7 @@ A new entry **Remove Media** appears in the 3-dots chat menu (and in the chat-li
 ### Implementation notes
 
 - **Search**: `MTPmessages_Search` paginated in batches of 100 with `offset_id = minIdSeen - 1`. One search stream per checked filter; their result sets are deduplicated via `base::flat_set<MsgId>` before deletion.
+- **Sender scoping (client-side)**: `messages.search`'s `from_id` filter is **ignored by the server in 1-on-1 chats** (it only works in groups/channels) — it returns every message regardless of `from_id`. So sender scoping is done **client-side** off each message's `out` flag (`MTPDmessage::is_out()` — `true` = sent by us, `false` = sent by the other side). Which media types get searched is decided in the box handler: the ticked type boxes, or — if none are ticked but a sender box is — all six. `SearchAndDelete` takes global `deleteMine`/`deleteTheirs` flags, and while walking each (already type-filtered) batch keeps a message if `(!deleteMine && !deleteTheirs) || (deleteMine && out) || (deleteTheirs && !out)` — i.e. no sweep ⇒ all senders, otherwise only the matching sender. Each searched type still runs **one** search over all senders — no redundant queries. This mirrors how the sticker filter already post-filters batches client-side.
 - **Sticker filter quirk**: Telegram's API has no `inputMessagesFilterStickers`, and the server treats stickers as a separate class from "files" — `inputMessagesFilterDocument` returns zero stickers. The only correct path is to scan the full chat history with `inputMessagesFilterEmpty` and pick out documents whose attributes include `documentAttributeSticker` on the client. This is documented in a comment in `remove_media_box.cpp` next to the addType call.
 - **Delete**: batched in groups of 100 with a 500–1000 ms jittered delay between batches. For channels (megagroups + broadcasts) the call is `MTPchannels_DeleteMessages`; for everything else it's `MTPmessages_DeleteMessages` with the `f_revoke` flag set per the toggle.
 - **Fail handling**: on any per-batch API failure (permission denied, network blip, etc.) the operation logs and **skips** that batch rather than retrying. Without this, channels where the user lacks delete-others permission would loop forever on the same batch.
@@ -101,7 +111,7 @@ Inserted `AyuUi::AddRemoveMediaAction(_peer, _controller, _addAction)` right aft
 
 #### Added (Remove Media)
 
-`ayu_RemoveMediaMenu`, `ayu_RemoveMediaTitle`, `ayu_RemoveMediaPhotos`, `ayu_RemoveMediaVideos`, `ayu_RemoveMediaVoice`, `ayu_RemoveMediaVideoMessages`, `ayu_RemoveMediaGifs`, `ayu_RemoveMediaStickers`, `ayu_RemoveMediaRevoke` (with `{user}` placeholder), `ayu_RemoveMediaRevokeSelf`, `ayu_RemoveMediaRevokeGroup`, `ayu_RemoveMediaButton`, `ayu_RemoveMediaNothingSelected`, `ayu_RemoveMediaSearching` (plural, with `{count}`), `ayu_RemoveMediaDeleting`, `ayu_RemoveMediaDone` (plural, with `{count}`), `ayu_RemoveMediaNoneFound`.
+`ayu_RemoveMediaMenu`, `ayu_RemoveMediaTitle`, `ayu_RemoveMediaPhotos`, `ayu_RemoveMediaVideos`, `ayu_RemoveMediaVoice`, `ayu_RemoveMediaVideoMessages`, `ayu_RemoveMediaGifs`, `ayu_RemoveMediaStickers`, `ayu_RemoveMediaMine`, `ayu_RemoveMediaTheirs` (with `{user}` placeholder), `ayu_RemoveMediaRevoke` (with `{user}` placeholder), `ayu_RemoveMediaRevokeSelf`, `ayu_RemoveMediaRevokeGroup`, `ayu_RemoveMediaButton`, `ayu_RemoveMediaNothingSelected` (now "Select at least one option." — broadened from "…media type." since sender boxes also count), `ayu_RemoveMediaSearching` (plural, with `{count}`), `ayu_RemoveMediaDeleting`, `ayu_RemoveMediaDone` (plural, with `{count}`), `ayu_RemoveMediaNoneFound`.
 
 #### Added (Delete All My Messages)
 

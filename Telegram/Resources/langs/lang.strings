@@ -8298,11 +8298,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RemoveMediaVideoMessages" = "Video messages";
 "ayu_RemoveMediaGifs" = "GIFs";
 "ayu_RemoveMediaStickers" = "Stickers";
+"ayu_RemoveMediaMine" = "My media";
+"ayu_RemoveMediaTheirs" = "{user}'s media";
 "ayu_RemoveMediaRevoke" = "Remove for Me and {user}";
 "ayu_RemoveMediaRevokeSelf" = "Remove for Me";
 "ayu_RemoveMediaRevokeGroup" = "Remove for everyone";
 "ayu_RemoveMediaButton" = "Remove";
-"ayu_RemoveMediaNothingSelected" = "Select at least one media type.";
+"ayu_RemoveMediaNothingSelected" = "Select at least one option.";
 "ayu_RemoveMediaSearching#one" = "Searching... {count} found";
 "ayu_RemoveMediaSearching#other" = "Searching... {count} found";
 "ayu_RemoveMediaDeleting" = "Removing media...";
