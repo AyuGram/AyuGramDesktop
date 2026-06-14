@@ -62,6 +62,7 @@ public:
 		return *static_cast<Sandbox*>(QCoreApplication::instance());
 	}
 	static void QuitWhenStarted();
+	static void NotifySystemShuttingDown();
 
 	~Sandbox();
 
@@ -125,6 +126,7 @@ private:
 	bool _secondInstance = false;
 	bool _started = false;
 	static bool QuitOnStartRequested;
+	static bool SystemShuttingDown;
 
 	std::unique_ptr<UpdateChecker> _updateChecker;
 

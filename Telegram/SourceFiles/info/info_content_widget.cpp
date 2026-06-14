@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "menu/menu_send.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/fields/input_field.h"
@@ -426,6 +427,14 @@ void ContentWidget::saveChanges(FnMut<void()> done) {
 	done();
 }
 
+SendMenu::Details ContentWidget::sendMenuDetails() const {
+	return {};
+}
+
+bool ContentWidget::processChosenSticker(ChatHelpers::FileChosen &&) {
+	return false;
+}
+
 void ContentWidget::refreshSearchField(bool shown) {
 	auto search = _controller->searchFieldController();
 	if (search && shown) {
@@ -508,8 +517,10 @@ void ContentWidget::setupSwipeHandler(not_null<Ui::RpWidget*> widget) {
 		}
 	};
 
-	auto init = [=](int, Qt::LayoutDirection direction) {
-		return (direction == Qt::RightToLeft && _controller->hasBackButton())
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		const auto isBack = (data.direction == Qt::RightToLeft)
+			&& _controller->hasBackButton();
+		return isBack
 			? Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
 				checkBeforeClose(crl::guard(this, [=] {
 					_controller->parentController()->hideLayer();

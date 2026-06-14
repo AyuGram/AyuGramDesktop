@@ -8,9 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/delete_messages_box.h"
 
 #include "apiwrap.h"
-#include "api/api_chat_participants.h"
-#include "api/api_messages_search.h"
-#include "api/api_report.h"
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -36,28 +33,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 
+namespace {
+
+constexpr auto kDeleteMessagesBoxAnimationDuration = crl::time(80);
+
+} // namespace
+
 DeleteMessagesBox::DeleteMessagesBox(
 	QWidget*,
-	not_null<HistoryItem*> item,
-	bool suggestModerateActions)
+	not_null<HistoryItem*> item)
 : _session(&item->history()->session())
 , _ids(1, item->fullId()) {
-	const auto peer = item->history()->peer;
-	const auto channel = peer->asChannel();
-	if (suggestModerateActions) {
-		_moderateBan = item->suggestBanReport();
-		_moderateDeleteAll = item->suggestDeleteAllReport();
-	} else if (item->out()) {
-		const auto chat = peer->asChat();
-		if ((chat && chat->canDeleteMessages()) ||
-			(channel && !channel->isBroadcast() && channel->canDeleteMessages())) {
-			_moderateDeleteAll = true;
-		}
-	}
-	if ((_moderateBan || _moderateDeleteAll) && channel) {
-		_moderateFrom = item->from();
-		_moderateInChannel = channel;
-	}
 }
 
 DeleteMessagesBox::DeleteMessagesBox(
@@ -88,6 +74,10 @@ DeleteMessagesBox::DeleteMessagesBox(
 : _session(&peer->session())
 , _wipeHistoryPeer(peer)
 , _wipeHistoryJustClear(justClear) {
+}
+
+crl::time DeleteMessagesBox::layerAnimationDuration() const {
+	return kDeleteMessagesBoxAnimationDuration;
 }
 
 void DeleteMessagesBox::prepare() {
@@ -185,53 +175,6 @@ void DeleteMessagesBox::prepare() {
 			appendDetails({
 				tr::lng_delete_clear_for_me(tr::now)
 			});
-		}
-	} else if (_moderateFrom) {
-		Assert(_moderateInChannel != nullptr);
-
-		details.text = tr::lng_selected_delete_sure_this(tr::now);
-		if (_moderateBan) {
-			_banUser.create(
-				this,
-				tr::lng_ban_user(tr::now),
-				false,
-				st::defaultBoxCheckbox);
-		}
-		_reportSpam.create(
-			this,
-			tr::lng_report_spam(tr::now),
-			false,
-			st::defaultBoxCheckbox);
-		if (_moderateDeleteAll) {
-			const auto search = lifetime().make_state<Api::MessagesSearch>(
-				_session->data().message(_ids.front())->history());
-			_deleteAll.create(
-				this,
-				tr::lng_delete_all_from_user(
-					tr::now,
-					lt_user,
-					tr::bold(_moderateFrom->name()),
-					tr::marked),
-				false,
-				st::defaultBoxCheckbox);
-
-			*deleteText = rpl::combine(
-				rpl::single(
-					0
-				) | rpl::then(
-					search->messagesFounds(
-					) | rpl::map([](const Api::FoundMessages &found) {
-						return found.total;
-					})
-				),
-				_deleteAll->checkedValue()
-			) | rpl::map([](int total, bool checked) {
-				return tr::lng_box_delete(tr::now)
-					+ ((total <= 0 || !checked)
-						? QString()
-						: QString(" (%1)").arg(total));
-			});
-			search->searchMessages({ .from = _moderateFrom });
 		}
 	} else {
 		details.text = hasSavedMusicMessages()
@@ -335,16 +278,7 @@ void DeleteMessagesBox::prepare() {
 		auto fullHeight = st::boxPadding.top()
 			+ _text->height()
 			+ st::boxPadding.bottom();
-		if (_moderateFrom) {
-			fullHeight += st::boxMediumSkip;
-			if (_banUser) {
-				fullHeight += _banUser->heightNoMargins() + st::boxLittleSkip;
-			}
-			fullHeight += _reportSpam->heightNoMargins();
-			if (_deleteAll) {
-				fullHeight += st::boxLittleSkip + _deleteAll->heightNoMargins();
-			}
-		} else if (_revoke) {
+		if (_revoke) {
 			fullHeight += st::boxMediumSkip + _revoke->heightNoMargins();
 		}
 		if (_autoDeleteSettings) {
@@ -483,20 +417,7 @@ void DeleteMessagesBox::resizeEvent(QResizeEvent *e) {
 	const auto &padding = st::boxPadding;
 	_text->moveToLeft(padding.left(), padding.top());
 	auto top = _text->bottomNoMargins() + st::boxMediumSkip;
-	if (_moderateFrom) {
-		if (_banUser) {
-			_banUser->moveToLeft(padding.left(), top);
-			top += _banUser->heightNoMargins() + st::boxLittleSkip;
-		}
-		_reportSpam->moveToLeft(padding.left(), top);
-		top += _reportSpam->heightNoMargins() + st::boxLittleSkip;
-		if (_deleteAll) {
-			const auto availableWidth = width() - 2 * padding.left();
-			_deleteAll->resizeToNaturalWidth(availableWidth);
-			_deleteAll->moveToLeft(padding.left(), top);
-			top += _deleteAll->heightNoMargins() + st::boxLittleSkip;
-		}
-	} else if (_revoke) {
+	if (_revoke) {
 		const auto availableWidth = width() - 2 * padding.left();
 		_revoke->resizeToNaturalWidth(availableWidth);
 		_revoke->moveToLeft(padding.left(), top);
@@ -633,23 +554,6 @@ void DeleteMessagesBox::deleteAndClear() {
 		}
 		return;
 	}
-	if (_moderateFrom) {
-		if (_banUser && _banUser->checked()) {
-			_moderateInChannel->session().api().chatParticipants().kick(
-				_moderateInChannel,
-				_moderateFrom,
-				ChatRestrictionsInfo());
-		}
-		if (_reportSpam->checked()) {
-			Api::ReportSpam(_moderateFrom, { _ids[0] });
-		}
-		if (_deleteAll && _deleteAll->checked()) {
-			_moderateInChannel->session().api().deleteAllFromParticipant(
-				_moderateInChannel,
-				_moderateFrom);
-		}
-	}
-
 	const auto ids = _ids;
 	invokeCallbackAndClose();
 	session->data().histories().deleteMessages(ids, revoke);

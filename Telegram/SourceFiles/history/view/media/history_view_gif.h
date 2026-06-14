@@ -145,6 +145,8 @@ private:
 	[[nodiscard]] bool autoplayEnabled() const;
 	[[nodiscard]] bool autoplayUnderCursor() const;
 	[[nodiscard]] bool underCursor() const;
+	[[nodiscard]] int maxInlineArea() const;
+	[[nodiscard]] bool canPlayInline() const;
 
 	void playAnimation(bool autoplay) override;
 	QSize countOptimalSize() override;

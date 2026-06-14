@@ -10,8 +10,8 @@ ENV PKG_CONFIG_PATH=/opt/rh/$TOOLSET/root/usr/lib64/pkgconfig:/opt/rh/$TOOLSET/r
 
 RUN dnf -y install epel-release \
 	&& dnf config-manager --set-enabled powertools \
-	&& dnf -y install cmake autoconf automake libtool pkgconfig make patch git \
-		python3.11-pip python3.11-devel gperf flex bison clang clang-tools-extra \
+	&& dnf -y install autoconf automake libtool pkgconfig make patch git \
+		python3.11-pip python3.11-devel gperf flex bison clang-tools-extra \
 		lld nasm file which wget perl-open perl-XML-Parser perl-IPC-Cmd \
 		xorg-x11-util-macros $TOOLSET-gcc $TOOLSET-gcc-c++ $TOOLSET-binutils \
 		$TOOLSET-gdb $TOOLSET-libasan-devel libffi-devel fontconfig-devel \
@@ -23,7 +23,7 @@ RUN dnf -y install epel-release \
 	&& dnf clean all
 
 RUN alternatives --set python3 /usr/bin/python3.11
-RUN python3 -m pip install meson ninja
+RUN python3 -m pip install cmake meson ninja
 RUN cat <<EOF > /usr/local/bin/pkg-config && chmod +x /usr/local/bin/pkg-config
 #!/bin/sh
 for i in "\$@"; do
@@ -31,8 +31,10 @@ for i in "\$@"; do
 done
 exec /usr/bin/pkg-config --static "\$@"
 EOF
-RUN sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/")/ -O0 {% if LTO %}-fno-lto -fno-use-linker-plugin{% endif %} -fuse-ld=lld")/' /usr/share/cmake/Modules/Compiler/GNU.cmake
-RUN sed -i 's/NO_DEFAULT_PATH//g; s/PKG_CONFIG_ALLOW_SYSTEM_LIBS/PKG_CONFIG_IS_DUMB/g' /usr/share/cmake/Modules/FindPkgConfig.cmake
+RUN CMAKE_ROOT="$(cmake --system-information | sed -n 's/^CMAKE_ROOT "\([^"]*\)"$/\1/p')" \
+	&& test -n "$CMAKE_ROOT" \
+	&& sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/")/ -O0 {% if LTO %}-fno-lto -fno-use-linker-plugin{% endif %} -fuse-ld=lld")/' "$CMAKE_ROOT/Modules/Compiler/GNU.cmake" \
+	&& sed -i 's/NO_DEFAULT_PATH//g; s/PKG_CONFIG_ALLOW_SYSTEM_LIBS/PKG_CONFIG_IS_DUMB/g' "$CMAKE_ROOT/Modules/FindPkgConfig.cmake"
 RUN sed -i '/Requires.private: valgrind/d' /usr/lib64/pkgconfig/libdrm.pc
 RUN sed -i '/Requires.private: gl/s/gl/opengl glx/' /usr/lib64/pkgconfig/epoxy.pc
 RUN sed -i 's/-lharfbuzz//' /usr/lib64/pkgconfig/harfbuzz.pc
@@ -44,7 +46,7 @@ WORKDIR /usr/src
 ENV AR=gcc-ar
 ENV RANLIB=gcc-ranlib
 ENV NM=gcc-nm
-ENV CFLAGS='{% if DEBUG %}-g{% endif %} {% if MINSIZE %}-Os{% else %}-O3{% endif %} {% if LTO %}-flto=auto -ffat-lto-objects{% endif %} -pipe -fPIC -fno-strict-aliasing -fexceptions -fasynchronous-unwind-tables -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -fhardened -Wno-hardened'
+ENV CFLAGS='{% if DEBUG %}-g -gdwarf64{% endif %} {% if MINSIZE %}-Os{% else %}-O3{% endif %} {% if LTO %}-flto=auto -ffat-lto-objects{% endif %} -pipe -fPIC -fno-strict-aliasing -fexceptions -fasynchronous-unwind-tables -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -fhardened -Wno-hardened'
 ENV CXXFLAGS=$CFLAGS
 ENV LDFLAGS='-static-libstdc++ -static-libgcc -static-libasan -pthread -Wl,--push-state,--no-as-needed,-ldl,--pop-state -Wl,--as-needed -Wl,-z,muldefs'
 
@@ -63,7 +65,7 @@ RUN git init Implib.so \
 		LIBFILE=$(basename $1); \
 		LIBNAME=$(basename $1 .so); \
 		../implib-gen.py -q $1; \
-		gcc $CFLAGS -c -o $LIBFILE.tramp.o $LIBFILE.tramp.S; \
+		gcc $CFLAGS -g0 -c -o $LIBFILE.tramp.o $LIBFILE.tramp.S; \
 		gcc $CFLAGS -c -o $LIBFILE.init.o $LIBFILE.init.c; \
 		ar rcs /usr/local/lib64/$LIBNAME.a $LIBFILE.tramp.o $LIBFILE.init.o; \
 	} \
@@ -93,18 +95,26 @@ FROM builder AS patches
 RUN git init patches \
 	&& cd patches \
 	&& git remote add origin https://github.com/desktop-app/patches.git \
-	&& git fetch --depth=1 origin 4519c85c924b9da81f29d4aac045886f896ee479 \
+	&& git fetch --depth=1 origin 99e4345c14fb57164139654d62ae483ceba49e2c \
 	&& git reset --hard FETCH_HEAD \
 	&& rm -rf .git
 
 FROM builder AS zlib
-RUN git clone -b v1.3.1 --depth=1 https://github.com/madler/zlib.git \
+RUN git init zlib \
 	&& cd zlib \
-	&& cmake -B build . -DZLIB_BUILD_EXAMPLES=OFF \
+	&& git remote add origin https://github.com/madler/zlib.git \
+	&& git fetch --depth=1 origin e3dc0a85b7032e98380dec011bc8f2c2ee0d8fca \
+	&& git reset --hard FETCH_HEAD \
+	&& sed -i 's/Bool/BOOL/;s/ZLIB::ZLIBSTATIC/MINIZIP::minizipstatic/;s/ZLIB::ZLIB/MINIZIP::minizip/' contrib/minizip/minizipConfig.cmake.in \
+	&& sed -i '/DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"/s@}@}/minizip@' contrib/minizip/CMakeLists.txt \
+	&& cmake -B build . \
+		-DZLIB_BUILD_SHARED=OFF \
+		-DZLIB_BUILD_TESTING=OFF \
+		-DZLIB_BUILD_MINIZIP=ON \
+		-DZLIB_MINIZIP_BUILD_SHARED=OFF \
+		-DZLIB_MINIZIP_BUILD_TESTING=OFF \
 	&& cmake --build build \
-	&& export DESTDIR=/usr/src/zlib-cache \
-	&& cmake --install build \
-	&& rm $DESTDIR/usr/local/lib/libz.so* \
+	&& DESTDIR=/usr/src/zlib-cache cmake --install build \
 	&& cd .. \
 	&& rm -rf zlib
 
@@ -169,6 +179,7 @@ RUN git clone -b v4.1.5 --depth=1 https://github.com/mozilla/mozjpeg.git \
 	&& cd mozjpeg \
 	&& cmake -B build . \
 		-DCMAKE_INSTALL_PREFIX=/usr/local \
+		-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
 		-DENABLE_SHARED=OFF \
 		-DWITH_JPEG8=ON \
 		-DPNG_SUPPORTED=OFF \
@@ -238,7 +249,7 @@ RUN git init libvpx \
 		--enable-vp9 \
 		--enable-webm-io \
 		--size-limit=4096x4096 \
-	&& make -j$(nproc) \
+	&& make HAVE_GNU_STRIP=no -j$(nproc) \
 	&& make DESTDIR=/usr/src/vpx-cache install \
 	&& cd .. \
 	&& rm -rf libvpx
@@ -699,6 +710,7 @@ RUN git clone -b 1.24.3 --depth=1 https://github.com/kcat/openal-soft.git \
 FROM builder AS openssl
 RUN git clone -b openssl-3.2.1 --depth=1 https://github.com/openssl/openssl.git \
 	&& cd openssl \
+	&& sed -i 's/$cmd $cmdflags -c -o/$cmd $cmdflags -g0 -c -o/' Configurations/unix-Makefile.tmpl \
 	&& ./config \
 		--openssldir=/etc/ssl \
 		no-shared \
@@ -743,7 +755,7 @@ COPY --link --from=xcb-cursor /usr/src/xcb-cursor-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
-ENV QT=6.11.0
+ENV QT=6.11.1
 RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 	&& cd qt5 \
 	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
@@ -773,7 +785,7 @@ FROM builder AS boost
 RUN curl -sSL https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz | tar -xz \
 	&& cd boost_* \
 	&& ./bootstrap.sh --prefix=/usr/src/boost-cache/usr/local --with-libraries=regex \
-	&& ./b2 release link=static install \
+	&& ./b2 release link=static cflags="$CFLAGS" cxxflags="$CXXFLAGS" linkflags="$LDFLAGS" -j$(nproc) install \
 	&& cd .. \
 	&& rm -rf boost_*
 

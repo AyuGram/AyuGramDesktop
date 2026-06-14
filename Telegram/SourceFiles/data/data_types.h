@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_msg_id.h"
 #include "base/qt/qt_compare.h"
 
+struct AudioAlbumThumbLocation;
 class HistoryItem;
 using HistoryItemsList = std::vector<not_null<HistoryItem*>>;
 
@@ -368,6 +369,7 @@ enum class MessageFlag : uint64 {
 	TextAppearing         = (1ULL << 60),
 	TextAppearingStarted  = (1ULL << 61),
 
+	GuestChatViaFrom      = (1ULL << 62),
 	AyuNoForwards         = (1ULL << 63),
 };
 inline constexpr bool is_flag_type(MessageFlag) { return true; }
@@ -389,6 +391,11 @@ enum class ForwardOptions {
 	PreserveInfo,
 	NoSenderNames,
 	NoNamesAndCaptions,
+};
+
+enum class ViewRemovalReason : uchar {
+	Removed,
+	Detached,
 };
 
 struct ForwardDraft {

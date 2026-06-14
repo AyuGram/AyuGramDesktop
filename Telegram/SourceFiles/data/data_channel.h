@@ -353,6 +353,11 @@ public:
 	[[nodiscard]] bool requestToJoin() const {
 		return flags() & Flag::RequestToJoin;
 	}
+	[[nodiscard]] UserData *guardBot() const;
+	[[nodiscard]] UserId guardBotId() const {
+		return _guardBotId;
+	}
+	void setGuardBotId(UserId userId);
 	[[nodiscard]] bool antiSpamMode() const {
 		return flags() & Flag::AntiSpam;
 	}
@@ -618,6 +623,7 @@ private:
 	int _pendingRequestsCount = 0;
 	int _levelHint = 0;
 	int _starsPerMessage = 0;
+	UserId _guardBotId = 0;
 
 	Data::AllowedReactions _allowedReactions;
 

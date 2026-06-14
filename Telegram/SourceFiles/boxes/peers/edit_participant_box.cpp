@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/add_bot_to_chat_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "boxes/peers/edit_peer_info_box.h"
+#include "boxes/peers/replace_boost_box.h"
 #include "settings/settings_common.h"
 #include "data/data_peer_values.h"
 #include "data/data_channel.h"
@@ -46,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_layers.h"
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
+#include "styles/style_premium.h"
 #include "styles/style_settings.h"
 
 namespace {
@@ -53,6 +55,108 @@ namespace {
 constexpr auto kMaxRestrictDelayDays = 366;
 constexpr auto kSecondsInDay = 24 * 60 * 60;
 constexpr auto kSecondsInWeek = 7 * kSecondsInDay;
+
+[[nodiscard]] bool CanProcessJoinRequests(
+		not_null<PeerData*> peer,
+		not_null<UserData*> user) {
+	const auto info = user->botInfo.get();
+	return peer->isChannel()
+		&& user->isBot()
+		&& info
+		&& info->supportsGuard;
+}
+
+[[nodiscard]] object_ptr<Ui::GenericBox> GuardBotReplaceBox(
+		not_null<UserData*> current,
+		not_null<UserData*> replacement,
+		Fn<void(Fn<void()>)> confirmed) {
+	return Box([=](not_null<Ui::GenericBox*> box) {
+		box->setStyle(st::guardBotReplaceBox);
+		const auto content = box->verticalLayout();
+		const auto weak = base::make_weak(box);
+		content->add(
+			CreateUserpicsTransfer(
+				content,
+				rpl::single(std::vector{ not_null<PeerData*>(current) }),
+				replacement,
+				UserpicsTransferType::GuardBotReplace),
+			st::boxRowPadding + st::boostReplaceUserpicsPadding);
+		content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				tr::lng_guard_bot_replace_title(),
+				st::boostCenteredTitle),
+			st::boxRowPadding + st::starrefJoinTitlePadding,
+			style::al_top);
+		content->add(
+			object_ptr<Ui::FlatLabel>(
+				content,
+				rpl::single(tr::lng_guard_bot_replace_text(
+					tr::now,
+					lt_from,
+					tr::bold(current->name()),
+					lt_to,
+					tr::bold(replacement->name()),
+					tr::rich)),
+				st::boxLabel),
+			QMargins(
+				st::boxPadding.left(),
+				0,
+				st::boxPadding.right(),
+				st::boxPadding.bottom()));
+		Ui::AddSkip(content);
+		const auto use = content->add(
+			object_ptr<Ui::RoundButton>(
+				content,
+				rpl::single(tr::lng_guard_bot_replace_confirm(
+					tr::now,
+					lt_bot,
+					replacement->shortName())),
+				st::defaultLightButton),
+			st::boxRowPadding,
+			style::al_justify);
+		Ui::AddSkip(content);
+		const auto keep = content->add(
+			object_ptr<Ui::RoundButton>(
+				content,
+				rpl::single(tr::lng_guard_bot_replace_cancel(
+					tr::now,
+					lt_bot,
+					current->shortName())),
+				st::defaultLightButton),
+			st::boxRowPadding,
+			style::al_justify);
+		use->setClickedCallback([=] {
+			confirmed(crl::guard(weak, [=] { weak->closeBox(); }));
+		});
+		keep->setClickedCallback([=] {
+			box->closeBox();
+		});
+	});
+}
+
+[[nodiscard]] object_ptr<Ui::GenericBox> GuardBotApproveBox(
+		bool isGroup,
+		not_null<UserData*> bot,
+		Fn<void(Fn<void()>)> confirmed) {
+	const auto text = isGroup
+		? tr::lng_guard_bot_approve_text(
+			tr::now,
+			lt_bot,
+			tr::bold(bot->name()),
+			tr::rich)
+		: tr::lng_guard_bot_approve_text_channel(
+			tr::now,
+			lt_bot,
+			tr::bold(bot->name()),
+			tr::rich);
+	return Ui::MakeConfirmBox({
+		.text = text,
+		.confirmed = confirmed,
+		.confirmText = tr::lng_guard_bot_approve_confirm(),
+		.title = tr::lng_guard_bot_approve_title(),
+	});
+}
 
 class Cover final : public Ui::FixedHeightWidget {
 public:
@@ -324,7 +428,10 @@ ChatAdminRightsInfo EditAdminBox::defaultRights() const {
 			| Flag::ManageTopics
 			| Flag::PinMessages
 			| Flag::ManageCall
-			| Flag::ManageRanks) }
+			| Flag::ManageRanks
+			| (CanProcessJoinRequests(peer(), user())
+				? Flag::ProcessJoinRequests
+				: Flag())) }
 		: ChatAdminRightsInfo{ (Flag::ChangeInfo
 			| Flag::PostMessages
 			| Flag::EditMessages
@@ -410,6 +517,15 @@ void EditAdminBox::prepare() {
 
 	const auto chat = peer()->asChat();
 	const auto channel = peer()->asChannel();
+	const auto supportsProcessJoinRequests = canSave()
+		&& CanProcessJoinRequests(peer(), user());
+	const auto canProcessJoinRequests = supportsProcessJoinRequests
+		&& peer()->isMegagroup();
+	const auto guardBotRight = (canProcessJoinRequests
+		&& channel
+		&& (channel->guardBotId() == peerToUser(user()->id)))
+		? Flag::ProcessJoinRequests
+		: Flag();
 	const auto prepareRights = _addingBot
 		? ChatAdminRightsInfo(_oldRights.flags | _addingBot->existing)
 		: _oldRights.flags
@@ -422,9 +538,16 @@ void EditAdminBox::prepare() {
 		&& !_oldRights.flags
 		&& channel
 		&& !channel->amCreator();
+	const auto myEditableRights = channel
+		? (channel->adminRights()
+			| (canProcessJoinRequests
+				? Flag::ProcessJoinRequests
+				: Flag()))
+		: Flags();
 	const auto prepareFlags = disabledByDefaults
+		| guardBotRight
 		| (prepareRights.flags
-			& (filterByMyRights ? channel->adminRights() : ~Flag(0)));
+			& (filterByMyRights ? myEditableRights : ~Flag(0)));
 
 	const auto disabledMessages = [&] {
 		auto result = base::flat_map<Flags, QString>();
@@ -443,7 +566,7 @@ void EditAdminBox::prepare() {
 			} else if (const auto channel = peer()->asChannel()) {
 				if (!channel->amCreator()) {
 					result.emplace(
-						~channel->adminRights(),
+						~myEditableRights,
 						tr::lng_rights_permission_cant_edit(tr::now));
 				}
 			}
@@ -459,6 +582,7 @@ void EditAdminBox::prepare() {
 		.isGroup = isGroup,
 		.isForum = peer()->isForum(),
 		.anyoneCanAddMembers = anyoneCanAddMembers,
+		.canProcessJoinRequests = canProcessJoinRequests,
 	};
 	Ui::AddSubsectionTitle(inner, tr::lng_rights_edit_admin_header());
 	auto [checkboxes, getChecked, changes, highlightWidget] = CreateEditAdminRights(
@@ -492,26 +616,33 @@ void EditAdminBox::prepare() {
 			Ui::AddDivider(emptyAboutAddAdminsInner->entity());
 		}
 		Ui::AddSkip(aboutAddAdminsInner->entity());
-		Ui::AddDividerText(
-			aboutAddAdminsInner->entity(),
-			rpl::duplicate(
-				selectedFlags
-			) | rpl::map(
-				(_1 & Flag::AddAdmins) != 0
-			) | rpl::distinct_until_changed(
-			) | rpl::map([=](bool canAddAdmins) -> rpl::producer<QString> {
-				const auto empty = (amCreator() && user()->isSelf());
-				aboutAddAdminsInner->toggle(!empty, anim::type::instant);
-				emptyAboutAddAdminsInner->toggle(empty, anim::type::instant);
-				if (empty) {
-					return rpl::single(QString());
-				} else if (!canSave()) {
-					return tr::lng_rights_about_admin_cant_edit();
-				} else if (canAddAdmins) {
-					return tr::lng_rights_about_add_admins_yes();
-				}
-				return tr::lng_rights_about_add_admins_no();
-			}) | rpl::flatten_latest());
+		if (canProcessJoinRequests) {
+			aboutAddAdminsInner->toggle(true, anim::type::instant);
+			Ui::AddDividerText(
+				aboutAddAdminsInner->entity(),
+				tr::lng_rights_about_process_join_requests());
+		} else {
+			Ui::AddDividerText(
+				aboutAddAdminsInner->entity(),
+				rpl::duplicate(
+					selectedFlags
+				) | rpl::map(
+					(_1 & Flag::AddAdmins) != 0
+				) | rpl::distinct_until_changed(
+				) | rpl::map([=](bool canAddAdmins) -> rpl::producer<QString> {
+					const auto empty = (amCreator() && user()->isSelf());
+					aboutAddAdminsInner->toggle(!empty, anim::type::instant);
+					emptyAboutAddAdminsInner->toggle(empty, anim::type::instant);
+					if (empty) {
+						return rpl::single(QString());
+					} else if (!canSave()) {
+						return tr::lng_rights_about_admin_cant_edit();
+					} else if (canAddAdmins) {
+						return tr::lng_rights_about_add_admins_yes();
+					}
+					return tr::lng_rights_about_add_admins_no();
+				}) | rpl::flatten_latest());
+		}
 	}
 
 	if (canTransferOwnership()) {
@@ -590,13 +721,15 @@ void EditAdminBox::prepare() {
 			const auto newFlags = (value() | ChatAdminRight::Other)
 				& ((!channel || channel->amCreator())
 					? ~Flags(0)
-					: channel->adminRights());
-			_saveCallback(
-				_oldRights,
-				ChatAdminRightsInfo(newFlags),
-				_tagControl
-					? std::optional<QString>(_tagControl->currentRank())
-					: std::nullopt);
+					: myEditableRights);
+			confirmGuardBotSave(ChatAdminRightsInfo(newFlags), [=] {
+				_saveCallback(
+					_oldRights,
+					ChatAdminRightsInfo(newFlags),
+					_tagControl
+						? std::optional<QString>(_tagControl->currentRank())
+						: std::nullopt);
+			});
 		};
 		_save = [=] {
 			const auto show = uiShow();
@@ -631,9 +764,44 @@ void EditAdminBox::prepare() {
 }
 
 void EditAdminBox::finishAddAdmin() {
+	const auto confirmBox = _confirmBox;
+	_confirmBox = nullptr;
+	if (confirmBox) {
+		confirmBox->closeBox();
+	}
 	_finishSave();
-	if (_confirmBox) {
-		_confirmBox->closeBox();
+}
+
+void EditAdminBox::confirmGuardBotSave(
+		ChatAdminRightsInfo rights,
+		Fn<void()> done) {
+	using Flag = ChatAdminRight;
+
+	const auto channel = peer()->asChannel();
+	if (!channel
+		|| !(rights.flags & Flag::ProcessJoinRequests)
+		|| !CanProcessJoinRequests(peer(), user())) {
+		done();
+		return;
+	}
+
+	const auto confirmed = crl::guard(this, [=](Fn<void()> close) {
+		close();
+		done();
+	});
+	const auto current = channel->guardBot();
+	if (current && current != user().get()) {
+		_confirmBox = getDelegate()->show(GuardBotReplaceBox(
+			current,
+			user(),
+			confirmed));
+	} else if (!channel->requestToJoin()) {
+		_confirmBox = getDelegate()->show(GuardBotApproveBox(
+			channel->isMegagroup(),
+			user(),
+			confirmed));
+	} else {
+		done();
 	}
 }
 

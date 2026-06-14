@@ -55,6 +55,13 @@ public:
 		not_null<DocumentData*> data,
 		const Lottie::ColorReplacements *replacements
 	) -> std::unique_ptr<StickerPlayer>;
+
+	[[nodiscard]] virtual uint16 fullSelectionLength() const;
+	[[nodiscard]] virtual TextSelection adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const;
+	[[nodiscard]] virtual TextForMimeData selectedText(
+		TextSelection selection) const;
 };
 
 struct MediaGenericDescriptor {
@@ -84,6 +91,14 @@ public:
 
 	void draw(Painter &p, const PaintContext &context) const override;
 	TextState textState(QPoint point, StateRequest request) const override;
+
+	[[nodiscard]] bool hasTextForCopy() const override;
+	[[nodiscard]] TextForMimeData selectedText(
+		TextSelection selection) const override;
+	[[nodiscard]] TextSelection adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const override;
+	[[nodiscard]] uint16 fullSelectionLength() const override;
 
 	void clickHandlerActiveChanged(
 		const ClickHandlerPtr &p,
@@ -157,6 +172,13 @@ public:
 		QPoint point,
 		StateRequest request,
 		int outerWidth) const override;
+
+	[[nodiscard]] uint16 fullSelectionLength() const override;
+	[[nodiscard]] TextSelection adjustSelection(
+		TextSelection selection,
+		TextSelectType type) const override;
+	[[nodiscard]] TextForMimeData selectedText(
+		TextSelection selection) const override;
 
 	QSize countOptimalSize() override;
 	QSize countCurrentSize(int newWidth) override;

@@ -50,8 +50,6 @@ RecentStickerPack gRecentStickers;
 
 RecentHashtagPack gRecentWriteHashtags, gRecentSearchHashtags;
 
-RecentInlineBots gRecentInlineBots;
-
 bool gPasswordRecovered = false;
 int32 gPasscodeBadTries = 0;
 crl::time gPasscodeLastTry = 0;

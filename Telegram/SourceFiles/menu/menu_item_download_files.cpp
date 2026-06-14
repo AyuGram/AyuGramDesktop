@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_item_download_files.h"
 
 #include "base/base_file_utilities.h"
+#include "base/unixtime.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
@@ -113,10 +114,16 @@ void AddAction(
 			};
 
 		auto views = std::vector<std::shared_ptr<Data::PhotoMedia>>();
+		auto dates = std::vector<TimeId>();
 		for (const auto &[photo, fullId] : photos) {
 			if (const auto view = photo->createMediaView()) {
 				view->wanted(Data::PhotoSize::Large, fullId);
 				views.push_back(view);
+				const auto photoDate = photo->date();
+				const auto item = session->data().message(fullId);
+				dates.push_back(photoDate
+					? photoDate
+					: (item ? item->date() : TimeId(0)));
 			}
 		}
 
@@ -139,7 +146,18 @@ void AddAction(
 			auto lastPath = QString();
 			for (auto i = 0; i < views.size(); i++) {
 				lastPath = fullPath(i + 1);
-				views[i]->saveToFile(lastPath);
+				if (views[i]->saveToFile(lastPath) && dates[i] > 0) {
+					auto f = QFile(lastPath);
+					if (f.open(QIODevice::ReadWrite)) {
+						const auto when = base::unixtime::parse(dates[i]);
+						f.setFileTime(
+							when,
+							QFileDevice::FileModificationTime);
+						f.setFileTime(
+							when,
+							QFileDevice::FileAccessTime);
+					}
+				}
 			}
 			if (showToast) {
 				showToast(lastPath);
@@ -246,18 +264,14 @@ void AddDownloadFilesAction(
 void AddDownloadFilesAction(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<Window::SessionController*> window,
-		const base::flat_map<HistoryItem*, TextSelection, std::less<>> &items,
+		const std::vector<not_null<HistoryItem*>> &items,
 		not_null<HistoryInner*> list) {
 	if (items.empty()) {
 		return;
 	}
-	auto sortedItems = ranges::views::all(items)
-		| ranges::views::keys
-		| ranges::to<std::vector>();
-	ranges::sort(sortedItems, {}, &HistoryItem::fullId);
 	auto docs = Documents();
 	auto photos = Photos();
-	for (const auto &item : sortedItems) {
+	for (const auto &item : items) {
 		if (!Added(item, docs, photos)) {
 			return;
 		}

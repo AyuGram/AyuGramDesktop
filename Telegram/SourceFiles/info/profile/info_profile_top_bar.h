@@ -150,6 +150,7 @@ private:
 		not_null<Window::SessionController*> controller,
 		const Ui::Menu::MenuCallback &addAction);
 	void setupUserpicButton(not_null<Window::SessionController*> controller);
+	void setupBirthdayEffect();
 	void startUploadOverlay();
 	void setupActions(not_null<Window::SessionController*> controller);
 	void setupButtons(

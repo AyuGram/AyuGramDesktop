@@ -485,8 +485,12 @@ private:
 	void ensurePhotoMediaCreated();
 	void ensureDocumentMediaCreated();
 	void validateThumbnail();
+	void setupLinks(
+		const TextWithEntities &text,
+		const QString &mainUrl);
 
 	ClickHandlerPtr _photol;
+	ClickHandlerPtr _titlel;
 
 	QString _title, _letter;
 	int _titlew = 0;
@@ -501,13 +505,14 @@ private:
 
 	struct LinkEntry {
 		LinkEntry() = default;
-		LinkEntry(const QString &url, const QString &text);
+		LinkEntry(const QString &url, const QString &display);
 
-		QString text;
-		int width = 0;
-		std::shared_ptr<TextClickHandler> lnk;
+		QString url;
+		QString display;
+		Ui::Text::String text;
+		ClickHandlerPtr handler;
 	};
-	QVector<LinkEntry> _links;
+	std::vector<LinkEntry> _links;
 
 };
 

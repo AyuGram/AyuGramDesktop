@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
+#include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_cloud_manager.h"
 #include "lang/lang_instance.h"
@@ -287,6 +288,11 @@ void Cover::initViewers() {
 	) | rpl::on_next([=](const TextWithEntities &value) {
 		_idText = value.text;
 		updateIdText();
+	}, lifetime());
+
+	_user->session().settings().phoneNumberHiddenValue(
+	) | rpl::on_next([=] {
+		updatePhoneText();
 	}, lifetime());
 
 	Info::Profile::UsernameValue(

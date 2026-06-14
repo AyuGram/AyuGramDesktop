@@ -332,8 +332,17 @@ QString ImagesOrAllFilter() {
 }
 
 QString PhotoVideoFilesFilter() {
-	return u"Image and Video Files (*"_q + Ui::ImageExtensions().join(u" *"_q) + u" *.mp4 *.mov *.m4v);;"_q
+	return u"Image and Video Files (*"_q
+		+ Ui::ImageExtensions().join(u" *"_q)
+		+ u" *.mp4 *.mov *.m4v);;"_q
 		+ AllFilesFilter();
+}
+
+QString PhotoVideoAudioFilesFilter() {
+	return u"Image, Video and Audio Files (*"_q
+		+ Ui::ImageExtensions().join(u" *"_q)
+		+ u" *.mp4 *.mov *.m4v *.webm"_q
+		+ u" *.mp3 *.m4a *.aac *.ogg *.flac *.opus *.oga)"_q;
 }
 
 const QString &Tmp() {

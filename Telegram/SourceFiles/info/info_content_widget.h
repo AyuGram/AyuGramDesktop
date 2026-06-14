@@ -40,6 +40,14 @@ namespace Ui::Menu {
 struct MenuCallback;
 } // namespace Ui::Menu
 
+namespace ChatHelpers {
+struct FileChosen;
+} // namespace ChatHelpers
+
+namespace SendMenu {
+struct Details;
+} // namespace SendMenu
+
 namespace Info::Settings {
 struct Tag;
 } // namespace Info::Settings
@@ -141,6 +149,8 @@ public:
 		-> rpl::producer<Dialogs::Stories::Content>;
 
 	virtual void saveChanges(FnMut<void()> done);
+	[[nodiscard]] virtual SendMenu::Details sendMenuDetails() const;
+	virtual bool processChosenSticker(ChatHelpers::FileChosen &&chosen);
 
 	[[nodiscard]] int scrollBottomSkip() const;
 	[[nodiscard]] rpl::producer<int> scrollBottomSkipValue() const;

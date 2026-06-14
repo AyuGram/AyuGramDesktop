@@ -27,6 +27,10 @@ private:
 };
 ```
 
+## No consecutive empty lines
+
+Use at most one empty line between declarations, definitions, include groups, or logical blocks. Two or more empty lines in a row add visual noise without adding structure.
+
 ## Multi-line expressions — operators at the start of continuation lines
 
 When splitting an expression across multiple lines, place operators (like `&&`, `||`, `;`, `+`, etc.) at the **beginning** of continuation lines, not at the end of the previous line. This makes it immediately obvious from the left edge whether a line is a continuation or new code.
@@ -355,6 +359,22 @@ void MyWidget::paintEvent(QPaintEvent *e) {
 
 When there are multiple local classes, put **all class definitions first**, then **all method definitions** after. This keeps the declarations readable as an overview.
 
+## Do not repeat [[nodiscard]] on method definitions
+
+Put `[[nodiscard]]` on the method declaration inside the class. Do not repeat it on the out-of-class method definition. Free functions may keep `[[nodiscard]]` on their definition when that is the only declaration.
+
+```cpp
+// BAD - duplicated attribute on the definition:
+[[nodiscard]] int MyClass::value() const {
+	return _value;
+}
+
+// GOOD - declaration carries the attribute, definition stays clean:
+int MyClass::value() const {
+	return _value;
+}
+```
+
 ## Use RAII for resource cleanup
 
 When working with raw resources (Win32 HANDLEs, file descriptors, COM objects), use `gsl::finally` or a dedicated RAII wrapper for cleanup instead of calling release functions manually. Manual cleanup breaks when early returns are added later.
@@ -470,17 +490,38 @@ struct State {
 const auto state = lifetime.make_state<State>();
 ```
 
-## Use trailing return type when the return type doesn't fit on one line
+## Use trailing return type only when the normal form is too long
 
-When a function's return type is long enough that the declaration would need a line break between the return type and the function name, use trailing return type syntax (`auto ... -> Type`) to keep the function name on the opening line.
+Prefer the normal return type form when the opening line fits comfortably, roughly around 77 characters or less. A short return type is easier to read in the normal position:
+
+```cpp
+// GOOD:
+[[nodiscard]] TextWithEntities FlattenSummaryBlocks(
+	const std::vector<Block> &blocks);
+```
+
+Do not use one-line trailing return types, and do not put the trailing return type after `)` on the same line. If trailing syntax fits on one line, the normal form is shorter:
+
+```cpp
+// BAD:
+auto ComputeTitle() -> QString;
+
+// BAD:
+[[nodiscard]] auto FlattenSummaryBlocks(
+	const std::vector<Block> &blocks) -> TextWithEntities;
+```
+
+Use `auto` with a trailing return type only when the normal opening line
+`{attributes} {return-type} {class-name::}{function-name(}` would be too long, or would force the return type onto its own line. In that case, put the arrow and return type on the next line:
 
 ```cpp
 // BAD - return type orphaned on its own line:
 not_null<HistoryView::Controls::ComposeAiButton*>
-SetupCaptionAiButton(SetupCaptionAiButtonArgs &&args);
+HistoryView::Controls::SetupCaptionAiButton(SetupCaptionAiButtonArgs &&args);
 
-// GOOD - trailing return type keeps name visible:
-auto SetupCaptionAiButton(SetupCaptionAiButtonArgs &&args)
+// GOOD - long return type is visible and the function name stays on top:
+auto HistoryView::Controls::SetupCaptionAiButton(
+		SetupCaptionAiButtonArgs &&args)
 -> not_null<HistoryView::Controls::ComposeAiButton*>;
 ```
 

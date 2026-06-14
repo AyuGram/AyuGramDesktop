@@ -306,6 +306,7 @@ bool PeerListGlobalSearchController::searchInCache() {
 
 void PeerListGlobalSearchController::searchOnServer() {
 	_requestId = _api.request(MTPcontacts_Search(
+		MTP_flags(0),
 		MTP_string(_query),
 		MTP_int(SearchPeopleLimit)
 	)).done([=](const MTPcontacts_Found &result, mtpRequestId requestId) {

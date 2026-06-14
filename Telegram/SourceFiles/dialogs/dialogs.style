@@ -36,6 +36,7 @@ ThreeStateIcon {
 }
 
 VerifiedBadge {
+	position: point;
 	color: color;
 	height: pixels;
 }
@@ -436,6 +437,7 @@ dialogsLockIcon: ThreeStateIcon {
 dialogsVerifiedColors: VerifiedBadge {
 	height: 20px;
 	color: dialogsVerifiedIconBg;
+	position: point(-1px, 0px);
 }
 dialogsVerifiedColorsOver: VerifiedBadge(dialogsVerifiedColors) {
 	color: dialogsVerifiedIconBgOver;
@@ -531,9 +533,6 @@ dialogsSearchInMenu: PopupMenu(defaultPopupMenu) {
 dialogsSearchInCheck: icon {{ "player/player_check", mediaPlayerActiveFg }};
 dialogsSearchInCheckSkip: 8px;
 dialogsSearchFromStyle: defaultTextStyle;
-dialogsSearchFromPalette: TextPalette(defaultTextPalette) {
-	linkFg: dialogsNameFg;
-}
 
 dialogsScamPadding: margins(2px, 0px, 2px, 0px);
 dialogsScamFont: font(9px semibold);
@@ -567,6 +566,11 @@ dialogsMiniReplyIcon: IconEmoji {
 	padding: margins(0px, 2px, 0px, 0px);
 }
 
+dialogsMiniPollIcon: IconEmoji {
+	icon: icon {{ "dialogs/dialogs_chatlist_poll-17x17", dialogsTextFg }};
+	padding: margins(0px, 1px, 3px, 0px);
+}
+
 dialogsMiniReplyStory: DialogsMiniIcon {
 	icon: ThreeStateIcon {
 		icon: icon {{ "mini_reply_story", dialogsTextFg, point(0px, 1px) }};
@@ -575,6 +579,11 @@ dialogsMiniReplyStory: DialogsMiniIcon {
 	}
 	skipText: 4px;
 	skipMedia: 5px;
+}
+
+historyReplyStoryIcon: IconEmoji {
+	icon: icon {{ "mini_reply_story", dialogsTextFg, point(0px, 1px) }};
+	padding: margins(0px, 0px, 4px, 0px);
 }
 
 dialogsUnreadMention: ThreeStateIcon {
@@ -890,6 +899,12 @@ dialogsTopBarSuggestionTitleStyle: TextStyle(defaultTextStyle) {
 }
 dialogsTopBarSuggestionAboutStyle: TextStyle(defaultTextStyle) {
 	font: font(11px);
+}
+dialogsTopBarSuggestionMargins: margins(8px, 8px, 8px, 8px);
+dialogsTopBarSuggestionShadow: BoxShadow {
+	blurRadius: 8px;
+	offset: point(0px, 2px);
+	opacity: 0.18;
 }
 dialogsSuggestionDeniedAuthLottie: size(70px, 70px);
 dialogsSuggestionDeniedAuthLottieCircle: size(90px, 90px);

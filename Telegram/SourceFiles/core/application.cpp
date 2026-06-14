@@ -1164,7 +1164,25 @@ void Application::checkStartUrls() {
 	if (!cRefStartUrls().isEmpty()
 		&& _lastActivePrimaryWindow
 		&& !_lastActivePrimaryWindow->locked()) {
-		_lastActivePrimaryWindow->widget()->sendPaths();
+		auto interprets = QStringList();
+		auto paths = QStringList();
+		cRefStartUrls() = ranges::views::all(
+			cRefStartUrls()
+		) | ranges::views::filter([&](const QUrl &url) {
+			if (url.scheme() == u"interpret"_q) {
+				interprets.append(url.path());
+				return false;
+			} else if (url.isLocalFile()) {
+				paths.append(url.toLocalFile());
+				return false;
+			}
+			return true;
+		}) | ranges::to<QList<QUrl>>;
+		if (!interprets.isEmpty() || !paths.isEmpty()) {
+			_lastActivePrimaryWindow->widget()->handleStartFiles(
+				std::move(interprets),
+				std::move(paths));
+		}
 	}
 }
 
@@ -1403,7 +1421,9 @@ Window::Controller *Application::ensureSeparateWindowFor(
 		return window;
 	};
 	if (const auto existing = separateWindowFor(id)) {
-		if (id.thread && id.type == Window::SeparateType::Chat) {
+		if (id.thread
+			&& id.type == Window::SeparateType::Chat
+			&& !passcodeLocked()) {
 			existing->sessionController()->showThread(
 				id.thread,
 				showAtMsgId,
@@ -1417,6 +1437,9 @@ Window::Controller *Application::ensureSeparateWindowFor(
 		std::make_unique<Window::Controller>(id, showAtMsgId)
 	).first->second.get();
 	processCreatedWindow(result);
+	if (passcodeLocked()) {
+		result->setupPasscodeLock();
+	}
 	result->firstShow();
 	result->finishFirstShow();
 	return activate(result);

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_blocked_peers.h"
+#include "api/api_chat_invite.h"
 #include "api/api_chat_links.h"
 #include "api/api_chat_participants.h"
 #include "api/api_cloud_password.h"
@@ -39,13 +40,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_user_names.h"
 #include "api/api_websites.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/credits.h"
 #include "data/components/scheduled_messages.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
+#include "data/data_media_types.h"
 #include "data/data_web_page.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
 #include "data/data_forum.h"
+#include "data/data_message_reaction_id.h"
+#include "data/data_premium_limits.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
@@ -69,10 +74,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "history/view/controls/history_view_forward_panel.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "main/main_account.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/boxes/emoji_stake_box.h"
+#include "ui/controls/ton_common.h"
 #include "boxes/sticker_set_box.h"
 #include "boxes/premium_limits_box.h"
 #include "window/notifications_manager.h"
@@ -576,6 +584,30 @@ void ApiWrap::sendMessageFail(
 			}
 		}
 		peer->updateFull();
+	} else if (error == u"BALANCE_TOO_LOW"_q) {
+		const auto item = _session->data().message(itemId);
+		const auto stake = (item && item->media())
+			? item->media()->diceGameOutcome().stakeNanoTon
+			: int64(0);
+		if (stake > 0) {
+			const auto required = CreditsAmount(
+				stake / Ui::kNanosInOne,
+				stake % Ui::kNanosInOne,
+				CreditsType::Ton);
+			if (randomId) {
+				_session->data().unregisterMessageRandomId(randomId);
+			}
+			item->destroy();
+			if (show) {
+				show->show(Box(
+					Ui::InsufficientTonBox,
+					_session,
+					required));
+			}
+			return;
+		} else if (show) {
+			show->showToast(error);
+		}
 	} else if (show) {
 		show->showToast(error);
 	}
@@ -1457,6 +1489,43 @@ void ApiWrap::deleteAllFromParticipantSend(
 	}).send();
 }
 
+void ApiWrap::deleteAllReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		not_null<PeerData*> participant,
+		MsgId originMsgId,
+		const Data::ReactionId &originReaction) {
+	_session->data().removeReactionsFromParticipant(
+		peer,
+		0,
+		participant,
+		originReaction,
+		originMsgId);
+	request(MTPmessages_DeleteParticipantReactions(
+		peer->input(),
+		participant->input()
+	)).send();
+}
+
+void ApiWrap::deleteParticipantReaction(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const Data::ReactionId &reaction) {
+	_session->data().removeReactionsFromParticipant(
+		peer,
+		msgId,
+		participant,
+		reaction,
+		0);
+	request(MTPmessages_DeleteParticipantReaction(
+		peer->input(),
+		MTP_int(msgId.bare),
+		participant->input()
+	)).done([=](const MTPUpdates &result) {
+		applyUpdates(result);
+	}).send();
+}
+
 void ApiWrap::deleteSublistHistory(
 		not_null<ChannelData*> channel,
 		not_null<PeerData*> sublistPeer) {
@@ -1791,14 +1860,20 @@ void ApiWrap::joinChannel(not_null<ChannelData*> channel) {
 	} else if (!_channelAmInRequests.contains(channel)) {
 		const auto requestId = request(MTPchannels_JoinChannel(
 			channel->inputChannel()
-		)).done([=](const MTPUpdates &result) {
+		)).done([=](const MTPmessages_ChatInviteJoinResult &result) {
 			_channelAmInRequests.remove(channel);
-			applyUpdates(result);
 
-			session().data().addRecentJoinChat({
-				.fromPeerId = channel->id,
-				.joinedPeerId = channel->id,
-			});
+			Api::ProcessChatInviteJoinResult(
+				_session,
+				ShowForPeer(channel),
+				result,
+				[=](const MTPUpdates &updates) {
+					applyUpdates(updates);
+					session().data().addRecentJoinChat({
+						.fromPeerId = channel->id,
+						.joinedPeerId = channel->id,
+					});
+				});
 		}).fail([=](const MTP::Error &error) {
 			const auto &type = error.type();
 
@@ -2266,7 +2341,8 @@ void ApiWrap::saveDraftsToCloud() {
 				cloudDraft->webpage,
 				textWithTags.text.isEmpty()),
 			MTP_long(0), // effect
-			Api::SuggestToMTP(cloudDraft->suggest)
+			Api::SuggestToMTP(cloudDraft->suggest),
+			MTPInputRichMessage()
 		)).done([=](const MTPBool &result, const MTP::Response &response) {
 			const auto requestId = response.requestId;
 			history->finishSavingCloudDraft(
@@ -2550,6 +2626,13 @@ void ApiWrap::refreshFileReference(
 	};
 	v::match(origin.data, [&](Data::FileOriginMessage data) {
 		if (const auto item = _session->data().message(data)) {
+			if (const auto iv = item->Get<HistoryMessageMediaForInstantView>()) {
+				if (!iv->url.isEmpty()) {
+					return refreshFileReference(
+						Data::FileOriginWebPage{ iv->url },
+						std::move(handler));
+				}
+			}
 			const auto media = item->media();
 			const auto mediaStory = media ? media->storyId() : FullStoryId();
 			const auto storyId = mediaStory
@@ -3517,6 +3600,10 @@ void ApiWrap::forwardMessages(
 		}
 		return;
 	}
+	draft.options = HistoryView::Controls::NormalizeForwardOptions(
+		_session,
+		draft.items,
+		draft.options);
 
 	struct SharedCallback {
 		int requestsLeft = 0;
@@ -4054,6 +4141,121 @@ void ApiWrap::sendShortcutMessages(
 	}).send();
 }
 
+void ApiWrap::sendRichMessage(
+		not_null<HistoryItem*> item,
+		const MTPInputRichMessage &richMessage,
+		SendAction action) {
+	Expects(item->history() == action.history);
+
+	const auto history = item->history();
+	const auto peer = history->peer;
+	action.generateLocal = true;
+	sendAction(action);
+
+	const auto clearCloudDraft = action.clearDraft;
+	const auto draftTopicRootId = action.replyTo.topicRootId;
+	const auto draftMonoforumPeerId = action.replyTo.monoforumPeerId;
+	const auto randomId = base::RandomValue<uint64>();
+	auto starsPaid = std::min(
+		peer->starsPerMessageChecked(),
+		action.options.starsApproved);
+	if (starsPaid) {
+		action.options.starsApproved -= starsPaid;
+	}
+	_session->data().registerMessageRandomId(randomId, item->fullId());
+	_session->data().registerMessageSentData(
+		randomId,
+		peer->id,
+		item->originalText().text);
+
+	using Flag = MTPmessages_SendMessage::Flag;
+	auto sendFlags = MTPmessages_SendMessage::Flags(0)
+		| Flag::f_rich_message;
+	if (action.replyTo) {
+		sendFlags |= Flag::f_reply_to;
+	}
+	if (ShouldSendSilent(peer, action.options)) {
+		sendFlags |= Flag::f_silent;
+	}
+	if (clearCloudDraft) {
+		sendFlags |= Flag::f_clear_draft;
+		history->clearCloudDraft(draftTopicRootId, draftMonoforumPeerId);
+		history->startSavingCloudDraft(
+			draftTopicRootId,
+			draftMonoforumPeerId);
+	}
+	if (action.options.sendAs) {
+		sendFlags |= Flag::f_send_as;
+	}
+	if (action.options.scheduled) {
+		sendFlags |= Flag::f_schedule_date;
+		if (action.options.scheduleRepeatPeriod) {
+			sendFlags |= Flag::f_schedule_repeat_period;
+		}
+	}
+	if (action.options.shortcutId) {
+		sendFlags |= Flag::f_quick_reply_shortcut;
+	}
+	if (action.options.effectId) {
+		sendFlags |= Flag::f_effect;
+	}
+	if (action.options.suggest) {
+		sendFlags |= Flag::f_suggested_post;
+	}
+	if (starsPaid) {
+		sendFlags |= Flag::f_allow_paid_stars;
+	}
+	const auto done = [=](
+			const MTPUpdates &result,
+			const MTP::Response &response) {
+		if (clearCloudDraft) {
+			history->finishSavingCloudDraft(
+				draftTopicRootId,
+				draftMonoforumPeerId,
+				Api::UnixtimeFromMsgId(response.outerMsgId));
+		}
+	};
+	const auto fail = [=](
+			const MTP::Error &error,
+			const MTP::Response &response) {
+		sendMessageFail(error, peer, randomId, item->fullId());
+		if (clearCloudDraft) {
+			history->finishSavingCloudDraft(
+				draftTopicRootId,
+				draftMonoforumPeerId,
+				Api::UnixtimeFromMsgId(response.outerMsgId));
+		}
+	};
+	const auto mtpShortcut = Data::ShortcutIdToMTP(
+		_session,
+		action.options.shortcutId);
+	history->owner().histories().sendPreparedMessage(
+		history,
+		action.replyTo,
+		randomId,
+		Data::Histories::PrepareMessage<MTPmessages_SendMessage>(
+			MTP_flags(sendFlags),
+			peer->input(),
+			Data::Histories::ReplyToPlaceholder(),
+			MTP_string(QString()),
+			MTP_long(randomId),
+			MTPReplyMarkup(),
+			MTPVector<MTPMessageEntity>(),
+			MTP_int(action.options.scheduled),
+			MTP_int(action.options.scheduleRepeatPeriod),
+			(action.options.sendAs
+				? action.options.sendAs->input()
+				: MTP_inputPeerEmpty()),
+			mtpShortcut,
+			MTP_long(action.options.effectId),
+			MTP_long(starsPaid),
+			Api::SuggestToMTP(action.options.suggest),
+			richMessage),
+		done,
+		fail);
+	finishForwarding(action);
+}
+
 void ApiWrap::sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId) {
@@ -4108,10 +4310,13 @@ void ApiWrap::sendMessage(
 	HistoryItem *lastMessage = nullptr;
 
 	auto &histories = history->owner().histories();
+	const auto messageLengthLimit = Data::PremiumLimits(
+		&history->session()
+	).messageLengthCurrent();
 
 	const auto exactWebPage = !message.webPage.url.isEmpty();
 	auto isFirst = true;
-	while (TextUtilities::CutPart(sending, left, MaxMessageSize)
+	while (TextUtilities::CutPart(sending, left, messageLengthLimit)
 		|| (isFirst && exactWebPage)) {
 		TextUtilities::Trim(left);
 		const auto isLast = left.empty();
@@ -4316,7 +4521,8 @@ void ApiWrap::sendMessage(
 					mtpShortcut,
 					MTP_long(action.options.effectId),
 					MTP_long(starsPaid),
-					Api::SuggestToMTP(action.options.suggest)
+					Api::SuggestToMTP(action.options.suggest),
+					MTPInputRichMessage()
 				), done, fail);
 		}
 		isFirst = false;

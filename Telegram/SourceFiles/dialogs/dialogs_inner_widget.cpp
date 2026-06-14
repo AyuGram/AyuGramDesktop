@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/vertical_list.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "data/components/sponsored_messages.h"
 #include "data/data_drafts.h"
@@ -53,6 +54,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_stories.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_send_action.h"
 #include "base/unixtime.h"
@@ -72,6 +74,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chats_filter_tag.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/loading_element.h"
+#include "ui/effects/thanos_effect_session.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/unread_badge.h"
@@ -91,6 +94,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
+#include <unordered_map>
 
 // AyuGram includes
 #include "ayu/ui/ayu_userpic.h"
@@ -301,6 +305,7 @@ InnerWidget::InnerWidget(
 , _childListShown(std::move(childListShown))
 , _freezeTimer([=] { _shownList->unfreeze(); update(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent, true);
+	setAccessibleName(tr::lng_recent_chats(tr::now));
 
 	style::PaletteChanged(
 	) | rpl::on_next([=] {
@@ -376,6 +381,8 @@ InnerWidget::InnerWidget(
 	}) | rpl::on_next([=] {
 		refresh();
 	}, lifetime());
+
+	Ui::ScheduleThanosEffectWarmUp(&session(), lifetime());
 
 	rpl::merge(
 		session().settings().archiveCollapsedChanges() | rpl::map_to(false),
@@ -883,7 +890,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 		const auto &key = row->key();
 		const auto active = mayBeActive && isRowActive(row, activeEntry);
 		const auto history = key.history();
-		const auto forum = history && history->isForum();
+		const auto forum = history && history->peer->displayAsForum();
 		const auto monoforum = history && history->amMonoforumAdmin();
 		if ((forum || monoforum) && !_topicJumpCache) {
 			_topicJumpCache = std::make_unique<Ui::TopicJumpCache>();
@@ -1615,7 +1622,8 @@ void InnerWidget::paintPeerSearchResult(
 		if (!result->badge.ready(info)) {
 			result->badge.set(
 				info,
-				peer->owner().customEmojiManager().factory(),
+				peer->owner().customEmojiManager().factory(
+					Data::CustomEmojiSizeTag::Isolated),
 				[=] { updateSearchResult(peer); });
 		}
 		const auto &st = Ui::VerifiedStyle(context);
@@ -2529,29 +2537,50 @@ bool InnerWidget::updateReorderPinned(QPoint localPosition) {
 	}
 
 	const auto draggingHeight = _dragging->height();
+	const auto promoted = fixedOnTopCount();
 	auto yaddWas = _pinnedRows[_draggingIndex].yadd.current();
 	auto shift = 0;
 	auto shiftHeight = 0;
 	auto now = crl::now();
+	const auto crossThreshold = [&](int height) {
+		return std::max(draggingHeight / 2, height - draggingHeight / 2);
+	};
 	if (_dragStart.y() > localPosition.y() && _draggingIndex > 0) {
-		shift = -floorclamp(_dragStart.y() - localPosition.y() + (draggingHeight / 2), draggingHeight, 0, _draggingIndex);
-
-		for (auto from = _draggingIndex, to = _draggingIndex + shift; from > to; --from) {
+		auto delta = _dragStart.y() - localPosition.y();
+		for (auto from = _draggingIndex; from > 0; --from) {
+			const auto height
+				= (*(_shownList->cbegin() + promoted + from - 1))->height();
+			if (delta < crossThreshold(height)) {
+				break;
+			}
+			delta -= height;
+			--shift;
 			_shownList->movePinned(_dragging, -1);
 			std::swap(_pinnedRows[from], _pinnedRows[from - 1]);
-			_pinnedRows[from].yadd = anim::value(_pinnedRows[from].yadd.current() - draggingHeight, 0);
+			_pinnedRows[from].yadd = anim::value(
+				_pinnedRows[from].yadd.current() - draggingHeight,
+				0);
 			_pinnedRows[from].animStartTime = now;
-			shiftHeight -= (*(_shownList->cbegin() + from))->height();
+			shiftHeight -= height;
 		}
-	} else if (_dragStart.y() < localPosition.y() && _draggingIndex + 1 < pinnedCount) {
-		shift = floorclamp(localPosition.y() - _dragStart.y() + (draggingHeight / 2), draggingHeight, 0, pinnedCount - _draggingIndex - 1);
-
-		for (auto from = _draggingIndex, to = _draggingIndex + shift; from < to; ++from) {
+	} else if (_dragStart.y() < localPosition.y()
+			&& _draggingIndex + 1 < pinnedCount) {
+		auto delta = localPosition.y() - _dragStart.y();
+		for (auto from = _draggingIndex; from + 1 < pinnedCount; ++from) {
+			const auto height
+				= (*(_shownList->cbegin() + promoted + from + 1))->height();
+			if (delta < crossThreshold(height)) {
+				break;
+			}
+			delta -= height;
+			++shift;
 			_shownList->movePinned(_dragging, 1);
 			std::swap(_pinnedRows[from], _pinnedRows[from + 1]);
-			_pinnedRows[from].yadd = anim::value(_pinnedRows[from].yadd.current() + draggingHeight, 0);
+			_pinnedRows[from].yadd = anim::value(
+				_pinnedRows[from].yadd.current() + draggingHeight,
+				0);
 			_pinnedRows[from].animStartTime = now;
-			shiftHeight += (*(_shownList->cbegin() + from))->height();
+			shiftHeight += height;
 		}
 	}
 	if (shift) {
@@ -2923,6 +2952,9 @@ void InnerWidget::moveSearchIn() {
 void InnerWidget::dialogRowReplaced(
 		Row *oldRow,
 		Row *newRow) {
+	if (_activeSubItemsRow == oldRow) {
+		_activeSubItemsRow = nullptr;
+	}
 	auto found = false;
 	if (_state == WidgetState::Filtered) {
 		auto top = 0;
@@ -3279,6 +3311,7 @@ void InnerWidget::refreshShownList() {
 		_shownList->unfreeze();
 		_shownList = list;
 		_shownList->updateHeights(_narrowRatio);
+		_activeSubItemsRow = nullptr;
 	}
 }
 
@@ -4285,6 +4318,7 @@ void InnerWidget::editOpenedFilter() {
 }
 
 void InnerWidget::refresh(bool toTop) {
+	_activeSubItemsRow = nullptr;
 	if (!_geometryInited) {
 		return;
 	} else if (needCollapsedRowsRefresh()) {
@@ -5869,6 +5903,414 @@ void InnerWidget::deactivateQuickAction() {
 		_inactiveQuickActions.push_back(
 			QuickActionPtr{ _activeQuickAction.release() });
 	}
+}
+
+void InnerWidget::focusInEvent(QFocusEvent *e) {
+	RpWidget::focusInEvent(e);
+
+	if (_state == WidgetState::Default) {
+		if (!_selected && !_shownList->empty()) {
+			_selected = _shownList->cbegin()->get();
+		}
+	} else if (_state == WidgetState::Filtered) {
+		const auto noneSelected
+			= !base::in_range(
+				_hashtagSelected, 0, int(_hashtagResults.size()))
+			&& !base::in_range(
+				_filteredSelected, 0, int(_filterResults.size()))
+			&& !base::in_range(
+				_peerSearchSelected, 0, int(_peerSearchResults.size()))
+			&& !base::in_range(
+				_previewSelected, 0, int(_previewResults.size()))
+			&& !base::in_range(
+				_searchedSelected, 0, int(_searchResults.size()));
+		if (noneSelected && filteredChildCount() > 0) {
+			selectSkip(1);
+		}
+	}
+	InvokeQueued(this, [=] {
+		if (hasFocus()) {
+			announceSelectedFocus();
+		}
+	});
+}
+
+bool InnerWidget::processKeyDispatch(QKeyEvent *e) {
+	struct Snapshot {
+		Row *selected = nullptr;
+		int hashtag = -1;
+		int filtered = -1;
+		int peerSearch = -1;
+		int preview = -1;
+		int searched = -1;
+	};
+	const auto snap = Snapshot{
+		_selected,
+		_hashtagSelected,
+		_filteredSelected,
+		_peerSearchSelected,
+		_previewSelected,
+		_searchedSelected,
+	};
+	if (e->key() == Qt::Key_Up) {
+		selectSkip(-1);
+	} else if (e->key() == Qt::Key_Down) {
+		selectSkip(1);
+	} else if (e->key() == Qt::Key_PageUp) {
+		selectSkipPage(_visibleBottom - _visibleTop, -1);
+	} else if (e->key() == Qt::Key_PageDown) {
+		selectSkipPage(_visibleBottom - _visibleTop, 1);
+	} else {
+		return false;
+	}
+	const auto changed = (_selected != snap.selected)
+		|| (_hashtagSelected != snap.hashtag)
+		|| (_filteredSelected != snap.filtered)
+		|| (_peerSearchSelected != snap.peerSearch)
+		|| (_previewSelected != snap.preview)
+		|| (_searchedSelected != snap.searched);
+	if (changed) {
+		announceSelectedFocus();
+	}
+	return true;
+}
+
+void InnerWidget::keyPressEvent(QKeyEvent *e) {
+	if (processKeyDispatch(e)) {
+		return;
+	} else if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+		chooseRow();
+		return;
+	}
+	RpWidget::keyPressEvent(e);
+}
+
+void InnerWidget::announceSelectedFocus() {
+	if (_state == WidgetState::Default) {
+		if (!_selected) {
+			return;
+		}
+		const auto i = _shownList->cfind(_selected);
+		if (i != _shownList->cend()) {
+			const auto index = int(i - _shownList->cbegin());
+			accessibilityChildNameChanged(index);
+			accessibilityChildFocused(index);
+		}
+	} else if (_state == WidgetState::Filtered) {
+		const auto h = int(_hashtagResults.size());
+		const auto f = int(_filterResults.size());
+		const auto p = int(_peerSearchResults.size());
+		const auto v = int(_previewResults.size());
+		auto index = -1;
+		if (base::in_range(_hashtagSelected, 0, h)) {
+			index = _hashtagSelected;
+		} else if (base::in_range(_filteredSelected, 0, f)) {
+			index = h + _filteredSelected;
+		} else if (base::in_range(_peerSearchSelected, 0, p)) {
+			index = h + f + _peerSearchSelected;
+		} else if (base::in_range(_previewSelected, 0, v)) {
+			index = h + f + p + _previewSelected;
+		} else if (base::in_range(
+				_searchedSelected,
+				0,
+				int(_searchResults.size()))) {
+			index = h + f + p + v + _searchedSelected;
+		}
+		if (index >= 0) {
+			accessibilityChildNameChanged(index);
+			accessibilityChildFocused(index);
+		}
+	}
+}
+
+Ui::AccessibilityState InnerWidget::accessibilityState() const {
+	// Mark the List container as non-focusable so screen readers
+	// drill down to the focusable child items (ListItem rows).
+	return {};
+}
+
+int InnerWidget::filteredChildCount() const {
+	return int(_hashtagResults.size()
+		+ _filterResults.size()
+		+ _peerSearchResults.size()
+		+ _previewResults.size()
+		+ _searchResults.size());
+}
+
+auto InnerWidget::filteredChildAt(int index) const
+-> std::optional<FilteredChildRef> {
+	if (index < 0) {
+		return std::nullopt;
+	}
+	const auto h = int(_hashtagResults.size());
+	const auto f = int(_filterResults.size());
+	const auto p = int(_peerSearchResults.size());
+	const auto v = int(_previewResults.size());
+	const auto s = int(_searchResults.size());
+	if (index < h) {
+		return FilteredChildRef{
+			AccessibilityCohort::Hashtag,
+			index,
+		};
+	} else if (index < h + f) {
+		return FilteredChildRef{
+			AccessibilityCohort::Filtered,
+			index - h,
+		};
+	} else if (index < h + f + p) {
+		return FilteredChildRef{
+			AccessibilityCohort::PeerSearch,
+			index - h - f,
+		};
+	} else if (index < h + f + p + v) {
+		return FilteredChildRef{
+			AccessibilityCohort::Preview,
+			index - h - f - p,
+		};
+	} else if (index < h + f + p + v + s) {
+		return FilteredChildRef{
+			AccessibilityCohort::Searched,
+			index - h - f - p - v,
+		};
+	}
+	return std::nullopt;
+}
+
+int InnerWidget::accessibilityChildCount() const {
+	if (_state == WidgetState::Default) {
+		return _shownList->size();
+	} else if (_state == WidgetState::Filtered) {
+		return filteredChildCount();
+	}
+	return 0;
+}
+
+QString InnerWidget::accessibilityChildName(int index) const {
+	if (_state == WidgetState::Default) {
+		if (index < 0 || index >= _shownList->size()) {
+			return {};
+		}
+		const auto it = _shownList->cbegin() + index;
+		return RowAccessibilityName(it->get(), _filterId);
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(index);
+		if (!ref) {
+			return {};
+		}
+		switch (ref->cohort) {
+		case AccessibilityCohort::Hashtag:
+			return HashtagAccessibilityName(
+				_hashtagResults[ref->local]->tag);
+		case AccessibilityCohort::Filtered:
+			return RowAccessibilityName(
+				_filterResults[ref->local].row,
+				_filterId);
+		case AccessibilityCohort::PeerSearch: {
+			const auto &r = _peerSearchResults[ref->local];
+			return PeerSearchResultAccessibilityName(
+				r->peer,
+				r->sponsored != nullptr);
+		}
+		case AccessibilityCohort::Preview:
+			return SearchedMessageAccessibilityName(
+				_previewResults[ref->local].get());
+		case AccessibilityCohort::Searched:
+			return SearchedMessageAccessibilityName(
+				_searchResults[ref->local].get());
+		}
+	}
+	return {};
+}
+
+QAccessible::State InnerWidget::accessibilityChildState(int index) const {
+	auto state = QAccessible::State();
+	state.selectable = true;
+	if (Ui::ScreenReaderModeActive()) {
+		state.focusable = true;
+	}
+	if (_state == WidgetState::Default) {
+		if (index < 0 || index >= _shownList->size()) {
+			return state;
+		}
+		const auto it = _shownList->cbegin() + index;
+		if (it->get() == _selected) {
+			state.selected = true;
+			state.active = true;
+			if (Ui::ScreenReaderModeActive()) {
+				state.focused = true;
+			}
+		}
+		return state;
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(index);
+		if (!ref) {
+			return state;
+		}
+		const auto active = [&] {
+			switch (ref->cohort) {
+			case AccessibilityCohort::Hashtag:
+				return ref->local == _hashtagSelected;
+			case AccessibilityCohort::Filtered:
+				return ref->local == _filteredSelected;
+			case AccessibilityCohort::PeerSearch:
+				return ref->local == _peerSearchSelected;
+			case AccessibilityCohort::Preview:
+				return ref->local == _previewSelected;
+			case AccessibilityCohort::Searched:
+				return ref->local == _searchedSelected;
+			}
+			return false;
+		}();
+		if (active) {
+			state.selected = true;
+			state.active = true;
+			if (Ui::ScreenReaderModeActive()) {
+				state.focused = true;
+			}
+		}
+		return state;
+	}
+	return state;
+}
+
+QAccessible::Role InnerWidget::accessibilityChildRole() const {
+	return QAccessible::Role::ListItem;
+}
+
+QRect InnerWidget::accessibilityChildRect(int index) const {
+	if (_state == WidgetState::Default) {
+		if (index < 0 || index >= _shownList->size()) {
+			return QRect();
+		}
+		const auto row = (_shownList->cbegin() + index)->get();
+		return QRect(0, row->top(), width(), row->height());
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(index);
+		if (!ref) {
+			return QRect();
+		}
+		switch (ref->cohort) {
+		case AccessibilityCohort::Hashtag:
+			return QRect(
+				0,
+				hashtagsOffset() + ref->local * st::mentionHeight,
+				width(),
+				st::mentionHeight);
+		case AccessibilityCohort::Filtered: {
+			const auto &r = _filterResults[ref->local];
+			return QRect(
+				0,
+				filteredOffset() + r.top,
+				width(),
+				r.row->height());
+		}
+		case AccessibilityCohort::PeerSearch:
+			return QRect(
+				0,
+				peerSearchOffset() + ref->local * st::dialogsRowHeight,
+				width(),
+				st::dialogsRowHeight);
+		case AccessibilityCohort::Preview:
+			return QRect(
+				0,
+				previewOffset() + ref->local * _st->height,
+				width(),
+				_st->height);
+		case AccessibilityCohort::Searched:
+			return QRect(
+				0,
+				searchedOffset() + ref->local * _st->height,
+				width(),
+				_st->height);
+		}
+		return QRect();
+	}
+	return QRect();
+}
+
+int InnerWidget::accessibilityChildColumnCount(int row) const {
+	if (_state == WidgetState::Default) {
+		if (row < 0 || row >= _shownList->size()) {
+			return 0;
+		}
+		const auto rowPtr = (_shownList->cbegin() + row)->get();
+		return int(activeSubItems(rowPtr).size());
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(row);
+		if (!ref || ref->cohort != AccessibilityCohort::Filtered) {
+			return 0;
+		}
+		return int(activeSubItems(_filterResults[ref->local].row).size());
+	}
+	return 0;
+}
+
+const std::vector<SubItem> &InnerWidget::activeSubItems(
+		not_null<const Row*> row) const {
+	if (row.get() != _activeSubItemsRow) {
+		_activeSubItems = ActiveSubItems(row, _filterId);
+		_activeSubItemsRow = row.get();
+	}
+	return _activeSubItems;
+}
+
+QAccessible::Role InnerWidget::accessibilityChildSubItemRole() const {
+	return QAccessible::Cell;
+}
+
+QString InnerWidget::accessibilityChildSubItemName(
+		int row,
+		int column) const {
+	if (_state == WidgetState::Default) {
+		if (row < 0 || row >= _shownList->size()) {
+			return {};
+		}
+		const auto rowPtr = (_shownList->cbegin() + row)->get();
+		const auto &active = activeSubItems(rowPtr);
+		if (column < 0 || column >= int(active.size())) {
+			return {};
+		}
+		return SubItemLabel(active[column]);
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(row);
+		if (!ref || ref->cohort != AccessibilityCohort::Filtered) {
+			return {};
+		}
+		const auto &active = activeSubItems(_filterResults[ref->local].row);
+		if (column < 0 || column >= int(active.size())) {
+			return {};
+		}
+		return SubItemLabel(active[column]);
+	}
+	return {};
+}
+
+QString InnerWidget::accessibilityChildSubItemValue(
+		int row,
+		int column) const {
+	if (_state == WidgetState::Default) {
+		if (row < 0 || row >= _shownList->size()) {
+			return {};
+		}
+		const auto rowPtr = (_shownList->cbegin() + row)->get();
+		const auto &active = activeSubItems(rowPtr);
+		if (column < 0 || column >= int(active.size())) {
+			return {};
+		}
+		return SubItemValue(rowPtr, _filterId, active[column]);
+	} else if (_state == WidgetState::Filtered) {
+		const auto ref = filteredChildAt(row);
+		if (!ref || ref->cohort != AccessibilityCohort::Filtered) {
+			return {};
+		}
+		const auto rowPtr = _filterResults[ref->local].row;
+		const auto &active = activeSubItems(rowPtr);
+		if (column < 0 || column >= int(active.size())) {
+			return {};
+		}
+		return SubItemValue(rowPtr, _filterId, active[column]);
+	}
+	return {};
 }
 
 } // namespace Dialogs

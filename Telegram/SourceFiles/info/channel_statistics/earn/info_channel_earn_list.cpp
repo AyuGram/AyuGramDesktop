@@ -966,8 +966,7 @@ void InnerWidget::fill() {
 		const auto button = Info::BotStarRef::AddViewListButton(
 			container,
 			tr::lng_credits_summary_earn_title(),
-			tr::lng_credits_summary_earn_about(),
-			true);
+			tr::lng_credits_summary_earn_about());
 		button->setClickedCallback([=] {
 			_controller->showSection(Info::BotStarRef::Join::Make(_peer));
 		});

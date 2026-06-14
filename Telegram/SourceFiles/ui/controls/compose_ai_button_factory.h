@@ -49,7 +49,6 @@ void UpdateCaptionAiButtonGeometry(
 	not_null<Ui::InputField*> field);
 
 [[nodiscard]] PreparedList PrepareTextAsFile(const QString &text);
-[[nodiscard]] int SendAsFilePasteThreshold();
 
 struct LargeTextPasteResult {
 	bool exceeds = false;
@@ -57,6 +56,7 @@ struct LargeTextPasteResult {
 };
 
 [[nodiscard]] LargeTextPasteResult CheckLargeTextPaste(
+	not_null<Main::Session*> session,
 	not_null<Ui::InputField*> field,
 	not_null<const QMimeData*> data);
 

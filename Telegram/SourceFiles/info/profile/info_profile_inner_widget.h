@@ -7,8 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
 #include "base/object_ptr.h"
+#include "info/profile/info_profile_section_stack.h"
+#include "ui/rp_widget.h"
 
 namespace Data {
 class ForumTopic;
@@ -73,23 +74,15 @@ private:
 	object_ptr<RpWidget> setupContent(
 		not_null<RpWidget*> parent,
 		Origin origin);
-	object_ptr<RpWidget> setupSharedMedia(
+	object_ptr<Ui::SlideWrap<Ui::RpWidget>> setupSharedMedia(
 		not_null<RpWidget*> parent,
-		rpl::producer<bool> showDivider,
 		Ui::MultiSlideTracker &sharedTracker);
-	void setupMembers(
-		not_null<Ui::VerticalLayout*> container,
-		rpl::producer<bool> showDivider);
-	void setupSavedMusic(not_null<Ui::VerticalLayout*> container);
+	[[nodiscard]] Section makeMembersSection(not_null<QWidget*> parent);
 
 	int countDesiredHeight() const;
 	void updateDesiredHeight() {
 		_desiredHeight.fire(countDesiredHeight());
 	}
-
-	void addAboutVerificationOrDivider(
-		not_null<Ui::VerticalLayout*> content,
-		rpl::producer<bool> showDivider);
 
 	const not_null<Controller*> _controller;
 	const not_null<PeerData*> _peer;
@@ -98,7 +91,6 @@ private:
 	Data::SavedSublist * const _sublist = nullptr;
 
 	bool _inResize = false;
-	bool _aboutVerificationAdded = false;
 	rpl::event_stream<Ui::ScrollToRequest> _scrollToRequests;
 	rpl::event_stream<int> _desiredHeight;
 

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_messages.h"
 
 class TaskQueue;
+class HistoryItem;
 struct MessageGroupId;
 struct SendingAlbum;
 enum class SendMediaType;
@@ -25,6 +26,7 @@ class Session;
 } // namespace Main
 
 namespace Data {
+struct ReactionId;
 struct UpdatedFileReferences;
 class WallPaper;
 struct ResolvedForwardDraft;
@@ -237,6 +239,16 @@ public:
 	void deleteAllFromParticipant(
 		not_null<ChannelData*> channel,
 		not_null<PeerData*> from);
+	void deleteAllReactionsFromParticipant(
+		not_null<PeerData*> peer,
+		not_null<PeerData*> participant,
+		MsgId originMsgId,
+		const Data::ReactionId &originReaction);
+	void deleteParticipantReaction(
+		not_null<PeerData*> peer,
+		MsgId msgId,
+		not_null<PeerData*> participant,
+		const Data::ReactionId &reaction);
 	void deleteSublistHistory(
 		not_null<ChannelData*> parentChat,
 		not_null<PeerData*> sublistPeer);
@@ -367,6 +379,10 @@ public:
 	void sendShortcutMessages(
 		not_null<PeerData*> peer,
 		BusinessShortcutId id);
+	void sendRichMessage(
+		not_null<HistoryItem*> item,
+		const MTPInputRichMessage &richMessage,
+		SendAction action);
 	void sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId = std::nullopt);

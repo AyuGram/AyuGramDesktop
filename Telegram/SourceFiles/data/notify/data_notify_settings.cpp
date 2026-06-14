@@ -259,9 +259,7 @@ void NotifySettings::resetToDefault(not_null<PeerData*> peer) {
 
 void NotifySettings::forumParentMuteUpdated(not_null<Forum*> forum) {
 	forum->enumerateTopics([&](not_null<ForumTopic*> topic) {
-		if (!topic->notify().settingsUnknown()) {
-			updateLocal(topic);
-		}
+		updateLocal(topic);
 	});
 }
 

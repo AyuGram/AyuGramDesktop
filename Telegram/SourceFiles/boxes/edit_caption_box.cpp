@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
+#include "boxes/send_files_box.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "chat_helpers/field_autocomplete.h"
 #include "chat_helpers/message_field.h"
@@ -545,6 +546,24 @@ void EditCaptionBox::rebuildPreview() {
 	_content->heightValue(
 	) | rpl::start_to_stream(_contentHeight, _content->lifetime());
 
+	if (const auto file = dynamic_cast<Ui::AbstractSingleFilePreview*>(
+			_content.get())) {
+		file->setRenameEnabled(!_preparedList.files.empty());
+		file->renameRequests(
+		) | rpl::on_next([=] {
+			renameCurrentFile();
+		}, _content->lifetime());
+	}
+
+	base::install_event_filter(_content.get(), [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu) {
+			const auto mouse = static_cast<QContextMenuEvent*>(e.get());
+			showMenu(mouse->globalPos(), false);
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	}, _content->lifetime());
+
 	_scroll->setOwnedWidget(
 		object_ptr<Ui::RpWidget>::fromRaw(_content.get()));
 
@@ -728,79 +747,107 @@ void EditCaptionBox::setupControls() {
 }
 
 void EditCaptionBox::setupEditEventHandler() {
-	const auto menu
-		= lifetime().make_state<base::unique_qptr<Ui::PopupMenu>>();
 	_editMediaClicks.events(
 	) | rpl::on_next([=] {
-		*menu = base::make_unique_q<Ui::PopupMenu>(
-			this,
-			st::popupMenuWithIcons);
-		(*menu)->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
-		if (_isAllowedEditMedia) {
-			(*menu)->addAction(tr::lng_attach_replace(tr::now), [=] {
-				ChooseReplacement(
-					_controller,
-					_albumType,
-					crl::guard(this, [=](Ui::PreparedList &&list) {
-						setPreparedList(std::move(list));
-					}));
-			}, &st::menuIconReplace);
-		}
-		using Type = Ui::PreparedFile::Type;
-		const auto canDraw = !_preparedList.files.empty()
-			? (_preparedList.files.front().type == Type::Photo)
-			: (_isPhoto && !_asFile);
-		if (canDraw) {
-			(*menu)->addAction(tr::lng_context_draw(tr::now), [=] {
-				_photoEditorOpens.fire({});
-			}, &st::menuIconDraw);
-		}
-		if (!_asFile && (_isPhoto || _isVideo)) {
-			if (hasSendLargePhotosOption()) {
-				const auto enabled = _sendLargePhotos;
-				Menu::AddCheckedAction(
-					menu->get(),
-					tr::lng_send_high_quality(tr::now),
-					[=] {
-						_sendLargePhotos = !enabled;
-						rebuildPreview();
-					},
-					&st::menuIconQualityHigh,
-					enabled);
-			}
-			if (_preparedList.hasSpoilerMenu(!_asFile)) {
-				const auto spoilered = hasSpoiler();
-				Menu::AddCheckedAction(
-					menu->get(),
-					tr::lng_context_spoiler_effect(tr::now),
-					[=] {
-						_mediaEditManager.apply({ .type = spoilered
-							? SendMenu::ActionType::SpoilerOff
-							: SendMenu::ActionType::SpoilerOn
-						});
-						rebuildPreview();
-					},
-					&st::menuIconSpoiler,
-					spoilered);
-			}
-			if (_isVideo && !_preparedList.files.empty()) {
-				(*menu)->addAction(tr::lng_context_edit_cover(tr::now), [=] {
-					setupEditCoverHandler();
-				}, &st::menuIconEdit);
-				if (_preparedList.files.front().videoCover != nullptr) {
-					(*menu)->addAction(
-						tr::lng_context_clear_cover(tr::now),
-						[=] { setupClearCoverHandler(); },
-						&st::menuIconCancel);
-				}
-			}
-		}
-		if ((*menu)->empty()) {
-			*menu = nullptr;
-		} else {
-			(*menu)->popup(QCursor::pos());
-		}
+		showMenu(QCursor::pos(), true);
 	}, lifetime());
+}
+
+void EditCaptionBox::showMenu(QPoint globalPos, bool forceTopRight) {
+	_previewMenu = base::make_unique_q<Ui::PopupMenu>(
+		this,
+		st::popupMenuWithIcons);
+	if (forceTopRight) {
+		_previewMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
+	}
+	if (_isAllowedEditMedia) {
+		_previewMenu->addAction(tr::lng_attach_replace(tr::now), [=] {
+			ChooseReplacement(
+				_controller,
+				_albumType,
+				crl::guard(this, [=](Ui::PreparedList &&list) {
+					setPreparedList(std::move(list));
+				}));
+		}, &st::menuIconReplace);
+	}
+	if (dynamic_cast<Ui::AbstractSingleFilePreview*>(_content.get())
+		&& !_preparedList.files.empty()) {
+		_previewMenu->addAction(tr::lng_rename_file(tr::now), [=] {
+			renameCurrentFile();
+		}, &st::menuIconEdit);
+	}
+	using Type = Ui::PreparedFile::Type;
+	const auto canDraw = !_preparedList.files.empty()
+		? (_preparedList.files.front().type == Type::Photo)
+		: (_isPhoto && !_asFile);
+	if (canDraw) {
+		_previewMenu->addAction(tr::lng_context_draw(tr::now), [=] {
+			_photoEditorOpens.fire({});
+		}, &st::menuIconDraw);
+	}
+	if (!_asFile && (_isPhoto || _isVideo)) {
+		if (hasSendLargePhotosOption()) {
+			const auto enabled = _sendLargePhotos;
+			Menu::AddCheckedAction(
+				_previewMenu.get(),
+				tr::lng_send_high_quality(tr::now),
+				[=] {
+					_sendLargePhotos = !enabled;
+					rebuildPreview();
+				},
+				&st::menuIconQualityHigh,
+				enabled);
+		}
+		if (_preparedList.hasSpoilerMenu(!_asFile)) {
+			const auto spoilered = hasSpoiler();
+			Menu::AddCheckedAction(
+				_previewMenu.get(),
+				tr::lng_context_spoiler_effect(tr::now),
+				[=] {
+					_mediaEditManager.apply({ .type = spoilered
+						? SendMenu::ActionType::SpoilerOff
+						: SendMenu::ActionType::SpoilerOn
+					});
+					rebuildPreview();
+				},
+				&st::menuIconSpoiler,
+				spoilered);
+		}
+		if (_isVideo && !_preparedList.files.empty()) {
+			_previewMenu->addAction(tr::lng_context_edit_cover(tr::now), [=] {
+				setupEditCoverHandler();
+			}, &st::menuIconEdit);
+			if (_preparedList.files.front().videoCover != nullptr) {
+				_previewMenu->addAction(
+					tr::lng_context_clear_cover(tr::now),
+					[=] { setupClearCoverHandler(); },
+					&st::menuIconCancel);
+			}
+		}
+	}
+	if (_previewMenu->empty()) {
+		_previewMenu = nullptr;
+	} else {
+		_previewMenu->popup(globalPos);
+	}
+}
+
+void EditCaptionBox::renameCurrentFile() {
+	if (_preparedList.files.empty()) {
+		return;
+	}
+	const auto &file = _preparedList.files.front();
+	const auto allowExtensionEdit = file.path.isEmpty();
+	_controller->show(Box(RenameFileBox, file.displayName, allowExtensionEdit, [=](
+			QString displayName) {
+		_preparedList.files.front().displayName = displayName;
+		if (const auto filePreview = dynamic_cast<Ui::AbstractSingleFilePreview*>(
+				_content.get())) {
+			filePreview->setDisplayName(displayName);
+		} else {
+			rebuildPreview();
+		}
+	}));
 }
 
 void EditCaptionBox::setupPhotoEditorEventHandler() {

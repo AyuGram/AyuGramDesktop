@@ -79,6 +79,7 @@ namespace {
 			| (data.is_send_docs() ? Flag::SendFiles : Flag())
 			| (data.is_send_plain() ? Flag::SendOther : Flag())
 			| (data.is_embed_links() ? Flag::EmbedLinks : Flag())
+			| (data.is_send_reactions() ? Flag::SendReactions : Flag())
 			| (data.is_change_info() ? Flag::ChangeInfo : Flag())
 			| (data.is_invite_users() ? Flag::AddParticipants : Flag())
 			| (data.is_pin_messages() ? Flag::PinMessages : Flag())
@@ -153,6 +154,7 @@ MTPChatBannedRights RestrictionsToMTP(ChatRestrictionsInfo info) {
 			| ((flags & R::SendFiles) ? Flag::f_send_docs : Flag())
 			| ((flags & R::SendOther) ? Flag::f_send_plain : Flag())
 			| ((flags & R::EmbedLinks) ? Flag::f_embed_links : Flag())
+			| ((flags & R::SendReactions) ? Flag::f_send_reactions : Flag())
 			| ((flags & R::ChangeInfo) ? Flag::f_change_info : Flag())
 			| ((flags & R::AddParticipants) ? Flag::f_invite_users : Flag())
 			| ((flags & R::PinMessages) ? Flag::f_pin_messages : Flag())
@@ -254,12 +256,9 @@ bool CanSendAnyOf(
 		if (!chat->amIn()) {
 			return false;
 		}
-		for (const auto right : AllSendRestrictionsList()) {
-			if ((rights & right) && !chat->amRestricted(right)) {
-				return true;
-			}
-		}
-		return false;
+		return chat->amCreator()
+			|| chat->hasAdminRights()
+			|| (rights & ~chat->defaultRestrictions());
 	} else if (const auto channel = peer->asChannel()) {
 		if (channel->monoforumDisabled()) {
 			return false;
@@ -271,17 +270,15 @@ bool CanSendAnyOf(
 			|| channel->isMonoforum();
 		if (!allowed || (forbidInForums && channel->isForum())) {
 			return false;
-		} else if (channel->canPostMessages()) {
-			return true;
-		} else if (channel->isBroadcast()) {
-			return false;
 		}
-		for (const auto right : AllSendRestrictionsList()) {
-			if ((rights & right) && !channel->amRestricted(right)) {
-				return true;
-			}
-		}
-		return false;
+		const auto restricted = channel->restrictions()
+			| (channel->unrestrictedByBoosts()
+				? ChatRestrictions()
+				: channel->defaultRestrictions());
+		return channel->canPostMessages()
+			|| (!channel->isBroadcast()
+				&& (channel->hasAdminRights()
+					|| (rights & ~restricted)));
 	}
 	Unexpected("Peer type in CanSendAnyOf.");
 }

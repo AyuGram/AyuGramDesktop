@@ -139,9 +139,11 @@ private:
 	struct PipWrap;
 	struct ItemContext;
 	struct StoriesContext;
+	struct InstantViewMedia;
 	class Renderer;
 	class RendererSW;
 	class RendererGL;
+	class RendererRhi;
 	class SponsoredButton;
 
 	// If changing, see paintControls()!
@@ -174,6 +176,8 @@ private:
 		MsgId topicRootId = 0;
 		PeerId monoforumPeerId = 0;
 	};
+	using InstantViewItem = std::variant<PhotoData*, DocumentData*>;
+	using InstantViewItems = std::vector<InstantViewItem>;
 	enum class SavePhotoVideo {
 		None,
 		QuickSave,
@@ -333,7 +337,9 @@ private:
 	void checkForSaveLoaded();
 	void showPremiumDownloadPromo();
 
+	[[nodiscard]] std::optional<InstantViewItem> instantViewMediaKey() const;
 	[[nodiscard]] Entity entityForUserPhotos(int index) const;
+	[[nodiscard]] Entity entityForInstantViewMedia(int index) const;
 	[[nodiscard]] Entity entityForSharedMedia(int index) const;
 	[[nodiscard]] Entity entityForCollage(int index) const;
 	[[nodiscard]] Entity entityByIndex(int index) const;
@@ -366,6 +372,9 @@ private:
 	bool validUserPhotos() const;
 	void validateUserPhotos();
 	void handleUserPhotosUpdate(UserPhotosSlice &&update);
+
+	bool validInstantViewMedia() const;
+	void validateInstantViewMedia();
 
 	struct Collage;
 	using CollageKey = WebPageCollage::Item;
@@ -612,6 +621,8 @@ private:
 	std::optional<SharedMediaWithLastSlice::Key> _sharedMediaDataKey;
 	std::unique_ptr<UserPhotos> _userPhotos;
 	std::optional<UserPhotosSlice> _userPhotosData;
+	std::unique_ptr<InstantViewMedia> _instantViewMedia;
+	std::optional<InstantViewItems> _instantViewMediaData;
 	std::unique_ptr<Collage> _collage;
 	std::optional<WebPageCollage> _collageData;
 

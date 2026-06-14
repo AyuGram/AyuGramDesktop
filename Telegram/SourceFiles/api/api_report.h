@@ -53,6 +53,21 @@ void SendPhotoReport(
 	not_null<PeerData*> peer)
 -> Fn<void(Data::ReportInput, Fn<void(ReportResult)>)>;
 
+struct ReactionReportCapabilities final {
+	bool canReport = false;
+	bool canBan = false;
+};
+
+[[nodiscard]] ReactionReportCapabilities GetReactionReportCapabilities(
+	not_null<PeerData*> group,
+	not_null<PeerData*> participant);
+
+void ReportReaction(
+	std::shared_ptr<Ui::Show> show,
+	not_null<PeerData*> group,
+	MsgId messageId,
+	not_null<PeerData*> participant);
+
 void ReportSpam(
 	not_null<PeerData*> sender,
 	const MessageIdsList &ids);

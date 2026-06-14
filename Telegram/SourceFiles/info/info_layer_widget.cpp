@@ -31,6 +31,7 @@ LayerWidget::LayerWidget(
 	not_null<Memento*> memento)
 : _controller(controller)
 , _contentWrap(this, controller, Wrap::Layer, memento) {
+	controller->registerActiveLayerSection(_contentWrap.data());
 	setupHeightConsumers();
 	controller->window().replaceFloatPlayerDelegate(floatPlayerDelegate());
 }
@@ -40,6 +41,7 @@ LayerWidget::LayerWidget(
 	not_null<MoveMemento*> memento)
 : _controller(controller)
 , _contentWrap(memento->takeContent(this, Wrap::Layer)) {
+	controller->registerActiveLayerSection(_contentWrap.data());
 	setupHeightConsumers();
 	controller->window().replaceFloatPlayerDelegate(floatPlayerDelegate());
 }
@@ -161,6 +163,7 @@ void LayerWidget::parentResized() {
 	if (parentWidth < MinimalSupportedWidth()) {
 		Ui::FocusPersister persister(this);
 		restoreFloatPlayerDelegate();
+		unregisterActiveLayerSection();
 
 		auto memento = std::make_shared<MoveMemento>(std::move(_contentWrap));
 
@@ -245,6 +248,12 @@ bool LayerWidget::showSectionInternal(
 
 bool LayerWidget::closeByOutsideClick() const {
 	return _contentWrap ? _contentWrap->closeByOutsideClick() : true;
+}
+
+bool LayerWidget::closeByBackButton() {
+	return _contentWrap
+		? _contentWrap->closeByBackButton()
+		: Ui::LayerWidget::closeByBackButton();
 }
 
 int LayerWidget::MinimalSupportedWidth() {
@@ -374,11 +383,19 @@ void LayerWidget::restoreFloatPlayerDelegate() {
 	}
 }
 
+void LayerWidget::unregisterActiveLayerSection() {
+	if (_contentWrap) {
+		_controller->unregisterActiveLayerSection(_contentWrap.data());
+	}
+}
+
 void LayerWidget::closeHook() {
+	unregisterActiveLayerSection();
 	restoreFloatPlayerDelegate();
 }
 
 LayerWidget::~LayerWidget() {
+	unregisterActiveLayerSection();
 	if (!Core::Quitting()) {
 		restoreFloatPlayerDelegate();
 	}

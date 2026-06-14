@@ -613,9 +613,9 @@ void Widget::resetAccount() {
 			} else if (type == u"2FA_RECENT_CONFIRM"_q) {
 				Ui::show(Ui::MakeInformBox(
 					tr::lng_signin_reset_cancelled()));
-			} else {
+			} else if (!MTP::IgnoreError(error)) {
 				getData()->controller->hideLayer();
-				getStep()->showError(rpl::single(Lang::Hard::ServerError()));
+				getStep()->showError(rpl::single(type));
 			}
 		}).send();
 	});
