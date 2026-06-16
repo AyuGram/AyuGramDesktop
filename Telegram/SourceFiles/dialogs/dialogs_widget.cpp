@@ -2891,7 +2891,9 @@ bool Widget::search(bool inCache, SearchRequestDelay delay) {
 }
 
 bool Widget::peerSearchRequired() const {
-	return _searchState.filterChatsList() && !_openedForum;
+	return _searchState.filterChatsList()
+		&& !_openedForum
+		&& !AyuSettings::getInstance().disableGlobalSearch();
 }
 
 bool Widget::searchForTopicsRequired(const QString &query) const {

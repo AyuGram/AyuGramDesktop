@@ -181,6 +181,13 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setDisableOpenLinkWarning,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/disableGlobalSearch"_q,
+		.title = tr::ayu_DisableGlobalSearch(),
+		.getter = &AyuSettings::disableGlobalSearch,
+		.setter = &AyuSettings::setDisableGlobalSearch,
+	});
+
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/similarChannels"_q,
 		.title = tr::ayu_DisableSimilarChannels(),
