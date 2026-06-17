@@ -25,6 +25,43 @@ add_subdirectory(codegen)
 add_subdirectory(lib_icu)
 # AyuGram filters
 
+# AyuGram STT: whisper.cpp
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
+    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    # Metal is only enabled on Apple Silicon; ggml's Metal backend targets
+    # Apple GPUs, so on Intel Macs we stay on the CPU backend to avoid
+    # shader-compilation failures at runtime.
+    if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+        set(GGML_METAL ON CACHE BOOL "" FORCE)
+    else()
+        set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    endif()
+    set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+    # dynamic backend loading via dlopen breaks static builds
+    set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE BOOL "" FORCE)
+    # whisper.cpp pins cmake_minimum_required(VERSION 3.5), which CMake 4.0+
+    # rejects; this overrides it without patching the submodule.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    # ggml-cpu's CMake appends to ARCH_FLAGS/ARCH_DEFINITIONS without
+    # initializing them; seed them here so the inherited scope is clean
+    # (CMake functions read unset locals from the calling scope).
+    set(ARCH_FLAGS "")
+    set(ARCH_DEFINITIONS "")
+    add_subdirectory(ThirdParty/whisper.cpp whisper_build)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS OFF CACHE BOOL "" FORCE)
+    # ggml-backend-reg.cpp uses std::filesystem (requires 10.15), but TDesktop targets 10.13
+    if (TARGET ggml)
+        set_target_properties(ggml PROPERTIES XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.15")
+        target_compile_options(ggml PRIVATE -mmacosx-version-min=10.15)
+    endif()
+    target_link_libraries(Telegram PRIVATE whisper)
+    target_include_directories(Telegram PRIVATE ThirdParty/whisper.cpp/include)
+    target_compile_definitions(Telegram PRIVATE HAVE_WHISPER)
+endif()
+
 get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
 
@@ -241,6 +278,20 @@ set(ayugram_files
         ayu/features/translator/implementations/yandex.h
         ayu/features/translator/implementations/base.cpp
         ayu/features/translator/implementations/base.h
+        ayu/features/stt/stt_manager.cpp
+        ayu/features/stt/stt_manager.h
+)
+
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
+    nice_target_sources(Telegram ${src_loc}
+    PRIVATE
+        ayu/features/stt/whisper_service.cpp
+        ayu/features/stt/whisper_service.h
+    )
+endif()
+
+nice_target_sources(Telegram ${src_loc}
+PRIVATE
         ayu/features/filters/filters_controller.cpp
         ayu/features/filters/filters_controller.h
         ayu/features/filters/filters_cache_controller.cpp
@@ -2069,6 +2120,8 @@ if (APPLE)
     nice_target_sources(Telegram ${src_loc}
     PRIVATE
         tray_accounts_menu.cpp
+        ayu/features/stt/platform/stt_mac.mm
+        ayu/features/stt/platform/stt_mac.h
     )
 else()
     nice_target_sources(Telegram ${src_loc}
@@ -2146,6 +2199,7 @@ elseif (APPLE)
     if (NOT DESKTOP_APP_USE_PACKAGED)
         target_link_libraries(Telegram PRIVATE desktop-app::external_iconv)
     endif()
+    target_link_libraries(Telegram PRIVATE "-framework Speech" "-framework AVFoundation")
 
 #    find_program(ACTOOL_EXECUTABLE actool)
 #    if(NOT ACTOOL_EXECUTABLE)

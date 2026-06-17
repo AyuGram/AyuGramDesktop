@@ -51,6 +51,28 @@ enum class SendWithoutSoundOption {
 	Always = 2,
 };
 
+enum class STTEngine {
+	AppleSpeech = 0,
+	Whisper = 1,
+};
+
+enum class WhisperModel {
+	Tiny = 0,
+	Base = 1,
+	Small = 2,
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(STTEngine, {
+	{STTEngine::AppleSpeech, 0},
+	{STTEngine::Whisper, 1},
+})
+
+NLOHMANN_JSON_SERIALIZE_ENUM(WhisperModel, {
+	{WhisperModel::Tiny, 0},
+	{WhisperModel::Base, 1},
+	{WhisperModel::Small, 2},
+})
+
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
 	{PeerIdDisplay::Hidden, 0},
 	{PeerIdDisplay::TelegramApi, 1},
@@ -604,6 +626,20 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusValue() const { return _singleCornerRadius.value(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 
+	[[nodiscard]] bool sttEnabled() const { return _sttEnabled.current(); }
+	[[nodiscard]] STTEngine sttEngine() const { return _sttEngine.current(); }
+	[[nodiscard]] const QString &sttLanguage() const { return _sttLanguage.current(); }
+	[[nodiscard]] WhisperModel whisperModelType() const { return _whisperModelType.current(); }
+	[[nodiscard]] rpl::producer<bool> sttEnabledValue() const { return _sttEnabled.value(); }
+	[[nodiscard]] rpl::producer<STTEngine> sttEngineValue() const { return _sttEngine.value(); }
+	[[nodiscard]] rpl::producer<QString> sttLanguageValue() const { return _sttLanguage.value(); }
+	[[nodiscard]] rpl::producer<WhisperModel> whisperModelTypeValue() const { return _whisperModelType.value(); }
+
+	void setSttEnabled(bool val);
+	void setSttEngine(STTEngine val);
+	void setSttLanguage(const QString &val);
+	void setWhisperModelType(WhisperModel val);
+
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
 
@@ -696,6 +732,15 @@ private:
 	rpl::variable<bool> _crashReporting = true;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
+
+	rpl::variable<bool> _sttEnabled = false;
+#if defined(Q_OS_MAC)
+	rpl::variable<STTEngine> _sttEngine = STTEngine::AppleSpeech;
+#else
+	rpl::variable<STTEngine> _sttEngine = STTEngine::Whisper;
+#endif
+	rpl::variable<QString> _sttLanguage = u"auto"_q;
+	rpl::variable<WhisperModel> _whisperModelType = WhisperModel::Base;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

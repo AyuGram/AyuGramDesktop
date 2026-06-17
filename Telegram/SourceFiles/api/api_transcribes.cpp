@@ -142,6 +142,36 @@ const Transcribes::Entry &Transcribes::entry(
 	return (i != _map.end()) ? i->second : empty;
 }
 
+// AyuGram: local STT injection
+void Transcribes::setLocalLoading(not_null<HistoryItem*> item) {
+	auto &e = _map[item->fullId()];
+	e.shown = true;
+	e.requestId = -1; // fake non-zero to trigger loading spinner
+
+	if (const auto media = item->media()) {
+		if (const auto doc = media->document(); doc && doc->isVideoMessage()) {
+			e.roundview = true;
+			_session->data().requestItemViewRefresh(item);
+		}
+	}
+
+	_session->data().requestItemResize(item);
+}
+
+void Transcribes::injectLocalResult(not_null<HistoryItem*> item, const QString &text) {
+	auto &e = _map[item->fullId()];
+	e.result = text;
+	e.shown = true;
+	e.requestId = 0;
+	e.pending = false;
+
+	if (e.roundview) {
+		_session->data().requestItemViewRefresh(item);
+	}
+
+	_session->data().requestItemResize(item);
+}
+
 const SummaryEntry &Transcribes::summary(
 		not_null<const HistoryItem*> item) const {
 	static const auto empty = SummaryEntry();

@@ -26,14 +26,128 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "styles/style_chat.h"
 #include "window/window_session_controller.h"
+// AyuGram includes
+#include "ayu/features/stt/stt_manager.h"
+#include "ayu/ayu_settings.h"
+#include "base/timer.h"
+#include "base/weak_ptr.h"
+#include <rpl/rpl.h>
+#include "data/data_file_origin.h"
+#include <QtCore/QStandardPaths>
+#include <QtCore/QFile>
 
 namespace HistoryView {
 namespace {
 
+constexpr crl::time kSttFileDownloadTimeoutMs = 60000;
 constexpr auto kInNonChosenOpacity = 0.12;
 constexpr auto kOutNonChosenOpacity = 0.18;
 constexpr auto kArrowPivotNear = 0.349;
 constexpr auto kArrowPivotFar = 1. - kArrowPivotNear;
+
+void StartLocalTranscribe(const not_null<HistoryItem*> item, Window::SessionController *controller) {
+	const auto session = &item->history()->session();
+	const auto id = item->fullId();
+	auto &transcribes = session->api().transcribes();
+
+	if (const auto &entry = transcribes.entry(item); entry.shown && !entry.requestId) {
+		transcribes.toggle(item);
+		return;
+	} else if (entry.requestId) {
+		return;
+	}
+
+	const auto doc = item->media() ? item->media()->document() : nullptr;
+	if (!doc || (!doc->isVoiceMessage() && !doc->isVideoMessage())) {
+		return;
+	}
+
+#if defined(HAVE_WHISPER)
+	if (AyuSettings::getInstance().sttEngine() == STTEngine::Whisper) {
+		const auto modelType = static_cast<int>(
+			AyuSettings::getInstance().whisperModelType());
+		if (!Ayu::STT::STTManager::modelExists(modelType)) {
+			if (controller) {
+				controller->showToast(tr::ayu_SttModelNotDownloaded(tr::now));
+			}
+			return;
+		}
+	}
+#endif
+
+	const auto tmpPath = QStandardPaths::writableLocation(
+		QStandardPaths::TempLocation)
+		+ u"/ayugram_stt_%1.oga"_q.arg(id.msg.bare);
+
+	// The engine callback may fire seconds later, guard against the session
+	// being destroyed in the meantime (logout, account switch).
+	const auto weak = base::make_weak(session);
+	const auto runSTT = [=](const QString &filePath, const bool isTmp) {
+		Ayu::STT::STTManager::instance().transcribe(
+			filePath,
+			[=](const QString &text) {
+				if (isTmp) {
+					QFile::remove(filePath);
+				}
+				const auto strong = weak.get();
+				if (!strong) {
+					return;
+				}
+				const auto msg = strong->data().message(id);
+				if (!msg) {
+					return;
+				}
+				strong->api().transcribes().injectLocalResult(
+					msg,
+					text.isEmpty()
+						? tr::ayu_SttTranscribeFailed(tr::now)
+						: text);
+			});
+	};
+
+	transcribes.setLocalLoading(item);
+
+	if (const auto ready = doc->filepath(true); !ready.isEmpty()) {
+		runSTT(ready, false);
+		return;
+	}
+
+	// Not cached yet, subscribe to downloader signal instead of polling.
+	doc->save(id, tmpPath);
+
+	struct DownloadWait {
+		rpl::lifetime lifetime;
+		base::Timer timeout;
+	};
+	const auto state = std::make_shared<DownloadWait>();
+
+	const auto finish = [=](const QString &path, bool isTmp) {
+		state->timeout.cancel();
+		state->lifetime.destroy();
+		runSTT(path, isTmp);
+	};
+
+	session->downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		if (const auto ready = doc->filepath(true); !ready.isEmpty()) {
+			finish(ready, false);
+		} else if (QFile::exists(tmpPath)) {
+			finish(tmpPath, true);
+		}
+	}, state->lifetime);
+
+	state->timeout.setCallback([=] {
+		state->lifetime.destroy();
+		if (const auto strong = weak.get()) {
+			if (const auto msg = strong->data().message(id)) {
+				strong->api().transcribes().injectLocalResult(
+					msg,
+					tr::ayu_SttTranscribeFailed(tr::now));
+			}
+		}
+	});
+	state->timeout.callOnce(kSttFileDownloadTimeoutMs);
+}
 
 void ClipPainterForLock(QPainter &p, bool roundview, const QRect &r) {
 	const auto &pos = roundview
@@ -378,6 +492,15 @@ ClickHandlerPtr TranscribeButton::link() {
 		if (!item) {
 			return;
 		}
+
+		// AyuGram: route plain transcription through local STT when enabled.
+		// Summaries are a separate premium feature and fall through below.
+		if (AyuSettings::getInstance().sttEnabled() && !summarize) {
+			const auto my = context.other.value<ClickHandlerContext>();
+			StartLocalTranscribe(item, my.sessionWindow.get());
+			return;
+		}
+
 		if (session->premium()) {
 			auto &transcribes = session->api().transcribes();
 			return summarize

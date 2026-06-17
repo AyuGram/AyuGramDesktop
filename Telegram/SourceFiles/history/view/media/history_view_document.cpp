@@ -444,14 +444,16 @@ QSize Document::countOptimalSize() {
 		const auto history = _realParent->history();
 		const auto session = &history->session();
 		const auto transcribes = &session->api().transcribes();
+
+		// AyuGram: local STT bypasses the premium gate.
+		const auto canTranscribe = AyuSettings::getInstance().sttEnabled()
+			|| session->premium()
+			|| ((transcribes->freeFor(_realParent) || transcribes->trialsSupport())
+				&& _data->duration() <= transcribes->trialsMaxLengthMs());
 		if ((_parent->data()->media() && _parent->data()->media()->ttlSeconds())
 			|| _realParent->isScheduled()
 			|| _realParent->isAdminLogEntry()
-			|| (!session->premium()
-				&& !transcribes->freeFor(_realParent)
-				&& !transcribes->trialsSupport())
-			|| (!session->premium()
-				&& _data->duration() > transcribes->trialsMaxLengthMs())) {
+			|| !canTranscribe) {
 			voice->transcribe = nullptr;
 			voice->transcribeText = {};
 		} else {
