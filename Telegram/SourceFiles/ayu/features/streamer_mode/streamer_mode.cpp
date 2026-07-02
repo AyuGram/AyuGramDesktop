@@ -7,6 +7,7 @@
 
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
+#include "ayu/ayu_settings.h"
 #include "window/window_controller.h"
 
 #if defined Q_OS_WINRT || defined Q_OS_WIN
@@ -31,12 +32,14 @@ void enable()
 {
 	isEnabledVal = true;
 	Impl::enableHook();
+	AyuSettings::getInstance().setStreamerMode(true);
 }
 
 void disable()
 {
 	isEnabledVal = false;
 	Impl::disableHook();
+	AyuSettings::getInstance().setStreamerMode(false);
 }
 
 void hideWidgetWindow(QWidget *widget)
