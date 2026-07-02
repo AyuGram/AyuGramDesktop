@@ -23,7 +23,7 @@ QString pathForSave(not_null<Main::Session*> session);
 QString filePath(not_null<Main::Session*> session, const Data::Media *media);
 void loadDocuments(not_null<Main::Session*> session, const std::vector<not_null<HistoryItem*>> &items);
 bool isMediaDownloadable(Data::Media *media);
-void sendMessageSync(not_null<Main::Session*> session, Api::MessageToSend &&message);
+bool sendMessageSync(not_null<Main::Session*> session, Api::MessageToSend &&message);
 
 void sendDocumentSync(not_null<Main::Session*> session,
 					  Ui::PreparedGroup &group,
@@ -34,7 +34,8 @@ void sendDocumentSync(not_null<Main::Session*> session,
 void sendStickerSync(not_null<Main::Session*> session,
 					 Api::MessageToSend &&message,
 					 not_null<DocumentData*> document);
-void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &action);
+bool waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &action);
+bool waitForMsgSync(not_null<Main::Session*> session, FullMsgId localId);
 void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<PhotoData*>, FullMsgId> &photos);
 void loadDocumentSync(not_null<Main::Session*> session, DocumentData *data, not_null<HistoryItem*> item);
 void forwardMessagesSync(not_null<Main::Session*> session,

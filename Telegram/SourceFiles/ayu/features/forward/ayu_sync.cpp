@@ -226,22 +226,43 @@ void loadPhotoSync(not_null<Main::Session*> session, const std::pair<not_null<Ph
 	}
 }
 
-void sendMessageSync(not_null<Main::Session*> session, Api::MessageToSend &&message) {
-	const auto action = message.action;
-	crl::on_main([=, message = std::move(message)]() mutable
+bool sendMessageSync(not_null<Main::Session*> session, Api::MessageToSend &&message) {
+	auto localId = FullMsgId();
+	crl::on_main_sync([=, &message, &localId]() mutable
 	{
-		// we cannot send events to objects
-		// owned by a different thread
-		// because sendMessage updates UI too
-
-		session->api().sendMessage(std::move(message));
+		localId = FullMsgId(
+			message.action.history->peer->id,
+			session->data().nextLocalMessageId());
+		session->api().sendMessage(std::move(message), localId.msg);
 	});
 
-
-	waitForMsgSync(session, action);
+	return waitForMsgSync(session, localId);
 }
 
-void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &action) {
+bool waitForMsgSync(not_null<Main::Session*> session, FullMsgId localId) {
+	auto latch = std::make_shared<TimedCountDownLatch>(1);
+	auto lifetime = std::make_shared<rpl::lifetime>();
+
+	crl::on_main([=]
+	{
+		session->data().itemIdChanged()
+			| rpl::filter([=](const Data::Session::IdChange &update)
+			{
+				return (localId.peer == update.newId.peer)
+					&& (localId.msg == update.oldId);
+			}) | rpl::on_next([=]
+									  {
+										  latch->countDown();
+									  },
+									  *lifetime);
+	});
+
+	const auto done = latch->await(std::chrono::minutes(5));
+	base::take(lifetime)->destroy();
+	return done;
+}
+
+bool waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &action) {
 	auto latch = std::make_shared<TimedCountDownLatch>(1);
 	auto lifetime = std::make_shared<rpl::lifetime>();
 
@@ -258,8 +279,9 @@ void waitForMsgSync(not_null<Main::Session*> session, const Api::SendAction &act
 									  *lifetime);
 	});
 
-	latch->await(std::chrono::minutes(5));
+	const auto done = latch->await(std::chrono::minutes(5));
 	base::take(lifetime)->destroy();
+	return done;
 }
 
 void sendDocumentSync(not_null<Main::Session*> session,

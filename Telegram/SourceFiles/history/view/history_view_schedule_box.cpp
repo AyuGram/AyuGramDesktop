@@ -10,7 +10,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_common.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "data/data_peer.h"
-#include "data/data_peer_values.h"
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
 #include "base/event_filter.h"
@@ -24,7 +23,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/padding_wrap.h"
 #include "main/main_session.h"
 #include "menu/menu_send.h"
-#include "settings/sections/settings_premium.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_chat.h"
@@ -125,33 +123,11 @@ void ScheduleBox(
 	});
 
 	if (repeat) {
-		const auto boxShow = box->uiShow();
-		const auto showPremiumPromo = [=] {
-			if (session->premium()) {
-				return false;
-			}
-			Settings::ShowPremiumPromoToast(
-				Main::MakeSessionShow(boxShow, session),
-				ChatHelpers::ResolveWindowDefault(),
-				tr::lng_schedule_repeat_promo(
-					tr::now,
-					lt_link,
-					tr::link(
-						tr::bold(
-							tr::lng_schedule_repeat_promo_link(tr::now))),
-					tr::rich),
-				u"schedule_repeat"_q);
-			return true;
-		};
-		auto locked = Data::AmPremiumValue(
-			session
-		) | rpl::map([=](bool premium) {
-			return !premium;
-		});
+		auto locked = rpl::single(false);
 		const auto row = box->addRow(Ui::ChooseRepeatPeriod(box, {
-			.value = session->premium() ? *repeat : TimeId(),
+			.value = *repeat,
 			.locked = std::move(locked),
-			.filter = showPremiumPromo,
+			.filter = nullptr,
 			.changed = [=](TimeId value) { *repeat = value; },
 			.test = session->isTestMode(),
 		}), style::al_top);

@@ -97,6 +97,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_worker.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/features/forward/ayu_sync.h"
+
+#include <limits>
 
 
 namespace {
@@ -112,6 +115,8 @@ constexpr auto kNotifySettingSaveTimeout = crl::time(1000);
 constexpr auto kDialogsFirstLoad = 20;
 constexpr auto kDialogsPerPage = 500;
 constexpr auto kStatsSessionKillTimeout = 10 * crl::time(1000);
+constexpr auto kLocalRepeatFallbackMessages = 99;
+constexpr auto kScheduleOneYearSeconds = TimeId(365 * 24 * 60 * 60);
 
 using PhotoFileLocationId = Data::PhotoFileLocationId;
 using DocumentFileLocationId = Data::DocumentFileLocationId;
@@ -4089,6 +4094,11 @@ void ApiWrap::sendMessage(
 		message.action.replyTo.messageId = FullMsgId(message.action.replyTo.messageId.peer, message.action.replyTo.topicRootId);
 		action.replyTo.messageId = FullMsgId(action.replyTo.messageId.peer, action.replyTo.topicRootId);
 	}
+	const auto repeatFallbackTemplate = (action.options.scheduled
+		&& action.options.scheduleRepeatPeriod)
+		? std::make_shared<MessageToSend>(message)
+		: nullptr;
+	const auto repeatFallbackStarted = std::make_shared<bool>(false);
 
 	if ((!canSendTexts && !AyuForward::isForwarding(peer->id)) || Api::SendDice(message)) {
 		return;
@@ -4260,6 +4270,37 @@ void ApiWrap::sendMessage(
 				const MTP::Response &response) {
 			if (error.type() == u"MESSAGE_EMPTY"_q) {
 				lastMessage->destroy();
+			} else if (error.type() == u"PREMIUM_ACCOUNT_REQUIRED"_q
+				&& repeatFallbackTemplate) {
+				_session->data().unregisterMessageRandomId(randomId);
+				if (const auto item = _session->data().message(newId)) {
+					item->destroy();
+				}
+				if (!*repeatFallbackStarted) {
+					*repeatFallbackStarted = true;
+					const auto templateMessage = *repeatFallbackTemplate;
+					crl::async([=] {
+						auto scheduled = int64(templateMessage.action.options.scheduled);
+						const auto period = int64(templateMessage.action.options.scheduleRepeatPeriod);
+						const auto limit = int64(std::numeric_limits<TimeId>::max());
+						const auto scheduleLimit = int64(base::unixtime::now() + kScheduleOneYearSeconds);
+						for (auto i = 0; i != kLocalRepeatFallbackMessages; ++i) {
+							if (scheduled <= 0 || scheduled > limit || scheduled > scheduleLimit) {
+								break;
+							}
+							auto repeated = templateMessage;
+							repeated.action.options.scheduled = TimeId(scheduled);
+							repeated.action.options.scheduleRepeatPeriod = 0;
+							if (!AyuSync::sendMessageSync(_session, std::move(repeated))) {
+								break;
+							}
+							if (scheduled > (limit - period)) {
+								break;
+							}
+							scheduled += period;
+						}
+					});
+				}
 			} else {
 				sendMessageFail(error, peer, randomId, newId);
 			}
