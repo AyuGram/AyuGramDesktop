@@ -8,6 +8,9 @@
 
 #include "apiwrap.h"
 #include "api/api_text_entities.h"
+#include "data/data_document.h"
+#include "data/data_media_types.h"
+#include "data/data_photo.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
@@ -206,6 +209,40 @@ int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item) {
 	}
 
 	return flags;
+}
+
+void mapMediaToMessage(not_null<HistoryItem*> item, AyuMessageBase &message) {
+	const auto media = item->media();
+	if (!media) {
+		return;
+	}
+
+	if (const auto photo = media->photo()) {
+		message.documentType = kDocumentTypePhoto;
+		message.documentSerialized = serializeObject(photo->mtpInput());
+	} else if (const auto document = media->document()) {
+		if (document->isVideoMessage()) {
+			message.documentType = kDocumentTypeVideoNote;
+		} else if (document->isAnimation()) {
+			message.documentType = kDocumentTypeAnimation;
+		} else if (document->isVideoFile()) {
+			message.documentType = kDocumentTypeVideo;
+		} else if (document->isVoiceMessage()) {
+			message.documentType = kDocumentTypeVoice;
+		} else if (document->sticker()) {
+			message.documentType = kDocumentTypeSticker;
+		} else if (document->isAudioFile()) {
+			message.documentType = kDocumentTypeAudio;
+		} else {
+			message.documentType = kDocumentTypeFile;
+		}
+		message.mimeType = document->mimeString().toStdString();
+		message.documentSerialized = serializeObject(document->mtpInput());
+		const auto location = document->location(true);
+		if (!location.isEmpty()) {
+			message.mediaPath = location.name().toStdString();
+		}
+	}
 }
 
 }
