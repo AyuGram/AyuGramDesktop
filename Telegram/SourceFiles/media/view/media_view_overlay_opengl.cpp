@@ -274,6 +274,16 @@ void OverlayWidget::RendererGL::init(QOpenGLFunctions &f) {
 
 void OverlayWidget::RendererGL::deinit(QOpenGLFunctions *f) {
 	_textures.destroy(f);
+	for (auto i = 0; i != 3; ++i) {
+		_rgbaSize[i] = QSize();
+		_cacheKeys[i] = 0;
+	}
+	_lumaSize = QSize();
+	_chromaSize = QSize();
+	_chromaSizeV = QSize();
+	_chromaNV12 = false;
+	_trackFrameIndex = 0;
+	_streamedIndex = 0;
 	_imageProgram = std::nullopt;
 	_texturedVertexShader = nullptr;
 	_withTransparencyProgram = std::nullopt;
@@ -424,8 +434,8 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 			nv12changed ? QSize() : _chromaSize,
 			yuv->u.stride / (nv12 ? 2 : 1),
 			yuv->u.data);
+		_chromaSize = yuv->chromaSize;
 		if (nv12) {
-			_chromaSize = yuv->chromaSize;
 			_f->glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 		}
 		_chromaNV12 = nv12;
@@ -443,10 +453,10 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 				GL_ALPHA,
 				GL_ALPHA,
 				yuv->chromaSize,
-				_chromaSize,
+				_chromaSizeV,
 				yuv->v.stride,
 				yuv->v.data);
-			_chromaSize = yuv->chromaSize;
+			_chromaSizeV = yuv->chromaSize;
 			_f->glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 		}
 
