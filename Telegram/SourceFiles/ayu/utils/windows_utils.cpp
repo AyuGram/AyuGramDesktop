@@ -35,7 +35,18 @@ void processIcon(QString shortcut, QString iconPath) {
 
 			if (SUCCEEDED(pPersistFile->Load(shortcutPath.c_str(), STGM_READWRITE))) {
 				pShellLink->SetIconLocation(iconPath.toStdWString().c_str(), 0);
-				pPersistFile->Save(shortcutPath.c_str(), TRUE);
+				if (SUCCEEDED(pPersistFile->Save(shortcutPath.c_str(), TRUE))) {
+					// Notify the shell that only this shortcut changed so its
+					// icon is refreshed. Using SHCNE_UPDATEITEM (instead of the
+					// global SHCNE_ASSOCCHANGED) avoids flushing the entire
+					// system icon cache, which redrew every desktop icon on
+					// each launch (see AyuGram/AyuGramDesktop#392).
+					SHChangeNotify(
+						SHCNE_UPDATEITEM,
+						SHCNF_PATHW,
+						shortcutPath.c_str(),
+						nullptr);
+				}
 			}
 
 			pPersistFile->Release();
@@ -162,8 +173,6 @@ void reloadAppIconFromTaskBar() {
 	processNewPinned(iconPath);
 	processNewShortcuts(iconPath);
 	processLegacy(iconPath);
-
-	SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, NULL, NULL);
 }
 
 #endif
