@@ -79,6 +79,7 @@ private:
 
 	std::unique_ptr<QMenuBar> _menuBar;
 	QAction *_logout = nullptr;
+	QAction *_closeWindow = nullptr;
 	QAction *_undo = nullptr;
 	QAction *_redo = nullptr;
 	QAction *_cut = nullptr;
@@ -92,6 +93,7 @@ private:
 	QAction *_newChannel = nullptr;
 	QAction *_showTelegram = nullptr;
 	QAction *_fullScreen = nullptr;
+	QAction *_minimizeWindow = nullptr;
 	QAction *_emoji = nullptr;
 	QAction *_bold = nullptr;
 	QAction *_italic = nullptr;
@@ -171,6 +173,9 @@ void Manager::retranslate() {
 	if (_logout) {
 		_logout->setText(tr::lng_mac_menu_logout(tr::now));
 	}
+	if (_closeWindow) {
+		_closeWindow->setText(tr::lng_shortcuts_close(tr::now));
+	}
 	if (_delete) {
 		_delete->setText(tr::lng_mac_menu_delete(tr::now));
 	}
@@ -191,6 +196,9 @@ void Manager::retranslate() {
 	}
 	if (_fullScreen) {
 		_fullScreen->setText(tr::lng_mac_menu_fullscreen(tr::now));
+	}
+	if (_minimizeWindow) {
+		_minimizeWindow->setText(tr::lng_minimize_window(tr::now));
 	}
 	if (_emoji) {
 		_emoji->setText(tr::lng_mac_menu_emoji_and_symbols(
@@ -381,6 +389,19 @@ void Manager::buildAppleMenu(QMenu *main) {
 }
 
 void Manager::buildFileMenu(QMenu *file) {
+	const auto receiver = _menuBar.get();
+	_closeWindow = file->addAction(
+		u"Close Window"_q,
+		receiver,
+		[this] {
+			withActiveWindow([](not_null<Window::Controller*> window) {
+				window->close();
+			});
+		},
+		QKeySequence(Qt::ControlModifier | Qt::Key_W));
+	_closeWindow->setShortcutContext(Qt::WidgetShortcut);
+	file->addSeparator();
+
 	auto callback = [this] {
 		withActiveWindow([](not_null<Window::Controller*> window) {
 			window->showLogoutConfirmation();
@@ -589,6 +610,18 @@ void Manager::buildGhostModeMenu(QMenu *ghostMode) {
 
 void Manager::buildWindowMenu(QMenu *window) {
 	const auto receiver = _menuBar.get();
+	_minimizeWindow = window->addAction(
+		u"Minimize"_q,
+		receiver,
+		[this] {
+			withActiveWindow([](not_null<Window::Controller*> w) {
+				w->minimize();
+			});
+		},
+		QKeySequence(Qt::ControlModifier | Qt::Key_M));
+	_minimizeWindow->setShortcutContext(Qt::WidgetShortcut);
+	window->addSeparator();
+
 	_fullScreen = window->addAction(
 		u"Toggle Full Screen"_q,
 		receiver,
@@ -699,12 +732,13 @@ void Manager::destroy() {
 	_lifetime.destroy();
 	_menuBar.reset();
 	_languageBound = false;
-	_logout = _undo = _redo = _cut = _copy = _paste = _delete
+	_logout = _closeWindow = _undo = _redo = _cut = _copy = _paste = _delete
 		= _selectAll = _contacts = _addContact = _newGroup
 		= _newChannel = _showTelegram = _fullScreen = _emoji
 		= _bold = _italic = _underline
 		= _strikeOut = _blockquote = _monospace = _clearFormat
 		= nullptr;
+	_minimizeWindow = nullptr;
 	_ghostModeMenu = nullptr;
 	_ghostMode = _readOnInteract = _scheduleMessages = nullptr;
 	_pasteboard = nullptr;
