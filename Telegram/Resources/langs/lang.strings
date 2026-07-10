@@ -8390,9 +8390,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SttModelTitle" = "Model File";
 "ayu_SttDownloadModel" = "Download";
 "ayu_SttModelDownloaded" = "Downloaded";
-"ayu_SttTranscribeFailed" = "Failed to recognize speech. Make sure the model is downloaded and the file is accessible.";
 "ayu_SttModelAlreadyDownloaded" = "Model is already downloaded.";
 "ayu_SttDownloadFailed" = "Failed to download the model. Check your internet connection.";
 "ayu_SttDownloadComplete" = "Model downloaded successfully.";
-"ayu_SttModelNotDownloaded" = "Whisper model is not downloaded. Open Settings to download it.";
 "ayu_SttSectionDescription" = "Uses on-device speech recognition instead of Telegram Premium Voice-to-Text.";
+"ayu_SttModelNotDownloaded" = "Whisper model is not downloaded. Open Settings to download it.";

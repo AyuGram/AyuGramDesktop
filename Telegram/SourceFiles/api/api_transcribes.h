@@ -43,11 +43,6 @@ public:
 
 	void toggle(not_null<HistoryItem*> item);
 	[[nodiscard]] const Entry &entry(not_null<HistoryItem*> item) const;
-
-	// AyuGram: local STT injection
-	void setLocalLoading(not_null<HistoryItem*> item);
-	void injectLocalResult(not_null<HistoryItem*> item, const QString &text);
-
 	void toggleSummary(not_null<HistoryItem*> item);
 	[[nodiscard]] const SummaryEntry &summary(
 		not_null<const HistoryItem*> item) const;

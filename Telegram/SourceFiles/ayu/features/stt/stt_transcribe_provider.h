@@ -10,9 +10,13 @@
 #include <functional>
 #include <QtCore/QString>
 
-namespace Ayu::STT::Mac {
+class HistoryItem;
 
-void transcribeFile(const QString &filePath, const QString &language, std::function<void(QString)> callback);
-void requestSpeechPermission();
+namespace Ayu::STT {
 
-} // namespace Ayu::STT::Mac
+[[nodiscard]] bool ShouldTranscribeLocally(not_null<HistoryItem*> item);
+void RequestLocalTranscribe(
+	not_null<HistoryItem*> item,
+	const std::function<void(QString)>& done);
+
+} // namespace Ayu::STT

@@ -280,6 +280,8 @@ set(ayugram_files
         ayu/features/translator/implementations/base.h
         ayu/features/stt/stt_manager.cpp
         ayu/features/stt/stt_manager.h
+        ayu/features/stt/stt_transcribe_provider.cpp
+        ayu/features/stt/stt_transcribe_provider.h
 )
 
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
