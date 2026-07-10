@@ -7,6 +7,7 @@
 #include "ayu/ui/settings/settings_ayu.h"
 
 #include "lang_auto.h"
+#include "base/event_filter.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_userpic.h"
 #include "ayu/ui/settings/ayu_builder.h"
@@ -794,7 +795,7 @@ void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			: tr::ayu_SttDownloadModel(tr::now);
 	});
 
-	builder.addButton({
+	const auto downloadButton = builder.addButton({
 		.id = u"ayu/sttDownloadModel"_q,
 		.title = tr::ayu_SttModelTitle(),
 		.st = &st::settingsButtonNoIcon,
@@ -861,6 +862,39 @@ void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		},
 		.shown = rpl::combine(isEnabled(), isWhisper())
 			| rpl::map([](bool e, bool w) { return e && w; }),
+	});
+
+	// AyuGram: right-click the model row to delete the downloaded file.
+	const auto modelContextMenu = downloadButton->lifetime()
+		.make_state<base::unique_qptr<Ui::PopupMenu>>();
+	const auto showModelContextMenu = [=] {
+		if (downloadProgress->current() >= 0) {
+			return false;
+		}
+		const auto modelType = static_cast<int>(settings->whisperModelType());
+		if (!Ayu::STT::STTManager::modelExists(modelType)) {
+			return false;
+		}
+		*modelContextMenu = base::make_unique_q<Ui::PopupMenu>(
+			downloadButton,
+			st::popupMenuWithIcons);
+		modelContextMenu->get()->addAction(
+			tr::lng_selected_delete(tr::now),
+			[=] {
+				Ayu::STT::WhisperService::instance().freeContext();
+				QFile::remove(Ayu::STT::STTManager::modelPath(modelType));
+				*downloadProgress = 0;
+				*downloadProgress = -1;
+			},
+			&st::menuIconDelete);
+		modelContextMenu->get()->popup(QCursor::pos());
+		return true;
+	};
+	base::install_event_filter(downloadButton, [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu && showModelContextMenu()) {
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
 	});
 
 	const auto langOptions = std::vector<std::pair<QString, QString>>{
