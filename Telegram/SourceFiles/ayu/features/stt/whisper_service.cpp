@@ -8,6 +8,7 @@
 #include "ayu/features/stt/whisper_service.h"
 
 #include "base/debug_log.h"
+#include "core/application.h"
 #include "crl/crl_on_main.h"
 
 #include "whisper.h"
@@ -61,6 +62,40 @@ void WhisperService::freeContext() {
 		QObject::connect(thread, &QThread::finished, thread, &QThread::deleteLater);
 		thread->start();
 	}
+}
+
+bool WhisperService::isQuitPrevent() {
+	if (_freeInFlight) {
+		return true;
+	}
+
+	QMutexLocker lock(&_ctxMutex);
+	const auto ctx = _cachedCtx;
+	_cachedCtx = nullptr;
+	_cachedModelPath.clear();
+	lock.unlock();
+
+	if (!ctx) {
+		return false;
+	}
+
+	_idleTimer.cancel();
+	_freeInFlight = true;
+
+	// whisper_free releases Metal buffers off the main thread; block quit
+	// until it's done, otherwise ggml's static residency-set destructor
+	// aborts on a still-alive context.
+	const auto thread = QThread::create([ctx] { whisper_free(ctx); });
+	QObject::connect(thread, &QThread::finished, thread, [=] {
+		thread->deleteLater();
+		_freeInFlight = false;
+		if (Core::Quitting()) {
+			LOG(("WhisperService doesn't prevent quit any more."));
+			Core::App().quitPreventFinished();
+		}
+	});
+	thread->start();
+	return true;
 }
 
 std::vector<float> WhisperService::decodeAudioToPcm(const QString &filePath) {

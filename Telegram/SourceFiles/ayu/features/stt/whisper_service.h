@@ -29,6 +29,7 @@ public:
 	static std::vector<float> decodeAudioToPcm(const QString &filePath);
 	void scheduleFreeContext();
 	void freeContext();
+	bool isQuitPrevent();
 
 private:
 	WhisperService();
@@ -37,6 +38,7 @@ private:
 	whisper_context *_cachedCtx = nullptr; // guarded by _ctxMutex
 	QString _cachedModelPath; // guarded by _ctxMutex
 	base::Timer _idleTimer; // main thread only
+	bool _freeInFlight = false; // main thread only
 
 };
 

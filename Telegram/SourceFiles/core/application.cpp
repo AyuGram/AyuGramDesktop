@@ -104,6 +104,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_infra.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
+#if defined(HAVE_WHISPER)
+#include "ayu/features/stt/whisper_service.h"
+#endif
 
 
 namespace Core {
@@ -1804,6 +1807,11 @@ bool Application::readyToQuit() {
 	if (_calls->isQuitPrevent()) {
 		prevented = true;
 	}
+#if defined(HAVE_WHISPER)
+	if (Ayu::STT::WhisperService::instance().isQuitPrevent()) {
+		prevented = true;
+	}
+#endif
 	if (_domain->started()) {
 		for (const auto &[index, account] : _domain->accounts()) {
 			if (const auto session = account->maybeSession()) {
