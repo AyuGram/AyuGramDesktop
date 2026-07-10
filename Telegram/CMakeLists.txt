@@ -42,9 +42,9 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
     # dynamic backend loading via dlopen breaks static builds
     set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE BOOL "" FORCE)
-    # whisper.cpp pins cmake_minimum_required(VERSION 3.5), which CMake 4.0+
-    # rejects; this overrides it without patching the submodule.
-    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    # whisper.cpp pins cmake_minimum_required(VERSION 3.5); CMake 4.x
+    # removed <3.10 compatibility, so bump the override (4.3 needs >= 3.10).
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
     # ggml-cpu's CMake appends to ARCH_FLAGS/ARCH_DEFINITIONS without
     # initializing them; seed them here so the inherited scope is clean
     # (CMake functions read unset locals from the calling scope).
@@ -53,7 +53,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
     add_subdirectory(ThirdParty/whisper.cpp whisper_build)
     set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS OFF CACHE BOOL "" FORCE)
     # ggml-backend-reg.cpp uses std::filesystem (requires 10.15), but TDesktop targets 10.13
-    if (TARGET ggml)
+    if (APPLE AND TARGET ggml)
         set_target_properties(ggml PROPERTIES XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.15")
         target_compile_options(ggml PRIVATE -mmacosx-version-min=10.15)
     endif()
