@@ -706,7 +706,7 @@ void FieldHeader::paintEditOrReplyToMessage(Painter &p) {
 				.options = Images::Option::RoundSmall,
 				.outer = to.size(),
 			}));
-		if (_shownPreviewSpoiler) {
+		if (_shownPreviewSpoiler && !AyuSettings::getInstance().revealAllSpoilers()) {
 			if (overEdit > 0.) {
 				p.setOpacity(1. - overEdit);
 			}

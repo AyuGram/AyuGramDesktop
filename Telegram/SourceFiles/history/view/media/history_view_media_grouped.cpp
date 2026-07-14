@@ -316,6 +316,9 @@ QRect GroupedMedia::groupItemRect(int index) const {
 }
 
 Media *GroupedMedia::lookupSpoilerTagMedia() const {
+	if (AyuSettings::getInstance().revealAllSpoilers()) {
+		return nullptr;
+	}
 	if (_parts.empty()) {
 		return nullptr;
 	}

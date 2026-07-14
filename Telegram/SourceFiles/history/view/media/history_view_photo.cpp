@@ -328,7 +328,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 			Assert(rounding.has_value());
 			fillImageShadow(p, rthumb, *rounding, context);
 		}
-		const auto revealed = _spoiler
+		const auto revealed = (_spoiler && !AyuSettings::getInstance().revealAllSpoilers())
 			? _spoiler->revealAnimation.value(_spoiler->revealed ? 1. : 0.)
 			: 1.;
 		if (revealed < 1.) {
@@ -694,7 +694,7 @@ TextState Photo::textState(QPoint point, StateRequest request) const {
 
 	if (QRect(paintx, painty, paintw, painth).contains(point)) {
 		ensureDataMediaCreated();
-		result.link = (_spoiler && !_spoiler->revealed)
+		result.link = (_spoiler && !_spoiler->revealed && !AyuSettings::getInstance().revealAllSpoilers())
 			? ((_data->extendedMediaPreview() || _sensitiveSpoiler)
 				? spoilerTagLink()
 				: _spoiler->link)
@@ -773,7 +773,7 @@ void Photo::drawGrouped(
 	}
 	const auto radial = isRadialAnimation();
 
-	const auto revealed = _spoiler
+	const auto revealed = (_spoiler && !AyuSettings::getInstance().revealAllSpoilers())
 		? _spoiler->revealAnimation.value(_spoiler->revealed ? 1. : 0.)
 		: 1.;
 	if (revealed < 1.) {
@@ -869,7 +869,7 @@ TextState Photo::getStateGrouped(
 		return {};
 	}
 	ensureDataMediaCreated();
-	auto link = (_spoiler && !_spoiler->revealed)
+	auto link = (_spoiler && !_spoiler->revealed && !AyuSettings::getInstance().revealAllSpoilers())
 		? ((_data->extendedMediaPreview() || _sensitiveSpoiler)
 			? spoilerTagLink()
 			: _spoiler->link)

@@ -159,6 +159,14 @@ void BuildMarks(
 		.setter = &AyuSettings::setReplaceBottomInfoWithIcons,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/revealAllSpoilers"_q,
+		.title = tr::ayu_RevealAllSpoilers(),
+		.getter = &AyuSettings::revealAllSpoilers,
+		.setter = &AyuSettings::setRevealAllSpoilers,
+	});
+
+
 	builder.scope([&] {
 		builder.addButton({
 			.id = u"ayu/deletedMark"_q,
