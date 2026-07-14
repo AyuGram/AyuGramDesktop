@@ -865,6 +865,7 @@ void Notification::paintTitle(Painter &p) {
 		.pausedEmoji = On(PowerSaving::kEmojiChat),
 		.pausedSpoiler = On(PowerSaving::kChatSpoiler),
 		.elisionLines = 1,
+		.disableRevealAllSpoilers = true,
 	});
 }
 
@@ -879,6 +880,7 @@ void Notification::paintText(Painter &p) {
 		.pausedEmoji = On(PowerSaving::kEmojiChat),
 		.pausedSpoiler = On(PowerSaving::kChatSpoiler),
 		.elisionHeight = _textRect.height(),
+		.disableRevealAllSpoilers = true,
 	});
 }
 
