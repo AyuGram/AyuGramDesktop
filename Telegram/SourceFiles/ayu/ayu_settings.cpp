@@ -1056,6 +1056,14 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 	save();
 }
 
+void AyuSettings::setRevealAllSpoilers(bool val) {
+	if (_revealAllSpoilers.current() == val) return;
+	_revealAllSpoilers = val;
+	repaintApp();
+	save();
+}
+
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1150,6 +1158,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"revealAllSpoilers", s._revealAllSpoilers.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1252,6 +1261,9 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._revealAllSpoilers = (j.contains("revealAllSpoilers") && j["revealAllSpoilers"].is_boolean())
+		? j["revealAllSpoilers"].get<bool>()
+		: defaults._revealAllSpoilers.current();
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

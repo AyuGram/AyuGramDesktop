@@ -964,7 +964,7 @@ void Reply::paint(
 							.outer = to.size(),
 						});
 					p.drawPixmap(to.x(), to.y(), preview);
-					if (_spoiler) {
+					if (_spoiler && !AyuSettings::getInstance().revealAllSpoilers()) {
 						view->clearCustomEmojiRepaint();
 						Ui::FillSpoilerRect(
 							p,

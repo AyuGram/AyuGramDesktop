@@ -30,6 +30,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
+#include "ayu/ayu_settings.h"
+
 #include "apiwrap.h"
 #include "boxes/peer_list_controllers.h"
 #include "data/data_changes.h"
@@ -310,7 +312,7 @@ void ForwardPanel::paint(
 				.options = Images::Option::RoundSmall,
 				.outer = to.size(),
 			}));
-		if (_spoiler) {
+		if (_spoiler && !AyuSettings::getInstance().revealAllSpoilers()) {
 			Ui::FillSpoilerRect(p, to, Ui::DefaultImageSpoiler().frame(
 				_spoiler->index(now, pausedSpoiler)));
 		}

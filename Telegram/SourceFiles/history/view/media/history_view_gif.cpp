@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_document.h" // TTLVoiceStops
 #include "history/view/media/history_view_media_common.h"
 #include "history/view/media/history_view_media_spoiler.h"
+#include "ayu/ayu_settings.h"
 #include "window/window_session_controller.h"
 #include "core/application.h" // Application::showDocument.
 #include "core/core_settings.h"
@@ -494,7 +495,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			&& item->media()->ttlSeconds()
 			&& !inTTLViewer)
 		? 0
-		: (!isRound && _spoiler)
+		: (!isRound && _spoiler && !AyuSettings::getInstance().revealAllSpoilers())
 		? _spoiler->revealAnimation.value(_spoiler->revealed ? 1. : 0.)
 		: 1.;
 	const auto fullHiddenBySpoiler = (revealed == 0.);
@@ -1351,7 +1352,7 @@ TextState Gif::textState(QPoint point, StateRequest request) const {
 	}
 	if (QRect(usex + paintx, painty, usew, painth).contains(point)) {
 		ensureDataMediaCreated();
-		if (_spoiler && !_spoiler->revealed) {
+		if (_spoiler && !_spoiler->revealed && !AyuSettings::getInstance().revealAllSpoilers()) {
 			result.link = _sensitiveSpoiler
 				? spoilerTagLink()
 				: (isRound && _parent->data()->media()->ttlSeconds())
@@ -1554,7 +1555,7 @@ void Gif::drawGrouped(
 	const auto cornerDownload = !_smallGroupPart && downloadInCorner();
 	const auto canBePlayed = _dataMedia->canBePlayed();
 
-	const auto revealed = _spoiler
+	const auto revealed = (_spoiler && !AyuSettings::getInstance().revealAllSpoilers())
 		? _spoiler->revealAnimation.value(_spoiler->revealed ? 1. : 0.)
 		: 1.;
 	const auto fullHiddenBySpoiler = (revealed == 0.);
@@ -1771,7 +1772,7 @@ TextState Gif::getStateGrouped(
 	}
 	ensureDataMediaCreated();
 
-	auto link = (_spoiler && !_spoiler->revealed)
+	auto link = (_spoiler && !_spoiler->revealed && !AyuSettings::getInstance().revealAllSpoilers())
 		? (_sensitiveSpoiler ? spoilerTagLink() : _spoiler->link)
 		: currentVideoLink();
 	return TextState(_parent, std::move(link));

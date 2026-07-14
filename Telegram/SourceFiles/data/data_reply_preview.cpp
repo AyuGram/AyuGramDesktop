@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo_media.h"
 #include "ui/image/image.h"
 #include "styles/style_chat.h"
+#include "ayu/ayu_settings.h"
 
 namespace Data {
 
@@ -67,6 +68,9 @@ Image *ReplyPreview::image(
 		Data::FileOrigin origin,
 		not_null<PeerData*> context,
 		bool spoiler) {
+	if (AyuSettings::getInstance().revealAllSpoilers()) {
+		spoiler = false;
+	}
 	auto &image = spoiler ? _spoilered : _regular;
 	auto &checked = spoiler ? _checkedSpoilered : _checkedRegular;
 	if (checked) {
@@ -140,6 +144,9 @@ Image *ReplyPreview::image(
 }
 
 bool ReplyPreview::loaded(bool spoiler) const {
+	if (AyuSettings::getInstance().revealAllSpoilers()) {
+		spoiler = false;
+	}
 	return spoiler ? _checkedSpoilered : _checkedRegular;
 }
 

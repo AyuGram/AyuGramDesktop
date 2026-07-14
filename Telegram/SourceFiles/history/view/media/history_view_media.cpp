@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "ayu/ayu_settings.h"
 #include "styles/style_menu_icons.h" // mediaMenuIconStealth.
 
 namespace HistoryView {
@@ -341,6 +342,9 @@ void Media::fillImageSpoiler(
 		not_null<MediaSpoiler*> spoiler,
 		QRect rect,
 		const PaintContext &context) const {
+	if (AyuSettings::getInstance().revealAllSpoilers()) {
+		return;
+	}
 	if (!spoiler->animation) {
 		spoiler->animation = std::make_unique<Ui::SpoilerAnimation>([=] {
 			_parent->customEmojiRepaint();
