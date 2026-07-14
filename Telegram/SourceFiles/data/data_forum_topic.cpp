@@ -390,6 +390,10 @@ void ForumTopic::readTillEnd() {
 	_replies->readTill(_lastKnownServerMessageId);
 }
 
+void ForumTopic::readTillEndLocally() {
+	_replies->readTillLocally(_lastKnownServerMessageId);
+}
+
 void ForumTopic::applyTopic(const MTPDforumTopic &data) {
 	Expects(_rootId == data.vid().v);
 

@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
+#include "ayu/ghost_mode_peer_exceptions.h"
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
 #include "rpl/lifetime.h"
@@ -19,6 +20,8 @@
 namespace Main {
 class Session;
 }
+
+class PeerData;
 
 enum class PeerIdDisplay {
 	Hidden = 0,
@@ -87,6 +90,13 @@ public:
 	GhostModeAccountSettings();
 
 	[[nodiscard]] bool sendReadMessages() const { return _sendReadMessages.current(); }
+	[[nodiscard]] bool shouldSendReadMessages(
+		not_null<PeerData*> peer,
+		bool passthrough = false) const;
+	[[nodiscard]] bool shouldSendChatActivity(not_null<PeerData*> peer) const;
+	[[nodiscard]] bool isTrustedChatException(not_null<PeerData*> peer) const;
+	[[nodiscard]] auto trustedChatExceptions() const
+		-> const Ayu::GhostModePeerExceptions::Values &;
 	[[nodiscard]] bool sendReadStories() const { return _sendReadStories.current(); }
 	[[nodiscard]] bool sendOnlinePackets() const { return _sendOnlinePackets.current(); }
 	[[nodiscard]] bool sendUploadProgress() const { return _sendUploadProgress.current(); }
@@ -106,6 +116,8 @@ public:
 	[[nodiscard]] bool sendOfflinePacketAfterOnlineLocked() const { return _sendOfflinePacketAfterOnlineLocked.current(); }
 
 	void setSendReadMessages(bool val);
+	void setTrustedChatException(not_null<PeerData*> peer, bool enabled);
+	void setTrustedChatExceptions(Ayu::GhostModePeerExceptions::Values values);
 	void setSendReadStories(bool val);
 	void setSendOnlinePackets(bool val);
 	void setSendUploadProgress(bool val);
@@ -161,6 +173,7 @@ private:
 	friend class AyuSettings;
 
 	rpl::variable<bool> _sendReadMessages = true;
+	Ayu::GhostModePeerExceptions _trustedChatExceptions;
 	rpl::variable<bool> _sendReadStories = true;
 	rpl::variable<bool> _sendOnlinePackets = true;
 	rpl::variable<bool> _sendUploadProgress = true;

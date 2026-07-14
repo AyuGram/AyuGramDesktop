@@ -321,6 +321,7 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 				auto &src = AyuSettings::ghost(userId);
 				auto &dst = AyuSettings::ghost(0);
 				dst.setSendReadMessages(src.sendReadMessages());
+				dst.setTrustedChatExceptions(src.trustedChatExceptions());
 				dst.setSendReadStories(src.sendReadStories());
 				dst.setSendOnlinePackets(src.sendOnlinePackets());
 				dst.setSendUploadProgress(src.sendUploadProgress());

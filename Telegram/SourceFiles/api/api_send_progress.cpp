@@ -117,11 +117,9 @@ void SendProgressManager::send(const Key &key, int progress) {
 		return;
 	}
 
-	// AyuGram sendUploadProgress
 	const auto &ghost = AyuSettings::ghost(_session);
-	if (!ghost.sendUploadProgress())
-	{
-		DEBUG_LOG(("[AyuGram] Don't send upload progress"));
+	if (!ghost.shouldSendChatActivity(key.history->peer)) {
+		DEBUG_LOG(("[AyuGram] Don't send chat activity"));
 		return;
 	}
 

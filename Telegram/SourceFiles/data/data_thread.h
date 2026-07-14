@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/flags.h"
+#include "data/data_unsent_read_generation.h"
 #include "dialogs/dialogs_entry.h"
 #include "dialogs/ui/dialogs_message_view.h"
 #include "ui/text/text.h"
@@ -81,6 +82,8 @@ public:
 	[[nodiscard]] HistoryUnreadThings::ConstProxy unreadReactions() const;
 	[[nodiscard]] HistoryUnreadThings::Proxy unreadPollVotes();
 	[[nodiscard]] HistoryUnreadThings::ConstProxy unreadPollVotes() const;
+	[[nodiscard]] UnsentReadGeneration &unreadMentionsReadDebt();
+	[[nodiscard]] UnsentReadGeneration &unreadReactionsReadDebt();
 	virtual void hasUnreadMentionChanged(bool has) = 0;
 	virtual void hasUnreadReactionChanged(bool has) = 0;
 	virtual void hasUnreadPollVoteChanged(bool has) = 0;
@@ -142,6 +145,8 @@ private:
 	Ui::Text::String _cloudDraftTextCache = { st::dialogsTextWidthMin };
 	Dialogs::Ui::MessageView _lastItemDialogsView;
 	std::unique_ptr<HistoryUnreadThings::All> _unreadThings;
+	UnsentReadGeneration _unreadMentionsReadDebt;
+	UnsentReadGeneration _unreadReactionsReadDebt;
 	std::deque<ItemNotification> _notifications;
 
 	base::flags<Flag> _flags;

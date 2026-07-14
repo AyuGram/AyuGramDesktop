@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/timer.h"
+#include "data/data_unsent_read_generation.h"
+#include "data/data_unsent_read_till.h"
 
 class History;
 class HistoryItem;
@@ -59,6 +61,7 @@ public:
 	void clearAll();
 
 	void readInbox(not_null<History*> history);
+	void readInboxLocally(not_null<History*> history);
 	void readInboxTill(not_null<HistoryItem*> item);
 	void readInboxTill(not_null<History*> history, MsgId tillId);
 	void readInboxOnNewMessage(not_null<HistoryItem*> item);
@@ -71,7 +74,10 @@ public:
 		not_null<History*> history,
 		Fn<void()> callback = nullptr);
 	void dialogEntryApplied(not_null<History*> history);
-	void changeDialogUnreadMark(not_null<History*> history, bool unread);
+	void changeDialogUnreadMark(
+		not_null<History*> history,
+		bool unread,
+		Fn<void(bool)> finished = nullptr);
 	void changeSublistUnreadMark(
 		not_null<Data::SavedSublist*> sublist,
 		bool unread);
@@ -155,7 +161,9 @@ private:
 		base::flat_map<int, SentRequest> sent;
 		MsgId willReadTill = 0;
 		MsgId sentReadTill = 0;
+		UnsentReadTill<MsgId> readTillNotSent;
 		crl::time willReadWhen = 0;
+		UnsentReadGeneration unreadMarkNotSent;
 		bool sentReadDone = false;
 		bool postponedRequestEntry = false;
 	};
@@ -192,7 +200,14 @@ private:
 		}
 	}
 
-	void readInboxTill(not_null<History*> history, MsgId tillId, bool force);
+	void readInbox(not_null<History*> history, bool locally);
+	void readInboxTill(
+		not_null<History*> history,
+		MsgId tillId,
+		bool force,
+		bool locally);
+	void cancelPendingReadInbox(not_null<History*> history);
+	void scheduleReadRequests();
 	void sendReadRequests();
 	void sendReadRequest(not_null<History*> history, State &state);
 	[[nodiscard]] State *lookup(not_null<History*> history);

@@ -70,8 +70,10 @@ Fn<void()> badgeClickHandler(not_null<PeerData *> peer);
 
 bool isMessageHidden(not_null<HistoryItem*> item);
 
-void MarkAsReadChatList(not_null<Dialogs::MainList*> list);
-void MarkAsReadThread(not_null<Data::Thread*> thread);
+void MarkAsReadChatList(
+	not_null<Dialogs::MainList*> list,
+	bool locally = false);
+void MarkAsReadThread(not_null<Data::Thread*> thread, bool locally = false);
 
 void markReadAfterAction(not_null<History*> history);
 void readHistory(not_null<HistoryItem*> message);

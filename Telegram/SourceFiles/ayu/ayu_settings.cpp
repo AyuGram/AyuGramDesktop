@@ -12,6 +12,9 @@
 #include "ayu/ayu_worker.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
+#include "data/data_peer.h"
+#include "data/data_peer_id.h"
+#include "data/data_user.h"
 #include "features/filters/filters_cache_controller.h"
 #include "features/translator/ayu_translator.h"
 #include "main/main_domain.h"
@@ -20,8 +23,11 @@
 #include "rpl/combine.h"
 #include "window/window_controller.h"
 
-#include <fstream>
 #include <QApplication>
+
+#include <algorithm>
+#include <fstream>
+#include <vector>
 
 using json = nlohmann::json;
 
@@ -38,6 +44,39 @@ void repaintApp() {
 }
 
 rpl::lifetime lifetime; // idk reactivity dies when placed in `GhostModeAccountSettings` as field
+
+using TrustedChatExceptions = Ayu::GhostModePeerExceptions;
+
+[[nodiscard]] auto SerializedTrustedChatPeerId(PeerId peerId)
+		-> std::optional<TrustedChatExceptions::SerializedPeerId> {
+	const auto userId = peerToUser(peerId);
+	if (!peerId || !userId || peerFromUser(userId) != peerId) {
+		return std::nullopt;
+	}
+	return SerializePeerId(peerFromUser(userId));
+}
+
+[[nodiscard]] auto SerializedTrustedChatPeerId(not_null<PeerData*> peer)
+		-> std::optional<TrustedChatExceptions::SerializedPeerId> {
+	const auto user = peer->asUser();
+	if (!user || user->isSelf() || user->isBot()) {
+		return std::nullopt;
+	}
+	return SerializedTrustedChatPeerId(peer->id);
+}
+
+[[nodiscard]] auto ValidTrustedChatExceptions(
+		TrustedChatExceptions::Values values) {
+	auto result = TrustedChatExceptions::Values();
+	result.reserve(values.size());
+	for (const auto serialized : values) {
+		const auto peerId = DeserializePeerId(serialized);
+		if (const auto normalized = SerializedTrustedChatPeerId(peerId)) {
+			result.emplace(*normalized);
+		}
+	}
+	return result;
+}
 
 } // namespace
 
@@ -67,9 +106,55 @@ GhostModeAccountSettings::GhostModeAccountSettings() {
 	}, lifetime);
 }
 
+bool GhostModeAccountSettings::shouldSendReadMessages(
+		not_null<PeerData*> peer,
+		bool passthrough) const {
+	return _trustedChatExceptions.shouldSend(
+		sendReadMessages() || passthrough,
+		SerializedTrustedChatPeerId(peer));
+}
+
+bool GhostModeAccountSettings::shouldSendChatActivity(
+		not_null<PeerData*> peer) const {
+	return _trustedChatExceptions.shouldSend(
+		sendUploadProgress(),
+		SerializedTrustedChatPeerId(peer));
+}
+
+bool GhostModeAccountSettings::isTrustedChatException(
+		not_null<PeerData*> peer) const {
+	const auto serialized = SerializedTrustedChatPeerId(peer);
+	return serialized && _trustedChatExceptions.contains(*serialized);
+}
+
+auto GhostModeAccountSettings::trustedChatExceptions() const
+		-> const Ayu::GhostModePeerExceptions::Values & {
+	return _trustedChatExceptions.values();
+}
+
 void GhostModeAccountSettings::setSendReadMessages(bool val) {
 	if (_sendReadMessages.current() == val) return;
 	_sendReadMessages = val;
+	AyuSettings::save();
+}
+
+void GhostModeAccountSettings::setTrustedChatException(
+		not_null<PeerData*> peer,
+		bool enabled) {
+	const auto serialized = SerializedTrustedChatPeerId(peer);
+	if (!serialized || !_trustedChatExceptions.set(*serialized, enabled)) {
+		return;
+	}
+	AyuSettings::save();
+}
+
+void GhostModeAccountSettings::setTrustedChatExceptions(
+		Ayu::GhostModePeerExceptions::Values values) {
+	values = ValidTrustedChatExceptions(std::move(values));
+	if (_trustedChatExceptions.values() == values) {
+		return;
+	}
+	_trustedChatExceptions.replace(std::move(values));
 	AyuSettings::save();
 }
 
@@ -182,8 +267,15 @@ void GhostModeAccountSettings::setSendOfflinePacketAfterOnlineLocked(bool val) {
 }
 
 void to_json(nlohmann::json &j, const GhostModeAccountSettings &s) {
+	auto trustedChatExceptions = std::vector<
+		Ayu::GhostModePeerExceptions::SerializedPeerId>(
+			s._trustedChatExceptions.values().begin(),
+			s._trustedChatExceptions.values().end());
+	std::sort(trustedChatExceptions.begin(), trustedChatExceptions.end());
+
 	j = nlohmann::json{
 		{"sendReadMessages", s._sendReadMessages.current()},
+		{"trustedChatExceptions", std::move(trustedChatExceptions)},
 		{"sendReadStories", s._sendReadStories.current()},
 		{"sendOnlinePackets", s._sendOnlinePackets.current()},
 		{"sendUploadProgress", s._sendUploadProgress.current()},
@@ -202,6 +294,30 @@ void to_json(nlohmann::json &j, const GhostModeAccountSettings &s) {
 
 void from_json(const nlohmann::json &j, GhostModeAccountSettings &s) {
 	s._sendReadMessages = j.value("sendReadMessages", true);
+	auto trustedChatExceptions = TrustedChatExceptions::Values();
+	const auto currentExceptions = j.find("trustedChatExceptions");
+	const auto legacyExceptions = j.find("readReceiptExceptions");
+	const auto exceptions = (currentExceptions != j.end()
+			&& currentExceptions->is_array())
+		? currentExceptions
+		: legacyExceptions;
+	if (exceptions != j.end() && exceptions->is_array()) {
+		for (const auto &value : *exceptions) {
+			if (value.is_number_unsigned()) {
+				trustedChatExceptions.emplace(
+					value.get<TrustedChatExceptions::SerializedPeerId>());
+			} else if (value.is_number_integer()) {
+				const auto serialized = value.get<std::int64_t>();
+				if (serialized >= 0) {
+					trustedChatExceptions.emplace(
+						static_cast<
+							TrustedChatExceptions::SerializedPeerId>(serialized));
+				}
+			}
+		}
+	}
+	s._trustedChatExceptions.replace(
+		ValidTrustedChatExceptions(std::move(trustedChatExceptions)));
 	s._sendReadStories = j.value("sendReadStories", true);
 	s._sendOnlinePackets = j.value("sendOnlinePackets", true);
 	s._sendUploadProgress = j.value("sendUploadProgress", true);
