@@ -15,8 +15,8 @@ All commands (if not stated otherwise) will be launched from **x64 Native Tools 
 
 ## Install third party software
 
-* Download **Python 3.10** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
-* Download **Git** installer from [https://git-scm.com/download/win](https://git-scm.com/download/win) and install it.
+- Download **Python 3.10** installer from [https://www.python.org/downloads/](https://www.python.org/downloads/) and install it with adding to PATH.
+- Download **Git** installer from [https://git-scm.com/download/win](https://git-scm.com/download/win) and install it.
 
 ## Clone source code and prepare libraries
 
@@ -33,9 +33,9 @@ Go to ***BuildPath*\\tdesktop\\Telegram** and run
 
     configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
 
-* Open ***BuildPath*\\tdesktop\\out\\Telegram.slnx** in Visual Studio 2022
-* Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
-* The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
+- Open ***BuildPath*\\tdesktop\\out\\Telegram.slnx** in Visual Studio 2022
+- Select Telegram project and press Build > Build Telegram (Debug and Release configurations)
+- The result AyuGram.exe will be located in **D:\TBuild\tdesktop\out\Debug** (and **Release**)
 
 If you encounter issue like `error C1090: PDB API call failed, error code '12'` on Release build, apply the following patch in `tdesktop/cmake` folder (via pwsh or manually):
 
