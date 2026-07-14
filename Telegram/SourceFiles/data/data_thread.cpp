@@ -98,6 +98,14 @@ HistoryUnreadThings::ConstProxy Thread::unreadReactions() const {
 	};
 }
 
+UnsentReadGeneration &Thread::unreadMentionsReadDebt() {
+	return _unreadMentionsReadDebt;
+}
+
+UnsentReadGeneration &Thread::unreadReactionsReadDebt() {
+	return _unreadReactionsReadDebt;
+}
+
 HistoryUnreadThings::Proxy Thread::unreadPollVotes() {
 	return {
 		this,

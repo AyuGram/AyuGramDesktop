@@ -770,14 +770,8 @@ void MainMenu::setupMenu() {
 				{&st::ayuLReadMenuIcon}
 			)->setClickedCallback([=]() mutable
 			{
-				auto &ghost = AyuSettings::ghost(&controller->session());
-				const auto prev = ghost.sendReadMessages();
-				ghost.setSendReadMessages(false);
-
 				const auto chats = controller->session().data().chatsList();
-				MarkAsReadChatList(chats);
-
-				ghost.setSendReadMessages(prev);
+				::MarkAsReadChatList(chats, true);
 			});
 		}
 

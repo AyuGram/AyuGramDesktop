@@ -301,17 +301,23 @@ bool isMessageHidden(const not_null<HistoryItem*> item) {
 	return FiltersController::filtered(item);
 }
 
-void MarkAsReadChatList(not_null<Dialogs::MainList*> list) {
+void MarkAsReadChatList(
+		not_null<Dialogs::MainList*> list,
+		bool locally) {
 	auto mark = std::vector<not_null<History*>>();
 	for (const auto &row : list->indexed()->all()) {
 		if (const auto history = row->history()) {
 			mark.push_back(history);
 		}
 	}
-	ranges::for_each(mark, MarkAsReadThread);
+	for (const auto history : mark) {
+		MarkAsReadThread(history, locally);
+	}
 }
 
-void readMentions(base::weak_ptr<Data::Thread> weakThread) {
+void readMentions(
+		base::weak_ptr<Data::Thread> weakThread,
+		Data::UnsentReadGeneration::Generation generation) {
 	const auto thread = weakThread.get();
 	if (!thread) {
 		return;
@@ -330,14 +336,19 @@ void readMentions(base::weak_ptr<Data::Thread> weakThread) {
 			peer,
 			result);
 		if (offset > 0) {
-			readMentions(weakThread);
+			readMentions(weakThread, generation);
 		} else {
+			if (const auto current = weakThread.get()) {
+				current->unreadMentionsReadDebt().sent(generation);
+			}
 			peer->owner().history(peer)->clearUnreadMentionsFor(rootId);
 		}
 	}).send();
 }
 
-void readReactions(base::weak_ptr<Data::Thread> weakThread) {
+void readReactions(
+		base::weak_ptr<Data::Thread> weakThread,
+		Data::UnsentReadGeneration::Generation generation) {
 	const auto thread = weakThread.get();
 	if (!thread) {
 		return;
@@ -358,55 +369,99 @@ void readReactions(base::weak_ptr<Data::Thread> weakThread) {
 			peer,
 			result);
 		if (offset > 0) {
-			readReactions(weakThread);
+			readReactions(weakThread, generation);
 		} else {
+			if (const auto current = weakThread.get()) {
+				current->unreadReactionsReadDebt().sent(generation);
+			}
 			peer->owner().history(peer)->clearUnreadReactionsFor(rootId, sublist);
 		}
 	}).send();
 }
 
-void MarkAsReadThread(not_null<Data::Thread*> thread) {
-	const auto readHistoryNative = [&](const not_null<History*> history)
+void MarkAsReadThread(not_null<Data::Thread*> thread, bool locally) {
+	const auto readHistoryNative = [=](const not_null<History*> history)
 	{
-		history->owner().histories().readInbox(history);
+		if (locally) {
+			history->owner().histories().readInboxLocally(history);
+		} else {
+			history->owner().histories().readInbox(history);
+		}
 	};
 	const auto sendReadMentions = [=](
 		const not_null<Data::Thread*> threadInner)
 	{
-		readMentions(base::make_weak(threadInner));
+		readMentions(
+			base::make_weak(threadInner),
+			threadInner->unreadMentionsReadDebt().generation());
 	};
 	const auto sendReadReactions = [=](
 		const not_null<Data::Thread*> threadInner)
 	{
-		readReactions(base::make_weak(threadInner));
+		readReactions(
+			base::make_weak(threadInner),
+			threadInner->unreadReactionsReadDebt().generation());
+	};
+	const auto clearReadMentions = [](
+		const not_null<Data::Thread*> threadInner)
+	{
+		threadInner->unreadMentionsReadDebt().add();
+		const auto peer = threadInner->peer();
+		const auto topic = threadInner->asTopic();
+		peer->owner().history(peer)->clearUnreadMentionsFor(
+			topic ? topic->rootId() : MsgId());
+	};
+	const auto clearReadReactions = [](
+		const not_null<Data::Thread*> threadInner)
+	{
+		threadInner->unreadReactionsReadDebt().add();
+		const auto peer = threadInner->peer();
+		const auto topic = threadInner->asTopic();
+		peer->owner().history(peer)->clearUnreadReactionsFor(
+			topic ? topic->rootId() : MsgId(),
+			threadInner->asSublist());
 	};
 
-	if (thread->chatListBadgesState().unread) {
-		if (const auto forum = thread->asForum()) {
-			forum->enumerateTopics([](
-				not_null<Data::ForumTopic*> topic)
-				{
-					MarkAsReadThread(topic);
-				});
-		} else if (const auto topic = thread->asTopic()) {
+	if (const auto forum = thread->asForum()) {
+		forum->enumerateTopics([=](
+			not_null<Data::ForumTopic*> topic)
+			{
+				MarkAsReadThread(topic, locally);
+			});
+	} else if (const auto topic = thread->asTopic()) {
+		if (locally) {
+			topic->readTillEndLocally();
+		} else {
 			topic->readTillEnd();
-		} else if (const auto history = thread->asHistory()) {
-			readHistoryNative(history);
-			if (const auto migrated = history->migrateSibling()) {
-				readHistoryNative(migrated);
-			}
+		}
+	} else if (const auto history = thread->asHistory()) {
+		readHistoryNative(history);
+		if (const auto migrated = history->migrateSibling()) {
+			readHistoryNative(migrated);
 		}
 	}
 
-	if (thread->unreadMentions().has()) {
-		sendReadMentions(thread);
+	if (thread->unreadMentions().has()
+		|| thread->unreadMentionsReadDebt()) {
+		if (locally) {
+			clearReadMentions(thread);
+		} else {
+			sendReadMentions(thread);
+		}
 	}
 
-	if (thread->unreadReactions().has()) {
-		sendReadReactions(thread);
+	if (thread->unreadReactions().has()
+		|| thread->unreadReactionsReadDebt()) {
+		if (locally) {
+			clearReadReactions(thread);
+		} else {
+			sendReadReactions(thread);
+		}
 	}
 
-	AyuWorker::markAsOnline(&thread->session());
+	if (!locally) {
+		AyuWorker::markAsOnline(&thread->session());
+	}
 }
 
 void readHistory(not_null<HistoryItem*> message) {
@@ -437,18 +492,25 @@ void readHistory(not_null<HistoryItem*> message) {
 						 }).send();
 					 });
 
-	if (history->unreadMentions().has()) {
-		readMentions(history->asThread());
+	if (history->unreadMentions().has()
+		|| history->unreadMentionsReadDebt()) {
+		readMentions(
+			history->asThread(),
+			history->unreadMentionsReadDebt().generation());
 	}
 
-	if (history->unreadReactions().has()) {
-		readReactions(history->asThread());
+	if (history->unreadReactions().has()
+		|| history->unreadReactionsReadDebt()) {
+		readReactions(
+			history->asThread(),
+			history->unreadReactionsReadDebt().generation());
 	}
 }
 
 void markReadAfterAction(not_null<History*> history) {
 	const auto &ghost = AyuSettings::ghost(&history->session());
-	if (ghost.sendReadMessages() || !ghost.markReadAfterAction()) {
+	if (ghost.shouldSendReadMessages(history->peer)
+		|| !ghost.markReadAfterAction()) {
 		return;
 	}
 	if (const auto last = history->lastServerMessage()) {

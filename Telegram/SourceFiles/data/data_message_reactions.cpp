@@ -1522,7 +1522,9 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 		_owner->session().api().applyUpdates(result);
 
 		const auto &ghost = AyuSettings::ghost(&_owner->session());
-		if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && item) {
+		if (item
+			&& !ghost.shouldSendReadMessages(item->history()->peer)
+			&& ghost.markReadAfterAction()) {
 			readHistory(item);
 		}
 	}).fail([=](const MTP::Error &error) {

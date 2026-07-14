@@ -121,6 +121,7 @@ public:
 
 	void setRealRootId(MsgId realId);
 	void readTillEnd();
+	void readTillEndLocally();
 	void requestChatListMessage();
 
 	void applyTopic(const MTPDforumTopic &data);

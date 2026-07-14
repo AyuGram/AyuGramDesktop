@@ -7985,6 +7985,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CategoryCustomization" = "Customization";
 "ayu_GhostEssentialsHeader" = "Ghost essentials";
 "ayu_DontReadMessages" = "Don't Read Messages";
+"ayu_GhostAlwaysSendReadsAndActivity" = "Always Send Reads and Activity";
+"ayu_GhostUseDefaultsForTrustedChat" = "Use Ghost Mode Defaults";
 "ayu_DontReadStories" = "Don't Read Stories";
 "ayu_DontSendOnlinePackets" = "Don't Send Online";
 "ayu_DontSendUploadProgress" = "Don't Send Typing";

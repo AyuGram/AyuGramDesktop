@@ -210,6 +210,11 @@ Fn<void()> DeleteMyMessagesHandler(not_null<Window::SessionController*> controll
 	};
 }
 
+bool CanToggleGhostTrustedChatException(PeerData *peerData) {
+	const auto user = peerData ? peerData->asUser() : nullptr;
+	return user && !user->isSelf() && !user->isBot();
+}
+
 }
 
 bool needToShowItem(ContextMenuVisibility state) {
@@ -230,7 +235,9 @@ void AddAyuGramActions(PeerData *peerData,
 	const auto showFilters = settings.filtersEnabled()
 		&& (!user || user->isBot());
 	const auto saveDeletedMessages = settings.saveDeletedMessages();
-	if (!showFilters && !saveDeletedMessages) {
+	const auto showTrustedChatException = CanToggleGhostTrustedChatException(
+		peerData);
+	if (!showFilters && !saveDeletedMessages && !showTrustedChatException) {
 		return;
 	}
 
@@ -243,6 +250,12 @@ void AddAyuGramActions(PeerData *peerData,
 		.icon = &st::menuIconGroupReactions,
 		.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
 			const auto addAction = Ui::Menu::CreateAddActionCallback(menu);
+			if (showTrustedChatException) {
+				AddGhostTrustedChatExceptionAction(peerData, addAction);
+				if (showFilters || saveDeletedMessages) {
+					addAction({ .isSeparator = true });
+				}
+			}
 			if (showFilters) {
 				addAction(
 					tr::ayu_ViewFiltersMenuText(tr::now),
@@ -429,6 +442,29 @@ void AddShadowBanAction(PeerData *peerData,
 					 : tr::ayu_FiltersQuickShadowBan(tr::now)),
 		.handler = toggleShadowBan,
 		.icon = shadowBanned ? &st::menuIconShowInChat : &st::menuIconStealth,
+	});
+}
+
+void AddGhostTrustedChatExceptionAction(
+		PeerData *peerData,
+		const Window::PeerMenuCallback &addCallback) {
+	if (!CanToggleGhostTrustedChatException(peerData)) {
+		return;
+	}
+
+	const auto &ghost = AyuSettings::ghost(&peerData->session());
+	const auto trusted = ghost.isTrustedChatException(peerData);
+	addCallback({
+		.text = trusted
+			? tr::ayu_GhostUseDefaultsForTrustedChat(tr::now)
+			: tr::ayu_GhostAlwaysSendReadsAndActivity(tr::now),
+		.handler = [=] {
+			auto &current = AyuSettings::ghost(&peerData->session());
+			current.setTrustedChatException(
+				peerData,
+				!current.isTrustedChatException(peerData));
+		},
+		.icon = trusted ? &st::menuIconStealth : &st::menuIconMarkRead,
 	});
 }
 
@@ -863,7 +899,7 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 	}
 
 	const auto &ghost = AyuSettings::ghost(&item->history()->session());
-	if (ghost.sendReadMessages()) {
+	if (ghost.shouldSendReadMessages(item->history()->peer)) {
 		return;
 	}
 

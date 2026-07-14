@@ -1758,6 +1758,7 @@ void Filler::fillContextMenuActions() {
 		}
 	}
 	addClearHistory();
+	AyuUi::AddGhostTrustedChatExceptionAction(_peer, _addAction);
 	AyuUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
 	addDeleteChat();
 	addLeaveChat();
@@ -1809,6 +1810,7 @@ void Filler::fillProfileActions() {
 	addToggleTopicClosed();
 	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
 	AyuUi::AddShadowBanAction(_peer, _addAction);
+	AyuUi::AddGhostTrustedChatExceptionAction(_peer, _addAction);
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();

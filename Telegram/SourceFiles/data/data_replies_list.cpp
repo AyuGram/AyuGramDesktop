@@ -963,27 +963,50 @@ void RepliesList::requestUnreadCount() {
 }
 
 void RepliesList::readTill(not_null<HistoryItem*> item) {
-	readTill(item->id, item);
+	readTill(item->id, item, false);
 }
 
 void RepliesList::readTill(MsgId tillId) {
-	readTill(tillId, _history->owner().message(_history->peer->id, tillId));
+	readTill(
+		tillId,
+		_history->owner().message(_history->peer->id, tillId),
+		false);
+}
+
+void RepliesList::readTillLocally(MsgId tillId) {
+	readTill(
+		tillId,
+		_history->owner().message(_history->peer->id, tillId),
+		true);
 }
 
 void RepliesList::readTill(
 		MsgId tillId,
-		HistoryItem *tillIdItem) {
+		HistoryItem *tillIdItem,
+		bool locally) {
+	const auto hadPendingRequest = _readRequestTimer.isActive();
+	if (locally) {
+		_readRequestTimer.cancel();
+	}
 	if (!IsServerMsgId(tillId)) {
 		return;
 	}
 	const auto was = computeInboxReadTillFull();
-	const auto now = tillId;
+	if (locally && hadPendingRequest) {
+		_readTillNotSent.add(was);
+	}
+	const auto hadReadTillNotSent = static_cast<bool>(_readTillNotSent);
+	const auto requested = _readTillNotSent.with(tillId);
+	const auto now = hadReadTillNotSent ? std::max(was, requested) : requested;
 	if (now < was) {
 		return;
 	}
+	if (locally && now > was) {
+		_readTillNotSent.add(now);
+	}
 	const auto unreadCount = computeUnreadCountLocally(now);
 	const auto fast = (tillIdItem && tillIdItem->out()) || !unreadCount.has_value();
-	if (was < now || (fast && now == was)) {
+	if (hadReadTillNotSent || was < now || (fast && now == was)) {
 		setInboxReadTill(now, unreadCount);
 		const auto rootFullId = FullMsgId(_history->peer->id, _rootId);
 		if (const auto root = _history->owner().message(rootFullId)) {
@@ -991,10 +1014,14 @@ void RepliesList::readTill(
 				post->setCommentsInboxReadTill(now);
 			}
 		}
-		if (!_readRequestTimer.isActive()) {
-			_readRequestTimer.callOnce(fast ? 0 : kReadRequestTimeout);
-		} else if (fast && _readRequestTimer.remainingTime() > 0) {
-			_readRequestTimer.callOnce(0);
+		if (!locally) {
+			if (hadReadTillNotSent) {
+				_readRequestTimer.callOnce(0);
+			} else if (!_readRequestTimer.isActive()) {
+				_readRequestTimer.callOnce(fast ? 0 : kReadRequestTimeout);
+			} else if (fast && _readRequestTimer.remainingTime() > 0) {
+				_readRequestTimer.callOnce(0);
+			}
 		}
 	}
 	if (const auto topic = _history->peer->forumTopicFor(_rootId)) {
@@ -1009,18 +1036,24 @@ void RepliesList::sendReadTillRequest() {
 	const auto api = &_history->session().api();
 	api->request(base::take(_readRequestId)).cancel();
 
+	const auto readTill = computeInboxReadTillFull();
 	const auto &ghost = AyuSettings::ghost(&_history->session());
 	if (!ghost.sendReadMessages()) {
+		_readTillNotSent.add(readTill);
 		return;
 	}
 
 	_readRequestId = api->request(MTPmessages_ReadDiscussion(
 		_history->peer->input(),
 		MTP_int(_rootId),
-		MTP_int(computeInboxReadTillFull())
+		MTP_int(readTill)
 	)).done(crl::guard(this, [=] {
+		_readTillNotSent.sent(readTill);
 		_readRequestId = 0;
 		reloadUnreadCountIfNeeded();
+	})).fail(crl::guard(this, [=] {
+		_readTillNotSent.add(readTill);
+		_readRequestId = 0;
 	})).send();
 }
 

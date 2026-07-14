@@ -7,8 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/weak_ptr.h"
 #include "base/timer.h"
+#include "base/weak_ptr.h"
+#include "data/data_unsent_read_till.h"
 
 class History;
 
@@ -62,6 +63,7 @@ public:
 
 	void readTill(not_null<HistoryItem*> item);
 	void readTill(MsgId tillId);
+	void readTillLocally(MsgId tillId);
 
 	[[nodiscard]] bool canDeleteMyTopic() const;
 
@@ -98,7 +100,7 @@ private:
 
 	void changeUnreadCountByPost(MsgId id, int delta);
 	void setUnreadCount(std::optional<int> count);
-	void readTill(MsgId tillId, HistoryItem *tillIdItem);
+	void readTill(MsgId tillId, HistoryItem *tillIdItem, bool locally);
 	void checkReadTillEnd();
 	void sendReadTillRequest();
 	void reloadUnreadCountIfNeeded();
@@ -125,6 +127,7 @@ private:
 
 	base::Timer _readRequestTimer;
 	mtpRequestId _readRequestId = 0;
+	UnsentReadTill<MsgId> _readTillNotSent;
 
 	mtpRequestId _reloadUnreadCountRequestId = 0;
 
