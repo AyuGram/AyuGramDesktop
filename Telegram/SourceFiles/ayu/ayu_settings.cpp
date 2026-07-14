@@ -1251,7 +1251,10 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
-	s._revealAllSpoilers = j.value("revealAllSpoilers", defaults._revealAllSpoilers.current());
+	s._enableMediaHistory = j.value("enableMediaHistory", defaults._enableMediaHistory.current());
+	s._revealAllSpoilers = (j.contains("revealAllSpoilers") && j["revealAllSpoilers"].is_boolean())
+		? j["revealAllSpoilers"].get<bool>()
+		: defaults._revealAllSpoilers.current();
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
