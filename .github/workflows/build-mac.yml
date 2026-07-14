@@ -1,0 +1,45 @@
+name: Build AyuGram for macOS
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja pkg-config openssl@3 qt@6
+
+      - name: Configure CMake
+        run: |
+          mkdir build && cd build
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DTDESKTOP_API_ID=YOUR_API_ID \
+            -DTDESKTOP_API_HASH=YOUR_API_HASH \
+            ..
+
+      - name: Build Application
+        run: |
+          cd build
+          ninja
+
+      - name: Package App
+        run: |
+          cd build
+          macdeployqt AyuGram.app -dmg
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-macOS
+          path: build/AyuGram.dmg
