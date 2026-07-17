@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "chat_helpers/compose/compose_features.h"
 #include "chat_helpers/tabbed_selector.h"
+#include "ui/effects/animations.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/round_rect.h"
 #include "base/timer.h"
@@ -84,6 +85,7 @@ enum class EmojiListMode {
 	BackgroundEmoji,
 	PeerTitle,
 	MessageEffects,
+	CustomOnly,
 };
 
 [[nodiscard]] std::vector<EmojiStatusId> DocumentListToRecent(
@@ -103,6 +105,7 @@ struct EmojiListDescriptor {
 	ComposeFeatures features;
 	QWidget *mediaPreviewParent = nullptr;
 	QMargins mediaPreviewMargins;
+	bool mediaPreviewPanelStyle = true;
 };
 
 class EmojiListWidget final
@@ -147,6 +150,8 @@ public:
 
 	void provideRecent(const std::vector<EmojiStatusId> &customRecentList);
 
+	void setSearchRightReserved(int value);
+
 	void prepareExpanding();
 	void paintExpanding(
 		Painter &p,
@@ -170,6 +175,7 @@ protected:
 	void mousePressEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
 	void mouseMoveEvent(QMouseEvent *e) override;
+	void wheelEvent(QWheelEvent *e) override;
 	void paintEvent(QPaintEvent *e) override;
 	void leaveEventHook(QEvent *e) override;
 	void leaveToChildEvent(QEvent *e, QWidget *child) override;
@@ -252,11 +258,31 @@ private:
 			return !(*this == other);
 		}
 	};
+	struct OverSearchShortcut {
+		int index = 0;
+
+		inline bool operator==(OverSearchShortcut other) const {
+			return (index == other.index);
+		}
+		inline bool operator!=(OverSearchShortcut other) const {
+			return !(*this == other);
+		}
+	};
+	struct OverSearchBack {
+		inline bool operator==(OverSearchBack other) const {
+			return true;
+		}
+		inline bool operator!=(OverSearchBack other) const {
+			return !(*this == other);
+		}
+	};
 	using OverState = std::variant<
 		v::null_t,
 		OverEmoji,
 		OverSet,
-		OverButton>;
+		OverButton,
+		OverSearchShortcut,
+		OverSearchBack>;
 	struct ExpandingContext {
 		float64 progress = 0.;
 		int finalHeight = 0;
@@ -318,7 +344,25 @@ private:
 		const MTPmessages_FoundStickerSets &result);
 	void showSearchResults();
 	void fillCloudSearchResults();
-	void fillCloudSearchSets();
+	void refreshSearchShortcuts();
+	void fillLocalSearchShortcuts(const QString &query);
+	bool addSearchShortcut(not_null<Data::StickersSet*> set);
+	[[nodiscard]] std::vector<CustomOne> collectSearchSet(
+		not_null<Data::StickersSet*> set);
+	void fillSelectedSearchShortcut();
+	[[nodiscard]] bool searchShortcutsShown() const;
+	[[nodiscard]] bool searchShortcutSelected() const;
+	void startSearchSwapAnimation(Fn<void()> change, bool packToPack = false);
+	[[nodiscard]] int searchShortcutsHeight() const;
+	[[nodiscard]] int searchShortcutsTop() const;
+	[[nodiscard]] QRect searchBackRect() const;
+	[[nodiscard]] QRect searchShortcutRect(int index) const;
+	void refreshSearchShortcutsScroll(int newWidth);
+	void scrollSearchShortcutsTo(int value);
+	void paintSearchShortcuts(Painter &p, QRect clip);
+	void paintSearchShortcutIcon(Painter &p, const CustomSet &set, QRect rect);
+	void toggleSearchShortcut(int index);
+	void backToSearchResults();
 	[[nodiscard]] CustomSet &searchSetBySection(int section);
 	[[nodiscard]] const CustomSet &searchSetBySection(int section) const;
 	void ensureLoaded(int section);
@@ -334,6 +378,8 @@ private:
 		not_null<Ui::PopupMenu*> menu,
 		int section,
 		int index);
+	[[nodiscard]] base::unique_qptr<Ui::PopupMenu> fillSetContextMenu(
+		const CustomSet &set);
 
 	[[nodiscard]] EmojiPtr lookupOverEmoji(const OverEmoji *over) const;
 	[[nodiscard]] ResolvedCustom lookupCustomEmoji(
@@ -403,6 +449,7 @@ private:
 		QRect clip) const;
 	void paintEmptySearchResults(Painter &p);
 
+	void displaySet(not_null<DocumentData*> document);
 	void displaySet(uint64 setId);
 	void removeSet(uint64 setId);
 	void removeMegagroupSet(bool locally);
@@ -411,6 +458,8 @@ private:
 	[[nodiscard]] std::unique_ptr<Ui::RippleAnimation> createButtonRipple(
 		int section);
 	[[nodiscard]] QPoint buttonRippleTopLeft(int section) const;
+	[[nodiscard]] std::unique_ptr<Ui::RippleAnimation>
+	createSearchShortcutRipple(int index);
 	[[nodiscard]] PowerSaving::Flag powerSavingFlag() const;
 
 	void repaintCustom(uint64 setId);
@@ -432,7 +481,7 @@ private:
 		uint64 setId);
 
 	void showPreview();
-	void showPreviewFor(not_null<DocumentData*> document);
+	bool showPreviewFor(not_null<DocumentData*> document);
 	void ensureMediaPreview();
 
 	void applyNextSearchQuery();
@@ -443,6 +492,7 @@ private:
 	Mode _mode = Mode::Full;
 	QWidget *_mediaPreviewParent = nullptr;
 	QMargins _mediaPreviewMargins;
+	bool _mediaPreviewPanelStyle = true;
 	std::unique_ptr<Ui::TabbedSearch> _search;
 	MTP::Sender _api;
 	const int _staticCount = 0;
@@ -497,9 +547,22 @@ private:
 	std::map<QString, int> _searchCloudNextOffset;
 	std::map<QString, std::vector<uint64>> _searchSetsCache;
 	std::vector<CustomSet> _searchSets;
+	std::vector<CustomSet> _searchShortcutSets;
 	QString _searchRequestQuery;
 	QString _searchNextRequestQuery;
 	QString _searchEmoticon;
+	uint64 _searchSelectedSetId = 0;
+	int _searchShortcutsScroll = 0;
+	int _searchShortcutsScrollMax = 0;
+	int _searchShortcutsDragStart = 0;
+	QPoint _searchShortcutsMouseDown;
+	bool _searchShortcutsDragging = false;
+	Ui::Animations::Simple _searchSwapAnimation;
+	QPixmap _searchSwapBefore;
+	QPixmap _searchSwapAfter;
+	int _searchSwapTop = 0;
+	bool _searchSwapReverse = false;
+	bool _searchSwapPartial = false;
 	mtpRequestId _searchCloudRequestId = 0;
 	mtpRequestId _searchSetsRequestId = 0;
 	bool _searchLoading = false;
