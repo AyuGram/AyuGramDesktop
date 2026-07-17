@@ -53,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "dialogs/dialogs_widget.h"
 #include "history/history_widget.h"
+#include "history/history_drag_area.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/view/media/history_view_media.h"
 #include "history/view/history_view_chat_section.h"
@@ -75,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
 #include "core/application.h"
+#include "core/click_handler_types.h"
 #include "core/changelogs.h"
 #include "core/mime_type.h"
 #include "calls/calls_call.h"
@@ -440,6 +442,15 @@ MainWidget::MainWidget(
 	cSetOtherOnline(0);
 
 	session().data().stickers().notifySavedGifsUpdated();
+
+	const auto weak = base::make_weak(controller);
+	DragArea::SetupProxyDropArea(this, [=](const QString &localUrl) {
+		Core::App().openLocalUrl(
+			localUrl,
+			QVariant::fromValue(ClickHandlerContext{
+				.sessionWindow = weak,
+			}));
+	});
 }
 
 MainWidget::~MainWidget() {
@@ -800,7 +811,10 @@ void MainWidget::searchMessages(
 		return;
 	}
 	auto tags = Data::SearchTagsFromQuery(query);
+	const auto archiveWindow = (_controller->windowId().type
+		== Window::SeparateType::Archive);
 	if (_dialogs
+		&& (!archiveWindow || inChat.folder())
 		&& (!ForceComposeSearchOneColumn.value() || !isOneColumn())) {
 		auto state = Dialogs::SearchState{
 			.inChat = ((tags.empty() || inChat.sublist())
@@ -1136,7 +1150,15 @@ void MainWidget::exportTopBarHeightUpdated() {
 }
 
 SendMenu::Details MainWidget::sendMenuDetails() const {
-	return _history->sendMenuDetails();
+	return _mainSection
+		? _mainSection->sendMenuDetails()
+		: _history->sendMenuDetails();
+}
+
+bool MainWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	return _mainSection
+		? _mainSection->processChosenSticker(std::move(chosen))
+		: _history->processChosenSticker(std::move(chosen));
 }
 
 void MainWidget::dialogsCancelled() {
@@ -1338,6 +1360,8 @@ bool MainWidget::showHistoryInDifferentWindow(
 		return true;
 	} else if (windowId().hasChatsList()) {
 		return false;
+	} else if (params.preferCurrentWindow) {
+		return false;
 	}
 	const auto account = not_null(&session().account());
 	auto primary = Core::App().separateWindowFor(account);
@@ -1467,6 +1491,9 @@ void MainWidget::showHistory(
 			|| (params.animated == anim::type::instant)) {
 			return false;
 		}
+		if (params.slideFromBottom) {
+			return !_history->isHidden();
+		}
 		if (!peerId) {
 			if (isOneColumn()) {
 				return _dialogs && _dialogs->isHidden();
@@ -1540,7 +1567,9 @@ void MainWidget::showHistory(
 		if (!_showAnimation) {
 			if (!animationParams.oldContentCache.isNull()) {
 				_history->showAnimated(
-					back
+					params.slideFromBottom
+						? Window::SlideDirection::FromBottom
+						: back
 						? Window::SlideDirection::FromLeft
 						: Window::SlideDirection::FromRight,
 					animationParams);
@@ -1814,9 +1843,9 @@ void MainWidget::showNewSection(
 	auto saveInStack = (params.way == SectionShow::Way::Forward);
 	const auto thirdSectionTop = getThirdSectionTop();
 	const auto newThirdGeometry = QRect(
-		width() - st::columnMinimalWidthThird,
+		width() - _thirdColumnWidth,
 		thirdSectionTop,
-		st::columnMinimalWidthThird,
+		_thirdColumnWidth,
 		height() - thirdSectionTop);
 	auto newThirdSection = (isThreeColumn() && params.thirdColumn)
 		? memento->createWidget(
@@ -2808,6 +2837,7 @@ bool MainWidget::eventFilter(QObject *o, QEvent *e) {
 			const auto event = static_cast<QMouseEvent*>(e);
 			if (event->button() == Qt::BackButton) {
 				if (!Core::App().hideMediaView()
+					&& !_controller->window().closeLayerByBackButton()
 					&& (!_dialogs || !_dialogs->cancelSearchByMouseBack())) {
 					handleHistoryBack();
 				}
@@ -2835,6 +2865,9 @@ void MainWidget::handleAdaptiveLayoutUpdate() {
 }
 
 void MainWidget::handleHistoryBack() {
+	if (_mainSection && _mainSection->showBackInternal()) {
+		return;
+	}
 	const auto openedFolder = _controller->openedFolder().current();
 	const auto openedForum = _controller->shownForum().current();
 	const auto rootPeer = !_stack.empty()
@@ -2938,35 +2971,7 @@ void MainWidget::activate() {
 	if (_showAnimation) {
 		return;
 	}
-	const auto urls = base::take(cRefStartUrls());
-	const auto interprets = urls | ranges::views::filter([](const QUrl &url) {
-		return url.scheme() == u"interpret"_q;
-	}) | ranges::views::transform([](const QUrl &url) {
-		return url.path();
-	}) | ranges::to<QStringList>;
-	const auto paths = urls | ranges::views::filter(
-		&QUrl::isLocalFile
-	) | ranges::views::transform(
-		&QUrl::toLocalFile
-	) | ranges::to<QStringList>;
-	if (!interprets.isEmpty() || !paths.isEmpty()) {
-		if (!interprets.isEmpty()) {
-			for (const auto &interpret : interprets) {
-				const auto error = Support::InterpretSendPath(
-					_controller,
-					interpret);
-				if (!error.isEmpty()) {
-					_controller->show(Ui::MakeInformBox(error));
-				}
-			}
-		}
-		if (!paths.isEmpty()) {
-			const auto chosen = [=](not_null<Data::Thread*> thread) {
-				return sendPaths(thread, paths);
-			};
-			Window::ShowChooseRecipientBox(_controller, chosen);
-		}
-	} else if (_mainSection) {
+	if (_mainSection) {
 		_mainSection->setInnerFocus();
 	} else if (_hider) {
 		Assert(_dialogs != nullptr);
@@ -2980,6 +2985,25 @@ void MainWidget::activate() {
 		}
 	}
 	_controller->widget()->fixOrder();
+}
+
+void MainWidget::handleStartFiles(
+		QStringList interprets,
+		QStringList paths) {
+	for (const auto &interpret : interprets) {
+		const auto error = Support::InterpretSendPath(
+			_controller,
+			interpret);
+		if (!error.isEmpty()) {
+			_controller->show(Ui::MakeInformBox(error));
+		}
+	}
+	if (!paths.isEmpty()) {
+		const auto chosen = [=](not_null<Data::Thread*> thread) {
+			return sendPaths(thread, paths);
+		};
+		Window::ShowChooseRecipientBox(_controller, chosen);
+	}
 }
 
 bool MainWidget::animatingShow() const {

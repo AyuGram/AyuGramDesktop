@@ -62,6 +62,7 @@ int MinItemHeight(Type type, int width) {
 	case Type::Photo:
 	case Type::GIF:
 	case Type::Video:
+	case Type::PhotoVideo:
 	case Type::RoundFile: {
 		auto itemsLeft = st::infoMediaSkip;
 		auto itemsInRow = (width - itemsLeft)

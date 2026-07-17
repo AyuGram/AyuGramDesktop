@@ -726,6 +726,7 @@ bool isMessageSavable(const not_null<HistoryItem*> item) {
 
 void processMessageDelete(not_null<HistoryItem*> item) {
 	if (!isMessageSavable(item)) {
+		item->history()->owner().notifyItemsAboutToBeDestroyed({ item });
 		item->destroy();
 	} else {
 		item->setDeleted();
@@ -842,6 +843,10 @@ void searchPeerInner(const QString &peerId, Main::Session *session, const Userna
 					return QString();
 				},
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
 				{
 					return QString();
 				});
@@ -1359,6 +1364,10 @@ void getUserRegistrationDateInner(
 					return QString();
 				},
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
+				{
+					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
 				{
 					return QString();
 				});
