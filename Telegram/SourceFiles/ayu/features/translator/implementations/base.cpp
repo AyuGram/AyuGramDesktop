@@ -182,6 +182,7 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 			for (auto &timer : retryTimers) {
 				if (timer) {
 					timer->stop();
+					timer->deleteLater();
 				}
 			}
 		}
@@ -200,36 +201,43 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 	state->retryCount.resize(state->total, 0);
 	state->retryTimers.resize(state->total);
 
+	const auto weak = std::weak_ptr(state);
 	const auto maxConcurrent = getConcurrencyLimit();
 	const auto maxRetries = getMaxRetries();
 	const auto baseWaitTime = getBaseWaitTimeMs();
 
-	auto finishFail = [state]()
+	auto finishFail = [weak]()
 	{
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		state->finished = true;
 		state->cancelAll();
 		if (state->onFail) state->onFail();
 	};
 
-	auto finishSuccess = [state]()
+	auto finishSuccess = [weak]()
 	{
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		state->finished = true;
 		if (state->onSuccess) state->onSuccess(state->results);
 	};
 
-	state->tryTranslateIndex = [state, finishFail, finishSuccess, maxRetries, baseWaitTime](int i) mutable
+	state->tryTranslateIndex = [weak, finishFail, finishSuccess, maxRetries, baseWaitTime](int i) mutable
 	{
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
+
+		const auto attemptCompleted = std::make_shared<bool>(false);
 
 		MultiThreadArgs singleArgs;
 		singleArgs.parsedData.text = state->inputs[i];
 		singleArgs.parsedData.fromLang = state->from;
 		singleArgs.parsedData.toLang = state->to;
-		singleArgs.onSuccess = [state, i, finishSuccess](const TextWithEntities &translated) mutable
+		singleArgs.onSuccess = [state, attemptCompleted, i, finishSuccess](const TextWithEntities &translated) mutable
 		{
-			if (state->finished) return;
+			if (state->finished || *attemptCompleted) return;
+			*attemptCompleted = true;
 			state->results[i] = translated;
 			state->replies[i] = nullptr;
 			state->inProgress--;
@@ -241,9 +249,10 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 				state->pump();
 			}
 		};
-		singleArgs.onFail = [state, i, finishFail, maxRetries, baseWaitTime]() mutable
+		singleArgs.onFail = [state, attemptCompleted, i, finishFail, maxRetries, baseWaitTime]() mutable
 		{
-			if (state->finished) return;
+			if (state->finished || *attemptCompleted) return;
+			*attemptCompleted = true;
 
 			state->replies[i] = nullptr;
 			state->retryCount[i]++;
@@ -263,25 +272,28 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 							 &QTimer::timeout,
 							 [state, i, timer]() mutable
 							 {
-								 if (state->finished) return;
 								 timer->deleteLater();
 								 state->retryTimers[i] = nullptr;
+								 if (state->finished) return;
 								 state->tryTranslateIndex(i);
 							 });
 
 			timer->start(delayMs);
 		};
 
-		const auto r = state->self->startSingleTranslation(singleArgs);
-		state->replies[i] = r;
-		if (!r && !state->finished) {
+		const auto reply = state->self->startSingleTranslation(singleArgs);
+		if (!*attemptCompleted) {
+			state->replies[i] = reply;
+		}
+		if (!reply && !*attemptCompleted) {
 			singleArgs.onFail();
 		}
 	};
 
-	state->pump = [state, maxConcurrent]() mutable
+	state->pump = [weak, maxConcurrent]() mutable
 	{
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		while (!state->finished && state->inProgress < maxConcurrent && state->nextIndex < state->total) {
 			const int i = state->nextIndex++;
 			state->inProgress++;
