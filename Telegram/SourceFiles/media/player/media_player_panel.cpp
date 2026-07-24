@@ -133,6 +133,10 @@ void Panel::updateSize() {
 	_scroll->setVisible(scrollVisible);
 }
 
+style::color Panel::listBackground() const {
+	return st::menuBg;
+}
+
 void Panel::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 

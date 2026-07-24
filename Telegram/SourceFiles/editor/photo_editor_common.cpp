@@ -12,17 +12,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/userpic_view.h"
 
 namespace Editor {
-namespace {
 
-void ApplyShapeMask(
-		QImage &image,
-		EditorData::CropType type,
-		RoundedCornersLevel cornersLevel) {
+void ApplyShapeMask(QImage &image, const PhotoModifications &mods) {
+	if (mods.cropMode != EditorData::CropMode::Mask) {
+		return;
+	}
+	const auto type = mods.cropType;
 	if (type == EditorData::CropType::Rect) {
 		return;
 	}
 	const auto multiplier = (type == EditorData::CropType::RoundedRect)
-		? RoundedCornersMultiplier(cornersLevel)
+		? RoundedCornersMultiplier(mods.cornersLevel)
 		: Ui::ForumUserpicRadiusMultiplier();
 	if (type == EditorData::CropType::RoundedRect && multiplier <= 0.) {
 		return;
@@ -50,8 +50,6 @@ void ApplyShapeMask(
 	p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
 	p.drawImage(0, 0, mask);
 }
-
-} // namespace
 
 float64 RoundedCornersMultiplier(RoundedCornersLevel level) {
 	switch (level) {
@@ -83,7 +81,6 @@ QImage ImageModified(QImage image, const PhotoModifications &mods) {
 	auto cropped = mods.crop.isValid()
 		? image.copy(mods.crop)
 		: image;
-	ApplyShapeMask(cropped, mods.cropType, mods.cornersLevel);
 	QTransform transform;
 	if (mods.flipped) {
 		transform.scale(-1, 1);
@@ -95,11 +92,7 @@ QImage ImageModified(QImage image, const PhotoModifications &mods) {
 }
 
 bool PhotoModifications::empty() const {
-	return !angle
-		&& !flipped
-		&& !crop.isValid()
-		&& cropType == EditorData::CropType::Rect
-		&& !paint;
+	return !angle && !flipped && !crop.isValid() && !paint;
 }
 
 PhotoModifications::operator bool() const {

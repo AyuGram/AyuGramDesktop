@@ -164,8 +164,10 @@ void PlaybackControls::handleSeekFinished(float64 progress) {
 		crl::time(0),
 		_lastDurationMs);
 	_seekPositionMs = -1;
-	_delegate->playbackControlsSeekFinished(positionMs);
 	refreshTimeTexts();
+
+	// This may destroy PlaybackControls.
+	_delegate->playbackControlsSeekFinished(positionMs);
 }
 
 template <typename Callback>
@@ -229,6 +231,13 @@ void PlaybackControls::saveQuality(Media::VideoQuality quality) {
 }
 
 void PlaybackControls::updateSpeedToggleQuality() {
+	const auto qualities = _delegate->playbackControlsQualities();
+	if (_qualitiesList != qualities) {
+		_qualitiesList = qualities;
+		if (_speedController) {
+			_speedController->setQualities(qualities);
+		}
+	}
 	_speedToggle->setQuality(_delegate->playbackControlsCurrentQuality());
 }
 

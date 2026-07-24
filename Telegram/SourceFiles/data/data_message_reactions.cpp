@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "main/main_session.h"
+#include "main/main_session_settings.h"
 #include "main/main_app_config.h"
 #include "main/session/send_as_peers.h"
 #include "data/components/credits.h"
@@ -313,6 +314,19 @@ PossibleItemReactionsRef LookupPossibleReactions(
 				std::rotate(begin(result.recent), i, i + 1);
 			}
 		};
+		if (!limited) {
+			const auto &extra = session->settings().extraFavoriteReactions();
+			for (const auto &id : extra | ranges::views::reverse) {
+				if (id.custom()
+					&& result.customAllowed
+					&& !ranges::contains(result.recent, id, &Reaction::id)) {
+					if (const auto temp = reactions->lookupTemporary(id)) {
+						result.recent.insert(begin(result.recent), temp);
+					}
+				}
+				toFront(id);
+			}
+		}
 		toFront(reactions->favoriteId());
 		if (paidInFront) {
 			toFront(ReactionId::Paid());
@@ -2053,6 +2067,71 @@ void MessageReactions::remove(const ReactionId &id) {
 	auto &owner = history->owner();
 	owner.reactions().send(_item, false);
 	owner.notifyItemDataChange(_item);
+}
+
+bool MessageReactions::removeFromParticipant(
+		not_null<PeerData*> participant,
+		const ReactionId &knownReaction) {
+	auto changed = false;
+	auto participantFound = false;
+	const auto decrementReactionCount = [&](const ReactionId &id, int count) {
+		const auto i = ranges::find(_list, id, &MessageReaction::id);
+		if (i == end(_list)) {
+			return false;
+		}
+		if (i->count <= count) {
+			_list.erase(i);
+		} else {
+			i->count -= count;
+		}
+		return true;
+	};
+	for (auto i = begin(_recent); i != end(_recent);) {
+		auto &list = i->second;
+		const auto was = int(list.size());
+		list.erase(
+			ranges::remove(list, participant, &RecentReaction::peer),
+			end(list));
+		if (const auto removed = was - int(list.size())) {
+			changed = true;
+			participantFound = true;
+			decrementReactionCount(i->first, removed);
+		}
+		if (list.empty()) {
+			i = _recent.erase(i);
+		} else {
+			++i;
+		}
+	}
+	if (_paid) {
+		auto removedCount = 0;
+		auto removedEntries = 0;
+		_paid->top.erase(
+			ranges::remove_if(_paid->top, [&](const TopPaid &entry) {
+				if (entry.peer != participant.get()) {
+					return false;
+				}
+				removedCount += int(entry.count);
+				++removedEntries;
+				return true;
+			}),
+			end(_paid->top));
+		if (removedEntries) {
+			changed = true;
+			const auto paid = ReactionId::Paid();
+			participantFound = true;
+			decrementReactionCount(paid, removedCount);
+			if (_paid->top.empty() && !localPaidData()) {
+				_paid = nullptr;
+			}
+		}
+	}
+	if (!knownReaction.empty()
+		&& !participantFound
+		&& decrementReactionCount(knownReaction, 1)) {
+		changed = true;
+	}
+	return changed;
 }
 
 bool MessageReactions::checkIfChanged(
