@@ -30,7 +30,9 @@ public:
 
 	[[nodiscard]] rpl::producer<> deleteRequests() const override;
 	[[nodiscard]] rpl::producer<> editRequests() const override;
+	[[nodiscard]] rpl::producer<> renameRequests() const;
 	[[nodiscard]] rpl::producer<> modifyRequests() const override;
+	void setRenameEnabled(bool enabled);
 	virtual void setDisplayName(const QString &displayName);
 	virtual void setCaption(const TextWithTags &caption);
 
@@ -58,10 +60,16 @@ protected:
 private:
 	void paintEvent(QPaintEvent *e) override;
 	void resizeEvent(QResizeEvent *e) override;
+	void mousePressEvent(QMouseEvent *e) override;
+	void mouseMoveEvent(QMouseEvent *e) override;
+	void mouseReleaseEvent(QMouseEvent *e) override;
 
 	void updateTextWidthFor(Data &data);
 	void updateDataGeometry();
 	[[nodiscard]] QRect captionRect() const;
+	[[nodiscard]] QRect nameRect() const;
+	[[nodiscard]] bool isOverName(QPoint point) const;
+	void applyCursor(style::cursor cursor);
 
 	const style::ComposeControls &_st;
 	const AttachControls::Type _type;
@@ -71,6 +79,11 @@ private:
 
 	object_ptr<IconButton> _editMedia = { nullptr };
 	object_ptr<IconButton> _deleteMedia = { nullptr };
+	rpl::event_stream<> _renameRequests;
+
+	style::cursor _cursor = style::cur_default;
+	bool _namePressed = false;
+	bool _renameEnabled = false;
 
 };
 

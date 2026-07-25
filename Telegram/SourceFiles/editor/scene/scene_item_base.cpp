@@ -171,7 +171,7 @@ void ItemBase::hoverMoveEvent(QGraphicsSceneHoverEvent *event) {
 }
 
 void ItemBase::mousePressEvent(QGraphicsSceneMouseEvent *event) {
-	setZValue((*_lastZ)++);
+	raiseToTop();
 	if (event->button() == Qt::LeftButton) {
 		_handle = handleType(event->pos());
 	}
@@ -266,6 +266,10 @@ void ItemBase::actionDuplicate() {
 		setSelected(false);
 		s->addItem(newItem);
 	}
+}
+
+void ItemBase::raiseToTop() {
+	setZValue((*_lastZ)++);
 }
 
 void ItemBase::keyPressEvent(QKeyEvent *e) {

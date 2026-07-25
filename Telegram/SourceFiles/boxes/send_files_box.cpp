@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/vertical_list.h"
 #include "ui/ui_utility.h"
 #include "lottie/lottie_single_player.h"
+#include "data/components/ephemeral_messages.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
 #include "data/data_user.h"
@@ -125,9 +126,12 @@ void FileDialogCallback(
 	callback(std::move(*list));
 }
 
+} // namespace
+
 void RenameFileBox(
 		not_null<Ui::GenericBox*> box,
 		const QString &currentName,
+		bool allowExtensionEdit,
 		Fn<void(QString)> apply) {
 	box->setTitle(tr::lng_rename_file());
 	const auto field = box->addRow(object_ptr<Ui::InputField>(
@@ -135,19 +139,25 @@ void RenameFileBox(
 		st::settingsDeviceName,
 		rpl::single(QString()),
 		currentName));
-	const auto extension = [&] {
-		if (currentName.isEmpty()) {
-			return u".png"_q;
-		}
-		const auto dot = currentName.lastIndexOf('.');
-		return (dot >= 0) ? currentName.mid(dot) : QString();
-	}();
-	const auto nameWithoutExt = extension.isEmpty()
-		? currentName
-		: currentName.left(currentName.size() - extension.size());
-	const auto maxNameLength = kMaxDisplayNameLength - extension.size();
-	field->setMaxLength((maxNameLength > 0) ? maxNameLength : 0);
-	field->setText(nameWithoutExt);
+	QString extension;
+	if (allowExtensionEdit) {
+		field->setMaxLength(kMaxDisplayNameLength);
+		field->setText(currentName);
+	} else {
+		extension = [&] {
+			if (currentName.isEmpty()) {
+				return u".png"_q;
+			}
+			const auto dot = currentName.lastIndexOf('.');
+			return (dot >= 0) ? currentName.mid(dot) : QString();
+		}();
+		const auto nameWithoutExt = extension.isEmpty()
+			? currentName
+			: currentName.left(currentName.size() - extension.size());
+		const auto maxNameLength = kMaxDisplayNameLength - extension.size();
+		field->setMaxLength((maxNameLength > 0) ? maxNameLength : 0);
+		field->setText(nameWithoutExt);
+	}
 	field->selectAll();
 	box->setFocusCallback([=] {
 		field->setFocusFast();
@@ -158,12 +168,18 @@ void RenameFileBox(
 			field->showError();
 			return;
 		}
-		if ((newName.size() + extension.size()) > kMaxDisplayNameLength) {
+		if (allowExtensionEdit) {
+			if (newName.size() > kMaxDisplayNameLength) {
+				field->showError();
+				return;
+			}
+		} else if ((newName.size() + extension.size())
+			> kMaxDisplayNameLength) {
 			field->showError();
 			return;
 		}
 		const auto weak = base::make_weak(box);
-		apply(newName + extension);
+		apply(allowExtensionEdit ? newName : (newName + extension));
 		if (const auto strong = weak.get()) {
 			strong->closeBox();
 		}
@@ -177,6 +193,8 @@ void RenameFileBox(
 	});
 }
 
+namespace {
+
 void EditFileCaptionBox(
 		not_null<Ui::GenericBox*> box,
 		const style::ComposeControls &st,
@@ -184,6 +202,18 @@ void EditFileCaptionBox(
 		TextWithTags currentCaption,
 		Fn<bool(TextWithTags)> apply) {
 	box->setTitle(tr::lng_context_upload_edit_caption());
+	const auto window = Core::App().findWindow(box);
+	const auto controller = window ? window->sessionController() : nullptr;
+	const auto maxCaptionLength = [&] {
+		if (captionToPeer) {
+			return Data::PremiumLimits(
+				&captionToPeer->session()).captionLengthCurrent();
+		} else if (controller) {
+			return Data::PremiumLimits(
+				&controller->session()).captionLengthCurrent();
+		}
+		return kMaxMessageLength;
+	}();
 	const auto wrap = box->addRow(
 		object_ptr<Ui::RpWidget>(box),
 		st::boxRowPadding);
@@ -192,11 +222,10 @@ void EditFileCaptionBox(
 		st.files.caption,
 		Ui::InputField::Mode::MultiLine,
 		tr::lng_photo_caption());
-	field->setMaxLength(kMaxMessageLength);
+	field->setMaxLength(maxCaptionLength);
 	field->setSubmitSettings(Core::App().settings().sendSubmitWay());
 	Ui::ResizeFitChild(wrap, field);
-	if (const auto window = Core::App().findWindow(box)) {
-		const auto controller = window->sessionController();
+	if (window) {
 		const auto allow = [=](not_null<DocumentData*> emoji) {
 			return captionToPeer
 				&& Data::AllowEmojiWithoutPremium(captionToPeer, emoji);
@@ -428,11 +457,13 @@ SendFilesBox::Block::Block(
 			media->setCanShowHighQualityBadge(first.canUseHighQualityPhoto());
 			_preview.reset(media);
 		} else {
-			_preview.reset(Ui::CreateChild<Ui::SingleFilePreview>(
+			const auto single = Ui::CreateChild<Ui::SingleFilePreview>(
 				parent.get(),
 				st,
 				first,
-				captionContext));
+				captionContext);
+			single->setRenameEnabled(!SkipCaption(first, way));
+			_preview.reset(single);
 		}
 	}
 	_preview->show();
@@ -504,6 +535,19 @@ rpl::producer<int> SendFilesBox::Block::itemModifyRequest() const {
 	}
 }
 
+rpl::producer<int> SendFilesBox::Block::itemRenameRequest() const {
+	using namespace rpl::mappers;
+
+	const auto preview = _preview.get();
+	const auto from = _from;
+	if (_isAlbum || _isSingleMedia) {
+		return rpl::never<int>();
+	} else {
+		const auto single = static_cast<Ui::SingleFilePreview*>(preview);
+		return single->renameRequests() | rpl::map_to(from);
+	}
+}
+
 rpl::producer<> SendFilesBox::Block::orderUpdated() const {
 	if (_isAlbum) {
 		const auto album = static_cast<Ui::AlbumPreview*>(_preview.get());
@@ -518,6 +562,10 @@ void SendFilesBox::Block::setSendWay(Ui::SendFilesWay way) {
 			const auto media = static_cast<Ui::SingleMediaPreview*>(
 				_preview.get());
 			media->setSendWay(way);
+		} else {
+			const auto single = static_cast<Ui::SingleFilePreview*>(
+				_preview.get());
+			single->setRenameEnabled(!SkipCaption((*_items)[_from], way));
 		}
 		return;
 	}
@@ -706,6 +754,9 @@ void SendFilesBox::setReplyTo(FullReplyTo replyTo) {
 		if (_replyHeader) {
 			_replyHeader->hideAnimated();
 		}
+		if (_send) {
+			refreshButtons();
+		}
 	}, _replyHeader->lifetime());
 	_replyHeader->hideFinished(
 	) | rpl::on_next([=] {
@@ -716,6 +767,9 @@ void SendFilesBox::setReplyTo(FullReplyTo replyTo) {
 			updateControlsGeometry();
 		});
 	}, _replyHeader->lifetime());
+	if (_send) {
+		refreshButtons();
+	}
 }
 
 Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
@@ -729,10 +783,8 @@ Fn<SendMenu::Details()> SendFilesBox::prepareSendMenuDetails(
 			? SendMenu::SpoilerState::Enabled
 			: SendMenu::SpoilerState::Possible;
 		const auto way = _sendWay.current();
-		const auto canMoveCaption = _list.canMoveCaption(
-			way.groupFiles() && way.sendImagesAsPhotos(),
-			way.sendImagesAsPhotos()
-		) && HasSendText(_caption);
+		const auto canMoveCaption = canMoveCaptionInCurrentSendWay()
+			&& HasSendText(_caption);
 		result.caption = !canMoveCaption
 			? SendMenu::CaptionState::None
 			: _invertCaption
@@ -868,7 +920,7 @@ void SendFilesBox::setupDragArea() {
 
 	const auto droppedCallback = [=](bool compress) {
 		return [=](const QMimeData *data) {
-			addFiles(data);
+			addFiles(data, compress);
 			_show->activate();
 		};
 	};
@@ -971,7 +1023,11 @@ void SendFilesBox::refreshButtons() {
 		[=] { send({}); });
 	refreshMessagesCount();
 
-	const auto perMessage = _toPeer->starsPerMessageChecked();
+	const auto ephemeralReply = _show->session().ephemeralMessages()
+		.isEphemeralBotReply(_replyTo.messageId);
+	const auto perMessage = ephemeralReply
+		? 0
+		: _toPeer->starsPerMessageChecked();
 	if (perMessage > 0) {
 		_send->setText(PaidSendButtonText(_messagesCount.value(
 		) | rpl::map(rpl::mappers::_1 * perMessage)));
@@ -1014,6 +1070,23 @@ bool SendFilesBox::hasSpoilerMenu() const {
 bool SendFilesBox::hasSendLargePhotosOption() const {
 	return _list.hasSendLargePhotosOption(
 		_sendWay.current().sendImagesAsPhotos());
+}
+
+bool SendFilesBox::canMoveCaptionInCurrentSendWay() const {
+	const auto way = _sendWay.current();
+	if (!way.sendImagesAsPhotos() || !_list.canAddCaption(true)) {
+		return false;
+	}
+	const auto count = int(_list.files.size());
+	if (count < 1 || count > Ui::MaxAlbumItems()) {
+		return false;
+	}
+	const auto isPhotoOrVideo = [](const Ui::PreparedFile &file) {
+		return file.type == Ui::PreparedFile::Type::Photo
+			|| file.type == Ui::PreparedFile::Type::Video;
+	};
+	return (count == 1 || way.groupFiles())
+		&& ranges::all_of(_list.files, isPhotoOrVideo);
 }
 
 bool SendFilesBox::canChangePrice() const {
@@ -1521,6 +1594,32 @@ void SendFilesBox::pushBlock(int from, int till) {
 			entry.videoCover = nullptr;
 		});
 	};
+	const auto renameFile = [=](int fileIndex) {
+		if (fileIndex < 0 || fileIndex >= _list.files.size()) {
+			return;
+		}
+		const auto &file = _list.files[fileIndex];
+		const auto canEditFileData = !SkipCaption(
+			file,
+			_sendWay.current());
+		if (!canEditFileData) {
+			return;
+		}
+		const auto allowExtensionEdit = file.path.isEmpty();
+		_show->show(Box(
+			RenameFileBox,
+			file.displayName,
+			allowExtensionEdit,
+			[=](QString newName) {
+				const auto displayName = std::move(newName);
+				_list.files[fileIndex].displayName = displayName;
+				if (!setDisplayNameInSingleFilePreview(
+						fileIndex,
+						displayName)) {
+					refreshAllAfterChanges(from);
+				}
+			}));
+	};
 	const auto showContextMenu = [=](
 			int fileIndex,
 			QPoint globalPosition,
@@ -1555,17 +1654,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 			_sendWay.current());
 		if (canEditFileData) {
 			state->menu->addAction(tr::lng_rename_file(tr::now), [=] {
-				auto &file = _list.files[fileIndex];
-				_show->show(Box(RenameFileBox, file.displayName, [=](
-						QString newName) {
-					const auto displayName = std::move(newName);
-					_list.files[fileIndex].displayName = displayName;
-					if (!setDisplayNameInSingleFilePreview(
-							fileIndex,
-							displayName)) {
-						refreshAllAfterChanges(from);
-					}
-				}));
+				renameFile(fileIndex);
 			}, &st::menuIconEdit);
 			state->menu->addAction(
 				tr::lng_context_upload_edit_caption(tr::now),
@@ -1678,6 +1767,11 @@ void SendFilesBox::pushBlock(int from, int till) {
 	block.itemModifyRequest(
 	) | rpl::on_next([=](int index) {
 		openInPhotoEditor(index);
+	}, widget->lifetime());
+
+	block.itemRenameRequest(
+	) | rpl::on_next([=](int index) {
+		renameFile(index);
 	}, widget->lifetime());
 
 	block.orderUpdated() | rpl::on_next([=]{
@@ -1871,7 +1965,8 @@ void SendFilesBox::setupCaption() {
 	}
 	_caption->setSubmitSettings(
 		Core::App().settings().sendSubmitWay());
-	_caption->setMaxLength(kMaxMessageLength);
+	_caption->setMaxLength(
+		Data::PremiumLimits(&_show->session()).captionLengthCurrent());
 
 	_caption->heightChanges(
 	) | rpl::on_next([=] {
@@ -2083,7 +2178,9 @@ void SendFilesBox::captionResized() {
 	update();
 }
 
-bool SendFilesBox::addFiles(not_null<const QMimeData*> data) {
+bool SendFilesBox::addFiles(
+		not_null<const QMimeData*> data,
+		std::optional<bool> overrideSendImagesAsPhotos) {
 	const auto premium = _show->session().premium();
 	auto list = [&] {
 		const auto urls = Core::ReadMimeUrls(data);
@@ -2105,13 +2202,30 @@ bool SendFilesBox::addFiles(not_null<const QMimeData*> data) {
 		}
 		return result;
 	}();
+	if (overrideSendImagesAsPhotos.has_value()) {
+		list.overrideSendImagesAsPhotos = overrideSendImagesAsPhotos;
+	}
 	return addFiles(std::move(list));
+}
+
+void SendFilesBox::applySendImagesAsPhotosOverride(
+		const Ui::PreparedList &list) {
+	if (!list.overrideSendImagesAsPhotos.has_value()) {
+		return;
+	}
+	_list.overrideSendImagesAsPhotos = list.overrideSendImagesAsPhotos;
+	auto candidate = _sendWay.current();
+	candidate.setSendImagesAsPhotos(*list.overrideSendImagesAsPhotos);
+	if (checkWith(list, candidate, true)) {
+		_sendWay = candidate;
+	}
 }
 
 bool SendFilesBox::addFiles(Ui::PreparedList list) {
 	if (list.error != Ui::PreparedList::Error::None) {
 		return false;
 	}
+	applySendImagesAsPhotosOverride(list);
 	const auto count = int(_list.files.size());
 	_list.filesToProcess.insert(
 		_list.filesToProcess.end(),
@@ -2310,7 +2424,7 @@ void SendFilesBox::requestToTakeTextWithTags() {
 		return;
 	}
 	const auto text = _caption->getTextWithTags();
-	if (!_prefilledCaptionText.text.isEmpty() && text.text.isEmpty()) {
+	if (text.text.isEmpty()) {
 		return;
 	}
 	_textTaken = true;

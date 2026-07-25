@@ -59,6 +59,28 @@ QSizeF FlipSizeByRotation(const QSizeF &size, int angle) {
 		size.height());
 }
 
+bool AdjustCropToInner(QRectF &crop, const QRectF &inner) {
+	if (inner.isEmpty()) {
+		return false;
+	}
+	const auto was = crop;
+	crop.setWidth(std::min(crop.width(), inner.width()));
+	crop.setHeight(std::min(crop.height(), inner.height()));
+	if (crop.left() < inner.left()) {
+		crop.moveLeft(inner.left());
+	}
+	if (crop.top() < inner.top()) {
+		crop.moveTop(inner.top());
+	}
+	if (crop.right() > inner.right()) {
+		crop.moveRight(inner.right());
+	}
+	if (crop.bottom() > inner.bottom()) {
+		crop.moveBottom(inner.bottom());
+	}
+	return (crop != was);
+}
+
 } // namespace
 
 Crop::Crop(
@@ -135,22 +157,21 @@ void Crop::applyTransform(
 			-cropHolderRotated.x() + _offset.x(),
 			-cropHolderRotated.y() + _offset.y());
 
-	// Check boundaries.
+	auto adjusted = false;
 	const auto min = float64(st::photoEditorCropMinSize);
 	if ((cropPaint.width() < min) || (cropPaint.height() < min)) {
-		cropPaint.setWidth(std::max(min, cropPaint.width()));
-		cropPaint.setHeight(std::max(min, cropPaint.height()));
-
-		const auto p = cropPaint.center().toPoint();
-		setCropPaint(std::move(cropPaint));
-
-		computeDownState(p);
-		performMove(p);
-		clearDownState();
-
+		cropPaint.setWidth(std::max(
+			std::min(min, _innerRect.width()),
+			cropPaint.width()));
+		cropPaint.setHeight(std::max(
+			std::min(min, _innerRect.height()),
+			cropPaint.height()));
+		adjusted = true;
+	}
+	adjusted = AdjustCropToInner(cropPaint, _innerRect) || adjusted;
+	setCropPaint(std::move(cropPaint));
+	if (adjusted) {
 		convertCropPaintToOriginal();
-	} else {
-		setCropPaint(std::move(cropPaint));
 	}
 }
 
@@ -184,10 +205,6 @@ void Crop::paintFrame(QPainter &p) {
 	p.save();
 	p.setRenderHint(QPainter::Antialiasing, true);
 	p.fillPath(frameShape, st::photoCropPointFg);
-	if (_data.fixedCrop) {
-		p.restore();
-		return;
-	}
 	{
 		const auto cornerLength = std::min(
 			float64(st::photoEditorCropPointSize * 2),
@@ -266,6 +283,7 @@ void Crop::paintGrid(QPainter &p, float64 opacity) {
 }
 
 void Crop::setCropPaint(QRectF &&rect) {
+	AdjustCropToInner(rect, _innerRect);
 	_cropPaint = std::move(rect);
 
 	updateEdges();
@@ -297,10 +315,6 @@ void Crop::convertCropPaintToOriginal() {
 }
 
 void Crop::updateEdges() {
-	if (_data.fixedCrop) {
-		_edges.clear();
-		return;
-	}
 	const auto &s = _pointSize;
 	const auto &m = _edgePointMargins;
 	const auto &r = _cropPaint;
@@ -353,7 +367,7 @@ Qt::Edges Crop::mouseState(const QPoint &p) {
 }
 
 void Crop::mousePressEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	computeDownState(e->pos());
@@ -363,7 +377,7 @@ void Crop::mousePressEvent(QMouseEvent *e) {
 }
 
 void Crop::mouseReleaseEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
+	if (_data.fixedCrop && e->button() != Qt::LeftButton) {
 		return;
 	}
 	const auto hadEdge = bool(_down.edge);
@@ -466,8 +480,10 @@ void Crop::performCrop(const QPoint &pos) {
 		const auto minH = (_keepAspectRatio && cropRatio < 1.)
 			? (minSize / cropRatio)
 			: float64(minSize);
-		const auto xMin = xFactor * int(crop.width() - minW);
-		const auto yMin = yFactor * int(crop.height() - minH);
+		const auto xMin = xFactor * int(
+			crop.width() - std::min(minW, crop.width()));
+		const auto yMin = yFactor * int(
+			crop.height() - std::min(minH, crop.height()));
 
 		const auto x = std::clamp(
 			diff.x(),
@@ -495,9 +511,6 @@ void Crop::performMove(const QPoint &pos) {
 }
 
 void Crop::mouseMoveEvent(QMouseEvent *e) {
-	if (_data.fixedCrop) {
-		return;
-	}
 	const auto pos = e->pos();
 	const auto pressedEdge = _down.edge;
 
@@ -508,6 +521,10 @@ void Crop::mouseMoveEvent(QMouseEvent *e) {
 			performCrop(pos);
 		}
 		update();
+	}
+
+	if (_data.fixedCrop && (e->buttons() & Qt::MiddleButton)) {
+		return;
 	}
 
 	const auto edge = pressedEdge ? pressedEdge : mouseState(pos);
@@ -551,19 +568,7 @@ void Crop::setAspectRatio(float64 ratio) {
 			newW,
 			newH);
 
-		if (adjusted.left() < _innerRect.left()) {
-			adjusted.moveLeft(_innerRect.left());
-		}
-		if (adjusted.top() < _innerRect.top()) {
-			adjusted.moveTop(_innerRect.top());
-		}
-		if (adjusted.right() > _innerRect.right()) {
-			adjusted.moveRight(_innerRect.right());
-		}
-		if (adjusted.bottom() > _innerRect.bottom()) {
-			adjusted.moveBottom(_innerRect.bottom());
-		}
-
+		AdjustCropToInner(adjusted, _innerRect);
 		setCropPaint(std::move(adjusted));
 		convertCropPaintToOriginal();
 	} else {

@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
 #include "data/business/data_shortcut_messages.h"
+#include "data/components/recent_inline_bots.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_message_reaction_id.h"
 #include "data/data_premium_limits.h"
@@ -57,6 +58,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/painter.h"
+#include "ui/screen_reader_mode.h"
 #include "window/themes/window_theme.h"
 #include "window/section_widget.h"
 #include "window/window_peer_menu.h"
@@ -93,6 +95,7 @@ public:
 
 	[[nodiscard]] rpl::producer<QString> title() override;
 	[[nodiscard]] rpl::producer<> sectionShowBack() override;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen) override;
 	void setInnerFocus() override;
 
 	rpl::producer<Info::SelectedItems> selectedListValue() override;
@@ -646,6 +649,7 @@ void ShortcutMessages::setupComposeControls() {
 	});
 	_composeControls->setHistory({
 		.history = _history.get(),
+		.sendActionFactory = [=] { return prepareSendAction({}); },
 		.writeRestriction = std::move(writeRestriction),
 	});
 
@@ -905,7 +909,8 @@ void ShortcutMessages::listSelectionChanged(SelectedItems &&items) {
 	}) | ranges::to_vector;
 	_selectedItems = std::move(value);
 
-	if (items.empty()) {
+	if (items.empty()
+		&& !(_inner->hasFocus() && Ui::ScreenReaderModeActive())) {
 		doSetInnerFocus();
 	}
 }
@@ -1228,19 +1233,20 @@ void ShortcutMessages::edit(
 	const auto hasMediaWithCaption = item
 		&& item->media()
 		&& item->media()->allowsEditCaption();
-	const auto maxCaptionSize = !hasMediaWithCaption
-		? MaxMessageSize
-		: Data::PremiumLimits(_session).captionLengthCurrent();
-	if (!TextUtilities::CutPart(sending, left, maxCaptionSize)
+	const auto limits = Data::PremiumLimits(_session);
+	const auto maxTextSize = hasMediaWithCaption
+		? limits.captionLengthCurrent()
+		: limits.messageLengthCurrent();
+	if (!TextUtilities::CutPart(sending, left, maxTextSize)
 		&& !hasMediaWithCaption) {
 		if (item) {
-			_controller->show(Box<DeleteMessagesBox>(item, false));
+			_controller->show(Box<DeleteMessagesBox>(item));
 		} else {
 			doSetInnerFocus();
 		}
 		return;
 	} else if (!left.text.isEmpty()) {
-		const auto remove = originalLeftSize - maxCaptionSize;
+		const auto remove = originalLeftSize - maxTextSize;
 		_controller->showToast(
 			tr::lng_edit_limit_reached(tr::now, lt_count, remove));
 		return;
@@ -1448,6 +1454,14 @@ void ShortcutMessages::finishSending() {
 	showAtEnd();
 }
 
+bool ShortcutMessages::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	if (!_composeControls) {
+		return false;
+	}
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
+}
+
 void ShortcutMessages::showAtEnd() {
 	showAtPosition(Data::MaxMessagePosition);
 }
@@ -1530,17 +1544,7 @@ void ShortcutMessages::sendInlineResult(
 	//_saveDraftStart = crl::now();
 	//onDraftSave();
 
-	auto &bots = cRefRecentInlineBots();
-	const auto index = bots.indexOf(bot);
-	if (index) {
-		if (index > 0) {
-			bots.removeAt(index);
-		} else if (bots.size() >= RecentInlineBotsLimit) {
-			bots.resize(RecentInlineBotsLimit - 1);
-		}
-		bots.push_front(bot);
-		bot->session().local().writeRecentHashtagsAndBots();
-	}
+	bot->session().recentInlineBots().bump(bot);
 	finishSending();
 }
 

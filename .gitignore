@@ -3,6 +3,7 @@ Debug/
 Release/
 /ThirdParty/
 /Telegram/build/target
+/Telegram/build/ai-machine-tag
 /Telegram/tests/
 /Telegram/gyp/tests/*.test
 /Telegram/out/
@@ -53,6 +54,7 @@ stage
 *.*~
 .idea/
 cmake-build-debug/
+*.qsb
 
 # Local configuration files
 settings.local.json
