@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_compare.h"
 #include "base/timer.h"
 #include "chat_helpers/compose/compose_features.h"
+#include "data/data_peer_id.h"
 #include "ui/widgets/fields/input_field.h"
 
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
