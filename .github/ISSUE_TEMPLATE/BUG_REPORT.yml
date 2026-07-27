@@ -1,4 +1,4 @@
-name: Bug report
+name: 🐞 Bug report
 description: Report errors or unexpected behavior.
 labels: [bug]
 body:
@@ -32,9 +32,9 @@ body:
   - type: input
     attributes:
       label: Operating system
-      description: >
-        Your operating system name, version and desktop environment.
-        **Don't use kernel version (uname), it's useless.**
+      description: |
+        Write exact OS (e.g. Windows 11, macOS 14, Ubuntu 24.04 GNOME).
+        * 🛑 NO KERNEL VERSIONS (uname)
     validations:
       required: true
   - type: input
@@ -66,7 +66,8 @@ body:
     attributes:
       label: Logs
       description: >
-        You can find log.txt using the `viewlogs`
-        [cheat code](https://github.com/telegramdesktop/tdesktop/wiki/Cheat-Codes).
-      placeholder: Insert log.txt here (if necessary)
+        Type the word `viewlogs`
+        [directly into your settings menu](https://github.com/telegramdesktop/tdesktop/wiki/Cheat-Codes)
+        to open the logs folder.
+      placeholder: Insert log.txt here
       render: shell

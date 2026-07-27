@@ -152,8 +152,6 @@ private:
 	mutable int _nameVersion = 0;
 	uint8 _hiddenSenderColorIndexPlusOne : 7 = 0;
 	uint8 _hasQuoteIcon : 1 = 0;
-	uint8 _replyToStory : 1 = 0;
-	uint8 _replyToPoll : 1 = 0;
 	uint8 _expanded : 1 = 0;
 	mutable uint8 _expandable : 1 = 0;
 	mutable uint8 _minHeightExpandable : 1 = 0;

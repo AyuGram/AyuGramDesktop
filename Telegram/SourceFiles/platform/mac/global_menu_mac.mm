@@ -20,9 +20,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
+#include "base/invoke_queued.h"
 
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMenu>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QTextEdit>
 #include <QtGui/QAction>
@@ -37,6 +39,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Platform {
 namespace {
+
+struct ComputedState {
+	bool logoutDisabled = false;
+	bool undoDisabled = false;
+	bool redoDisabled = false;
+	bool cutDisabled = false;
+	bool copyDisabled = false;
+	bool pasteDisabled = false;
+	bool deleteDisabled = false;
+	bool selectAllDisabled = false;
+	bool contactsDisabled = false;
+	bool addContactDisabled = false;
+	bool newGroupDisabled = false;
+	bool newChannelDisabled = false;
+	bool showTelegramDisabled = false;
+	Ui::MarkdownEnabledState markdown;
+
+	friend inline bool operator==(
+		const ComputedState &,
+		const ComputedState &) = default;
+};
 
 class Manager final {
 public:
@@ -78,6 +101,11 @@ private:
 	}
 
 	std::unique_ptr<QMenuBar> _menuBar;
+	// Coalesces requestUpdate() bursts into one recomputeState() per Qt
+	// event-loop turn. Posted events drain on every CFRunLoop
+	// BeforeWaiting before the next NSEvent dispatches, so menu state
+	// is fresh by the time Cmd+C reaches AppKit's performKeyEquivalent.
+	std::unique_ptr<SingleQueuedInvokation> _scheduledUpdate;
 	QAction *_logout = nullptr;
 	QAction *_undo = nullptr;
 	QAction *_redo = nullptr;
@@ -110,7 +138,8 @@ private:
 	int _pasteboardChangeCount = -1;
 	bool _pasteboardHasText = false;
 
-	rpl::event_stream<> _updateRequests;
+	std::optional<ComputedState> _lastState;
+
 	rpl::event_stream<Ui::MarkdownEnabledState> _markdownChanges;
 	rpl::lifetime _lifetime;
 	bool _languageBound = false;
@@ -123,6 +152,7 @@ void SendKeySequence(
 	const auto focused = QApplication::focusWidget();
 	if (qobject_cast<QLineEdit*>(focused)
 		|| qobject_cast<QTextEdit*>(focused)
+		|| qobject_cast<QLabel*>(focused)
 		|| dynamic_cast<HistoryInner*>(focused)) {
 		QApplication::postEvent(
 			focused,
@@ -287,31 +317,61 @@ void Manager::recomputeState() {
 				markdownState = inputField->markdownEnabledState();
 			}
 		}
+	} else if (const auto label = qobject_cast<QLabel*>(focused)) {
+		const auto flags = label->textInteractionFlags();
+		const auto selectable = flags
+			& (Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+		if (selectable) {
+			canCopy = label->hasSelectedText();
+			canSelectAll = !label->text().isEmpty();
+		}
 	} else if (const auto list = dynamic_cast<HistoryInner*>(focused)) {
 		canCopy = list->canCopySelected();
 		canDelete = list->canDeleteSelected();
 	}
-
-	_markdownChanges.fire_copy(markdownState);
 
 	widget->updateIsActive();
 	const auto controller = window->sessionController();
 	const auto logged = (controller != nullptr);
 	const auto inactive = !logged || window->locked();
 	const auto support = logged && controller->session().supportMode();
-	ForceDisabled(_logout, !logged && !Core::App().passcodeLocked());
-	ForceDisabled(_undo, !canUndo);
-	ForceDisabled(_redo, !canRedo);
-	ForceDisabled(_cut, !canCut);
-	ForceDisabled(_copy, !canCopy);
-	ForceDisabled(_paste, !canPaste);
-	ForceDisabled(_delete, !canDelete);
-	ForceDisabled(_selectAll, !canSelectAll);
-	ForceDisabled(_contacts, inactive || support);
-	ForceDisabled(_addContact, inactive);
-	ForceDisabled(_newGroup, inactive || support);
-	ForceDisabled(_newChannel, inactive || support);
-	ForceDisabled(_showTelegram, widget->isActive());
+
+	auto next = ComputedState{
+		.logoutDisabled = !logged && !Core::App().passcodeLocked(),
+		.undoDisabled = !canUndo,
+		.redoDisabled = !canRedo,
+		.cutDisabled = !canCut,
+		.copyDisabled = !canCopy,
+		.pasteDisabled = !canPaste,
+		.deleteDisabled = !canDelete,
+		.selectAllDisabled = !canSelectAll,
+		.contactsDisabled = inactive || support,
+		.addContactDisabled = inactive,
+		.newGroupDisabled = inactive || support,
+		.newChannelDisabled = inactive || support,
+		.showTelegramDisabled = widget->isActive(),
+		.markdown = markdownState,
+	};
+	if (_lastState && *_lastState == next) {
+		return;
+	}
+	_lastState = next;
+
+	_markdownChanges.fire_copy(markdownState);
+
+	ForceDisabled(_logout, next.logoutDisabled);
+	ForceDisabled(_undo, next.undoDisabled);
+	ForceDisabled(_redo, next.redoDisabled);
+	ForceDisabled(_cut, next.cutDisabled);
+	ForceDisabled(_copy, next.copyDisabled);
+	ForceDisabled(_paste, next.pasteDisabled);
+	ForceDisabled(_delete, next.deleteDisabled);
+	ForceDisabled(_selectAll, next.selectAllDisabled);
+	ForceDisabled(_contacts, next.contactsDisabled);
+	ForceDisabled(_addContact, next.addContactDisabled);
+	ForceDisabled(_newGroup, next.newGroupDisabled);
+	ForceDisabled(_newChannel, next.newChannelDisabled);
+	ForceDisabled(_showTelegram, next.showTelegramDisabled);
 
 	const auto disabled = [&](const QString &tag) {
 		return !markdownState.enabledForTag(tag);
@@ -417,27 +477,18 @@ void Manager::buildEditMenu(QMenu *edit) {
 		[] { SendKeySequence(Qt::Key_X, Qt::ControlModifier); },
 		QKeySequence::Cut);
 	_cut->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_cut->setMenuRole(QAction::CutRole);
-#endif // Qt >= 6.8.0
 	_copy = edit->addAction(
 		u"Copy"_q,
 		receiver,
 		[] { SendKeySequence(Qt::Key_C, Qt::ControlModifier); },
 		QKeySequence::Copy);
 	_copy->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_copy->setMenuRole(QAction::CopyRole);
-#endif // Qt >= 6.8.0
 	_paste = edit->addAction(
 		u"Paste"_q,
 		receiver,
 		[] { SendKeySequence(Qt::Key_V, Qt::ControlModifier); },
 		QKeySequence::Paste);
 	_paste->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_paste->setMenuRole(QAction::PasteRole);
-#endif // Qt >= 6.8.0
 	_delete = edit->addAction(
 		u"Delete"_q,
 		receiver,
@@ -512,9 +563,6 @@ void Manager::buildEditMenu(QMenu *edit) {
 		[] { SendKeySequence(Qt::Key_A, Qt::ControlModifier); },
 		QKeySequence::SelectAll);
 	_selectAll->setShortcutContext(Qt::WidgetShortcut);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-	_selectAll->setMenuRole(QAction::SelectAllRole);
-#endif // Qt >= 6.8.0
 
 	if (!Platform::IsMac26_0OrGreater()) {
 		edit->addSeparator();
@@ -689,13 +737,16 @@ void Manager::create() {
 
 	buildMenu();
 
-	_updateRequests.events() | rpl::on_next([this] {
-		ensureLanguageBound();
+	_scheduledUpdate = std::make_unique<SingleQueuedInvokation>([this] {
+		if (!_menuBar) {
+			return;
+		}
 		recomputeState();
-	}, _lifetime);
+	});
 }
 
 void Manager::destroy() {
+	_scheduledUpdate.reset();
 	_lifetime.destroy();
 	_menuBar.reset();
 	_languageBound = false;
@@ -710,13 +761,15 @@ void Manager::destroy() {
 	_pasteboard = nullptr;
 	_pasteboardChangeCount = -1;
 	_pasteboardHasText = false;
+	_lastState.reset();
 }
 
 void Manager::requestUpdate() {
 	if (!_menuBar) {
 		return;
 	}
-	_updateRequests.fire({});
+	ensureLanguageBound();
+	_scheduledUpdate->call();
 }
 
 auto Manager::markdownStateChanges() const

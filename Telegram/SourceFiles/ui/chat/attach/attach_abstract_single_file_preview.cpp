@@ -56,6 +56,7 @@ AbstractSingleFilePreview::AbstractSingleFilePreview(
 		_deleteMedia->hide();
 		_editMedia->hide();
 	}
+	setMouseTracking(true);
 }
 
 AbstractSingleFilePreview::~AbstractSingleFilePreview() = default;
@@ -66,12 +67,27 @@ rpl::producer<> AbstractSingleFilePreview::editRequests() const {
 	}) | rpl::flatten_latest();
 }
 
+rpl::producer<> AbstractSingleFilePreview::renameRequests() const {
+	return _renameRequests.events();
+}
+
 rpl::producer<> AbstractSingleFilePreview::deleteRequests() const {
 	return _deleteMedia->clicks() | rpl::to_empty;
 }
 
 rpl::producer<> AbstractSingleFilePreview::modifyRequests() const {
 	return rpl::never<>();
+}
+
+void AbstractSingleFilePreview::setRenameEnabled(bool enabled) {
+	if (_renameEnabled == enabled) {
+		return;
+	}
+	_renameEnabled = enabled;
+	if (!_renameEnabled) {
+		_namePressed = false;
+		applyCursor(style::cur_default);
+	}
 }
 
 void AbstractSingleFilePreview::setDisplayName(const QString &displayName) {
@@ -277,6 +293,55 @@ void AbstractSingleFilePreview::setData(Data data) {
 	_data = std::move(data);
 	updateTextWidthFor(_data);
 	updateDataGeometry();
+}
+
+void AbstractSingleFilePreview::mousePressEvent(QMouseEvent *e) {
+	if (isOverName(e->pos())) {
+		_namePressed = true;
+	}
+}
+
+void AbstractSingleFilePreview::mouseMoveEvent(QMouseEvent *e) {
+	applyCursor(isOverName(e->pos())
+		? style::cur_pointer
+		: style::cur_default);
+}
+
+void AbstractSingleFilePreview::mouseReleaseEvent(QMouseEvent *e) {
+	if (base::take(_namePressed)
+		&& (e->button() == Qt::LeftButton)
+		&& isOverName(e->pos())) {
+		_renameRequests.fire({});
+	}
+}
+
+QRect AbstractSingleFilePreview::nameRect() const {
+	const auto w = width()
+		- st::boxPhotoPadding.left()
+		- st::boxPhotoPadding.right();
+	const auto &st = !isThumbedLayout(_data)
+		? st::attachPreviewLayout
+		: st::attachPreviewThumbLayout;
+	const auto nameleft = st.thumbSize + st.thumbSkip;
+	const auto nametop = st.nameTop;
+	const auto x = (width() - w) / 2, y = 0;
+	return style::rtlrect(
+		x + nameleft,
+		y + nametop,
+		_data.nameWidth,
+		st::semiboldFont->height,
+		width());
+}
+
+bool AbstractSingleFilePreview::isOverName(QPoint point) const {
+	return _renameEnabled && nameRect().contains(point);
+}
+
+void AbstractSingleFilePreview::applyCursor(style::cursor cursor) {
+	if (_cursor != cursor) {
+		_cursor = cursor;
+		setCursor(_cursor);
+	}
 }
 
 } // namespace Ui

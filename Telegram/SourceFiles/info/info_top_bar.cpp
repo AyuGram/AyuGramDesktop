@@ -245,6 +245,7 @@ void TopBar::createSearchView(
 	});
 
 	_searchField = field;
+	field->customUpDown(true);
 	auto fieldWrap = Ui::CreateChild<Ui::FadeWrap<Ui::InputField>>(
 		wrap,
 		object_ptr<Ui::InputField>::fromRaw(field),
@@ -397,10 +398,17 @@ void TopBar::updateDefaultControlsGeometry(int newWidth) {
 		const auto y = _subtitle
 			? _st.titleWithSubtitlePosition.y()
 			: _st.titlePosition.y();
+		const auto available = std::max(newWidth - right - x, 0);
+		_title->entity()->resizeToWidth(available);
 		_title->moveToLeft(x, y, newWidth);
 		if (_subtitle) {
+			const auto subtitleX = _back
+				? _st.back.width
+				: _st.subtitlePosition.x();
+			_subtitle->entity()->resizeToWidth(
+				std::max(newWidth - right - subtitleX, 0));
 			_subtitle->moveToLeft(
-				_back ? _st.back.width : _st.subtitlePosition.x(),
+				subtitleX,
 				_st.subtitlePosition.y(),
 				newWidth);
 		}
