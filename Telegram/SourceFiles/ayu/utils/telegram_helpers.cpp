@@ -1365,6 +1365,10 @@ void getUserRegistrationDateInner(
 				[&](const MTPDbotInlineMessageMediaWebPage &data)
 				{
 					return QString();
+				},
+				[&](const MTPDbotInlineMessageRichMessage &data)
+				{
+					return QString();
 				});
 
 			if (text.isEmpty() || text == "failed") {
