@@ -4100,7 +4100,7 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		- ((_scheduled && !_scheduled->isHidden())
 			? _scheduled->width()
 			: 0)
-		- ((_ttlInfo && !_ttlInfo->isHidden()) ? _ttlInfo->width() : 0)
+		- ((_ttlInfo && _ttlInfo->isVisible()) ? _ttlInfo->width() : 0)
 		- (_starsReaction
 			? (_st.starsSkip + _starsReaction->width())
 			: 0);

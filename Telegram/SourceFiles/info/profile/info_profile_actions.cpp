@@ -2028,7 +2028,7 @@ Section DetailsFiller::makeInfo() {
 				return Ui::Text::Code(text.text);
 			});
 			auto idInfo = addInfoOneLine(
-				rpl::single(QString("ID")),
+				QString("ID"),
 				std::move(idDrawableText),
 				tr::ayu_ContextCopyID(tr::now)
 			);
