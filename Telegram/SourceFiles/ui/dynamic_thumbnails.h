@@ -54,6 +54,9 @@ class DynamicImage;
 [[nodiscard]] std::shared_ptr<DynamicImage> MakeDocumentThumbnail(
 	not_null<DocumentData*> document,
 	Data::FileOrigin origin);
+[[nodiscard]] std::shared_ptr<DynamicImage> MakeDocumentThumbnailFit(
+	not_null<DocumentData*> document,
+	Data::FileOrigin origin);
 [[nodiscard]] std::shared_ptr<DynamicImage> MakeDocumentThumbnailCenterCrop(
 	not_null<DocumentData*> document,
 	FullMsgId fullId);

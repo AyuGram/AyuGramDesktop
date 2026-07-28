@@ -186,6 +186,7 @@ void WebpageResolver::request(const QString &link, bool force) {
 void WebpageResolver::cancel(const QString &link) {
 	if (_requestLink == link) {
 		_api.request(base::take(_requestId)).cancel();
+		_requestLink = QString();
 	}
 }
 

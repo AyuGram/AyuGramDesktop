@@ -48,9 +48,10 @@ public:
 	void updateZoom(float64 zoom);
 
 	void cancelDrawing();
+	void cancelTextEditing();
 
 	void startTextEditing(ItemText *item);
-	void createTextAtCenter();
+	void createTextAtCenter(int rotation);
 	void setTextColor(const QColor &color);
 	void setSelectedTextColor(const QColor &color);
 
@@ -75,8 +76,8 @@ protected:
 	void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 private:
 	void removeIf(Fn<bool(const ItemPtr &)> proj);
-	void finishTextEditing(bool save);
-	void setTextEditing(bool editing);
+	void finishTextEditing(bool save, bool notify = true);
+	void setTextEditing(bool editing, bool notify = true);
 	void setupTextProxy(
 		QGraphicsTextItem *proxy,
 		const QColor &color,
