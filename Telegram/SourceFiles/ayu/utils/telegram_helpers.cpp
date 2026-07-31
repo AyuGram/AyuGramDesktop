@@ -1527,7 +1527,7 @@ static TextWithEntities appendTextWithEntities(TextWithEntities first, const Tex
 }
 
 static TextWithEntities formatJoinDateText(not_null<UserData*> user, const QString &chatName, const QString &joinDateFormatted) {
-	const auto langId = Lang::GetInstance().id();
+	const auto langId = Lang::LanguageIdOrDefault(Lang::Id());
 	const auto isRu = langId.startsWith(u"ru"_q) || langId.startsWith(u"uk"_q) || langId.startsWith(u"be"_q);
 	TextWithEntities result;
 	if (user->isSelf()) {

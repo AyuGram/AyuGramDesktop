@@ -199,7 +199,7 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 		if (val.contains(qsl("%1$d")) && !val.contains(qsl("%2$d"))) {
 			val = val.replace(qsl("%1$d"), qsl("{count}"));
 		} else if (val.contains(qsl("%1$d")) && val.contains(qsl("%2$d"))) {
-			val = val.replace(qsl("%1$d"), qsl("{count1}")).replace(qsl("%2$d"), qsl("{count2}"));
+			val = val.replace(qsl("%1$d"), qsl("{item1}")).replace(qsl("%2$d"), qsl("{item2}"));
 		} else if (val.contains(qsl("%1$s")) && !val.contains(qsl("%2$s"))) {
 			val = val.replace(qsl("%1$s"), qsl("{item}"));
 		} else if (val.contains(qsl("%1$s")) && val.contains(qsl("%2$s"))) {
