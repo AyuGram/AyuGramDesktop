@@ -1484,7 +1484,7 @@ void AddRegistrationOrCreationButton(const not_null<Window::SessionController*> 
 
 				tooltip->toggleAnimated(true);
 			},
-			controller->activeChat().peer());
+			controller->activeChatCurrent().peer());
 		return false;
 	});
 }

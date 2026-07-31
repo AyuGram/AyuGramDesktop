@@ -4579,7 +4579,7 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 		|| error.type() == u"CHANNEL_PUBLIC_GROUP_NA"_q
 		|| error.type() == u"USER_BANNED_IN_CHANNEL"_q) {
 		auto was = _peer;
-		if (!cAyuSettings().keepForbiddenChats()) {
+		if (!AyuSettings::getInstance().keepForbiddenChats()) {
 			closeCurrent();
 		}
 		const auto wasAccount = not_null(&was->account());
