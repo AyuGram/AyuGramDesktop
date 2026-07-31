@@ -229,7 +229,7 @@ void ChannelData::setFlags(ChannelDataFlags which) {
 		}
 
 		if (wasIn && !amIn()) {
-			if (!cAyuSettings().keepForbiddenChats()) {
+			if (!AyuSettings::getInstance().keepForbiddenChats()) {
 				crl::on_main(&session(), [=] {
 					if (!amIn()) {
 						Core::App().closeChatFromWindows(this);

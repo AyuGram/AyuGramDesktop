@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h" // History::session
 #include "history/history_item.h" // HistoryItem::originalText
 #include "history/history_item_helpers.h" // DropDisallowedCustomEmoji
+#include "data/data_chat.h"
+#include "data/data_channel.h"
 #include "base/unixtime.h"
 #include "base/qthelp_regex.h"
 #include "base/qthelp_url.h"
