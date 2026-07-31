@@ -44,6 +44,7 @@ jobs:
 
       - name: Build Telegram Desktop
         run: |
+          rm -rf out/Debug/gen/lang_subsets out/Release/gen/lang_subsets out/Debug/Telegram/gen/lang_subsets out/Release/Telegram/gen/lang_subsets
           docker run --rm \
           -u $(id -u) \
           -v $PWD:/usr/src/tdesktop \
