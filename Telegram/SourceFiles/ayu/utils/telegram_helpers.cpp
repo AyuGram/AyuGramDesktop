@@ -1526,6 +1526,35 @@ static TextWithEntities appendTextWithEntities(TextWithEntities first, const Tex
 	return first;
 }
 
+static TextWithEntities formatJoinDateText(not_null<UserData*> user, const QString &chatName, const QString &joinDateFormatted) {
+	const auto langId = Lang::GetInstance().id();
+	const auto isRu = langId.startsWith(u"ru"_q) || langId.startsWith(u"uk"_q) || langId.startsWith(u"be"_q);
+	TextWithEntities result;
+	if (user->isSelf()) {
+		if (isRu) {
+			result.text = u"Вы вступили в "_q + chatName + u" "_q + joinDateFormatted + u"."_q;
+			result.entities.push_back(EntityInText(EntityType::Bold, 13, chatName.length()));
+		} else {
+			result.text = u"You joined "_q + chatName + u" on "_q + joinDateFormatted + u"."_q;
+			result.entities.push_back(EntityInText(EntityType::Bold, 11, chatName.length()));
+		}
+	} else {
+		const auto userName = user->name();
+		if (isRu) {
+			result.text = userName + u" вступил(а) в "_q + chatName + u" "_q + joinDateFormatted + u"."_q;
+			result.entities.push_back(EntityInText(EntityType::Bold, 0, userName.length()));
+			const auto chatOffset = userName.length() + QString(u" вступил(а) в "_q).length();
+			result.entities.push_back(EntityInText(EntityType::Bold, chatOffset, chatName.length()));
+		} else {
+			result.text = userName + u" joined "_q + chatName + u" on "_q + joinDateFormatted + u"."_q;
+			result.entities.push_back(EntityInText(EntityType::Bold, 0, userName.length()));
+			const auto chatOffset = userName.length() + QString(u" joined "_q).length();
+			result.entities.push_back(EntityInText(EntityType::Bold, chatOffset, chatName.length()));
+		}
+	}
+	return result;
+}
+
 void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback, PeerData *contextPeer) {
 	const auto userId = getBareID(user);
 	const auto estimatedDate = estimateUserRegistrationDate(userId);
@@ -1555,45 +1584,13 @@ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)
 			const auto date = channel->inviteDate ? channel->inviteDate : channel->date;
 			if (date) {
 				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(date).date());
-				const auto joinText = user->isSelf()
-					? tr::ayu_JoinDateSelfInChat(
-						tr::now,
-						lt_item1,
-						TextWithEntities{ channel->name() },
-						lt_item2,
-						TextWithEntities{ joinDateFormatted },
-						tr::rich)
-					: tr::ayu_JoinDateUserInChat(
-						tr::now,
-						lt_item1,
-						TextWithEntities{ user->name() },
-						lt_item2,
-						TextWithEntities{ channel->name() },
-						lt_item3,
-						TextWithEntities{ joinDateFormatted },
-						tr::rich);
+				const auto joinText = formatJoinDateText(user, channel->name(), joinDateFormatted);
 				regResult = appendTextWithEntities(regResult, joinText);
 			}
 		} else if (const auto chat = contextPeer->asChat()) {
 			if (chat->date) {
 				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(chat->date).date());
-				const auto joinText = user->isSelf()
-					? tr::ayu_JoinDateSelfInChat(
-						tr::now,
-						lt_item1,
-						TextWithEntities{ chat->name() },
-						lt_item2,
-						TextWithEntities{ joinDateFormatted },
-						tr::rich)
-					: tr::ayu_JoinDateUserInChat(
-						tr::now,
-						lt_item1,
-						TextWithEntities{ user->name() },
-						lt_item2,
-						TextWithEntities{ chat->name() },
-						lt_item3,
-						TextWithEntities{ joinDateFormatted },
-						tr::rich);
+				const auto joinText = formatJoinDateText(user, chat->name(), joinDateFormatted);
 				regResult = appendTextWithEntities(regResult, joinText);
 			}
 		}
