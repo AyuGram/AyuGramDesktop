@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_bottom_info.h"
 
+#include "ayu/features/filters/filters_controller.h"
 #include "ui/chat/message_bubble.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/reaction_fly_animation.h"
@@ -513,7 +514,8 @@ void BottomInfo::layoutDateText() {
 			? FormatEditedDate(_data.date, _data.editedDate)
 			: edited + ((_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
-			: QLocale().toString(_data.date.time(), QLocale::ShortFormat));
+			: QLocale().toString(_data.date.time(), QLocale::ShortFormat))
+			+ (_data.repeatCount > 1 ? (" (x" + QString::number(_data.repeatCount) + ")") : QString());
 		const auto afterAuthor = prefix + date;
 		const auto afterAuthorWidth = st::msgDateFont->width(afterAuthor);
 		const auto authorWidth = st::msgDateFont->width(author);
@@ -770,6 +772,9 @@ struct BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	auto result = BottomInfo::Data();
 	result.date = message->dateTime();
 	result.effectId = item->effectId();
+	if (AyuSettings::getInstance().collapseDuplicates()) {
+		result.repeatCount = FiltersController::countDuplicateGroupSize(item);
+	}
 	if (message->hasOutLayout()) {
 		result.flags |= Flag::OutLayout;
 	}

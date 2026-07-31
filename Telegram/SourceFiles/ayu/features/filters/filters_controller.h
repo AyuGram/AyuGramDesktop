@@ -19,6 +19,7 @@ bool isEnabled(not_null<PeerData*> peer);
 bool isBlocked(not_null<HistoryItem*> item);
 bool isBlocked(not_null<PeerData*> peer);
 bool filtered(not_null<HistoryItem*> historyItem);
+int countDuplicateGroupSize(not_null<HistoryItem*> item);
 std::optional<bool> filteredMessagesShown(not_null<PeerData*> peer);
 void toggleFilteredMessagesShown(not_null<PeerData*> peer);
 

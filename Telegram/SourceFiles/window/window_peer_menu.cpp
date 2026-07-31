@@ -289,6 +289,17 @@ void PeerMenuAddMuteSubmenuAction(
 			},
 		});
 	}
+
+	const auto mentionsDisabled = AyuSettings::getInstance().mentionsDisabled(thread->peer()->id.value);
+	const auto mentionsText = mentionsDisabled
+		? tr::ayu_EnableMentions(tr::now)
+		: tr::ayu_DisableMentions(tr::now);
+	const auto mentionsIcon = mentionsDisabled
+		? &st::menuIconUnmute
+		: &st::menuIconMute;
+	addAction(mentionsText, with([=](not_null<Data::Thread*> thread) {
+		AyuSettings::getInstance().toggleMentionsDisabled(thread->peer()->id.value);
+	}), mentionsIcon);
 }
 
 class Filler {

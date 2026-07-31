@@ -1747,6 +1747,9 @@ bool HistoryItem::hasUnreadMediaFlag() const {
 }
 
 bool HistoryItem::isUnreadMention() const {
+	if (AyuSettings::getInstance().mentionsDisabled(_history->peer->id.value)) {
+		return false;
+	}
 	return !out() && mentionsMe() && (_flags & MessageFlag::MediaIsUnread);
 }
 

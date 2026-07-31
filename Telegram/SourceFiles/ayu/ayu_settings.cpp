@@ -567,6 +567,28 @@ void AyuSettings::setFiltersEnabledInChats(bool val) {
 	save();
 }
 
+void AyuSettings::setFiltersEnabledInChannels(bool val) {
+	if (_filtersEnabledInChannels.current() == val) return;
+	_filtersEnabledInChannels = val;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::setFiltersEnabledInGroups(bool val) {
+	if (_filtersEnabledInGroups.current() == val) return;
+	_filtersEnabledInGroups = val;
+	_filtersEnabledInChats = val;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::setFiltersEnabledInPrivate(bool val) {
+	if (_filtersEnabledInPrivate.current() == val) return;
+	_filtersEnabledInPrivate = val;
+	repaintApp();
+	save();
+}
+
 void AyuSettings::setHideFromBlocked(bool val) {
 	if (_hideFromBlocked.current() == val) return;
 	_hideFromBlocked = val;
@@ -1059,6 +1081,23 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 	save();
 }
 
+void AyuSettings::setCollapseDuplicates(bool val) {
+	if (_collapseDuplicates.current() == val) return;
+	_collapseDuplicates = val;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::toggleMentionsDisabled(uint64 peerId) {
+	if (_disabledMentionsIds.contains(peerId)) {
+		_disabledMentionsIds.erase(peerId);
+	} else {
+		_disabledMentionsIds.insert(peerId);
+	}
+	repaintApp();
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1075,7 +1114,12 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"shadowBanIds", s._shadowBanIds},
 		{"filtersEnabled", s._filtersEnabled.current()},
 		{"filtersEnabledInChats", s._filtersEnabledInChats.current()},
+		{"filtersEnabledInChannels", s._filtersEnabledInChannels.current()},
+		{"filtersEnabledInGroups", s._filtersEnabledInGroups.current()},
+		{"filtersEnabledInPrivate", s._filtersEnabledInPrivate.current()},
 		{"hideFromBlocked", s._hideFromBlocked.current()},
+		{"collapseDuplicates", s._collapseDuplicates.current()},
+		{"disabledMentionsIds", s._disabledMentionsIds},
 		{"semiTransparentDeletedMessages", s._semiTransparentDeletedMessages.current()},
 		{"disableAds", s._disableAds.current()},
 		{"disableStories", s._disableStories.current()},
@@ -1178,7 +1222,12 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._shadowBanIds = j.value("shadowBanIds", defaults._shadowBanIds);
 	s._filtersEnabled = j.value("filtersEnabled", defaults._filtersEnabled.current());
 	s._filtersEnabledInChats = j.value("filtersEnabledInChats", defaults._filtersEnabledInChats.current());
+	s._filtersEnabledInChannels = j.value("filtersEnabledInChannels", defaults._filtersEnabledInChannels.current());
+	s._filtersEnabledInGroups = j.value("filtersEnabledInGroups", s._filtersEnabledInChats.current());
+	s._filtersEnabledInPrivate = j.value("filtersEnabledInPrivate", s._filtersEnabledInChats.current());
 	s._hideFromBlocked = j.value("hideFromBlocked", defaults._hideFromBlocked.current());
+	s._collapseDuplicates = j.value("collapseDuplicates", defaults._collapseDuplicates.current());
+	s._disabledMentionsIds = j.value("disabledMentionsIds", defaults._disabledMentionsIds);
 	s._semiTransparentDeletedMessages = j.value("semiTransparentDeletedMessages", defaults._semiTransparentDeletedMessages.current());
 	s._disableAds = j.value("disableAds", defaults._disableAds.current());
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());

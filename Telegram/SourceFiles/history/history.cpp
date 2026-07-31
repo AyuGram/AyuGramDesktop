@@ -2807,9 +2807,10 @@ Dialogs::UnreadState History::computeUnreadState() const {
 	result.messages = count;
 	result.chats = count ? 1 : 0;
 	result.marks = mark ? 1 : 0;
-	result.mentions = unreadMentions().has() ? 1 : 0;
 	const auto peer = this->peer.get();
 	const auto &settings = AyuSettings::getInstance();
+	const auto hideMentions = settings.mentionsDisabled(peer->id.value);
+	result.mentions = hideMentions ? 0 : (unreadMentions().has() ? 1 : 0);
 	const auto hideReactions = (peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions())
 		|| (peer->isMegagroup() && !settings.showGroupReactions())
 		|| (peer->isUser() && !settings.showPrivateChatReactions());

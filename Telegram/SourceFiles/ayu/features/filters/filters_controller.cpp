@@ -18,6 +18,7 @@
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "history/view/history_view_element.h"
 #include "unicode/regex.h"
 
 #include <memory>
@@ -94,7 +95,19 @@ std::optional<bool> isFiltered(
 
 bool isEnabled(not_null<PeerData*> peer) {
 	const auto &settings = AyuSettings::getInstance();
-	return settings.filtersEnabled() && (settings.filtersEnabledInChats() || peer->isBroadcast());
+	if (!settings.filtersEnabled()) {
+		return false;
+	}
+	if (peer->isBroadcast()) {
+		return settings.filtersEnabledInChannels();
+	}
+	if (peer->isChat() || peer->isMegagroup()) {
+		return settings.filtersEnabledInGroups();
+	}
+	if (peer->isUser()) {
+		return settings.filtersEnabledInPrivate();
+	}
+	return true;
 }
 
 bool isBlocked(const not_null<HistoryItem*> item) {
@@ -149,12 +162,75 @@ bool isBlocked(const not_null<PeerData*> peer) {
 	);
 }
 
+bool isDuplicateMessage(const not_null<HistoryItem*> item) {
+	if (!AyuSettings::getInstance().collapseDuplicates()) {
+		return false;
+	}
+	if (item->isService() || item->out()) {
+		return false;
+	}
+	const auto &text = item->originalText().text;
+	if (text.isEmpty()) {
+		return false;
+	}
+
+	if (const auto view = item->mainView()) {
+		auto prev = view->previousInBlocks();
+		while (prev) {
+			const auto prevData = prev->data();
+			if (!prevData->isService()) {
+				if (prevData->from() == item->from()
+					&& prevData->originalText().text == text
+					&& !prevData->out()) {
+					return true;
+				}
+				break;
+			}
+			prev = prev->previousInBlocks();
+		}
+	}
+	return false;
+}
+
+int countDuplicateGroupSize(const not_null<HistoryItem*> item) {
+	if (!AyuSettings::getInstance().collapseDuplicates() || item->isService() || item->out()) {
+		return 1;
+	}
+	const auto &text = item->originalText().text;
+	if (text.isEmpty()) {
+		return 1;
+	}
+	int count = 1;
+	if (const auto view = item->mainView()) {
+		auto next = view->nextInBlocks();
+		while (next) {
+			const auto nextData = next->data();
+			if (!nextData->isService()) {
+				if (nextData->from() == item->from()
+					&& nextData->originalText().text == text
+					&& !nextData->out()) {
+					count++;
+				} else {
+					break;
+				}
+			}
+			next = next->nextInBlocks();
+		}
+	}
+	return count;
+}
+
 bool filtered(const not_null<HistoryItem*> item) {
 	if (showingFilteredMessages.contains(item->history()->peer->id.value)) {
 		return false;
 	}
 
 	const auto &settings = AyuSettings::getInstance();
+
+	if (settings.collapseDuplicates() && isDuplicateMessage(item)) {
+		return true;
+	}
+
 	if (!settings.filtersEnabled()) {
 		return false;
 	}

@@ -8756,13 +8756,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_RegexFiltersExcludedAmount#one" = "{count} excluded";
 "ayu_RegexFiltersExcludedAmount#other" = "{count} excluded";
 "ayu_RegexFiltersHeader" = "Filters";
-"ayu_RegexFiltersShared" = "Shared Filters";
-"ayu_FiltersShadowBan" = "Shadow Ban";
+"ayu_RegexFiltersShared" = "Global Regex Rules";
+"ayu_FiltersShadowBan" = "Shadow Ban List";
 "ayu_RegexFiltersExcluded" = "Excluded Filters";
-"ayu_RegexFiltersEnable" = "Enable Filters";
+"ayu_RegexFiltersEnable" = "Enable Message Filters";
 "ayu_FiltersHideFromBlocked" = "Hide from Blocked Users";
 "ayu_FiltersHideFromBlockedNote" = "Message filters were enabled.";
-"ayu_RegexFiltersEnableSharedInChats" = "Enable Shared Filters in Chats";
+"ayu_RegexFiltersEnableSharedInChats" = "Apply Global Filters in Group Chats";
 "ayu_RegexFiltersAdd" = "Add Filter";
 "ayu_RegexFiltersEdit" = "Edit Filter";
 "ayu_RegexFiltersPlaceholder" = "Expression";
@@ -8989,3 +8989,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+"ayu_CollapseDuplicates" = "Collapse repeating messages (xN)";
+"ayu_DisableMentions" = "Disable mentions";
+"ayu_EnableMentions" = "Enable mentions";
+"ayu_FiltersAutoSection" = "Automatic filtering";
+"ayu_FiltersManageSection" = "Rules and lists management";
+"ayu_FiltersGlobalSection" = "Global filters";
+"ayu_FiltersPerChatSection" = "Individual chat filters";
+"ayu_FiltersAddPerChat" = "Add filters for specific chat...";
+"ayu_FiltersInChannels" = "Channels";
+"ayu_FiltersInGroups" = "Groups & Supergroups";
+"ayu_FiltersInPrivate" = "Private Chats (DMs)";
+"ayu_FiltersScopeHeader" = "Apply global filters in";
+

@@ -274,7 +274,17 @@ public:
 	[[nodiscard]] bool saveForBots() const { return _saveForBots.current(); }
 	[[nodiscard]] bool filtersEnabled() const { return _filtersEnabled.current(); }
 	[[nodiscard]] bool filtersEnabledInChats() const { return _filtersEnabledInChats.current(); }
+	[[nodiscard]] bool filtersEnabledInChannels() const { return _filtersEnabledInChannels.current(); }
+	void setFiltersEnabledInChannels(bool val);
+	[[nodiscard]] bool filtersEnabledInGroups() const { return _filtersEnabledInGroups.current(); }
+	void setFiltersEnabledInGroups(bool val);
+	[[nodiscard]] bool filtersEnabledInPrivate() const { return _filtersEnabledInPrivate.current(); }
+	void setFiltersEnabledInPrivate(bool val);
 	[[nodiscard]] bool hideFromBlocked() const { return _hideFromBlocked.current(); }
+	[[nodiscard]] bool collapseDuplicates() const { return _collapseDuplicates.current(); }
+	void setCollapseDuplicates(bool val);
+	[[nodiscard]] bool mentionsDisabled(uint64 peerId) const { return _disabledMentionsIds.contains(peerId); }
+	void toggleMentionsDisabled(uint64 peerId);
 	[[nodiscard]] bool semiTransparentDeletedMessages() const { return _semiTransparentDeletedMessages.current(); }
 	[[nodiscard]] bool disableAds() const { return _disableAds.current(); }
 	[[nodiscard]] bool disableStories() const { return _disableStories.current(); }
@@ -627,7 +637,12 @@ private:
 	std::unordered_set<int64> _shadowBanIds;
 	rpl::variable<bool> _filtersEnabled = false;
 	rpl::variable<bool> _filtersEnabledInChats = false;
+	rpl::variable<bool> _filtersEnabledInChannels = true;
+	rpl::variable<bool> _filtersEnabledInGroups = true;
+	rpl::variable<bool> _filtersEnabledInPrivate = true;
 	rpl::variable<bool> _hideFromBlocked = false;
+	rpl::variable<bool> _collapseDuplicates = true;
+	std::unordered_set<uint64> _disabledMentionsIds;
 	rpl::variable<bool> _semiTransparentDeletedMessages = false;
 	rpl::variable<bool> _disableAds = true;
 	rpl::variable<bool> _disableStories = false;
