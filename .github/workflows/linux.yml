@@ -62,6 +62,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Patch codegen scanner for ayu_ prefix
+        run: |
+          python3 -c "
+          p = 'Telegram/codegen/codegen/lang/subsets.cpp'
+          c = open(p).read()
+          old = 'if (data[i] != \'l\'\n\t\t\t|| data[i + 1] != \'n\'\n\t\t\t|| data[i + 2] != \'g\'\n\t\t\t|| data[i + 3] != \'_\''
+          new = 'const auto isLng = (data[i] == \'l\' && data[i + 1] == \'n\' && data[i + 2] == \'g\' && data[i + 3] == \'_\');\n\t\tconst auto isAyu = (data[i] == \'a\' && data[i + 1] == \'y\' && data[i + 2] == \'u\' && data[i + 3] == \'_\');\n\t\tif ((!isLng && !isAyu)'
+          if old in c:
+              open(p, 'w').write(c.replace(old, new))
+          "
+
       - name: First set up.
         run: |
           sudo apt update
