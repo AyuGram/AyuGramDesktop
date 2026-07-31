@@ -1516,9 +1516,12 @@ static TextWithEntities appendTextWithEntities(TextWithEntities first, const Tex
 	}
 	const auto firstLen = first.text.length();
 	first.text += "\n" + second.text;
-	for (auto entity : second.entities) {
-		entity.offset += firstLen + 1;
-		first.entities.push_back(entity);
+	for (const auto &entity : second.entities) {
+		first.entities.push_back(EntityInText(
+			entity.type(),
+			entity.offset() + firstLen + 1,
+			entity.length(),
+			entity.data()));
 	}
 	return first;
 }
