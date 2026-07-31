@@ -1216,14 +1216,14 @@ base::unique_qptr<Ui::RpWidget> CreateDisabledFieldView(
 	const auto raw = result.get();
 	const auto isForbidden = (peer->isChat() && peer->asChat()->isForbidden())
 		|| (peer->isChannel() && peer->asChannel()->isForbidden());
-	const auto labelText = isForbidden
+	auto labelText = isForbidden
 		? ((peer->isMegagroup() || peer->isChat())
 			? tr::lng_group_not_accessible()
 			: tr::lng_channel_not_accessible())
 		: tr::lng_send_text_no();
 	const auto label = CreateChild<Ui::FlatLabel>(
 		result.get(),
-		labelText,
+		std::move(labelText),
 		st::historySendDisabled);
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 	raw->setPointerCursor(false);
