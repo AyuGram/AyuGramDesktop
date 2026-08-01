@@ -140,15 +140,14 @@ void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 	}
 
 	QUrl url;
-	if (!finalLangPackId.isEmpty() && !baseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
-			finalLangPackId));
-	} else {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
-			needFallback ? baseId : finalLangPackId));
-	}
+	const auto targetLangId = (!finalLangPackId.isEmpty() && !needFallback)
+		? finalLangPackId
+		: (needFallback ? baseId : finalLangPackId);
 
-	LOG(("AyuGram Language fetchLanguage: requested id='%1', baseId='%2', finalLangPackId='%3', currentLangId='%4', url='%5'").arg(id, baseId, finalLangPackId, _currentLangId, url.toString()));
+	url.setUrl(qsl("https://raw.githubusercontent.com/PH4N7OMx/Languages/main/values/langs/%1/Shared.json").arg(
+		targetLangId));
+
+	LOG(("AyuGram Language fetchLanguage: requested id='%1', baseId='%2', finalLangPackId='%3', currentLangId='%4', targetLangId='%5', url='%6'").arg(id, baseId, finalLangPackId, _currentLangId, targetLangId, url.toString()));
 
 	QNetworkRequest req(url);
 	req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
