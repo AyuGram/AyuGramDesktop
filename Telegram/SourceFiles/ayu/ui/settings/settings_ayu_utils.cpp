@@ -358,7 +358,7 @@ CollapsibleToggleResult AddCollapsibleToggle(not_null<Ui::VerticalLayout*> conta
 		const auto checkbox = verticalLayout->add(
 			object_ptr<Ui::Checkbox>(
 				verticalLayout,
-				entry.checkboxLabel ? entry.checkboxLabel() : QString(),
+				rpl::duplicate(entry.checkboxLabel),
 				entry.getter(),
 				st::settingsCheckbox),
 			st::powerSavingButton.padding);

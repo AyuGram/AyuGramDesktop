@@ -23,11 +23,39 @@ using BoolSetter = void (AyuSettings::*)(bool);
 
 struct NestedEntry
 {
-	Fn<QString()> checkboxLabel;
+	rpl::producer<QString> checkboxLabel;
+	QString staticLabel;
 	Fn<bool()> getter;
 	Fn<void(bool)> setter;
 	Fn<bool()> lockGetter;     // nullptr = no lock support
 	Fn<void(bool)> lockSetter;
+
+	NestedEntry(
+		rpl::producer<QString> label,
+		Fn<bool()> getter,
+		Fn<void(bool)> setter,
+		Fn<bool()> lockGetter = nullptr,
+		Fn<void(bool)> lockSetter = nullptr)
+	: checkboxLabel(std::move(label))
+	, getter(std::move(getter))
+	, setter(std::move(setter))
+	, lockGetter(std::move(lockGetter))
+	, lockSetter(std::move(lockSetter)) {
+	}
+
+	NestedEntry(
+		const QString &label,
+		Fn<bool()> getter,
+		Fn<void(bool)> setter,
+		Fn<bool()> lockGetter = nullptr,
+		Fn<void(bool)> lockSetter = nullptr)
+	: checkboxLabel(rpl::single(label))
+	, staticLabel(label)
+	, getter(std::move(getter))
+	, setter(std::move(setter))
+	, lockGetter(std::move(lockGetter))
+	, lockSetter(std::move(lockSetter)) {
+	}
 };
 
 void AddBetaBadge(not_null<Button*> parent);

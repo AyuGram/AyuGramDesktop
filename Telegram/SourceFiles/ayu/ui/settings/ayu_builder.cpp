@@ -129,7 +129,7 @@ Fn<void()> AyuSectionBuilder::addCollapsibleToggle(
 				});
 			}
 			for (const auto &cb : checkboxes) {
-				const auto label = cb.checkboxLabel ? cb.checkboxLabel() : QString();
+				const auto label = cb.staticLabel;
 				if (!label.isEmpty()) {
 					sctx.entries->push_back({
 						.id = id + u"/"_q + label,
