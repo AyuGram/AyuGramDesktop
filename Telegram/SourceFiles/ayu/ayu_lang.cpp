@@ -63,7 +63,21 @@ void AyuLanguage::loadCachedLanguage() {
 		finalLangPackId = langPackBaseId;
 	}
 	if (finalLangPackId.isEmpty()) {
-		return;
+		finalLangPackId = u"ru"_q;
+	}
+
+	const auto devPath = u"C:/Users/aver/Desktop/Languages/values/langs/"_q + finalLangPackId + u"/Shared.json"_q;
+	QFile devFile(devPath);
+	if (devFile.open(QIODevice::ReadOnly)) {
+		const auto data = devFile.readAll();
+		devFile.close();
+		QJsonParseError error{};
+		const auto doc = QJsonDocument::fromJson(data, &error);
+		if (error.error == QJsonParseError::NoError) {
+			LOG(("Loading local dev AyuGram language: %1").arg(finalLangPackId));
+			applyLanguageJson(doc);
+			return;
+		}
 	}
 
 	const auto cachePath = getCachePath(finalLangPackId);
@@ -114,14 +128,12 @@ void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 		}
 	}
 
-	// using `jsdelivr` since China (...and maybe other?) users have some problems with GitHub
-	// https://crowdin.com/project/ayugram/discussions/6
 	QUrl url;
 	if (!finalLangPackId.isEmpty() && !baseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
+		url.setUrl(qsl("https://raw.githubusercontent.com/PH4N7OMx/Languages/main/values/langs/%1/Shared.json").arg(
 			finalLangPackId));
 	} else {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
+		url.setUrl(qsl("https://raw.githubusercontent.com/PH4N7OMx/Languages/main/values/langs/%1/Shared.json").arg(
 			needFallback ? baseId : finalLangPackId));
 	}
 	_chkReply = networkManager.get(QNetworkRequest(url));
