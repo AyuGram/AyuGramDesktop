@@ -411,6 +411,7 @@ public:
 		_isDeletedLocally = deleted;
 	}
 
+	int fixedOnTopIndex() const override;
 	void updateChatListExistence() override;
 	bool shouldBeInChatList() const override;
 	Dialogs::UnreadState chatListUnreadState() const override;
