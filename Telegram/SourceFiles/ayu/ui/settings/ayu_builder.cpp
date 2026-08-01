@@ -129,10 +129,11 @@ Fn<void()> AyuSectionBuilder::addCollapsibleToggle(
 				});
 			}
 			for (const auto &cb : checkboxes) {
-				if (!cb.checkboxLabel.isEmpty()) {
+				const auto label = cb.checkboxLabel ? cb.checkboxLabel() : QString();
+				if (!label.isEmpty()) {
 					sctx.entries->push_back({
-						.id = id + u"/"_q + cb.checkboxLabel,
-						.title = cb.checkboxLabel,
+						.id = id + u"/"_q + label,
+						.title = label,
 						.section = sctx.sectionId,
 						.checkIcon = cb.getter()
 							? Builder::SearchEntryCheckIcon::Checked

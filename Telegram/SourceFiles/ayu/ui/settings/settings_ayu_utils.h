@@ -23,7 +23,7 @@ using BoolSetter = void (AyuSettings::*)(bool);
 
 struct NestedEntry
 {
-	rpl::producer<QString> checkboxLabel;
+	Fn<QString()> checkboxLabel;
 	Fn<bool()> getter;
 	Fn<void(bool)> setter;
 	Fn<bool()> lockGetter;     // nullptr = no lock support

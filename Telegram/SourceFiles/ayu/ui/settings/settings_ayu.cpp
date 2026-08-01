@@ -386,35 +386,35 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 
 			std::vector<NestedEntry> checkboxes{
 				NestedEntry{
-					tr::ayu_DontReadMessages(),
+					[] { return tr::ayu_DontReadMessages(tr::now); },
 					[state] { return !AyuSettings::ghost(state->selectedUserId.current()).sendReadMessages(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendReadMessages(!v); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendReadMessagesLocked(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendReadMessagesLocked(v); }
 				},
 				NestedEntry{
-					tr::ayu_DontReadStories(),
+					[] { return tr::ayu_DontReadStories(tr::now); },
 					[state] { return !AyuSettings::ghost(state->selectedUserId.current()).sendReadStories(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendReadStories(!v); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendReadStoriesLocked(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendReadStoriesLocked(v); }
 				},
 				NestedEntry{
-					tr::ayu_DontSendOnlinePackets(),
+					[] { return tr::ayu_DontSendOnlinePackets(tr::now); },
 					[state] { return !AyuSettings::ghost(state->selectedUserId.current()).sendOnlinePackets(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendOnlinePackets(!v); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendOnlinePacketsLocked(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendOnlinePacketsLocked(v); }
 				},
 				NestedEntry{
-					tr::ayu_DontSendUploadProgress(),
+					[] { return tr::ayu_DontSendUploadProgress(tr::now); },
 					[state] { return !AyuSettings::ghost(state->selectedUserId.current()).sendUploadProgress(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendUploadProgress(!v); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendUploadProgressLocked(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendUploadProgressLocked(v); }
 				},
 				NestedEntry{
-					tr::ayu_SendOfflinePacketAfterOnline(),
+					[] { return tr::ayu_SendOfflinePacketAfterOnline(tr::now); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendOfflinePacketAfterOnline(); },
 					[state](bool v) { AyuSettings::ghost(state->selectedUserId.current()).setSendOfflinePacketAfterOnline(v); },
 					[state] { return AyuSettings::ghost(state->selectedUserId.current()).sendOfflinePacketAfterOnlineLocked(); },
