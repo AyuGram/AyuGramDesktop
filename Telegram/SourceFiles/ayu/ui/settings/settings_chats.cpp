@@ -101,9 +101,9 @@ void BuildGroupsAndChannels(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.boxTitle = tr::ayu_ChannelBottomButton(),
 		.initialSelection = static_cast<int>(settings->channelBottomButton()),
 		.options = {
-			tr::ayu_ChannelBottomButtonHide(),
-			tr::ayu_ChannelBottomButtonMute(),
-			tr::ayu_ChannelBottomButtonDiscuss(),
+			tr::ayu_ChannelBottomButtonHide(tr::now),
+			tr::ayu_ChannelBottomButtonMute(tr::now),
+			tr::ayu_ChannelBottomButtonDiscuss(tr::now),
 		},
 		.setter = [](int index) {
 			AyuSettings::getInstance().setChannelBottomButton(
