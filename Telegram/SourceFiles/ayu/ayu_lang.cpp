@@ -74,6 +74,7 @@ void AyuLanguage::loadCachedLanguage() {
 		finalLangPackId = langPackBaseId;
 	}
 	if (finalLangPackId.isEmpty()) {
+		LOG(("AyuGram Language: loadCachedLanguage empty finalLangPackId"));
 		return;
 	}
 
@@ -81,6 +82,7 @@ void AyuLanguage::loadCachedLanguage() {
 	QFile file(cachePath);
 	if (!file.exists()) {
 		const auto basePath = getCachePath(langPackBaseId);
+		LOG(("AyuGram Language cache %1 does not exist, checking base: %2").arg(cachePath, basePath));
 		if (!QFile::exists(basePath)) {
 			return;
 		}
@@ -94,8 +96,10 @@ void AyuLanguage::loadCachedLanguage() {
 		QJsonParseError error{};
 		const auto doc = QJsonDocument::fromJson(data, &error);
 		if (error.error == QJsonParseError::NoError) {
-			LOG(("Loading cached AyuGram language: %1").arg(finalLangPackId));
+			LOG(("Loading cached AyuGram language: %1 (%2 bytes, %3 keys)").arg(finalLangPackId).arg(data.size()).arg(doc.object().keys().size()));
 			applyLanguageJson(doc);
+		} else {
+			LOG(("Failed parsing cached AyuGram language %1 (%2 bytes): %3").arg(finalLangPackId).arg(data.size()).arg(error.errorString()));
 		}
 	}
 }
@@ -109,12 +113,15 @@ void AyuLanguage::saveCachedLanguage(const QByteArray &json, const QString &lang
 	if (file.open(QIODevice::WriteOnly)) {
 		file.write(json);
 		file.close();
-		LOG(("Cached AyuGram language: %1").arg(langId));
+		LOG(("Cached AyuGram language: %1 (%2 bytes) at %3").arg(langId).arg(json.size()).arg(cachePath));
+	} else {
+		LOG(("Failed to open cache file for writing: %1").arg(cachePath));
 	}
 }
 
 void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 	if (_chkReply) {
+		LOG(("Aborting previous pending AyuGram language request"));
 		_chkReply->disconnect();
 		_chkReply->abort();
 		_chkReply = nullptr;
@@ -132,8 +139,6 @@ void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 		}
 	}
 
-	// using `jsdelivr` since China (...and maybe other?) users have some problems with GitHub
-	// https://crowdin.com/project/ayugram/discussions/6
 	QUrl url;
 	if (!finalLangPackId.isEmpty() && !baseId.isEmpty() && !needFallback) {
 		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
@@ -142,7 +147,12 @@ void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
 		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/PH4N7OMx/Languages@main/values/langs/%1/Shared.json").arg(
 			needFallback ? baseId : finalLangPackId));
 	}
-	_chkReply = networkManager.get(QNetworkRequest(url));
+
+	LOG(("AyuGram Language fetchLanguage: requested id='%1', baseId='%2', finalLangPackId='%3', currentLangId='%4', url='%5'").arg(id, baseId, finalLangPackId, _currentLangId, url.toString()));
+
+	QNetworkRequest req(url);
+	req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+	_chkReply = networkManager.get(req);
 	connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));
 	connect(_chkReply, SIGNAL(finished()), this, SLOT(fetchFinished()));
 }
@@ -153,9 +163,10 @@ void AyuLanguage::fetchFinished() {
 	QString langPackBaseId = Lang::GetInstance().baseId();
 	QString langPackId = Lang::GetInstance().id();
 	auto statusCode = _chkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+	LOG(("AyuGram Language fetchFinished: statusCode=%1, currentLangId='%2'").arg(statusCode).arg(_currentLangId));
 
 	if (statusCode == 404 && !langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-		LOG(("AyuGram Language not found! Fallback to main language: %1...").arg(langPackBaseId));
+		LOG(("AyuGram Language not found (404)! Fallback to main language: %1...").arg(langPackBaseId));
 		needFallback = true;
 		_chkReply->disconnect();
 		fetchLanguage("", langPackBaseId);
@@ -164,10 +175,11 @@ void AyuLanguage::fetchFinished() {
 		QJsonParseError error{};
 		const auto doc = QJsonDocument::fromJson(result, &error);
 		if (error.error == QJsonParseError::NoError) {
+			LOG(("Fetched AyuGram language successfully: %1 (%2 bytes, %3 keys)").arg(_currentLangId).arg(result.size()).arg(doc.object().keys().size()));
 			saveCachedLanguage(result, _currentLangId);
 			applyLanguageJson(doc);
 		} else {
-			LOG(("Incorrect language JSON File."));
+			LOG(("Incorrect language JSON File for %1 (status %2, size %3 bytes): %4").arg(_currentLangId).arg(statusCode).arg(result.size()).arg(error.errorString()));
 		}
 
 		_chkReply = nullptr;
@@ -175,7 +187,7 @@ void AyuLanguage::fetchFinished() {
 }
 
 void AyuLanguage::fetchError(QNetworkReply::NetworkError e) {
-	LOG(("Network error: %1").arg(e));
+	LOG(("AyuGram Language Network error: %1 for currentLangId='%2'").arg(e).arg(_currentLangId));
 
 	if (e == QNetworkReply::NetworkError::ContentNotFoundError) {
 		const auto baseId = Lang::GetInstance().baseId();
