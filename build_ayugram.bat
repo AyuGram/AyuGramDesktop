@@ -70,7 +70,11 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 4. Run Win.bat dependency preparation in silent mode
+set "PATH=C:\Users\aver\AppData\Local\Programs\Python\Python313;C:\Users\aver\AppData\Local\Programs\Python\Python313\Scripts;%PATH%"
+
+:: 4. Run Win.bat dependency preparation if Libraries doesn't exist
+if exist "..\Libraries\win64" goto skip_prepare
+
 echo ==================================================
 echo Preparing dependencies (silent mode)...
 echo ==================================================
@@ -80,6 +84,12 @@ if %ERRORLEVEL% neq 0 (
     pause
     exit /b %ERRORLEVEL%
 )
+goto configure
+
+:skip_prepare
+echo [INFO] Existing Libraries folder found at ..\Libraries\win64. Skipping dependency preparation.
+
+:configure
 
 :: 5. Configure project
 echo ==================================================
