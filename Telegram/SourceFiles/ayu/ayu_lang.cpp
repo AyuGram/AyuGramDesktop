@@ -217,6 +217,14 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 			Lang::GetInstance().applyValue("ayu_MessageSavingSaveForBots", val.toUtf8());
 		} else if (brokenKey == u"MarkReadAfterSend"_q) {
 			Lang::GetInstance().applyValue("ayu_MarkReadAfterAction", val.toUtf8());
+		} else if (brokenKey == u"GhostMode"_q) {
+			Lang::GetInstance().applyValue("ayu_GhostModeToggle", val.toUtf8());
+		} else if (brokenKey == u"GhostModeToggle"_q) {
+			Lang::GetInstance().applyValue("ayu_GhostMode", val.toUtf8());
+		} else if (brokenKey == u"LocalTelegramPremium"_q) {
+			Lang::GetInstance().applyValue("ayu_LocalPremium", val.toUtf8());
+		} else if (brokenKey == u"LocalPremium"_q) {
+			Lang::GetInstance().applyValue("ayu_LocalTelegramPremium", val.toUtf8());
 		}
 	}
 	Lang::GetInstance().updatePluralRules();
