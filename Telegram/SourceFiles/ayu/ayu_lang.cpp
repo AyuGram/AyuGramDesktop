@@ -38,7 +38,18 @@ AyuLanguage *AyuLanguage::instance = nullptr;
 AyuLanguage::AyuLanguage() = default;
 
 void AyuLanguage::init() {
-	if (!instance) instance = new AyuLanguage;
+	if (!instance) {
+		instance = new AyuLanguage;
+		Lang::GetInstance().updated(
+		) | rpl::start_with_next([] {
+			const auto id = Lang::GetInstance().id();
+			const auto baseId = Lang::GetInstance().baseId();
+			if (!id.isEmpty() && instance) {
+				instance->loadCachedLanguage();
+				instance->fetchLanguage(id, baseId);
+			}
+		}, instance->lifetime());
+	}
 	instance->loadCachedLanguage();
 }
 
@@ -103,6 +114,13 @@ void AyuLanguage::saveCachedLanguage(const QByteArray &json, const QString &lang
 }
 
 void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
+	if (_chkReply) {
+		_chkReply->disconnect();
+		_chkReply->abort();
+		_chkReply = nullptr;
+	}
+	needFallback = false;
+
 	auto finalLangPackId = langMapping.contains(id) ? langMapping[id] : id;
 	_currentLangId = finalLangPackId.isEmpty() ? baseId : finalLangPackId;
 
