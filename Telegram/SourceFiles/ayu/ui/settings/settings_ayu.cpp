@@ -384,7 +384,7 @@ void BuildGhostEssentials(SectionBuilder &builder) {
 					r.y() + (r.height() - arrow->height()) / 2);
 			}, pickerButton->lifetime());
 
-			std::vector checkboxes{
+			std::vector<NestedEntry> checkboxes{
 				NestedEntry{
 					tr::ayu_DontReadMessages(),
 					[state] { return !AyuSettings::ghost(state->selectedUserId.current()).sendReadMessages(); },
