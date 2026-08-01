@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_drag_area.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
+#include "history/history_view_pull_to_next_channel.h"
 #include "iv/iv_rich_message_serializer.h"
 #include "iv/iv_rich_page.h"
 #include "ui/chat/pinned_bar.h"
@@ -289,6 +290,15 @@ ChatWidget::ChatWidget(
 , _scroll(std::make_unique<Ui::ElasticScroll>(
 	this,
 	controller->chatStyle()->value(lifetime(), st::historyScroll)))
+, _pullToNext(std::make_unique<PullToNextChannel>(
+	this,
+	_scroll.get(),
+	controller,
+	[=] {
+		return _inner
+			&& _inner->loadedAtBottomKnown()
+			&& _inner->loadedAtBottom();
+	}))
 , _cornerButtons(
 		_scroll.get(),
 		controller->chatStyle(),
@@ -373,6 +383,7 @@ ChatWidget::ChatWidget(
 	}, [=] {
 		return _inner->loadedAtBottomKnown() && _inner->loadedAtBottom();
 	});
+	_pullToNext->setTopic(_topic);
 	_scroll->scrolls(
 	) | rpl::on_next([=] {
 		onScroll();
@@ -733,6 +744,7 @@ void ChatWidget::setTopic(Data::ForumTopic *topic) {
 	}
 	_topicLifetime.destroy();
 	_topic = topic;
+	_pullToNext->setTopic(topic);
 	refreshReplies();
 	refreshTopBarActiveChat();
 	validateSubsectionTabs();
@@ -1091,7 +1103,9 @@ void ChatWidget::setupSwipeReplyAndBack() {
 		}
 		const auto view = _inner->lookupItemByY(data.cursorPosition.y());
 		if (!view
-			|| !view->data()->isRegular()
+			|| (!view->data()->isRegular()
+				&& (!view->data()->isEphemeral()
+					|| view->data()->out()))
 			|| view->data()->isService()) {
 			return result;
 		}
@@ -3125,6 +3139,7 @@ void ChatWidget::updateControlsGeometry() {
 	}
 
 	_cornerButtons.updatePositions();
+	_pullToNext->updateGeometry();
 }
 
 void ChatWidget::paintEvent(QPaintEvent *e) {

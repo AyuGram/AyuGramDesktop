@@ -356,6 +356,7 @@ private:
 	void showSponsoredMenu(int peerSearchIndex, QPoint globalPos);
 
 	void clearMouseSelection(bool clearSelection = false);
+	void deselectAllRows();
 	void mousePressReleased(
 		QPoint globalPosition,
 		Qt::MouseButton button,

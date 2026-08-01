@@ -194,6 +194,8 @@ PRIVATE
     editor/scene/scene_item_image.h
     editor/scene/scene_item_line.cpp
     editor/scene/scene_item_line.h
+    editor/scene/scene_item_shape.cpp
+    editor/scene/scene_item_shape.h
     editor/scene/scene_item_text.cpp
     editor/scene/scene_item_text.h
     editor/scene/scene_emoji_document.cpp
@@ -323,6 +325,8 @@ PRIVATE
 
     settings/settings_common.cpp
     settings/settings_common.h
+    settings/settings_key_navigation.cpp
+    settings/settings_key_navigation.h
     settings/cloud_password/settings_cloud_password_common.cpp
     settings/cloud_password/settings_cloud_password_common.h
 

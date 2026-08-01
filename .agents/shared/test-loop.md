@@ -26,8 +26,8 @@ adapter point; every other rule here still applies.
 - `TASK_ID` — full dated task identifier and required source-commit locator.
 - `BASE_REF` — local pre-task baseline ref derived from `TASK_ID`.
 - `GREEN_REF` — local ref for the current retained implementation attempt.
-- `EVIDENCE_DIR` — per-run logs and screenshots; defaults to `TASK_DIR` unless the wrapper passes a
-  run-specific directory.
+- `EVIDENCE_DIR` — a required run-specific directory the repository ignores; it holds per-run logs,
+  screenshots, and preserved stale-crash payloads.
 - **TASK SPEC** — the task's self-contained `task.md`, including its design
   basis when the wrapper records one, plus any referenced images (`images/<file>` mockups /
   screenshots / graphic resources). Images are optional evidence: read them when present, but their
@@ -70,9 +70,12 @@ signature, perform the one-time clean-rebuild recovery under "Crashes & assertio
 UNRECOVERABLE conditions: the app reaches a login screen / `AUTH_KEY_DUPLICATED` and re-copying the
 test account does not recover it, or a crash has no usable diagnostic after one retry and the
 macOS cached-language recovery below does not apply. Missing `test_TelegramForcePortable` is a
-global environment hard stop, not a task `Block`. A file-lock build error (`LNK1104`, `C1041`,
-access denied, file in use) is likewise a repository hard stop: do not retry or work around it;
-ask the user to close the app and debugger.
+global environment hard stop, not a task `Block`. An unmovable stale-report refusal is also a
+global environment hard stop, not a task `Block`: report the exact helper refusal, consume no
+implementation attempt, do not immediately retry it, and wait for the external lock or permission
+condition to be resolved. On Windows, recover a file-lock build error (`LNK1104`, `C1041`, access
+denied, file in use) through `.agents/shared/build-lock-recovery.md`; only an exhausted or unsafe
+recovery is a repository hard stop.
 
 ## Handoff tokens
 
@@ -90,11 +93,17 @@ ask the user to close the app and debugger.
 Impl commits must read like the repository's own history and carry only the durable task locator.
 Match the style of recent `git log` subjects.
 - **Subject:** one concise, plain-language line summarizing the change, ≤ ~50-60 characters. This is
-  the first line.
+  the first line. Start it with exactly `[ai] ` when the retained task implementation changes
+  permanent test-helper code, the agent harness, or agent documentation in any way; for every
+  other task, it must not contain `[ai]` anywhere. The prefix counts toward the length.
 - **Second line:** empty.
 - **Third line:** exactly `Task: <TASK_ID>`.
 - **Nothing else:** no explanatory body, `Autotask:`, attempt marker, `Co-Authored-By:`, or any
   tool/assistant attribution. The attempt number is runner state, never part of the message.
+
+The triggering scope includes `Telegram/SourceFiles/test/`, `.agents/`, `.claude/`, `AGENTS.md`,
+`CLAUDE.md`, and files whose sole role is supporting those systems. Classify the retained
+implementation only: the disposable test overlay and external AI task artifacts do not count.
 
 ## Test account (portable data) — hard rules
 
@@ -108,11 +117,27 @@ The debug build runs in portable mode out of `out/Debug/`. Three sibling folders
 - `real_TelegramForcePortable` — the user's real data, preserved so manual use survives. Once it
   exists, NO flow step may ever delete, rename, move, overwrite, or write into it.
 
-**SETUP — run at the START of every test run, with NO app instance alive. Idempotent, and a pure
-no-op between runs and between consecutive tasks (the marked test copy is simply reused).**
-1. Require `test_TelegramForcePortable`. Its absence is the only portable-account setup blocker.
+**SETUP — run at the START of every test run, with NO app instance alive. It is idempotent: the
+first SETUP after a crash moves leftover crash files and can refuse before launch; after successful
+relocation, the next SETUP finds nothing left to move.**
+The workspace helper's `test-run` command performs exactly these steps before every launch, and
+`test-account-reset` performs the broken-account recovery below; the manual steps remain the
+contract those commands implement.
+1. Require `test_TelegramForcePortable`. Its absence is a portable-account setup blocker.
 2. If `TelegramForcePortable/testing` exists, the live folder is already the reusable test copy:
-   touch none of the three folders and proceed straight to testing.
+   never copy, move, or delete any of the three folders. Clear only what an earlier run left
+   inside the live copy — move a non-empty `TelegramForcePortable/tdata/working` into
+   `<EVIDENCE_DIR>/stale-crash/` and every `TelegramForcePortable/tdata/dumps/*.dmp` into
+   `<EVIDENCE_DIR>/stale-crash/dumps/`, then proceed straight to testing. `<EVIDENCE_DIR>` must be
+   a run-specific directory the repository ignores, never a tracked one: a preserved minidump
+   is routinely tens of megabytes, and a tracked destination sweeps it into the wrapper's
+   publishing commit. Never delete either: the leftover `tdata/working` is what blinds the next
+   run (the app shows its "previous launch was not finished properly" window instead of starting,
+   so the run writes no `test_log.txt` and reads as a hang), while a leftover `.dmp` never blocks
+   a launch and is moved only to keep a later run's `dumps` report free of old minidumps.
+   `test-run` names every moved file and its destination in `stale_crash_cleared`, refuses to
+   launch when the report itself cannot be moved, and leaves a minidump it cannot move in place,
+   reported with a null destination.
 3. If `TelegramForcePortable` exists without the marker, it is the user's real data: move it to
    `real_TelegramForcePortable` when that is absent. If `real_...` already exists, the unmarked
    live folder is the user's manual restore of that same preserved data — recursively delete the
@@ -125,10 +150,11 @@ Any live/real folder combination is never a blocker. After SETUP the live folder
 copy, the golden folder is untouched, and `real_...` may or may not exist.
 
 **NO CLEANUP — the flow performs no folder operations after testing, ever.** The marked test copy
-stays live, so the next run or next task starts with SETUP as a no-op and the folders are never
-copied, moved, or deleted between testing phases. The flow never restores real data to live: when
-the user wants manual use they copy `real_...` to `TelegramForcePortable` themselves (keeping
-`real_...` in place), and the next SETUP handles that unmarked live folder by step 3.
+stays live, and the three folders are never copied, moved, or deleted between testing phases. SETUP
+may move stale crash files from inside the marked live copy before a launch; this is not a folder
+operation. The flow never restores real data to live: when the user wants manual use they copy
+`real_...` to `TelegramForcePortable` themselves (keeping `real_...` in place), and the next SETUP
+handles that unmarked live folder by step 3.
 
 Deletion guard — the only folder the flow may ever delete is a live `TelegramForcePortable` that
 either carries the `testing` marker or coexists with `real_...` (step 3). If the test account
@@ -151,7 +177,8 @@ account, and MUST be left alive. On Windows, scope the kill by path:
 
 `taskkill /IM Telegram.exe /F` is forbidden here and anywhere else in this loop — it is image-name-wide
 and takes down the user's unrelated clients. Every "kill stragglers" / "taskkill" step below means
-this path-scoped kill.
+this path-scoped kill. The workspace helper's `test-run` and `test-cleanup` commands implement it
+on every platform; prefer them over hand-written kill shell.
 
 **Avoid account-fatal calls; cloud data is otherwise fair game.** The overlay must never trigger
 logout / session-termination / account-deletion, and must not wipe the account wholesale. Tests that
@@ -195,9 +222,20 @@ writing any overlay:
      alignment); supplied artwork is optional and never a prerequisite for that contract.
    - **Behavior** → drive the specific action and observe the concrete state/log/screenshot the
      change should produce, and confirm the pre-change behavior no longer happens.
-3. **Cover every surface the task names.** If the Observable result lists a settings row, a balance
-   header, a gift field, and a suggestion bar, each must be observed (or explicitly marked N/A with
-   a reason). Do not stop at one or two.
+3. **Cover every surface the task names — and only those.** If the Observable result lists a settings
+   row, a balance header, a gift field, and a suggestion bar, each must be observed (or explicitly
+   marked N/A with a reason). Do not stop at one or two.
+   The same sentence sets the upper bound. You are testing **this change**, not the area it landed
+   in. Apply the revert test to every candidate check: *if this task's diff were reverted, could this
+   check's outcome change?* If not, it is measuring pre-existing behavior and does not belong here,
+   however interesting it looks — a code path that cannot reach the changed lines, a neighbouring
+   feature the diff never touches, a pre-existing bug you noticed on the way. Note such a thing as a
+   discovered follow-up if it is worth anyone's time, and move on.
+   Do not expand the parameter space either. Iterate fully over a range the task's acceptance names
+   (every value of the enum it calls out, both halves of the branch it describes), but do not invent
+   ranges it does not: the four wallpaper kinds, the other themes, the remaining scales, the sibling
+   sections. Existing behavior is not this task's to re-establish, and in a codebase this size a
+   verification that wanders into it has no natural end.
 4. **Write the checks into `<WORK_DIR>/test.md` BEFORE running** (format under "Test report"), so the
    design is explicit and Actual/Result can be filled in per check afterward.
 5. **Run economy — plan ONE run.** A test run costs a build, an app launch, and an assessment pass,
@@ -207,8 +245,21 @@ writing any overlay:
    destroy later fixtures. Plan a second run only when two checks genuinely cannot share one process
    lifetime (mutually exclusive fixtures or settings, state one check needs fresh that another
    necessarily contaminates) — never for scenario simplicity. Unplanned re-runs stay what the state
-   machine allows: a TEST_FLAW re-run or the next attempt after an IMPL_BUG fix — and a TEST_FLAW
-   re-author fixes every flaw observed in that run in one pass, not one flaw per relaunch.
+   machine allows: a TEST_FLAW re-run, the next attempt after an IMPL_BUG fix, or the coverage run
+   below — and a TEST_FLAW re-author fixes every flaw observed in that run in one pass, not one flaw
+   per relaunch.
+6. **Coverage run — when you find a missing check, take it here.** Run economy governs how checks are
+   packed into runs, never how many checks are taken. If at any point before the task is published you
+   find a check its acceptance needs and this checkout can take — a parameter the scenario only
+   sampled (a subset of an enum, one interface scale, one of two branch halves), a surface reachable
+   only behind a different launch flag, a persisted or server value only a fresh start re-reads, a
+   wire path an in-process assertion never exercised — add it now. Extend the current scenario when
+   the check can share the process, otherwise run again. Do this even after every planned check has
+   passed and even while writing the result. This process already holds the context, the branch, the
+   overlay and the build; anything that defers the measurement pays to rebuild all four before it can
+   take the same reading. Where an acceptance criterion ranges over a parameter, iterate the range
+   rather than sampling it — a hand-picked subset is the most common way a check goes missing. A
+   coverage run is not an attempt and never advances the attempt counter.
 
 ## Visual contract (layout tasks)
 
@@ -263,48 +314,102 @@ How TEST verifies it (numbers over eyes):
 
 ## Overlay mechanics
 
-The overlay is ad-hoc, authored fresh against the CURRENT implementation, injected at the
-highest level that still exercises the change (often a direct data-layer call like
-`item->applyEdition(...)` rather than a faked MTP response). It is also the complete runtime driver
-of first resort: prefer programmatically triggering every required action and judging the saved logs
-and captures afterwards over any external desktop driver, whether or not one is available. Drive the
-whole task-specific flow inside the Debug binary by invoking application actions or posting Qt input events on the event loop, waiting for
-observable state, logging assertions, capturing the rendered target in-process, and quitting. A
-locked macOS session does not reduce required coverage and is never a testing blocker. The overlay
-must:
+The repository carries a permanent test harness under
+`Telegram/SourceFiles/test/` — always compiled, runtime-gated on `-testagent`
+(`Test::Active()`), with all of its `#ifdef`s inside the harness itself:
 
-- Live entirely inside `#ifdef _DEBUG` blocks.
+- `test_runner.h` — the staged scenario engine: `Stage{name, run, until, then, timeout}`,
+  `waitEvent`, `waitForSessionReady`, the normal bounded non-fatal `waitForChatsLoaded()`, and
+  explicit strict `waitForChatsLoadedStrict()`; timing out an ordinary `Stage` ends the whole
+  scenario, while the wall-clock watchdog (default 120s, `TDESKTOP_TEST_WATCHDOG` override)
+  guarantees `TEST_COMPLETE` + quit on every exit path including timeout.
+- `test_log.h` — evidence dir from `TDESKTOP_TEST_EVIDENCE_DIR` (the workspace `test-run`
+  helper sets it), flushed absolute-path logging, `Step/Pass/Fail/Check/Note`, `CheckNear`
+  tolerance assertions, `LogGeometry`, the standard markers.
+- `test_widgets.h` — `FindAll<T>`/`FindFirst<T>`/`FindVisible<T>` (the `dynamic_cast`-based
+  finders that avoid the guaranteed `findChildren<CustomWidget*>` crash), `Click`, `TypeText`,
+  `PressKey` via real Qt events.
+- `test_capture.h` — `CaptureWidget`/`CaptureRect` (visibility check, `QWidget::grab()` so
+  floating elements and locked desktops cannot occlude, automatic blank-image FAIL, geometry
+  log, `SCREENSHOT` marker), `Crop`/`Zoom`/`ContactSheet` for tight same-scale evidence.
+- `test_agent.h` — `Test::Fire(name)` / `HasFired(name)` named waitpoints;
+  `launch_finished` fires at the end of `Application::run()`. `TDESKTOP_TEST_SCALE` is applied
+  by the harness at startup.
+- `test_scenario.cpp` — the overlay-owned slot: it defines `Test::SetupScenario(runner)` and
+  is a no-op in the repository.
+
+A minimal scenario shape:
+
+```cpp
+void SetupScenario(not_null<Runner*> runner) {
+	runner->waitEvent(u"launch_finished"_q);
+	runner->waitForChatsLoaded();
+	runner->add({
+		.name = u"open the target and verify the row"_q,
+		.run = [] { /* trigger the flow under test */ },
+		.until = [] {
+			return Test::FindFirst<Ui::SomeWidget>(
+				Core::App().activeWindow()->widget()) != nullptr;
+		},
+		.then = [] {
+			const auto row = Test::FindFirst<Ui::SomeWidget>(
+				Core::App().activeWindow()->widget());
+			Test::LogGeometry(u"row"_q, row->geometry());
+			Test::CheckNear(row->height(), st::someRowHeight, 1, u"row height"_q);
+			Test::CaptureWidget(row, u"target_row"_q);
+		},
+	});
+}
+```
+
+**The overlay = replacing `test_scenario.cpp` with the task's scenario.** Author the scenario
+fresh against the CURRENT implementation from the task's check design; never re-implement
+logging, finding, capturing, watchdogs, or quit handling that the harness already provides —
+re-derived scaffolding is where capture flaws come from. Only two kinds of edits may touch
+other files, and both stay in the inventory: a one-line `Test::Fire("task_waitpoint")` in code
+this task already owns, and a true in-situ injection at the highest level that still exercises
+the change (often a direct data-layer call like `item->applyEdition(...)` rather than a faked
+MTP response). The scenario is the complete runtime driver of first resort: prefer
+programmatically triggering every required action and judging the saved logs and captures
+afterwards over any external desktop driver, whether or not one is available. Drive the whole
+task-specific flow inside the Debug binary on the event loop, waiting for observable state,
+logging assertions, capturing the rendered target in-process, and quitting. A locked macOS
+session does not reduce required coverage and is never a testing blocker. The scenario runs
+only when `-testagent` was passed AND the live portable folder carries the `testing` marker,
+so it can never run against real account data. The overlay must:
+
+- Keep any code added outside `test/` inside `#ifdef _DEBUG` blocks only when it would
+  change release behavior; harness calls like `Test::Fire` are runtime no-ops and need no
+  guard.
 - Pick a **test strategy** and record it in the spec:
   `live-data` (use real account data) · `live-mutate` (really create an entity — prefer a
   throwaway target, clean up after) · `inject` (build fake local state without the network) ·
   `mock-api` (intercept specific requests, return canned responses — for payments/destructive).
   Prefer `inject` over `live-mutate` to avoid account/server accumulation and flake.
-- Drive the scenario on the Qt event loop, preferring **condition-waits over fixed timers**
-  (wait until the target widget/data actually exists, with a timeout fallback). Fixed sleeps are
-  the main source of screenshot flake.
-- Write a flushed log to `<EVIDENCE_DIR>/test_log.txt` (open Append|Text, flush after each write) and
-  save screenshots to `<EVIDENCE_DIR>/screenshots/`. Delete the old log at the first step.
-- **Capture the target tightly.** Grab the specific widget / row / glyph (or crop the saved PNG to
-  it) so the target is unambiguously in frame at usable resolution. A full-window grab that leaves
-  the target clipped, off-screen, or thumbnail-sized is NOT acceptable evidence — if the target
-  isn't clearly captured, that is a TEST_FLAW (re-frame), never a pass.
-- When the desktop is locked or an OS screenshot is unavailable, capture from inside the process
-  with `QWidget::grab()` or a renderer-owned image after layout and paint have completed. A widget or
-  test-window grab plus logged geometry is primary visual evidence; never wait for unlock merely to
-  obtain a desktop screenshot.
+- Express the flow as `Runner` stages with **condition-waits over fixed timers** (an `until`
+  predicate on the target widget/data actually existing, with the stage timeout as fallback).
+  Fixed sleeps are the main source of screenshot flake.
+- Log through `test_log.h` (`Step`/`Pass`/`Fail`/`Check`/`Note`/`CheckNear`/`LogGeometry`) —
+  it already writes the flushed absolute-path log and the exact `TEST_STEP` / `TEST_RESULT` /
+  `SCREENSHOT` / `TEST_COMPLETE` markers the external runner parses. Never hand-roll marker
+  strings or log files.
+- **Capture the target tightly** with `CaptureWidget`/`CaptureRect` — the specific widget /
+  row / glyph, unambiguously in frame at usable resolution. A full-window grab that leaves the
+  target clipped, off-screen, or thumbnail-sized is NOT acceptable evidence — if the target
+  isn't clearly captured, that is a TEST_FLAW (re-frame), never a pass. The helpers grab
+  in-process after layout and paint, so a locked desktop never blocks capture and a blank
+  grab fails loudly instead of passing silently.
 - **Lay down the oracle's references.** Save every applicable independent reference beside the
-  crop. Exact asset work saves OLD and intended-NEW art as `<name>_{old,new}.png`. Without target
-  artwork, save the baseline/reference-component crop when available and log the contract anchors,
+  crop (`SaveImage`, `ContactSheet` for same-scale comparison). Exact asset work saves OLD and
+  intended-NEW art as `<name>_{old,new}.png`. Without target artwork, save the
+  baseline/reference-component crop when available and log the contract anchors,
   style/resource identities, and measurements. Never fabricate an `_new` image.
-- Emit these markers, one per line:
-  `TEST_STEP: <desc>` · `TEST_RESULT: PASS: <what>` / `TEST_RESULT: FAIL: <what> - <details>` ·
-  `SCREENSHOT: <full path>` · `TEST_COMPLETE` (immediately before quit).
 - Prefer asserting on **logged state** (log the actual value, assert on text — deterministic);
   reserve screenshots for genuinely visual checks where an eye is the right judge.
-- **Watchdog:** install a `QTimer` at scenario start that force-quits (`Core::Quit()`, and if
-  needed `std::abort` after a flush) at a hard wall-clock cap (default 120s). This guarantees the
-  app never hangs holding a lock on the exe — independent of the runner's own timeout.
-- End every path (success or assertion failure) by logging `TEST_COMPLETE` then `Core::Quit()`.
+- Rely on the Runner's built-in watchdog and termination: it force-quits at the wall-clock cap
+  and ends every path — success, assertion failure, or stage timeout — with `TEST_COMPLETE`
+  then quit, so the app never hangs holding a lock on the exe. Do not install a second
+  watchdog and do not call `Core::Quit()` from scenario code.
 
 ### Finding widgets in an overlay (CRITICAL — avoids a guaranteed crash)
 
@@ -316,40 +421,34 @@ do **NOT** declare `Q_OBJECT` — they have no own meta-object. So `QObject::fin
 get a raw SIGSEGV — the debugger shows `this` with the *wrong* dynamic type. A clean rebuild does NOT
 fix it; it is a real bug in the overlay, not a stale build.
 
-- **Never** `findChildren<Ui::SomeCustomWidget*>()`. Instead enumerate `findChildren<QWidget*>()`
-  (`QWidget` *is* `Q_OBJECT`, so that call is sound and returns all descendants) and
-  `dynamic_cast<Ui::SomeCustomWidget*>()` each, keeping the non-null results — C++ RTTI identifies the
-  real type regardless of `Q_OBJECT`. A reusable helper:
-  ```cpp
-  template <typename T>
-  [[nodiscard]] std::vector<T*> FindWidgets(QWidget *root) {
-      auto out = std::vector<T*>();
-      for (const auto w : root->findChildren<QWidget*>()) {
-          if (const auto t = dynamic_cast<T*>(w)) out.push_back(t);
-      }
-      return out;
-  }
-  ```
+- **Never** `findChildren<Ui::SomeCustomWidget*>()`. Use the harness finders
+  `Test::FindAll<T>` / `Test::FindFirst<T>` / `Test::FindVisible<T>` from `test_widgets.h`,
+  which enumerate `findChildren<QWidget*>()` (`QWidget` *is* `Q_OBJECT`, so that call is sound)
+  and `dynamic_cast` each result — C++ RTTI identifies the real type regardless of `Q_OBJECT`.
 - Only genuine Qt `Q_OBJECT` types (`QWidget`, `QLabel`, `QLineEdit`, …) are safe to pass directly to
   `findChildren<T*>()`.
 
 ### Log to an ABSOLUTE path (the launcher chdir's)
 
 The Windows launcher changes the working directory to the exe folder before the app runs, so a
-**relative** overlay log path (`<EVIDENCE_DIR>/test_log.txt`) silently fails to write (`QFile` won't
-create missing parents) — the run looks "clean" but produces no evidence. Create and resolve
-`EVIDENCE_DIR` to an absolute path up front (or bake its absolute path into the overlay) so flushes
-actually land; likewise for screenshots.
+**relative** log path silently fails to write (`QFile` won't create missing parents) — the run
+looks "clean" but produces no evidence. `Test::EvidenceDir()` resolves
+`TDESKTOP_TEST_EVIDENCE_DIR` (which the workspace `test-run` helper always exports as an
+absolute path) and creates it up front, so harness logging and captures are immune; never
+bypass it with hand-built relative paths.
 
 ### Git mechanics for the overlay (no stash)
 
-- Before authoring, inventory every tracked overlay path in `<WORK_DIR>/test-overlay.paths`; no
-  unrelated or untracked source path may be used. After building, save the overlay with
-  `git diff --binary HEAD > <WORK_DIR>/test-overlay.patch` and verify the patch is nonempty and
-  reapplicable. Restore only the inventoried overlay paths to `GREEN_REF`; never hard-reset the
-  repository. The overlay never enters an impl commit.
-- Next round, re-apply on top of the new implementation: `git apply --3way
-  <WORK_DIR>/test-overlay.patch`. This succeeds ~90% of the time when the tail change was small.
+- The inventory in `<WORK_DIR>/test-overlay.paths` is normally exactly
+  `Telegram/SourceFiles/test/test_scenario.cpp`, plus any in-situ injection or `Test::Fire`
+  paths; no unrelated or untracked source path may be used. After building, save the overlay
+  with the workspace helper's `overlay-save` command: it verifies every dirty path against the
+  inventory, writes a nonempty verified `<WORK_DIR>/test-overlay.patch`, and restores only the
+  inventoried overlay paths to the wrapper's restore ref; never hard-reset the repository. The
+  overlay never enters an impl commit.
+- Next round, re-apply on top of the new implementation with `overlay-apply` (a `--3way`
+  application that reports conflicted paths). This succeeds ~90% of the time when the tail change
+  was small.
 - On conflict, **re-author the conflicting hunk from the latest Attempt/Run in `<WORK_DIR>/test.md`** (which
   records injection point, fake values, and assertions) rather than fighting conflict markers.
   Scenario steps that only call public APIs should live in their own block so they never conflict;
@@ -361,30 +460,34 @@ actually land; likewise for screenshots.
   run the in-binary overlay flow, collect its logs and widget/window grabs, assess them, and clean up.
   Do not try to unlock the session and do not return BLOCKED because the lock screen is present.
 - Build with `BUILD`. A single changed TU compiles fast; only the overlay-touched files + link
-  rebuild between rounds. Proactive path-scoped cleanup may run before the build. If the build reports
-  `LNK1104`, `C1041`, access denied, or file in use, follow `AGENTS.md`: stop immediately, do not
-  retry or attempt a workaround, and ask the user to close the app/debugger.
+  rebuild between rounds. On Windows, run the shared exact-path proactive cleanup before every
+  build. If the build reports `LNK1104`, `C1041`, access denied, or file in use, follow
+  `.agents/shared/build-lock-recovery.md` and retry within its bounded budget.
 - **Codegen does not track resource mtimes.** If the task changed only a resource the style codegen
   consumes (an icon `.svg`, etc.) without touching a `.style`, an incremental build will NOT re-pack
   it and the binary keeps the OLD asset. Before building such a task force regeneration — touch the
   referencing `.style` (or clean the codegen output) — so the change actually ships. A render that
   shows no difference from before is the symptom of skipping this.
-- Run: run the SETUP steps (Test account) -> create `EVIDENCE_DIR` -> launch `EXE` **with
-  `-testagent`** in the background, redirecting stdout to `<EVIDENCE_DIR>/app_stdout.txt` and stderr
-  to `<EVIDENCE_DIR>/app_stderr.txt` (this flag prevents modal crash hangs, and stderr captures
-  assertion text) -> **start a hard wall-clock deadline (~90s) from launch** -> poll
-  `<EVIDENCE_DIR>/test_log.txt` every ~5s -> on each `SCREENSHOT:` read the image and judge it -> detect
-  `TEST_COMPLETE` (success) or process death (crash) or no new output for the watchdog cap, or the
-  hard deadline elapsing (hang) -> path-scoped kill of any straggler (Test account → "Serialize app
-  runs") -> save the binary overlay patch -> restore only inventoried overlay
-  paths to `GREEN_REF` (the patch must be saved before this restore).
-
-    On Windows, launch and capture both streams like:
-
-        $exe = (Resolve-Path "$EXE").Path
-        Start-Process -FilePath $exe -ArgumentList '-testagent' `
-          -RedirectStandardError "$EVIDENCE_DIR/app_stderr.txt" `
-          -RedirectStandardOutput "$EVIDENCE_DIR/app_stdout.txt" -PassThru
+- Run: execute the workspace helper's `test-run` command with `EXE` and `EVIDENCE_DIR`. One call
+  performs the SETUP steps (Test account), creates `EVIDENCE_DIR`, path-scope-kills stragglers,
+  then, for a reused marked-live account, moves a non-empty live `tdata/working` to
+  `<EVIDENCE_DIR>/stale-crash/working` and every live `tdata/dumps/*.dmp` to
+  `<EVIDENCE_DIR>/stale-crash/dumps/` before launch. A zero-byte `tdata/working` is neither moved
+  nor reported. It launches `EXE` **with `-testagent -noupdate`** (so a shipped update can never
+  replace the binary under test mid-run) capturing stdout to
+  `<EVIDENCE_DIR>/app_stdout.txt` and stderr to `<EVIDENCE_DIR>/app_stderr.txt` (the flag prevents
+  modal crash hangs, and stderr captures assertion text), enforces **a hard wall-clock deadline
+  from launch** and a quiet-log watchdog while polling `<EVIDENCE_DIR>/test_log.txt`, detects
+  `TEST_COMPLETE` (success) versus process death (crash) versus the caps elapsing (hang), kills any
+  straggler, and returns one JSON report with the parsed markers, stderr tail, fresh crash
+  diagnostics, and `stale_crash_cleared`. That field is an ordered list of `{from, kind, to}`
+  entries whose `kind` is `"report"` or `"dump"`, and is `[]` when nothing was cleared. If the
+  stale report cannot be moved, `test-run` refuses before launch, prints the helper error on stderr,
+  exits non-zero, and emits no JSON. If a dump cannot be moved, `test-run` leaves it in place,
+  records `"to": null` (a null destination), and continues to launch. Then read each `SCREENSHOT:`
+  image and judge it, save the binary overlay patch, and restore only inventoried overlay paths
+  (`overlay-save` — the patch must be saved before that restore). The runner only gathers evidence;
+  ASSESS below stays the agent's own adversarial judgement.
 
 ### Crashes & assertions (always launch the test binary with `-testagent`)
 
@@ -477,9 +580,8 @@ The on-disk `EXE` (`out/Debug/Telegram.exe`) always contains the compiled overla
 Restoring source does not rewrite the binary. When the loop reaches a TERMINAL verdict (APPROVED,
 BLOCKED, UNRECOVERABLE, or attempt cap), after the final path-scoped kill and exact-path source
 restore, **delete the built `EXE`** so no overlay-laden test binary is left for
-the user to launch by mistake:
-
-    Remove-Item -Force "$EXE"
+the user to launch by mistake — the workspace helper's `test-cleanup --exe EXE --delete-exe` does
+the final path-scoped kill and the deletion in one call.
 
 A clean, feature-ready binary is one `BUILD` away on demand. (Delete only on terminal exit — between
 attempts the next round rebuilds the overlay, so the binary is reused there.)

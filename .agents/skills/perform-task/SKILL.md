@@ -16,6 +16,8 @@ Read these files completely before phase work:
 - `references/pipeline.md` for the authoritative end-to-end runner contract;
 - `references/phase-prompts.md` for exact leaf prompts and retry rules;
 - `.agents/shared/test-loop.md` for the implementation/test state machine;
+- `.agents/shared/build-lock-recovery.md` for bounded exact-checkout Windows
+  build-lock recovery;
 - `references/computer-use-testing.md` when UI-driver selection or operation is
   relevant.
 
@@ -87,11 +89,22 @@ task, canonical master must already contain its `Start` commit.
 Execute `references/pipeline.md` exactly. A normal task produces:
 
 1. one or more tested Telegram implementation-attempt commits, each with an
-   exact one-line subject, blank line, and `Task: <full-task-id>`;
+   exact one-line subject using the pipeline's conditional `[ai] ` prefix,
+   blank line, and `Task: <full-task-id>`;
 2. local tracked phase artifacts and progress in the AI slot worktree, without
    phase commits;
 3. one canonical `Approve <full-task-id>` commit containing all final AI
    artifacts and state.
+
+Read `type` from the `resolve` output before planning. A `type: verify` task
+measures shipped behavior, carries no implementation, and produces **no Telegram
+commit at all** — only item 2 and item 3 above. It skips implementation, the
+implementation build, the four-lens review loop, and Windows normalization, and
+runs the pipeline's Verification tasks profile instead: measurement plan,
+falsifiability assessment, then the test loop. Its outcome is either that the
+behavior held or a `Finding: deviation` recording the exact disagreement plus
+follow-up tasks that repair it; both finish `approved`. Never repair what a
+verification measured, and never let one commit source.
 
 Only a genuine exhausted implementation or verification blocker produces a
 canonical `Block <full-task-id>` commit. Agent interruption, tool loss, and
@@ -102,6 +115,11 @@ A locked macOS session is not an environment stop or verification blocker.
 Skip interactive Computer Use and complete the same coverage through the
 in-binary overlay: drive the flow, log/assert, capture widgets or windows,
 quit, and assess the saved artifacts.
+
+A Windows build-output lock is not an immediate environment stop. Follow the
+shared bounded recovery contract, including exact-path cleanup before builds.
+Only its exhausted or unsafe outcome is a global hard stop; it never becomes a
+task `Block`.
 
 Do not report success from a source commit alone. The final AI commit must be
 canonical. Retry ordinary concurrent-master publication races until success.

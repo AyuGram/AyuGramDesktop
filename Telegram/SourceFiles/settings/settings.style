@@ -49,6 +49,18 @@ settingsAttentionButtonWithIcon: SettingsButton(settingsButton) {
 	textFg: attentionButtonFg;
 	textFgOver: attentionButtonFgOver;
 }
+settingsExperimentalTitle: FlatLabel(defaultFlatLabel) {
+	minWidth: 100px;
+}
+settingsExperimentalAbout: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: 100px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+	}
+}
+settingsExperimentalTitlePadding: margins(22px, 9px, 66px, 1px);
+settingsExperimentalAboutPadding: margins(22px, 0px, 66px, 9px);
 settingsOptionDisabled: SettingsButton(settingsButtonNoIcon) {
 	textFg: windowSubTextFg;
 	textFgOver: windowSubTextFg;
@@ -147,6 +159,9 @@ settingsCheckbox: Checkbox(defaultBoxCheckbox) {
 settingsCheckboxPadding: margins(22px, 10px, 10px, 10px);
 settingsLink: boxLinkButton;
 settingsCheckboxesSkip: 12px;
+
+settingsNavigationMargin: 60px;
+settingsNavigationBandSkip: 4px;
 
 settingsSendType: settingsCheckbox;
 settingsSendTypePadding: margins(22px, 5px, 10px, 5px);
@@ -690,6 +705,14 @@ settingsIconPasskeys: icon {{ "menu/permissions", windowBgActive }};
 settingsIconPasskeysAboutIcon1: icon {{ "menu/permissions", boxTextFg }};
 settingsIconPasskeysAboutIcon2: icon {{ "menu/passcode_winhello", boxTextFg }};
 settingsIconPasskeysAboutIcon3: icon {{ "menu/lock", boxTextFg }};
+passkeyCableBox: Box(defaultBox) {
+	buttonPadding: margins(22px, 10px, 22px, 12px);
+}
+passkeyCableHintLabel: FlatLabel(boxDividerLabel) {
+	align: align(top);
+}
+passkeyCableQrCenter: size(64px, 64px);
+passkeyCableQrSize: 260px;
 
 settingsAgeVerifyBox: Box(filterInviteBox) {
 	buttonPadding: margins(24px, 24px, 24px, 24px);
