@@ -1628,6 +1628,7 @@ void Session::deleteConversationLocally(not_null<PeerData*> peer) {
 		}
 	};
 	if (const auto history = historyLoaded(peer)) {
+		history->setDeletedLocally(true);
 		if (history->folderKnown()) {
 			setChatPinned(history, FilterId(), false);
 		}

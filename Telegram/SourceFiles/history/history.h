@@ -404,7 +404,13 @@ public:
 
 	History *migrateSibling() const;
 	[[nodiscard]] bool useTopPromotion() const;
-	int fixedOnTopIndex() const override;
+	[[nodiscard]] bool isDeletedLocally() const {
+		return _isDeletedLocally;
+	}
+	void setDeletedLocally(bool deleted) {
+		_isDeletedLocally = deleted;
+	}
+
 	void updateChatListExistence() override;
 	bool shouldBeInChatList() const override;
 	Dialogs::UnreadState chatListUnreadState() const override;
@@ -705,6 +711,8 @@ private:
 	QString _topPromotedType;
 
 	HistoryView::SendActionPainter _sendActionPainter;
+
+	bool _isDeletedLocally = false;
 
 
 };

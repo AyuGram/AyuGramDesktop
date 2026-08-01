@@ -3361,6 +3361,15 @@ bool History::lastServerMessageKnown() const {
 }
 
 void History::updateChatListExistence() {
+	if (const auto channel = peer->asChannel()) {
+		if (channel->amIn()) {
+			_isDeletedLocally = false;
+		}
+	} else if (const auto chat = peer->asChat()) {
+		if (chat->amIn()) {
+			_isDeletedLocally = false;
+		}
+	}
 	Entry::updateChatListExistence();
 }
 
@@ -3389,6 +3398,8 @@ bool History::trackUnreadMessages() const {
 bool History::shouldBeInChatList() const {
 	if (peer->migrateTo() || !folderKnown()) {
 		return false;
+	} else if (_isDeletedLocally) {
+		return false;
 	} else if (const auto community = peer->asChannel()
 		; community && community->isCommunity()) {
 		return !(community->flags() & ChannelDataFlag::Forbidden)
@@ -3398,14 +3409,18 @@ bool History::shouldBeInChatList() const {
 		return true;
 	} else if (const auto channel = peer->asChannel()) {
 		if (!channel->amIn()) {
-			if (AyuSettings::getInstance().keepForbiddenChats() && (lastMessageKnown() && lastMessage() != nullptr)) {
+			if (AyuSettings::getInstance().keepForbiddenChats()
+				&& (channel->haveLeft() || channel->isForbidden())
+				&& (lastMessageKnown() && lastMessage() != nullptr)) {
 				return true;
 			}
 			return isTopPromoted();
 		}
 	} else if (const auto chat = peer->asChat()) {
 		if (!chat->amIn()) {
-			if (AyuSettings::getInstance().keepForbiddenChats() && (lastMessageKnown() && lastMessage() != nullptr)) {
+			if (AyuSettings::getInstance().keepForbiddenChats()
+				&& (chat->haveLeft() || chat->isForbidden())
+				&& (lastMessageKnown() && lastMessage() != nullptr)) {
 				return true;
 			}
 		}
