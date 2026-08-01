@@ -39,32 +39,7 @@ AyuLanguage::AyuLanguage() = default;
 
 void AyuLanguage::init() {
 	if (!instance) instance = new AyuLanguage;
-	instance->applyDefaultFallbacks();
 	instance->loadCachedLanguage();
-}
-
-void AyuLanguage::applyDefaultFallbacks() {
-	const auto langId = Lang::GetInstance().id();
-	const auto baseId = Lang::GetInstance().baseId();
-	const auto isRu = (langId == u"ru"_q || baseId == u"ru"_q || langId.startsWith(u"ru"_q));
-	const auto isUk = (langId == u"uk"_q || baseId == u"uk"_q || langId.startsWith(u"uk"_q));
-	const auto isBe = (langId == u"be"_q || baseId == u"be"_q || langId.startsWith(u"be"_q));
-	const auto isEs = (langId == u"es"_q || baseId == u"es"_q || langId.startsWith(u"es"_q));
-	const auto isPt = (langId == u"pt"_q || baseId == u"pt"_q || langId.startsWith(u"pt"_q));
-
-	if (isRu) {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Сохранять покинутые чаты");
-	} else if (isUk) {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Зберігати покинені чати");
-	} else if (isBe) {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Захоўваць пакінутыя чаты");
-	} else if (isEs) {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Conservar chats abandonados");
-	} else if (isPt) {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Manter chats abandonados");
-	} else {
-		Lang::GetInstance().applyValue("ayu_KeepForbiddenChats", "Keep Left Chats");
-	}
 }
 
 AyuLanguage *AyuLanguage::currentInstance() {
