@@ -274,14 +274,14 @@ QString AddOption(
 		toggles->fire_copy(option.value());
 	}, lifetime);
 
-<<<<<<< HEAD
 	const auto referrer = OptionReferrer(option);
 	Button *button = nullptr;
 	if (!referrer.isEmpty()) {
-		button = inner->add(object_ptr<Button>(
+		button = AddOptionRow(
 			inner,
-			rpl::single(name),
-			st::settingsButtonNoIcon));
+			name,
+			description,
+			st::settingsButtonNoIcon);
 		button->addClickHandler([=] {
 			const auto resolved = ResolveReferrer(
 				referrer,
@@ -291,24 +291,15 @@ QString AddOption(
 			window->activate();
 		});
 	} else {
-		button = inner->add(object_ptr<Button>(
+		button = AddOptionRow(
 			inner,
-			rpl::single(name),
+			name,
+			description,
 			(option.relevant()
 				? st::settingsButtonNoIcon
 				: st::settingsOptionDisabled)
-		))->toggleOn(toggles->events_starting_with(option.value()));
+		)->toggleOn(toggles->events_starting_with(option.value()));
 	}
-=======
-	const auto button = AddOptionRow(
-		inner,
-		name,
-		description,
-		(option.relevant()
-			? st::settingsButtonNoIcon
-			: st::settingsOptionDisabled)
-	)->toggleOn(toggles->events_starting_with(option.value()));
->>>>>>> v7.0.7
 
 	if (registerHighlight) {
 		registerHighlight(u"experimental/"_q + option.id(), button);
@@ -555,6 +546,7 @@ void SetupExperimental(
 			const char name[]) {
 		return AddOption(
 			window,
+			controller,
 			inner,
 			base::options::lookup<bool>(name),
 			(reset
