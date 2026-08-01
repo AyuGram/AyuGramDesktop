@@ -208,6 +208,16 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 
 		Lang::GetInstance().resetValue(key.toUtf8());
 		Lang::GetInstance().applyValue(key.toUtf8(), val.toUtf8());
+
+		if (brokenKey == u"KeepDeletedMessages"_q) {
+			Lang::GetInstance().applyValue("ayu_SaveDeletedMessages", val.toUtf8());
+		} else if (brokenKey == u"KeepMessagesHistory"_q) {
+			Lang::GetInstance().applyValue("ayu_SaveMessagesHistory", val.toUtf8());
+		} else if (brokenKey == u"SaveForBots"_q) {
+			Lang::GetInstance().applyValue("ayu_MessageSavingSaveForBots", val.toUtf8());
+		} else if (brokenKey == u"MarkReadAfterSend"_q) {
+			Lang::GetInstance().applyValue("ayu_MarkReadAfterAction", val.toUtf8());
+		}
 	}
 	Lang::GetInstance().updatePluralRules();
 }
