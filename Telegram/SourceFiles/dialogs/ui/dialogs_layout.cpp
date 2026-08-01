@@ -505,7 +505,8 @@ void PaintRow(
 	}
 
 	const auto origOpacity = p.opacity();
-	const auto peer = entry ? entry->peer().get() : nullptr;
+	const auto history = entry ? entry->asHistory() : nullptr;
+	const auto peer = history ? history->peer.get() : nullptr;
 	const auto isForbiddenOrLeft = peer && (
 		(peer->isChannel() && (!peer->asChannel()->amIn() || peer->asChannel()->isForbidden())) ||
 		(peer->isChat() && (!peer->asChat()->amIn() || peer->asChat()->isForbidden()))
