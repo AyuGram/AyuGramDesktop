@@ -327,7 +327,7 @@ CollapsibleToggleResult AddCollapsibleToggle(not_null<Ui::VerticalLayout*> conta
 						  rpl::producer<QString> title,
 						  std::vector<NestedEntry> checkboxes,
 						  bool toggledWhenAll,
-						  QString description) {
+						  rpl::producer<QString> description) {
 	struct CheckboxEntry {
 		not_null<Ui::AbstractCheckView*> checkView;
 		Ui::Checkbox *checkbox = nullptr;
@@ -436,10 +436,8 @@ CollapsibleToggleResult AddCollapsibleToggle(not_null<Ui::VerticalLayout*> conta
 		}
 	}
 
-	if (!description.isEmpty()) {
-		Ui::AddDividerText(verticalLayout, rpl::single(std::move(description)));
-		Ui::AddSkip(verticalLayout);
-	}
+	Ui::AddDividerText(verticalLayout, std::move(description));
+	Ui::AddSkip(verticalLayout);
 
 	// Apply initial lock visuals.
 	for (auto i = 0u; i < cState->entries.size(); ++i) {
