@@ -1579,12 +1579,56 @@ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)
 		);
 	}
 
-	if (contextPeer && contextPeer != user && user->isSelf()) {
+	if (contextPeer && contextPeer != user) {
 		if (const auto channel = contextPeer->asChannel()) {
-			if (channel->inviteDate) {
-				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(channel->inviteDate).date());
-				const auto joinText = formatJoinDateText(user, channel->name(), joinDateFormatted);
-				regResult = appendTextWithEntities(regResult, joinText);
+			if (user->isSelf()) {
+				if (channel->inviteDate) {
+					const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(channel->inviteDate).date());
+					const auto joinText = formatJoinDateText(user, channel->name(), joinDateFormatted);
+					regResult = appendTextWithEntities(regResult, joinText);
+				}
+				if (callback) {
+					callback(regResult);
+				}
+				return;
+			} else {
+				user->session().api().request(MTPchannels_GetParticipant(
+					channel->inputChannel,
+					user->inputUser
+				)).done([=](const MTPchannels_ChannelParticipant &result) {
+					auto finalResult = regResult;
+					result.match([&](const MTPDchannels_channelParticipant &data) {
+						channel->owner().processUsers(data.vusers());
+
+						TimeId joinDate = 0;
+						data.vparticipant().match([&](const MTPDchannelParticipant &p) {
+							joinDate = p.vdate().v;
+						}, [&](const MTPDchannelParticipantSelf &p) {
+							joinDate = p.vdate().v;
+						}, [&](const MTPDchannelParticipantAdmin &p) {
+							joinDate = p.vdate().v;
+						}, [&](const MTPDchannelParticipantBanned &p) {
+							joinDate = p.vdate().v;
+						}, [&](const MTPDchannelParticipantCreator &) {
+							joinDate = channel->date;
+						}, [&](const auto &) {
+						});
+
+						if (joinDate > 0) {
+							const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(joinDate).date());
+							const auto joinText = formatJoinDateText(user, channel->name(), joinDateFormatted);
+							finalResult = appendTextWithEntities(finalResult, joinText);
+						}
+					});
+					if (callback) {
+						callback(finalResult);
+					}
+				}).fail([=] {
+					if (callback) {
+						callback(regResult);
+					}
+				}).send();
+				return;
 			}
 		}
 	}
