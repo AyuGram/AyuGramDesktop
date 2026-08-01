@@ -256,34 +256,6 @@ void ResolveDocument(
 	};
 
 	const auto media = document->createMediaView();
-<<<<<<< HEAD
-	const auto openImageInApp = [&] {
-		if (document->size >= Images::kReadBytesLimit) {
-			return false;
-		}
-		const auto &location = document->location(true);
-		const auto mime = u"image/"_q;
-		if (!location.isEmpty() && location.accessEnable()) {
-			const auto guard = gsl::finally([&] {
-				location.accessDisable();
-			});
-			const auto path = location.name();
-			if (Core::MimeTypeForFile(QFileInfo(path)).name().startsWith(mime)
-				&& QImageReader(path).canRead()) {
-				showDocument();
-				return true;
-			}
-		} else if (document->mimeString().startsWith(mime)
-			&& !media->bytes().isEmpty()) {
-			auto bytes = media->bytes();
-			auto buffer = QBuffer(&bytes);
-			if (QImageReader(&buffer).canRead()) {
-				showDocument();
-				return true;
-			}
-		}
-		return false;
-	};
 	const auto openPluginInfo = [&] {
 		// image size limit is fine too ig (64MB)
 		if (document->size >= Images::kReadBytesLimit) {
@@ -312,8 +284,6 @@ void ResolveDocument(
 		}
 		return false;
 	};
-=======
->>>>>>> v7.0.7
 	const auto &location = document->location(true);
 	if (document->isTheme() && media->loaded(true)) {
 		showDocument();

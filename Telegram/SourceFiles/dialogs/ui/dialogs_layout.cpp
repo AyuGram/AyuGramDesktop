@@ -43,6 +43,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ui/unread_badge.h"
 #include "ui/unread_badge_paint.h"
 #include "ui/unread_counter_format.h"
@@ -499,6 +502,16 @@ void PaintRow(
 			? st::dialogsRippleBgActive
 			: st::dialogsRippleBg;
 		row->paintRipple(p, 0, 0, context.width, &ripple->c);
+	}
+
+	const auto origOpacity = p.opacity();
+	const auto peer = entry ? entry->peer().get() : nullptr;
+	const auto isForbiddenOrLeft = peer && (
+		(peer->isChannel() && (!peer->asChannel()->amIn() || peer->asChannel()->isForbidden())) ||
+		(peer->isChat() && (!peer->asChat()->amIn() || peer->asChat()->isForbidden()))
+	);
+	if (isForbiddenOrLeft) {
+		p.setOpacity(origOpacity * 0.5f);
 	}
 
 	if (flags & Flag::SavedMessages) {
@@ -1086,6 +1099,9 @@ void PaintRow(
 		if (quick->rippleFg->empty()) {
 			quick->rippleFg.reset();
 		}
+	}
+	if (isForbiddenOrLeft) {
+		p.setOpacity(origOpacity);
 	}
 }
 

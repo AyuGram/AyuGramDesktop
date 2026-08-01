@@ -3398,9 +3398,17 @@ bool History::shouldBeInChatList() const {
 		return true;
 	} else if (const auto channel = peer->asChannel()) {
 		if (!channel->amIn()) {
+			if (AyuSettings::getInstance().keepForbiddenChats() && (lastMessageKnown() && lastMessage() != nullptr)) {
+				return true;
+			}
 			return isTopPromoted();
 		}
 	} else if (const auto chat = peer->asChat()) {
+		if (!chat->amIn()) {
+			if (AyuSettings::getInstance().keepForbiddenChats() && (lastMessageKnown() && lastMessage() != nullptr)) {
+				return true;
+			}
+		}
 		return chat->amIn()
 			|| !lastMessageKnown()
 			|| (lastMessage() != nullptr);
