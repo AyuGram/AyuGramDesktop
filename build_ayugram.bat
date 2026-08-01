@@ -70,7 +70,9 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-set "PATH=C:\Users\aver\AppData\Local\Programs\Python\Python313;C:\Users\aver\AppData\Local\Programs\Python\Python313\Scripts;%PATH%"
+if exist "%LocalAppData%\Programs\Python\Python313\python.exe" (
+    set "PATH=%LocalAppData%\Programs\Python\Python313;%LocalAppData%\Programs\Python\Python313\Scripts;!PATH!"
+)
 
 :: 4. Run Win.bat dependency preparation if Libraries doesn't exist
 if exist "..\Libraries\win64" goto skip_prepare
