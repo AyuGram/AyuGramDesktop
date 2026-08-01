@@ -1594,7 +1594,7 @@ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)
 			} else {
 				user->session().api().request(MTPchannels_GetParticipant(
 					channel->inputChannel(),
-					user->inputUser()
+					user->input()
 				)).done([=](const MTPchannels_ChannelParticipant &result) {
 					auto finalResult = regResult;
 					result.match([&](const MTPDchannels_channelParticipant &data) {
