@@ -49,17 +49,17 @@ void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.title = tr::ayu_HideReactions(),
 		.checkboxes = {
 			NestedEntry{
-				tr::ayu_HideReactionsInChannels(tr::now),
+				tr::ayu_HideReactionsInChannels(),
 				[] { return !AyuSettings::getInstance().showChannelReactions(); },
 				[](bool v) { AyuSettings::getInstance().setShowChannelReactions(!v); }
 			},
 			NestedEntry{
-				tr::ayu_HideReactionsInGroups(tr::now),
+				tr::ayu_HideReactionsInGroups(),
 				[] { return !AyuSettings::getInstance().showGroupReactions(); },
 				[](bool v) { AyuSettings::getInstance().setShowGroupReactions(!v); }
 			},
 			NestedEntry{
-				tr::ayu_HideReactionsInPrivateChats(tr::now),
+				tr::ayu_HideReactionsInPrivateChats(),
 				[] { return !AyuSettings::getInstance().showPrivateChatReactions(); },
 				[](bool v) { AyuSettings::getInstance().setShowPrivateChatReactions(!v); }
 			}
@@ -101,9 +101,9 @@ void BuildGroupsAndChannels(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.boxTitle = tr::ayu_ChannelBottomButton(),
 		.initialSelection = static_cast<int>(settings->channelBottomButton()),
 		.options = {
-			tr::ayu_ChannelBottomButtonHide(tr::now),
-			tr::ayu_ChannelBottomButtonMute(tr::now),
-			tr::ayu_ChannelBottomButtonDiscuss(tr::now),
+			tr::ayu_ChannelBottomButtonHide(),
+			tr::ayu_ChannelBottomButtonMute(),
+			tr::ayu_ChannelBottomButtonDiscuss(),
 		},
 		.setter = [](int index) {
 			AyuSettings::getInstance().setChannelBottomButton(
