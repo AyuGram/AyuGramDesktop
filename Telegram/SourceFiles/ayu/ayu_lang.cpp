@@ -41,14 +41,14 @@ void AyuLanguage::init() {
 	if (!instance) {
 		instance = new AyuLanguage;
 		Lang::GetInstance().updated(
-		) | rpl::start_with_next([] {
+		) | rpl::on_next([] {
 			const auto id = Lang::GetInstance().id();
 			const auto baseId = Lang::GetInstance().baseId();
 			if (!id.isEmpty() && instance) {
 				instance->loadCachedLanguage();
 				instance->fetchLanguage(id, baseId);
 			}
-		}, instance->lifetime());
+		}, instance->_lifetime);
 	}
 	instance->loadCachedLanguage();
 }
