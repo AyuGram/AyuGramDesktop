@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/ui_integration.h"
 #include "data/data_channel.h"
+#include "data/data_chat.h"
 #include "data/data_drafts.h"
 #include "data/data_folder.h"
 #include "data/data_forum_topic.h"
