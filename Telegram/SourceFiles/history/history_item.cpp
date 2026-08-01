@@ -4706,7 +4706,7 @@ TextWithEntities HistoryItem::notificationText(
 }
 
 ItemPreview HistoryItem::toPreview(ToPreviewOptions options) const {
-	if (FiltersController::filtered(const_cast<HistoryItem*>(this))) {
+	if (FiltersController::isBlockedOrRegexFiltered(const_cast<HistoryItem*>(this))) {
 		return {};
 	}
 

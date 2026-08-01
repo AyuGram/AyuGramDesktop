@@ -472,7 +472,7 @@ void PaintRow(
 	const auto history = entry->asHistory();
 	const auto thread = entry->asThread();
 	const auto sublist = entry->asSublist();
-	const auto itemIsFiltered = item && FiltersController::filtered(item);
+	const auto itemIsFiltered = item && FiltersController::isBlockedOrRegexFiltered(item);
 	const auto itemIsEmpty = item && (item->isEmpty() || itemIsFiltered);
 	const auto showFilteredItem = !fakeRow
 		&& itemIsEmpty
@@ -1297,7 +1297,7 @@ void RowPainter::Paint(
 		not_null<const FakeRow*> row,
 		const PaintContext &context) {
 	const auto item = row->item();
-	const auto itemIsFiltered = FiltersController::filtered(item);
+	const auto itemIsFiltered = FiltersController::isBlockedOrRegexFiltered(item);
 	const auto topic = context.forum ? row->topic() : nullptr;
 	const auto history = topic ? nullptr : item->history().get();
 	const auto entry = topic ? (Entry*)topic : (Entry*)history;

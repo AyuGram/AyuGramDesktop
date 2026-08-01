@@ -179,14 +179,36 @@ bool isDuplicateMessage(const not_null<HistoryItem*> item) {
 		while (prev) {
 			const auto prevData = prev->data();
 			if (!prevData->isService()) {
-				if (prevData->from() == item->from()
+				return (prevData->from() == item->from()
 					&& prevData->originalText().text == text
-					&& !prevData->out()) {
-					return true;
-				}
-				break;
+					&& !prevData->out());
 			}
 			prev = prev->previousInBlocks();
+		}
+		return false;
+	}
+
+	const auto history = item->history();
+	const auto &blocks = history->blocks;
+	bool foundSelf = false;
+
+	for (auto bIt = blocks.rbegin(); bIt != blocks.rend(); ++bIt) {
+		const auto &msgs = (*bIt)->messages;
+		for (auto mIt = msgs.rbegin(); mIt != msgs.rend(); ++mIt) {
+			const auto prevData = (*mIt)->data();
+			if (prevData == item) {
+				foundSelf = true;
+				continue;
+			}
+			if (!foundSelf) {
+				continue;
+			}
+			if (prevData->isService()) {
+				continue;
+			}
+			return (prevData->from() == item->from()
+				&& prevData->originalText().text == text
+				&& !prevData->out());
 		}
 	}
 	return false;
@@ -216,21 +238,43 @@ int countDuplicateGroupSize(const not_null<HistoryItem*> item) {
 			}
 			next = next->nextInBlocks();
 		}
+		if (count > 1) {
+			return count;
+		}
+	}
+
+	const auto history = item->history();
+	const auto &blocks = history->blocks;
+	bool foundSelf = false;
+	count = 1;
+
+	for (const auto &block : blocks) {
+		for (const auto &element : block->messages) {
+			const auto nextData = element->data();
+			if (nextData == item) {
+				foundSelf = true;
+				continue;
+			}
+			if (!foundSelf) {
+				continue;
+			}
+			if (nextData->isService()) {
+				continue;
+			}
+			if (nextData->from() == item->from()
+				&& nextData->originalText().text == text
+				&& !nextData->out()) {
+				count++;
+			} else {
+				return count;
+			}
+		}
 	}
 	return count;
 }
 
-bool filtered(const not_null<HistoryItem*> item) {
-	if (showingFilteredMessages.contains(item->history()->peer->id.value)) {
-		return false;
-	}
-
+bool isBlockedOrRegexFiltered(const not_null<HistoryItem*> item) {
 	const auto &settings = AyuSettings::getInstance();
-
-	if (settings.collapseDuplicates() && isDuplicateMessage(item)) {
-		return true;
-	}
-
 	if (!settings.filtersEnabled()) {
 		return false;
 	}
@@ -257,14 +301,30 @@ bool filtered(const not_null<HistoryItem*> item) {
 		getDialogIdFromPeer(item->history()->peer),
 		cache);
 
-	// sometimes item has empty text.
-	// so we cache result only if
-	// processed item is filterable
 	if (res.has_value()) {
 		FiltersCacheController::putFiltered(item, group, res.value(), cache);
 		return res.value();
 	}
 	return false;
+}
+
+bool filtered(const not_null<HistoryItem*> item) {
+	if (showingFilteredMessages.contains(item->history()->peer->id.value)) {
+		return false;
+	}
+
+	const auto &settings = AyuSettings::getInstance();
+	if (!settings.filtersEnabled()) {
+		return false;
+	}
+
+	if (!isEnabled(item->history()->peer)) return false;
+
+	if (settings.collapseDuplicates() && isDuplicateMessage(item)) {
+		return true;
+	}
+
+	return isBlockedOrRegexFiltered(item);
 }
 
 std::optional<bool> filteredMessagesShown(not_null<PeerData*> peer) {
