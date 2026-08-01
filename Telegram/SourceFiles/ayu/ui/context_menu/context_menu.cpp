@@ -64,7 +64,7 @@ Fn<void()> ClearDeletedMessagesHandler(not_null<Window::SessionController*> cont
 					}
 				}
 				AyuMessages::clearDeletedMessages(peer, topicId);
-				for (const auto item : items) {
+				for (const auto &item : items) {
 					item->destroy();
 				}
 				close();

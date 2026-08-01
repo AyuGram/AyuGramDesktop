@@ -222,12 +222,6 @@ Rows::Rows(
 	const std::vector<Font> &data,
 	const QString &chosen)
 	: RpWidget(parent), _chosen(chosen) {
-	const auto descriptionOptions = TextParseOptions{
-		TextParseMultiline,
-		0,
-		0,
-		Qt::LayoutDirectionAuto
-	};
 	_rows.reserve(data.size());
 	for (const auto &item : data) {
 		_rows.push_back(Row{item});
