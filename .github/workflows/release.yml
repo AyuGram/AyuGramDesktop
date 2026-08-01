@@ -6,6 +6,7 @@ on:
       - 'v*'
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -30,6 +31,11 @@ jobs:
           if old in c:
               open(p, 'w').write(c.replace(old, new))
           "
+
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: true
 
       - name: Set up build environment
         run: |
@@ -75,40 +81,6 @@ jobs:
         with:
           files: out/Release/Linux.tar.gz
 
-  build-windows:
-    name: Build Windows Portable
-    runs-on: windows-2022
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup MSVC & Ninja
-        uses: getdef/setup-ninja@v1
-
-      - name: Build Windows Executable
-        run: |
-          mkdir out
-          cmake -B out -S . -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build out --config Release --parallel
-
-      - name: Package Windows Portable
-        run: |
-          Compress-Archive -Path out/Release/Telegram.exe -DestinationPath Windows-Portable.zip
-
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-Portable
-          path: Windows-Portable.zip
-
-      - name: Upload Windows Asset to Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
-        with:
-          files: Windows-Portable.zip
-
   build-macos:
     name: Build macOS
     runs-on: macos-14
@@ -127,13 +99,13 @@ jobs:
           cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release
           cmake --build out --config Release
 
-      - name: Package macOS Zip
+      - name: Package macOS DMG
         run: |
           cd out/Release
-          zip -r macOS.zip Telegram.app
+          hdiutil create -volname "AyuGram" -srcfolder Telegram.app -ov -format UDZO macOS.dmg
 
       - name: Upload macOS Asset to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         with:
-          files: out/Release/macOS.zip
+          files: out/Release/macOS.dmg
