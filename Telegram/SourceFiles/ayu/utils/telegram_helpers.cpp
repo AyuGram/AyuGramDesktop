@@ -1579,18 +1579,11 @@ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)
 		);
 	}
 
-	if (contextPeer && contextPeer != user) {
+	if (contextPeer && contextPeer != user && user->isSelf()) {
 		if (const auto channel = contextPeer->asChannel()) {
-			const auto date = channel->inviteDate ? channel->inviteDate : channel->date;
-			if (date) {
-				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(date).date());
+			if (channel->inviteDate) {
+				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(channel->inviteDate).date());
 				const auto joinText = formatJoinDateText(user, channel->name(), joinDateFormatted);
-				regResult = appendTextWithEntities(regResult, joinText);
-			}
-		} else if (const auto chat = contextPeer->asChat()) {
-			if (chat->date) {
-				const auto joinDateFormatted = langDayOfMonthFull(base::unixtime::parse(chat->date).date());
-				const auto joinText = formatJoinDateText(user, chat->name(), joinDateFormatted);
 				regResult = appendTextWithEntities(regResult, joinText);
 			}
 		}
