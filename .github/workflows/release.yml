@@ -141,15 +141,10 @@ jobs:
 
       - name: Build macOS Application
         run: |
-          mkdir -p out
           QT6_PATH=$(brew --prefix qt@6 2>/dev/null || brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt6")
           QT_PATH=$(brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt")
-          cmake -B out -S . -G Xcode \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DDESKTOP_APP_USE_PACKAGED=ON \
-            -DCMAKE_PREFIX_PATH="$QT6_PATH;$QT6_PATH/lib/cmake;$QT_PATH;$QT_PATH/lib/cmake;/opt/homebrew;/opt/homebrew/lib/cmake;/usr/local" \
-            -DTDESKTOP_API_ID=2040 \
-            -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+          export CMAKE_PREFIX_PATH="$QT6_PATH;$QT6_PATH/lib/cmake;$QT_PATH;$QT_PATH/lib/cmake;/opt/homebrew;/opt/homebrew/lib/cmake;/usr/local"
+          python3 Telegram/configure.py -DDESKTOP_APP_USE_PACKAGED=ON -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
           cmake --build out --config Release
 
       - name: Package macOS DMG
