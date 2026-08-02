@@ -175,9 +175,17 @@ jobs:
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd out/Debug
-          mkdir artifact
-          mv {Telegram,Updater} artifact/
+          BIN_PATH=$(find out/ -name "Telegram" -type f | head -n 1)
+          if [ -n "$BIN_PATH" ]; then
+            BIN_DIR=$(dirname "$BIN_PATH")
+            cd "$BIN_DIR"
+            mkdir -p artifact
+            cp Telegram artifact/ || true
+            test -f Updater && cp Updater artifact/ || true
+          else
+            echo "Error: Telegram binary not found under out/"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v7
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
