@@ -920,11 +920,12 @@ void Filler::addClearHistory() {
 }
 
 void Filler::addDeleteChat() {
-	if (_topic || (!_sublist && _peer->isChannel())) {
+	const auto channel = _peer->asChannel();
+	if (_topic || (!_sublist && channel && channel->amIn())) {
 		return;
 	}
 	_addAction({
-		.text = ((_peer->isUser() || _sublist)
+		.text = ((_peer->isUser() || _sublist || (channel && !channel->amIn()))
 			? tr::lng_profile_delete_conversation(tr::now)
 			: tr::lng_profile_clear_and_exit(tr::now)),
 		.handler = (_sublist

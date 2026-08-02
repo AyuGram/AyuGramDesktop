@@ -97,12 +97,13 @@ jobs:
       - name: Set up Xcode & Dependencies
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install qt pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
+          brew install qt@6 qt pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
 
       - name: Build macOS Application
         run: |
           mkdir -p out
-          cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/opt/homebrew/opt/qt;/opt/homebrew" -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+          QT_PATH=$(brew --prefix qt@6 2>/dev/null || brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt")
+          cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release -DDESKTOP_APP_USE_PACKAGED=ON -DCMAKE_PREFIX_PATH="$QT_PATH;/opt/homebrew" -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
           cmake --build out --config Release
 
       - name: Package macOS DMG
