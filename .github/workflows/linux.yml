@@ -161,29 +161,30 @@ jobs:
       - name: Check.
         if: env.ONLY_CACHE == 'false'
         run: |
-          filePath="out/Debug/Telegram"
-          if test -f "$filePath"; then
+          filePath=$(find out/ \( -name "AyuGram" -o -name "Telegram" \) -type f | head -n 1)
+          if test -n "$filePath" && test -f "$filePath"; then
             echo "Build successfully done! :)"
-
             size=$(stat -c %s "$filePath")
             echo "File size of ${filePath}: ${size} Bytes."
           else
             echo "Build error, output file does not exist."
+            find out/ -maxdepth 3 || true
             exit 1
           fi
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          BIN_PATH=$(find out/ -name "Telegram" -type f | head -n 1)
+          BIN_PATH=$(find out/ \( -name "AyuGram" -o -name "Telegram" \) -type f | head -n 1)
           if [ -n "$BIN_PATH" ]; then
+            BIN_NAME=$(basename "$BIN_PATH")
             BIN_DIR=$(dirname "$BIN_PATH")
             cd "$BIN_DIR"
             mkdir -p artifact
-            cp Telegram artifact/ || true
+            cp "$BIN_NAME" artifact/ || true
             test -f Updater && cp Updater artifact/ || true
           else
-            echo "Error: Telegram binary not found under out/"
+            echo "Error: Binary not found under out/"
             exit 1
           fi
       - uses: actions/upload-artifact@v7

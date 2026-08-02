@@ -76,18 +76,19 @@ jobs:
       - name: Package Linux Binary
         run: |
           mkdir -p out/Release
-          BIN_PATH=$(find out/ -name "Telegram" -type f | head -n 1)
+          BIN_PATH=$(find out/ \( -name "AyuGram" -o -name "Telegram" \) -type f | head -n 1)
           if [ -n "$BIN_PATH" ]; then
+            BIN_NAME=$(basename "$BIN_PATH")
             BIN_DIR=$(dirname "$BIN_PATH")
             cd "$BIN_DIR"
-            FILES="Telegram"
+            FILES="$BIN_NAME"
             test -f Updater && FILES="$FILES Updater"
             tar -czvf Linux.tar.gz $FILES
-            if [ "$BIN_DIR" != "$GITHUB_WORKSPACE/out/Release" ] && [ "$BIN_DIR" != "out/Release" ]; then
+            if [ "$(realpath .)" != "$(realpath $GITHUB_WORKSPACE/out/Release)" ]; then
               cp Linux.tar.gz "$GITHUB_WORKSPACE/out/Release/Linux.tar.gz" || true
             fi
           else
-            echo "Error: Telegram binary not found under out/"
+            echo "Error: Binary not found under out/"
             find out/ -maxdepth 3 || true
             exit 1
           fi
