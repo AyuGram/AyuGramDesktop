@@ -105,6 +105,12 @@ jobs:
           cd out/Release
           tar -czvf Linux.tar.gz Telegram Updater
 
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-Linux
+          path: out/Release/Linux.tar.gz
+
       - name: Upload Linux Asset to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
@@ -168,6 +174,12 @@ jobs:
         run: |
           cd out/Release
           hdiutil create -volname "AyuGram" -srcfolder Telegram.app -ov -format UDZO macOS.dmg
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-macOS
+          path: out/Release/macOS.dmg
 
       - name: Upload macOS Asset to Release
         uses: softprops/action-gh-release@v2
