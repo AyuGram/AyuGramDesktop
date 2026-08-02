@@ -41,8 +41,8 @@ jobs:
           if os.path.exists(p_qt):
               c = open(p_qt).read()
               old_qt = 'if (DEFINED QT_VERSION_MAJOR)'
-              new_qt = 'if (APPLE)\n    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt /opt/homebrew/lib/cmake/Qt6 /opt/homebrew/lib/cmake/Qt5 /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt /usr/local/lib/cmake/Qt6 /usr/local/lib/cmake/Qt5)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
-              if old_qt in c and 'opt/homebrew/opt/qt6' not in c:
+              new_qt = 'if (APPLE)\n    file(GLOB _mac_qt6 \"/opt/homebrew/opt/qt*/lib/cmake/Qt6\" \"/usr/local/opt/qt*/lib/cmake/Qt6\")\n    file(GLOB _mac_qt5 \"/opt/homebrew/opt/qt*/lib/cmake/Qt5\" \"/usr/local/opt/qt*/lib/cmake/Qt5\")\n    list(APPEND CMAKE_PREFIX_PATH ${_mac_qt6} ${_mac_qt5} /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt6/lib/cmake /opt/homebrew/opt/qt /opt/homebrew/opt/qt/lib/cmake /opt/homebrew/opt/qt@5 /opt/homebrew/opt/qt@5/lib/cmake /opt/homebrew/lib/cmake /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt6/lib/cmake /usr/local/opt/qt /usr/local/opt/qt/lib/cmake /usr/local/lib/cmake)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
+              if old_qt in c and '_mac_qt6' not in c:
                   open(p_qt, 'w').write(c.replace(old_qt, new_qt))
           p_ada = 'cmake/external/ada/CMakeLists.txt'
           if os.path.exists(p_ada):
@@ -122,8 +122,8 @@ jobs:
           if os.path.exists(p_qt):
               c = open(p_qt).read()
               old_qt = 'if (DEFINED QT_VERSION_MAJOR)'
-              new_qt = 'if (APPLE)\n    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt /opt/homebrew/lib/cmake/Qt6 /opt/homebrew/lib/cmake/Qt5 /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt /usr/local/lib/cmake/Qt6 /usr/local/lib/cmake/Qt5)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
-              if old_qt in c and 'opt/homebrew/opt/qt6' not in c:
+              new_qt = 'if (APPLE)\n    file(GLOB _mac_qt6 \"/opt/homebrew/opt/qt*/lib/cmake/Qt6\" \"/usr/local/opt/qt*/lib/cmake/Qt6\")\n    file(GLOB _mac_qt5 \"/opt/homebrew/opt/qt*/lib/cmake/Qt5\" \"/usr/local/opt/qt*/lib/cmake/Qt5\")\n    list(APPEND CMAKE_PREFIX_PATH ${_mac_qt6} ${_mac_qt5} /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt6/lib/cmake /opt/homebrew/opt/qt /opt/homebrew/opt/qt/lib/cmake /opt/homebrew/opt/qt@5 /opt/homebrew/opt/qt@5/lib/cmake /opt/homebrew/lib/cmake /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt6/lib/cmake /usr/local/opt/qt /usr/local/opt/qt/lib/cmake /usr/local/lib/cmake)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
+              if old_qt in c and '_mac_qt6' not in c:
                   open(p_qt, 'w').write(c.replace(old_qt, new_qt))
           p_ada = 'cmake/external/ada/CMakeLists.txt'
           if os.path.exists(p_ada):
@@ -142,8 +142,14 @@ jobs:
       - name: Build macOS Application
         run: |
           mkdir -p out
-          QT_PATH=$(brew --prefix qt@6 2>/dev/null || brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt")
-          cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release -DDESKTOP_APP_USE_PACKAGED=ON -DCMAKE_PREFIX_PATH="$QT_PATH;/opt/homebrew" -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+          QT6_PATH=$(brew --prefix qt@6 2>/dev/null || brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt6")
+          QT_PATH=$(brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt")
+          cmake -B out -S . -G Xcode \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDESKTOP_APP_USE_PACKAGED=ON \
+            -DCMAKE_PREFIX_PATH="$QT6_PATH;$QT6_PATH/lib/cmake;$QT_PATH;$QT_PATH/lib/cmake;/opt/homebrew;/opt/homebrew/lib/cmake;/usr/local" \
+            -DTDESKTOP_API_ID=2040 \
+            -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
           cmake --build out --config Release
 
       - name: Package macOS DMG
