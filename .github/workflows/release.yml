@@ -40,9 +40,9 @@ jobs:
           p_qt = 'cmake/external/qt/package.cmake'
           if os.path.exists(p_qt):
               c = open(p_qt).read()
-              old_qt = 'if (DEFINED QT_VERSION_MAJOR)'
-              new_qt = 'if (APPLE)\n    file(GLOB _mac_qt6 \"/opt/homebrew/opt/qt*/lib/cmake/Qt6\" \"/usr/local/opt/qt*/lib/cmake/Qt6\")\n    file(GLOB _mac_qt5 \"/opt/homebrew/opt/qt*/lib/cmake/Qt5\" \"/usr/local/opt/qt*/lib/cmake/Qt5\")\n    list(APPEND CMAKE_PREFIX_PATH ${_mac_qt6} ${_mac_qt5} /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt6/lib/cmake /opt/homebrew/opt/qt /opt/homebrew/opt/qt/lib/cmake /opt/homebrew/opt/qt@5 /opt/homebrew/opt/qt@5/lib/cmake /opt/homebrew/lib/cmake /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt6/lib/cmake /usr/local/opt/qt /usr/local/opt/qt/lib/cmake /usr/local/lib/cmake)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
-              if old_qt in c and '_mac_qt6' not in c:
+              old_qt = 'find_package(QT NAMES Qt6 COMPONENTS Core QUIET)'
+              new_qt = 'find_package(Qt6 COMPONENTS Core QUIET)\n    if (Qt6_FOUND)\n        set(QT_FOUND TRUE)\n        set(QT_VERSION_MAJOR 6)\n    else()\n        find_package(Qt5 COMPONENTS Core QUIET)\n        if (Qt5_FOUND)\n            set(QT_FOUND TRUE)\n            set(QT_VERSION_MAJOR 5)\n        endif()\n    endif()'
+              if old_qt in c:
                   open(p_qt, 'w').write(c.replace(old_qt, new_qt))
           p_ada = 'cmake/external/ada/CMakeLists.txt'
           if os.path.exists(p_ada):
@@ -114,6 +114,12 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.5.3'
+          arch: 'clang_64'
+
       - name: Patch cmake files for macOS & Linux
         run: |
           python3 -c "
@@ -121,9 +127,9 @@ jobs:
           p_qt = 'cmake/external/qt/package.cmake'
           if os.path.exists(p_qt):
               c = open(p_qt).read()
-              old_qt = 'if (DEFINED QT_VERSION_MAJOR)'
-              new_qt = 'if (APPLE)\n    file(GLOB _mac_qt6 \"/opt/homebrew/opt/qt*/lib/cmake/Qt6\" \"/usr/local/opt/qt*/lib/cmake/Qt6\")\n    file(GLOB _mac_qt5 \"/opt/homebrew/opt/qt*/lib/cmake/Qt5\" \"/usr/local/opt/qt*/lib/cmake/Qt5\")\n    list(APPEND CMAKE_PREFIX_PATH ${_mac_qt6} ${_mac_qt5} /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt6/lib/cmake /opt/homebrew/opt/qt /opt/homebrew/opt/qt/lib/cmake /opt/homebrew/opt/qt@5 /opt/homebrew/opt/qt@5/lib/cmake /opt/homebrew/lib/cmake /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt6/lib/cmake /usr/local/opt/qt /usr/local/opt/qt/lib/cmake /usr/local/lib/cmake)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
-              if old_qt in c and '_mac_qt6' not in c:
+              old_qt = 'find_package(QT NAMES Qt6 COMPONENTS Core QUIET)'
+              new_qt = 'find_package(Qt6 COMPONENTS Core QUIET)\n    if (Qt6_FOUND)\n        set(QT_FOUND TRUE)\n        set(QT_VERSION_MAJOR 6)\n    else()\n        find_package(Qt5 COMPONENTS Core QUIET)\n        if (Qt5_FOUND)\n            set(QT_FOUND TRUE)\n            set(QT_VERSION_MAJOR 5)\n        endif()\n    endif()'
+              if old_qt in c:
                   open(p_qt, 'w').write(c.replace(old_qt, new_qt))
           p_ada = 'cmake/external/ada/CMakeLists.txt'
           if os.path.exists(p_ada):
@@ -137,13 +143,10 @@ jobs:
       - name: Set up Xcode & Dependencies
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install qt@6 qt pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
+          brew install pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
 
       - name: Build macOS Application
         run: |
-          QT6_PATH=$(brew --prefix qt@6 2>/dev/null || brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt6")
-          QT_PATH=$(brew --prefix qt 2>/dev/null || echo "/opt/homebrew/opt/qt")
-          export CMAKE_PREFIX_PATH="$QT6_PATH;$QT6_PATH/lib/cmake;$QT_PATH;$QT_PATH/lib/cmake;/opt/homebrew;/opt/homebrew/lib/cmake;/usr/local"
           python3 Telegram/configure.py -DDESKTOP_APP_USE_PACKAGED=ON -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
           cmake --build out --config Release
 

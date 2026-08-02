@@ -43,9 +43,9 @@ jobs:
           p_qt = 'cmake/external/qt/package.cmake'
           if os.path.exists(p_qt):
               c = open(p_qt).read()
-              old_qt = 'if (DEFINED QT_VERSION_MAJOR)'
-              new_qt = 'if (APPLE)\n    file(GLOB _mac_qt6 \"/opt/homebrew/opt/qt*/lib/cmake/Qt6\" \"/usr/local/opt/qt*/lib/cmake/Qt6\")\n    file(GLOB _mac_qt5 \"/opt/homebrew/opt/qt*/lib/cmake/Qt5\" \"/usr/local/opt/qt*/lib/cmake/Qt5\")\n    list(APPEND CMAKE_PREFIX_PATH ${_mac_qt6} ${_mac_qt5} /opt/homebrew/opt/qt6 /opt/homebrew/opt/qt6/lib/cmake /opt/homebrew/opt/qt /opt/homebrew/opt/qt/lib/cmake /opt/homebrew/opt/qt@5 /opt/homebrew/opt/qt@5/lib/cmake /opt/homebrew/lib/cmake /opt/homebrew /usr/local/opt/qt6 /usr/local/opt/qt6/lib/cmake /usr/local/opt/qt /usr/local/opt/qt/lib/cmake /usr/local/lib/cmake)\nendif()\n\nif (DEFINED QT_VERSION_MAJOR)'
-              if old_qt in c and '_mac_qt6' not in c:
+              old_qt = 'find_package(QT NAMES Qt6 COMPONENTS Core QUIET)'
+              new_qt = 'find_package(Qt6 COMPONENTS Core QUIET)\n    if (Qt6_FOUND)\n        set(QT_FOUND TRUE)\n        set(QT_VERSION_MAJOR 6)\n    else()\n        find_package(Qt5 COMPONENTS Core QUIET)\n        if (Qt5_FOUND)\n            set(QT_FOUND TRUE)\n            set(QT_VERSION_MAJOR 5)\n        endif()\n    endif()'
+              if old_qt in c:
                   open(p_qt, 'w').write(c.replace(old_qt, new_qt))
           p_ada = 'cmake/external/ada/CMakeLists.txt'
           if os.path.exists(p_ada):
