@@ -136,6 +136,22 @@ jobs:
               open(p, 'w').write(c.replace(old, new))
           "
 
+      - name: Patch lib_translate for Xcode 15 / macOS 14 SDK
+        run: |
+          python3 -c "
+          p = 'Telegram/lib_translate/translate_provider_mac_swift.swift'
+          import os
+          if os.path.exists(p):
+              c = open(p).read()
+              if '#if canImport(Translation)' not in c:
+                  c = c.replace('import Translation', '#if canImport(Translation)\nimport Translation\n#endif')
+                  c = c.replace('@available(macOS 15.0, *)', '#if canImport(Translation)\n@available(macOS 15.0, *)')
+                  c = c.replace('default:\n\t\treturn \"unknown\"\n\t}\n}', 'default:\n\t\treturn \"unknown\"\n\t}\n}\n#endif')
+                  c = c.replace('compiler(>=6.2)', 'canImport(Translation)')
+                  c = c.replace('macOS 26.0', 'macOS 15.0')
+                  open(p, 'w').write(c)
+          "
+
       - name: Set up Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
