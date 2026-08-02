@@ -51,6 +51,13 @@ jobs:
               new_ada = 'find_package(ada QUIET)\n    if (TARGET ada::ada)\n        target_link_libraries(external_ada INTERFACE ada::ada)\n    else()\n        find_path(ADA_INCLUDE_DIR ada.h HINTS /opt/homebrew/include /usr/local/include /usr/include)\n        find_library(ADA_LIBRARY NAMES ada libada HINTS /opt/homebrew/lib /usr/local/lib /usr/lib)\n        if (ADA_INCLUDE_DIR AND ADA_LIBRARY)\n            target_include_directories(external_ada SYSTEM INTERFACE ${ADA_INCLUDE_DIR})\n            target_link_libraries(external_ada INTERFACE ${ADA_LIBRARY})\n        endif()\n    endif()'
               if old_ada in c:
                   open(p_ada, 'w').write(c.replace(old_ada, new_ada))
+          p_boost = 'cmake/external/boost/CMakeLists.txt'
+          if os.path.exists(p_boost):
+              c = open(p_boost).read()
+              old_b = 'find_package(Boost COMPONENTS regex REQUIRED)'
+              new_b = 'find_package(Boost COMPONENTS regex QUIET)\n    if (TARGET Boost::regex)\n        target_link_libraries(external_boost_regex INTERFACE Boost::regex)\n        return()\n    endif()'
+              if old_b in c:
+                  open(p_boost, 'w').write(c.replace(old_b, new_b))
           "
 
       - name: Free up disk space
@@ -138,12 +145,19 @@ jobs:
               new_ada = 'find_package(ada QUIET)\n    if (TARGET ada::ada)\n        target_link_libraries(external_ada INTERFACE ada::ada)\n    else()\n        find_path(ADA_INCLUDE_DIR ada.h HINTS /opt/homebrew/include /usr/local/include /usr/include)\n        find_library(ADA_LIBRARY NAMES ada libada HINTS /opt/homebrew/lib /usr/local/lib /usr/lib)\n        if (ADA_INCLUDE_DIR AND ADA_LIBRARY)\n            target_include_directories(external_ada SYSTEM INTERFACE ${ADA_INCLUDE_DIR})\n            target_link_libraries(external_ada INTERFACE ${ADA_LIBRARY})\n        endif()\n    endif()'
               if old_ada in c:
                   open(p_ada, 'w').write(c.replace(old_ada, new_ada))
+          p_boost = 'cmake/external/boost/CMakeLists.txt'
+          if os.path.exists(p_boost):
+              c = open(p_boost).read()
+              old_b = 'find_package(Boost COMPONENTS regex REQUIRED)'
+              new_b = 'find_package(Boost COMPONENTS regex QUIET)\n    if (TARGET Boost::regex)\n        target_link_libraries(external_boost_regex INTERFACE Boost::regex)\n        return()\n    endif()'
+              if old_b in c:
+                  open(p_boost, 'w').write(c.replace(old_b, new_b))
           "
 
       - name: Set up Xcode & Dependencies
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
+          brew install boost pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
 
       - name: Build macOS Application
         run: |
