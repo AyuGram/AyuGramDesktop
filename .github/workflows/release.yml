@@ -33,33 +33,6 @@ jobs:
               open(p, 'w').write(c.replace(old, new))
           "
 
-      - name: Patch cmake files for macOS & Linux
-        run: |
-          python3 -c "
-          import os
-          p_qt = 'cmake/external/qt/package.cmake'
-          if os.path.exists(p_qt):
-              c = open(p_qt).read()
-              old_qt = 'find_package(QT NAMES Qt6 COMPONENTS Core QUIET)'
-              new_qt = 'find_package(Qt6 COMPONENTS Core QUIET)\n    if (Qt6_FOUND)\n        set(QT_FOUND TRUE)\n        set(QT_VERSION_MAJOR 6)\n    else()\n        find_package(Qt5 COMPONENTS Core QUIET)\n        if (Qt5_FOUND)\n            set(QT_FOUND TRUE)\n            set(QT_VERSION_MAJOR 5)\n        endif()\n    endif()'
-              if old_qt in c:
-                  open(p_qt, 'w').write(c.replace(old_qt, new_qt))
-          p_ada = 'cmake/external/ada/CMakeLists.txt'
-          if os.path.exists(p_ada):
-              c = open(p_ada).read()
-              old_ada = 'find_package(ada REQUIRED)'
-              new_ada = 'find_package(ada QUIET)\n    if (TARGET ada::ada)\n        target_link_libraries(external_ada INTERFACE ada::ada)\n    else()\n        find_path(ADA_INCLUDE_DIR ada.h HINTS /opt/homebrew/include /usr/local/include /usr/include)\n        find_library(ADA_LIBRARY NAMES ada libada HINTS /opt/homebrew/lib /usr/local/lib /usr/lib)\n        if (ADA_INCLUDE_DIR AND ADA_LIBRARY)\n            target_include_directories(external_ada SYSTEM INTERFACE ${ADA_INCLUDE_DIR})\n            target_link_libraries(external_ada INTERFACE ${ADA_LIBRARY})\n        endif()\n    endif()'
-              if old_ada in c:
-                  open(p_ada, 'w').write(c.replace(old_ada, new_ada))
-          p_boost = 'cmake/external/boost/CMakeLists.txt'
-          if os.path.exists(p_boost):
-              c = open(p_boost).read()
-              old_b = 'find_package(Boost COMPONENTS regex REQUIRED)'
-              new_b = 'find_package(Boost COMPONENTS regex QUIET)\n    if (TARGET Boost::regex)\n        target_link_libraries(external_boost_regex INTERFACE Boost::regex)\n        return()\n    endif()'
-              if old_b in c:
-                  open(p_boost, 'w').write(c.replace(old_b, new_b))
-          "
-
       - name: Free up disk space
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
         with:
@@ -120,6 +93,9 @@ jobs:
   build-macos:
     name: Build macOS
     runs-on: macos-14
+    env:
+      ONLY_CACHE: "false"
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -127,62 +103,65 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.5.3'
-          arch: 'clang_64'
-
-      - name: Patch cmake files for macOS & Linux
+      - name: Patch codegen scanner for ayu_ prefix
         run: |
           python3 -c "
-          import os
-          p_qt = 'cmake/external/qt/package.cmake'
-          if os.path.exists(p_qt):
-              c = open(p_qt).read()
-              old_qt = 'find_package(QT NAMES Qt6 COMPONENTS Core QUIET)'
-              new_qt = 'find_package(Qt6 COMPONENTS Core QUIET)\n    if (Qt6_FOUND)\n        set(QT_FOUND TRUE)\n        set(QT_VERSION_MAJOR 6)\n    else()\n        find_package(Qt5 COMPONENTS Core QUIET)\n        if (Qt5_FOUND)\n            set(QT_FOUND TRUE)\n            set(QT_VERSION_MAJOR 5)\n        endif()\n    endif()'
-              if old_qt in c:
-                  open(p_qt, 'w').write(c.replace(old_qt, new_qt))
-          p_ada = 'cmake/external/ada/CMakeLists.txt'
-          if os.path.exists(p_ada):
-              c = open(p_ada).read()
-              old_ada = 'find_package(ada REQUIRED)'
-              new_ada = 'find_package(ada QUIET)\n    if (TARGET ada::ada)\n        target_link_libraries(external_ada INTERFACE ada::ada)\n    else()\n        find_path(ADA_INCLUDE_DIR ada.h HINTS /opt/homebrew/include /usr/local/include /usr/include)\n        find_library(ADA_LIBRARY NAMES ada libada HINTS /opt/homebrew/lib /usr/local/lib /usr/lib)\n        if (ADA_INCLUDE_DIR AND ADA_LIBRARY)\n            target_include_directories(external_ada SYSTEM INTERFACE ${ADA_INCLUDE_DIR})\n            target_link_libraries(external_ada INTERFACE ${ADA_LIBRARY})\n        endif()\n    endif()'
-              if old_ada in c:
-                  open(p_ada, 'w').write(c.replace(old_ada, new_ada))
-          p_boost = 'cmake/external/boost/CMakeLists.txt'
-          if os.path.exists(p_boost):
-              c = open(p_boost).read()
-              old_b = 'find_package(Boost COMPONENTS regex REQUIRED)'
-              new_b = 'find_package(Boost COMPONENTS regex QUIET)\n    if (TARGET Boost::regex)\n        target_link_libraries(external_boost_regex INTERFACE Boost::regex)\n        return()\n    endif()'
-              if old_b in c:
-                  open(p_boost, 'w').write(c.replace(old_b, new_b))
+          p = 'Telegram/codegen/codegen/lang/subsets.cpp'
+          c = open(p).read()
+          old = 'if (data[i] != \'l\'\n\t\t\t|| data[i + 1] != \'n\'\n\t\t\t|| data[i + 2] != \'g\'\n\t\t\t|| data[i + 3] != \'_\''
+          new = 'const auto isLng = (data[i] == \'l\' && data[i + 1] == \'n\' && data[i + 2] == \'g\' && data[i + 3] == \'_\');\n\t\tconst auto isAyu = (data[i] == \'a\' && data[i + 1] == \'y\' && data[i + 2] == \'u\' && data[i + 3] == \'_\');\n\t\tif ((!isLng && !isAyu)'
+          if old in c:
+              open(p, 'w').write(c.replace(old, new))
           "
 
-      - name: Set up Xcode & Dependencies
+      - name: Set up Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install boost pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
+          brew install ninja nasm yasm pkg-config cmake
 
-      - name: Build macOS Application
+      - name: Libraries cache
+        id: cache-libs
+        uses: actions/cache@v4
+        with:
+          path: Libraries
+          key: ${{ runner.os }}-libs-${{ hashFiles('Telegram/build/prepare/prepare.py') }}
+
+      - name: Prepare libraries
+        if: steps.cache-libs.outputs.cache-hit != 'true'
         run: |
-          python3 Telegram/configure.py -DDESKTOP_APP_USE_PACKAGED=ON -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
-          cmake --build out --config Release
+          cd ..
+          python3 $GITHUB_WORKSPACE/${{ env.PREPARE_PATH }}
+
+      - name: Configure
+        run: |
+          python3 Telegram/configure.py \
+            -DTDESKTOP_API_ID=2040 \
+            -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+
+      - name: Build
+        run: |
+          cmake --build out --config Release -- -j$(sysctl -n hw.logicalcpu)
 
       - name: Package macOS DMG
         run: |
           cd out/Release
-          hdiutil create -volname "AyuGram" -srcfolder Telegram.app -ov -format UDZO macOS.dmg
+          if [ -d "Telegram.app" ]; then
+            hdiutil create -volname "AyuGram" -srcfolder Telegram.app -ov -format UDZO macOS.dmg
+          else
+            echo "Telegram.app not found, listing out/Release contents:"
+            ls -la
+          fi
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AyuGram-macOS
           path: out/Release/macOS.dmg
+          if-no-files-found: warn
 
       - name: Upload macOS Asset to Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         with:
           files: out/Release/macOS.dmg
+
