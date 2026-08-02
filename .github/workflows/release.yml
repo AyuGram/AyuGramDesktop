@@ -130,7 +130,10 @@ jobs:
         if: steps.cache-libs.outputs.cache-hit != 'true'
         run: |
           cd ..
-          python3 $GITHUB_WORKSPACE/${{ env.PREPARE_PATH }}
+          for i in {1..5}; do
+            echo "Attempt $i to prepare libraries..."
+            python3 $GITHUB_WORKSPACE/${{ env.PREPARE_PATH }} && break || (echo "Attempt $i failed, retrying in 15s..." && sleep 15)
+          done
 
       - name: Configure
         run: |
