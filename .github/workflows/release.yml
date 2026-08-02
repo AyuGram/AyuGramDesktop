@@ -165,7 +165,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build out --config Release -- -j$(sysctl -n hw.logicalcpu)
+          cmake --build out --config Release -- -jobs $(sysctl -n hw.logicalcpu)
 
       - name: Package macOS DMG
         run: |
