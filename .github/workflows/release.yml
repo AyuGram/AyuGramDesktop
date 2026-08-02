@@ -103,6 +103,14 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Free up disk space on macOS
+        run: |
+          sudo rm -rf /usr/local/share/android-sdk /usr/local/lib/node_modules || true
+          sudo rm -rf /Applications/Xcode_13*.app /Applications/Xcode_14*.app /Applications/Xcode_15.[0-3]*.app || true
+          brew cleanup -s || true
+          rm -rf ~/Library/Caches/Homebrew || true
+          df -h
+
       - name: Patch codegen scanner for ayu_ prefix
         run: |
           python3 -c "
