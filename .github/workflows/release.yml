@@ -117,7 +117,7 @@ jobs:
       - name: Set up Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install ninja nasm yasm pkg-config cmake autoconf automake libtool
+          brew install ninja nasm yasm pkg-config cmake autoconf automake libtool meson wget gperf
 
       - name: Libraries cache
         id: cache-libs
