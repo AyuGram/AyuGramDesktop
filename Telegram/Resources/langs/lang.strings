@@ -9025,9 +9025,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
-"ayu_CollapseDuplicates" = "Collapse repeating messages (xN)";
+"ayu_CollapseDuplicates" = "Collapse repeats (xN)";
 "ayu_DisableMentions" = "Disable mentions";
 "ayu_EnableMentions" = "Enable mentions";
+"ayu_MentionsMenuSoundSelect" = "Select mention sound";
+"ayu_MentionsMenuSoundOn" = "Turn mention sound on";
+"ayu_MentionsMenuSoundOff" = "Turn mention sound off";
+"ayu_MentionsMenuDurationAny" = "Turn off mentions for {duration}";
+"ayu_MentionsMenuDuration" = "Turn off mentions for...";
+"ayu_MentionsMuteBoxTitle" = "Turn off mentions for...";
 "ayu_FiltersAutoSection" = "Automatic filtering";
 "ayu_FiltersManageSection" = "Rules and lists management";
 "ayu_FiltersGlobalSection" = "Global filters";

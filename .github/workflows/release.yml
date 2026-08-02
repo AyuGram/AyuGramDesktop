@@ -69,7 +69,9 @@ jobs:
           -v ${{ env.CCACHE_DIR }}:/var/cache/ccache \
           -e CONFIG=Release \
           tdesktop:centos_env \
-          /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh
+          /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D TDESKTOP_API_ID=2040 \
+          -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
 
       - name: Package Linux Binary
         run: |
@@ -95,12 +97,12 @@ jobs:
       - name: Set up Xcode & Dependencies
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          brew install qt pkg-config ninja nasm cmake || true
+          brew install qt pkg-config ninja nasm cmake ada cmark-gfm range-v3 fmt || true
 
       - name: Build macOS Application
         run: |
-          mkdir out
-          cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/opt/homebrew/opt/qt"
+          mkdir -p out
+          cmake -B out -S . -G Xcode -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/opt/homebrew/opt/qt;/opt/homebrew" -DTDESKTOP_API_ID=2040 -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
           cmake --build out --config Release
 
       - name: Package macOS DMG

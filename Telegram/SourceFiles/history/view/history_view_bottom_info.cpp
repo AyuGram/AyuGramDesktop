@@ -600,7 +600,8 @@ void BottomInfo::layoutDateText() {
 			? FormatEditedDate(_data.date, _data.editedDate)
 			: (_data.flags & Data::Flag::ForwardedDate)
 			? Ui::FormatDateTimeSavedFrom(_data.date)
-			: QLocale().toString(_data.date.time(), QLocale::ShortFormat);
+			: QLocale().toString(_data.date.time(), QLocale::ShortFormat)
+			+ (_data.repeatCount > 1 ? (" (x" + QString::number(_data.repeatCount) + ")") : QString());
 
 		const auto date = TextWithEntities{}
 			.append(edited)

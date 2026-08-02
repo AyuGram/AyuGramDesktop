@@ -7,11 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "menu/menu_mute.h"
 
+#include "ayu/ayu_settings.h"
 #include "boxes/ringtones_box.h"
-#include "data/data_session.h"
-#include "data/data_thread.h"
 #include "data/notify/data_notify_settings.h"
 #include "data/notify/data_peer_notify_settings.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "data/data_thread.h"
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
@@ -22,8 +24,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animation_value.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
-#include "ui/widgets/checkbox.h"
 #include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/painter.h"
 #include "styles/style_info.h" // infoTopBarMenu
@@ -82,6 +84,29 @@ private:
 
 };
 
+
+
+class MentionsMuteItem final : public Ui::Menu::Action {
+public:
+	MentionsMuteItem(
+		not_null<Ui::Menu::Menu*> parent,
+		const style::Menu &st,
+		MentionsDescriptor descriptor);
+
+protected:
+	void paintEvent(QPaintEvent *e) override;
+
+private:
+	void setDisabled(bool disabled);
+
+	const QPoint _itemIconPosition;
+	const Fn<void(TimeId)> _updateMutePeriod;
+	Ui::Animations::Simple _animation;
+	bool _isDisabled = false;
+	bool _inited = false;
+
+};
+
 MuteItem::MuteItem(
 	not_null<Ui::Menu::Menu*> parent,
 	const style::Menu &st,
@@ -131,6 +156,62 @@ void MuteItem::paintEvent(QPaintEvent *e) {
 	Action::paintText(p);
 
 	const auto &icon = _isMuted ? st::menuIconUnmute : st::menuIconMute;
+	icon.paint(p, _itemIconPosition, width(), color);
+}
+
+MentionsMuteItem::MentionsMuteItem(
+		not_null<Ui::Menu::Menu*> parent,
+		const style::Menu &st,
+		MentionsDescriptor descriptor)
+: Ui::Menu::Action(
+	parent,
+	st,
+	Ui::CreateChild<QAction>(parent.get()),
+	nullptr,
+	nullptr)
+, _itemIconPosition(st.itemIconPosition)
+, _updateMutePeriod(std::move(descriptor.updateMutePeriod)) {
+	setDisabled(descriptor.isDisabled());
+	_animation.stop();
+
+	setActionTriggered([=] {
+		const auto disabled = !_isDisabled;
+		_updateMutePeriod(disabled ? kMuteForeverValue : 0);
+		setDisabled(disabled);
+	});
+}
+
+void MentionsMuteItem::setDisabled(bool disabled) {
+	action()->setText(disabled
+		? tr::ayu_EnableMentions(tr::now)
+		: tr::ayu_DisableMentions(tr::now));
+	if (_inited && disabled == _isDisabled) {
+		return;
+	}
+	_inited = true;
+	_isDisabled = disabled;
+	_animation.start(
+		[=] { update(); },
+		disabled ? 0. : 1.,
+		disabled ? 1. : 0.,
+		st::defaultPopupMenu.showDuration);
+}
+
+void MentionsMuteItem::paintEvent(QPaintEvent *e) {
+	Painter p(this);
+
+	const auto progress = _animation.value(_isDisabled ? 1. : 0.);
+	const auto color = anim::color(
+		st::menuIconAttentionColor,
+		st::boxTextFgGood,
+		progress);
+	p.setPen(color);
+
+	Action::paintBackground(p, Action::isSelected());
+	RippleButton::paintRipple(p, 0, 0);
+	Action::paintText(p);
+
+	const auto &icon = _isDisabled ? st::menuIconUnmute : st::menuIconMute;
 	icon.paint(p, _itemIconPosition, width(), color);
 }
 
@@ -214,7 +295,125 @@ void PickMuteBox(
 	});
 }
 
+void MentionsMuteBox(
+		not_null<Ui::GenericBox*> box,
+		MentionsDescriptor descriptor) {
+	struct State {
+		int lastSeconds = 0;
+	};
+
+	auto chooseTimeResult = ChooseTimeWidget(box, kMuteDurSecondsDefault);
+	box->addRow(std::move(chooseTimeResult.widget));
+
+	const auto state = box->lifetime().make_state<State>();
+
+	box->setTitle(tr::ayu_MentionsMuteBoxTitle());
+
+	auto confirmText = std::move(
+		chooseTimeResult.secondsValue
+	) | rpl::map([=](int seconds) {
+		state->lastSeconds = seconds;
+		return !seconds
+			? tr::ayu_EnableMentions()
+			: tr::ayu_DisableMentions();
+	}) | rpl::flatten_latest();
+
+	Ui::ConfirmBox(box, {
+		.confirmed = [=] {
+			descriptor.updateMutePeriod(state->lastSeconds);
+			box->getDelegate()->hideLayer();
+		},
+		.confirmText = std::move(confirmText),
+		.cancelText = tr::lng_cancel(),
+	});
+}
+
+void PickMentionsMuteBox(
+		not_null<Ui::GenericBox*> box,
+		MentionsDescriptor descriptor) {
+	struct State {
+		base::unique_qptr<Ui::PopupMenu> menu;
+	};
+	const auto seconds = Ui::DefaultTimePickerValues();
+	const auto phrases = ranges::views::all(
+		seconds
+	) | ranges::views::transform(Ui::FormatMuteFor) | ranges::to_vector;
+
+	const auto state = box->lifetime().make_state<State>();
+
+	const auto pickerCallback = TimePickerBox(box, seconds, phrases, 0);
+
+	Ui::ConfirmBox(box, {
+		.confirmed = [=] {
+			const auto muteFor = pickerCallback();
+			descriptor.updateMutePeriod(muteFor);
+			descriptor.session->settings().addMutePeriod(muteFor);
+			descriptor.session->saveSettings();
+			box->closeBox();
+		},
+		.confirmText = tr::ayu_DisableMentions(),
+		.cancelText = tr::lng_cancel(),
+	});
+
+	box->setTitle(tr::ayu_MentionsMuteBoxTitle());
+
+	const auto top = box->addTopButton(st::infoTopBarMenu);
+	top->setClickedCallback([=] {
+		if (state->menu) {
+			return;
+		}
+		state->menu = base::make_unique_q<Ui::PopupMenu>(
+			top,
+			st::popupMenuWithIcons);
+		state->menu->addAction(
+			tr::lng_manage_messages_ttl_after_custom(tr::now),
+			[=] { box->getDelegate()->show(Box(MentionsMuteBox, descriptor)); },
+			&st::menuIconCustomize);
+		state->menu->setDestroyedCallback(crl::guard(top, [=] {
+			top->setForceRippled(false);
+		}));
+		top->setForceRippled(true);
+	});
+}
+
 } // namespace
+
+MentionsDescriptor MentionsThreadDescriptor(not_null<Data::Thread*> thread) {
+	const auto peerId = thread->peer()->id.value;
+	const auto mentionsDisabled = [=] {
+		return AyuSettings::getInstance().mentionsDisabled(peerId);
+	};
+	const auto currentSound = [=] {
+		const auto &settings = AyuSettings::getInstance();
+		return Data::NotifySound{
+			.id = settings.mentionsSoundId(peerId),
+			.none = settings.mentionsSoundDisabled(peerId),
+		};
+	};
+	const auto updateSound = [=](Data::NotifySound sound) {
+		AyuSettings::getInstance().setMentionsSound(
+			peerId,
+			sound.id,
+			sound.none);
+	};
+	const auto updateMutePeriod = [=](TimeId mute) {
+		if (!mute) {
+			AyuSettings::getInstance().enableMentions(peerId);
+		} else if (mute == kMuteForeverValue) {
+			AyuSettings::getInstance().disableMentionsForever(peerId);
+		} else {
+			AyuSettings::getInstance().setMentionsMutePeriod(peerId, mute);
+		}
+	};
+	return {
+		.session = &thread->session(),
+		.isDisabled = mentionsDisabled,
+		.currentSound = currentSound,
+		.updateSound = updateSound,
+		.updateMutePeriod = updateMutePeriod,
+		.volumeController = Data::ThreadRingtonesVolumeController(thread),
+	};
+}
 
 Descriptor ThreadDescriptor(not_null<Data::Thread*> thread) {
 	const auto weak = base::make_weak(thread);
@@ -369,6 +568,73 @@ void FillMuteMenu(
 
 	menu->addAction(
 		base::make_unique_q<MuteItem>(
+			menu->menu(),
+			menu->st().menu,
+			descriptor));
+}
+
+void FillMentionsMenu(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Data::Thread*> thread,
+		std::shared_ptr<Ui::Show> show) {
+	const auto descriptor = MentionsThreadDescriptor(thread);
+	const auto soundSelect = [=] {
+		show->showBox(Box(
+			RingtonesBox,
+			descriptor.session,
+			descriptor.currentSound(),
+			descriptor.updateSound,
+			descriptor.volumeController));
+	};
+	menu->addAction(
+		tr::ayu_MentionsMenuSoundSelect(tr::now),
+		soundSelect,
+		&st::menuIconSoundSelect);
+
+	const auto soundIsNone = descriptor.currentSound().none;
+	const auto toggleSound = [=] {
+		auto sound = descriptor.currentSound();
+		sound.none = !soundIsNone;
+		descriptor.updateSound(sound);
+	};
+	menu->addAction(
+		(soundIsNone
+			? tr::ayu_MentionsMenuSoundOn(tr::now)
+			: tr::ayu_MentionsMenuSoundOff(tr::now)),
+		toggleSound,
+		soundIsNone ? &st::menuIconSoundOn : &st::menuIconSoundOff);
+
+	const auto &st = menu->st().menu;
+	const auto iconTextPosition = st.itemIconPosition
+		+ st::menuIconMuteForAnyTextPosition;
+	for (const auto muteFor : descriptor.session->settings().mutePeriods()) {
+		const auto callback = [=, update = descriptor.updateMutePeriod] {
+			update(muteFor);
+		};
+
+		auto item = base::make_unique_q<IconWithText>(
+			menu->menu(),
+			st,
+			Ui::Menu::CreateAction(
+				menu->menu().get(),
+				tr::ayu_MentionsMenuDurationAny(
+					tr::now,
+					lt_duration,
+					Ui::FormatMuteFor(muteFor)),
+				callback),
+			&st::menuIconMuteForAny,
+			&st::menuIconMuteForAny);
+		item->setData(Ui::FormatMuteForTiny(muteFor), iconTextPosition);
+		menu->addAction(std::move(item));
+	}
+
+	menu->addAction(
+		tr::ayu_MentionsMenuDuration(tr::now),
+		[=] { show->showBox(Box(PickMentionsMuteBox, descriptor)); },
+		&st::menuIconMuteFor);
+
+	menu->addAction(
+		base::make_unique_q<MentionsMuteItem>(
 			menu->menu(),
 			menu->st().menu,
 			descriptor));

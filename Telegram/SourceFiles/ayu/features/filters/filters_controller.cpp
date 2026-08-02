@@ -162,91 +162,108 @@ bool isBlocked(const not_null<PeerData*> peer) {
 	);
 }
 
-bool isDuplicateMessage(const not_null<HistoryItem*> item) {
-	if (!AyuSettings::getInstance().collapseDuplicates()) {
-		return false;
-	}
-	if (item->isService() || item->out()) {
-		return false;
-	}
-	const auto &text = item->originalText().text;
-	if (text.isEmpty()) {
-		return false;
-	}
+static base::flat_set<not_null<const HistoryItem*>> notifiedDuplicates;
 
-	if (const auto view = item->mainView()) {
-		auto prev = view->previousInBlocks();
-		while (prev) {
-			const auto prevData = prev->data();
-			if (!prevData->isService()) {
-				return (prevData->from() == item->from()
-					&& prevData->originalText().text == text
-					&& !prevData->out());
-			}
-			prev = prev->previousInBlocks();
-		}
-		return false;
-	}
-
+const HistoryItem *getPreviousNonService(const not_null<HistoryItem*> item) {
 	const auto history = item->history();
 	const auto &blocks = history->blocks;
 	bool foundSelf = false;
+	const HistoryItem *lastNonServiceInBlocks = nullptr;
 
 	for (auto bIt = blocks.rbegin(); bIt != blocks.rend(); ++bIt) {
 		const auto &msgs = (*bIt)->messages;
 		for (auto mIt = msgs.rbegin(); mIt != msgs.rend(); ++mIt) {
-			const auto prevData = (*mIt)->data();
-			if (prevData == item) {
+			const auto data = (*mIt)->data();
+			if (data == item) {
 				foundSelf = true;
 				continue;
 			}
-			if (!foundSelf) {
+			if (data->isService()) {
 				continue;
 			}
-			if (prevData->isService()) {
-				continue;
+			if (!lastNonServiceInBlocks) {
+				lastNonServiceInBlocks = data;
 			}
-			return (prevData->from() == item->from()
-				&& prevData->originalText().text == text
-				&& !prevData->out());
+			if (foundSelf) {
+				return data;
+			}
 		}
 	}
-	return false;
+	return foundSelf ? nullptr : lastNonServiceInBlocks;
+}
+
+const HistoryItem *getDuplicateHead(const not_null<HistoryItem*> item) {
+	if (!AyuSettings::getInstance().collapseDuplicates() || item->isService()) {
+		return nullptr;
+	}
+	const auto &text = item->originalText().text;
+	if (text.isEmpty()) {
+		return nullptr;
+	}
+
+	const auto prev = getPreviousNonService(item);
+	if (!prev) {
+		return nullptr;
+	}
+
+	if (prev->from() != item->from() || prev->originalText().text != text) {
+		return nullptr;
+	}
+
+	const HistoryItem *head = prev;
+	while (const auto earlier = getPreviousNonService(const_cast<HistoryItem*>(head))) {
+		if (earlier->from() == item->from() && earlier->originalText().text == text) {
+			head = earlier;
+		} else {
+			break;
+		}
+	}
+
+	return head;
+}
+
+void notifyDuplicateHead(
+		not_null<const HistoryItem*> duplicateItem,
+		not_null<const HistoryItem*> headItem) {
+	if (notifiedDuplicates.contains(duplicateItem)) {
+		return;
+	}
+	if (notifiedDuplicates.size() > 2000) {
+		notifiedDuplicates.clear();
+	}
+	notifiedDuplicates.insert(duplicateItem);
+
+	const auto headPtr = const_cast<HistoryItem*>(headItem.get());
+	crl::on_main([=] {
+		headPtr->history()->owner().requestItemViewRefresh(headPtr);
+	});
+}
+
+bool isDuplicateMessage(const not_null<HistoryItem*> item) {
+	if (!AyuSettings::getInstance().collapseDuplicates() || item->isService()) {
+		return false;
+	}
+	const auto head = getDuplicateHead(item);
+	if (!head) {
+		return false;
+	}
+	notifyDuplicateHead(item, head);
+	return true;
 }
 
 int countDuplicateGroupSize(const not_null<HistoryItem*> item) {
-	if (!AyuSettings::getInstance().collapseDuplicates() || item->isService() || item->out()) {
+	if (!AyuSettings::getInstance().collapseDuplicates() || item->isService()) {
 		return 1;
 	}
 	const auto &text = item->originalText().text;
 	if (text.isEmpty()) {
 		return 1;
 	}
-	int count = 1;
-	if (const auto view = item->mainView()) {
-		auto next = view->nextInBlocks();
-		while (next) {
-			const auto nextData = next->data();
-			if (!nextData->isService()) {
-				if (nextData->from() == item->from()
-					&& nextData->originalText().text == text
-					&& !nextData->out()) {
-					count++;
-				} else {
-					break;
-				}
-			}
-			next = next->nextInBlocks();
-		}
-		if (count > 1) {
-			return count;
-		}
-	}
 
+	int count = 1;
 	const auto history = item->history();
 	const auto &blocks = history->blocks;
 	bool foundSelf = false;
-	count = 1;
 
 	for (const auto &block : blocks) {
 		for (const auto &element : block->messages) {
@@ -255,15 +272,11 @@ int countDuplicateGroupSize(const not_null<HistoryItem*> item) {
 				foundSelf = true;
 				continue;
 			}
-			if (!foundSelf) {
-				continue;
-			}
-			if (nextData->isService()) {
+			if (!foundSelf || nextData->isService()) {
 				continue;
 			}
 			if (nextData->from() == item->from()
-				&& nextData->originalText().text == text
-				&& !nextData->out()) {
+				&& nextData->originalText().text == text) {
 				count++;
 			} else {
 				return count;

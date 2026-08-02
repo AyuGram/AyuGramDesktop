@@ -13,8 +13,8 @@
 #include "rpl/variable.h"
 
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
-
 
 namespace Main {
 class Session;
@@ -49,6 +49,12 @@ enum class SendWithoutSoundOption {
 	Never = 0,
 	InGhostMode = 1,
 	Always = 2,
+};
+
+struct MentionsSettings {
+	uint64 soundId = 0;
+	int mutedUntil = 0;
+	bool soundNone = false;
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(PeerIdDisplay, {
@@ -283,8 +289,14 @@ public:
 	[[nodiscard]] bool hideFromBlocked() const { return _hideFromBlocked.current(); }
 	[[nodiscard]] bool collapseDuplicates() const { return _collapseDuplicates.current(); }
 	void setCollapseDuplicates(bool val);
-	[[nodiscard]] bool mentionsDisabled(uint64 peerId) const { return _disabledMentionsIds.contains(peerId); }
-	void toggleMentionsDisabled(uint64 peerId);
+	[[nodiscard]] bool mentionsDisabled(uint64 peerId) const;
+	[[nodiscard]] int mentionsMuteUntil(uint64 peerId) const;
+	[[nodiscard]] uint64 mentionsSoundId(uint64 peerId) const;
+	[[nodiscard]] bool mentionsSoundDisabled(uint64 peerId) const;
+	void setMentionsSound(uint64 peerId, uint64 soundId, bool none);
+	void setMentionsMutePeriod(uint64 peerId, int period);
+	void disableMentionsForever(uint64 peerId);
+	void enableMentions(uint64 peerId);
 	[[nodiscard]] bool semiTransparentDeletedMessages() const { return _semiTransparentDeletedMessages.current(); }
 	[[nodiscard]] bool disableAds() const { return _disableAds.current(); }
 	[[nodiscard]] bool disableStories() const { return _disableStories.current(); }
@@ -642,7 +654,7 @@ private:
 	rpl::variable<bool> _filtersEnabledInPrivate = true;
 	rpl::variable<bool> _hideFromBlocked = false;
 	rpl::variable<bool> _collapseDuplicates = true;
-	std::unordered_set<uint64> _disabledMentionsIds;
+	std::unordered_map<uint64, MentionsSettings> _mentionsSettings;
 	rpl::variable<bool> _semiTransparentDeletedMessages = false;
 	rpl::variable<bool> _disableAds = true;
 	rpl::variable<bool> _disableStories = false;

@@ -6,20 +6,23 @@
 // Copyright @Radolyn, 2026
 #include "ayu/ayu_settings.h"
 
-#include "lang_auto.h"
-#include "tray.h"
-#include "ayu/ayu_worker.h"
 #include "ayu/ui/ayu_logo.h"
+#include "ayu/ayu_worker.h"
+#include "base/unixtime.h"
 #include "core/application.h"
 #include "features/filters/filters_cache_controller.h"
 #include "features/translator/ayu_translator.h"
+#include "lang_auto.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "platform/platform_translate_provider.h"
 #include "rpl/combine.h"
+#include "tray.h"
 #include "window/window_controller.h"
 
+#include <algorithm>
 #include <fstream>
+#include <limits>
 #include <QApplication>
 
 using json = nlohmann::json;
@@ -37,6 +40,8 @@ void repaintApp() {
 }
 
 rpl::lifetime lifetime; // idk reactivity dies when placed in `GhostModeAccountSettings` as field
+
+constexpr auto kMentionsMutedForever = std::numeric_limits<int>::max();
 
 } // namespace
 
@@ -1088,12 +1093,69 @@ void AyuSettings::setCollapseDuplicates(bool val) {
 	save();
 }
 
-void AyuSettings::toggleMentionsDisabled(uint64 peerId) {
-	if (_disabledMentionsIds.contains(peerId)) {
-		_disabledMentionsIds.erase(peerId);
-	} else {
-		_disabledMentionsIds.insert(peerId);
+bool AyuSettings::mentionsDisabled(uint64 peerId) const {
+	const auto i = _mentionsSettings.find(peerId);
+	return i != _mentionsSettings.end()
+		&& i->second.mutedUntil > base::unixtime::now();
+}
+
+int AyuSettings::mentionsMuteUntil(uint64 peerId) const {
+	const auto i = _mentionsSettings.find(peerId);
+	return (i != _mentionsSettings.end()) ? i->second.mutedUntil : 0;
+}
+
+uint64 AyuSettings::mentionsSoundId(uint64 peerId) const {
+	const auto i = _mentionsSettings.find(peerId);
+	return (i != _mentionsSettings.end()) ? i->second.soundId : 0;
+}
+
+bool AyuSettings::mentionsSoundDisabled(uint64 peerId) const {
+	const auto i = _mentionsSettings.find(peerId);
+	return (i != _mentionsSettings.end()) && i->second.soundNone;
+}
+
+void AyuSettings::setMentionsSound(uint64 peerId, uint64 soundId, bool none) {
+	auto &settings = _mentionsSettings[peerId];
+	const auto newSoundId = none ? uint64(0) : soundId;
+	if (settings.soundId == newSoundId && settings.soundNone == none) {
+		return;
 	}
+	settings.soundId = newSoundId;
+	settings.soundNone = none;
+	save();
+}
+
+void AyuSettings::setMentionsMutePeriod(uint64 peerId, int period) {
+	const auto until = (period > 0)
+		? int(std::min(
+			int64(kMentionsMutedForever),
+			int64(base::unixtime::now()) + period))
+		: 0;
+	auto &settings = _mentionsSettings[peerId];
+	if (settings.mutedUntil == until) {
+		return;
+	}
+	settings.mutedUntil = until;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::disableMentionsForever(uint64 peerId) {
+	auto &settings = _mentionsSettings[peerId];
+	if (settings.mutedUntil == kMentionsMutedForever) {
+		return;
+	}
+	settings.mutedUntil = kMentionsMutedForever;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::enableMentions(uint64 peerId) {
+	const auto i = _mentionsSettings.find(peerId);
+	if (i == _mentionsSettings.end() || !i->second.mutedUntil) {
+		return;
+	}
+	i->second.mutedUntil = 0;
 	repaintApp();
 	save();
 }
@@ -1102,6 +1164,14 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
 		ghostAccounts[std::to_string(key)] = *value;
+	}
+	auto mentionsSettings = nlohmann::json::object();
+	for (const auto &[peerId, settings] : s._mentionsSettings) {
+		mentionsSettings[std::to_string(peerId)] = {
+			{"soundId", settings.soundId},
+			{"mutedUntil", settings.mutedUntil},
+			{"soundNone", settings.soundNone},
+		};
 	}
 
 	j = nlohmann::json{
@@ -1119,7 +1189,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"filtersEnabledInPrivate", s._filtersEnabledInPrivate.current()},
 		{"hideFromBlocked", s._hideFromBlocked.current()},
 		{"collapseDuplicates", s._collapseDuplicates.current()},
-		{"disabledMentionsIds", s._disabledMentionsIds},
+		{"mentionsSettings", mentionsSettings},
 		{"semiTransparentDeletedMessages", s._semiTransparentDeletedMessages.current()},
 		{"disableAds", s._disableAds.current()},
 		{"disableStories", s._disableStories.current()},
@@ -1227,7 +1297,25 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._filtersEnabledInPrivate = j.value("filtersEnabledInPrivate", s._filtersEnabledInChats.current());
 	s._hideFromBlocked = j.value("hideFromBlocked", defaults._hideFromBlocked.current());
 	s._collapseDuplicates = j.value("collapseDuplicates", defaults._collapseDuplicates.current());
-	s._disabledMentionsIds = j.value("disabledMentionsIds", defaults._disabledMentionsIds);
+	s._mentionsSettings.clear();
+	if (j.contains("mentionsSettings") && j["mentionsSettings"].is_object()) {
+		for (auto &[key, value] : j["mentionsSettings"].items()) {
+			s._mentionsSettings.emplace(std::stoull(key), MentionsSettings{
+				.soundId = value.value("soundId", uint64(0)),
+				.mutedUntil = value.value("mutedUntil", 0),
+				.soundNone = value.value("soundNone", false),
+			});
+		}
+	} else {
+		const auto disabledMentionsIds = j.value(
+			"disabledMentionsIds",
+			std::unordered_set<uint64>());
+		for (const auto peerId : disabledMentionsIds) {
+			s._mentionsSettings.emplace(peerId, MentionsSettings{
+				.mutedUntil = kMentionsMutedForever,
+			});
+		}
+	}
 	s._semiTransparentDeletedMessages = j.value("semiTransparentDeletedMessages", defaults._semiTransparentDeletedMessages.current());
 	s._disableAds = j.value("disableAds", defaults._disableAds.current());
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());

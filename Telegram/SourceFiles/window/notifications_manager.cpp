@@ -162,8 +162,19 @@ base::options::toggle HideReplyButtonOption({
 }
 
 [[nodiscard]] std::optional<DocumentId> MaybeSoundFor(
+		HistoryItem *item,
 		not_null<Data::Thread*> thread,
 		PeerData *from) {
+	if (item && item->mentionsMe()) {
+		const auto peerId = thread->peer()->id.value;
+		const auto &settings = AyuSettings::getInstance();
+		if (settings.mentionsSoundDisabled(peerId)) {
+			return std::nullopt;
+		}
+		if (const auto soundId = settings.mentionsSoundId(peerId)) {
+			return soundId;
+		}
+	}
 	const auto notifySettings = &thread->owner().notifySettings();
 	const auto threadUnknown = notifySettings->muteUnknown(thread);
 	const auto threadAlert = !threadUnknown
@@ -172,8 +183,11 @@ base::options::toggle HideReplyButtonOption({
 		|| notifySettings->muteUnknown(from));
 	const auto fromAlert = !fromUnknown
 		&& !notifySettings->isMuted(from);
+	if (!(threadAlert || fromAlert)) {
+		return std::nullopt;
+	}
 	const auto &sound = notifySettings->sound(thread);
-	return ((threadAlert || fromAlert) && !sound.none)
+	return !sound.none
 		? sound.id
 		: std::optional<DocumentId>();
 }
@@ -336,6 +350,12 @@ System::SkipState System::computeSkipState(
 	const auto thread = item->notificationThread();
 	const auto notifySettings = &thread->owner().notifySettings();
 	const auto messageType = (type == Data::ItemNotificationType::Message);
+	const auto mention = messageType && item->mentionsMe();
+	const auto peerId = thread->peer()->id.value;
+	const auto &ayuSettings = AyuSettings::getInstance();
+	if (mention && ayuSettings.mentionsDisabled(peerId)) {
+		return { SkipState::Skip };
+	}
 	const auto withSilent = [&](
 			SkipState::Value value,
 			bool forceSilent = false) {
@@ -344,12 +364,16 @@ System::SkipState System::computeSkipState(
 			.silent = (forceSilent
 				|| !messageType
 				|| item->isSilent()
-				|| notifySettings->sound(thread).none),
+				|| (mention
+					? (ayuSettings.mentionsSoundDisabled(peerId)
+						|| (!ayuSettings.mentionsSoundId(peerId)
+							&& notifySettings->sound(thread).none))
+					: notifySettings->sound(thread).none)),
 		};
 	};
 	const auto showForMuted = messageType
-		&& item->out()
-		&& item->isFromScheduled();
+		&& ((mention && !ayuSettings.mentionsDisabled(peerId))
+			|| (item->out() && item->isFromScheduled()));
 	const auto notifyBy = messageType
 		? item->specialNotificationPeer()
 		: notification.reactionOrVoteSender;
@@ -468,8 +492,15 @@ void System::schedule(Data::ItemNotification notification) {
 		? item->specialNotificationPeer()
 		: notification.reactionOrVoteSender;
 	if (!skip.silent) {
-		registerThread(thread);
-		_whenAlerts[thread].emplace(timing.when, notifyBy);
+		const auto messageItem = (type == Data::ItemNotificationType::Message)
+			? item.get()
+			: nullptr;
+		if (const auto soundId = MaybeSoundFor(messageItem, thread, notifyBy)) {
+			registerThread(thread);
+			_whenAlerts[thread].emplace(timing.when, Alert{
+				.soundId = *soundId,
+			});
+		}
 	}
 	if (const auto user = item->history()->peer->asUser()) {
 		if (user->hasStarsPerMessage()
@@ -740,11 +771,8 @@ void System::showNext() {
 	for (auto i = _whenAlerts.begin(); i != _whenAlerts.end();) {
 		while (!i->second.empty() && i->second.begin()->first <= ms) {
 			const auto thread = i->first;
-			const auto from = i->second.begin()->second;
-			if (const auto soundId = MaybeSoundFor(thread, from)) {
-				alertThread = thread;
-				alertSoundId = soundId;
-			}
+			alertThread = thread;
+			alertSoundId = i->second.begin()->second.soundId;
 			while (!i->second.empty()
 				&& i->second.begin()->first <= ms + kMinimalAlertDelay) {
 				i->second.erase(i->second.begin());
@@ -776,7 +804,7 @@ void System::showNext() {
 		}
 		if (settings.soundNotify()) {
 			const auto owner = &alertThread->owner();
-			const auto id = owner->notifySettings().sound(alertThread).id;
+			const auto id = *alertSoundId;
 			auto volume
 				= owner->session().settings().ringtoneVolume(
 					alertThread->peer()->id,
@@ -931,6 +959,7 @@ void System::showNext() {
 			_lastHistorySessionId = groupedItem->history()->session().uniqueId();
 			_lastHistoryItemId = groupedItem->fullId();
 			_lastSoundId = notifySilent ? std::nullopt : MaybeSoundFor(
+				groupedItem,
 				notifyThread,
 				groupedItem->specialNotificationPeer());
 		}
@@ -952,6 +981,7 @@ void System::showNext() {
 			_lastHistorySessionId = groupedItem->history()->session().uniqueId();
 			_lastHistoryItemId = groupedItem->fullId();
 			_lastSoundId = notifySilent ? std::nullopt : MaybeSoundFor(
+				groupedItem,
 				notifyThread,
 				groupedItem->specialNotificationPeer());
 			_waitForAllGroupedTimer.callOnce(kWaitingForAllGroupedDelay);
@@ -985,7 +1015,10 @@ void System::showNext() {
 					.pollVoteOption = pollVoteOption,
 					.soundId = (notifySilent
 						? std::nullopt
-						: MaybeSoundFor(notifyThread, soundFrom)),
+						: MaybeSoundFor(
+							messageType ? notify->item.get() : nullptr,
+							notifyThread,
+							soundFrom)),
 				});
 			}
 		}
