@@ -165,10 +165,10 @@ jobs:
       - name: Configure
         run: |
           XCODE_VER=$(xcodebuild -version | head -n 1 | awk '{print $2}' | cut -d. -f1)
-          EXTRA_FLAGS=""
+          EXTRA_FLAGS="-GNinja"
           if [ "$XCODE_VER" -lt 16 ]; then
             echo "Xcode version is < 16 ($XCODE_VER), disabling Swift 6..."
-            EXTRA_FLAGS="-DDESKTOP_APP_DISABLE_SWIFT6=ON"
+            EXTRA_FLAGS="$EXTRA_FLAGS -DDESKTOP_APP_DISABLE_SWIFT6=ON"
           fi
           python3 Telegram/configure.py \
             -DTDESKTOP_API_ID=2040 \
@@ -177,7 +177,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build out --config Release -- -jobs $(sysctl -n hw.logicalcpu)
+          cmake --build out --config Release -- -j 4
 
       - name: Package macOS DMG
         run: |
