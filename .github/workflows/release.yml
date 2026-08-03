@@ -132,7 +132,7 @@ jobs:
               open(p, 'w').write(c.replace(old, new))
           "
 
-      - name: Set up Xcode
+      - name: Set up Xcode & ccache
         run: |
           if [ -d "/Applications/Xcode_16.0.app" ]; then
             sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
@@ -144,7 +144,16 @@ jobs:
             sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           fi
           xcodebuild -version
-          brew install ninja nasm yasm pkg-config cmake autoconf automake libtool meson wget gperf
+          brew install ninja nasm yasm pkg-config cmake autoconf automake libtool meson wget gperf ccache
+          echo "CCACHE_DIR=$RUNNER_TEMP/.tdesktop-cache" >> $GITHUB_ENV
+
+      - name: ccache cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.tdesktop-cache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
 
       - name: Libraries cache
         id: cache-libs
@@ -165,10 +174,10 @@ jobs:
       - name: Configure
         run: |
           XCODE_VER=$(xcodebuild -version | head -n 1 | awk '{print $2}' | cut -d. -f1)
-          EXTRA_FLAGS=""
+          EXTRA_FLAGS="-GNinja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
           if [ "$XCODE_VER" -lt 16 ]; then
             echo "Xcode version is < 16 ($XCODE_VER), disabling Swift 6..."
-            EXTRA_FLAGS="-DDESKTOP_APP_DISABLE_SWIFT6=ON"
+            EXTRA_FLAGS="$EXTRA_FLAGS -DDESKTOP_APP_DISABLE_SWIFT6=ON"
           fi
           python3 Telegram/configure.py \
             -DTDESKTOP_API_ID=2040 \
@@ -177,7 +186,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build out --config Release -- -jobs $(sysctl -n hw.logicalcpu)
+          cmake --build out --config Release -- -j 4
 
       - name: Package macOS DMG
         run: |
