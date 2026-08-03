@@ -2,11 +2,6 @@ name: Automatic Release Builder
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
-  release:
-    types: [published]
 
 permissions:
   contents: write
