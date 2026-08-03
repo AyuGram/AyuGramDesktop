@@ -132,23 +132,18 @@ jobs:
               open(p, 'w').write(c.replace(old, new))
           "
 
-      - name: Patch lib_translate for Xcode 15 / macOS 14 SDK
-        run: |
-          python3 -c "
-          import os
-          p = 'Telegram/lib_translate/translate_provider_mac_swift.swift'
-          if os.path.exists(p):
-              c = open(p).read()
-              if '#if canImport(Translation)' not in c:
-                  c = c.replace('import Translation', '#if canImport(Translation)\nimport Translation\n#endif')
-                  c = c.replace('compiler(>=6.2)', 'canImport(Translation)')
-                  c = c.replace('macOS 26.0', 'macOS 15.0')
-                  open(p, 'w').write(c)
-          "
-
       - name: Set up Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          if [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.1.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_16.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          else
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
           brew install ninja nasm yasm pkg-config cmake autoconf automake libtool meson wget gperf
 
       - name: Libraries cache
@@ -169,9 +164,16 @@ jobs:
 
       - name: Configure
         run: |
+          XCODE_VER=$(xcodebuild -version | head -n 1 | awk '{print $2}' | cut -d. -f1)
+          EXTRA_FLAGS=""
+          if [ "$XCODE_VER" -lt 16 ]; then
+            echo "Xcode version is < 16 ($XCODE_VER), disabling Swift 6..."
+            EXTRA_FLAGS="-DDESKTOP_APP_DISABLE_SWIFT6=ON"
+          fi
           python3 Telegram/configure.py \
             -DTDESKTOP_API_ID=2040 \
-            -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+            -DTDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
+            $EXTRA_FLAGS
 
       - name: Build
         run: |
