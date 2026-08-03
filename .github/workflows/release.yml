@@ -2,6 +2,9 @@ name: Automatic Release Builder
 
 on:
   push:
+    branches:
+      - dev
+      - main
     tags:
       - 'v*'
   release:

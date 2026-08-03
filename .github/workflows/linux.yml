@@ -1,6 +1,10 @@
 name: Linux.
 
 on:
+  push:
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 jobs:
