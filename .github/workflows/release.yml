@@ -45,6 +45,14 @@ jobs:
           DOCKERFILE=$(DEBUG= LTO= poetry run gen_dockerfile)
           echo "$DOCKERFILE" > Dockerfile
 
+      - name: ccache cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.tdesktop-cache
+          key: ${{ runner.os }}-linux-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-linux-ccache-
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
