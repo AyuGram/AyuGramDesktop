@@ -198,12 +198,19 @@ jobs:
 
       - name: Package macOS DMG
         run: |
-          cd out/Release
-          if [ -d "Telegram.app" ]; then
-            hdiutil create -volname "AyuGram" -srcfolder Telegram.app -ov -format UDZO macOS.dmg
+          APP_PATH=$(find out/ \( -name "AyuGram.app" -o -name "Telegram.app" \) -type d | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            APP_NAME=$(basename "$APP_PATH")
+            APP_DIR=$(dirname "$APP_PATH")
+            echo "Found $APP_NAME at $APP_PATH"
+            cd "$APP_DIR"
+            hdiutil create -volname "AyuGram" -srcfolder "$APP_NAME" -ov -format UDZO macOS.dmg
+            mkdir -p "$GITHUB_WORKSPACE/out/Release"
+            cp macOS.dmg "$GITHUB_WORKSPACE/out/Release/macOS.dmg" || true
           else
-            echo "Telegram.app not found, listing out/Release contents:"
-            ls -la
+            echo "Error: Neither AyuGram.app nor Telegram.app found under out/"
+            find out/ -maxdepth 3 || true
+            exit 1
           fi
 
       - name: Upload macOS Artifact
