@@ -181,8 +181,8 @@ jobs:
 
       - name: Configure
         run: |
-          XCODE_VER=$(xcodebuild -version | head -n 1 | awk '{print $2}' | cut -d. -f1)
-          EXTRA_FLAGS="-GNinja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+          XCODE_VER=$(xcodebuild -version | awk 'NR==1{print $2}' | cut -d. -f1)
+          EXTRA_FLAGS="-GNinja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OSX_ARCHITECTURES=arm64"
           if [ "$XCODE_VER" -lt 16 ]; then
             echo "Xcode version is < 16 ($XCODE_VER), disabling Swift 6..."
             EXTRA_FLAGS="$EXTRA_FLAGS -DDESKTOP_APP_DISABLE_SWIFT6=ON"
