@@ -10,11 +10,15 @@
 #include "ayu/utils/ayu_mapper.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/unixtime.h"
+#include "data/data_document.h"
 #include "data/data_forum_topic.h"
+#include "data/data_media_types.h"
+#include "data/data_photo.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 
 namespace AyuMessages {
@@ -74,14 +78,7 @@ void map(not_null<HistoryItem*> item, AyuMessageBase &message) {
 	message.text = serializedText.first;
 	message.textEntities = serializedText.second;
 
-	// todo: implement mapping
-	message.mediaPath = "/";
-	// message.hqThumbPath
-	message.documentType = 0; // document type none
-	// message.documentSerialized
-	// message.thumbsSerialized
-	// message.documentAttributesSerialized
-	// message.mimeType
+	AyuMapper::mapMediaToMessage(item, message);
 }
 
 void addEditedMessage(not_null<HistoryItem *> item) {
@@ -116,7 +113,33 @@ void addDeletedMessage(not_null<HistoryItem*> item) {
 	map(item, message);
 
 	if (message.text.empty()) {
-		return;
+		const auto media = item->media();
+		if (!media) {
+			return;
+		}
+		if (media->photo()) {
+			message.text = tr::lng_in_dlg_photo(tr::now).toStdString();
+		} else if (const auto document = media->document()) {
+			const auto type = [&] {
+				if (document->isVideoMessage()) {
+					return tr::lng_in_dlg_video_message(tr::now);
+				} else if (document->isAnimation()) {
+					return u"GIF"_q;
+				} else if (document->isVideoFile()) {
+					return tr::lng_in_dlg_video(tr::now);
+				} else if (document->isVoiceMessage()) {
+					return tr::lng_in_dlg_audio(tr::now);
+				} else if (document->sticker()) {
+					return tr::lng_in_dlg_sticker(tr::now);
+				} else if (document->isAudioFile()) {
+					return tr::lng_in_dlg_audio_file(tr::now);
+				}
+				return tr::lng_in_dlg_file(tr::now);
+			}();
+			message.text = type.toStdString();
+		} else {
+			return;
+		}
 	}
 
 	AyuDatabase::addDeletedMessage(message);
