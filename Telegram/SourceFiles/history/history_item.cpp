@@ -3943,6 +3943,8 @@ void HistoryItem::setDeleted() {
 		}
 	}
 
+	removeFromSharedMediaIndex();
+
 	if (isService()) {
 		const auto &settings = AyuSettings::getInstance();
 		setAyuHint(settings.deletedMark());
