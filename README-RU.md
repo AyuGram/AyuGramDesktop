@@ -70,7 +70,8 @@ scoop install ayugram
 #### Homebrew
 
 ```bash
-brew install --cask ayugram
+brew tap SoftwareRat/unsigned-tap
+brew install --cask SoftwareRat/unsigned-tap/ayugram
 ```
 
 ### Arch Linux
