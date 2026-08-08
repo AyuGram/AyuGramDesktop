@@ -436,7 +436,7 @@ void Action::updateUserpicsFromContent() {
 }
 
 void Action::populateSubmenu() {
-	if (_content.participants.size() < 1) {
+	if (_content.participants.size() < 1 || !isEnabled()) {
 		_submenu.clear();
 		_parentMenu->removeSubmenu(action());
 		if (!isEnabled()) {
@@ -449,7 +449,15 @@ void Action::populateSubmenu() {
 		action(),
 		st::whoReadMenu);
 	_submenu.populate(submenu, _content);
-	_parentMenu->checkSubmenuShow();
+	if (isSelected() && lastTriggeredSource() == Menu::TriggeredSource::Mouse) {
+		PostponeCall(this, [=] {
+			if (isEnabled()
+				&& isSelected()
+				&& lastTriggeredSource() == Menu::TriggeredSource::Mouse) {
+				_parentMenu->checkSubmenuShow();
+			}
+		});
+	}
 }
 
 void Action::paint(Painter &p) {
