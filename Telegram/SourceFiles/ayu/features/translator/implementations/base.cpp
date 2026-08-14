@@ -201,47 +201,35 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 	state->retryCount.resize(state->total, 0);
 	state->retryTimers.resize(state->total);
 
+	const auto weak = std::weak_ptr(state);
 	const auto maxConcurrent = getConcurrencyLimit();
 	const auto maxRetries = getMaxRetries();
 	const auto baseWaitTime = getBaseWaitTimeMs();
 	const auto weakState = std::weak_ptr<BatchState>(state);
 
-	auto finishFail = [weakState]()
+	auto finishFail = [weak]()
 	{
-		const auto state = weakState.lock();
-		if (!state) {
-			return;
-		}
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		state->finished = true;
 		state->cancelAll();
 		if (state->onFail) state->onFail();
 	};
 
-	auto finishSuccess = [weakState]()
+	auto finishSuccess = [weak]()
 	{
-		const auto state = weakState.lock();
-		if (!state) {
-			return;
-		}
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		state->finished = true;
 		if (state->onSuccess) state->onSuccess(state->results);
 	};
 
-	state->tryTranslateIndex = [
-		weakState,
-		finishFail,
-		finishSuccess,
-		maxRetries,
-		baseWaitTime
-	](int i) mutable
+	state->tryTranslateIndex = [weak, finishFail, finishSuccess, maxRetries, baseWaitTime](int i) mutable
 	{
-		const auto state = weakState.lock();
-		if (!state) {
-			return;
-		}
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
+
+		const auto attemptCompleted = std::make_shared<bool>(false);
 
 		const auto attemptCompleted = std::make_shared<bool>(false);
 
@@ -299,19 +287,16 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 		const auto reply = state->self->startSingleTranslation(singleArgs);
 		if (!*attemptCompleted) {
 			state->replies[i] = reply;
-			if (!reply && !state->finished) {
-				singleArgs.onFail();
-			}
+		}
+		if (!reply && !*attemptCompleted) {
+			singleArgs.onFail();
 		}
 	};
 
-	state->pump = [weakState, maxConcurrent]() mutable
+	state->pump = [weak, maxConcurrent]() mutable
 	{
-		const auto state = weakState.lock();
-		if (!state) {
-			return;
-		}
-		if (state->finished) return;
+		const auto state = weak.lock();
+		if (!state || state->finished) return;
 		while (!state->finished && state->inProgress < maxConcurrent && state->nextIndex < state->total) {
 			const int i = state->nextIndex++;
 			state->inProgress++;
