@@ -134,6 +134,12 @@ bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId) {
 	return AyuDatabase::hasDeletedMessages(userId, getDialogIdFromPeer(peer), topicId);
 }
 
+void removeDeletedMessage(not_null<HistoryItem*> item) {
+	const auto peer = item->history()->peer;
+	const ID userId = peer->session().userId().bare & PeerId::kChatTypeMask;
+	AyuDatabase::removeDeletedMessage(userId, getDialogIdFromPeer(peer), item->id.bare);
+}
+
 void clearDeletedMessages(not_null<PeerData*> peer, ID topicId) {
 	const ID userId = peer->session().userId().bare & PeerId::kChatTypeMask;
 	AyuDatabase::clearDeletedMessages(userId, getDialogIdFromPeer(peer), topicId);

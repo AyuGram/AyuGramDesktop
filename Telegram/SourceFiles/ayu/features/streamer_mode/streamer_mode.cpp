@@ -7,46 +7,57 @@
 
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
+#include "ayu/features/streamer_mode/platform/platform_streamer_mode.h"
+#include "core/application.h"
 #include "window/window_controller.h"
 
-#if defined Q_OS_WINRT || defined Q_OS_WIN
-#include "ayu/features/streamer_mode/platform/streamer_mode_win.h"
-#elif defined Q_OS_MAC // Q_OS_WINRT || Q_OS_WIN
-#include "ayu/features/streamer_mode/platform/streamer_mode_mac.h"
-#else // Q_OS_WINRT || Q_OS_WIN || Q_OS_MAC
-#include "ayu/features/streamer_mode/platform/streamer_mode_linux.h"
-#endif // else for Q_OS_WINRT || Q_OS_WIN || Q_OS_MAC
+#include <QtCore/QVariant>
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QWidget>
 
-namespace AyuFeatures::StreamerMode
-{
+namespace AyuFeatures::StreamerMode {
 
-bool isEnabledVal;
+namespace {
 
-bool isEnabled()
-{
-	return isEnabledVal;
+constexpr auto kHiddenProperty = "AyuStreamerModeHidden";
+
+[[nodiscard]] bool IsWindowCaptureExcluded(not_null<QWidget*> widget) {
+	return widget->property(kHiddenProperty).toBool();
 }
 
-void enable()
-{
-	isEnabledVal = true;
-	Impl::enableHook();
+void SetWindowCaptureExcluded(QWidget *widget, bool excluded) {
+	const auto window = widget->window();
+	Platform::SetWindowCaptureExcluded(window, excluded);
+	window->setProperty(kHiddenProperty, excluded);
 }
 
-void disable()
-{
-	isEnabledVal = false;
-	Impl::disableHook();
+} // namespace
+
+void apply(bool enabled) {
+	Core::App().enumerateWindows([=](not_null<Window::Controller*> window) {
+		SetWindowCaptureExcluded(window->widget(), enabled);
+	});
+	for (const auto widget : QApplication::topLevelWidgets()) {
+		if (!widget->windowHandle()) {
+			continue;
+		}
+		if (enabled) {
+			if (widget->isVisible()
+				&& !IsWindowCaptureExcluded(widget)) {
+				SetWindowCaptureExcluded(widget, true);
+			}
+		} else if (IsWindowCaptureExcluded(widget)) {
+			SetWindowCaptureExcluded(widget, false);
+		}
+	}
 }
 
-void hideWidgetWindow(QWidget *widget)
-{
-	Impl::hideWidgetWindow(widget);
+void hideWidgetWindow(QWidget *widget) {
+	SetWindowCaptureExcluded(widget, true);
 }
 
-void showWidgetWindow(QWidget *widget)
-{
-	Impl::showWidgetWindow(widget);
+void showWidgetWindow(QWidget *widget) {
+	SetWindowCaptureExcluded(widget, false);
 }
 
-}
+} // namespace AyuFeatures::StreamerMode

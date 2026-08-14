@@ -205,6 +205,7 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 	const auto maxConcurrent = getConcurrencyLimit();
 	const auto maxRetries = getMaxRetries();
 	const auto baseWaitTime = getBaseWaitTimeMs();
+	const auto weakState = std::weak_ptr<BatchState>(state);
 
 	auto finishFail = [weak]()
 	{
@@ -227,6 +228,8 @@ void MultiThreadTranslator::startTranslation(const StartTranslationArgs &args) {
 	{
 		const auto state = weak.lock();
 		if (!state || state->finished) return;
+
+		const auto attemptCompleted = std::make_shared<bool>(false);
 
 		const auto attemptCompleted = std::make_shared<bool>(false);
 

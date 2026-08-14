@@ -125,14 +125,6 @@ Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
 
 Or follow the [official guide](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
-### Remarks for Windows
-
-Make sure you have these components installed with VS Build Tools:
-
-- C++ MFC latest (x86 & x64)
-- C++ ATL latest (x86 & x64)
-- latest Windows 11 SDK
-
 ## Donation
 
 Enjoy using **AyuGram**? Consider sending us a tip!

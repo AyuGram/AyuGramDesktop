@@ -44,6 +44,14 @@ void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setShowOnlyAddedEmojisAndStickers,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/unlimitedRecentStickers"_q,
+		.altIds = { u"ayu/recentStickersCount"_q },
+		.title = tr::ayu_SettingsUnlimitedRecentStickers(),
+		.getter = &AyuSettings::unlimitedRecentStickers,
+		.setter = &AyuSettings::setUnlimitedRecentStickers,
+	});
+
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/hideReactions"_q,
 		.title = tr::ayu_HideReactions(),
@@ -65,25 +73,6 @@ void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			}
 		},
 		.toggledWhenAll = false,
-	});
-
-	ayu.addSectionDivider();
-}
-
-void BuildRecentStickersLimit(SectionBuilder &builder, AyuSectionBuilder &ayu) {
-	auto *settings = &AyuSettings::getInstance();
-
-	ayu.addSlider({
-		.id = u"ayu/recentStickersCount"_q,
-		.title = tr::ayu_SettingsRecentStickersCount(),
-		.steps = 200 + 1,
-		.current = settings->recentStickersCount(),
-		.indexToValue = [](int index) { return index; },
-		.onChanged = nullptr,
-		.onFinalChanged = [](int amount) {
-			AyuSettings::getInstance().setRecentStickersCount(amount);
-		},
-		.formatLabel = [](int amount) { return QString::number(amount); },
 	});
 
 	ayu.addSectionDivider();
@@ -467,7 +456,6 @@ const auto kMeta = BuildHelper({
 
 	builder.addSkip();
 	BuildStickersAndEmoji(builder, ayu);
-	BuildRecentStickersLimit(builder, ayu);
 	BuildGroupsAndChannels(builder, ayu);
 	BuildMarks(builder, ayu, previewState);
 	BuildWideMessagesMultiplier(builder, ayu, previewState);

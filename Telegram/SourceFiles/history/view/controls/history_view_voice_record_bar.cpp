@@ -48,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "webrtc/webrtc_video_track.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_history_view_voice_record_bar.h"
 #include "styles/style_layers.h"
 #include "styles/style_media_player.h"
 
@@ -3010,13 +3011,34 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 								? std::numeric_limits<int>::max()
 								: 0),
 						};
-						_sendVoiceRequests.fire({
-							.bytes = data.content,
-							//.waveform = {},
-							.duration = data.duration,
-							.options = options,
-							.video = true,
-						});
+
+						auto sendRoundCallback = crl::guard(
+							this,
+							[=, this](Fn<void()> &&close)
+							{
+								_sendVoiceRequests.fire({
+									.bytes = data.content,
+									//.waveform = {},
+									.duration = data.duration,
+									.options = options,
+									.video = true,
+								});
+								close();
+							});
+
+						const auto &settings = AyuSettings::getInstance();
+						if (settings.roundConfirmation()) {
+							_show->showBox(Ui::MakeConfirmBox(
+								{
+									.text = tr::ayu_ConfirmationRound(),
+									.confirmed = std::move(sendRoundCallback),
+									.confirmText = tr::lng_send_button()
+								}));
+						} else {
+							sendRoundCallback([]
+							{
+							});
+						}
 					}
 				});
 			});
@@ -3133,6 +3155,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			_listen->applyTrimBeforeSend();
 		}
 
+		const auto video = !_data.minithumbs.isNull();
 		const auto &settings = AyuSettings::getInstance();
 		auto sendVoiceCallback = crl::guard(
 			this,
@@ -3143,15 +3166,17 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 					.waveform = _data.waveform,
 					.duration = _data.duration,
 					.options = options,
-					.video = !_data.minithumbs.isNull(),
+					.video = video,
 				});
 				close();
 			});
 
-		if (settings.voiceConfirmation()) {
+		if (video ? settings.roundConfirmation() : settings.voiceConfirmation()) {
 			_show->showBox(Ui::MakeConfirmBox(
 				{
-					.text = tr::ayu_ConfirmationVoice(),
+					.text = (video
+						? tr::ayu_ConfirmationRound()
+						: tr::ayu_ConfirmationVoice()),
 					.confirmed = std::move(sendVoiceCallback),
 					.confirmText = tr::lng_send_button()
 				}));

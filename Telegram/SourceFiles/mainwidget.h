@@ -19,6 +19,10 @@ namespace Bot {
 struct SendCommandRequest;
 } // namespace Bot
 
+namespace ChatHelpers {
+struct FileChosen;
+} // namespace ChatHelpers
+
 namespace SendMenu {
 struct Details;
 } // namespace SendMenu
@@ -123,6 +127,7 @@ public:
 	void showAnimated(QPixmap oldContentCache, bool back = false);
 
 	void activate();
+	void handleStartFiles(QStringList interprets, QStringList paths);
 
 	void windowShown();
 
@@ -144,6 +149,7 @@ public:
 	void checkMainSectionToLayer();
 
 	[[nodiscard]] SendMenu::Details sendMenuDetails() const;
+	bool processChosenSticker(ChatHelpers::FileChosen &&chosen);
 
 	[[nodiscard]] bool animatingShow() const;
 
@@ -260,7 +266,8 @@ private:
 	void exportTopBarHeightUpdated();
 
 	Window::SectionSlideParams prepareShowAnimation(
-		bool willHaveTopBarShadow);
+		bool willHaveTopBarShadow,
+		bool fromBottom);
 	void showNewSection(
 		std::shared_ptr<Window::SectionMemento> memento,
 		const SectionShow &params);
@@ -269,7 +276,9 @@ private:
 	Window::SectionSlideParams prepareThirdSectionAnimation(Window::SectionWidget *section);
 
 	// All this methods use the prepareShowAnimation().
-	Window::SectionSlideParams prepareMainSectionAnimation(Window::SectionWidget *section);
+	Window::SectionSlideParams prepareMainSectionAnimation(
+		Window::SectionWidget *section,
+		bool fromBottom);
 	Window::SectionSlideParams prepareHistoryAnimation(PeerId historyPeerId);
 	Window::SectionSlideParams prepareDialogsAnimation();
 

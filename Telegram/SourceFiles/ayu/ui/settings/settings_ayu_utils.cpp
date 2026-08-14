@@ -7,21 +7,28 @@
 #include "ayu/ui/settings/settings_ayu_utils.h"
 
 #include "lang_auto.h"
+#include "base/event_filter.h"
 #include "core/application.h"
 #include "lang/lang_text_entity.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_styles.h"
+#include "styles/style_chat_helpers.h"
+#include "styles/style_edit_peer_members.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "styles/style_widgets.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
+#include "ui/text/text_entity.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
-#include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/labels.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
@@ -73,6 +80,43 @@ void AddBetaBadge(not_null<Button*> parent) {
 			st.padding.top()
 				+ (st.style.font->height - badge->height()) / 2);
 	}, badge->lifetime());
+}
+
+void SetupCopyLinkMenus(
+		not_null<Window::SessionController*> controller,
+		const HighlightRegistry &highlights,
+		rpl::lifetime &lifetime) {
+	const auto prefix = u"ayu/"_q;
+	const auto menu = lifetime.make_state<base::unique_qptr<Ui::PopupMenu>>();
+	for (const auto &[id, entry] : highlights) {
+		const auto widget = entry.widget.data();
+		if (!widget || id.size() <= prefix.size() || !id.startsWith(prefix)) {
+			continue;
+		}
+		const auto link = u"https://t.me/ayuSettings?s="_q
+			+ id.mid(prefix.size());
+		base::install_event_filter(widget, [=](not_null<QEvent*> e) {
+			if (e->type() != QEvent::ContextMenu) {
+				return base::EventFilterResult::Continue;
+			}
+			*menu = base::make_unique_q<Ui::PopupMenu>(
+				widget,
+				st::popupMenuWithIcons);
+			(*menu)->addAction(tr::lng_context_copy_link(tr::now), [=] {
+				TextUtilities::SetClipboardText(
+					TextForMimeData::Simple(link));
+				controller->showToast({
+					.text = {
+						tr::lng_channel_public_link_copied(tr::now),
+					},
+					.iconLottie = u"toast/voip_invite"_q,
+					.iconLottieSize = st::toastLottieIconSize,
+				});
+			}, &st::menuIconLink);
+			(*menu)->popup(QCursor::pos());
+			return base::EventFilterResult::Cancel;
+		});
+	}
 }
 
 not_null<Ui::RpWidget*> AddInnerToggle(not_null<Ui::VerticalLayout*> container,
@@ -491,7 +535,7 @@ CollapsibleToggleResult AddCollapsibleToggle(not_null<Ui::VerticalLayout*> conta
 	};
 }
 
-void AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> container,
+not_null<Button*> AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> container,
 											  not_null<Window::SessionController*> controller,
 											  int initialState,
 											  std::vector<QString> options,
@@ -508,12 +552,13 @@ void AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> cont
 			return options[val];
 		});
 
-	Settings::AddButtonWithLabel(
+	const auto button = Settings::AddButtonWithLabel(
 		container,
 		std::move(text),
 		rightTextReactive,
 		st,
-		std::move(descriptor))->addClickHandler(
+		std::move(descriptor));
+	button->addClickHandler(
 		[=]
 		{
 			controller->show(Box(
@@ -534,6 +579,7 @@ void AddChooseButtonWithIconAndRightTextInner(not_null<Ui::VerticalLayout*> cont
 									});
 				}));
 		});
+	return button;
 }
 
 void AddChooseButtonWithIconAndRightText(not_null<Ui::VerticalLayout*> container,

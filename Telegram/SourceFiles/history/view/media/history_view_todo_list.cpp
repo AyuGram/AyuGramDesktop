@@ -44,20 +44,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_polls.h"
 #include "styles/style_widgets.h"
-#include "styles/style_window.h"
 
 namespace HistoryView {
-namespace {
-
-constexpr auto kShowRecentVotersCount = 3;
-constexpr auto kRotateSegments = 8;
-constexpr auto kRotateAmplitude = 3.;
-constexpr auto kScaleSegments = 2;
-constexpr auto kScaleAmplitude = 0.03;
-constexpr auto kLargestRadialDuration = 30 * crl::time(1000);
-constexpr auto kCriticalCloseDuration = 5 * crl::time(1000);
-
-} // namespace
 
 struct TodoList::Task {
 	Task();

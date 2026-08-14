@@ -22,6 +22,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_settings.h"
 
+// AyuGram includes
+#include "ayu/ui/settings/settings_ayu_utils.h"
+
+
 namespace Settings::Builder {
 namespace {
 
@@ -73,6 +77,7 @@ BuildHelper::BuildHelper(
 		.highlights = highlights,
 	});
 	_method(builder);
+	SetupCopyLinkMenus(controller, *highlights, lifetime);
 
 	std::move(showFinished) | rpl::on_next([=] {
 		for (const auto &[id, entry] : *highlights) {

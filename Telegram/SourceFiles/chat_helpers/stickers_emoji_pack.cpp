@@ -122,7 +122,8 @@ EmojiPack::EmojiPack(not_null<Main::Session*> session)
 EmojiPack::~EmojiPack() = default;
 
 bool EmojiPack::add(not_null<ViewElement*> view) {
-	if (view->data()->textAppearing()) {
+	if (view->data()->textAppearing()
+		|| view->Get<HistoryView::FakeBotAboutTop>()) {
 		return false;
 	} else if (const auto custom = view->onlyCustomEmoji()) {
 		_onlyCustomItems.emplace(view);

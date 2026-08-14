@@ -18,6 +18,7 @@
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_document.h"
+#include "data/data_media_types.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -536,10 +537,22 @@ int typeOfMessage(const HistoryItem *item) {
 		return 0; // TYPE_TEXT
 	}
 
+	if (item->showSimilarChannels()) {
+		return 27; // TYPE_JOINED_CHANNEL
+	}
+
 	if (!item->isService()) {
+		if (item->richPage()) {
+			return 36; // TYPE_ARTICLE
+		}
 		if (const auto media = item->media()) {
-			if (const auto invoice = media->invoice(); invoice && invoice->isPaidMedia) {
-				return 29; // TYPE_PAID_MEDIA
+			if (const auto invoice = media->invoice()) {
+				if (invoice->isPaidMedia) {
+					return 29; // TYPE_PAID_MEDIA
+				}
+				if (Data::HasUnpaidMedia(*invoice)) {
+					return 20; // TYPE_EXTENDED_MEDIA_PREVIEW
+				}
 			}
 			if (media->giveawayStart()) {
 				return 26; // TYPE_GIVEAWAY
@@ -627,10 +640,31 @@ int typeOfMessage(const HistoryItem *item) {
 					|| gift->type == Data::GiftType::Ton) {
 					return 30; // TYPE_GIFT_STARS
 				}
+				if (gift->type == Data::GiftType::ChatTheme) {
+					return 31; // TYPE_GIFT_THEME_UPDATE
+				}
+				if (gift->type == Data::GiftType::BirthdaySuggest) {
+					return 32; // TYPE_SUGGEST_BIRTHDAY
+				}
+				if (gift->type == Data::GiftType::GiftOffer) {
+					return 33; // TYPE_GIFT_OFFER
+				}
 			}
-			if (item->Get<HistoryServiceGiveawayResults>()) {
-				return 28; // TYPE_GIVEAWAY_RESULTS
-			}
+		}
+		if (item->Get<HistoryServiceGiveawayResults>()) {
+			return 28; // TYPE_GIVEAWAY_RESULTS
+		}
+		if (item->Get<HistoryServiceNoForwardsRequest>()) {
+			return 35; // TYPE_SHARING_OFFER
+		}
+		if (item->Get<HistoryServiceCommunityAdded>()) {
+			return 37; // TYPE_COMMUNITY_CHANGED
+		}
+		if (const auto finish = item->Get<HistoryServiceSuggestFinish>();
+			finish
+			&& finish->refundType != SuggestRefundType::None
+			&& !finish->price.empty()) {
+			return 34; // TYPE_GIFT_OFFER_REJECTED
 		}
 		return 10; // TYPE_DATE
 	}

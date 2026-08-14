@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "api/api_sending.h"
 #include "apiwrap.h"
-#include "ayu/ayu_settings.h"
 #include "base/random.h"
 #include "base/unixtime.h"
 #include "ui/effects/premium_stars.h"
@@ -57,7 +56,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h" // GroupCallUserpics
 #include "styles/style_credits.h"
+#include "styles/style_history_view_about_view.h"
 #include "styles/style_menu_icons.h"
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+
 
 namespace HistoryView {
 namespace {

@@ -17,7 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "styles/style_intro.h"
-#include "styles/style_boxes.h"
+#include "styles/style_userpic_button.h"
 
 namespace Intro {
 namespace details {
@@ -141,12 +141,8 @@ void SignupWidget::nameSubmitFail(const MTP::Error &error) {
 	} else if (err == "LASTNAME_INVALID") {
 		showError(tr::lng_bad_name());
 		_last->setFocus();
-	} else {
-		if (Logs::DebugEnabled()) { // internal server error
-			showError(rpl::single(err + ": " + error.description()));
-		} else {
-			showError(rpl::single(Lang::Hard::ServerError()));
-		}
+	} else if (!MTP::IgnoreError(error)) {
+		showError(rpl::single(err));
 		if (_invertOrder) {
 			_last->setFocus();
 		} else {

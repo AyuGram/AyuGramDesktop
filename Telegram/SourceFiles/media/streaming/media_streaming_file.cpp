@@ -172,6 +172,7 @@ Stream File::Context::initStream(
 		result.codec = FFmpeg::MakeCodecPointer({
 			.stream = info,
 			.hwAllowed = options.hwAllow,
+			.videoMaxArea = kMaxFrameArea,
 		});
 		if (!result.codec) {
 			return result;

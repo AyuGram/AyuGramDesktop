@@ -124,14 +124,6 @@ Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
 
 Или следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
-### Примечания для Windows
-
-Убедитесь что у вас присутствуют эти зависимости:
-
-- C++ MFC latest (x86 & x64)
-- C++ ATL latest (x86 & x64)
-- последний Windows 11 SDK
-
 ## Пожертвования
 
 Вам нравится использовать **AyuGram**? Оставьте нам чаевые!

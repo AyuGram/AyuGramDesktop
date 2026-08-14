@@ -9,6 +9,7 @@
 #include "ayu/ayu_settings.h"
 #include "boxes/peer_list_controllers.h"
 #include "lang/lang_keys.h"
+#include "styles/style_add_contact_box.h"
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_widgets.h"

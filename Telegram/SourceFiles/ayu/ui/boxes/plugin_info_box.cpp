@@ -27,10 +27,10 @@
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
-#include "ui/image/image_prepare.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/scroll_area.h"
 #include "window/window_session_controller.h"
@@ -43,18 +43,91 @@ namespace Ui {
 namespace {
 
 QString ExtractField(const QByteArray &data, const QString &key) {
+	// supports probably all kinds of weird python syntax + both " and '
+	// "description"
+	// """description"""
+	// (
+	// 	"description\n\n"
+	// 	"description\n"
+	// )
+	static const auto quotedValue = QRegularExpression(
+		uR"field((?:"""((?:\\[\s\S]|(?!""")[^\\])*)"""|'''((?:\\[\s\S]|(?!''')[^\\])*)'''|(?!""")"((?:\\.|[^\r\n"\\])*)"|(?!''')'((?:\\.|[^\r\n'\\])*)'))field"_q);
 	const auto re = QRegularExpression(
-		u"__%1__\\s*=\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|'((?:\\\\.|[^'\\\\])*)')"_q.arg(key));
+		uR"(__%1__\s*=\s*(?:%2|\((?:\s*%2)+\s*\)))"_q.arg(
+			key,
+			quotedValue.pattern()));
 	const auto match = re.match(QString::fromUtf8(data));
 	if (!match.hasMatch()) {
 		return {};
 	}
-	auto result = match.captured(1).isEmpty() ? match.captured(2) : match.captured(1);
-	result.replace(u"\\n"_q, u"\n"_q);
-	result.replace(u"\\t"_q, u"\t"_q);
-	result.replace(u"\\\""_q, u"\""_q);
-	result.replace(u"\\'"_q, u"'"_q);
-	result.replace(u"\\\\"_q, u"\\"_q);
+	auto result = QString();
+	auto parts = quotedValue.globalMatch(match.captured());
+	while (parts.hasNext()) {
+		const auto partMatch = parts.next();
+		auto part = partMatch.captured(1);
+		for (auto i = 2
+			; part.isNull() && i <= quotedValue.captureCount()
+			; ++i) {
+			part = partMatch.captured(i);
+		}
+		part.replace(u"\\n"_q, u"\n"_q);
+		part.replace(u"\\t"_q, u"\t"_q);
+		part.replace(u"\\\""_q, u"\""_q);
+		part.replace(u"\\'"_q, u"'"_q);
+		part.replace(u"\\\\"_q, u"\\"_q);
+		result += part;
+	}
+	return result;
+}
+
+TextWithEntities ParsePluginDescriptionPlain(const QString &text) {
+	auto result = TextWithEntities{ text };
+	TextUtilities::ParseEntities(
+		result,
+		TextParseLinks | TextParseMentions);
+	return result;
+}
+
+TextWithEntities ParsePluginDescriptionLinks(const QString &text) {
+	static const auto linkExpression = QRegularExpression(
+		uR"(\[([^\]\r\n]+)\]\(([^)\r\n]+)\))"_q);
+	auto result = TextWithEntities();
+	auto offset = 0;
+	auto matches = linkExpression.globalMatch(text);
+	while (matches.hasNext()) {
+		const auto match = matches.next();
+		const auto url = match.capturedView(2);
+		if (!Ui::InputField::IsValidMarkdownLink(url)) {
+			continue;
+		}
+		result.append(ParsePluginDescriptionPlain(
+			text.mid(offset, match.capturedStart() - offset)));
+		result.append(Ui::Text::Link(
+			match.captured(1),
+			url.toString()));
+		offset = match.capturedEnd();
+	}
+	result.append(ParsePluginDescriptionPlain(text.mid(offset)));
+	return result;
+}
+
+TextWithEntities ParsePluginDescription(const QString &text) {
+	static const auto boldExpression = QRegularExpression(
+		uR"(\*\*(.+?)\*\*)"_q,
+		QRegularExpression::DotMatchesEverythingOption);
+	auto result = TextWithEntities();
+	auto offset = 0;
+	auto matches = boldExpression.globalMatch(text);
+	while (matches.hasNext()) {
+		const auto match = matches.next();
+		result.append(ParsePluginDescriptionLinks(
+			text.mid(offset, match.capturedStart() - offset)));
+		result.append(Ui::Text::Wrapped(
+			ParsePluginDescriptionLinks(match.captured(1)),
+			EntityType::Bold));
+		offset = match.capturedEnd();
+	}
+	result.append(ParsePluginDescriptionLinks(text.mid(offset)));
 	return result;
 }
 
@@ -62,7 +135,7 @@ void FillPluginInfoBox(
 	not_null<Ui::GenericBox*> box,
 	not_null<Window::SessionController*> controller,
 	const QString &pluginPath,
-	PluginMetadata metadata,
+	const PluginMetadata& metadata,
 	DocumentData *stickerDoc) {
 	box->setStyle(st::giveawayGiftCodeBox);
 	box->setNoContentMargin(true);
@@ -229,14 +302,9 @@ void FillPluginInfoBox(
 
 	{
 		const auto hasDescription = !metadata.description.isEmpty();
-		auto descText = hasDescription
-			? TextWithEntities{metadata.description}
+		const auto descText = hasDescription
+			? ParsePluginDescription(metadata.description)
 			: TextWithEntities{tr::ayu_PluginNoDescription(tr::now)};
-		if (hasDescription) {
-			TextUtilities::ParseEntities(
-				descText,
-				TextParseLinks | TextParseMentions | TextParseMarkdown);
-		}
 
 		const auto availableWidth = box->width()
 			- st::boxRowPadding.left()
@@ -433,7 +501,7 @@ void ShowPluginInfoBox(
 		return;
 	}
 
-	const auto shortName = parts[0];
+	const auto& shortName = parts[0];
 	const auto index = parts[1].toInt();
 	const auto session = &controller->session();
 	const auto shared = std::make_shared<PluginMetadata>(

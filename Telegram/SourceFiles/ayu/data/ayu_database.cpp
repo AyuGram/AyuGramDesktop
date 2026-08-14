@@ -356,6 +356,20 @@ bool hasDeletedMessages(ID userId, ID dialogId, ID topicId) {
 	}
 }
 
+void removeDeletedMessage(ID userId, ID dialogId, ID messageId) {
+	try {
+		storage.remove_all<DeletedMessage>(
+			where(
+				column<DeletedMessage>(&DeletedMessage::userId) == userId and
+				column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
+				column<DeletedMessage>(&DeletedMessage::messageId) == messageId
+			)
+		);
+	} catch (std::exception &ex) {
+		LOG(("Failed to remove deleted message: %1").arg(ex.what()));
+	}
+}
+
 void clearDeletedMessages(ID userId, ID dialogId, ID topicId) {
 	try {
 		storage.remove_all<DeletedMessage>(

@@ -18,7 +18,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "window/window_controller.h"
 #include "lang_auto.h"
 
@@ -134,25 +133,20 @@ void Tray::rebuildMenu() {
 	}
 
 	if (settings.showStreamerToggleInTray()) {
-		auto turnStreamerModeText = _textUpdates.events(
-		) | rpl::map(
-			[=]
-			{
-				bool streamerModeEnabled = AyuFeatures::StreamerMode::isEnabled();
-
-				return streamerModeEnabled
-						   ? tr::ayu_DisableStreamerModeTray(tr::now)
-						   : tr::ayu_EnableStreamerModeTray(tr::now);
-			});
+		auto turnStreamerModeText = rpl::combine(
+			_textUpdates.events_starting_with({}),
+			AyuSettings::getInstance().streamerModeValue()
+		) | rpl::map([=](auto, bool enabled) {
+			return enabled
+					   ? tr::ayu_DisableStreamerModeTray(tr::now)
+					   : tr::ayu_EnableStreamerModeTray(tr::now);
+		});
 		_tray.addAction(
 			std::move(turnStreamerModeText),
-			[=]
+			[]
 			{
-				if (AyuFeatures::StreamerMode::isEnabled()) {
-					AyuFeatures::StreamerMode::disable();
-				} else {
-					AyuFeatures::StreamerMode::enable();
-				}
+				auto &ayuSettings = AyuSettings::getInstance();
+				ayuSettings.setStreamerMode(!ayuSettings.streamerMode());
 			});
 	}
 

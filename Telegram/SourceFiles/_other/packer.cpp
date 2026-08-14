@@ -29,7 +29,10 @@ w/CVnbwQOw0g5GBwwFV3r0uTTvy44xx8XXxk+Qknu4eBCsmrAFNnAgMBAAE=\n\
 
 extern const char *PrivateKey;
 extern const char *PrivateBetaKey;
+
+// AyuGram includes
 #include "packer_private.h" // RSA PRIVATE KEYS for update signing
+
 
 QString countAlphaVersionSignature(quint64 version);
 

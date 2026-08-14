@@ -31,7 +31,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/ripple_animation.h"
 #include "ui/image/image.h"
 #include "ui/painter.h"
-#include "boxes/send_gif_with_caption_box.h"
 #include "boxes/stickers_box.h"
 #include "inline_bots/inline_bot_result.h"
 #include "storage/localstorage.h"
@@ -133,7 +132,11 @@ GifsListWidget::GifsListWidget(
 
 	session().data().stickers().savedGifsUpdated(
 	) | rpl::on_next([=] {
-		refreshSavedGifs();
+		if (underMouse()) {
+			_refreshDelayed = true;
+		} else {
+			refreshSavedGifs();
+		}
 	}, lifetime());
 
 	session().downloaderTaskFinished(
@@ -420,21 +423,12 @@ base::unique_qptr<Ui::PopupMenu> GifsListWidget::fillContextMenu(
 		icons);
 
 	if (!isInlineResult && _inlineQueryPeer) {
-		auto done = crl::guard(this, [=](
-				Api::SendOptions options,
-				TextWithTags text) {
-			selectInlineResult(selected, options, true, std::move(text));
-		});
-		const auto show = _show;
-		const auto peer = _inlineQueryPeer;
-		menu->addAction(tr::lng_send_gif_with_caption(tr::now), [=] {
-			show->show(Box(
-				Ui::SendGifWithCaptionBox,
-				item->getDocument(),
-				peer,
-				copyDetails,
-				std::move(done)));
-		}, &st::menuIconEdit);
+		menu->addAction(
+			tr::lng_send_gif_with_caption(tr::now),
+			crl::guard(this, [=] {
+				selectInlineResult(selected, {}, true, true);
+			}),
+			&icons->menuGifCaption);
 	}
 
 	if (const auto item = _mosaic.maybeItemAt(_selected)) {
@@ -495,7 +489,7 @@ void GifsListWidget::selectInlineResult(
 		int index,
 		Api::SendOptions options,
 		bool forceSend,
-		TextWithTags caption) {
+		bool needsCaption) {
 	const auto item = _mosaic.maybeItemAt(index);
 	if (!item) {
 		return;
@@ -536,18 +530,17 @@ void GifsListWidget::selectInlineResult(
 			auto from = messageSendingFrom();
 			auto sendGIFCallback = crl::guard(
 				this,
-				[=]
-				{
+				[=] {
 					_fileChosen.fire({
 						.document = document,
 						.options = options,
 						.messageSendingFrom = from,
-						.caption = std::move(caption),
+						.needsCaption = needsCaption,
 					});
 				});
 
 			const auto &settings = AyuSettings::getInstance();
-			if (settings.gifConfirmation()) {
+			if (settings.gifConfirmation() && !needsCaption) {
 				_show->showBox(Ui::MakeConfirmBox({
 					.text = tr::ayu_ConfirmationGIF(),
 					.confirmed = sendGIFCallback,
@@ -585,10 +578,16 @@ void GifsListWidget::mouseMoveEvent(QMouseEvent *e) {
 
 void GifsListWidget::leaveEventHook(QEvent *e) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshSavedGifs();
+	}
 }
 
 void GifsListWidget::leaveToChildEvent(QEvent *e, QWidget *child) {
 	clearSelection();
+	if (base::take(_refreshDelayed)) {
+		refreshSavedGifs();
+	}
 }
 
 void GifsListWidget::enterFromChildEvent(QEvent *e, QWidget *child) {
@@ -636,6 +635,7 @@ void GifsListWidget::clearHeavyData() {
 }
 
 void GifsListWidget::refreshSavedGifs() {
+	_refreshDelayed = false;
 	if (_section == Section::Gifs) {
 		clearInlineRows(false);
 

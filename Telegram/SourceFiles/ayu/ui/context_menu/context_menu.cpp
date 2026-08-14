@@ -15,6 +15,7 @@
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/forward/ayu_forward.h"
+#include "ayu/features/forward/ayu_forward_rich.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
 #include "ayu/ui/message_history/history_section.h"
 #include "ayu/ui/settings/filters/edit_filter.h"
@@ -35,6 +36,7 @@
 #include "history/history_item_components.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_element.h"
+#include "main/main_session.h"
 #include "main/session/send_as_peers.h"
 #include "styles/style_ayu_icons.h"
 #include "styles/style_layers.h"
@@ -79,6 +81,13 @@ Fn<void()> ClearDeletedMessagesHandler(not_null<Window::SessionController*> cont
 void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 	const auto session = &peer->session();
 
+	if (const auto channel = peer->asChannel()) {
+		if (channel->isMegagroup() && channel->canDeleteMessages()) {
+			session->api().deleteAllFromParticipant(channel, session->user());
+			return;
+		}
+	}
+
 	auto collected = std::make_shared<std::vector<MsgId>>();
 
 	const auto removeNext = std::make_shared<Fn<void(int)>>();
@@ -113,9 +122,30 @@ void DeleteMyMessagesAfterConfirm(not_null<PeerData*> peer) {
 		};
 		const auto fail = [=](const MTP::Error &error)
 		{
-			DEBUG_LOG(("Delete batch failed: %1").arg(error.type()));
-			const auto delay = crl::time(1000);
-			base::call_delayed(delay, [=] { (*removeNext)(index); });
+			const auto type = error.type();
+			DEBUG_LOG(("Delete batch %1 failed: %2").arg(batch).arg(type));
+
+			if (type.startsWith(u"FLOOD_WAIT_"_q)
+				|| type.startsWith(u"FLOOD_PREMIUM_WAIT_"_q)) {
+				const auto underscore = type.lastIndexOf('_');
+				const auto seconds = (underscore >= 0)
+					? type.mid(underscore + 1).toInt()
+					: 0;
+				const auto delay = crl::time(std::max(seconds, 1) * 1000);
+				base::call_delayed(delay, [=] { (*removeNext)(index); });
+				return;
+			}
+
+			if (type == u"MESSAGE_DELETE_FORBIDDEN"_q
+				|| type == u"MSG_ID_INVALID"_q
+				|| type == u"MESSAGE_ID_INVALID"_q) {
+				DEBUG_LOG(("Skipping batch %1 (%2 ids)").arg(batch).arg(ids.size()));
+				const auto delay = crl::time(500 + base::RandomValue<int>() % 500);
+				base::call_delayed(delay, [=] { (*removeNext)(index + ids.size()); });
+				return;
+			}
+
+			DEBUG_LOG(("Stopping deletion, unrecoverable error: %1").arg(type));
 		};
 
 		if (const auto channel = peer->asChannel()) {
@@ -439,16 +469,12 @@ void AddDeleteOwnMessagesAction(PeerData *peerData,
 	if (topic) {
 		return;
 	}
-	const auto isGroup = peerData->isChat() || peerData->isMegagroup();
-	if (!isGroup) {
-		return;
-	}
 	if (const auto chat = peerData->asChat()) {
-		if (!chat->amIn() || chat->amCreator() || chat->hasAdminRights()) {
+		if (!chat->amIn()) {
 			return;
 		}
 	} else if (const auto channel = peerData->asChannel()) {
-		if (!channel->isMegagroup() || !channel->amIn() || channel->amCreator() || channel->hasAdminRights()) {
+		if (!channel->isMegagroup() || !channel->amIn()) {
 			return;
 		}
 	} else {
@@ -506,8 +532,8 @@ void AddHideMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 			const auto ids = owner->itemOrItsGroup(item);
 			for (const auto &fullId : ids) {
 				if (const auto current = owner->message(fullId)) {
-					current->destroy();
 					AyuState::hide(current);
+					current->destroy();
 				}
 			}
 			history->requestChatListMessage();
@@ -814,23 +840,41 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, Hi
 			}
 
 			if (useNoQuote) {
-				auto message = ApiWrap::MessageToSend(action);
-				const auto media = currentItem->media();
-				if (!currentItem->originalText().text.isEmpty()) {
-					message.textWithTags = {
-						currentItem->originalText().text,
-						TextUtilities::ConvertEntitiesToTextTags(
-							currentItem->originalText().entities),
-					};
-				}
-				if (media) {
-					if (const auto photo = media->photo()) {
-						Api::SendExistingPhoto(std::move(message), photo);
-					} else if (const auto document = media->document()) {
-						Api::SendExistingDocument(std::move(message), document);
+				if (currentItem->richPage() && session->premium()) {
+					if (preserveReply) {
+						crl::async([=] {
+							AyuForward::forwardRichMessage(session, itemId, action);
+						});
+					} else {
+						const auto forwardDraft = Data::ForwardDraft{
+							.ids = MessageIdsList{ itemId },
+							.options = Data::ForwardOptions::NoSenderNames,
+						};
+						auto resolvedDraft = history->resolveForwardDraft(forwardDraft);
+						session->api().forwardMessages(
+							std::move(resolvedDraft),
+							action,
+							[] {});
 					}
 				} else {
-					session->api().sendMessage(std::move(message));
+					auto message = ApiWrap::MessageToSend(action);
+					const auto media = currentItem->media();
+					if (!currentItem->originalText().text.isEmpty()) {
+						message.textWithTags = {
+							currentItem->originalText().text,
+							TextUtilities::ConvertEntitiesToTextTags(
+								currentItem->originalText().entities),
+						};
+					}
+					if (media) {
+						if (const auto photo = media->photo()) {
+							Api::SendExistingPhoto(std::move(message), photo);
+						} else if (const auto document = media->document()) {
+							Api::SendExistingDocument(std::move(message), document);
+						}
+					} else {
+						session->api().sendMessage(std::move(message));
+					}
 				}
 			} else {
 				const auto forwardDraft = Data::ForwardDraft{
@@ -858,11 +902,17 @@ void AddRepeatMessageAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item, Hi
 }
 
 void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
-	if (!item->isHistoryEntry() || item->isLocal() || item->out() || item->isDeleted() || item->history()->peer->isSelf()) {
+	const auto group = item->history()->owner().groups().find(item);
+	const auto readItem = group ? group->items.back().get() : item;
+	if (!readItem->isHistoryEntry()
+		|| readItem->isLocal()
+		|| readItem->out()
+		|| readItem->isDeleted()
+		|| readItem->history()->peer->isSelf()) {
 		return;
 	}
 
-	const auto &ghost = AyuSettings::ghost(&item->history()->session());
+	const auto &ghost = AyuSettings::ghost(&readItem->history()->session());
 	if (ghost.sendReadMessages()) {
 		return;
 	}
@@ -871,25 +921,30 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		tr::ayu_ReadUntilMenuText(tr::now),
 		[=]
 		{
-			readHistory(item);
-			if (item->media() && item->media()->ttlSeconds() <= 0 && item->unsupportedTTL() <= 0 && !item->out()) {
-				const auto ids = MTP_vector<MTPint>(1, MTP_int(item->id));
-				if (const auto channel = item->history()->peer->asChannel()) {
-					item->history()->session().api().request(MTPchannels_ReadMessageContents(
+			readHistory(readItem);
+			const auto media = readItem->media();
+			if (media
+				&& media->ttlSeconds() <= 0
+				&& readItem->unsupportedTTL() <= 0
+				&& !readItem->out()) {
+				const auto ids = MTP_vector<MTPint>(1, MTP_int(readItem->id));
+				if (const auto channel = readItem->history()->peer->asChannel()) {
+					readItem->history()->session().api().request(
+						MTPchannels_ReadMessageContents(
 						channel->inputChannel(),
-						ids
-					)).send();
+						ids)).send();
 				} else {
-					item->history()->session().api().request(MTPmessages_ReadMessageContents(
-						ids
-					)).done([=](const MTPmessages_AffectedMessages &result)
+					readItem->history()->session().api().request(
+						MTPmessages_ReadMessageContents(ids)
+					).done([=](const MTPmessages_AffectedMessages &result)
 					{
-						item->history()->session().api().applyAffectedMessages(
-							item->history()->peer,
+						readItem->history()->session().api()
+							.applyAffectedMessages(
+							readItem->history()->peer,
 							result);
 					}).send();
 				}
-				item->markContentsRead();
+				readItem->markContentsRead();
 			}
 		},
 		&st::menuIconShowInChat);

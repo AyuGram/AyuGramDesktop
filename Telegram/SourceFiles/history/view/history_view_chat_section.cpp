@@ -28,17 +28,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_drag_area.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
+#include "history/history_view_pull_to_next_channel.h"
+#include "iv/iv_rich_message_serializer.h"
+#include "iv/iv_rich_page.h"
 #include "ui/chat/pinned_bar.h"
 #include "ui/chat/chat_style.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/effects/message_sending_animation_controller.h"
 #include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
 #include "base/timer_rpl.h"
 #include "api/api_bot.h"
@@ -64,6 +68,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "menu/menu_timecode_action.h"
+#include "data/components/ephemeral_messages.h"
+#include "data/components/recent_inline_bots.h"
 #include "data/components/scheduled_messages.h"
 #include "data/data_histories.h"
 #include "data/data_saved_messages.h"
@@ -85,9 +91,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/localimageloader.h"
 #include "inline_bots/inline_bot_result.h"
 #include "info/profile/info_profile_values.h"
+#include "iv/editor/iv_editor_session.h"
 #include "lang/lang_keys.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_info.h"
 #include "styles/style_window.h"
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
@@ -279,10 +287,18 @@ ChatWidget::ChatWidget(
 	}))
 , _translateBar(
 	std::make_unique<TranslateBar>(_topBars.get(), controller, _history))
-, _scroll(std::make_unique<Ui::ScrollArea>(
+, _scroll(std::make_unique<Ui::ElasticScroll>(
 	this,
-	controller->chatStyle()->value(lifetime(), st::historyScroll),
-	false))
+	controller->chatStyle()->value(lifetime(), st::historyScroll)))
+, _pullToNext(std::make_unique<PullToNextChannel>(
+	this,
+	_scroll.get(),
+	controller,
+	[=] {
+		return _inner
+			&& _inner->loadedAtBottomKnown()
+			&& _inner->loadedAtBottom();
+	}))
 , _cornerButtons(
 		_scroll.get(),
 		controller->chatStyle(),
@@ -353,12 +369,21 @@ ChatWidget::ChatWidget(
 		updateAdaptiveLayout();
 	}, lifetime());
 
+	_scroll->setHandleTouch(false);
 	_inner = _scroll->setOwnedWidget(object_ptr<ListWidget>(
 		this,
 		&controller->session(),
 		static_cast<ListDelegate*>(this)));
+	_inner->lower();
 	_scroll->move(0, _topBar->height());
 	_scroll->show();
+	_scroll->setOverscrollBg(QColor(0, 0, 0, 0));
+	_scroll->setOverscrollEdges([=] {
+		return _inner->loadedAtTopKnown() && _inner->loadedAtTop();
+	}, [=] {
+		return _inner->loadedAtBottomKnown() && _inner->loadedAtBottom();
+	});
+	_pullToNext->setTopic(_topic);
 	_scroll->scrolls(
 	) | rpl::on_next([=] {
 		onScroll();
@@ -719,6 +744,7 @@ void ChatWidget::setTopic(Data::ForumTopic *topic) {
 	}
 	_topicLifetime.destroy();
 	_topic = topic;
+	_pullToNext->setTopic(topic);
 	refreshReplies();
 	refreshTopBarActiveChat();
 	validateSubsectionTabs();
@@ -843,7 +869,7 @@ void ChatWidget::setupComposeControls() {
 	) | rpl::filter([=] {
 		return !_joinGroup;
 	}) | rpl::on_next([=] {
-		const auto wasMax = (_scroll->scrollTopMax() == _scroll->scrollTop());
+		const auto wasMax = (_scroll->scrollTop() >= _scroll->scrollTopMax());
 		updateControlsGeometry();
 		if (wasMax) {
 			listScrollTo(_scroll->scrollTopMax());
@@ -872,9 +898,6 @@ void ChatWidget::setupComposeControls() {
 
 	_composeControls->sendCommandRequests(
 	) | rpl::on_next([=](const QString &command) {
-		if (showSlowmodeError()) {
-			return;
-		}
 		listSendBotCommand(command, FullMsgId());
 		session().api().finishForwarding(prepareSendAction({}));
 	}, lifetime());
@@ -1060,40 +1083,60 @@ void ChatWidget::setupSwipeReplyAndBack() {
 	};
 
 	auto init = [=, show = controller()->uiShow()](
-			int cursorTop,
-			Qt::LayoutDirection direction) {
-		if (direction == Qt::RightToLeft) {
+			Ui::Controls::SwipeHandlerInitData data) {
+		auto result = Ui::Controls::SwipeHandlerFinishData();
+		const auto horizontalScrollDelta = (data.direction == Qt::LeftToRight)
+			? 1
+			: -1;
+		if (_inner->canConsumeHorizontalScroll(
+				data.cursorPosition,
+				horizontalScrollDelta)) {
+			return result;
+		}
+		if (data.direction == Qt::RightToLeft) {
 			return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
 				controller()->showBackFromStack();
 			});
 		}
-		auto result = Ui::Controls::SwipeHandlerFinishData();
 		if (_inner->elementInSelectionMode(nullptr).inSelectionMode) {
 			return result;
 		}
-		const auto view = _inner->lookupItemByY(cursorTop);
+		const auto view = _inner->lookupItemByY(data.cursorPosition.y());
 		if (!view
-			|| !view->data()->isRegular()
+			|| (!view->data()->isRegular()
+				&& (!view->data()->isEphemeral()
+					|| view->data()->out()))
 			|| view->data()->isService()) {
 			return result;
 		}
-		if (!can(view->data())) {
+		const auto item = _inner->lookupItemByPoint(
+			data.cursorPosition,
+			view);
+		if (!can(item)) {
 			return result;
 		}
 
 		_inner->hideElementOverlay();
-		result.msgBareId = view->data()->fullId().msg.bare;
-		result.callback = [=, itemId = view->data()->fullId()] {
-			const auto still = show->session().data().message(itemId);
-			const auto view = _inner->viewByPosition(still->position());
-			const auto selected = view
-				? view->selectedQuote(_inner->getSelectedTextRange(still))
+		const auto viewItemId = view->data()->fullId();
+		const auto itemId = item->fullId();
+		result.msgBareId = viewItemId.msg.bare;
+		result.callback = [=] {
+			const auto still = show->session().data().message(viewItemId);
+			const auto view = still
+				? _inner->viewByPosition(still->position())
+				: nullptr;
+			const auto selected = (still && view)
+				? view->selectedQuote(_inner->getSelectedTextSelection(still))
 				: SelectedQuote();
-			const auto replyToItemId = (selected.item
+			const auto exact = selected.item
 				? selected.item
-				: still)->fullId();
+				: show->session().data().message(itemId);
+			if (!exact) {
+				return;
+			}
+			Window::ActivateWindow(controller());
 			_inner->replyToMessageRequestNotify({
-				.messageId = replyToItemId,
+				.messageId = exact->fullId(),
 				.quote = selected.highlight.quote,
 				.quoteOffset = selected.highlight.quoteOffset,
 				.todoItemId = selected.highlight.todoItemId,
@@ -1109,17 +1152,29 @@ void ChatWidget::setupSwipeReplyAndBack() {
 		.update = std::move(update),
 		.init = std::move(init),
 		.dontStart = _inner->touchMaybeSelectingValue(),
+		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
+			const auto delta = Ui::ScrollDelta(event);
+			if (std::abs(delta.x()) <= std::abs(delta.y())) {
+				return false;
+			}
+			return _inner->canConsumeHorizontalScroll(
+				_inner->mapFromGlobal(event->globalPosition().toPoint()),
+				delta.x());
+		},
 	});
 }
 
 void ChatWidget::chooseAttach(
 		std::optional<bool> overrideSendImagesAsPhotos) {
 	_choosingAttach = false;
-	if (const auto error = Data::AnyFileRestrictionError(_peer)) {
-		Data::ShowSendErrorToast(controller(), _peer, error);
-		return;
-	} else if (showSlowmodeError()) {
-		return;
+	if (!session().ephemeralMessages().isEphemeralBotReply(
+			replyTo().messageId)) {
+		if (const auto error = Data::AnyFileRestrictionError(_peer)) {
+			Data::ShowSendErrorToast(controller(), _peer, error);
+			return;
+		} else if (showSlowmodeError()) {
+			return;
+		}
 	}
 
 	const auto filter = (overrideSendImagesAsPhotos == true)
@@ -1248,18 +1303,27 @@ void ChatWidget::sendingFilesConfirmed(
 	if (showSendingFilesError(*bundle)) {
 		return;
 	}
-
-	const auto withPaymentApproved = [=](int approved) {
-		auto copy = options;
-		copy.starsApproved = approved;
-		sendingFilesConfirmed(bundle, copy);
-	};
-	const auto checked = checkSendPayment(
-		bundle->totalCount,
-		options,
-		withPaymentApproved);
-	if (!checked) {
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(replyTo().messageId);
+	if (bundle->totalCount > 1 && ephemeralReply) {
+		controller()->showToast(
+			tr::lng_ephemeral_reply_single_message(tr::now));
 		return;
+	}
+
+	if (!ephemeralReply) {
+		const auto withPaymentApproved = [=](int approved) {
+			auto copy = options;
+			copy.starsApproved = approved;
+			sendingFilesConfirmed(bundle, copy);
+		};
+		const auto checked = checkSendPayment(
+			bundle->totalCount,
+			options,
+			withPaymentApproved);
+		if (!checked) {
+			return;
+		}
 	}
 
 	const auto compress = bundle->way.sendImagesAsPhotos();
@@ -1353,12 +1417,27 @@ void ChatWidget::uploadFile(
 bool ChatWidget::showSendingFilesError(
 		const Ui::PreparedList &list) const {
 	const auto show = controller()->uiShow();
-	return Data::ShowSendError(show, _peer, list, std::nullopt);
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(replyTo().messageId);
+	return Data::ShowSendError(
+		show,
+		_peer,
+		list,
+		std::nullopt,
+		false,
+		ephemeralReply);
 }
 
 bool ChatWidget::showSendingFilesError(
 		const Ui::PreparedBundle &bundle) const {
-	return Data::ShowSendError(controller()->uiShow(), _peer, bundle);
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(replyTo().messageId);
+	return Data::ShowSendError(
+		controller()->uiShow(),
+		_peer,
+		bundle,
+		false,
+		ephemeralReply);
 }
 
 Api::SendAction ChatWidget::prepareSendAction(
@@ -1366,11 +1445,19 @@ Api::SendAction ChatWidget::prepareSendAction(
 	auto result = Api::SendAction(_history, options);
 	result.replyTo = replyTo();
 	result.options.sendAs = _composeControls->sendAsPeer();
+	result.clearDraft = !Iv::Editor::IsComposeBoxOpen(
+		&session(),
+		_peer->id,
+		_repliesRootId,
+		_monoforumPeerId);
 	return result;
 }
 
 void ChatWidget::send() {
 	if (_composeControls->getTextWithAppliedMarkdown().text.isEmpty()) {
+		if (const auto page = _composeControls->shownRichMessage()) {
+			sendRichDraft(page, {});
+		}
 		return;
 	}
 	send({});
@@ -1404,8 +1491,17 @@ void ChatWidget::sendVoice(const ComposeControls::VoiceToSend &data) {
 }
 
 void ChatWidget::send(Api::SendOptions options) {
-	if (!options.scheduled && showSlowmodeError()) {
+	if (const auto page = _composeControls->shownRichMessage()) {
+		sendRichDraft(page, options);
 		return;
+	}
+	if (!options.scheduled) {
+		auto message = Api::MessageToSend(prepareSendAction(options));
+		message.textWithTags = _composeControls->getTextWithAppliedMarkdown();
+		if (!session().ephemeralMessages().wouldSend(message)
+			&& showSlowmodeError()) {
+			return;
+		}
 	}
 
 	sendTextWithTags(
@@ -1413,6 +1509,122 @@ void ChatWidget::send(Api::SendOptions options) {
 		true,
 		options,
 		nullptr);
+}
+
+void ChatWidget::sendRichDraft(
+		std::shared_ptr<const Iv::RichPage> page,
+		Api::SendOptions options) {
+	if (!page) {
+		return;
+	}
+	if (ShowEphemeralReplyTextOnlyError(
+			controller()->uiShow(),
+			&session(),
+			replyTo().messageId)) {
+		return;
+	}
+	if (!options.scheduled) {
+		_cornerButtons.clearReplyReturns();
+		if (showSlowmodeError()) {
+			return;
+		}
+	}
+
+	auto request = SendingErrorRequest{
+		.topicRootId = _topic ? _topic->rootId() : MsgId(0),
+		.forward = &_composeControls->forwardItems(),
+		.messagesCount = 1,
+		.ignoreSlowmodeCountdown = (options.scheduled != 0),
+		.richMessage = true,
+	};
+	request.messagesCount = ComputeSendingMessagesCount(_history, request);
+	const auto error = GetErrorForSending(_peer, request);
+	if (error) {
+		Data::ShowSendErrorToast(controller(), _peer, error);
+		return;
+	}
+
+	const auto serialized = Iv::SerializeInputRichMessage(
+		&session(),
+		*page,
+		Iv::SerializeInputRichMessageMode::FinalSubmit);
+	if (serialized.status == Iv::SerializeInputRichMessageStatus::EmptyContent) {
+		controller()->showToast(tr::lng_article_submit_empty(tr::now));
+		return;
+	} else if (serialized.status != Iv::SerializeInputRichMessageStatus::Success
+		|| !serialized.value) {
+		controller()->showToast(tr::lng_attach_failed(tr::now));
+		return;
+	}
+	if (!session().premium()
+		&& Iv::RichPageUsesPremiumFormatting(*page)) {
+		if (Iv::RichPageIsFlattenSafe(*page)) {
+			const auto weak = base::make_weak(this);
+			Iv::Editor::OfferRichMessagePremiumChoice(
+				controller()->uiShow(),
+				&session(),
+				*page,
+				[=] {
+					if (const auto strong = weak.get()) {
+						strong->sendRichDraftWithoutFormatting(
+							page,
+							options);
+					}
+				});
+		} else {
+			Iv::Editor::ShowRichMessagesPremiumToast(
+				controller()->uiShow());
+		}
+		return;
+	}
+	if (!options.scheduled) {
+		const auto withPaymentApproved = [=](int approved) {
+			auto copy = options;
+			copy.starsApproved = approved;
+			sendRichDraft(page, copy);
+		};
+		const auto checked = checkSendPayment(
+			request.messagesCount,
+			options,
+			withPaymentApproved);
+		if (!checked) {
+			return;
+		}
+	}
+
+	session().api().sendRichMessage(
+		page,
+		*serialized.value,
+		prepareSendAction(options));
+
+	_composeControls->clear();
+	_composeControls->applyCloudDraft();
+	if (_repliesRootId) {
+		session().sendProgressManager().update(
+			_history,
+			_repliesRootId,
+			Api::SendProgressType::Typing,
+			-1);
+	}
+	finishSending();
+}
+
+void ChatWidget::sendRichDraftWithoutFormatting(
+		std::shared_ptr<const Iv::RichPage> page,
+		Api::SendOptions options) {
+	if (!page) {
+		return;
+	}
+	const auto flattened = Iv::FlattenRichPageToSimpleText(*page);
+	sendTextWithTags(
+		{
+			flattened.text,
+			TextUtilities::ConvertEntitiesToTextTags(flattened.entities),
+		},
+		false,
+		options,
+		nullptr);
+	_composeControls->applyCloudDraft();
 }
 
 void ChatWidget::sendTextWithTags(
@@ -1429,12 +1641,19 @@ void ChatWidget::sendTextWithTags(
 	if (useCurrentWebPageDraft) {
 		message.webPage = _composeControls->webPageDraft();
 	}
+	if (options.scheduled
+		&& session().ephemeralMessages().wouldSend(message)) {
+		controller()->showToast(tr::lng_ephemeral_cant_schedule(tr::now));
+		return;
+	}
 
+	const auto ephemeral = session().ephemeralMessages().wouldSend(message);
 	auto request = SendingErrorRequest{
 		.topicRootId = _topic ? _topic->rootId() : MsgId(0),
 		.forward = &_composeControls->forwardItems(),
 		.text = &message.textWithTags,
 		.ignoreSlowmodeCountdown = (options.scheduled != 0),
+		.ignoreRestrictions = ephemeral,
 	};
 	request.messagesCount = ComputeSendingMessagesCount(_history, request);
 	const auto error = GetErrorForSending(_peer, request);
@@ -1442,7 +1661,7 @@ void ChatWidget::sendTextWithTags(
 		Data::ShowSendErrorToast(controller(), _peer, error);
 		return;
 	}
-	if (!options.scheduled) {
+	if (!options.scheduled && !ephemeral) {
 		const auto withPaymentApproved = [=](int approved) {
 			auto copy = options;
 			copy.starsApproved = approved;
@@ -1521,17 +1740,18 @@ void ChatWidget::edit(
 		&& item->media()->allowsEditCaption();
 	if (sending.text.isEmpty() && !hasMediaWithCaption) {
 		if (item) {
-			controller()->show(Box<DeleteMessagesBox>(item, false));
+			controller()->show(Box<DeleteMessagesBox>(item));
 		} else {
 			doSetInnerFocus();
 		}
 		return;
 	} else {
-		const auto maxCaptionSize = !hasMediaWithCaption
-			? MaxMessageSize
-			: Data::PremiumLimits(&session()).captionLengthCurrent();
+		const auto limits = Data::PremiumLimits(&session());
+		const auto maxTextSize = hasMediaWithCaption
+			? limits.captionLengthCurrent()
+			: limits.messageLengthCurrent();
 		const auto remove = _composeControls->fieldCharacterCount()
-			- maxCaptionSize;
+			- maxTextSize;
 		if (remove > 0) {
 			controller()->showToast(
 				tr::lng_edit_limit_reached(tr::now, lt_count, remove));
@@ -1585,18 +1805,47 @@ void ChatWidget::edit(
 }
 
 void ChatWidget::validateSubsectionTabs() {
-	if (!_subsectionCheckLifetime && _history->peer->isMegagroup()) {
-		_subsectionCheckLifetime = _history->peer->asChannel()->flagsValue(
-		) | rpl::skip(
-			1
-		) | rpl::filter([=](Data::Flags<ChannelDataFlags>::Change change) {
-			const auto mask = ChannelDataFlag::Forum
-				| ChannelDataFlag::ForumTabs
-				| ChannelDataFlag::MonoforumAdmin;
-			return change.diff & mask;
-		}) | rpl::on_next([=] {
-			validateSubsectionTabs();
-		});
+	if (!_subsectionCheckLifetime) {
+		if (const auto group = _history->peer->asMegagroup()) {
+			_subsectionCheckLifetime = group->flagsValue(
+			) | rpl::skip(
+				1
+			) | rpl::filter([=](Data::Flags<ChannelDataFlags>::Change change) {
+				const auto mask = ChannelDataFlag::Forum
+					| ChannelDataFlag::ForumTabs
+					| ChannelDataFlag::MonoforumAdmin;
+				return change.diff & mask;
+			}) | rpl::on_next([=] {
+				validateSubsectionTabs();
+			});
+		} else if (!_topic) {
+			if (const auto user = _history->peer->asBot()) {
+				_subsectionCheckLifetime = user->flagsValue(
+				) | rpl::skip(
+					1
+				) | rpl::filter([=](Data::Flags<UserDataFlags>::Change change) {
+					return change.diff & UserDataFlag::Forum;
+				}) | rpl::on_next([=] {
+					_subsectionTopicsLifetime.destroy();
+					validateSubsectionTabs();
+				});
+			}
+		}
+	}
+	if (!_subsectionTopicsLifetime && !_topic) {
+		if (const auto user = _history->peer->asBot()) {
+			if (const auto forum = user->forum()) {
+				_subsectionTopicsLifetime = forum->topicsList()->fullSize().value(
+				) | rpl::map([](int size) {
+					return size > 0;
+				}) | rpl::distinct_until_changed(
+				) | rpl::skip(
+					1
+				) | rpl::on_next([=] {
+					validateSubsectionTabs();
+				});
+			}
+		}
 	}
 	const auto thread = _topic ? (Data::Thread*)_topic : _sublist;
 	if (!thread || !HistoryView::SubsectionTabs::UsedFor(_history)) {
@@ -1604,7 +1853,9 @@ void ChatWidget::validateSubsectionTabs() {
 			_subsectionTabsLifetime.destroy();
 			_subsectionTabs = nullptr;
 			updateControlsGeometry();
-			if (const auto forum = _history->asForum()) {
+
+			if (const auto forum = _history->asForum()
+				; forum && !_history->peer->isUser()) {
 				controller()->showForum(forum, {
 					Window::SectionShow::Way::Backward,
 					anim::type::normal,
@@ -1633,12 +1884,14 @@ void ChatWidget::validateSubsectionTabs() {
 			? ElementChatMode::Narrow
 			: std::optional<ElementChatMode>());
 		updateControlsGeometry();
+		updateSubsectionTabsGeometry();
 		orderWidgets();
 	}, _subsectionTabsLifetime);
 	_inner->overrideChatMode((_subsectionTabs->leftSkip() > 0)
 		? ElementChatMode::Narrow
 		: std::optional<ElementChatMode>());
 	updateControlsGeometry();
+	updateSubsectionTabsGeometry();
 	orderWidgets();
 }
 
@@ -1650,7 +1903,7 @@ void ChatWidget::refreshJoinGroupButton() {
 		if (!button && !_joinGroup) {
 			return;
 		}
-		const auto atMax = (_scroll->scrollTopMax() == _scroll->scrollTop());
+		const auto atMax = (_scroll->scrollTop() >= _scroll->scrollTopMax());
 		_joinGroup = std::move(button);
 		if (!animatingShow()) {
 			if (button) {
@@ -1695,27 +1948,31 @@ bool ChatWidget::sendExistingDocument(
 		not_null<DocumentData*> document,
 		Api::MessageToSend messageToSend,
 		std::optional<MsgId> localId) {
-	const auto error = Data::RestrictionError(
-		_peer,
-		ChatRestriction::SendStickers);
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(messageToSend.action.replyTo.messageId);
+	const auto error = !ephemeralReply
+		? Data::RestrictionError(_peer, ChatRestriction::SendStickers)
+		: Data::SendError();
 	if (error) {
 		Data::ShowSendErrorToast(controller(), _peer, error);
 		return false;
-	} else if (showSlowmodeError()
+	} else if ((!ephemeralReply && showSlowmodeError())
 		|| ShowSendPremiumError(controller(), document)) {
 		return false;
 	}
-	const auto withPaymentApproved = [=](int approved) {
-		auto copy = messageToSend;
-		copy.action.options.starsApproved = approved;
-		sendExistingDocument(document, std::move(copy), localId);
-	};
-	const auto checked = checkSendPayment(
-		1,
-		messageToSend.action.options,
-		withPaymentApproved);
-	if (!checked) {
-		return false;
+	if (!ephemeralReply) {
+		const auto withPaymentApproved = [=](int approved) {
+			auto copy = messageToSend;
+			copy.action.options.starsApproved = approved;
+			sendExistingDocument(document, std::move(copy), localId);
+		};
+		const auto checked = checkSendPayment(
+			1,
+			messageToSend.action.options,
+			withPaymentApproved);
+		if (!checked) {
+			return false;
+		}
 	}
 
 	Api::SendExistingDocument(
@@ -1735,27 +1992,31 @@ void ChatWidget::sendExistingPhoto(not_null<PhotoData*> photo) {
 bool ChatWidget::sendExistingPhoto(
 		not_null<PhotoData*> photo,
 		Api::SendOptions options) {
-	const auto error = Data::RestrictionError(
-		_peer,
-		ChatRestriction::SendPhotos);
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(replyTo().messageId);
+	const auto error = !ephemeralReply
+		? Data::RestrictionError(_peer, ChatRestriction::SendPhotos)
+		: Data::SendError();
 	if (error) {
 		Data::ShowSendErrorToast(controller(), _peer, error);
 		return false;
-	} else if (showSlowmodeError()) {
+	} else if (!ephemeralReply && showSlowmodeError()) {
 		return false;
 	}
 
-	const auto withPaymentApproved = [=](int approved) {
-		auto copy = options;
-		copy.starsApproved = approved;
-		sendExistingPhoto(photo, copy);
-	};
-	const auto checked = checkSendPayment(
-		1,
-		options,
-		withPaymentApproved);
-	if (!checked) {
-		return false;
+	if (!ephemeralReply) {
+		const auto withPaymentApproved = [=](int approved) {
+			auto copy = options;
+			copy.starsApproved = approved;
+			sendExistingPhoto(photo, copy);
+		};
+		const auto checked = checkSendPayment(
+			1,
+			options,
+			withPaymentApproved);
+		if (!checked) {
+			return false;
+		}
 	}
 
 	Api::SendExistingPhoto(
@@ -1788,6 +2049,12 @@ void ChatWidget::sendInlineResult(
 		not_null<UserData*> bot,
 		Api::SendOptions options,
 		std::optional<MsgId> localMessageId) {
+	if (ShowEphemeralReplyTextOnlyError(
+			controller()->uiShow(),
+			&session(),
+			replyTo().messageId)) {
+		return;
+	}
 	const auto withPaymentApproved = [=](int approved) {
 		auto copy = options;
 		copy.starsApproved = approved;
@@ -1814,26 +2081,31 @@ void ChatWidget::sendInlineResult(
 	//_saveDraftStart = crl::now();
 	//onDraftSave();
 
-	auto &bots = cRefRecentInlineBots();
-	const auto index = bots.indexOf(bot);
-	if (index) {
-		if (index > 0) {
-			bots.removeAt(index);
-		} else if (bots.size() >= RecentInlineBotsLimit) {
-			bots.resize(RecentInlineBotsLimit - 1);
-		}
-		bots.push_front(bot);
-		bot->session().local().writeRecentHashtagsAndBots();
-	}
+	bot->session().recentInlineBots().bump(bot);
 	finishSending();
 }
 
 SendMenu::Details ChatWidget::sendMenuDetails() const {
 	using Type = SendMenu::Type;
-	const auto type = (_topic && !_peer->starsPerMessageChecked())
+	const auto ephemeralReply = session().ephemeralMessages()
+		.isEphemeralBotReply(replyTo().messageId);
+	const auto type = ephemeralReply
+		? Type::Disabled
+		: (_topic && !_peer->starsPerMessageChecked())
 		? Type::Scheduled
 		: Type::SilentOnly;
-	return SendMenu::Details{ .type = type };
+	return SendMenu::Details{
+		.type = type,
+		.barePeerId = (_sublist
+			? _sublist->owningHistory()
+			: _history)->peer->id.value,
+		.bareTopicRootId = _topic ? _topic->rootId().bare : 0,
+	};
+}
+
+bool ChatWidget::processChosenSticker(ChatHelpers::FileChosen &&chosen) {
+	_composeControls->processChosenSticker(std::move(chosen));
+	return true;
 }
 
 FullReplyTo ChatWidget::replyTo() const {
@@ -2155,6 +2427,50 @@ void ChatWidget::checkPinnedBarState() {
 		}
 	}, _pinnedBar->lifetime());
 
+	_pinnedBar->barRightClicks(
+	) | rpl::on_next([=] {
+		if (_pinnedBarHasCustomButton) {
+			return;
+		}
+		const auto reference = _pinnedClickedId
+			? _pinnedClickedId
+			: _pinnedTracker->currentMessageId().message;
+		if (!reference) {
+			return;
+		}
+		const auto top = Data::ResolveTopPinnedId(
+			_peer,
+			_repliesRootId,
+			_monoforumPeerId);
+		const auto targetId = (top && reference.msg >= top.msg)
+			? Data::ResolveMinPinnedId(
+				_peer,
+				_repliesRootId,
+				_monoforumPeerId)
+			: _pinnedTracker->nextPinnedId(reference.msg);
+		if (!targetId) {
+			return;
+		}
+		const auto jump = crl::guard(this, [=] {
+			const auto item = session().data().message(targetId);
+			if (!item) {
+				return;
+			}
+			showAtPosition(item->position());
+			_pinnedClickedId = FullMsgId();
+			_minPinnedId = std::nullopt;
+			updatePinnedViewer();
+		});
+		if (session().data().message(targetId)) {
+			jump();
+		} else {
+			session().api().requestMessageData(
+				session().data().peer(targetId.peer),
+				targetId.msg,
+				jump);
+		}
+	}, _pinnedBar->lifetime());
+
 	_pinnedBarHeight = 0;
 	_pinnedBar->heightValue(
 	) | rpl::on_next([=](int height) {
@@ -2201,6 +2517,7 @@ void ChatWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
 	};
 	auto customButton = CreatePinnedBarCustomButton(this, item, context);
 	if (customButton) {
+		_pinnedBarHasCustomButton = true;
 		struct State {
 			base::unique_qptr<Ui::PopupMenu> menu;
 		};
@@ -2217,12 +2534,13 @@ void ChatWidget::refreshPinnedBarButton(bool many, HistoryItem *item) {
 		_pinnedBar->setRightButton(std::move(customButton));
 		return;
 	}
+	_pinnedBarHasCustomButton = false;
 	const auto close = !many;
 	auto button = object_ptr<Ui::IconButton>(
 		this,
 		close ? st::historyReplyCancel : st::historyPinnedShowAll);
 	button->setAccessibleName(close
-		? tr::lng_cancel(tr::now)
+		? tr::lng_pinned_unpin(tr::now)
 		: tr::lng_settings_events_pinned(tr::now));
 	button->clicks(
 	) | rpl::on_next([=] {
@@ -2389,14 +2707,21 @@ bool ChatWidget::preventsClose(Fn<void()> &&continueCallback) const {
 
 QPixmap ChatWidget::grabForShowAnimation(const Window::SectionSlideParams &params) {
 	_topBar->updateControlsVisibility();
-	if (params.withTopBarShadow) _topBarShadow->hide();
+	const auto hideTopBarShadow = params.withTopBarShadow
+		&& !params.fromBottom;
+	if (hideTopBarShadow) {
+		_topBarShadow->hide();
+	}
 	if (_joinGroup) {
 		_composeControls->hide();
 	} else {
 		_composeControls->showForGrab();
 	}
+	if (params.fromBottom && _subsectionTabs) {
+		_subsectionTabs->hide();
+	}
 	auto result = Ui::GrabWidget(this);
-	if (params.withTopBarShadow) {
+	if (hideTopBarShadow) {
 		_topBarShadow->show();
 	}
 	_topBars->hide();
@@ -2683,6 +3008,26 @@ void ChatWidget::restoreState(not_null<ChatMemento*> memento) {
 		refreshReplies();
 	}
 	_cornerButtons.setReplyReturns(memento->replyReturns());
+
+	// Custom initial scroll for post comments, from "Discussion started".
+	if (!memento->highlightId()
+		&& _repliesRoot
+		&& _repliesRoot->isDiscussionPost()
+		&& _replies->computeInboxReadTillFull() == MsgId(1)) {
+		_inner->overrideInitialScroll([=] {
+			const auto divider = _replies ? _replies->divider() : nullptr;
+			if (!divider) {
+				return false;
+			}
+			const auto view = _inner->viewByPosition(divider->position());
+			if (!view) {
+				return false;
+			}
+			const auto top = std::max(view->y() - st::topBarHeight, 0);
+			listScrollTo(top);
+			return true;
+		});
+	}
 	_inner->restoreState(memento->list());
 	if (const auto highlight = memento->highlightId()) {
 		auto params = Window::SectionShow(
@@ -2715,10 +3060,12 @@ void ChatWidget::recountChatWidth() {
 void ChatWidget::updateControlsGeometry() {
 	const auto contentWidth = width();
 
+	const auto wasAtBottom = !_scroll->isHidden()
+		&& (_scroll->scrollTop() >= _scroll->scrollTopMax());
 	const auto newScrollDelta = _scroll->isHidden()
 		? std::nullopt
 		: _scroll->scrollTop()
-		? base::make_optional(topDelta() + _scrollTopDelta)
+		? base::make_optional(takeTopDelta() + _scrollTopDelta)
 		: 0;
 	_topBar->resizeToWidth(contentWidth);
 	_topBarShadow->resize(contentWidth, st::lineWidth);
@@ -2781,27 +3128,35 @@ void ChatWidget::updateControlsGeometry() {
 	}
 	_scroll->move(tabsLeftSkip, top);
 	if (!_scroll->isHidden()) {
-		const auto newScrollTop = (newScrollDelta && _scroll->scrollTop())
-			? (_scroll->scrollTop() + *newScrollDelta)
-			: std::optional<int>();
-		if (newScrollTop) {
-			_scroll->scrollToY(*newScrollTop);
+		if (wasAtBottom) {
+			_scroll->scrollToY(_scroll->scrollTopMax());
+		} else if (newScrollDelta && _scroll->scrollTop()) {
+			_scroll->scrollToY(_scroll->scrollTop() + *newScrollDelta);
 		}
 		updateInnerVisibleArea();
 	}
 	_composeControls->move(0, composeTop);
 	_composeControls->setAutocompleteBoundingRect(_scroll->geometry());
 
-	if (_subsectionTabs) {
-		const auto scrollBottom = _scroll->y() + scrollHeight;
-		const auto areaHeight = scrollBottom
-			+ tabsBottomSkip
-			- subsectionTabsTop;
-		_subsectionTabs->setBoundingRect(
-			{ 0, subsectionTabsTop, width(), areaHeight });
+	if (!animatingShow()) {
+		updateSubsectionTabsGeometry();
 	}
 
 	_cornerButtons.updatePositions();
+	_pullToNext->updateGeometry();
+}
+
+void ChatWidget::updateSubsectionTabsGeometry() {
+	if (!_subsectionTabs) {
+		return;
+	}
+	const auto subsectionTabsTop = _topBar->bottomNoMargins();
+	const auto scrollBottom = _scroll->y() + _scroll->height();
+	const auto areaHeight = scrollBottom
+		+ _subsectionTabs->bottomSkip()
+		- subsectionTabsTop;
+	_subsectionTabs->setBoundingRect(
+		{ 0, subsectionTabsTop, width(), areaHeight });
 }
 
 void ChatWidget::paintEvent(QPaintEvent *e) {
@@ -2884,11 +3239,7 @@ void ChatWidget::setPinnedVisibility(bool shown) {
 			const auto height = shown ? st::historyReplyHeight : 0;
 			if (const auto delta = height - _repliesRootViewHeight) {
 				_repliesRootViewHeight = height;
-				if (_scroll->scrollTop() == _scroll->scrollTopMax()) {
-					setGeometryWithTopMoved(geometry(), delta);
-				} else {
-					updateControlsGeometry();
-				}
+				setGeometryWithTopMoved(geometry(), delta);
 			}
 		}
 		_repliesRootVisible = shown;
@@ -2909,8 +3260,12 @@ void ChatWidget::setPinnedVisibility(bool shown) {
 void ChatWidget::showAnimatedHook(
 		const Window::SectionSlideParams &params) {
 	_topBar->setAnimatingMode(true);
-	if (params.withTopBarShadow) {
+	if (params.withTopBarShadow && !params.fromBottom) {
 		_topBarShadow->show();
+	}
+	if (params.fromBottom && _subsectionTabs) {
+		_subsectionTabs->show();
+		orderWidgets();
 	}
 	_composeControls->showStarted();
 }
@@ -2926,6 +3281,7 @@ void ChatWidget::showFinishedHook() {
 		_composeControls->showFinished();
 	}
 	_inner->showFinished();
+	updateSubsectionTabsGeometry();
 	_topBars->show();
 	if (_subsectionTabs) {
 		_subsectionTabs->show();
@@ -3064,7 +3420,7 @@ bool ChatWidget::listAllowsMultiSelect() {
 
 bool ChatWidget::listIsItemGoodForSelection(
 		not_null<HistoryItem*> item) {
-	return item->isRegular() && !item->isService();
+	return item->canBeSelected();
 }
 
 bool ChatWidget::listIsLessInOrder(
@@ -3090,7 +3446,7 @@ void ChatWidget::listSelectionChanged(SelectedItems &&items) {
 	if ((state.count > 0) && _composeSearch) {
 		_composeSearch->hideAnimated();
 	}
-	if (items.empty()) {
+	if (!_inner->hasFocus() || !Ui::ScreenReaderModeActive()) {
 		doSetInnerFocus();
 	}
 }
@@ -3112,6 +3468,8 @@ MessagesBarData ChatWidget::listMessagesBar(
 		const std::vector<not_null<Element*>> &elements,
 		bool markLastAsRead) {
 	if ((!_sublist && !_replies) || elements.empty()) {
+		return {};
+	} else if (_sublist && !_sublist->parentChat()) {
 		return {};
 	}
 	const auto till = _replies
@@ -3218,25 +3576,32 @@ void ChatWidget::sendBotCommandWithOptions(
 		const QString &command,
 		const FullMsgId &context,
 		Api::SendOptions options) {
-	const auto withPaymentApproved = [=](int approved) {
-		auto copy = options;
-		copy.starsApproved = approved;
-		sendBotCommandWithOptions(command, context, copy);
-	};
-	const auto checked = checkSendPayment(
-		1,
-		options,
-		withPaymentApproved);
-	if (!checked) {
-		return;
-	}
-
 	const auto text = Bot::WrapCommandInChat(
 		_peer,
 		command,
 		context);
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = { text };
+
+	const auto ephemeral = session().ephemeralMessages().wouldSend(message);
+	if (!ephemeral && showSlowmodeError()) {
+		return;
+	}
+	if (!ephemeral) {
+		const auto withPaymentApproved = [=](int approved) {
+			auto copy = options;
+			copy.starsApproved = approved;
+			sendBotCommandWithOptions(command, context, copy);
+		};
+		const auto checked = checkSendPayment(
+			1,
+			options,
+			withPaymentApproved);
+		if (!checked) {
+			return;
+		}
+	}
+
 	session().api().sendMessage(std::move(message));
 	finishSending();
 }
@@ -3405,6 +3770,10 @@ base::unique_qptr<Ui::PopupMenu> ChatWidget::listFillSenderUserpicMenu(
 		searchInEntry,
 		Ui::Menu::CreateAddActionCallback(menu.get()));
 	return menu->empty() ? nullptr : std::move(menu);
+}
+
+Ui::ElasticScroll *ChatWidget::listScrollArea() const {
+	return _scroll.get();
 }
 
 void ChatWidget::setupEmptyPainter() {
