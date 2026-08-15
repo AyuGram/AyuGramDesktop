@@ -40,14 +40,13 @@
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "ayu/features/stt/download_helper.h"
+#include "ayu/features/stt/ggml_backend_detector.h"
+#include "ayu/features/stt/ggml_backend_manager.h"
 #include "ayu/features/stt/stt_manager.h"
 #include "ayu/features/stt/whisper_service.h"
 
-#include <QtCore/QDir>
 #include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QNetworkRequest>
 
 #include "range/v3/algorithm/find.hpp"
 #include "rpl/combine.h"
@@ -677,6 +676,32 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	auto *settings = &AyuSettings::getInstance();
 
+	const auto ggmlKind = Ayu::STT::BestAvailableGgmlBackendKind();
+	const auto backendProgress = std::make_shared<rpl::variable<int>>(-1);
+	const auto startDownloadIfNeeded = [=] {
+		if (!ggmlKind
+				|| !settings->sttEnabled()
+				|| !settings->sttHardwareAcceleration()
+				|| backendProgress->current() >= 0
+				|| Ayu::STT::GgmlBackendManager::isDownloaded(*ggmlKind)) {
+			return;
+		}
+		LOG(("AyuGram STT: downloading GPU backend, kind=%1"
+			).arg(static_cast<int>(*ggmlKind)));
+		*backendProgress = 0;
+		Ayu::STT::GgmlBackendManager::download(
+			*ggmlKind,
+			[=](const int percent) {
+				*backendProgress = percent;
+			},
+			[=](const bool ok) {
+				LOG(("AyuGram STT: GPU backend download %1, kind=%2"
+					).arg(ok ? u"ok"_q : u"failed"_q).arg(static_cast<int>(*ggmlKind)));
+				*backendProgress = -1;
+			});
+	};
+	startDownloadIfNeeded();
+
 	builder.addSubsectionTitle(tr::ayu_SttSectionTitle());
 
 	ayu.addToggle({
@@ -687,16 +712,30 @@ void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			settings->setSttEnabled(val);
 			if (val) {
 				Ayu::STT::STTManager::requestPermission();
+				startDownloadIfNeeded();
+			} else {
+				Ayu::STT::WhisperService::instance().freeContext(true);
 			}
 		},
 	});
 
-	builder.addSkip();
-	builder.addDividerText(tr::ayu_SttSectionDescription());
-
-	const auto isEnabled = [=]() {
+	const auto isEnabled = [=] {
 		return AyuSettings::getInstance().sttEnabledValue();
 	};
+
+#if defined(Q_OS_MAC)
+	const auto isWhisper = [=] {
+		return AyuSettings::getInstance().sttEngineValue()
+			| rpl::map([](const STTEngine e) { return e == STTEngine::Whisper; });
+	};
+#else
+	const auto isWhisper = [=]() {
+		return rpl::single(true);
+	};
+#endif
+
+	builder.addSkip();
+	builder.addDividerText(tr::ayu_SttSectionDescription());
 
 #if defined(Q_OS_MAC)
 	const auto engineOptions = std::vector<QString>{
@@ -734,16 +773,38 @@ void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		},
 		.shown = isEnabled(),
 	});
-
-	const auto isWhisper = [=]() {
-		return AyuSettings::getInstance().sttEngineValue()
-			| rpl::map([](STTEngine e) { return e == STTEngine::Whisper; });
-	};
-#else
-	const auto isWhisper = [=]() {
-		return rpl::single(true);
-	};
 #endif
+
+	auto accelerationTitle = rpl::combine(
+		tr::ayu_SttHardwareAcceleration(),
+		backendProgress->value()
+	) | rpl::map([](const QString &title, const int percent) {
+		return (percent >= 0)
+			? title + u" ("_q + QString::number(percent) + u"%)"_q
+			: title;
+	});
+
+	ayu.addToggle({
+		.id = u"ayu/sttHardwareAcceleration"_q,
+		.title = std::move(accelerationTitle),
+		// No GPU backend detected - hardware acceleration will not be enabled.
+		.getter = [=] { return ggmlKind && settings->sttHardwareAcceleration(); },
+		.setter = [=](const bool val) {
+			settings->setSttHardwareAcceleration(val);
+			Ayu::STT::WhisperService::instance().freeContext(!val);
+			if (val) {
+				startDownloadIfNeeded();
+			}
+		},
+		.shown = rpl::combine(isEnabled(), isWhisper())
+			| rpl::map([](const bool e, const bool w) { return e && w; }),
+		.disabled = !ggmlKind,
+		.tooltip = ggmlKind
+			? QString()
+			: tr::ayu_SttHardwareAccelerationUnavailable(tr::now),
+	});
+
+	builder.addDividerText(tr::ayu_SttHardwareAccelerationDescription());
 
 	const auto whisperModelOptions = std::vector<QString>{
 		u"Tiny (~75 MB)"_q,
@@ -815,50 +876,23 @@ void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 
 			const auto url = Ayu::STT::STTManager::modelUrl(modelType);
 			const auto dest = Ayu::STT::STTManager::modelPath(modelType);
-			(void)QDir().mkpath(QFileInfo(dest).absolutePath());
-			const auto downloader = new QNetworkAccessManager();
-			const auto file = new QFile(dest + u".tmp"_q);
-			if (!file->open(QIODevice::WriteOnly)) {
-				file->deleteLater();
-				downloader->deleteLater();
-				if (const auto controller = Core::App().activeWindow()->sessionController()) {
-					controller->showToast(tr::ayu_SttDownloadFailed(tr::now));
-				}
-				return;
-			}
-			const auto reply = downloader->get(QNetworkRequest(QUrl(url)));
 
 			*downloadProgress = 0;
-			QObject::connect(reply, &QNetworkReply::downloadProgress,
-				[=](const qint64 received, const qint64 total) {
-					if (total > 0) {
-						*downloadProgress = static_cast<int>(received * 100 / total);
+			Ayu::STT::DownloadWithProgress(
+				url,
+				dest,
+				QString(), // no known sha256 for these files
+				[=](const int percent) {
+					*downloadProgress = percent;
+				},
+				[=](const bool ok) {
+					if (const auto controller = Core::App().activeWindow()->sessionController()) {
+						controller->showToast(ok
+							? tr::ayu_SttDownloadComplete(tr::now)
+							: tr::ayu_SttDownloadFailed(tr::now));
 					}
+					*downloadProgress = -1;
 				});
-			QObject::connect(reply, &QNetworkReply::readyRead, [=] {
-				if (file->write(reply->readAll()) < 0) {
-					reply->abort();
-				}
-			});
-			QObject::connect(reply, &QNetworkReply::finished, [=] {
-				file->close();
-				file->deleteLater();
-				downloader->deleteLater();
-				if (reply->error() != QNetworkReply::NoError) {
-					QFile::remove(dest + u".tmp"_q);
-					if (const auto controller = Core::App().activeWindow()->sessionController()) {
-						controller->showToast(tr::ayu_SttDownloadFailed(tr::now));
-					}
-				} else {
-					QFile::remove(dest);
-					QFile::rename(dest + u".tmp"_q, dest);
-					if (const auto controller = Core::App().activeWindow()->sessionController()) {
-						controller->showToast(tr::ayu_SttDownloadComplete(tr::now));
-					}
-				}
-				*downloadProgress = -1;
-				reply->deleteLater();
-			});
 		},
 		.shown = rpl::combine(isEnabled(), isWhisper())
 			| rpl::map([](bool e, bool w) { return e && w; }),

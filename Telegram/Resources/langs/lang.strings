@@ -8395,3 +8395,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SttDownloadComplete" = "Model downloaded successfully.";
 "ayu_SttSectionDescription" = "Uses on-device speech recognition instead of Telegram Premium Voice-to-Text.";
 "ayu_SttModelNotDownloaded" = "Whisper model is not downloaded. Open Settings to download it.";
+"ayu_SttHardwareAcceleration" = "Hardware Acceleration";
+"ayu_SttHardwareAccelerationUnavailable" = "No supported GPU acceleration backend detected on this device.";
+"ayu_SttHardwareAccelerationDescription" = "Uses your GPU to speed up transcription. Downloads an extra module on first use. Without it, recognition will be very slow.";

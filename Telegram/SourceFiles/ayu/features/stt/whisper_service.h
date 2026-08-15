@@ -29,7 +29,7 @@ public:
 		std::function<void(QString)> callback);
 	static std::vector<float> decodeAudioToPcm(const QString &filePath);
 	void scheduleFreeContext();
-	void freeContext();
+	void freeContext(bool unloadBackend = false);
 	bool isQuitPrevent();
 
 private:
@@ -38,9 +38,10 @@ private:
 	QMutex _ctxMutex;
 	whisper_context *_cachedCtx = nullptr; // guarded by _ctxMutex
 	QString _cachedModelPath; // guarded by _ctxMutex
+	QString _loadedGgmlBackendPath; // guarded by _ctxMutex
+	void *_loadedGgmlBackendReg = nullptr; // guarded by _ctxMutex
 	base::Timer _idleTimer; // main thread only
 	bool _freeInFlight = false; // main thread only
-
 };
 
 } // namespace Ayu::STT

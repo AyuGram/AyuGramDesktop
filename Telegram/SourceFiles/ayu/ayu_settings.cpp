@@ -1074,6 +1074,12 @@ void AyuSettings::setWhisperModelType(WhisperModel val) {
 	save();
 }
 
+void AyuSettings::setSttHardwareAcceleration(bool val) {
+	if (_sttHardwareAcceleration.current() == val) return;
+	_sttHardwareAcceleration = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1170,6 +1176,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"sttEngine", s._sttEngine.current()},
 		{"sttLanguage", s._sttLanguage.current()},
 		{"whisperModelType", s._whisperModelType.current()},
+		{"sttHardwareAcceleration", s._sttHardwareAcceleration.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1274,6 +1281,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._sttEngine = j.value("sttEngine", defaults._sttEngine.current());
 	s._sttLanguage = j.value("sttLanguage", defaults._sttLanguage.current());
 	s._whisperModelType = j.value("whisperModelType", defaults._whisperModelType.current());
+	s._sttHardwareAcceleration = j.value("sttHardwareAcceleration", defaults._sttHardwareAcceleration.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

@@ -30,14 +30,8 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
     set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    # Metal is only enabled on Apple Silicon; ggml's Metal backend targets
-    # Apple GPUs, so on Intel Macs we stay on the CPU backend to avoid
-    # shader-compilation failures at runtime.
-    if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-        set(GGML_METAL ON CACHE BOOL "" FORCE)
-    else()
-        set(GGML_METAL OFF CACHE BOOL "" FORCE)
-    endif()
+    # AyuGram STT: only CPU is statically linked
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
     set(GGML_BLAS OFF CACHE BOOL "" FORCE)
     # dynamic backend loading via dlopen breaks static builds
     set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
@@ -58,8 +52,17 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
         target_compile_options(ggml PRIVATE -mmacosx-version-min=10.15)
     endif()
     target_link_libraries(Telegram PRIVATE whisper)
-    target_include_directories(Telegram PRIVATE ThirdParty/whisper.cpp/include)
+    target_include_directories(Telegram PRIVATE
+        ThirdParty/whisper.cpp/include
+        ThirdParty/whisper.cpp/ggml/include)
     target_compile_definitions(Telegram PRIVATE HAVE_WHISPER)
+    execute_process(
+        COMMAND git rev-parse HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp"
+        OUTPUT_VARIABLE WHISPER_CPP_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    target_compile_definitions(Telegram PRIVATE WHISPER_CPP_COMMIT="${WHISPER_CPP_COMMIT}")
 endif()
 
 get_filename_component(src_loc SourceFiles REALPATH)
@@ -289,6 +292,12 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
     PRIVATE
         ayu/features/stt/whisper_service.cpp
         ayu/features/stt/whisper_service.h
+        ayu/features/stt/download_helper.cpp
+        ayu/features/stt/download_helper.h
+        ayu/features/stt/ggml_backend_detector.cpp
+        ayu/features/stt/ggml_backend_detector.h
+        ayu/features/stt/ggml_backend_manager.cpp
+        ayu/features/stt/ggml_backend_manager.h
     )
 endif()
 

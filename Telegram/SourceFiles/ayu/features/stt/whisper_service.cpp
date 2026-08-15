@@ -7,11 +7,15 @@
 
 #include "ayu/features/stt/whisper_service.h"
 
+#include "ayu/ayu_settings.h"
+#include "ayu/features/stt/ggml_backend_detector.h"
+#include "ayu/features/stt/ggml_backend_manager.h"
 #include "base/debug_log.h"
 #include "core/application.h"
 #include "crl/crl_on_main.h"
 
 #include "whisper.h"
+#include "ggml-backend.h"
 #include "gsl/util"
 
 extern "C" {
@@ -21,7 +25,12 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 
+#include <QtCore/QFileInfo>
 #include <QtCore/QThread>
+
+#if defined(Q_OS_WIN)
+#include <windows.h>
+#endif
 
 namespace Ayu::STT {
 
@@ -46,7 +55,7 @@ void WhisperService::scheduleFreeContext() {
 	crl::on_main([this] { _idleTimer.callOnce(kCtxIdleTimeoutMs); });
 }
 
-void WhisperService::freeContext() {
+void WhisperService::freeContext(bool unloadBackend) {
 	if (!_ctxMutex.tryLock()) {
 		scheduleFreeContext();
 		return;
@@ -55,10 +64,23 @@ void WhisperService::freeContext() {
 	const auto ctx = _cachedCtx;
 	_cachedCtx = nullptr;
 	_cachedModelPath.clear();
+	void *backendReg = nullptr;
+	if (unloadBackend) {
+		backendReg = _loadedGgmlBackendReg;
+		_loadedGgmlBackendReg = nullptr;
+		_loadedGgmlBackendPath.clear();
+	}
 	_ctxMutex.unlock();
-	if (ctx) {
-		// whisper_free releases Metal buffers off the main thread.
-		const auto thread = QThread::create([ctx] { whisper_free(ctx); });
+	if (ctx || backendReg) {
+		const auto thread = QThread::create([ctx, backendReg] {
+			if (ctx) {
+				whisper_free(ctx);
+			}
+			if (backendReg) {
+				LOG(("WhisperService: unloading GPU backend"));
+				ggml_backend_unload(static_cast<ggml_backend_reg_t>(backendReg));
+			}
+		});
 		QObject::connect(thread, &QThread::finished, thread, &QThread::deleteLater);
 		thread->start();
 	}
@@ -220,7 +242,47 @@ void WhisperService::transcribeOnDemand(
 			}
 			const auto modelUtf8 = modelPath.toUtf8();
 			whisper_context_params ctxParams = whisper_context_default_params();
-			ctxParams.use_gpu = true;
+			const auto accelerationEnabled = AyuSettings::getInstance().sttHardwareAcceleration();
+			const auto kind = accelerationEnabled
+				? BestAvailableGgmlBackendKind()
+				: std::nullopt;
+			ctxParams.use_gpu = kind.has_value();
+			LOG(("WhisperService: hardware acceleration=%1, kind=%2"
+				).arg(accelerationEnabled ? 1 : 0
+				).arg(kind ? static_cast<int>(*kind) : -1));
+			if (kind) {
+				const auto modulePath = GgmlBackendManager::loadedModulePath(*kind);
+				if (modulePath.isEmpty()) {
+					LOG(("WhisperService: GPU backend not downloaded yet, falling back to CPU"));
+					ctxParams.use_gpu = false; // not downloaded yet
+				} else if (_loadedGgmlBackendPath == modulePath) {
+					LOG(("WhisperService: GPU backend already loaded, skipping reload: %1"
+						).arg(modulePath));
+				} else {
+					LOG(("WhisperService: loading GPU backend module: %1").arg(modulePath));
+#if defined(Q_OS_WIN)
+					// dl_load_library's LoadLibraryW (ggml-backend-dl.cpp) doesn't
+					// search the loaded DLL's own directory for transitive deps
+					// (ggml-base.dll, cublas64_*.dll) by default - widen the
+					// search path first.
+					const auto moduleDir = QFileInfo(modulePath).absolutePath();
+					SetDllDirectoryW(reinterpret_cast<LPCWSTR>(moduleDir.utf16()));
+#endif
+					const auto reg = ggml_backend_load(modulePath.toUtf8().constData());
+#if defined(Q_OS_WIN)
+					SetDllDirectoryW(nullptr);
+#endif
+					if (!reg) {
+						LOG(("WhisperService: failed to load GPU backend module: %1, falling back to CPU"
+							).arg(modulePath));
+						ctxParams.use_gpu = false;
+					} else {
+						LOG(("WhisperService: GPU backend loaded ok: %1").arg(modulePath));
+						_loadedGgmlBackendPath = modulePath;
+						_loadedGgmlBackendReg = reg;
+					}
+				}
+			}
 			_cachedCtx = whisper_init_from_file_with_params(
 				modelUtf8.constData(),
 				ctxParams);
@@ -231,6 +293,7 @@ void WhisperService::transcribeOnDemand(
 				});
 				return;
 			}
+			LOG(("WhisperService: model loaded, use_gpu=%1").arg(ctxParams.use_gpu ? 1 : 0));
 			_cachedModelPath = modelPath;
 		}
 		whisper_context *ctx = _cachedCtx;
