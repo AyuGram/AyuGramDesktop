@@ -1,0 +1,121 @@
+name: GGML backend Linux Vulkan build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [dev]
+    paths:
+      - 'Telegram/ThirdParty/whisper.cpp'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/telegramdesktop/tdesktop/centos_env:latest
+      options: --user root
+    outputs:
+      short-sha: ${{ steps.vars.outputs.short-sha }}
+      full-sha: ${{ steps.vars.outputs.full-sha }}
+      api-version: ${{ steps.vars.outputs.api-version }}
+      whisper-version: ${{ steps.vars.outputs.version }}
+      zip-name: ${{ steps.package.outputs.zip_path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github
+            Telegram/ThirdParty/whisper.cpp
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Init whisper.cpp submodule
+        run: git submodule update --init Telegram/ThirdParty/whisper.cpp
+
+      - id: vars
+        uses: ./.github/actions/ggml-backend/resolve-vars
+
+      - name: Install Vulkan SDK
+        run: |
+          VULKAN_SDK_VERSION=1.4.309.0
+          curl -fsSL -o vulkan-sdk.tar.xz \
+            "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.xz"
+          mkdir -p /opt/vulkan-sdk
+          tar -xf vulkan-sdk.tar.xz -C /opt/vulkan-sdk --strip-components=1
+          echo "VULKAN_SDK=/opt/vulkan-sdk/x86_64" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=/opt/vulkan-sdk/x86_64" >> "$GITHUB_ENV"
+
+      - name: Build glslc from source
+        run: |
+          export CC=/opt/rh/gcc-toolset-15/root/usr/bin/gcc
+          export CXX=/opt/rh/gcc-toolset-15/root/usr/bin/g++
+          git clone --depth 1 --branch v2026.3 https://github.com/google/shaderc.git /tmp/shaderc
+          cd /tmp/shaderc
+          python3 utils/git-sync-deps
+          cmake -S . -B build -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSHADERC_SKIP_TESTS=ON \
+            -DSHADERC_SKIP_EXAMPLES=ON \
+            -DSHADERC_SKIP_COPYRIGHT_CHECK=ON
+          cmake --build build --target glslc_exe -- -j"$(nproc)"
+          echo "GLSLC_BIN=/tmp/shaderc/build/glslc/glslc" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: >
+          cmake -S Telegram/ThirdParty/whisper.cpp -B build
+          -DBUILD_SHARED_LIBS=ON
+          -DGGML_BACKEND_DL=ON
+          -DGGML_NATIVE=OFF
+          -DWHISPER_BUILD_TESTS=OFF
+          -DWHISPER_BUILD_EXAMPLES=OFF
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_VULKAN=ON
+          -DVulkan_GLSLC_EXECUTABLE=${{ env.GLSLC_BIN }}
+          -DCMAKE_BUILD_RPATH='$ORIGIN'
+          -DCMAKE_INSTALL_RPATH='$ORIGIN'
+
+      - name: Build
+        run: cmake --build build --target ggml-vulkan ggml-base -- -j"$(nproc)"
+
+      - name: Package
+        id: package
+        run: |
+          dnf install -y zip
+          dest=package
+          mkdir -p "$dest"
+          find build -name "libggml-vulkan.so" -exec cp {} "$dest/" \;
+          find build -name "libggml-base.so.0" -exec cp {} "$dest/" \;
+          test -f "$dest/libggml-vulkan.so" || { echo "::error::libggml-vulkan.so not found in build output"; exit 1; }
+          test -f "$dest/libggml-base.so.0" || { echo "::error::libggml-base.so.0 not found in build output"; exit 1; }
+          zipName="ggml-vulkan-linux-x64-${{ steps.vars.outputs.short-sha }}.zip"
+          (cd "$dest" && zip "../$zipName" ./*)
+          echo "zip_path=$zipName" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ggml-vulkan-linux-x64
+          path: ${{ steps.package.outputs.zip_path }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ggml-manifest-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ggml-vulkan-linux-x64
+
+      - uses: ./.github/actions/ggml-backend/publish
+        with:
+          zip-path: ${{ needs.build.outputs.zip-name }}
+          short-sha: ${{ needs.build.outputs.short-sha }}
+          whisper-cpp-commit: ${{ needs.build.outputs.full-sha }}
+          api-version: ${{ needs.build.outputs.api-version }}
+          whisper-cpp-version: ${{ needs.build.outputs.whisper-version }}

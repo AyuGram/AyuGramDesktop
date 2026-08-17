@@ -1,0 +1,95 @@
+name: GGML backend macOS Metal build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [dev]
+    paths:
+      - 'Telegram/ThirdParty/whisper.cpp'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    outputs:
+      short-sha: ${{ steps.vars.outputs.short-sha }}
+      full-sha: ${{ steps.vars.outputs.full-sha }}
+      api-version: ${{ steps.vars.outputs.api-version }}
+      whisper-version: ${{ steps.vars.outputs.version }}
+      zip-name: ${{ steps.package.outputs.zip_path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github
+            Telegram/ThirdParty/whisper.cpp
+
+      - name: Init whisper.cpp submodule
+        run: git submodule update --init Telegram/ThirdParty/whisper.cpp
+
+      - id: vars
+        uses: ./.github/actions/ggml-backend/resolve-vars
+
+      - name: Configure
+        run: >
+          cmake -S Telegram/ThirdParty/whisper.cpp -B build
+          -DBUILD_SHARED_LIBS=ON
+          -DGGML_BACKEND_DL=ON
+          -DGGML_NATIVE=OFF
+          -DWHISPER_BUILD_TESTS=OFF
+          -DWHISPER_BUILD_EXAMPLES=OFF
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_METAL=ON
+          -DGGML_METAL_EMBED_LIBRARY=ON
+          -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          -DCMAKE_BUILD_RPATH='@loader_path'
+          -DCMAKE_INSTALL_RPATH='@loader_path'
+
+      - name: Build
+        run: cmake --build build --config Release --target ggml-metal ggml-base -- -j"$(sysctl -n hw.ncpu)"
+
+      - name: Package
+        id: package
+        run: |
+          dest=package
+          mkdir -p "$dest"
+          # ggml-metal.so links against @rpath/libggml-base.0.dylib (the
+          # SONAME, not the unversioned symlink) - copy that exact name so
+          # dyld's @loader_path lookup (set above) actually finds it
+          # sitting next to the module at runtime.
+          find build -name "libggml-metal.so" -exec cp {} "$dest/" \;
+          find build -name "libggml-base.0.dylib" -exec cp {} "$dest/" \;
+          test -f "$dest/libggml-metal.so" || { echo "::error::libggml-metal.so not found in build output"; exit 1; }
+          test -f "$dest/libggml-base.0.dylib" || { echo "::error::libggml-base.0.dylib not found in build output"; exit 1; }
+          zipName="ggml-metal-macos-universal-${{ steps.vars.outputs.short-sha }}.zip"
+          (cd "$dest" && zip "../$zipName" ./*)
+          echo "zip_path=$zipName" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ggml-metal-macos-universal
+          path: ${{ steps.package.outputs.zip_path }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ggml-manifest-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ggml-metal-macos-universal
+
+      - uses: ./.github/actions/ggml-backend/publish
+        with:
+          zip-path: ${{ needs.build.outputs.zip-name }}
+          short-sha: ${{ needs.build.outputs.short-sha }}
+          whisper-cpp-commit: ${{ needs.build.outputs.full-sha }}
+          api-version: ${{ needs.build.outputs.api-version }}
+          whisper-cpp-version: ${{ needs.build.outputs.whisper-version }}

@@ -1,0 +1,100 @@
+name: GGML backend Windows CUDA build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [dev]
+    paths:
+      - 'Telegram/ThirdParty/whisper.cpp'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    outputs:
+      short-sha: ${{ steps.vars.outputs.short-sha }}
+      full-sha: ${{ steps.vars.outputs.full-sha }}
+      api-version: ${{ steps.vars.outputs.api-version }}
+      whisper-version: ${{ steps.vars.outputs.version }}
+      zip-name: ${{ steps.package.outputs.zip_path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github
+            Telegram/ThirdParty/whisper.cpp
+
+      - name: Init whisper.cpp submodule
+        run: git submodule update --init Telegram/ThirdParty/whisper.cpp
+
+      - id: vars
+        uses: ./.github/actions/ggml-backend/resolve-vars
+
+      - name: Install CUDA toolkit
+        uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: '12.4.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "visual_studio_integration", "cublas", "cublas_dev"]'
+
+      # GGML_NATIVE=OFF fat-bins for all archs (huge size), so pin
+      # CMAKE_CUDA_ARCHITECTURES to supported GPU gens only:
+      # 61 Pascal, 75 Turing, 86 Ampere, 89 Ada.
+      - name: Configure
+        run: >
+          cmake -S Telegram/ThirdParty/whisper.cpp -B build -G "Visual Studio 17 2022" -A x64
+          -DBUILD_SHARED_LIBS=ON
+          -DGGML_BACKEND_DL=ON
+          -DGGML_NATIVE=OFF
+          -DCMAKE_CUDA_ARCHITECTURES="61;75;86;89"
+          -DWHISPER_BUILD_TESTS=OFF
+          -DWHISPER_BUILD_EXAMPLES=OFF
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_CUDA=ON
+          -DGGML_STATIC=ON
+          -DGGML_CUDA_NCCL=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --target ggml-cuda ggml-base
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dest = "package"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item build/bin/Release/ggml-cuda.dll $dest/
+          Copy-Item build/bin/Release/ggml-base.dll $dest/
+          Get-ChildItem "$env:CUDA_PATH\bin" -Filter "cublas64_*.dll" | Copy-Item -Destination $dest/
+          Get-ChildItem "$env:CUDA_PATH\bin" -Filter "cublasLt64_*.dll" | Copy-Item -Destination $dest/
+          $zipName = "ggml-cuda-windows-x64-${{ steps.vars.outputs.short-sha }}.zip"
+          Compress-Archive -Path "$dest/*" -DestinationPath $zipName
+          echo "zip_path=$zipName" >> $env:GITHUB_OUTPUT
+        id: package
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ggml-cuda-windows-x64
+          path: ${{ steps.package.outputs.zip_path }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ggml-manifest-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ggml-cuda-windows-x64
+
+      - uses: ./.github/actions/ggml-backend/publish
+        with:
+          zip-path: ${{ needs.build.outputs.zip-name }}
+          short-sha: ${{ needs.build.outputs.short-sha }}
+          whisper-cpp-commit: ${{ needs.build.outputs.full-sha }}
+          api-version: ${{ needs.build.outputs.api-version }}
+          whisper-cpp-version: ${{ needs.build.outputs.whisper-version }}
