@@ -479,6 +479,20 @@ void AyuSettings::removeShadowBan(int64 id) {
 	}
 }
 
+void AyuSettings::addHiddenFolder(int64 id) {
+	if (_hiddenFolderIds.insert(id).second) {
+		_hiddenFolderIdsChanged.fire({});
+		save();
+	}
+}
+
+void AyuSettings::removeHiddenFolder(int64 id) {
+	if (_hiddenFolderIds.erase(id) > 0) {
+		_hiddenFolderIdsChanged.fire({});
+		save();
+	}
+}
+
 void AyuSettings::validate() {
 	AyuSettings defaults;
 	auto modified = false;
@@ -1082,6 +1096,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"saveMessagesHistory", s._saveMessagesHistory.current()},
 		{"saveForBots", s._saveForBots.current()},
 		{"shadowBanIds", s._shadowBanIds},
+		{"hiddenFolderIds", s._hiddenFolderIds},
 		{"filtersEnabled", s._filtersEnabled.current()},
 		{"filtersEnabledInChats", s._filtersEnabledInChats.current()},
 		{"hideFromBlocked", s._hideFromBlocked.current()},
@@ -1186,6 +1201,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._saveMessagesHistory = j.value("saveMessagesHistory", defaults._saveMessagesHistory.current());
 	s._saveForBots = j.value("saveForBots", defaults._saveForBots.current());
 	s._shadowBanIds = j.value("shadowBanIds", defaults._shadowBanIds);
+	s._hiddenFolderIds = j.value("hiddenFolderIds", defaults._hiddenFolderIds);
 	s._filtersEnabled = j.value("filtersEnabled", defaults._filtersEnabled.current());
 	s._filtersEnabledInChats = j.value("filtersEnabledInChats", defaults._filtersEnabledInChats.current());
 	s._hideFromBlocked = j.value("hideFromBlocked", defaults._hideFromBlocked.current());
