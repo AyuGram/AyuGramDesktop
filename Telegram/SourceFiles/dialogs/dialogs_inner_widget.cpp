@@ -1201,7 +1201,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			const auto view = thread
 				? &thread->lastItemDialogsView()
 				: nullptr;
-			auto &badge = row->entry()->chatListPeerBadge();
+			const auto &badge = row->entry()->chatListPeerBadge();
 			_rowsScrollCache.paintRow(
 				p,
 				cacheKey,
@@ -1427,11 +1427,11 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 
 				p.setFont(st::mentionFont);
 				for (; from < to; ++from) {
-					auto &result = _hashtagResults[from];
+					const auto &result = _hashtagResults[from];
 					bool selected = (from == (isPressed() ? _hashtagPressed : _hashtagSelected));
 					p.fillRect(0, 0, fullWidth, st::mentionHeight, selected ? st::mentionBgOver : currentBg());
 					result->row.paintRipple(p, 0, 0, fullWidth);
-					auto &tag = result->tag;
+					const auto &tag = result->tag;
 					if (selected) {
 						int skip = (st::mentionHeight - st::smallCloseIconOver.height()) / 2;
 						st::smallCloseIconOver.paint(p, QPoint(fullWidth - st::smallCloseIconOver.width() - skip, skip), width());
@@ -2614,7 +2614,7 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 				updateCallback);
 		}
 	} else if (base::in_range(_searchedPressed, 0, _searchResults.size())) {
-		auto &row = _searchResults[_searchedPressed];
+		const auto &row = _searchResults[_searchedPressed];
 		row->addRipple(
 			e->pos() - QPoint(0, searchedOffset() + _searchedPressed * _st->height),
 			QSize(width(), _st->height),
@@ -3989,6 +3989,9 @@ void InnerWidget::contextMenuEvent(QContextMenuEvent *e) {
 	const auto fromMouse = e->reason() == QContextMenuEvent::Mouse;
 
 	if (fromMouse) {
+		if (e->modifiers() & Qt::AltModifier) {
+			return;
+		}
 		selectByMouse(e->globalPos());
 	}
 
@@ -5540,7 +5543,7 @@ void InnerWidget::scrollToEntry(const RowDescriptor &entry) {
 			}
 		}
 		for (auto i = 0, c = int(_filterResults.size()); i != c; ++i) {
-			auto &result = _filterResults[i];
+			const auto &result = _filterResults[i];
 			if (result.key() == entry.key) {
 				const auto from = filteredOffset() + result.top;
 				scrollToItem(from, result.row->height());
@@ -6499,17 +6502,19 @@ void InnerWidget::setSwipeContextData(
 				&& !context->icon->frameIndex()
 				&& !context->icon->animating()) {
 				context->icon->animate(
-					[=] { update(); },
+					[=] { updateQuickActionRow(key); },
 					0,
 					context->icon->framesCount());
 			}
 		} else if (context->data.ratio < kResetAnimateThreshold) {
 			if (context->icon
 				&& context->icon->frameIndex()) {
-				context->icon->jumpTo(0, [=] { update(); });
+				context->icon->jumpTo(
+					0,
+					[=] { updateQuickActionRow(key); });
 			}
 		}
-		update();
+		updateQuickActionRow(key);
 	}
 }
 
@@ -6574,6 +6579,12 @@ void InnerWidget::deactivateQuickAction() {
 		_activeQuickAction->finishedAt = crl::now();
 		_inactiveQuickActions.push_back(
 			QuickActionPtr{ _activeQuickAction.release() });
+	}
+}
+
+void InnerWidget::updateQuickActionRow(int64 key) {
+	if (const auto history = session().data().historyLoaded(PeerId(key))) {
+		repaintDialogRow({ history, FullMsgId() });
 	}
 }
 

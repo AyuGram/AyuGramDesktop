@@ -5,6 +5,9 @@ description: Process the local ignored ai-tdesktop inbox into durable, independe
 
 # Process Inbox
 
+When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
+before any other host-specific delegation rule and apply its substitutions.
+
 Turn the human-written ignored inbox into tracked planning artifacts. Route and
 plan only: do not edit Telegram source, build, test, claim, or implement tasks.
 
@@ -54,6 +57,13 @@ Read these before planning:
   `projects/archive/`, and relevant task states from `<inbox_worktree>`;
 - the transaction's `inbox.md` and every file it references.
 
+Some retained task directories have `superseded.yaml` instead of `state.yaml`.
+They are durable aliases created by queue consolidation, not missing or reusable
+paths. Follow `superseded_by` chains to their live task when deduplicating,
+resolving prior receipt references, or checking whether a same-digest result
+still exists. New dependencies and project links must name the final live task,
+never an alias. A dated slug occupied by an alias still counts as a collision.
+
 Use one disposable leaf planner when the harness supports delegation; instruct
 it not to delegate. Otherwise perform the same work locally. The planner may
 write a proposed routing file inside the ignored transaction, but only the
@@ -65,6 +75,17 @@ inbox into requests, then decide for each request whether to:
 - create a standalone task with no project;
 - add one or more tasks to an existing project;
 - create a new project when durable shared context is useful.
+
+Never create a task whose work is to move an existing source commit between
+branches: no backport, forward-port, cherry-pick, rebase, merge, branch sync,
+or equivalent integration task. Branch placement is human release/history
+coordination, not product work for the autonomous queue. When a request only
+asks for that operation, record a receipt-only disposition naming the existing
+source task or commit description and the requested target branch, then leave
+the operation to the human. When new product work requires code shipped by an
+earlier task, route only the product work and express the source task as a
+dependency; do not create a companion task to bring that dependency onto a
+branch.
 
 Bias project assignment toward continuity. When a request follows from an
 existing task, begin with that task's project and keep it unless independence
@@ -179,21 +200,27 @@ phase: null
 inbox_receipt: receipts/YYYY/MM/DD/<receipt>.md
 ```
 
+Do not write a `model` field. It records which model finished the task, so only
+`finish` writes it, at the canonical `Approve` or `Block` boundary; a task
+carrying one before it is claimed is malformed.
+
 Use a project slug instead of `null` when routed to a project. Use a YAML list
 of task identifiers for dependencies. Dependencies record code lineage as well
 as readiness: keep an approved source task in `depends_on` when the new task's
 implementation assumes its shipped changes. State that prerequisite in
-`task.md`. Inbox processing never reserves work: new tasks always remain
+`task.md`. This dependency is sufficient; never add a separate backport,
+cherry-pick, rebase, merge, or branch-sync task to make it reachable. Inbox
+processing never reserves work: new tasks always remain
 `status: todo` with `claimed_by`, `claimed_at`, and `claim_order` set to `null`.
 The checkout tag belongs in the receipt only.
 
-Inbox processing always writes `type: implement`. A human request is work to do,
-not a measurement of work already done. Only the `continue` scheduler's routing
-step creates `type: verify` tasks, when an approved result leaves an
-`Unverified:` gap the existing checkout could close; that step reuses these
-task-creation rules and sets the field itself. A verification carries no
-implementation, so never give one acceptance criteria that would need a source
-change to satisfy — that request is an `implement` task.
+Every new task uses `type: implement`. Do not predict a cheap or expensive
+execution profile while routing: the performer selects review specialists and
+evidence instruments after inspecting the real code and risks. Keep acceptance
+criteria outcome-focused. Name a required build, probe, app run, interaction,
+or screenshot only when that instrument is itself part of the requested result
+or no other instrument could decide the claim from the facts already known to
+the planner.
 
 For a new project, create `projects/<slug>/project.md` with a concise durable
 scope and `projects/<slug>/tasks.md` with task links. For an existing project,
@@ -209,8 +236,9 @@ Create one tracked Markdown receipt under `receipts/YYYY/MM/DD/`. Include:
 - deduplication decisions.
 
 Before writing, search receipts for the same digest. If it was already fully
-processed and all referenced tasks still exist, create nothing and reuse that
-receipt for finalization.
+processed and every referenced task either has live state or has a durable alias
+chain reaching live state, create nothing and reuse that receipt for
+finalization.
 
 ## Validate and publish
 

@@ -165,20 +165,6 @@ void Controller::showAccount(
 	_id.account = account;
 	Core::App().checkWindowId(this);
 
-	const auto updateOnlineOfPrevSesssion = crl::guard(account, [=] {
-		if (!prevSessionUniqueId) {
-			return;
-		}
-		for (auto &[index, account] : _id.account->domain().accounts()) {
-			if (const auto anotherSession = account->maybeSession()) {
-				if (anotherSession->uniqueId() == prevSessionUniqueId) {
-					anotherSession->updates().updateOnline(crl::now());
-					return;
-				}
-			}
-		}
-	});
-
 	if (!isPrimary()) {
 		_id.account->sessionChanges(
 		) | rpl::on_next([=](Main::Session *session) {
@@ -233,7 +219,19 @@ void Controller::showAccount(
 			_widget.updateGlobalMenu();
 		}
 
-		crl::on_main(updateOnlineOfPrevSesssion);
+		crl::on_main(this, [=] {
+			if (!prevSessionUniqueId) {
+				return;
+			}
+			for (auto &[index, account] : _id.account->domain().accounts()) {
+				if (const auto anotherSession = account->maybeSession()) {
+					if (anotherSession->uniqueId() == prevSessionUniqueId) {
+						anotherSession->updates().updateOnline(crl::now());
+						return;
+					}
+				}
+			}
+		});
 	}, _accountLifetime);
 }
 

@@ -87,9 +87,7 @@ struct SwitchAccountResult {
 		not_null<Ui::RpWidget*> parent,
 		UserId userIdHint = UserId()) {
 	const auto session = &Core::App().domain().active().session();
-	const auto widget = Ui::CreateChild<SwitchableUserpicButton>(
-		parent,
-		st::restoreUserpicIcon.photoSize + st::lineWidth * 8);
+	const auto widget = Ui::CreateChild<SwitchableUserpicButton>(parent);
 	struct State {
 		base::unique_qptr<Ui::PopupMenu> menu;
 		UserData *currentUser = nullptr;
@@ -206,8 +204,7 @@ void RequestButton(
 	std::shared_ptr<Ui::Show> show,
 	const MTPDurlAuthResultRequest &request,
 	not_null<const HistoryItem*> message,
-	int row,
-	int column);
+	Api::BotButtonLookup lookup);
 void RequestUrl(
 	std::shared_ptr<Ui::Show> show,
 	const MTPDurlAuthResultRequest &request,
@@ -218,15 +215,10 @@ void RequestUrl(
 void ActivateButton(
 		std::shared_ptr<Ui::Show> show,
 		not_null<const HistoryItem*> message,
-		int row,
-		int column) {
+		Api::BotButtonLookup lookup) {
 	const auto itemId = message->fullId();
-	const auto button = HistoryMessageMarkupButton::Get(
-		&message->history()->owner(),
-		itemId,
-		row,
-		column);
-	if (button->requestId || !message->isRegular()) {
+	const auto button = lookup();
+	if (!button || button->requestId || !message->isRegular()) {
 		return;
 	}
 	const auto session = &message->history()->session();
@@ -243,11 +235,7 @@ void ActivateButton(
 		MTPstring(), // #TODO auth url
 		MTPstring() // in_app_origin
 	)).done([=](const MTPUrlAuthResult &result) {
-		const auto button = HistoryMessageMarkupButton::Get(
-			&session->data(),
-			itemId,
-			row,
-			column);
+		const auto button = lookup();
 		if (!button) {
 			return;
 		}
@@ -261,15 +249,11 @@ void ActivateButton(
 			HiddenUrlClickHandler::Open(url);
 		}, [&](const MTPDurlAuthResultRequest &data) {
 			if (const auto item = session->data().message(itemId)) {
-				RequestButton(show, data, item, row, column);
+				RequestButton(show, data, item, lookup);
 			}
 		});
 	}).fail([=] {
-		const auto button = HistoryMessageMarkupButton::Get(
-			&session->data(),
-			itemId,
-			row,
-			column);
+		const auto button = lookup();
 		if (!button) {
 			return;
 		}
@@ -320,14 +304,9 @@ void RequestButton(
 		std::shared_ptr<Ui::Show> show,
 		const MTPDurlAuthResultRequest &request,
 		not_null<const HistoryItem*> message,
-		int row,
-		int column) {
+		Api::BotButtonLookup lookup) {
 	const auto itemId = message->fullId();
-	const auto button = HistoryMessageMarkupButton::Get(
-		&message->history()->owner(),
-		itemId,
-		row,
-		column);
+	const auto button = lookup();
 	if (!button || button->requestId || !message->isRegular()) {
 		return;
 	}
@@ -644,7 +623,7 @@ void RequestUrl(
 				userIdHint);
 			box->verticalLayout()->widthValue(
 			) | rpl::on_next([=, w = (*accountResult).widget] {
-				w->moveToRight(st::lineWidth * 4, 0);
+				w->moveToRight(SwitchableUserpicButton::Skip(), 0);
 			}, (*accountResult).widget->lifetime());
 			state->anotherSession = (*accountResult).anotherSession;
 			(*accountResult).setOnUserChanged(reloadRequest);

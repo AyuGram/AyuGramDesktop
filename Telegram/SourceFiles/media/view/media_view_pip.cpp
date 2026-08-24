@@ -357,6 +357,7 @@ void PipPanel::init() {
 	widget()->setWindowFlags(Qt::Tool
 		| Qt::WindowStaysOnTopHint
 		| Qt::FramelessWindowHint
+		| Qt::NoDropShadowWindowHint
 		| Qt::WindowDoesNotAcceptFocus);
 	widget()->setAttribute(Qt::WA_ShowWithoutActivating);
 	widget()->setAttribute(Qt::WA_MacAlwaysShowToolWindow);

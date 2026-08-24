@@ -30,6 +30,7 @@ set(style_files
     ui/effects/premium.style
     ui/effects/premium_limits.style
     ui/color_indices.style
+    ui/controls/ttl_media.style
     ui/controls/userpic_button.style
     boxes/boxes.style
     api/api_chat_invite.style
@@ -50,6 +51,7 @@ set(style_files
     ui/boxes/country_select_box.style
     ui/controls/labeled_emoji_tabs.style
     ui/widgets/color_editor.style
+    ui/widgets/marquee_label.style
     window/window_lock_widgets.style
     boxes/compose_ai_box.style
     boxes/connection_box.style
@@ -152,6 +154,7 @@ PRIVATE
     data/data_passkey_deserialize.h
     data/data_peer_colors.h
     data/data_premium_subscription_option.h
+    data/data_statistics.h
     data/data_statistics_chart.cpp
     data/data_statistics_chart.h
     data/data_subscriptions.h
@@ -172,6 +175,8 @@ PRIVATE
     dialogs/ui/dialogs_top_bar_suggestion_content.h
     dialogs/ui/posts_search_intro.cpp
     dialogs/ui/posts_search_intro.h
+    dialogs/ui/restore_windows_offer.cpp
+    dialogs/ui/restore_windows_offer.h
     dialogs/ui/top_peers_strip.cpp
     dialogs/ui/top_peers_strip.h
 
@@ -345,7 +350,11 @@ PRIVATE
     statistics/statistics_format_values.h
     statistics/statistics_graphics.cpp
     statistics/statistics_graphics.h
+    statistics/statistics_sheets.cpp
+    statistics/statistics_sheets.h
     statistics/statistics_types.h
+    statistics/statistics_xlsx.cpp
+    statistics/statistics_xlsx.h
     statistics/view/abstract_chart_view.cpp
     statistics/view/abstract_chart_view.h
     statistics/view/bar_chart_view.cpp
@@ -461,8 +470,14 @@ PRIVATE
     ui/chat/pinned_bar.h
     ui/chat/requests_bar.cpp
     ui/chat/requests_bar.h
+    ui/chat/torn_edge.cpp
+    ui/chat/torn_edge.h
+    ui/chat/unsupported_notice.cpp
+    ui/chat/unsupported_notice.h
     ui/controls/button_labels.cpp
     ui/controls/button_labels.h
+    ui/controls/call_button.cpp
+    ui/controls/call_button.h
     ui/controls/call_mute_button.cpp
     ui/controls/call_mute_button.h
     ui/controls/chat_service_checkbox.cpp
@@ -513,6 +528,8 @@ PRIVATE
     ui/controls/tabbed_search.h
     ui/controls/ton_common.cpp
     ui/controls/ton_common.h
+    ui/controls/ttl_media.cpp
+    ui/controls/ttl_media.h
     ui/controls/who_reacted_context_action.cpp
     ui/controls/who_reacted_context_action.h
     ui/controls/window_outdated_bar.cpp
@@ -520,6 +537,8 @@ PRIVATE
     ui/controls/window_outdated_bar.h
     ui/controls/window_screen_reader_bar.cpp
     ui/controls/window_screen_reader_bar.h
+    ui/effects/drifting_particles.cpp
+    ui/effects/drifting_particles.h
     ui/effects/fireworks_animation.cpp
     ui/effects/fireworks_animation.h
     ui/effects/glare.cpp
@@ -548,6 +567,8 @@ PRIVATE
     ui/effects/premium_diamond_renderer.h
     ui/effects/premium_graphics.cpp
     ui/effects/premium_graphics.h
+    ui/effects/premium_promo_particles.cpp
+    ui/effects/premium_promo_particles.h
     ui/effects/premium_star.cpp
     ui/effects/premium_star.h
     ui/effects/premium_star_model.cpp
@@ -574,10 +595,12 @@ PRIVATE
     ui/effects/snowflakes.h
     ui/effects/toggle_arrow.cpp
     ui/effects/toggle_arrow.h
-    ui/effects/upload_progress_overlay.cpp
-    ui/effects/upload_progress_overlay.h
     ui/effects/ttl_icon.cpp
     ui/effects/ttl_icon.h
+    ui/effects/unique_gift_message_bubble.cpp
+    ui/effects/unique_gift_message_bubble.h
+    ui/effects/upload_progress_overlay.cpp
+    ui/effects/upload_progress_overlay.h
     ui/search_field_controller.cpp
     ui/search_field_controller.h
     ui/text/format_song_name.cpp
@@ -616,10 +639,14 @@ PRIVATE
     ui/widgets/horizontal_fit_container.h
     ui/widgets/level_meter.cpp
     ui/widgets/level_meter.h
+    ui/widgets/marquee_label.cpp
+    ui/widgets/marquee_label.h
     ui/widgets/middle_click_autoscroll.cpp
     ui/widgets/middle_click_autoscroll.h
     ui/widgets/multi_select.cpp
     ui/widgets/multi_select.h
+    ui/widgets/selecting_scroll.cpp
+    ui/widgets/selecting_scroll.h
     ui/widgets/sent_code_field.cpp
     ui/widgets/sent_code_field.h
     ui/widgets/participants_check_view.cpp
@@ -640,6 +667,8 @@ PRIVATE
     ui/empty_userpic.h
     ui/grouped_layout.cpp
     ui/grouped_layout.h
+    ui/grouped_layout_geometry.cpp
+    ui/grouped_layout_geometry.h
     ui/new_badges.cpp
     ui/new_badges.h
     ui/peer/color_sample.cpp
@@ -706,5 +735,6 @@ PRIVATE
     desktop-app::lib_spellcheck
     desktop-app::lib_stripe
     desktop-app::external_kcoreaddons
+    desktop-app::external_minizip
     desktop-app::external_webrtc
 )

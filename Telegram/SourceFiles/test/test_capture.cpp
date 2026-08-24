@@ -12,6 +12,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "test/test_log.h"
 #include "ui/ui_utility.h"
 
+#include "styles/palette.h"
+
 #include <QtGui/QPainter>
 
 namespace Test {
@@ -19,6 +21,9 @@ namespace {
 
 constexpr auto kBlankSpreadThreshold = 6;
 constexpr auto kContactSheetGap = 8;
+constexpr auto kCoverageSamples = 32;
+constexpr auto kUnpaintedMinPermille = 100;
+constexpr auto kBackgroundOwnerHops = 6;
 
 [[nodiscard]] QString WithPngExtension(const QString &name) {
 	return name.endsWith(u".png"_q, Qt::CaseInsensitive)
@@ -51,10 +56,149 @@ constexpr auto kContactSheetGap = 8;
 		.arg(logicalRect.width());
 }
 
+[[nodiscard]] std::vector<QPoint> SamplePoints(const QSize &size) {
+	auto result = std::vector<QPoint>();
+	const auto columns = std::min(size.width(), kCoverageSamples);
+	const auto rows = std::min(size.height(), kCoverageSamples);
+	if (columns < 1 || rows < 1) {
+		return result;
+	}
+	result.reserve(columns * rows);
+	for (auto y = 0; y != rows; ++y) {
+		for (auto x = 0; x != columns; ++x) {
+			result.push_back(QPoint(
+				((2 * x + 1) * size.width()) / (2 * columns),
+				((2 * y + 1) * size.height()) / (2 * rows)));
+		}
+	}
+	return result;
+}
+
+[[nodiscard]] int SampledMatchPermille(
+		const QImage &image,
+		const QColor &color) {
+	const auto points = SamplePoints(image.size());
+	if (points.empty()) {
+		return 0;
+	}
+	const auto reference = color.rgb();
+	auto matched = 0;
+	for (const auto &point : points) {
+		if (image.pixelColor(point).rgb() == reference) {
+			++matched;
+		}
+	}
+	return (1000 * matched) / int(points.size());
+}
+
+[[nodiscard]] int UnpaintedPermille(
+		not_null<QWidget*> widget,
+		const QRect &logicalRect) {
+	if (widget->testAttribute(Qt::WA_OpaquePaintEvent)) {
+		return 0;
+	}
+	const auto rect = logicalRect.isEmpty()
+		? widget->rect()
+		: logicalRect.intersected(widget->rect());
+	if (rect.isEmpty()) {
+		return 0;
+	}
+	const auto firstSentinel = QColor(255, 0, 255);
+	const auto secondSentinel = QColor(0, 255, 0);
+	const auto first = Ui::GrabWidgetToImage(widget, rect, firstSentinel);
+	const auto second = Ui::GrabWidgetToImage(widget, rect, secondSentinel);
+	if (first.isNull() || first.size() != second.size()) {
+		return 0;
+	}
+	const auto points = SamplePoints(first.size());
+	if (points.empty()) {
+		return 0;
+	}
+	const auto firstRgb = firstSentinel.rgb();
+	const auto secondRgb = secondSentinel.rgb();
+	auto unpainted = 0;
+	for (const auto &point : points) {
+		if (first.pixelColor(point).rgb() == firstRgb
+			&& second.pixelColor(point).rgb() == secondRgb) {
+			++unpainted;
+		}
+	}
+	return (1000 * unpainted) / int(points.size());
+}
+
+[[nodiscard]] QString WidgetDescription(not_null<QWidget*> widget) {
+	const auto &instance = *widget;
+	return u"%1 %2"_q.arg(
+		QString::fromUtf8(typeid(instance).name()),
+		RectText(widget->geometry()));
+}
+
+[[nodiscard]] QString BackgroundOwnerDetails(
+		not_null<QWidget*> widget,
+		const QRect &logicalRect) {
+	const auto rect = logicalRect.isEmpty() ? widget->rect() : logicalRect;
+	const auto top = widget->window();
+	auto ancestor = (widget.get() == top) ? nullptr : widget->parentWidget();
+	for (auto hop = 0; ancestor && (hop != kBackgroundOwnerHops); ++hop) {
+		const auto mapped = Ui::MapFrom(ancestor, widget, rect)
+			.intersected(ancestor->rect());
+		if (!mapped.isEmpty()) {
+			const auto unpainted = UnpaintedPermille(ancestor, mapped);
+			if (unpainted < kUnpaintedMinPermille) {
+				return u"grab %1 instead (unpainted %2/1000)"_q
+					.arg(WidgetDescription(ancestor))
+					.arg(unpainted);
+			}
+		}
+		ancestor = (ancestor == top) ? nullptr : ancestor->parentWidget();
+	}
+	return u"no ancestor within %1 parents paints a background"_q
+		.arg(kBackgroundOwnerHops);
+}
+
+[[nodiscard]] QString BlankRootDetails(
+		not_null<QWidget*> widget,
+		const QImage &image,
+		const QRect &logicalRect,
+		bool logCoverage = true) {
+	if (image.isNull()
+		|| widget->testAttribute(Qt::WA_OpaquePaintEvent)
+		|| widget->testAttribute(Qt::WA_NoSystemBackground)) {
+		return QString();
+	}
+	const auto harnessThemeBase = st::windowBg->c;
+	const auto baseMatched = SampledMatchPermille(image, harnessThemeBase);
+	if (!baseMatched) {
+		return QString();
+	}
+	const auto unpainted = UnpaintedPermille(widget, logicalRect);
+	if (logCoverage) {
+		Note(u"capture coverage: harnessThemeBase=%1/1000 unpainted=%2/1000 "
+			u"(threshold %3/1000)"_q
+			.arg(baseMatched)
+			.arg(unpainted)
+			.arg(kUnpaintedMinPermille));
+	}
+	if (unpainted < kUnpaintedMinPermille) {
+		return QString();
+	}
+	return u"render root paints no background of its own: %1 has neither "
+		u"Qt::WA_OpaquePaintEvent nor Qt::WA_NoSystemBackground, and %2/1000 "
+		u"sampled points were painted by neither the widget nor its "
+		u"children; the harness theme base is active st::windowBg %3 "
+		u"(%4/1000 of the grab matches that base) "
+		u"- %5"_q
+		.arg(WidgetDescription(widget))
+		.arg(unpainted)
+		.arg(harnessThemeBase.name())
+		.arg(baseMatched)
+		.arg(BackgroundOwnerDetails(widget, logicalRect));
+}
+
 } // namespace
 
 QImage GrabWidget(not_null<QWidget*> widget) {
-	return widget->grab().toImage();
+	return Ui::GrabWidgetToImage(widget, QRect(), st::windowBg->c);
 }
 
 QImage GrabRect(
@@ -63,7 +207,7 @@ QImage GrabRect(
 	const auto bounded = logicalRect.intersected(widget->rect());
 	return bounded.isEmpty()
 		? QImage()
-		: widget->grab(bounded).toImage();
+		: Ui::GrabWidgetToImage(widget, bounded, st::windowBg->c);
 }
 
 bool LooksBlank(const QImage &image) {
@@ -85,6 +229,77 @@ bool LooksBlank(const QImage &image) {
 		}
 	}
 	return (maxLuma - minLuma) < kBlankSpreadThreshold;
+}
+
+bool PreparedWidgetCapture::prepare(QWidget *widget) {
+	_widget = nullptr;
+	_image = QImage();
+	_globalGeometry = QRect();
+	if (!widget) {
+		_pendingReason = u"target does not exist"_q;
+		return false;
+	} else if (!widget->isVisible()) {
+		_pendingReason = u"target is not visible: %1"_q.arg(
+			WidgetDescription(widget));
+		return false;
+	} else if (widget->size().isEmpty()) {
+		_pendingReason = u"target has empty geometry: %1"_q.arg(
+			WidgetDescription(widget));
+		return false;
+	}
+	const auto image = GrabWidget(widget);
+	if (LooksBlank(image)) {
+		_pendingReason = u"target grab still looks blank: %1"_q.arg(
+			WidgetDescription(widget));
+		return false;
+	}
+	const auto blankRoot = BlankRootDetails(widget, image, QRect(), false);
+	if (!blankRoot.isEmpty()) {
+		_pendingReason = blankRoot;
+		return false;
+	}
+	_widget = widget;
+	_image = image;
+	_globalGeometry = QRect(widget->mapToGlobal(QPoint()), widget->size());
+	_pendingReason = QString();
+	return true;
+}
+
+void PreparedWidgetCapture::invalidate(QString reason) {
+	_widget = nullptr;
+	_image = QImage();
+	_globalGeometry = QRect();
+	_pendingReason = std::move(reason);
+}
+
+bool PreparedWidgetCapture::save(const QString &name) {
+	if (!_widget || _image.isNull()) {
+		Fail(
+			u"prepared capture %1"_q.arg(name),
+			_pendingReason.isEmpty()
+				? u"no accepted frame"_q
+				: _pendingReason);
+		return false;
+	}
+	LogGeometry(name, _globalGeometry);
+	const auto path = SaveImage(_image, name);
+	if (path.isEmpty()) {
+		Fail(u"prepared capture %1"_q.arg(name), u"could not save image"_q);
+		return false;
+	}
+	return true;
+}
+
+QWidget *PreparedWidgetCapture::widget() const {
+	return _widget.data();
+}
+
+const QImage &PreparedWidgetCapture::image() const {
+	return _image;
+}
+
+QString PreparedWidgetCapture::pendingReason() const {
+	return _pendingReason;
 }
 
 QString SaveImage(const QImage &image, const QString &name) {
@@ -110,6 +325,11 @@ bool CaptureWidget(not_null<QWidget*> widget, const QString &name) {
 		Fail(u"capture %1"_q.arg(name), u"grabbed image looks blank"_q);
 		return false;
 	}
+	const auto blankRoot = BlankRootDetails(widget, image, QRect());
+	if (!blankRoot.isEmpty()) {
+		Fail(u"capture %1"_q.arg(name), blankRoot);
+		return false;
+	}
 	return !SaveImage(image, name).isEmpty();
 }
 
@@ -130,6 +350,11 @@ bool CaptureRect(
 	const auto image = GrabRect(widget, logicalRect);
 	if (LooksBlank(image)) {
 		Fail(u"capture %1"_q.arg(name), u"grabbed image looks blank"_q);
+		return false;
+	}
+	const auto blankRoot = BlankRootDetails(widget, image, logicalRect);
+	if (!blankRoot.isEmpty()) {
+		Fail(u"capture %1"_q.arg(name), blankRoot);
 		return false;
 	}
 	return !SaveImage(image, name).isEmpty();

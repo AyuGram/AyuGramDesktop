@@ -136,10 +136,16 @@ void SaveLastPlaybackPosition(
 		: (state.length >= limit * state.frequency)
 		? (state.position / state.frequency) * crl::time(1000)
 		: TimeId(0);
-	auto &session = document->session();
+	const auto &session = document->session();
 	if (session.local().mediaLastPlaybackPosition(document->id) != time) {
 		session.local().setMediaLastPlaybackPosition(document->id, time);
 	}
+}
+
+bool IsRealPlaybackContext(not_null<const HistoryItem*> item) {
+	return item->isRegular()
+		|| item->isScheduled()
+		|| item->isSavedMusicItem();
 }
 
 Instance::Streamed::Streamed(
@@ -325,7 +331,10 @@ void Instance::setSession(not_null<Data*> data, Main::Session *session) {
 
 		session->data().itemRemoved(
 		) | rpl::filter([=](not_null<const HistoryItem*> item) {
-			return (data->current.contextId() == item->fullId());
+			const auto document = data->current.audio();
+			return (data->current.contextId() == item->fullId())
+				&& (IsRealPlaybackContext(item)
+					|| (document && document->isVideoMessage()));
 		}) | rpl::on_next([=] {
 			stopAndClear(data);
 		}, data->sessionLifetime);
@@ -456,10 +465,7 @@ auto Instance::playlistKey(not_null<const Data*> data) const
 		return {};
 	}
 	const auto item = data->history->owner().message(contextId);
-	if (!item
-		|| (!item->isRegular()
-			&& !item->isScheduled()
-			&& !item->isSavedMusicItem())) {
+	if (!item || !IsRealPlaybackContext(item)) {
 		return {};
 	}
 

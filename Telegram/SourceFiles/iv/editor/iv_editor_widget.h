@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/unique_qptr.h"
 #include "base/flat_map.h"
+#include "iv/editor/iv_editor_button_box.h"
 #include "iv/editor/iv_editor_clipboard_import.h"
 #include "iv/editor/iv_editor_state.h"
 #include "iv/markdown/iv_markdown_article.h"
@@ -134,10 +135,11 @@ public:
 	void refreshPreparedLeafAtActiveSource();
 	void applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation);
 	void syncInlineFieldGeometry();
+	[[nodiscard]] bool canInsertListAtCaret() const;
 	void insertBlock(State::InsertAction action);
 	void requestMedia(
 		std::optional<State::ReplaceTarget> replaceTarget,
-		RequestMediaType type = RequestMediaType::PhotoVideoAudio);
+		RequestMediaType type);
 	void insertPreparedBlock(RichPage::Block block);
 	void replacePreparedBlock(State::ReplaceTarget target, RichPage::Block block);
 	void insertPreparedBlocks(std::vector<RichPage::Block> blocks);
@@ -213,6 +215,7 @@ public:
 	void applyToolbarFormatAction(ToolbarFormatAction action);
 	void editLinkFromToolbar();
 	void editMathFromToolbar();
+	void editButtonFromToolbar();
 	[[nodiscard]] bool inlineToolbarModeActive() const;
 	struct ActiveBlockInfo {
 		RichPage::BlockKind kind = RichPage::BlockKind::Unsupported;
@@ -459,6 +462,11 @@ private:
 		Skip,
 	};
 
+	enum class LimitToast {
+		Show,
+		Skip,
+	};
+
 	void setDocument(const Markdown::MarkdownArticleContent &prepared);
 	void activateTextOrdinal(
 		int ordinal,
@@ -491,7 +499,7 @@ private:
 	void refreshInlineFieldPlaceholderColor();
 	void refreshInlineFieldTextEmptyOverride();
 	void refreshInlineFieldMaxLineWidthOverride();
-	void activateTrailingParagraph();
+	void activateTrailingParagraph(LimitToast toast = LimitToast::Show);
 	void setInlineFieldFromActiveState(int selectionFrom, int selectionTo);
 	void revertInlineFieldToState();
 	struct MathEditRequest {
@@ -502,6 +510,22 @@ private:
 		bool allowSeparateLine = false;
 		bool separateLine = false;
 		bool insertNewDisplayBlock = false;
+	};
+	struct ButtonEditRequest {
+		enum class Target : uchar {
+			CreateInline,
+			InlineToken,
+			RowButton,
+			AppendToRow,
+		};
+		Target target = Target::CreateInline;
+		RichButtonEditData data;
+		Markdown::PreparedEditBlockSource block;
+		int ordinal = -1;
+		int offset = -1;
+		int buttonIndex = -1;
+		bool editingExisting = false;
+		bool allowSeparateLine = false;
 	};
 	[[nodiscard]] std::optional<State::ActiveTextInsertContext>
 	activeTextInsertContext() const;
@@ -519,6 +543,21 @@ private:
 		bool useStructuralSelection = true);
 	[[nodiscard]] std::optional<MathEditRequest> activeMathEditRequest() const;
 	[[nodiscard]] MathEditRequest newDisplayMathRequest() const;
+	[[nodiscard]] auto inlineButtonEditRequestFromArticleHit(
+		const Markdown::MarkdownArticleHitTestResult &hit) const
+	-> std::optional<ButtonEditRequest>;
+	[[nodiscard]] auto inlineButtonEditRequestFromFieldPoint(
+		QPoint globalPoint) const
+	-> std::optional<ButtonEditRequest>;
+	[[nodiscard]] std::optional<ButtonEditRequest> rowButtonEditRequest(
+		const Markdown::PreparedEditBlockSource &block,
+		int index) const;
+	[[nodiscard]] static ButtonEditRequest MakeInlineButtonEditRequest(
+		int ordinal,
+		int offset,
+		const Markdown::InlineTextObjectButtonData &button);
+	[[nodiscard]] int fieldTextOffsetForCursorPosition(int position) const;
+	[[nodiscard]] int cursorPositionForFieldTextOffset(int offset) const;
 	[[nodiscard]] int richOffsetForFieldOffset(
 		const TextWithEntities &text,
 		int offset) const;
@@ -531,6 +570,12 @@ private:
 	[[nodiscard]] State::ApplyResult applyMathEditResult(
 		const MathEditRequest &request,
 		MathEditResult result);
+	[[nodiscard]] State::ApplyResult applyButtonEditResult(
+		const ButtonEditRequest &request,
+		RichButtonEditResult result);
+	[[nodiscard]] State::ApplyResult applyMutationWithFieldCommit(
+		Fn<State::ApplyResult()> mutate,
+		Fn<void()> afterRefresh);
 	bool showLastLimitToast();
 	void hideInlineField();
 	void acceptInlineField();
@@ -558,17 +603,23 @@ private:
 	[[nodiscard]] bool handleFieldBlockInsertShortcut(QKeyEvent *e);
 	[[nodiscard]] bool handleStructuralBlockInsertShortcut(QKeyEvent *e);
 	[[nodiscard]] bool handleHardcodedBlockShortcut(QKeyEvent *e);
+	[[nodiscard]] bool handleBroaderFormatShortcut(QKeyEvent *e);
+	[[nodiscard]] bool activeLeafIsTableCell() const;
 	[[nodiscard]] bool fieldMonospaceShortcutUsesCodeBlock() const;
 	[[nodiscard]] bool structuralMonospaceShortcutTargetsCodeBlock() const;
 	void applyFieldMonospaceAction();
+	void toggleFieldMonospaceLineByLine();
 	void applyStructuralMonospaceAction();
 	void insertCodeBlock();
 	[[nodiscard]] bool handleFieldKey(QKeyEvent *e);
+
+	[[nodiscard]] bool handleFieldInputRule(QKeyEvent *e);
+	[[nodiscard]] bool undoLastInputRule();
 	struct VerticalNavigationTarget {
 		int ordinal = -1;
 		int offset = 0;
 	};
-	[[nodiscard]] bool commitAndActivateTextOrdinal(
+	bool commitAndActivateTextOrdinal(
 		int ordinal,
 		int selectionFrom,
 		int selectionTo,
@@ -597,7 +648,7 @@ private:
 	[[nodiscard]] bool enterStructuralSelectionFromField(
 		bool forward,
 		bool page);
-	[[nodiscard]] bool adjustStructuralSelectionFromKeyboard(
+	bool adjustStructuralSelectionFromKeyboard(
 		bool forward,
 		bool page);
 	[[nodiscard]] bool restoreFieldFromBoundaryOrigin();
@@ -611,11 +662,17 @@ private:
 	void pasteImportedTable(TableImportResult &&imported);
 	[[nodiscard]] std::optional<BlocksImportResult> importBlocksFromMimeData(
 		not_null<const QMimeData*> data) const;
+	[[nodiscard]] auto markdownForLiteralHtmlImport(
+		const BlocksImportResult &imported,
+		not_null<const QMimeData*> data) const
+	-> std::optional<BlocksImportResult>;
 	void pasteImportedBlocks(BlocksImportResult &&imported);
 	void resolveImportedLocalMedia(BlocksImportResult &&imported);
 	[[nodiscard]] bool handleIvClipboardMime(
 		not_null<const QMimeData*> data,
 		Ui::InputField::MimeAction action);
+	void offerPlainMarkdownPaste(const QString &text);
+	void undoMarkdownPaste(const QString &text, const RichPage &pasted);
 	[[nodiscard]] bool moveBoundary(bool forward, bool allowTrailing);
 
 	// At the very first text node with no editable node above, inserts an
@@ -631,10 +688,13 @@ private:
 		bool allowTrailing,
 		bool *mutated = nullptr);
 	[[nodiscard]] bool moveTabBoundary(bool forward);
+	[[nodiscard]] bool moveListItemDepth(bool deeper);
+	[[nodiscard]] bool resetActiveBlockType();
 	[[nodiscard]] bool removeBoundaryOwner(bool forward);
 	void ensurePendingActivation();
 	void updateInlineFieldHeightOverride();
 	void showMathEditBox(MathEditRequest request);
+	void showButtonEditBox(ButtonEditRequest request);
 	void clearDisplayMathEditSession();
 	void clearInlineFieldEditSession(
 		bool keepRetainedFieldOnCurrentHistoryEntry = false);
@@ -666,6 +726,7 @@ private:
 		return result;
 	}
 	void truncateHistoryRedo();
+	void resetMutationHistory();
 	[[nodiscard]] bool activeInlineFieldTextMatchesState() const;
 	[[nodiscard]] bool canPerformFieldUndoRedo(bool redo) const;
 	[[nodiscard]] bool canPerformHistoryUndoRedo(bool redo) const;
@@ -742,6 +803,8 @@ private:
 	broaderSelectionTextSpans() const;
 	[[nodiscard]] std::vector<State::BlockPath>
 	broaderSelectionMediaBlocks() const;
+	[[nodiscard]] Markdown::PreparedEditSelection
+	structuralSelectionForTextSelection() const;
 	[[nodiscard]] bool hasStructuralSelection() const;
 	void startArticleSelection(
 		QPoint pressPoint,
@@ -776,8 +839,8 @@ private:
 		const Markdown::PreparedEditHit &editHit);
 	void updateArticleSelectionDragAtWidgetPoint(QPoint widgetPoint);
 	void updateArticleSelectionDragFromCursor();
-	[[nodiscard]] bool applyStructuralSelectionDrop();
-	[[nodiscard]] bool applyInlineSelectionDrop();
+	void applyStructuralSelectionDrop();
+	void applyInlineSelectionDrop();
 	[[nodiscard]] bool handleStructuralSelectionKey(QKeyEvent *e);
 	void addFieldBlockFormatActions(not_null<QMenu*> menu);
 	void handleFieldContextMenuRequest(
@@ -810,6 +873,8 @@ private:
 	void applyTableChange(Fn<bool()> change);
 	[[nodiscard]] std::optional<State::BlockPath> simpleMediaBlockPathFromHit(
 		const Markdown::PreparedEditHit &hit) const;
+	[[nodiscard]] std::optional<State::BlockPath> documentRowBlockPathFromHit(
+		const Markdown::PreparedEditHit &hit) const;
 	[[nodiscard]] std::optional<State::BlockPath> groupedMediaBlockPathFromHit(
 		const Markdown::PreparedEditHit &hit) const;
 	[[nodiscard]] bool structuralPhotoVideoSelectionAvailable() const;
@@ -820,13 +885,24 @@ private:
 		const State::BlockPath &path,
 		int itemIndex,
 		QPoint globalPos);
+	void showRowButtonMenu(
+		const Markdown::PreparedEditBlockSource &block,
+		int index,
+		bool disabled,
+		QPoint globalPos);
+	void removeRowButton(
+		const Markdown::PreparedEditBlockSource &block,
+		int index);
+	void showButtonRowMenu(
+		const Markdown::PreparedEditBlockSource &block,
+		QPoint globalPos);
 	void showStructuralPhotoVideoMenu(QPoint globalPos);
 	[[nodiscard]] bool showMediaMenuFromHit(
 		const Markdown::PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
 		QPoint globalPos,
 		MediaClickKind clickKind);
-	[[nodiscard]] bool activateGroupedMediaLinkFromHit(
+	[[nodiscard]] bool activateMediaBlockLinkFromHit(
 		const Markdown::PreparedEditHit &hit,
 		const Markdown::MarkdownArticleHitTestResult &articleHit,
 		Qt::MouseButton button);
@@ -839,7 +915,16 @@ private:
 	bool applyGroupedMediaChangePreservingActiveIndex(
 		const State::BlockPath &path,
 		Fn<bool()> change);
+	[[nodiscard]] std::optional<State::ReplaceTarget> replaceTargetForMedia(
+		const State::BlockPath &path,
+		int itemIndex) const;
 	void requestReplaceMedia(State::BlockPath path);
+	void requestReplaceGroupedItem(State::BlockPath path, int itemIndex);
+	void addReplaceFromClipboardAction(
+		not_null<Ui::PopupMenu*> menu,
+		State::BlockPath path,
+		int itemIndex);
+	void replaceMediaFromClipboard(State::BlockPath path, int itemIndex);
 	void editPhotoBlock(State::BlockPath path);
 	void editGroupedItemPhoto(State::BlockPath path, int itemIndex);
 	void openPhotoEditor(
@@ -851,6 +936,7 @@ private:
 		bool spoiler,
 		State::ReplaceTarget target);
 	void paintMediaControls(Painter &p, QPoint topLeft);
+	void paintButtonRowControls(Painter &p, QPoint topLeft);
 	struct MediaControlLayout {
 		QRect threeDots;
 		QRect plus;
@@ -938,6 +1024,12 @@ private:
 	int _activeDisplayMathBaselineHeight = 0;
 	int _pendingOrdinal = -1;
 	int _pendingCursorOffset = 0;
+	struct InputRuleUndo {
+		int historyIndex = -1;
+		State::LeafPath leaf;
+		QString text;
+	};
+	std::optional<InputRuleUndo> _inputRuleUndo;
 	std::vector<HistoryEntry> _history;
 	int _historyIndex = -1;
 	std::vector<RetainedLeafField> _retainedLeafFields;
@@ -963,6 +1055,7 @@ private:
 	Ui::DraggingScrollManager _selectScroll;
 	std::optional<Qt::Orientation> _horizontalScrollLock;
 	bool _settingField = false;
+	bool _preparedContentStaleAfterCommit = false;
 	bool _trackingPointerPress = false;
 	bool _inlineFieldExternalInteractionActive = false;
 	bool _keyboardStructuralSelectionActive = false;
@@ -970,6 +1063,8 @@ private:
 	std::optional<QPoint> _pressedControlPoint;
 	PressedMediaControl _pressedMediaControl;
 	std::optional<QPoint> _pressedMediaControlPoint;
+	std::optional<ButtonEditRequest> _pressedInlineButton;
+	std::optional<QPoint> _pressedInlineButtonPoint;
 	HorizontalScrollDrag _horizontalScrollDrag = HorizontalScrollDrag::None;
 	std::optional<QPoint> _pendingTouchHorizontalScrollPoint;
 	bool _syncingInlineFieldGeometry = false;

@@ -74,7 +74,7 @@ enum class IvHistoryViewMediaKind {
 	Photo,
 	Document,
 	Map,
-	Audio,
+	DocumentRow,
 	GroupedMedia,
 	Slideshow,
 };
@@ -113,9 +113,9 @@ public:
 	using VideoFactory = std::function<std::shared_ptr<MediaBlock>(
 		Window::SessionController *controller,
 		const PreparedVideoBlockData &prepared)>;
-	using AudioFactory = std::function<std::shared_ptr<MediaBlock>(
+	using DocumentBlockFactory = std::function<std::shared_ptr<MediaBlock>(
 		Window::SessionController *controller,
-		const PreparedAudioBlockData &prepared)>;
+		const PreparedDocumentBlockData &prepared)>;
 	using MapFactory = std::function<std::shared_ptr<MediaBlock>(
 		Window::SessionController *controller,
 		const PreparedMapBlockData &prepared)>;
@@ -127,7 +127,7 @@ public:
 		base::weak_ptr<Window::SessionController> controller,
 		PhotoFactory createPhoto = {},
 		VideoFactory createVideo = {},
-		AudioFactory createAudio = {},
+		DocumentBlockFactory createDocument = {},
 		MapFactory createMap = {},
 		GroupedMediaFactory createGroupedMedia = {});
 
@@ -135,8 +135,8 @@ public:
 		const PreparedPhotoBlockData &prepared) const override;
 	[[nodiscard]] std::shared_ptr<MediaBlock> createVideo(
 		const PreparedVideoBlockData &prepared) const override;
-	[[nodiscard]] std::shared_ptr<MediaBlock> createAudio(
-		const PreparedAudioBlockData &prepared) const override;
+	[[nodiscard]] std::shared_ptr<MediaBlock> createDocument(
+		const PreparedDocumentBlockData &prepared) const override;
 	[[nodiscard]] std::shared_ptr<MediaBlock> createMap(
 		const PreparedMapBlockData &prepared) const override;
 	[[nodiscard]] std::shared_ptr<MediaBlock> createGroupedMedia(
@@ -151,9 +151,10 @@ private:
 	const base::weak_ptr<Window::SessionController> _controller;
 	const PhotoFactory _createPhoto;
 	const VideoFactory _createVideo;
-	const AudioFactory _createAudio;
+	const DocumentBlockFactory _createDocument;
 	const MapFactory _createMap;
 	const GroupedMediaFactory _createGroupedMedia;
+
 };
 
 template <typename Prepared, typename Factory>

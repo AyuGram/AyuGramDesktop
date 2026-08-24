@@ -13,12 +13,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/markdown/iv_markdown_article_paint.h"
 #include "iv/markdown/iv_markdown_article_selection.h"
 #include "iv/markdown/iv_markdown_article_text.h"
+#include "iv/markdown/iv_markdown_button_row.h"
 #include "iv/markdown/iv_markdown_media_reuse.h"
 #include "iv/markdown/iv_markdown_prepare_links.h"
 #include "iv/markdown/iv_markdown_prepare_serialize.h"
 #include "lang/lang_keys.h"
 #include "ui/style/style_core_color.h"
 #include "ui/style/style_core_scale.h"
+#include "ui/text/text_extended_data.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/dynamic_image.h"
@@ -162,6 +164,7 @@ struct MarkdownArticleHorizontalScrollLookup {
 		bool rtl) {
 	auto result = CachedTextLeafSourceSignature();
 	result.dependsOnMediaRuntime = TextDependsOnMediaRuntime(text);
+	result.dependsOnInlineButtonColumn = TextHasInlineButton(text);
 	result.text = std::move(text);
 	result.minResizeWidth = minResizeWidth;
 	result.styleKey = TextStyleKey(textStyle);
@@ -274,12 +277,13 @@ void StoreCachedTextLeaf(
 	*leaf = Ui::Text::String();
 }
 
-void PruneMediaRuntimeBoundCachedTextLeafs(CachedTextLeafPool *pool) {
+template <typename Predicate>
+void PruneCachedTextLeafs(CachedTextLeafPool *pool, Predicate &&unusable) {
 	if (!pool) {
 		return;
 	}
 	for (auto i = pool->entries.begin(); i != pool->entries.end();) {
-		if (i->second.source.dependsOnMediaRuntime) {
+		if (unusable(i->second)) {
 			i = pool->entries.erase(i);
 		} else {
 			++i;
@@ -324,12 +328,17 @@ void HarvestCachedTextLeafs(
 		bool rtl) {
 	const auto storeBlockLeaf = [&](CachedTextLeafSlot slot,
 			CachedTextLeafSourceSignature source,
-			Ui::Text::String *leaf) {
+			Ui::Text::String *leaf,
+			Spellchecker::HighlightProcessId syntaxHighlightProcessId = 0) {
+		if (source.dependsOnInlineButtonColumn) {
+			source.inlineButtonWidthCap = block->inlineButtonWidthCap;
+		}
 		StoreCachedTextLeaf(
 			pool,
 			BlockCachedTextLeafKey(slot, prepared, preparedPath),
 			std::move(source),
-			leaf);
+			leaf,
+			syntaxHighlightProcessId);
 	};
 	const auto storeTableCellLeaf = [&](
 			CachedTextLeafSlot slot,
@@ -338,6 +347,9 @@ void HarvestCachedTextLeafs(
 			int tableCellIndex,
 			CachedTextLeafSourceSignature source,
 			Ui::Text::String *leaf) {
+		if (source.dependsOnInlineButtonColumn) {
+			source.inlineButtonWidthCap = block->inlineButtonWidthCap;
+		}
 		StoreCachedTextLeaf(
 			pool,
 			TableCellCachedTextLeafKey(
@@ -390,12 +402,8 @@ void HarvestCachedTextLeafs(
 			&block->placeholderLeaf);
 	} break;
 	case PreparedBlockKind::CodeBlock:
-		StoreCachedTextLeaf(
-			pool,
-			BlockCachedTextLeafKey(
-				CachedTextLeafSlot::Leaf,
-				prepared,
-				preparedPath),
+		storeBlockLeaf(
+			CachedTextLeafSlot::Leaf,
 			CodeTextLeafSourceSignature(prepared, st),
 			&block->leaf,
 			block->syntaxHighlightProcessId);
@@ -584,7 +592,7 @@ void HarvestCachedTextLeafs(
 		break;
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -606,6 +614,7 @@ void HarvestCachedTextLeafs(
 			&block->placeholderLeaf);
 		break;
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::Quote:
 	case PreparedBlockKind::List:
 	case PreparedBlockKind::ListItem:
@@ -807,6 +816,54 @@ void CollectPlaceholderIds(
 			return &block;
 		}
 		if (const auto child = FindPlaceholderBlock(&block.children, id)) {
+			return child;
+		}
+	}
+	return nullptr;
+}
+
+void CollectButtonRowIds(
+		const std::vector<LaidOutBlock> &blocks,
+		std::unordered_set<uint64> *result) {
+	if (!result) {
+		return;
+	}
+	for (const auto &block : blocks) {
+		if (block.buttonRowId) {
+			result->emplace(block.buttonRowId.value);
+		}
+		CollectButtonRowIds(block.children, result);
+	}
+}
+
+[[nodiscard]] LaidOutBlock *FindButtonRowBlock(
+		std::vector<LaidOutBlock> *blocks,
+		PreparedMediaBlockId id) {
+	if (!blocks || !id) {
+		return nullptr;
+	}
+	for (auto &block : *blocks) {
+		if (block.buttonRowId.value == id.value) {
+			return &block;
+		}
+		if (const auto child = FindButtonRowBlock(&block.children, id)) {
+			return child;
+		}
+	}
+	return nullptr;
+}
+
+[[nodiscard]] const LaidOutBlock *FindButtonRowBlock(
+		const std::vector<LaidOutBlock> &blocks,
+		PreparedMediaBlockId id) {
+	if (!id) {
+		return nullptr;
+	}
+	for (const auto &block : blocks) {
+		if (block.buttonRowId.value == id.value) {
+			return &block;
+		}
+		if (const auto child = FindButtonRowBlock(block.children, id)) {
 			return child;
 		}
 	}
@@ -1086,6 +1143,7 @@ void AppendBlockRevealLines(
 			block.textWidth);
 		break;
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 		AppendGenericRevealBand(lines, block.outer);
 		break;
 	case PreparedBlockKind::List:
@@ -1104,7 +1162,7 @@ void AppendBlockRevealLines(
 		break;
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -1343,6 +1401,12 @@ void RebuildVisibleSegmentLookup(
 	}
 	result.preparedLink = ExtractPreparedLink(result.state.link);
 	if (!result.preparedLink
+		&& dynamic_cast<Ui::Text::CustomEmojiClickHandler*>(
+			result.state.link.get())) {
+		result.inlineButton = point;
+	}
+	if (!result.preparedLink
+		&& !result.inlineButton
 		&& (flags & Ui::Text::StateRequest::Flag::LookupLink)) {
 		if (const auto prepared = PreparedLinkForDetailsBlock(segment)) {
 			result.preparedLink = prepared;
@@ -1397,7 +1461,26 @@ void RebuildVisibleSegmentLookup(
 		}
 	};
 	if (segment.block) {
-		if (segment.block->kind == PreparedBlockKind::RelatedArticle
+		if (segment.block->kind == PreparedBlockKind::ButtonRow) {
+			const auto index = ButtonRowHitIndex(
+				segment.block->buttons,
+				point);
+			if (index >= 0) {
+				const auto &button = segment.block->buttons[index];
+				const auto &runtime = segment.block->buttonRowRuntime;
+				if (runtime && (index < int(runtime->handlers.size()))) {
+					result.state.link = runtime->handlers[index];
+				}
+				result.buttonRow = {
+					.id = segment.block->buttonRowId,
+					.localPoint = point - button.rect.topLeft(),
+					.index = index,
+				};
+				if (button.elided) {
+					result.customTooltip = button.fullLabel;
+				}
+			}
+		} else if (segment.block->kind == PreparedBlockKind::RelatedArticle
 			&& segment.block->preparedLink) {
 			result.preparedLink = segment.block->preparedLink;
 			result.state.link = segment.block->preparedLinkHandler;
@@ -1411,8 +1494,14 @@ void RebuildVisibleSegmentLookup(
 				applyActivation(segment.block->mediaBlock->activationAt(point));
 			}
 		} else {
-			applyActivation(segment.block->activation);
-			if (result.mediaActivation.kind == MediaActivationKind::Embed
+			const auto unsupported = (segment.block->activation.kind
+				== MediaActivationKind::UnsupportedBlock);
+			if (!unsupported || segment.block->mediaRect.contains(point)) {
+				applyActivation(segment.block->activation);
+			}
+			const auto kind = result.mediaActivation.kind;
+			if ((kind == MediaActivationKind::Embed
+				|| kind == MediaActivationKind::UnsupportedBlock)
 				&& segment.block->placeholderRuntime) {
 				result.state.link = segment.block->placeholderRuntime->clickHandler;
 				result.placeholderLocalPoint = point
@@ -1420,7 +1509,8 @@ void RebuildVisibleSegmentLookup(
 			}
 		}
 	}
-	result.direct = true;
+	result.direct = !segment.block
+		|| (segment.block->kind != PreparedBlockKind::ButtonRow);
 	return result;
 }
 
@@ -1454,6 +1544,27 @@ void RebuildVisibleSegmentLookup(
 
 [[nodiscard]] bool ContainsPoint(QRect rect, QPoint point) {
 	return !rect.isEmpty() && rect.contains(point);
+}
+
+[[nodiscard]] std::optional<PreparedLink> CollapsibleQuoteToggleAt(
+		const std::vector<LaidOutBlock> &blocks,
+		QPoint point) {
+	for (const auto &block : blocks) {
+		if (!ContainsPoint(block.outer, point)) {
+			continue;
+		}
+		if (auto nested = CollapsibleQuoteToggleAt(block.children, point)) {
+			return nested;
+		}
+		if (QuoteHasCollapseControl(block)) {
+			return PreparedLink{
+				.kind = PreparedLinkKind::ToggleBlockquote,
+				.target = block.collapseToggleId,
+			};
+		}
+		break;
+	}
+	return std::nullopt;
 }
 
 struct ActiveHorizontalScrollOwnerState {
@@ -1519,6 +1630,8 @@ void RestoreLogicalBlockGeometry(LaidOutBlock *block) {
 	block->actionRect = block->logicalGeometry.actionRect;
 	block->markerRect = block->logicalGeometry.markerRect;
 	block->contentRect = block->logicalGeometry.contentRect;
+	block->collapseControlRect = block->logicalGeometry.collapseControlRect;
+	block->buttonRowControlRect = block->logicalGeometry.buttonRowControlRect;
 	block->formulaRect = block->logicalGeometry.formulaRect;
 	block->tableRect = block->logicalGeometry.tableRect;
 	block->mediaRect = block->logicalGeometry.mediaRect;
@@ -1540,6 +1653,11 @@ void RestoreLogicalBlockGeometry(LaidOutBlock *block) {
 			cell.textRect = cell.logicalTextRect;
 		}
 	}
+	for (auto &button : block->buttons) {
+		button.rect = button.logicalRect;
+		button.labelRect = button.logicalLabelRect;
+		button.iconRect = button.logicalIconRect;
+	}
 }
 
 [[nodiscard]] bool ScrollOwnerMovesOwnContent(PreparedBlockKind kind) {
@@ -1552,12 +1670,13 @@ void RestoreLogicalBlockGeometry(LaidOutBlock *block) {
 	case PreparedBlockKind::Table:
 		return true;
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::List:
 	case PreparedBlockKind::ListItem:
 	case PreparedBlockKind::Quote:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -1583,11 +1702,12 @@ void RestoreLogicalBlockGeometry(LaidOutBlock *block) {
 	case PreparedBlockKind::Heading:
 	case PreparedBlockKind::CodeBlock:
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::DisplayMath:
 	case PreparedBlockKind::Table:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -1625,6 +1745,12 @@ void ApplyTranslatedDescendantGeometry(
 	block->markerRect = ClipRectToViewport(
 		TranslateRect(block->markerRect, state.shift),
 		state.viewport);
+	block->collapseControlRect = ClipRectToViewport(
+		TranslateRect(block->collapseControlRect, state.shift),
+		state.viewport);
+	block->buttonRowControlRect = ClipRectToViewport(
+		TranslateRect(block->buttonRowControlRect, state.shift),
+		state.viewport);
 	block->formulaRect = TranslateRect(block->formulaRect, state.shift);
 	block->tableRect = TranslateRect(block->tableRect, state.shift);
 	block->mediaRect = TranslateRect(block->mediaRect, state.shift);
@@ -1651,6 +1777,13 @@ void ApplyTranslatedDescendantGeometry(
 				state.viewport);
 			cell.textRect = TranslateRect(cell.logicalTextRect, state.shift);
 		}
+	}
+	for (auto &button : block->buttons) {
+		button.rect = TranslateRect(button.logicalRect, state.shift);
+		button.labelRect = TranslateRect(
+			button.logicalLabelRect,
+			state.shift);
+		button.iconRect = TranslateRect(button.logicalIconRect, state.shift);
 	}
 }
 
@@ -1691,12 +1824,13 @@ void ApplyOwnerContentGeometry(
 		}
 		break;
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::List:
 	case PreparedBlockKind::ListItem:
 	case PreparedBlockKind::Quote:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -1886,7 +2020,7 @@ void CollectMediaBlockGeometries(
 	for (const auto &block : blocks) {
 		const auto media = (block.kind == PreparedBlockKind::Photo)
 			|| (block.kind == PreparedBlockKind::Video)
-			|| (block.kind == PreparedBlockKind::Audio)
+			|| (block.kind == PreparedBlockKind::Document)
 			|| (block.kind == PreparedBlockKind::Map)
 			|| (block.kind == PreparedBlockKind::GroupedMedia);
 		if (media && block.editBlock) {
@@ -1911,6 +2045,47 @@ void CollectMediaBlockGeometries(
 			CollectMediaBlockGeometries(out, block.children);
 		}
 	}
+}
+
+[[nodiscard]] bool ButtonRowControlFullyVisible(const LaidOutBlock &block) {
+	return !block.buttonRowControlRect.isEmpty()
+		&& (block.buttonRowControlRect.width()
+			== block.logicalGeometry.buttonRowControlRect.width());
+}
+
+void CollectButtonRowControlRects(
+		std::vector<QRect> *out,
+		const std::vector<LaidOutBlock> &blocks) {
+	for (const auto &block : blocks) {
+		if (ButtonRowControlFullyVisible(block)) {
+			out->push_back(block.buttonRowControlRect);
+		}
+		if (!block.children.empty()) {
+			CollectButtonRowControlRects(out, block.children);
+		}
+	}
+}
+
+void CollectUnsupportedNoticeRects(
+		std::vector<QRect> *out,
+		const std::vector<LaidOutBlock> &blocks) {
+	for (const auto &block : blocks) {
+		if (block.activation.kind == MediaActivationKind::UnsupportedBlock) {
+			out->push_back(block.outer);
+		}
+	}
+}
+
+[[nodiscard]] bool PreparedBlocksHaveUnsupportedNotices(
+		const std::vector<PreparedBlock> &blocks) {
+	for (const auto &block : blocks) {
+		if ((block.kind == PreparedBlockKind::Placeholder)
+			&& (block.placeholder.intent
+				== PlaceholderIntent::UnsupportedBlock)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 [[nodiscard]] PreparedEditHit EditFallbackHitForBlock(
@@ -1939,11 +2114,12 @@ void CollectMediaBlockGeometries(
 	case PreparedBlockKind::Thinking:
 	case PreparedBlockKind::Heading:
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::DisplayMath:
 	case PreparedBlockKind::Table:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -2117,6 +2293,85 @@ void CollectMediaBlockGeometries(
 	return {};
 }
 
+[[nodiscard]] MarkdownArticleEditControlHit EditControlHitForQuoteBlock(
+		const LaidOutBlock &block,
+		QPoint point) {
+	if (block.editBlock
+		&& QuoteHasCollapseControl(block)
+		&& (block.collapsedAtomic
+			|| ContainsPoint(block.collapseControlRect, point))) {
+		return {
+			.kind = MarkdownArticleEditControlHitKind::QuoteCollapse,
+			.block = *block.editBlock,
+		};
+	}
+	if (!block.children.empty()) {
+		return EditControlHitForBlocks(block.children, point);
+	}
+	return {};
+}
+
+[[nodiscard]] MarkdownArticleButtonRowButtonHit ButtonRowButtonHitForBlocks(
+	const std::vector<LaidOutBlock> &blocks,
+	QPoint point);
+
+[[nodiscard]] MarkdownArticleButtonRowButtonHit ButtonRowButtonHitForBlock(
+		const LaidOutBlock &block,
+		QPoint point) {
+	if (block.kind != PreparedBlockKind::ButtonRow) {
+		if (!block.children.empty()) {
+			return ButtonRowButtonHitForBlocks(block.children, point);
+		}
+		return {};
+	} else if (!block.editBlock) {
+		return {};
+	}
+	const auto index = ButtonRowHitIndex(block.buttons, point);
+	if (index < 0) {
+		return {};
+	}
+	return {
+		.block = *block.editBlock,
+		.index = index,
+		.disabled = (block.buttons[index].type
+			== HistoryMessageMarkupButton::Type::Disabled),
+	};
+}
+
+[[nodiscard]] MarkdownArticleButtonRowButtonHit ButtonRowButtonHitForBlocks(
+		const std::vector<LaidOutBlock> &blocks,
+		QPoint point) {
+	for (const auto &block : blocks) {
+		if (ContainsPoint(block.outer, point)) {
+			return ButtonRowButtonHitForBlock(block, point);
+		}
+	}
+	return {};
+}
+
+[[nodiscard]] MarkdownArticleEditControlHit EditControlHitForButtonRowBlock(
+		const LaidOutBlock &block,
+		QPoint point) {
+	if (!block.editBlock) {
+		return {};
+	} else if (ButtonRowControlFullyVisible(block)
+		&& ContainsPoint(block.buttonRowControlRect, point)) {
+		return {
+			.kind = MarkdownArticleEditControlHitKind::ButtonRowMenu,
+			.block = *block.editBlock,
+		};
+	}
+	const auto hit = ButtonRowButtonHitForBlock(block, point);
+	if (!hit.valid() || hit.disabled) {
+		return {};
+	}
+	return {
+		.kind = MarkdownArticleEditControlHitKind::ButtonEdit,
+		.block = *hit.block,
+		.buttonIndex = hit.index,
+	};
+}
+
 [[nodiscard]] MarkdownArticleEditControlHit EditControlHitForBlock(
 		const LaidOutBlock &block,
 		QPoint point) {
@@ -2125,6 +2380,10 @@ void CollectMediaBlockGeometries(
 		return EditControlHitForListItemBlock(block, point);
 	case PreparedBlockKind::Details:
 		return EditControlHitForDetailsBlock(block, point);
+	case PreparedBlockKind::Quote:
+		return EditControlHitForQuoteBlock(block, point);
+	case PreparedBlockKind::ButtonRow:
+		return EditControlHitForButtonRowBlock(block, point);
 	default:
 		if (!block.children.empty()) {
 			return EditControlHitForBlocks(block.children, point);
@@ -2168,9 +2427,10 @@ void CollectMediaBlockGeometries(
 	case PreparedBlockKind::Heading:
 	case PreparedBlockKind::CodeBlock:
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -2493,7 +2753,7 @@ void AddSelectedBlockRects(
 	}
 }
 
-[[nodiscard]] bool AddSelectedListItemRects(
+bool AddSelectedListItemRects(
 		QRect *result,
 		const std::vector<LaidOutBlock> &blocks,
 		const PreparedEditListItemRange &range) {
@@ -2528,10 +2788,10 @@ void AddSelectedBlockRects(
 		AddSelectedBlockRects(&result, blocks, selection.blocks);
 		return result;
 	case PreparedEditSelectionKind::ListItems:
-		static_cast<void>(AddSelectedListItemRects(
+		AddSelectedListItemRects(
 			&result,
 			blocks,
-			selection.listItems));
+			selection.listItems);
 		return result;
 	case PreparedEditSelectionKind::TableRows:
 	case PreparedEditSelectionKind::TableCells:
@@ -2721,6 +2981,10 @@ void ConsiderStructuralBlockDropTargets(
 			}
 			break;
 		case PreparedBlockKind::Quote:
+			if (block.collapsedAtomic) {
+				break;
+			}
+			[[fallthrough]];
 		case PreparedBlockKind::Details:
 			if (ContainsPoint(block.contentRect, point)) {
 				ConsiderStructuralBlockDropTargets(
@@ -2738,10 +3002,11 @@ void ConsiderStructuralBlockDropTargets(
 		case PreparedBlockKind::Heading:
 		case PreparedBlockKind::CodeBlock:
 		case PreparedBlockKind::Rule:
+		case PreparedBlockKind::ButtonRow:
 		case PreparedBlockKind::DisplayMath:
 		case PreparedBlockKind::Photo:
 		case PreparedBlockKind::Video:
-		case PreparedBlockKind::Audio:
+		case PreparedBlockKind::Document:
 		case PreparedBlockKind::Map:
 		case PreparedBlockKind::Channel:
 		case PreparedBlockKind::GroupedMedia:
@@ -2801,10 +3066,11 @@ void ConsiderStructuralListItemDropTargets(
 		case PreparedBlockKind::Heading:
 		case PreparedBlockKind::CodeBlock:
 		case PreparedBlockKind::Rule:
+		case PreparedBlockKind::ButtonRow:
 		case PreparedBlockKind::DisplayMath:
 		case PreparedBlockKind::Photo:
 		case PreparedBlockKind::Video:
-		case PreparedBlockKind::Audio:
+		case PreparedBlockKind::Document:
 		case PreparedBlockKind::Map:
 		case PreparedBlockKind::Channel:
 		case PreparedBlockKind::GroupedMedia:
@@ -2857,6 +3123,10 @@ void ConsiderStructuralListItemDropTargets(
 		}
 		return {};
 	case PreparedBlockKind::Quote:
+		if (block.collapsedAtomic) {
+			return {};
+		}
+		[[fallthrough]];
 	case PreparedBlockKind::Details:
 		if (ContainsPoint(block.contentRect, point)) {
 			return EditDropLocationForBlockContainer(
@@ -2878,10 +3148,11 @@ void ConsiderStructuralListItemDropTargets(
 	case PreparedBlockKind::Heading:
 	case PreparedBlockKind::CodeBlock:
 	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
 	case PreparedBlockKind::DisplayMath:
 	case PreparedBlockKind::Photo:
 	case PreparedBlockKind::Video:
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 	case PreparedBlockKind::Map:
 	case PreparedBlockKind::Channel:
 	case PreparedBlockKind::GroupedMedia:
@@ -2906,6 +3177,25 @@ void ConsiderStructuralListItemDropTargets(
 			return true;
 		}
 		if (ToggleDetailsBlock(&block.children, anchorId)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+[[nodiscard]] bool ToggleBlockquoteBlock(
+		std::vector<PreparedBlock> *blocks,
+		const QString &toggleId) {
+	if (!blocks || toggleId.isEmpty()) {
+		return false;
+	}
+	for (auto &block : *blocks) {
+		if (block.kind == PreparedBlockKind::Quote
+			&& block.collapseToggleId == toggleId) {
+			block.collapsed = !block.collapsed;
+			return true;
+		}
+		if (ToggleBlockquoteBlock(&block.children, toggleId)) {
 			return true;
 		}
 	}
@@ -3038,6 +3328,153 @@ void HideBlocksSpoilers(std::vector<LaidOutBlock> *blocks) {
 	}
 }
 
+void AccumulateFormattedDateUpdate(TimeId *result, TimeId value) {
+	if (value && (!*result || value < *result)) {
+		*result = value;
+	}
+}
+
+[[nodiscard]] bool FormattedDateExpired(TimeId pending, TimeId now) {
+	return pending && (pending <= now);
+}
+
+[[nodiscard]] TimeId CountBlocksFormattedDateUpdate(
+	const std::vector<LaidOutBlock> &blocks);
+
+[[nodiscard]] TimeId CountBlockFormattedDateUpdate(
+		const LaidOutBlock &block) {
+	auto result = TimeId(block.leaf.nextFormattedDateUpdate());
+	for (const auto &row : block.tableRows) {
+		for (const auto &cell : row.cells) {
+			AccumulateFormattedDateUpdate(
+				&result,
+				cell.leaf.nextFormattedDateUpdate());
+		}
+	}
+	AccumulateFormattedDateUpdate(
+		&result,
+		CountBlocksFormattedDateUpdate(block.children));
+	return result;
+}
+
+TimeId CountBlocksFormattedDateUpdate(
+		const std::vector<LaidOutBlock> &blocks) {
+	auto result = TimeId(0);
+	for (const auto &block : blocks) {
+		AccumulateFormattedDateUpdate(
+			&result,
+			CountBlockFormattedDateUpdate(block));
+	}
+	return result;
+}
+
+[[nodiscard]] bool RefreshBlocksFormattedDates(
+	const std::vector<PreparedBlock> &preparedBlocks,
+	std::vector<LaidOutBlock> *blocks,
+	const std::vector<PreparedFormulaSlot> *formulas,
+	InlineFormulaObjectCache *inlineFormulaObjects,
+	const std::shared_ptr<MediaRuntime> &mediaRuntime,
+	const style::Markdown &st,
+	TimeId now,
+	const LayoutContext &context);
+
+[[nodiscard]] bool RefreshBlockFormattedDates(
+		const PreparedBlock &prepared,
+		LaidOutBlock *block,
+		const std::vector<PreparedFormulaSlot> *formulas,
+		InlineFormulaObjectCache *inlineFormulaObjects,
+		const std::shared_ptr<MediaRuntime> &mediaRuntime,
+		const style::Markdown &st,
+		TimeId now,
+		const LayoutContext &context) {
+	auto result = false;
+	if (FormattedDateExpired(block->leaf.nextFormattedDateUpdate(), now)) {
+		auto leafContext = context;
+		leafContext.inlineButtonWidthCap = block->inlineButtonWidthCap;
+		UpdateLaidOutLeafContent(
+			block,
+			prepared,
+			formulas,
+			inlineFormulaObjects,
+			mediaRuntime,
+			st,
+			leafContext);
+		result = true;
+	}
+	const auto rowCount = std::min(
+		int(prepared.tableRows.size()),
+		int(block->tableRows.size()));
+	for (auto rowIndex = 0; rowIndex != rowCount; ++rowIndex) {
+		auto &row = block->tableRows[rowIndex];
+		const auto &preparedRow = prepared.tableRows[rowIndex];
+		const auto cellCount = std::min(
+			int(preparedRow.cells.size()),
+			int(row.cells.size()));
+		for (auto cellIndex = 0; cellIndex != cellCount; ++cellIndex) {
+			auto &cell = row.cells[cellIndex];
+			if (!FormattedDateExpired(
+					cell.leaf.nextFormattedDateUpdate(),
+					now)) {
+				continue;
+			}
+			auto cellContext = context;
+			cellContext.inlineButtonWidthCap = block->inlineButtonWidthCap;
+			UpdateLaidOutLeafContent(
+				&cell,
+				preparedRow.cells[cellIndex],
+				formulas,
+				inlineFormulaObjects,
+				mediaRuntime,
+				st,
+				rowIndex,
+				cellIndex,
+				cellContext);
+			result = true;
+		}
+	}
+	if (RefreshBlocksFormattedDates(
+			prepared.children,
+			&block->children,
+			formulas,
+			inlineFormulaObjects,
+			mediaRuntime,
+			st,
+			now,
+			context)) {
+		result = true;
+	}
+	return result;
+}
+
+bool RefreshBlocksFormattedDates(
+		const std::vector<PreparedBlock> &preparedBlocks,
+		std::vector<LaidOutBlock> *blocks,
+		const std::vector<PreparedFormulaSlot> *formulas,
+		InlineFormulaObjectCache *inlineFormulaObjects,
+		const std::shared_ptr<MediaRuntime> &mediaRuntime,
+		const style::Markdown &st,
+		TimeId now,
+		const LayoutContext &context) {
+	auto result = false;
+	const auto count = std::min(
+		int(preparedBlocks.size()),
+		int(blocks->size()));
+	for (auto i = 0; i != count; ++i) {
+		if (RefreshBlockFormattedDates(
+				preparedBlocks[i],
+				&(*blocks)[i],
+				formulas,
+				inlineFormulaObjects,
+				mediaRuntime,
+				st,
+				now,
+				context)) {
+			result = true;
+		}
+	}
+	return result;
+}
+
 struct PreparedArticleLeafLookup {
 	PreparedBlock *block = nullptr;
 	PreparedTableCell *cell = nullptr;
@@ -3057,6 +3494,7 @@ struct ConstPreparedArticleLeafLookup {
 };
 
 struct LaidOutArticleLeafLookup {
+	LaidOutBlock *owner = nullptr;
 	LaidOutBlock *block = nullptr;
 	LaidOutTableCell *cell = nullptr;
 
@@ -3259,12 +3697,18 @@ struct LaidOutArticleLeafLookup {
 	}
 	switch (source.kind) {
 	case PreparedEditLeafKind::TableCellText:
-		return { .cell = FindLaidOutArticleLeafCell(owner, source) };
+		return {
+			.owner = owner,
+			.cell = FindLaidOutArticleLeafCell(owner, source),
+		};
 	case PreparedEditLeafKind::BlockText:
 	case PreparedEditLeafKind::BlockCaption:
 	case PreparedEditLeafKind::ListItemText:
 	case PreparedEditLeafKind::MathFormula:
-		return { .block = FindLaidOutArticleLeafBlock(owner, source) };
+		return {
+			.owner = owner,
+			.block = FindLaidOutArticleLeafBlock(owner, source),
+		};
 	}
 	return {};
 }
@@ -3317,8 +3761,8 @@ void CollectCodeBlockHighlightKeys(
 		return bool(prepared.video.id);
 	case PreparedBlockKind::Map:
 		return bool(prepared.map.id);
-	case PreparedBlockKind::Audio:
-		return bool(prepared.audio.id);
+	case PreparedBlockKind::Document:
+		return bool(prepared.document.id);
 	case PreparedBlockKind::GroupedMedia:
 		return bool(prepared.groupedMedia.id);
 	default:
@@ -3397,7 +3841,7 @@ public:
 	[[nodiscard]] int lastLayoutWidth() const;
 	[[nodiscard]] bool hasMissingMediaBlocks() const;
 
-	[[nodiscard]] int resizeGetHeight(int width);
+	int resizeGetHeight(int width);
 
 	[[nodiscard]] auto countRevealLinesGeometry(int width)
 	-> std::vector<MarkdownArticleRevealLine>;
@@ -3413,6 +3857,9 @@ public:
 	[[nodiscard]] PreparedEditHit editHitTest(QPoint point) const;
 	[[nodiscard]] std::vector<MarkdownArticleMediaGeometry>
 		mediaBlockGeometries() const;
+	[[nodiscard]] std::vector<QRect> buttonRowControlRects() const;
+	[[nodiscard]] std::vector<QRect> unsupportedNoticeRects() const;
+	[[nodiscard]] bool hasUnsupportedNotices() const;
 	void setGroupedActiveIndex(
 		const PreparedEditBlockSource &source,
 		int index);
@@ -3424,6 +3871,8 @@ public:
 		QPoint point,
 		const PreparedEditSelection &selection) const;
 	[[nodiscard]] MarkdownArticleEditControlHit editControlHitTest(
+		QPoint point) const;
+	[[nodiscard]] MarkdownArticleButtonRowButtonHit buttonRowButtonHitTest(
 		QPoint point) const;
 
 	void clickHandlerActiveChanged(
@@ -3439,12 +3888,12 @@ public:
 	[[nodiscard]] bool canConsumeHorizontalScroll(
 		QPoint point,
 		int delta) const;
-	[[nodiscard]] bool consumeHorizontalScroll(
+	bool consumeHorizontalScroll(
 		QPoint point,
 		int delta,
 		Qt::ScrollPhase phase);
 	[[nodiscard]] bool beginHorizontalScroll(QPoint point, bool fromTouch);
-	[[nodiscard]] bool updateHorizontalScroll(QPoint point);
+	bool updateHorizontalScroll(QPoint point);
 	void endHorizontalScroll();
 
 	[[nodiscard]] int anchorTop(const QString &anchorId) const;
@@ -3462,6 +3911,8 @@ public:
 		const QString &anchorId);
 
 	[[nodiscard]] bool toggleDetails(const QString &anchorId);
+
+	[[nodiscard]] bool toggleBlockquote(const QString &toggleId);
 
 	[[nodiscard]] bool segmentIsText(int index) const;
 
@@ -3530,8 +3981,13 @@ public:
 	[[nodiscard]] std::vector<RichPage::Block> richPageSliceForSelection(
 		MarkdownArticleSelection selection) const;
 
+	[[nodiscard]] bool richPageRtl() const;
+
 	[[nodiscard]] bool highlightProcessDone(
 		Spellchecker::HighlightProcessId processId);
+
+	[[nodiscard]] TimeId nextFormattedDateUpdate() const;
+	void refreshFormattedDates(TimeId now);
 
 	void invalidatePaletteCache();
 
@@ -3553,6 +4009,13 @@ public:
 		QPoint point);
 	void addPlaceholderRipple(PreparedPlaceholderBlockId id, QPoint point);
 	void stopPlaceholderRipple(PreparedPlaceholderBlockId id);
+	void addButtonRowRipple(
+		PreparedMediaBlockId id,
+		int index,
+		QPoint point);
+	void stopButtonRowRipple(PreparedMediaBlockId id);
+	void addInlineButtonRipple(QPoint point);
+	void stopInlineButtonRipple();
 
 	void invalidateLayout();
 
@@ -3566,6 +4029,10 @@ private:
 	};
 
 	[[nodiscard]] int currentDevicePixelRatio() const;
+
+	[[nodiscard]] MarkdownArticleHitTestResult hitTestSegments(
+		QPoint point,
+		Ui::Text::StateRequest::Flags flags) const;
 
 	void rebuildVisibleSegmentLookup();
 
@@ -3584,6 +4051,17 @@ private:
 	void prunePlaceholderRuntimes();
 
 	void requestPlaceholderRepaint(PreparedPlaceholderBlockId id);
+
+	void clearButtonRowRuntimes();
+
+	void clearInlineButtonRipple();
+
+	[[nodiscard]] auto getOrCreateButtonRowRuntime(PreparedMediaBlockId id)
+	-> std::shared_ptr<ButtonRowRuntime>;
+
+	void pruneButtonRowRuntimes();
+
+	void requestButtonRowRepaint(PreparedMediaBlockId id);
 
 	[[nodiscard]] auto getOrCreateTaskMarkerRippleRuntime(
 		const PreparedEditListItemSource &source)
@@ -3684,6 +4162,8 @@ private:
 		int left);
 
 	void finalizeRelayout(int heightBottom);
+	[[nodiscard]] int inlineButtonWidthCap() const;
+	void publishInlineButtonWidthCap();
 	void relayout(int width);
 	void relayoutRetained(int width);
 	void retainBlocks();
@@ -3695,14 +4175,19 @@ private:
 	std::vector<RenderedFormula> _formulaRenders;
 	std::shared_ptr<MathRenderer> _renderer;
 	std::shared_ptr<InlineFormulaObjectCache> _inlineFormulaObjects;
+	std::shared_ptr<InlineButtonPaintState> _inlineButtonPaintState
+		= std::make_shared<InlineButtonPaintState>();
+	RichButtonLoadingState _buttonLoading;
 	MediaBlockHost *_mediaBlockHost = nullptr;
 	Fn<void()> _textRepaint;
 	Fn<void(QRect)> _textRepaintRect;
 	Fn<bool(const ClickContext&)> _textSpoilerLinkFilter;
 	int _width = -1;
+	int _relayoutWidth = 1;
 	int _laidOutWidth = 0;
 	int _height = 0;
 	int _layoutGeneration = 0;
+	TimeId _nextFormattedDateUpdate = 0;
 	double _mediaPixelScale = 1.;
 	MarkdownArticleRevealLineCountsCache _revealLineCounts;
 	CachedTextLeafPool _cachedTextLeafs;
@@ -3712,6 +4197,8 @@ private:
 	int _missingMediaBlocks = 0;
 	std::unordered_map<uint64, std::shared_ptr<PlaceholderBlockRuntime>>
 		_placeholderRuntimes;
+	std::unordered_map<uint64, std::shared_ptr<ButtonRowRuntime>>
+		_buttonRowRuntimes;
 	TaskMarkerRippleRuntimeMap _taskMarkerRippleRuntimes;
 	std::unordered_map<
 		uint64,
@@ -3787,6 +4274,7 @@ void MarkdownArticle::Impl::setTextRepaintCallbacks(
 		Fn<void(QRect)> repaintRect,
 		Fn<bool(const ClickContext&)> spoilerLinkFilter) {
 	_textRepaint = std::move(repaint);
+	_buttonLoading.repaint = _textRepaint;
 	_textRepaintRect = std::move(repaintRect);
 	_textSpoilerLinkFilter = std::move(spoilerLinkFilter);
 }
@@ -3805,7 +4293,11 @@ void MarkdownArticle::Impl::setContent(MarkdownArticleContent content) {
 		&_cachedTextLeafs,
 		contentRtl());
 	if (!reuseMediaBlocks) {
-		PruneMediaRuntimeBoundCachedTextLeafs(&_cachedTextLeafs);
+		PruneCachedTextLeafs(
+			&_cachedTextLeafs,
+			[](const CachedTextLeafEntry &entry) {
+				return entry.source.dependsOnMediaRuntime;
+			});
 	}
 	if (reuseMediaBlocks) {
 		auto oldMediaBlocks = MediaBlockStorage();
@@ -3818,8 +4310,12 @@ void MarkdownArticle::Impl::setContent(MarkdownArticleContent content) {
 		clearMediaBlocks();
 	}
 	clearPlaceholderRuntimes();
+	clearButtonRowRuntimes();
 	_relatedArticleImages.clear();
 	_content = std::move(content);
+	_inlineButtonPaintState->editMode = _content.editMode;
+	_inlineButtonPaintState->pressPending = false;
+	clearInlineButtonRipple();
 	if (reuseMediaBlocks) {
 		_mediaBlocks = std::move(reusedMediaBlocks);
 	}
@@ -3954,7 +4450,11 @@ void MarkdownArticle::Impl::updatePreparedLeaf(
 	context.repaint = _textRepaint;
 	context.repaintRect = _textRepaintRect;
 	context.spoilerLinkFilter = _textSpoilerLinkFilter;
+	context.inlineButtonPaintState = _inlineButtonPaintState;
 	if (live.block && incoming.block) {
+		context.inlineButtonWidthCap = live.block->inlineButtonWidthCap;
+		live.block->carriesInlineButton = PreparedBlockHasInlineButton(
+			*incoming.block);
 		UpdateLaidOutLeafContent(
 			live.block,
 			*incoming.block,
@@ -3964,6 +4464,10 @@ void MarkdownArticle::Impl::updatePreparedLeaf(
 			layoutStyle(),
 			context);
 	} else if (live.cell && incoming.cell) {
+		context.inlineButtonWidthCap = live.owner->inlineButtonWidthCap;
+		if (TextHasInlineButton(incoming.cell->text)) {
+			live.owner->carriesInlineButton = true;
+		}
 		UpdateLaidOutLeafContent(
 			live.cell,
 			*incoming.cell,
@@ -4133,6 +4637,26 @@ void MarkdownArticle::Impl::paint(
 	local.searchState.matches = &_searchMatches;
 	local.searchState.current = _currentSearchMatch;
 	const auto &paintSt = local.paintMarkdownStyle(st);
+	local.buttonLoading.state = &_buttonLoading;
+	const auto laidOut = QRect(
+		0,
+		0,
+		std::max(_width, 1),
+		std::max(_height, 1));
+	if (RichButtonLoadingPassCovered(
+			context.buttonLoadingCoverage,
+			laidOut,
+			context.clip)) {
+		_buttonLoading.lastCoveringPassAt = crl::now();
+	}
+	_inlineButtonPaintState->st = &paintSt;
+	_inlineButtonPaintState->bubbleGradient = local.bubbleGradient;
+	_inlineButtonPaintState->buttonLoading = local.buttonLoading;
+	const auto inlineButtonPaintGuard = gsl::finally([&] {
+		_inlineButtonPaintState->st = nullptr;
+		_inlineButtonPaintState->bubbleGradient = false;
+		_inlineButtonPaintState->buttonLoading = {};
+	});
 	auto textPalette = paintSt.textPalette;
 	auto markBg = MarkBgColorForStyle(paintSt);
 	const auto ownedMarkBg = style::internal::OwnedColor(markBg);
@@ -4163,7 +4687,7 @@ void MarkdownArticle::Impl::paint(
 	_blocksPainted = true;
 }
 
-MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTest(
+MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTestSegments(
 		QPoint point,
 		Ui::Text::StateRequest::Flags flags) const {
 	const auto span = candidateSegmentSpan(point);
@@ -4194,6 +4718,25 @@ MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTest(
 	return {};
 }
 
+MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTest(
+		QPoint point,
+		Ui::Text::StateRequest::Flags flags) const {
+	auto result = hitTestSegments(point, flags);
+	if ((flags & Ui::Text::StateRequest::Flag::LookupLink)
+		&& !result.state.link
+		&& !result.preparedLink
+		&& !result.inlineButton
+		&& (result.buttonRow.index < 0)
+		&& (result.mediaActivation.kind == MediaActivationKind::None)
+		&& !result.codeHeaderCopy) {
+		if (auto toggle = CollapsibleQuoteToggleAt(_blocks, point)) {
+			result.state.link = CreatePreparedLinkHandler(*toggle);
+			result.preparedLink = std::move(toggle);
+		}
+	}
+	return result;
+}
+
 PreparedEditHit MarkdownArticle::Impl::editHitTest(QPoint point) const {
 	return EditHitForBlocks(_blocks, point);
 }
@@ -4203,6 +4746,22 @@ MarkdownArticle::Impl::mediaBlockGeometries() const {
 	auto result = std::vector<MarkdownArticleMediaGeometry>();
 	CollectMediaBlockGeometries(&result, _blocks);
 	return result;
+}
+
+std::vector<QRect> MarkdownArticle::Impl::buttonRowControlRects() const {
+	auto result = std::vector<QRect>();
+	CollectButtonRowControlRects(&result, _blocks);
+	return result;
+}
+
+std::vector<QRect> MarkdownArticle::Impl::unsupportedNoticeRects() const {
+	auto result = std::vector<QRect>();
+	CollectUnsupportedNoticeRects(&result, _blocks);
+	return result;
+}
+
+bool MarkdownArticle::Impl::hasUnsupportedNotices() const {
+	return PreparedBlocksHaveUnsupportedNotices(_content.blocks.blocks);
 }
 
 void MarkdownArticle::Impl::setGroupedActiveIndex(
@@ -4299,6 +4858,11 @@ MarkdownArticleEditControlHit MarkdownArticle::Impl::editControlHitTest(
 	return EditControlHitForBlocks(_blocks, point);
 }
 
+auto MarkdownArticle::Impl::buttonRowButtonHitTest(QPoint point) const
+-> MarkdownArticleButtonRowButtonHit {
+	return ButtonRowButtonHitForBlocks(_blocks, point);
+}
+
 int MarkdownArticle::Impl::anchorTop(const QString &anchorId) const {
 	for (const auto &entry : _anchors) {
 		if (entry.first == anchorId) {
@@ -4387,6 +4951,14 @@ MarkdownArticleAnchorExpansion MarkdownArticle::Impl::expandDetailsBlock(
 
 bool MarkdownArticle::Impl::toggleDetails(const QString &anchorId) {
 	if (!ToggleDetailsBlock(&_content.blocks.blocks, anchorId)) {
+		return false;
+	}
+	invalidateLayout();
+	return true;
+}
+
+bool MarkdownArticle::Impl::toggleBlockquote(const QString &toggleId) {
+	if (!ToggleBlockquoteBlock(&_content.blocks.blocks, toggleId)) {
 		return false;
 	}
 	invalidateLayout();
@@ -4733,6 +5305,10 @@ std::vector<RichPage::Block> MarkdownArticle::Impl::richPageSliceForSelection(
 		selection);
 }
 
+bool MarkdownArticle::Impl::richPageRtl() const {
+	return _content.richPage && _content.richPage->rtl;
+}
+
 bool MarkdownArticle::Impl::highlightProcessDone(
 		Spellchecker::HighlightProcessId processId) {
 	const auto i = _pendingHighlightEntries.find(processId);
@@ -4749,6 +5325,8 @@ bool MarkdownArticle::Impl::highlightProcessDone(
 			*block,
 			&_content.formulas,
 			_inlineFormulaObjects.get(),
+			_inlineButtonPaintState,
+			block->inlineButtonWidthCap,
 			_content.mediaRuntime,
 			layoutStyle(),
 			true,
@@ -4760,6 +5338,46 @@ bool MarkdownArticle::Impl::highlightProcessDone(
 		rebuilt = true;
 	}
 	return rebuilt;
+}
+
+TimeId MarkdownArticle::Impl::nextFormattedDateUpdate() const {
+	return _nextFormattedDateUpdate;
+}
+
+void MarkdownArticle::Impl::refreshFormattedDates(TimeId now) {
+	if (!FormattedDateExpired(_nextFormattedDateUpdate, now)) {
+		return;
+	}
+	_nextFormattedDateUpdate = 0;
+	PruneCachedTextLeafs(
+		&_cachedTextLeafs,
+		[&](const CachedTextLeafEntry &entry) {
+			return FormattedDateExpired(
+				entry.leaf.nextFormattedDateUpdate(),
+				now);
+		});
+	if (_blocks.empty()) {
+		return;
+	}
+	auto context = LayoutContext();
+	context.rtl = contentRtl();
+	context.syntaxHighlightTracker = this;
+	context.repaint = _textRepaint;
+	context.repaintRect = _textRepaintRect;
+	context.spoilerLinkFilter = _textSpoilerLinkFilter;
+	context.inlineButtonPaintState = _inlineButtonPaintState;
+	const auto refreshed = RefreshBlocksFormattedDates(
+		_content.blocks.blocks,
+		&_blocks,
+		&_content.formulas,
+		_inlineFormulaObjects.get(),
+		_content.mediaRuntime,
+		layoutStyle(),
+		now,
+		context);
+	if (refreshed && _width > 0) {
+		invalidateGeometry();
+	}
 }
 
 void MarkdownArticle::Impl::invalidatePaletteCache() {
@@ -4892,12 +5510,14 @@ void MarkdownArticle::Impl::addPlaceholderRipple(
 	}
 	block->placeholderRuntime = runtime;
 	const auto size = block->mediaRect.size();
+	const auto radius = (block->activation.kind
+		== MediaActivationKind::UnsupportedBlock)
+		? (block->mediaRect.height() / 2)
+		: layoutStyle().placeholder.radius;
 	if (!runtime->ripple || runtime->rippleSize != size) {
 		runtime->ripple = std::make_unique<Ui::RippleAnimation>(
 			st::defaultRippleAnimation,
-			Ui::RippleAnimation::RoundRectMask(
-				size,
-				layoutStyle().placeholder.radius),
+			Ui::RippleAnimation::RoundRectMask(size, radius),
 			[=] {
 				requestPlaceholderRepaint(id);
 			});
@@ -4922,6 +5542,51 @@ void MarkdownArticle::Impl::stopPlaceholderRipple(
 	}
 	i->second->ripple->lastStop();
 	requestPlaceholderRepaint(id);
+}
+
+void MarkdownArticle::Impl::addButtonRowRipple(
+		PreparedMediaBlockId id,
+		int index,
+		QPoint point) {
+	const auto block = FindButtonRowBlock(&_blocks, id);
+	if (!block) {
+		return;
+	}
+	auto runtime = block->buttonRowRuntime
+		? block->buttonRowRuntime
+		: getOrCreateButtonRowRuntime(id);
+	if (!runtime) {
+		return;
+	}
+	block->buttonRowRuntime = runtime;
+	AddButtonRowRipple(runtime, block->buttons, index, point);
+}
+
+void MarkdownArticle::Impl::stopButtonRowRipple(PreparedMediaBlockId id) {
+	if (!id) {
+		return;
+	}
+	const auto i = _buttonRowRuntimes.find(id.value);
+	if (i == end(_buttonRowRuntimes)) {
+		return;
+	}
+	StopButtonRowRipple(i->second);
+}
+
+void MarkdownArticle::Impl::addInlineButtonRipple(QPoint point) {
+	if (!_textRepaint) {
+		return;
+	}
+	_inlineButtonPaintState->repaint = _textRepaint;
+	clearInlineButtonRipple();
+	_inlineButtonPaintState->pressPoint = point;
+	_inlineButtonPaintState->pressPending = true;
+	_textRepaint();
+}
+
+void MarkdownArticle::Impl::stopInlineButtonRipple() {
+	_inlineButtonPaintState->pressPending = false;
+	StopPillRipple(_inlineButtonPaintState->ripple, _textRepaint);
 }
 
 void MarkdownArticle::Impl::invalidateLayout() {
@@ -5001,6 +5666,16 @@ void MarkdownArticle::Impl::clearPlaceholderRuntimes() {
 	_placeholderRuntimes.clear();
 }
 
+void MarkdownArticle::Impl::clearButtonRowRuntimes() {
+	_buttonRowRuntimes.clear();
+}
+
+void MarkdownArticle::Impl::clearInlineButtonRipple() {
+	_inlineButtonPaintState->ripple = nullptr;
+	_inlineButtonPaintState->rippleRect = QRect();
+	_inlineButtonPaintState->rippleSize = QSize();
+}
+
 void MarkdownArticle::Impl::refreshMediaBlockHosts() {
 	for (const auto &[id, block] : _mediaBlocks) {
 		if (block) {
@@ -5041,6 +5716,23 @@ MarkdownArticle::Impl::getOrCreatePlaceholderRuntime(
 	return runtime;
 }
 
+auto MarkdownArticle::Impl::getOrCreateButtonRowRuntime(
+		PreparedMediaBlockId id)
+-> std::shared_ptr<ButtonRowRuntime> {
+	if (!id) {
+		return nullptr;
+	}
+	if (const auto i = _buttonRowRuntimes.find(id.value);
+		i != end(_buttonRowRuntimes)) {
+		return i->second;
+	}
+	auto runtime = std::make_shared<ButtonRowRuntime>([=] {
+		requestButtonRowRepaint(id);
+	});
+	_buttonRowRuntimes.emplace(id.value, runtime);
+	return runtime;
+}
+
 void MarkdownArticle::Impl::pruneTaskMarkerRuntimes() {
 	auto live = TaskMarkerSourceSet();
 	CollectTaskMarkerSources(_blocks, &live);
@@ -5066,6 +5758,18 @@ void MarkdownArticle::Impl::prunePlaceholderRuntimes() {
 	}
 }
 
+void MarkdownArticle::Impl::pruneButtonRowRuntimes() {
+	auto live = std::unordered_set<uint64>();
+	CollectButtonRowIds(_blocks, &live);
+	for (auto i = _buttonRowRuntimes.begin(); i != _buttonRowRuntimes.end();) {
+		if (live.find(i->first) != end(live)) {
+			++i;
+		} else {
+			i = _buttonRowRuntimes.erase(i);
+		}
+	}
+}
+
 void MarkdownArticle::Impl::requestTaskMarkerRepaint(
 		const PreparedEditListItemSource &source) {
 	if (const auto block = FindListItemBlock(_blocks, source)) {
@@ -5085,6 +5789,18 @@ void MarkdownArticle::Impl::requestPlaceholderRepaint(
 	if (const auto block = FindPlaceholderBlock(_blocks, id)) {
 		if (_textRepaintRect) {
 			_textRepaintRect(block->mediaRect);
+		} else if (_textRepaint) {
+			_textRepaint();
+		}
+	} else if (_textRepaint) {
+		_textRepaint();
+	}
+}
+
+void MarkdownArticle::Impl::requestButtonRowRepaint(PreparedMediaBlockId id) {
+	if (const auto block = FindButtonRowBlock(_blocks, id)) {
+		if (_textRepaintRect) {
+			_textRepaintRect(block->outer);
 		} else if (_textRepaint) {
 			_textRepaint();
 		}
@@ -5123,12 +5839,12 @@ std::shared_ptr<MediaBlock> MarkdownArticle::Impl::getOrCreateMediaBlock(
 					_content.mediaRuntime,
 					layoutStyle());
 			});
-	case PreparedBlockKind::Audio:
+	case PreparedBlockKind::Document:
 		return getOrCreateMediaBlock(
-			prepared.audio.id,
+			prepared.document.id,
 			[=] {
-				return CreateAudioMediaBlock(
-					prepared.audio,
+				return CreateDocumentMediaBlock(
+					prepared.document,
 					_content.mediaRuntime,
 					layoutStyle());
 			});
@@ -5811,7 +6527,7 @@ bool MarkdownArticle::Impl::beginHorizontalScroll(
 			: (thumb.width() / 2),
 	};
 	if (!lookup.hit.overScrollbarThumb) {
-		(void)updateHorizontalScroll(point);
+		updateHorizontalScroll(point);
 	}
 	return true;
 }
@@ -5856,11 +6572,12 @@ void MarkdownArticle::Impl::endHorizontalScroll() {
 	_activeHorizontalScrollDrag.reset();
 }
 
-// The laid out width is passed through the _width field, assigned by the
-// callers right before the call, instead of a parameter, because GCC 15
-// IPA-CP with LTO wrongly constant-folded such a parameter to 1 (the lower
-// bound of the std::max(width, 1) clamps in the callers), collapsing rich
-// message bubbles to the minimum width in release Linux builds.
+// The laid out width is passed to these relayout helpers through the _width
+// and _relayoutWidth fields, assigned by the callers right before the call,
+// instead of a parameter, because GCC 15 IPA-CP with LTO wrongly
+// constant-folded such a parameter to 1 (the lower bound of the
+// std::max(width, 1) clamps in the callers), collapsing rich message bubbles
+// to the minimum width in release Linux builds.
 void MarkdownArticle::Impl::finalizeRelayout(int heightBottom) {
 	const auto &page = layoutStyle().pagePadding;
 	++_layoutGeneration;
@@ -5873,6 +6590,7 @@ void MarkdownArticle::Impl::finalizeRelayout(int heightBottom) {
 			page.left() + page.right() + 1));
 	pruneTaskMarkerRuntimes();
 	prunePlaceholderRuntimes();
+	pruneButtonRowRuntimes();
 	_relatedArticleImages.clear();
 	StoreRelatedArticleImageStates(
 		_blocks,
@@ -5889,10 +6607,32 @@ void MarkdownArticle::Impl::finalizeRelayout(int heightBottom) {
 	CollectSelectableSegments(&_blocks, &_segments);
 	RefreshScrollableSegmentRects(_blocks, &_segments);
 	rebuildVisibleSegmentLookup();
+	_nextFormattedDateUpdate = CountBlocksFormattedDateUpdate(_blocks);
+}
+
+int MarkdownArticle::Impl::inlineButtonWidthCap() const {
+	const auto &st = layoutStyle();
+	const auto &page = st.pagePadding;
+	const auto inner = std::max(
+		_relayoutWidth - page.left() - page.right(),
+		1);
+	const auto column = std::max(
+		inner - st.textPadding.left() - st.textPadding.right(),
+		1);
+	return std::min(column, st.inlineButton.maxWidth);
+}
+
+void MarkdownArticle::Impl::publishInlineButtonWidthCap() {
+	const auto cap = inlineButtonWidthCap();
+	if (_inlineButtonPaintState->widthCap == cap) {
+		return;
+	}
+	_inlineButtonPaintState->widthCap = cap;
 }
 
 void MarkdownArticle::Impl::relayout(int width) {
 	width = std::max(width, 1);
+	_relayoutWidth = width;
 	if (_width == width) {
 		return;
 	}
@@ -5908,6 +6648,7 @@ void MarkdownArticle::Impl::relayout(int width) {
 		contentRtl());
 	retainBlocks();
 	_missingMediaBlocks = 0;
+	publishInlineButtonWidthCap();
 
 	const auto &st = layoutStyle();
 	const auto &page = st.pagePadding;
@@ -5924,6 +6665,7 @@ void MarkdownArticle::Impl::relayout(int width) {
 		.repaint = _textRepaint,
 		.repaintRect = _textRepaintRect,
 		.spoilerLinkFilter = _textSpoilerLinkFilter,
+		.inlineButtonPaintState = _inlineButtonPaintState,
 	};
 	if (_editableMaxLineWidthOverrideLeaf
 		&& (_editableMaxLineWidthOverride > 0)) {
@@ -5962,12 +6704,14 @@ void MarkdownArticle::Impl::relayout(int width) {
 	context.placeholderRuntimeFactory = [=](PreparedPlaceholderBlockId id) {
 		return getOrCreatePlaceholderRuntime(id);
 	};
+	context.buttonRowRuntimeFactory = [=](PreparedMediaBlockId id) {
+		return getOrCreateButtonRowRuntime(id);
+	};
 	context.taskMarkerRippleRuntimeFactory
 		= [=](const PreparedEditListItemSource &source) {
 			return getOrCreateTaskMarkerRippleRuntime(source);
 		};
 	const auto contextScope = LayoutContextScope(context);
-	(void)contextScope;
 	const auto y = LayoutBlocks(
 		_content.blocks.blocks,
 		&_content.formulas,
@@ -5990,6 +6734,7 @@ void MarkdownArticle::Impl::relayout(int width) {
 
 void MarkdownArticle::Impl::relayoutRetained(int width) {
 	width = std::max(width, 1);
+	_relayoutWidth = width;
 	if (_width == width) {
 		return;
 	} else if (_blocks.empty()) {
@@ -5997,6 +6742,7 @@ void MarkdownArticle::Impl::relayoutRetained(int width) {
 		return;
 	}
 	captureScrollState();
+	publishInlineButtonWidthCap();
 
 	const auto &st = layoutStyle();
 	const auto &page = st.pagePadding;
@@ -6013,6 +6759,7 @@ void MarkdownArticle::Impl::relayoutRetained(int width) {
 		.repaint = _textRepaint,
 		.repaintRect = _textRepaintRect,
 		.spoilerLinkFilter = _textSpoilerLinkFilter,
+		.inlineButtonPaintState = _inlineButtonPaintState,
 	};
 	if (_editableMaxLineWidthOverrideLeaf
 		&& (_editableMaxLineWidthOverride > 0)) {
@@ -6045,12 +6792,14 @@ void MarkdownArticle::Impl::relayoutRetained(int width) {
 	context.placeholderRuntimeFactory = [=](PreparedPlaceholderBlockId id) {
 		return getOrCreatePlaceholderRuntime(id);
 	};
+	context.buttonRowRuntimeFactory = [=](PreparedMediaBlockId id) {
+		return getOrCreateButtonRowRuntime(id);
+	};
 	context.taskMarkerRippleRuntimeFactory
 		= [=](const PreparedEditListItemSource &source) {
 			return getOrCreateTaskMarkerRippleRuntime(source);
 		};
 	const auto contextScope = LayoutContextScope(context);
-	(void)contextScope;
 	const auto y = RecountLaidOutBlocks(
 		_content.blocks.blocks,
 		_content.formulas,
@@ -6233,6 +6982,11 @@ MarkdownArticleEditControlHit MarkdownArticle::editControlHitTest(
 	return _impl->editControlHitTest(point);
 }
 
+MarkdownArticleButtonRowButtonHit MarkdownArticle::buttonRowButtonHitTest(
+		QPoint point) const {
+	return _impl->buttonRowButtonHitTest(point);
+}
+
 void MarkdownArticle::addTaskMarkerRipple(
 		const PreparedEditListItemSource &source,
 		QPoint point) {
@@ -6313,6 +7067,10 @@ bool MarkdownArticle::toggleDetails(const QString &anchorId) {
 	return _impl->toggleDetails(anchorId);
 }
 
+bool MarkdownArticle::toggleBlockquote(const QString &toggleId) {
+	return _impl->toggleBlockquote(toggleId);
+}
+
 bool MarkdownArticle::segmentIsText(int index) const {
 	return _impl->segmentIsText(index);
 }
@@ -6378,6 +7136,18 @@ QRect MarkdownArticle::segmentRect(int segmentIndex) const {
 std::vector<MarkdownArticleMediaGeometry>
 MarkdownArticle::mediaBlockGeometries() const {
 	return _impl->mediaBlockGeometries();
+}
+
+std::vector<QRect> MarkdownArticle::buttonRowControlRects() const {
+	return _impl->buttonRowControlRects();
+}
+
+std::vector<QRect> MarkdownArticle::unsupportedNoticeRects() const {
+	return _impl->unsupportedNoticeRects();
+}
+
+bool MarkdownArticle::hasUnsupportedNotices() const {
+	return _impl->hasUnsupportedNotices();
 }
 
 void MarkdownArticle::setGroupedActiveIndex(
@@ -6453,9 +7223,21 @@ std::vector<RichPage::Block> MarkdownArticle::richPageSliceForSelection(
 	return _impl->richPageSliceForSelection(selection);
 }
 
+bool MarkdownArticle::richPageRtl() const {
+	return _impl->richPageRtl();
+}
+
 bool MarkdownArticle::highlightProcessDone(
 		Spellchecker::HighlightProcessId processId) {
 	return _impl->highlightProcessDone(processId);
+}
+
+TimeId MarkdownArticle::nextFormattedDateUpdate() const {
+	return _impl->nextFormattedDateUpdate();
+}
+
+void MarkdownArticle::refreshFormattedDates(TimeId now) {
+	_impl->refreshFormattedDates(now);
 }
 
 void MarkdownArticle::invalidatePaletteCache() {
@@ -6502,6 +7284,25 @@ void MarkdownArticle::addPlaceholderRipple(
 
 void MarkdownArticle::stopPlaceholderRipple(PreparedPlaceholderBlockId id) {
 	_impl->stopPlaceholderRipple(id);
+}
+
+void MarkdownArticle::addButtonRowRipple(
+		PreparedMediaBlockId id,
+		int index,
+		QPoint point) {
+	_impl->addButtonRowRipple(id, index, point);
+}
+
+void MarkdownArticle::stopButtonRowRipple(PreparedMediaBlockId id) {
+	_impl->stopButtonRowRipple(id);
+}
+
+void MarkdownArticle::addInlineButtonRipple(QPoint point) {
+	_impl->addInlineButtonRipple(point);
+}
+
+void MarkdownArticle::stopInlineButtonRipple() {
+	_impl->stopInlineButtonRipple();
 }
 
 void MarkdownArticle::clearBeforeDestroy() {

@@ -89,11 +89,6 @@ namespace Platform {
 
 namespace {
 
-enum class TrayClickType {
-	Left,
-	Right,
-};
-
 [[nodiscard]] bool IsAnyActiveForTrayMenu() {
 	for (const NSWindow *w in [[NSApplication sharedApplication] windows]) {
 		if (w.isKeyWindow) {
@@ -244,17 +239,21 @@ public:
 	~NativeIcon();
 
 	void updateIcon();
-	void showMenu(not_null<QMenu*> menu);
+	void setMenuProvider(Fn<QMenu*(bool rightButton)> provider);
 	void deactivateButton();
 
-	[[nodiscard]] rpl::producer<TrayClickType> clicks() const;
+	[[nodiscard]] rpl::producer<> activateRequests() const;
 	[[nodiscard]] rpl::producer<> aboutToShowRequests() const;
 
 private:
+	void prepareMenuForClick(bool rightButton);
+
 	CommonDelegate *_delegate;
 	NSStatusItem *_status;
+	id _clickMonitor = nil;
+	Fn<QMenu*(bool rightButton)> _menuProvider;
 
-	rpl::event_stream<TrayClickType> _clicks;
+	rpl::event_stream<> _activateRequests;
 
 	rpl::lifetime _lifetime;
 
@@ -282,6 +281,17 @@ NativeIcon::NativeIcon()
 		updateIcon();
 	}, _lifetime);
 
+	_clickMonitor = [NSEvent
+		addLocalMonitorForEventsMatchingMask:(NSEventMaskLeftMouseDown
+			| NSEventMaskRightMouseDown)
+		handler:^ NSEvent *(NSEvent *event) {
+			if (event.window == _status.button.window) {
+				prepareMenuForClick(
+					event.type == NSEventTypeRightMouseDown);
+			}
+			return event;
+		}];
+
 	const auto masks = NSEventMaskLeftMouseDown
 		| NSEventMaskLeftMouseUp
 		| NSEventMaskRightMouseDown
@@ -290,17 +300,11 @@ NativeIcon::NativeIcon()
 	[_status.button sendActionOn:masks];
 
 	id buttonCallback = [^{
-		const auto event = NSApp.currentEvent;
-		const auto type = event.type;
-
-		if (type == NSEventTypeLeftMouseDown) {
+		if (_status.menu) {
+			return;
+		} else if (NSApp.currentEvent.type == NSEventTypeLeftMouseDown) {
 			Core::Sandbox::Instance().customEnterFromEventLoop([=] {
-				_clicks.fire(TrayClickType::Left);
-			});
-		} else if (type == NSEventTypeRightMouseDown
-			|| type == NSEventTypeRightMouseUp) {
-			Core::Sandbox::Instance().customEnterFromEventLoop([=] {
-				_clicks.fire(TrayClickType::Right);
+				_activateRequests.fire({});
 			});
 		}
 	} copy];
@@ -315,6 +319,7 @@ NativeIcon::NativeIcon()
 }
 
 NativeIcon::~NativeIcon() {
+	[NSEvent removeMonitor:_clickMonitor];
 	[_status
 		removeObserver:_delegate
 		forKeyPath:@"button.effectiveAppearance"];
@@ -328,18 +333,30 @@ void NativeIcon::updateIcon() {
 	UpdateIcon(_status);
 }
 
-void NativeIcon::showMenu(not_null<QMenu*> menu) {
-	_status.menu = menu->toNSMenu();
-	_status.menu.delegate = _delegate;
-	[_status.button performClick:nil];
+void NativeIcon::setMenuProvider(Fn<QMenu*(bool rightButton)> provider) {
+	_menuProvider = std::move(provider);
+}
+
+void NativeIcon::prepareMenuForClick(bool rightButton) {
+	Core::Sandbox::Instance().customEnterFromEventLoop([&] {
+		const auto menu = _menuProvider
+			? _menuProvider(rightButton)
+			: nullptr;
+		if (menu) {
+			_status.menu = menu->toNSMenu();
+			_status.menu.delegate = _delegate;
+		} else {
+			_status.menu = nil;
+		}
+	});
 }
 
 void NativeIcon::deactivateButton() {
 	[_status.button highlight:false];
 }
 
-rpl::producer<TrayClickType> NativeIcon::clicks() const {
-	return _clicks.events();
+rpl::producer<> NativeIcon::activateRequests() const {
+	return _activateRequests.events();
 }
 
 rpl::producer<> NativeIcon::aboutToShowRequests() const {
@@ -354,19 +371,15 @@ void Tray::createIcon() {
 		_nativeIcon = std::make_unique<NativeIcon>();
 		// On macOS we are activating the window on click
 		// instead of showing the menu, when the window is not activated.
-		_nativeIcon->clicks(
-		) | rpl::on_next([=](TrayClickType type) {
-			if (!_menu) {
-				return;
-			}
-			if (type == TrayClickType::Right) {
-				_nativeIcon->showMenu(_menu.get());
-			} else if (IsAnyActiveForTrayMenu()) {
-				_nativeIcon->showMenu(_menu.get());
-			} else {
-				_nativeIcon->deactivateButton();
-				_showFromTrayRequests.fire({});
-			}
+		_nativeIcon->setMenuProvider([=](bool rightButton) -> QMenu* {
+			return (_menu && (rightButton || IsAnyActiveForTrayMenu()))
+				? _menu.get()
+				: nullptr;
+		});
+		_nativeIcon->activateRequests(
+		) | rpl::on_next([=] {
+			_nativeIcon->deactivateButton();
+			_showFromTrayRequests.fire({});
 		}, _lifetime);
 	}
 	updateIcon();

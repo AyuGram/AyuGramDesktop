@@ -14,7 +14,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "window/window_section_common.h"
 
+#include <optional>
+
 class PeerData;
+class UserData;
 
 namespace ChatHelpers {
 struct FileChosen;
@@ -27,6 +30,7 @@ struct Details;
 
 namespace Data {
 struct ReactionId;
+struct ReportInput;
 class ForumTopic;
 class WallPaper;
 class Session;
@@ -166,6 +170,24 @@ public:
 		return false;
 	}
 
+	virtual bool showChooseReportMessages(
+			not_null<PeerData*> peer,
+			Data::ReportInput &&reportInput,
+			Fn<void(std::vector<MsgId>)> &&done) {
+		return false;
+	}
+	virtual bool clearChooseReportMessages() {
+		return false;
+	}
+	virtual bool toggleChooseChatTheme(
+			not_null<PeerData*> peer,
+			std::optional<bool> show = std::nullopt) {
+		return false;
+	}
+	[[nodiscard]] virtual Ui::ChatTheme *customChatTheme() const {
+		return nullptr;
+	}
+
 	[[nodiscard]] virtual bool preventsClose(
 			Fn<void()> &&continueCallback) const {
 		return false;
@@ -177,10 +199,21 @@ public:
 		return SectionActionResult::Ignore;
 	}
 
+	virtual SectionActionResult hideSingleUseKeyboard(FullMsgId replyToId) {
+		return SectionActionResult::Fallback;
+	}
+
 	virtual bool confirmSendingFiles(const QStringList &files) {
 		return false;
 	}
 	virtual bool confirmSendingFiles(not_null<const QMimeData*> data) {
+		return false;
+	}
+
+	virtual bool notify_switchInlineBotButtonReceived(
+			const QString &query,
+			UserData *samePeerBot,
+			MsgId samePeerReplyTo) {
 		return false;
 	}
 
@@ -206,6 +239,10 @@ public:
 	}
 
 	virtual void validateSubsectionTabs() {
+	}
+
+	[[nodiscard]] virtual bool contentOverlapped(const QRect &globalRect) {
+		return false;
 	}
 
 	static void PaintBackground(

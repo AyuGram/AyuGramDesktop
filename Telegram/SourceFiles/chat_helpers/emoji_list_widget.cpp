@@ -2704,7 +2704,7 @@ void EmojiListWidget::drawCustom(
 		int index) {
 	auto &custom = _custom[set];
 	custom.painted = true;
-	auto &entry = custom.list[index];
+	const auto &entry = custom.list[index];
 	_emojiPaintContext->scale = context.progress;
 	_emojiPaintContext->position = position
 		+ _innerPosition
@@ -2720,7 +2720,7 @@ void EmojiListWidget::drawSearchSetCustom(
 		int index) {
 	auto &custom = searchSetBySection(section);
 	custom.painted = true;
-	auto &entry = custom.list[index];
+	const auto &entry = custom.list[index];
 	_emojiPaintContext->scale = context.progress;
 	_emojiPaintContext->position = position
 		+ _innerPosition
@@ -2760,7 +2760,7 @@ EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 	} else if (_searchMode && section > 0) {
 		const auto &set = searchSetBySection(section);
 		if (index < int(set.list.size())) {
-			auto &entry = set.list[index];
+			const auto &entry = set.list[index];
 			return { entry.document, entry.collectible };
 		}
 		return {};
@@ -2779,8 +2779,8 @@ EmojiListWidget::ResolvedCustom EmojiListWidget::lookupCustomEmoji(
 		}
 	} else if (section >= _staticCount
 		&& index < _custom[section - _staticCount].list.size()) {
-		auto &set = _custom[section - _staticCount];
-		auto &entry = set.list[index];
+		const auto &set = _custom[section - _staticCount];
+		const auto &entry = set.list[index];
 		return { entry.document, entry.collectible };
 	}
 	return {};
@@ -4087,7 +4087,7 @@ void EmojiListWidget::setPressed(OverState newPressed) {
 				&& button->section <= int(_searchSets.size()))
 			|| (button->section >= _staticCount
 				&& button->section < _staticCount + _custom.size()));
-		auto &ripple = (_searchMode && button->section > 0)
+		const auto &ripple = (_searchMode && button->section > 0)
 			? searchSetBySection(button->section).ripple
 			: (button->section >= _staticCount)
 			? _custom[button->section - _staticCount].ripple
@@ -4098,7 +4098,7 @@ void EmojiListWidget::setPressed(OverState newPressed) {
 	} else if (auto shortcut = std::get_if<OverSearchShortcut>(&_pressed)) {
 		if (shortcut->index >= 0
 			&& shortcut->index < _searchShortcutSets.size()) {
-			auto &ripple = _searchShortcutSets[shortcut->index].ripple;
+			const auto &ripple = _searchShortcutSets[shortcut->index].ripple;
 			if (ripple) {
 				ripple->lastStop();
 			}

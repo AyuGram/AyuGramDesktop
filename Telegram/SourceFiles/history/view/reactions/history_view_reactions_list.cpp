@@ -159,7 +159,7 @@ private:
 		return {};
 	}
 	auto result = std::vector<not_null<PeerData*>>();
-	auto &owner = window->session().data();
+	const auto &owner = window->session().data();
 	for (const auto &peerWithDate : whoReadIds->list) {
 		if (const auto peer = owner.peerLoaded(peerWithDate.peer)) {
 			if (FiltersController::isBlocked(peer)) {

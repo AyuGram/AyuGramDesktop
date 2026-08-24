@@ -619,6 +619,7 @@ private:
 	[[nodiscard]] not_null<Ui::QuickActionContext*> ensureQuickAction(
 		int64 key);
 	void deactivateQuickAction();
+	void updateQuickActionRow(int64 key);
 
 	[[nodiscard]] bool lookupIsInBotAppButton(
 		Row *row,

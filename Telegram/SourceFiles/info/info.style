@@ -236,6 +236,7 @@ infoTopBar: InfoTopBar {
 	titleWithSubtitlePosition: point(16px, 8px);
 	subtitle: FlatLabel(defaultFlatLabel) {
 		textFg: windowSubTextFg;
+		maxHeight: 20px;
 	}
 	subtitlePosition: point(16px, 28px);
 	bg: windowBg;
@@ -371,6 +372,7 @@ infoProfileBirthdayDigitSize: 64px;
 
 
 infoProfileTopBarActionButtonBgOpacity: 0.16;
+infoProfileTopBarBackdropRippleOpacity: 0.125;
 infoProfileTopBarActionButtonSize: 52px;
 infoProfileTopBarActionButtonIconSize: 23px;
 infoProfileTopBarActionButtonLottieSize: infoProfileTopBarActionButtonIconSize - 0px;
@@ -746,6 +748,7 @@ managePeerButton: SettingsCountButton {
 	iconPosition: point(20px, 5px);
 	label: FlatLabel(defaultFlatLabel) {
 		textFg: windowActiveTextFg;
+		maxHeight: 20px;
 	}
 	labelPosition: point(25px, 12px);
 }
@@ -1000,6 +1003,10 @@ inviteLinkThreeDots: IconButton(defaultIconButton) {
 inviteLinkFieldPadding: margins(22px, 7px, 22px, 14px);
 inviteLinkFieldLabel: FlatLabel(defaultFlatLabel) {
 	align: align(center);
+	maxHeight: 20px;
+}
+inviteLinkFieldLabelLeft: FlatLabel(inviteLinkFieldLabel) {
+	align: align(left);
 }
 
 inviteLinkButton: RoundButton(defaultActiveButton) {
@@ -1285,6 +1292,7 @@ collectionEmptyTitle: FlatLabel(boxTitle) {
 }
 collectionEmptyText: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
+	minWidth: 256px;
 }
 collectionEmptyButton: RoundButton(defaultActiveButton) {
 	width: -96px;
