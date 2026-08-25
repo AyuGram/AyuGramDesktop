@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/sandbox.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/version.h"
 #include "core/crash_reports.h"
 #include "menu/menu_dock.h"
 #include "storage/localstorage.h"
@@ -40,6 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+
 
 using Platform::Q2NSString;
 using Platform::NS2QString;

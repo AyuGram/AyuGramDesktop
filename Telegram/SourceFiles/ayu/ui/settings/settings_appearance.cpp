@@ -204,7 +204,6 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::disableCustomBackgrounds,
 		.setter = &AyuSettings::setDisableCustomBackgrounds,
 	});
-
 	ayu.addSettingToggle({
 		.id = u"ayu/hidePremiumStatuses"_q,
 		.title = tr::ayu_HidePremiumStatuses(),

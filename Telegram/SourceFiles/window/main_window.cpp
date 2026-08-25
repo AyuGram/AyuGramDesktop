@@ -89,6 +89,9 @@ base::options::toggle OptionNewWindowsSizeAsFirst({
 base::options::toggle OptionDisableTouchbar({
 	.id = kOptionDisableTouchbar,
 	.name = "Disable Touch Bar (macOS only).",
+#if defined Q_OS_MAC && defined Q_PROCESSOR_ARM
+	.defaultValue = true,
+#endif // Q_OS_MAC && Q_PROCESSOR_ARM
 	.scope = [] {
 #ifdef Q_OS_MAC
 		return true;
@@ -190,27 +193,44 @@ void OverrideApplicationIcon(QImage image) {
 	OverridenIcon() = std::move(image);
 }
 
-QIcon CreateOfficialIcon(Main::Session *session) {
-	return QIcon(Ui::PixmapFromImage(AyuAssets::currentAppLogo()));
+QIcon CreateSupportIcon(Main::Session *session) {
+	const auto support = (session && session->supportMode());
+	if (!support) {
+		return QIcon();
+	}
+	auto overriden = OverridenIcon();
+	auto image = overriden.isNull()
+		? Platform::DefaultApplicationIcon()
+		: overriden;
+	ConvertIconToBlack(image);
+	return QIcon(Ui::PixmapFromImage(std::move(image)));
 }
 
 QIcon CreateIcon(Main::Session *session, bool returnNullIfDefault) {
-	const auto officialIcon = CreateOfficialIcon(session);
+	const auto supportIcon = CreateSupportIcon(session);
+	if (!supportIcon.isNull()) {
+		return supportIcon;
+	}
+
+	const auto officialIcon = QIcon(
+		Ui::PixmapFromImage(base::duplicate(Logo())));
 	if (!officialIcon.isNull() || returnNullIfDefault) {
 		return officialIcon;
 	}
 
-	auto result = QIcon(Ui::PixmapFromImage(base::duplicate(Logo())));
-
 	if constexpr (!Platform::IsLinux()) {
-		return result;
+		return officialIcon;
 	}
 
 	const auto iconFromTheme = QIcon::fromTheme(
 		Platform::ApplicationIconName(),
-		result);
+		officialIcon);
 
-	result = QIcon();
+	if (!Platform::IsX11()) {
+		return iconFromTheme;
+	}
+
+	QIcon result;
 
 	static const auto iconSizes = {
 		16,

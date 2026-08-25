@@ -8,6 +8,7 @@
 
 #include "api/api_text_entities.h"
 #include "ayu/features/translator/ayu_translator.h"
+#include "base/weak_ptr.h"
 #include "data/data_msg_id.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -17,7 +18,9 @@
 
 namespace {
 
-class AyuTranslateProvider final : public Ui::TranslateProvider {
+class AyuTranslateProvider final
+	: public Ui::TranslateProvider
+	, public base::has_weak_ptr {
 public:
 	AyuTranslateProvider(
 		not_null<Main::Session*> session,
@@ -48,6 +51,18 @@ public:
 			const LanguageId &to,
 			Fn<void(int, Ui::TranslateProviderResult)> doneOne,
 			Fn<void()> doneAll) override {
+		doneOne = [weak = base::make_weak(this), doneOne = std::move(doneOne)](
+				int index,
+				Ui::TranslateProviderResult result) {
+			if (weak) {
+				doneOne(index, std::move(result));
+			}
+		};
+		doneAll = [weak = base::make_weak(this), doneAll = std::move(doneAll)] {
+			if (weak) {
+				doneAll();
+			}
+		};
 		if (requests.empty()) {
 			doneAll();
 			return;

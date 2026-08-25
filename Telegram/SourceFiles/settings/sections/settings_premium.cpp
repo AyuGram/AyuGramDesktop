@@ -67,6 +67,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
+#include "styles/style_settings_premium.h"
 #include "styles/style_widgets.h"
 
 // AyuGram includes
@@ -262,6 +263,7 @@ using Order = std::vector<QString>;
 		u"business"_q,
 		u"effects"_q,
 		u"ai_compose"_q,
+		u"rich_formatting"_q,
 	};
 }
 
@@ -481,6 +483,16 @@ using Order = std::vector<QString>;
 				tr::lng_premium_summary_subtitle_ai_compose(),
 				tr::lng_premium_summary_about_ai_compose(),
 				PremiumFeature::AiCompose,
+				true,
+			},
+		},
+		{
+			u"rich_formatting"_q,
+			Entry{
+				&st::settingsPremiumIconRich,
+				tr::lng_premium_summary_subtitle_rich_formatting(),
+				tr::lng_premium_summary_about_rich_formatting(),
+				PremiumFeature::RichFormatting,
 				true,
 			},
 		},
@@ -1049,6 +1061,8 @@ void TopBarWithSticker::resizeEvent(QResizeEvent *e) {
 		return tr::lng_premium_summary_subtitle_no_forwards(tr::now);
 	} else if (key == u"ai_compose"_q) {
 		return tr::lng_premium_summary_subtitle_ai_compose(tr::now);
+	} else if (key == u"rich_formatting"_q) {
+		return tr::lng_premium_summary_subtitle_rich_formatting(tr::now);
 	}
 	return QString();
 }
@@ -1303,19 +1317,8 @@ void BuildPremiumSectionContent(
 				state->ref,
 				state->radioGroup);
 
-			auto buttonCallback = [controller, state](PremiumFeature section) {
-				if (state->setPaused) {
-					state->setPaused(true);
-				}
-				const auto hidden = crl::guard(
-					(QObject*)controller->widget(),
-					[state] {
-						if (state->setPaused) {
-							state->setPaused(false);
-						}
-					});
-
-				ShowPremiumPreviewToBuy(controller, section, hidden);
+			auto buttonCallback = [controller](PremiumFeature section) {
+				ShowPremiumPreviewToBuy(controller, section, nullptr);
 			};
 			AddSummaryPremium(
 				ctx.container,
@@ -1429,8 +1432,8 @@ void Premium::setupSwipeBack() {
 		}
 	};
 
-	auto init = [=](int, Qt::LayoutDirection direction) {
-		return (direction == Qt::RightToLeft)
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
+		return (data.direction == Qt::RightToLeft)
 			? DefaultSwipeBackHandlerFinishData([=] {
 				_showBack.fire({});
 			})
@@ -1571,6 +1574,8 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 				.clickContextOther = clickContextOther,
 				.title = std::move(title),
 				.about = std::move(about),
+				.use3dStar = true,
+				.showFinished = _showFinished.events(),
 			});
 	}();
 	_state->setPaused = [=](bool paused) {
@@ -1579,6 +1584,10 @@ base::weak_qptr<Ui::RpWidget> Premium::createPinnedToTop(
 			_subscribe->setGlarePaused(paused);
 		}
 	};
+	controller()->boxShownValue(
+	) | rpl::on_next([=](bool shown) {
+		_state->setPaused(shown);
+	}, content->lifetime());
 
 	_wrap.value(
 	) | rpl::on_next([=](Info::Wrap wrap) {
@@ -1825,6 +1834,7 @@ void ShowPremium(not_null<::Main::Session*> session, const QString &ref) {
 void ShowPremium(
 		not_null<Window::SessionController*> controller,
 		const QString &ref) {
+	controller->window().activate();
 	if (!controller->session().premiumPossible()) {
 		controller->show(Box(PremiumUnavailableBox));
 		return;
@@ -2038,6 +2048,7 @@ not_null<Ui::GradientButton*> CreateSubscribeButton(
 			Settings::ShowPremium(window, computeRef());
 			return;
 		}
+		window->window().activate();
 		const auto url = computeBotUrl ? computeBotUrl() : QString();
 		if (!url.isEmpty()) {
 			const auto local = Core::TryConvertUrlToLocal(url);
@@ -2144,6 +2155,8 @@ std::vector<PremiumFeature> PremiumFeaturesOrder(
 			return PremiumFeature::NoForwards;
 		} else if (s == u"ai_compose"_q) {
 			return PremiumFeature::AiCompose;
+		} else if (s == u"rich_formatting"_q) {
+			return PremiumFeature::RichFormatting;
 		}
 		return PremiumFeature::kCount;
 	}) | ranges::views::filter([](PremiumFeature type) {

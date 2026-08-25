@@ -40,7 +40,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwindow.h"
 #include "apiwrap.h"
 #include "styles/style_chat_helpers.h"
-#include "styles/style_menu_icons.h"
 
 namespace ChatHelpers {
 
@@ -530,6 +529,7 @@ TabbedSelector::TabbedSelector(
 	}
 	if (hasEmojiTab()) {
 		emoji()->refreshEmoji();
+		setSearchRightReserved(descriptor.searchRightReserved);
 	}
 	setAttribute(Qt::WA_OpaquePaintEvent, false);
 	showAll();
@@ -538,7 +538,7 @@ TabbedSelector::TabbedSelector(
 
 TabbedSelector::~TabbedSelector() = default;
 
-void TabbedSelector::reinstallSwipe(not_null<Ui::RpWidget*> widget) {
+void TabbedSelector::reinstallSwipe(not_null<Inner*> widget) {
 	_swipeLifetime.destroy();
 
 	auto update = [=](Ui::Controls::SwipeContextData data) {
@@ -561,12 +561,20 @@ void TabbedSelector::reinstallSwipe(not_null<Ui::RpWidget*> widget) {
 		}
 	};
 
-	auto init = [=](int, Qt::LayoutDirection direction) {
+	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
 		if (!_tabsSlider) {
 			return Ui::Controls::SwipeHandlerFinishData();
 		}
+		const auto horizontalDelta = (data.direction == Qt::LeftToRight)
+			? 1
+			: -1;
+		if (widget->canConsumeHorizontalScroll(
+				data.cursorPosition,
+				horizontalDelta)) {
+			return Ui::Controls::SwipeHandlerFinishData();
+		}
 		const auto activeSection = _tabsSlider->activeSection();
-		const auto isToLeft = direction == Qt::RightToLeft;
+		const auto isToLeft = data.direction == Qt::RightToLeft;
 		if ((isToLeft && activeSection > 0)
 			|| (!isToLeft && activeSection < _tabs.size() - 1)) {
 			return Ui::Controls::DefaultSwipeBackHandlerFinishData([=] {
@@ -588,6 +596,15 @@ void TabbedSelector::reinstallSwipe(not_null<Ui::RpWidget*> widget) {
 		.update = std::move(update),
 		.init = std::move(init),
 		.dontStart = nullptr,
+		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
+			const auto delta = Ui::ScrollDelta(event);
+			if (std::abs(delta.x()) <= std::abs(delta.y())) {
+				return false;
+			}
+			return widget->canConsumeHorizontalScroll(
+				widget->mapFromGlobal(event->globalPosition().toPoint()),
+				delta.x());
+		},
 		.onLifetime = &_swipeLifetime,
 	});
 }
@@ -625,6 +642,8 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 					? EmojiMode::FullReactions
 					: _mode == Mode::RecentReactions
 					? EmojiMode::RecentReactions
+					: _mode == Mode::CustomEmojiOnly
+					? EmojiMode::CustomOnly
 					: _mode == Mode::PeerTitle
 					? EmojiMode::PeerTitle
 					: EmojiMode::Full),
@@ -777,6 +796,10 @@ void TabbedSelector::resizeEvent(QResizeEvent *e) {
 	update();
 }
 
+void TabbedSelector::contextMenuEvent(QContextMenuEvent *e) {
+	e->accept();
+}
+
 void TabbedSelector::updateScrollGeometry(QSize oldSize) {
 	auto scrollWidth = width() - st::emojiPanRadius;
 	auto scrollHeight = height() - scrollTop() - scrollBottom();
@@ -843,8 +866,12 @@ void TabbedSelector::paintEvent(QPaintEvent *e) {
 		paintSlideFrame(p);
 		if (!_a_slide.animating()) {
 			_slideAnimation.reset();
-			afterShown();
-			_slideFinished.fire({});
+			InvokeQueued(this, [=] {
+				if (!_slideAnimation) {
+					afterShown();
+					_slideFinished.fire({});
+				}
+			});
 		}
 	} else {
 		paintContent(p);
@@ -1090,6 +1117,16 @@ void TabbedSelector::provideRecentEmoji(
 	}
 }
 
+void TabbedSelector::setMarkedCustomIds(
+		const base::flat_set<DocumentId> &ids) {
+	for (const auto &tab : _tabs) {
+		if (tab.type() == SelectorTab::Emoji) {
+			const auto emoji = static_cast<EmojiListWidget*>(tab.widget());
+			emoji->setMarkedCustomIds(ids);
+		}
+	}
+}
+
 void TabbedSelector::checkRestrictedPeer() {
 	if (_currentPeer) {
 		const auto error = (_currentTabType == SelectorTab::Stickers)
@@ -1329,6 +1366,10 @@ void TabbedSelector::switchTab() {
 	}
 }
 
+void TabbedSelector::setSearchRightReserved(int value) {
+	emoji()->setSearchRightReserved(value);
+}
+
 not_null<EmojiListWidget*> TabbedSelector::emoji() const {
 	Expects(hasEmojiTab());
 
@@ -1479,18 +1520,22 @@ void TabbedSelector::Inner::disableScroll(bool disabled) {
 	_disableScrollRequests.fire_copy(disabled);
 }
 
-void TabbedSelector::Inner::checkHideWithBox(
+void TabbedSelector::Inner::showBoxPreventHide(
 		object_ptr<Ui::BoxContent> box) {
-	const auto raw = base::make_weak(box.data());
+	const auto weak = base::make_weak(box.data());
 	_show->showBox(std::move(box));
-	if (!raw) {
-		return;
+	preventHideWithBox(weak);
+}
+
+void TabbedSelector::Inner::preventHideWithBox(
+		base::weak_qptr<Ui::BoxContent> weak) {
+	if (const auto strong = weak.get()) {
+		_preventHideWithBox = true;
+		connect(strong, &QObject::destroyed, this, [=] {
+			_preventHideWithBox = false;
+			_checkForHide.fire({});
+		});
 	}
-	_preventHideWithBox = true;
-	connect(raw.get(), &QObject::destroyed, this, [=] {
-		_preventHideWithBox = false;
-		_checkForHide.fire({});
-	});
 }
 
 void TabbedSelector::Inner::paintEmptySearchResults(

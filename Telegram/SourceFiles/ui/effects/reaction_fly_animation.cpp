@@ -18,7 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 
 // AyuGram includes
-#include "ayu/utils/taptic_engine/taptic_engine.h"
+#include "base/platform/base_platform_haptic.h"
 
 
 namespace Ui {
@@ -40,6 +40,10 @@ ReactionFlyAnimationArgs ReactionFlyAnimationArgs::translated(QPoint point) cons
 		.id = id,
 		.flyIcon = flyIcon,
 		.flyFrom = flyFrom.translated(point),
+		.flyUp = flyUp,
+		.centerSizeMultiplier = centerSizeMultiplier,
+		.flyKeepSize = flyKeepSize,
+		.haptic = haptic,
 	};
 }
 
@@ -59,11 +63,6 @@ auto ReactionFlyAnimation::callback() {
 	return [=] {
 		if (_repaint) {
 			_repaint();
-
-			if (_minis.animating() && !_hapticExecuted) {
-				TapticEngine::generateGeneric();
-				_hapticExecuted = true;
-			}
 		}
 	};
 }
@@ -77,9 +76,12 @@ ReactionFlyAnimation::ReactionFlyAnimation(
 : _owner(owner)
 , _repaint(std::move(repaint))
 , _flyFrom(args.flyFrom)
+, _flyUp(args.flyUp ? args.flyUp : st::reactionFlyUp)
 , _scaleOutDuration(args.scaleOutDuration)
 , _scaleOutTarget(args.scaleOutTarget)
-, _forceFirstFrame(args.forceFirstFrame) {
+, _flyKeepSize(args.flyKeepSize)
+, _forceFirstFrame(args.forceFirstFrame)
+, _haptic(args.haptic) {
 	const auto &list = owner->list(::Data::Reactions::Type::All);
 	auto centerIcon = (DocumentData*)nullptr;
 	auto aroundAnimation = (DocumentData*)nullptr;
@@ -111,6 +113,9 @@ ReactionFlyAnimation::ReactionFlyAnimation(
 		aroundAnimation = i->aroundAnimation;
 		_centerSizeMultiplier = i->centerIcon ? 1. : 0.5;
 	}
+	if (!_custom && args.centerSizeMultiplier > 0.) {
+		_centerSizeMultiplier = args.centerSizeMultiplier;
+	}
 	const auto resolve = [&](
 			std::unique_ptr<AnimatedIcon> &icon,
 			DocumentData *document,
@@ -130,9 +135,11 @@ ReactionFlyAnimation::ReactionFlyAnimation(
 		return true;
 	};
 	generateMiniCopies(size + size / 2, args.miniCopyMultiplier);
+	const auto centerSize = int(base::SafeRound(
+		size * std::max(_centerSizeMultiplier, 1.)));
 	if (args.effectOnly) {
 		_effectOnly = true;
-	} else if (!_custom && !resolve(_center, centerIcon, size)) {
+	} else if (!_custom && !resolve(_center, centerIcon, centerSize)) {
 		return;
 	}
 	resolve(_effect, aroundAnimation, size * 2);
@@ -207,8 +214,8 @@ QRect ReactionFlyAnimation::paintGetArea(
 		return area;
 	}
 	const auto from = _flyFrom.translated(origin);
-	const auto lshift = target.width() / 4;
-	const auto rshift = target.width() / 2 - lshift;
+	const auto lshift = _flyKeepSize ? 0 : (target.width() / 4);
+	const auto rshift = _flyKeepSize ? 0 : (target.width() / 2 - lshift);
 	const auto margins = QMargins{ lshift, lshift, rshift, rshift };
 	target = target.marginsRemoved(margins);
 	const auto progress = _fly.value(1.);
@@ -218,7 +225,7 @@ QRect ReactionFlyAnimation::paintGetArea(
 			_cached,
 			from.y(),
 			target.y(),
-			st::reactionFlyUp,
+			_flyUp,
 			progress),
 		anim::interpolate(from.width(), target.width(), progress),
 		anim::interpolate(from.height(), target.height(), progress));
@@ -393,6 +400,10 @@ int ReactionFlyAnimation::computeParabolicTop(
 }
 
 void ReactionFlyAnimation::startAnimations() {
+	if (_haptic && !_hapticExecuted) {
+		base::Platform::Haptic();
+		_hapticExecuted = true;
+	}
 	if (const auto center = _center.get()) {
 		center->animate(callback());
 	}
@@ -426,6 +437,10 @@ bool ReactionFlyAnimation::finished() const {
 			&& (!_effect || !_effect->animating())
 			&& !_noEffectScaleAnimation.animating()
 			&& !_minis.animating());
+}
+
+bool ReactionFlyAnimation::centerInDefaultState() {
+	return !_custom || _custom->readyInDefaultState();
 }
 
 ReactionFlyCenter ReactionFlyAnimation::takeCenter() {

@@ -356,6 +356,7 @@ void ReactionView::playEffect() {
 		.id = _data.reaction,
 		.miniCopyMultiplier = std::min(1., scaleDown),
 		.effectOnly = true,
+		.haptic = true,
 	};
 	_effect = std::make_unique<Ui::ReactionFlyAnimation>(
 		reactions,
@@ -953,7 +954,8 @@ void Reactions::Panel::create() {
 		[=](bool fast) { hide(mode); },
 		nullptr, // iconFactory
 		nullptr, // paused
-		true);
+		true,
+		_controller->wrap().get());
 
 	_selector->chosen(
 	) | rpl::on_next([=](
@@ -1253,6 +1255,7 @@ void Reactions::animateAndProcess(Chosen &&chosen) {
 				: wrap->mapFromGlobal(chosen.reaction.globalGeometry)),
 			.scaleOutDuration = scaleOutDuration,
 			.scaleOutTarget = scaleOutTarget,
+			.haptic = true,
 		}, target, std::move(done));
 	}
 }

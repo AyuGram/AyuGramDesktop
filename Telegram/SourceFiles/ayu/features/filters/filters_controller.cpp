@@ -33,6 +33,11 @@ bool filterBlocked(const not_null<HistoryItem*> item) {
 			return true;
 		}
 	}
+	if (const auto bot = item->viaBot()) {
+		if (isBlocked(bot)) {
+			return true;
+		}
+	}
 	return false;
 }
 

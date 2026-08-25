@@ -39,7 +39,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_intro.h" // introFragmentIcon.
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
-#include "styles/style_widgets.h"
 
 #include <QtSvg/QSvgRenderer>
 
@@ -80,7 +79,7 @@ PaintRoundImageCallback MultiThumbnail(
 		q.setBrush(st::shadowFg);
 		q.drawRoundedRect(QRect(0, shift, smaller, smaller), radius, radius);
 		q.setPen(st::toastFg);
-		q.setFont(style::font(smaller / 2, style::FontFlag::Semibold, 0));
+		q.setFont(style::font(smaller / 2, style::FontFlag::Bold, 0));
 		q.drawText(
 			QRect(0, shift, smaller, smaller),
 			QString::number(totalCount),
@@ -586,6 +585,8 @@ TextWithEntities GenerateEntryName(const Data::CreditsHistoryEntry &entry) {
 		? tr::lng_credits_box_history_entry_api
 		: entry.reaction
 		? tr::lng_credits_box_history_entry_reaction_name
+		: entry.giftOffer
+		? tr::lng_credits_box_history_entry_gift_offer
 		: entry.giftResale
 		? (entry.in
 			? tr::lng_credits_box_history_entry_gift_sold

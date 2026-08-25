@@ -177,7 +177,7 @@ void AyuSectionBuilder::addChooseButton(ChooseButtonArgs &&args) {
 
 	_builder.add([&](const Builder::BuildContext &ctx) {
 		v::match(ctx, [&](const Builder::WidgetContext &wctx) {
-			AddChooseButtonWithIconAndRightTextInner(
+			const auto button = AddChooseButtonWithIconAndRightTextInner(
 				wctx.container,
 				wctx.controller,
 				initialSelection,
@@ -187,6 +187,12 @@ void AyuSectionBuilder::addChooseButton(ChooseButtonArgs &&args) {
 				icon.icon ? st::settingsButton : st::settingsButtonNoIcon,
 				std::move(icon),
 				setter);
+			if (!id.isEmpty() && wctx.highlights) {
+				wctx.highlights->push_back({
+					id,
+					{ button.get(), {} },
+				});
+			}
 		}, [&](const Builder::SearchContext &sctx) {
 			if (!id.isEmpty()) {
 				sctx.entries->push_back({
@@ -210,12 +216,21 @@ void AyuSectionBuilder::addSlider(SliderArgs &&args) {
 	_builder.add([&](const Builder::BuildContext &ctx) {
 		v::match(ctx, [&](const Builder::WidgetContext &wctx) {
 			const auto container = wctx.container;
-			if (args.showTitle) {
-				container->add(
+			const auto titleButton = args.showTitle
+				? container->add(
 					object_ptr<Button>(container,
 						std::move(args.title),
-						st::settingsButtonNoIcon)
-				)->setAttribute(Qt::WA_TransparentForMouseEvents);
+						st::settingsButtonNoIcon))
+				: nullptr;
+			if (titleButton) {
+				titleButton->setAttribute(
+					Qt::WA_TransparentForMouseEvents);
+				if (!id.isEmpty() && wctx.highlights) {
+					wctx.highlights->push_back({
+						id,
+						{ titleButton, { .rippleShape = true } },
+					});
+				}
 			}
 
 			auto sliderWithLabel = MakeSliderWithLabel(

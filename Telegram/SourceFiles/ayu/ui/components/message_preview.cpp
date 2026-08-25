@@ -85,7 +85,7 @@ MessagePreview::MessagePreview(
 		.replyTo = FullReplyTo{
 			.messageId = _state->reply->data()->fullId(),
 		},
-		.date = base::unixtime::now(),
+		.date = base::unixtime::now() - 3600,
 	}, TextWithEntities{ u"You need to go outside and touch some grass..."_q },
 	MTP_messageMediaEmpty());
 

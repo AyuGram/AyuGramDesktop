@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_styles.h"
 
@@ -509,7 +510,10 @@ QRect Service::innerGeometry() const {
 	return countGeometry();
 }
 
-bool Service::consumeHorizontalScroll(QPoint position, int delta) {
+bool Service::consumeHorizontalScroll(
+		QPoint position,
+		int delta,
+		Qt::ScrollPhase phase) {
 	if (const auto media = this->media()) {
 		return media->consumeHorizontalScroll(position, delta);
 	}
@@ -998,6 +1002,9 @@ EmptyPainter::EmptyPainter(not_null<History*> history)
 , _text(st::msgMinWidth) {
 	if (NeedAboutGroup(_history)) {
 		fillAboutGroup();
+	} else if (_history->peer->isUser()
+		&& AyuSettings::getInstance().disableGreetingSticker()) {
+		SetText(_header, tr::lng_chat_intro_default_title(tr::now));
 	}
 }
 
@@ -1049,7 +1056,33 @@ void EmptyPainter::paint(
 		not_null<const Ui::ChatStyle*> st,
 		int width,
 		int height) {
+	if (_phrases.empty() && _text.isEmpty() && _header.isEmpty()) {
+		return;
+	}
 	if (_phrases.empty() && _text.isEmpty()) {
+		const auto w = st::msgServiceFont->width(_header.toString())
+			+ st::msgPadding.left()
+			+ st::msgPadding.right();
+		const auto h = st::msgServiceFont->height
+			+ st::msgServicePadding.top()
+			+ st::msgServicePadding.bottom();
+		const auto rect = QRect(
+			(width - w) / 2,
+			(height - h) / 2,
+			w,
+			h);
+		ServiceMessagePainter::PaintBubble(
+			p,
+			st->msgServiceBg(),
+			st->serviceBgCornersNormal(),
+			rect);
+		p.setPen(st->msgServiceFg());
+		p.setFont(st::msgServiceFont->f);
+		p.drawTextLeft(
+			rect.left() + st::msgPadding.left(),
+			rect.top() + st::msgServicePadding.top(),
+			width,
+			_header.toString());
 		return;
 	}
 	constexpr auto kMaxTextLines = 3;

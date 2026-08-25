@@ -1,9 +1,5 @@
 ## Build instructions for macOS
 
-### Note
-
-The build has only been tested with Xcode 26.1. Although it may work on lower Xcode versions, this is not guaranteed.
-
 ### Prepare folder
 
 Choose a folder for the future build, for example **/Users/user/TBuild**. It will be named ***BuildPath*** in the rest of this document. All commands will be launched from Terminal.
@@ -17,7 +13,7 @@ Choose a folder for the future build, for example **/Users/user/TBuild**. It wil
 Go to ***BuildPath*** and run
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    brew install git automake cmake wget pkg-config gnu-tar ninja nasm meson
+    brew install git automake libtool cmake wget pkg-config gnu-tar ninja nasm meson
 
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 

@@ -46,7 +46,9 @@ namespace Window {
 	if constexpr (!Platform::IsMacStoreBuild()
 		&& !Platform::IsWindowsStoreBuild()) {
 		Ui::InstallTooltip(label, [] {
-			return u"Build date: %1."_q.arg(__DATE__);
+			return u"Build date: %1.\nQt version: %2."_q
+				.arg(__DATE__)
+				.arg(QT_VERSION_STR);
 		});
 	}
 	return label;
@@ -224,6 +226,7 @@ not_null<Ui::SettingsButton*> AddMyChannelsBox(
 		} else {
 			data.enumerateBroadcasts([&](not_null<ChannelData*> channel) {
 				if (channel->amCreator()
+					&& !channel->isCommunity()
 					&& !ranges::contains(ids, channel->id)) {
 					ids.push_back(channel->id);
 					add(channel, box->verticalLayout());

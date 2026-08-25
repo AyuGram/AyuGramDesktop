@@ -10,6 +10,7 @@
 #include "tray.h"
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
+#include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
 #include "features/filters/filters_cache_controller.h"
@@ -516,7 +517,6 @@ void AyuSettings::validate() {
 
 	validateRange(_messageBubbleRadius, 0, 16, defaults._messageBubbleRadius);
 	validateRange(_wideMultiplier, 0.5, 4.0, defaults._wideMultiplier);
-	validateRange(_recentStickersCount, 1, 200, defaults._recentStickersCount);
 	validateRange(_avatarCorners, 0, AyuUiSettings::kMaxAvatarCorners, defaults._avatarCorners);
 
 	const auto embeddedType = _messageShotSettings._embeddedThemeType.current();
@@ -735,9 +735,9 @@ void AyuSettings::setEditedMark(const QString &val) {
 	save();
 }
 
-void AyuSettings::setRecentStickersCount(int val) {
-	if (_recentStickersCount.current() == val) return;
-	_recentStickersCount = val;
+void AyuSettings::setUnlimitedRecentStickers(bool val) {
+	if (_unlimitedRecentStickers.current() == val) return;
+	_unlimitedRecentStickers = val;
 	save();
 }
 
@@ -963,6 +963,12 @@ void AyuSettings::setQuickAdminShortcuts(bool val) {
 	save();
 }
 
+void AyuSettings::setDisableGreetingSticker(bool val) {
+	if (_disableGreetingSticker.current() == val) return;
+	_disableGreetingSticker = val;
+	save();
+}
+
 void AyuSettings::setShowPeerId(PeerIdDisplay val) {
 	if (_showPeerId.current() == val) return;
 	_showPeerId = val;
@@ -1002,6 +1008,12 @@ void AyuSettings::setGifConfirmation(bool val) {
 void AyuSettings::setVoiceConfirmation(bool val) {
 	if (_voiceConfirmation.current() == val) return;
 	_voiceConfirmation = val;
+	save();
+}
+
+void AyuSettings::setRoundConfirmation(bool val) {
+	if (_roundConfirmation.current() == val) return;
+	_roundConfirmation = val;
 	save();
 }
 
@@ -1080,6 +1092,13 @@ void AyuSettings::setSttHardwareAcceleration(bool val) {
 	save();
 }
 
+void AyuSettings::setStreamerMode(bool val) {
+	if (_streamerMode.current() == val) return;
+	_streamerMode = val;
+	AyuFeatures::StreamerMode::apply(val);
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1100,6 +1119,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"disableAds", s._disableAds.current()},
 		{"disableStories", s._disableStories.current()},
 		{"disableCustomBackgrounds", s._disableCustomBackgrounds.current()},
+		{"hidePremiumStatuses", s._hidePremiumStatuses.current()},
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
 		{"collapseSimilarChannels", s._collapseSimilarChannels.current()},
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
@@ -1122,7 +1142,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"replaceBottomInfoWithIcons", s._replaceBottomInfoWithIcons.current()},
 		{"deletedMark", s._deletedMark.current()},
 		{"editedMark", s._editedMark.current()},
-		{"recentStickersCount", s._recentStickersCount.current()},
+		{"unlimitedRecentStickers", s._unlimitedRecentStickers.current()},
 		{"showReactionsPanelInContextMenu", s._showReactionsPanelInContextMenu.current()},
 		{"showViewsPanelInContextMenu", s._showViewsPanelInContextMenu.current()},
 		{"showHideMessageInContextMenu", s._showHideMessageInContextMenu.current()},
@@ -1159,6 +1179,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"hideAllChatsFolder", s._hideAllChatsFolder.current()},
 		{"channelBottomButton", s._channelBottomButton.current()},
 		{"quickAdminShortcuts", s._quickAdminShortcuts.current()},
+		{"disableGreetingSticker", s._disableGreetingSticker.current()},
 		{"showPeerId", s._showPeerId.current()},
 		{"showMessageSeconds", s._showMessageSeconds.current()},
 		{"showMessageShot", s._showMessageShot.current()},
@@ -1166,6 +1187,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"stickerConfirmation", s._stickerConfirmation.current()},
 		{"gifConfirmation", s._gifConfirmation.current()},
 		{"voiceConfirmation", s._voiceConfirmation.current()},
+		{"roundConfirmation", s._roundConfirmation.current()},
 		{"translationProvider", s._translationProvider.current()},
 		{"adaptiveCoverColor", s._adaptiveCoverColor.current()},
 		{"improveLinkPreviews", s._improveLinkPreviews.current()},
@@ -1177,6 +1199,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"sttLanguage", s._sttLanguage.current()},
 		{"whisperModelType", s._whisperModelType.current()},
 		{"sttHardwareAcceleration", s._sttHardwareAcceleration.current()},
+		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1205,6 +1228,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._disableAds = j.value("disableAds", defaults._disableAds.current());
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());
 	s._disableCustomBackgrounds = j.value("disableCustomBackgrounds", defaults._disableCustomBackgrounds.current());
+	s._hidePremiumStatuses = j.value("hidePremiumStatuses", defaults._hidePremiumStatuses.current());
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());
 	s._collapseSimilarChannels = j.value("collapseSimilarChannels", defaults._collapseSimilarChannels.current());
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());
@@ -1227,7 +1251,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._replaceBottomInfoWithIcons = j.value("replaceBottomInfoWithIcons", defaults._replaceBottomInfoWithIcons.current());
 	s._deletedMark = j.value("deletedMark", defaults._deletedMark.current());
 	s._editedMark = j.value("editedMark", defaults._editedMark.current());
-	s._recentStickersCount = j.value("recentStickersCount", defaults._recentStickersCount.current());
+	s._unlimitedRecentStickers = j.value("unlimitedRecentStickers", defaults._unlimitedRecentStickers.current());
 	s._showReactionsPanelInContextMenu = j.value("showReactionsPanelInContextMenu", defaults._showReactionsPanelInContextMenu.current());
 	s._showViewsPanelInContextMenu = j.value("showViewsPanelInContextMenu", defaults._showViewsPanelInContextMenu.current());
 	s._showHideMessageInContextMenu = j.value("showHideMessageInContextMenu", defaults._showHideMessageInContextMenu.current());
@@ -1264,6 +1288,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._hideAllChatsFolder = j.value("hideAllChatsFolder", defaults._hideAllChatsFolder.current());
 	s._channelBottomButton = j.value("channelBottomButton", defaults._channelBottomButton.current());
 	s._quickAdminShortcuts = j.value("quickAdminShortcuts", defaults._quickAdminShortcuts.current());
+	s._disableGreetingSticker = j.value("disableGreetingSticker", defaults._disableGreetingSticker.current());
 	s._showPeerId = j.value("showPeerId", defaults._showPeerId.current());
 	s._showMessageSeconds = j.value("showMessageSeconds", defaults._showMessageSeconds.current());
 	s._showMessageShot = j.value("showMessageShot", defaults._showMessageShot.current());
@@ -1271,6 +1296,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._stickerConfirmation = j.value("stickerConfirmation", defaults._stickerConfirmation.current());
 	s._gifConfirmation = j.value("gifConfirmation", defaults._gifConfirmation.current());
 	s._voiceConfirmation = j.value("voiceConfirmation", defaults._voiceConfirmation.current());
+	s._roundConfirmation = j.value("roundConfirmation", defaults._roundConfirmation.current());
 	s._translationProvider = j.value("translationProvider", defaults._translationProvider.current());
 	s._adaptiveCoverColor = j.value("adaptiveCoverColor", defaults._adaptiveCoverColor.current());
 	s._improveLinkPreviews = j.value("improveLinkPreviews", defaults._improveLinkPreviews.current());
@@ -1282,6 +1308,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._sttLanguage = j.value("sttLanguage", defaults._sttLanguage.current());
 	s._whisperModelType = j.value("whisperModelType", defaults._whisperModelType.current());
 	s._sttHardwareAcceleration = j.value("sttHardwareAcceleration", defaults._sttHardwareAcceleration.current());
+	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

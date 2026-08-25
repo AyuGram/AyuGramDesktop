@@ -63,6 +63,7 @@ public:
 		const QVariant &context) override;
 	bool copyPreOnClick(const QVariant &context) override;
 	rpl::producer<> forcePopupMenuHideRequests() override;
+	void preparePopupMenu(not_null<QWidget*> widget) override;
 	const Ui::Emoji::One *defaultEmojiVariant(
 		const Ui::Emoji::One *emoji) override;
 

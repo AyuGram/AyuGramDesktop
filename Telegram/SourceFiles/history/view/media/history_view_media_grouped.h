@@ -10,7 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_media.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
+
+// AyuGram includes
 #include "ui/effects/animations.h"
+
 
 namespace Data {
 class Media;
@@ -100,7 +103,9 @@ public:
 		return true;
 	}
 	QRect groupItemRect(int index) const override;
+	[[nodiscard]] Media *partMediaAt(QPoint point) const;
 	bool enforceBubbleWidth() const override;
+	int contributedMaxMonospaceWidth() const override;
 
 	void stopAnimation() override;
 	void checkAnimation() override;
