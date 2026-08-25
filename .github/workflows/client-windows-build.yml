@@ -1,0 +1,84 @@
+name: Client Windows build
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_id:
+        description: TDESKTOP_API_ID (my.telegram.org)
+        required: false
+        default: "2040"
+      api_hash:
+        description: TDESKTOP_API_HASH (my.telegram.org)
+        required: false
+        default: "b18441a1ff607e10a989891a5462e627"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+
+      - uses: Eden-CI/msvc-dev-cmd@master
+        with:
+          arch: x64
+          toolset: "14.44"
+
+      - name: Patch cmake debug info flags
+        shell: bash
+        run: |
+          sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
+
+      - name: NuGet sources
+        shell: cmd
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            Libraries\win64
+            ThirdParty
+          key: win64-libs-v1-${{ hashFiles('Telegram/build/prepare/win.bat', 'Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+          restore-keys: |
+            win64-libs-v1-
+
+      - name: Prepare libraries
+        run: Telegram\build\prepare\win.bat skip-release silent
+
+      # CMAKE_POLICY_DEFAULT_CMP0194=NEW: silences a dev warning from the
+      # whisper.cpp/ggml submodule that -Werror=dev otherwise turns fatal.
+      - name: Configure
+        run: >
+          Telegram\configure.bat x64
+          -D TDESKTOP_API_ID=${{ inputs.api_id }}
+          -D TDESKTOP_API_HASH=${{ inputs.api_hash }}
+          -D CMAKE_POLICY_DEFAULT_CMP0194=NEW
+          -D CMAKE_CONFIGURATION_TYPES=Debug
+          -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF
+          -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
+
+      - name: Build
+        run: cmake --build out --config Debug -- /m
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path out -Filter AyuGram.exe -Recurse -File | Select-Object -First 1
+          if (-not $exe) { throw "AyuGram.exe not found under out\" }
+          New-Item -ItemType Directory -Path package | Out-Null
+          Copy-Item $exe.FullName -Destination package\AyuGram.exe
+          Compress-Archive -Path package\* -DestinationPath AyuGram-windows-x64.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-windows-x64
+          path: AyuGram-windows-x64.zip
