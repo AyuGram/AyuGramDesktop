@@ -7,6 +7,7 @@
 #include "ayu/ui/settings/ayu_builder.h"
 
 #include "ayu/ayu_settings.h"
+#include "base/event_filter.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_styles.h"
@@ -67,6 +68,8 @@ Ui::SettingsButton *AyuSectionBuilder::addToggle(ToggleArgs &&args) {
 	auto getter = std::move(args.getter);
 	auto setter = std::move(args.setter);
 	const auto initialValue = getter();
+	const auto disabled = args.disabled;
+	const auto tooltip = std::move(args.tooltip);
 
 	const auto button = _builder.addButton({
 		.id = std::move(args.id),
@@ -79,16 +82,33 @@ Ui::SettingsButton *AyuSectionBuilder::addToggle(ToggleArgs &&args) {
 		.shown = std::move(args.shown),
 	});
 	if (button) {
-		button->toggledValue(
-		) | rpl::filter(
-			[=](bool enabled) {
-				return (enabled != getter());
+		if (disabled) {
+			button->setDisabled(true);
+			if (!tooltip.isEmpty()) {
+				button->setToolTip(tooltip);
 			}
-		) | rpl::on_next(
-			[=](bool enabled) {
-				setter(enabled);
-			},
-			button->lifetime());
+			base::install_event_filter(button, [=](not_null<QEvent*> e) {
+				switch (e->type()) {
+				case QEvent::MouseButtonPress:
+				case QEvent::MouseButtonRelease:
+				case QEvent::MouseButtonDblClick:
+					return base::EventFilterResult::Cancel;
+				default:
+					return base::EventFilterResult::Continue;
+				}
+			});
+		} else {
+			button->toggledValue(
+			) | rpl::filter(
+				[=](bool enabled) {
+					return (enabled != getter());
+				}
+			) | rpl::on_next(
+				[=](bool enabled) {
+					setter(enabled);
+				},
+				button->lifetime());
+		}
 	}
 	return button;
 }

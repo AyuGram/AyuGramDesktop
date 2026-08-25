@@ -69,6 +69,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/features/message_shot/message_shot.h"
+#include "ayu/ayu_settings.h"
 
 
 namespace HistoryView {
@@ -2642,12 +2643,16 @@ void Gif::ensureTranscribeButton() const {
 	}
 
 	const auto media = _parent->data()->media();
+
+	// AyuGram: local STT lets the button show without premium.
+	const auto canTranscribe = AyuSettings::getInstance().sttEnabled()
+		|| _data->session().premium()
+		|| _data->session().api().transcribes().trialsSupport();
 	if (_data->isVideoMessage()
 		&& (!media || !media->ttlSeconds())
 		&& !_parent->data()->isScheduled()
 		&& !_parent->data()->isAdminLogEntry()
-		&& (_data->session().premium()
-			|| _data->session().api().transcribes().trialsSupport())) {
+		&& canTranscribe) {
 		if (!_transcribe) {
 			_transcribe = std::make_unique<TranscribeButton>(
 				_realParent,

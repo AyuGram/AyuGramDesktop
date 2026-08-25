@@ -94,6 +94,9 @@
 [submodule "Telegram/lib_icu"]
 	path = Telegram/lib_icu
 	url = https://github.com/AyuGram/lib_icu.git
+[submodule "Telegram/ThirdParty/whisper.cpp"]
+	path = Telegram/ThirdParty/whisper.cpp
+	url = https://github.com/ggml-org/whisper.cpp
 [submodule "Telegram/ThirdParty/cmark-gfm"]
 	path = Telegram/ThirdParty/cmark-gfm
 	url = https://github.com/github/cmark-gfm.git

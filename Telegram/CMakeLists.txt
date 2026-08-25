@@ -25,6 +25,46 @@ add_subdirectory(codegen)
 add_subdirectory(lib_icu)
 # AyuGram filters
 
+# AyuGram STT: whisper.cpp
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
+    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    # AyuGram STT: only CPU is statically linked
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+    # dynamic backend loading via dlopen breaks static builds
+    set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ON CACHE BOOL "" FORCE)
+    # whisper.cpp pins cmake_minimum_required(VERSION 3.5); CMake 4.x
+    # removed <3.10 compatibility, so bump the override (4.3 needs >= 3.10).
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+    # ggml-cpu's CMake appends to ARCH_FLAGS/ARCH_DEFINITIONS without
+    # initializing them; seed them here so the inherited scope is clean
+    # (CMake functions read unset locals from the calling scope).
+    set(ARCH_FLAGS "")
+    set(ARCH_DEFINITIONS "")
+    add_subdirectory(ThirdParty/whisper.cpp whisper_build)
+    set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS OFF CACHE BOOL "" FORCE)
+    # ggml-backend-reg.cpp uses std::filesystem (requires 10.15), but TDesktop targets 10.13
+    if (APPLE AND TARGET ggml)
+        set_target_properties(ggml PROPERTIES XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.15")
+        target_compile_options(ggml PRIVATE -mmacosx-version-min=10.15)
+    endif()
+    target_link_libraries(Telegram PRIVATE whisper)
+    target_include_directories(Telegram PRIVATE
+        ThirdParty/whisper.cpp/include
+        ThirdParty/whisper.cpp/ggml/include)
+    target_compile_definitions(Telegram PRIVATE HAVE_WHISPER)
+    execute_process(
+        COMMAND git rev-parse HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp"
+        OUTPUT_VARIABLE WHISPER_CPP_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    target_compile_definitions(Telegram PRIVATE WHISPER_CPP_COMMIT="${WHISPER_CPP_COMMIT}")
+endif()
+
 get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
 
@@ -235,6 +275,28 @@ set(ayugram_files
         ayu/features/translator/implementations/yandex.h
         ayu/features/translator/implementations/base.cpp
         ayu/features/translator/implementations/base.h
+        ayu/features/stt/stt_manager.cpp
+        ayu/features/stt/stt_manager.h
+        ayu/features/stt/stt_transcribe_provider.cpp
+        ayu/features/stt/stt_transcribe_provider.h
+)
+
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/whisper.cpp/CMakeLists.txt")
+    nice_target_sources(Telegram ${src_loc}
+    PRIVATE
+        ayu/features/stt/whisper_service.cpp
+        ayu/features/stt/whisper_service.h
+        ayu/features/stt/download_helper.cpp
+        ayu/features/stt/download_helper.h
+        ayu/features/stt/ggml_backend_detector.cpp
+        ayu/features/stt/ggml_backend_detector.h
+        ayu/features/stt/ggml_backend_manager.cpp
+        ayu/features/stt/ggml_backend_manager.h
+    )
+endif()
+
+nice_target_sources(Telegram ${src_loc}
+PRIVATE
         ayu/features/filters/filters_controller.cpp
         ayu/features/filters/filters_controller.h
         ayu/features/filters/filters_cache_controller.cpp
@@ -2241,6 +2303,8 @@ if (APPLE)
     nice_target_sources(Telegram ${src_loc}
     PRIVATE
         tray_accounts_menu.cpp
+        ayu/features/stt/platform/stt_mac.mm
+        ayu/features/stt/platform/stt_mac.h
         media/view/media_view_metal_texture.mm
         media/streaming/media_streaming_native_frame_mac.mm
     )
@@ -2323,6 +2387,7 @@ elseif (APPLE)
     if (NOT DESKTOP_APP_USE_PACKAGED)
         target_link_libraries(Telegram PRIVATE desktop-app::external_iconv)
     endif()
+    target_link_libraries(Telegram PRIVATE "-framework Speech" "-framework AVFoundation")
 
     target_link_frameworks(Telegram PRIVATE CoreBluetooth)
     target_link_frameworks_weak(Telegram PRIVATE UserNotifications)

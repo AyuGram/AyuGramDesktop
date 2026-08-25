@@ -1062,6 +1062,36 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 	save();
 }
 
+void AyuSettings::setSttEnabled(bool val) {
+	if (_sttEnabled.current() == val) return;
+	_sttEnabled = val;
+	save();
+}
+
+void AyuSettings::setSttEngine(STTEngine val) {
+	if (_sttEngine.current() == val) return;
+	_sttEngine = val;
+	save();
+}
+
+void AyuSettings::setSttLanguage(const QString &val) {
+	if (_sttLanguage.current() == val) return;
+	_sttLanguage = val;
+	save();
+}
+
+void AyuSettings::setWhisperModelType(WhisperModel val) {
+	if (_whisperModelType.current() == val) return;
+	_whisperModelType = val;
+	save();
+}
+
+void AyuSettings::setSttHardwareAcceleration(bool val) {
+	if (_sttHardwareAcceleration.current() == val) return;
+	_sttHardwareAcceleration = val;
+	save();
+}
+
 void AyuSettings::setStreamerMode(bool val) {
 	if (_streamerMode.current() == val) return;
 	_streamerMode = val;
@@ -1164,6 +1194,11 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"sttEnabled", s._sttEnabled.current()},
+		{"sttEngine", s._sttEngine.current()},
+		{"sttLanguage", s._sttLanguage.current()},
+		{"whisperModelType", s._whisperModelType.current()},
+		{"sttHardwareAcceleration", s._sttHardwareAcceleration.current()},
 		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
@@ -1268,6 +1303,11 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._sttEnabled = j.value("sttEnabled", defaults._sttEnabled.current());
+	s._sttEngine = j.value("sttEngine", defaults._sttEngine.current());
+	s._sttLanguage = j.value("sttLanguage", defaults._sttLanguage.current());
+	s._whisperModelType = j.value("whisperModelType", defaults._whisperModelType.current());
+	s._sttHardwareAcceleration = j.value("sttHardwareAcceleration", defaults._sttHardwareAcceleration.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {

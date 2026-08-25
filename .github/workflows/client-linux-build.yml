@@ -1,0 +1,48 @@
+name: Client Linux build
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_id:
+        description: TDESKTOP_API_ID (my.telegram.org)
+        required: false
+        default: "2040"
+      api_hash:
+        description: TDESKTOP_API_HASH (my.telegram.org)
+        required: false
+        default: "b18441a1ff607e10a989891a5462e627"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/telegramdesktop/tdesktop/centos_env:latest
+      options: --user root
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build
+        run: >
+          Telegram/build/docker/centos_env/build.sh
+          -D TDESKTOP_API_ID=${{ inputs.api_id }}
+          -D TDESKTOP_API_HASH=${{ inputs.api_hash }}
+
+      - name: Package
+        run: |
+          binary=$(find out -maxdepth 3 -type f -name AyuGram -perm -u+x | head -n1)
+          test -n "$binary" || { echo "::error::AyuGram binary not found under out/"; exit 1; }
+          dest=package
+          mkdir -p "$dest"
+          cp "$binary" "$dest/AyuGram"
+          strip "$dest/AyuGram"
+          tar -C "$dest" -czf AyuGram-linux-x64.tar.gz .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-linux-x64
+          path: AyuGram-linux-x64.tar.gz

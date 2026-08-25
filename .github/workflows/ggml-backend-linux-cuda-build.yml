@@ -1,0 +1,115 @@
+name: GGML backend Linux CUDA build
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [dev]
+    paths:
+      - 'Telegram/ThirdParty/whisper.cpp'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/telegramdesktop/tdesktop/centos_env:latest
+      options: --user root
+    outputs:
+      short-sha: ${{ steps.vars.outputs.short-sha }}
+      full-sha: ${{ steps.vars.outputs.full-sha }}
+      api-version: ${{ steps.vars.outputs.api-version }}
+      whisper-version: ${{ steps.vars.outputs.version }}
+      zip-name: ${{ steps.package.outputs.zip_path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            .github
+            Telegram/ThirdParty/whisper.cpp
+
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Init whisper.cpp submodule
+        run: git submodule update --init Telegram/ThirdParty/whisper.cpp
+
+      - id: vars
+        uses: ./.github/actions/ggml-backend/resolve-vars
+
+      - name: Install CUDA toolkit (manual, CentOS container)
+        run: |
+          dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+          dnf -y install cuda-nvcc-12-4 cuda-cudart-devel-12-4 libcublas-devel-12-4 cuda-driver-devel-12-4
+          echo "CUDA_PATH=/usr/local/cuda-12.4" >> "$GITHUB_ENV"
+          echo "/usr/local/cuda-12.4/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+      - name: Install CUDA-compatible host compiler
+        run: dnf -y install gcc-toolset-13-gcc gcc-toolset-13-gcc-c++
+
+      # GGML_NATIVE=OFF fat-bins for all archs (huge size), so pin
+      # CMAKE_CUDA_ARCHITECTURES to supported GPU gens only:
+      # 61 Pascal, 75 Turing, 86 Ampere, 89 Ada.
+      - name: Configure
+        run: >
+          cmake -S Telegram/ThirdParty/whisper.cpp -B build
+          -DBUILD_SHARED_LIBS=ON
+          -DGGML_BACKEND_DL=ON
+          -DGGML_NATIVE=OFF
+          -DCMAKE_CUDA_ARCHITECTURES="61;75;86;89"
+          -DWHISPER_BUILD_TESTS=OFF
+          -DWHISPER_BUILD_EXAMPLES=OFF
+          -DCMAKE_BUILD_TYPE=Release
+          -DGGML_CUDA=ON
+          -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/gcc
+          -DCMAKE_BUILD_RPATH='$ORIGIN'
+          -DCMAKE_INSTALL_RPATH='$ORIGIN'
+
+      - name: Build
+        run: cmake --build build --target ggml-cuda ggml-base -- -j"$(nproc)"
+
+      - name: Package
+        id: package
+        run: |
+          dnf install -y zip
+          dest=package
+          mkdir -p "$dest"
+          find build -name "libggml-cuda.so" -exec cp {} "$dest/" \;
+          find build -name "libggml-base.so.0" -exec cp {} "$dest/" \;
+          test -f "$dest/libggml-cuda.so" || { echo "::error::libggml-cuda.so not found in build output"; exit 1; }
+          test -f "$dest/libggml-base.so.0" || { echo "::error::libggml-base.so.0 not found in build output"; exit 1; }
+          cp -P "$CUDA_PATH"/lib64/libcublas.so.* "$dest/"
+          cp -P "$CUDA_PATH"/lib64/libcublasLt.so.* "$dest/"
+          zipName="ggml-cuda-linux-x64-${{ steps.vars.outputs.short-sha }}.zip"
+          # -y keeps symlinks as symlinks, else zip dereferences and
+          # duplicates the ~110-440MB lib under both names.
+          (cd "$dest" && zip -y "../$zipName" ./*)
+          echo "zip_path=$zipName" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ggml-cuda-linux-x64
+          path: ${{ steps.package.outputs.zip_path }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ggml-manifest-${{ github.sha }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ggml-cuda-linux-x64
+
+      - uses: ./.github/actions/ggml-backend/publish
+        with:
+          zip-path: ${{ needs.build.outputs.zip-name }}
+          short-sha: ${{ needs.build.outputs.short-sha }}
+          whisper-cpp-commit: ${{ needs.build.outputs.full-sha }}
+          api-version: ${{ needs.build.outputs.api-version }}
+          whisper-cpp-version: ${{ needs.build.outputs.whisper-version }}
