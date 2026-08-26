@@ -136,12 +136,13 @@ void GenerateItems(
 
 	auto media = MTP_messageMediaEmpty();
 	if (!message.documentSerialized.empty()) {
-		const auto from = reinterpret_cast<const mtpPrime*>(message.documentSerialized.data());
-		const auto end = from + message.documentSerialized.size() / sizeof(mtpPrime);
-		auto current = from;
-		MTPMessageMedia parsed;
-		if (parsed.read(current, end) && parsed.type() != 0) {
-			media = std::move(parsed);
+		auto parsed = AyuMapper::deserializeObject<MTPMessageMedia>(message.documentSerialized);
+		if (parsed.type() != 0) {
+			if (parsed.type() == mtpc_messageMediaPhoto && !parsed.c_messageMediaPhoto().vphoto()) {
+				// Ignore legacy broken photo payload
+			} else {
+				media = std::move(parsed);
+			}
 		}
 	}
 

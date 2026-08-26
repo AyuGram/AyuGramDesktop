@@ -41,12 +41,17 @@ template<typename MTPObject>
 	if (serialized.empty()) {
 		return MTPObject();
 	}
+	if (serialized.size() % sizeof(mtpPrime) != 0) {
+		return MTPObject();
+	}
 	const auto from = reinterpret_cast<const mtpPrime*>(serialized.data());
 	const auto end = from + serialized.size() / sizeof(mtpPrime);
 
 	auto current = from;
 	MTPObject result;
-	(void)result.read(current, end);
+	if (!result.read(current, end)) {
+		return MTPObject();
+	}
 
 	return result;
 }
