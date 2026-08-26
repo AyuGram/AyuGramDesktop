@@ -23,6 +23,13 @@ ayuRepeatMenuIcon: icon {{ "ayu/repeat", menuIconColor }};
 ayuContactsMutualIcon: icon {{ "ayu/contacts_mutual", contactsStatusFg }};
 ayuContactsMutualIconOver: icon {{ "ayu/contacts_mutual", contactsStatusFgOver }};
 
+ayuFolderShowIcon: icon {{ "ayu/folder_show", menuIconColor }};
+ayuFolderHideIcon: icon {{ "ayu/folder_hide", menuIconColor }};
+ayuFolderShowSettingsIcon: icon {{ "ayu/folder_show_settings", menuIconFg }};
+ayuFolderHideSettingsIcon: icon {{ "ayu/folder_hide_settings", menuIconFg }};
+ayuFolderShowSettingsIconOver: icon {{ "ayu/folder_show_settings", menuIconFgOver }};
+ayuFolderHideSettingsIconOver: icon {{ "ayu/folder_hide_settings", menuIconFgOver }};
+
 messageFieldAttachIcon: icon {{ "ayu/message_field/attach", menuIconColor }};
 messageFieldCommandsIcon: icon {{ "ayu/message_field/commands", menuIconColor }};
 messageFieldEmojiIcon: icon {{ "ayu/message_field/emoji", menuIconColor }};

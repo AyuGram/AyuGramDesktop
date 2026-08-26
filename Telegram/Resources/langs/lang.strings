@@ -8743,6 +8743,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SingleCornerRadius" = "Single Corner Radius";
 "ayu_SingleCornerRadiusDescription" = "Forums will have the same avatar shape as chats.";
 "ayu_HideAllChats" = "Hide \"All Chats\" Tab";
+"ayu_HideFolder" = "Hide folder";
+"ayu_ShowFolder" = "Show folder";
 "ayu_ChannelBottomButton" = "Channel Bottom Button";
 "ayu_ChannelBottomButtonHide" = "Hide";
 "ayu_ChannelBottomButtonMute" = "Mute";

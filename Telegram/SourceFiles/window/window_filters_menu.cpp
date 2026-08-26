@@ -51,6 +51,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/hidden_folders/hidden_folders.h"
 
 
 namespace Window {
@@ -369,9 +370,12 @@ void FiltersMenu::refresh() {
 	if (!reorderAll && !settings.hideAllChatsFolder()) {
 		_reorder->addPinnedInterval(0, 1);
 	}
+
+	const auto visibleFilters = AyuFeatures::HiddenFolders::VisibleOnly(
+		filters->list());
 	_reorder->addPinnedInterval(
 		premiumFrom,
-		std::max(1, int(filters->list().size()) - maxLimit));
+		std::max(1, int(visibleFilters.size()) - maxLimit));
 
 	// Remember which folder holds keyboard focus so the roving Tab-stop can be
 	// re-established on its replacement after the rebuild: the new buttons are
@@ -387,7 +391,13 @@ void FiltersMenu::refresh() {
 
 	auto now = base::flat_map<int, base::unique_qptr<Ui::SideBarButton>>();
 	const auto &currentFilter = _session->activeChatsFilterCurrent();
-	for (const auto &filter : filters->list()) {
+	const auto firstVisibleId = !visibleFilters.empty()
+		? visibleFilters.front().id()
+		: FilterId();
+	if (AyuFeatures::HiddenFolders::IsHidden(currentFilter)) {
+		_session->setActiveChatsFilter(firstVisibleId);
+	}
+	for (const auto &filter : visibleFilters) {
 		const auto nextIsLocked = (now.size() >= premiumFrom);
 		if (nextIsLocked && (currentFilter == filter.id())) {
 			_session->setActiveChatsFilter(FilterId(0));
@@ -433,7 +443,7 @@ void FiltersMenu::refresh() {
 
 	if (settings.hideAllChatsFolder()
 		&& _session->widget()->sessionContent()) {
-		_session->setActiveChatsFilter(filters->lookupId(0));
+		_session->setActiveChatsFilter(firstVisibleId);
 	}
 
 	if (refocus) {
@@ -788,6 +798,8 @@ void FiltersMenu::showMenu(QPoint position, FilterId id) {
 			std::move(filteredChats),
 			addAction);
 
+		AyuFeatures::HiddenFolders::AddToggleAction(addAction, id);
+
 		addAction({
 			.text = tr::lng_filters_context_remove(tr::now),
 			.handler = crl::guard(&_outer, [=, this] {
@@ -839,9 +851,11 @@ void FiltersMenu::applyReorder(
 			filters->moveAllToFront();
 		}
 	}
-	Assert(oldPosition >= 0 && oldPosition < list.size());
-	Assert(newPosition >= 0 && newPosition < list.size());
-	const auto id = list[oldPosition].id();
+
+	const auto visibleFilters = AyuFeatures::HiddenFolders::VisibleOnly(list);
+	Assert(oldPosition >= 0 && oldPosition < int(visibleFilters.size()));
+	Assert(newPosition >= 0 && newPosition < int(visibleFilters.size()));
+	const auto id = visibleFilters[oldPosition].id();
 	const auto i = _filters.find(id);
 	Assert(i != end(_filters));
 	Assert(i->second == widget);
@@ -851,7 +865,11 @@ void FiltersMenu::applyReorder(
 	) | ranges::views::transform(
 		&Data::ChatFilter::id
 	) | ranges::to_vector;
-	base::reorder(order, oldPosition, newPosition);
+	order = AyuFeatures::HiddenFolders::ReorderVisible(
+		std::move(order),
+		oldPosition,
+		newPosition,
+		AyuFeatures::HiddenFolders::IsHidden);
 
 	_ignoreRefresh = true;
 	filters->saveOrder(order);

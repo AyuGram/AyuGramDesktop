@@ -8,6 +8,7 @@
 
 #include "ayu/libs/json.hpp"
 #include "ayu/libs/json_ext.hpp"
+#include "rpl/event_stream.h"
 #include "rpl/lifetime.h"
 #include "rpl/producer.h"
 #include "rpl/variable.h"
@@ -264,6 +265,12 @@ public:
 	void removeShadowBan(int64 id);
 	[[nodiscard]] bool isShadowBanned(const int64 id) const { return _shadowBanIds.contains(id); }
 	[[nodiscard]] const std::unordered_set<int64> &shadowBanIds() const { return _shadowBanIds; }
+
+	void addHiddenFolder(int64 id);
+	void removeHiddenFolder(int64 id);
+	[[nodiscard]] bool isFolderHidden(const int64 id) const { return _hiddenFolderIds.contains(id); }
+	[[nodiscard]] const std::unordered_set<int64> &hiddenFolderIds() const { return _hiddenFolderIds; }
+	[[nodiscard]] rpl::producer<> hiddenFolderIdsChanges() const { return _hiddenFolderIdsChanged.events(); }
 
 	void validate();
 
@@ -628,6 +635,8 @@ private:
 	rpl::variable<bool> _saveMessagesHistory = true;
 	rpl::variable<bool> _saveForBots = false;
 	std::unordered_set<int64> _shadowBanIds;
+	std::unordered_set<int64> _hiddenFolderIds;
+	rpl::event_stream<> _hiddenFolderIdsChanged;
 	rpl::variable<bool> _filtersEnabled = false;
 	rpl::variable<bool> _filtersEnabledInChats = false;
 	rpl::variable<bool> _hideFromBlocked = false;
