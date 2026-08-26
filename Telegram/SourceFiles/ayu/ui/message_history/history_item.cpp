@@ -14,15 +14,20 @@
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/file_location.h"
 #include "data/data_channel.h"
+#include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_forum_topic.h"
+#include "data/data_media_types.h"
+#include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history.h"
 #include "history/view/history_view_element.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/text/text_utilities.h"
+#include <QtCore/QFileInfo>
 
 namespace MessageHistory {
 
@@ -82,7 +87,7 @@ void GenerateItems(
 		return callback(OwnedItem(delegate, item), sentDate, realId);
 	};
 
-	const auto makeSimpleTextMessage = [&](TextWithEntities &&text)
+	const auto makeMessageWithMedia = [&](TextWithEntities &&text, MTPMessageMedia &&media)
 	{
 		base::flags<MessageFlag> flags = MessageFlag::AdminLogEntry;
 		if (from) {
@@ -94,31 +99,53 @@ void GenerateItems(
 			flags |= MessageFlag::HasPostAuthor;
 		}
 
-		return history->makeMessage({
-										.id = history->nextNonHistoryEntryId(),
-										.flags = flags,
-										.from = from ? from->id : 0,
-										.date = date,
-										.postAuthor = !message.postAuthor.empty()
-														  ? QString::fromStdString(message.postAuthor)
-														  : from
-																? QString()
-																: QString("unknown user: %1").arg(message.fromId),
-									},
-									std::move(text),
-									MTP_messageMediaEmpty());
-	};
+		auto item = history->makeMessage({
+			.id = history->nextNonHistoryEntryId(),
+			.flags = flags,
+			.from = from ? from->id : 0,
+			.date = date,
+			.postAuthor = !message.postAuthor.empty()
+				? QString::fromStdString(message.postAuthor)
+				: from
+					? QString()
+					: QString("unknown user: %1").arg(message.fromId),
+		}, std::move(text), std::move(media));
 
-	const auto addSimpleTextMessage = [&](TextWithEntities &&text)
-	{
-		addPart(makeSimpleTextMessage(std::move(text)));
+		if (!message.mediaPath.empty()) {
+			const auto localPath = QString::fromStdString(message.mediaPath);
+			if (QFileInfo::exists(localPath)) {
+				if (const auto m = item->media()) {
+					if (const auto photo = m->photo()) {
+						photo->setLocation(Core::FileLocation(localPath));
+					} else if (const auto doc = m->document()) {
+						doc->setLocation(Core::FileLocation(localPath));
+					}
+				}
+			}
+		}
+
+		return item;
 	};
 
 	const auto text = QString::fromStdString(message.text);
 	auto textAndEntities = Ui::Text::WithEntities(text);
-	const auto entities = AyuMapper::deserializeTextWithEntities(message.textEntities);
-	textAndEntities.entities = Api::EntitiesFromMTP(&history->session(), entities.v);
-	addSimpleTextMessage(std::move(textAndEntities));
+	if (!message.textEntities.empty()) {
+		const auto entities = AyuMapper::deserializeTextWithEntities(message.textEntities);
+		textAndEntities.entities = Api::EntitiesFromMTP(&history->session(), entities.v);
+	}
+
+	auto media = MTP_messageMediaEmpty();
+	if (!message.documentSerialized.empty()) {
+		const auto from = reinterpret_cast<const mtpPrime*>(message.documentSerialized.data());
+		const auto end = from + message.documentSerialized.size() / sizeof(mtpPrime);
+		auto current = from;
+		MTPMessageMedia parsed;
+		if (parsed.read(current, end) && parsed.type() != 0) {
+			media = std::move(parsed);
+		}
+	}
+
+	addPart(makeMessageWithMedia(std::move(textAndEntities), std::move(media)));
 }
 
 } // namespace MessageHistory
