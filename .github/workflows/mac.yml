@@ -1,0 +1,173 @@
+name: AyuGram macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: Target architecture (universal includes Intel and Apple Silicon)
+        type: choice
+        options: [universal, arm64, x86_64]
+        default: universal
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ayugram-macos-${{ github.ref }}-${{ inputs.architecture }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Release ${{ inputs.architecture }}
+    runs-on: macos-15
+    timeout-minutes: 350
+    env:
+      REPO_NAME: AyuGramDesktop
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      CCACHE_DIR: ${{ github.workspace }}/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPILERCHECK: content
+      CCACHE_SLOPPINESS: pch_defines,time_macros
+      TARGET_ARCH: ${{ inputs.architecture }}
+      TDESKTOP_API_ID: ${{ vars.TDESKTOP_API_ID }}
+      TDESKTOP_API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+
+    steps:
+      - name: Validate build configuration
+        id: target
+        run: |
+          if [[ ! "$TDESKTOP_API_ID" =~ ^[1-9][0-9]*$ || ! "$TDESKTOP_API_HASH" =~ ^[[:xdigit:]]{32}$ ]]; then
+            echo 'Set repository variable TDESKTOP_API_ID and secret TDESKTOP_API_HASH before building.' >&2
+            exit 1
+          fi
+          case "$TARGET_ARCH" in
+            universal) echo 'architectures=x86_64;arm64' >> "$GITHUB_OUTPUT" ;;
+            arm64|x86_64) echo "architectures=$TARGET_ARCH" >> "$GITHUB_OUTPUT" ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Clone sources
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+          persist-credentials: false
+
+      - name: Install build tools
+        id: toolchain
+        run: |
+          brew install automake libtool meson nasm ninja pkg-config ccache
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          toolchain_id=$( { xcodebuild -version; xcrun --sdk macosx --show-sdk-version; cmake --version; } | shasum -a 256 | cut -c1-16)
+          echo "id=$toolchain_id" >> "$GITHUB_OUTPUT"
+
+      - name: Restore libraries cache
+        id: libraries-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: macos-${{ inputs.architecture }}-release-${{ steps.toolchain.outputs.id }}-${{ hashFiles('AyuGramDesktop/Telegram/build/prepare/**', 'AyuGramDesktop/Telegram/build/qt_version.py') }}
+          restore-keys: |
+            macos-${{ inputs.architecture }}-release-${{ steps.toolchain.outputs.id }}-
+
+      - name: Prepare libraries
+        run: |
+          options=(silent qt-release-only)
+          if [[ "$TARGET_ARCH" != universal ]]; then options+=("mac-$TARGET_ARCH"); fi
+          ./"$REPO_NAME"/Telegram/build/prepare/mac.sh "${options[@]}"
+
+      - name: Free disk space
+        run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
+
+      - name: Save libraries cache
+        if: steps.libraries-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: ${{ steps.libraries-cache.outputs.cache-primary-key }}
+
+      - name: Restore compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ inputs.architecture }}-release-${{ steps.toolchain.outputs.id }}-${{ github.sha }}
+          restore-keys: ccache-${{ inputs.architecture }}-release-${{ steps.toolchain.outputs.id }}-
+
+      - name: Configure AyuGram
+        working-directory: ${{ env.REPO_NAME }}/Telegram
+        env:
+          ARCHITECTURES: ${{ steps.target.outputs.architectures }}
+        run: |
+          mac_arch=$TARGET_ARCH
+          if [[ "$mac_arch" == universal ]]; then mac_arch=''; fi
+          ./configure.sh -G Ninja \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -D "CMAKE_OSX_ARCHITECTURES=$ARCHITECTURES" \
+            -D "DESKTOP_APP_MAC_ARCH=$mac_arch" \
+            -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_OBJC_COMPILER_LAUNCHER=ccache \
+            -D CMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
+            -D 'CMAKE_CXX_FLAGS=-Xclang -fno-pch-timestamp' \
+            -D 'CMAKE_OBJCXX_FLAGS=-Xclang -fno-pch-timestamp' \
+            -D "TDESKTOP_API_ID=$TDESKTOP_API_ID" \
+            -D "TDESKTOP_API_HASH=$TDESKTOP_API_HASH" \
+            -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
+          IFS=';' read -r -a architectures <<< "$ARCHITECTURES"
+          python3 build/check_macos_release.py ../out --architectures "${architectures[@]}" --disable-autoupdate
+
+      - name: Build AyuGram
+        working-directory: ${{ env.REPO_NAME }}
+        run: |
+          cmake --build out --parallel 3 --target Telegram
+          ccache --show-stats
+
+      - name: Save compiler cache
+        if: always() && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+
+      - name: Verify and package app
+        working-directory: ${{ env.REPO_NAME }}/out
+        env:
+          ARCHITECTURES: ${{ steps.target.outputs.architectures }}
+        run: |
+          app=AyuGram.app
+          test -s "$app/Contents/Resources/AppIcon-Default.icns"
+          test -s "$app/Contents/Resources/Telegram.rcc"
+          expected=$(tr ';' '\n' <<< "$ARCHITECTURES" | sort)
+          actual=$(lipo -archs "$app/Contents/MacOS/AyuGram" | tr ' ' '\n' | sort)
+          test "$actual" = "$expected"
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Contents/Info.plist")" = one.ayugram.AyuGramDesktop
+          icon_name=$(plutil -extract CFBundleIconFile raw -o - "$app/Contents/Info.plist")
+          test -s "$app/Contents/Resources/$icon_name"
+          /usr/bin/strip -S "$app/Contents/MacOS/AyuGram"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          version=$(awk '$1 == "AppVersionStr" {print $2}' ../Telegram/build/version)
+          test -n "$version"
+          mkdir -p artifacts
+          package="AyuGram-$version-macOS-$TARGET_ARCH"
+          file "$app/Contents/MacOS/AyuGram" > "artifacts/$package-architecture.txt"
+          git rev-parse HEAD > "artifacts/$package-source.txt"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "artifacts/$package.zip"
+          cd artifacts
+          shasum -a 256 "$package.zip" > "$package.zip.sha256"
+
+      - name: Upload AyuGram
+        uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-macOS-${{ inputs.architecture }}-${{ github.sha }}
+          path: ${{ env.REPO_NAME }}/out/artifacts/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

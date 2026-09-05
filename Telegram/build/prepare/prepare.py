@@ -5,6 +5,7 @@ sys.dont_write_bytecode = True
 scriptPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scriptPath + '/..')
 import qt_version
+from macos_options import qt_options
 
 def finish(code):
     global executePath
@@ -61,6 +62,9 @@ optionsList = [
     'qt6',
     'skip-release',
     'build-stackwalk',
+    'qt-release-only',
+    'mac-arm64',
+    'mac-x86_64',
 ]
 options = []
 runCommand = []
@@ -75,6 +79,13 @@ for arg in sys.argv[1:]:
     elif arg == 'shell':
         customRunCommand = True
         runCommand.append('shell')
+
+try:
+    macQtConfiguration, macQtArchitectures = qt_options(options)
+except ValueError as exception:
+    error(str(exception))
+if not mac and any(option in options for option in ('qt-release-only', 'mac-arm64', 'mac-x86_64')):
+    error('macOS preparation options require macOS.')
 
 if not os.path.isdir(os.path.join(libsDir, keysLoc)):
     pathlib.Path(os.path.join(libsDir, keysLoc)).mkdir(parents=True, exist_ok=True)
@@ -1598,9 +1609,7 @@ mac:
     find $PWD/../patches/qtbase_$QT -type f -print0 | sort -z | xargs -0 git -C qtbase apply -v
     sed -i.bak 's/tqtc-//' {qtimageformats,qtsvg}/dependencies.yaml
 
-    CONFIGURATIONS=-debug
-release:
-    CONFIGURATIONS=-debug-and-release
+    CONFIGURATIONS=""" + macQtConfiguration + """
 mac:
     ./configure -prefix "$USED_PREFIX/Qt-$QT" \
         $CONFIGURATIONS \
@@ -1618,7 +1627,7 @@ mac:
         -no-feature-brotli \
         -no-feature-cxx17_filesystem \
         -platform macx-clang -- \
-        -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+        -DCMAKE_OSX_ARCHITECTURES=\"""" + macQtArchitectures + """\" \
         -DCMAKE_PREFIX_PATH="$USED_PREFIX" \
         -DQT_NO_HANDLE_APPLE_SINGLE_ARCH_CROSS_COMPILING=ON \
         -DQT_SYNC_HEADERS_AT_CONFIGURE_TIME=ON

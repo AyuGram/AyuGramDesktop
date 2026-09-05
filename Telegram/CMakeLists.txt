@@ -2328,7 +2328,7 @@ elseif (APPLE)
     target_link_frameworks_weak(Telegram PRIVATE UserNotifications)
 
     set(icons_path ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets)
-    if (CMAKE_GENERATOR STREQUAL Xcode)
+    if (CMAKE_GENERATOR STREQUAL Xcode AND XCODE_VERSION VERSION_GREATER_EQUAL 26)
         set(ayugram_icons
             Default
             Alt

@@ -1,0 +1,36 @@
+name: Source checks
+
+on:
+  pull_request:
+  push:
+    paths-ignore: ['**.md', 'LICENSE', 'LEGAL']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Build configuration tests
+        run: python3 -B -m unittest discover -s Telegram/build -p 'test_*macos*.py'
+      - name: Preparation syntax
+        run: python3 -c 'import ast, pathlib; ast.parse(pathlib.Path("Telegram/build/prepare/prepare.py").read_text())'
+      - name: Workflow validation
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck=
