@@ -14,6 +14,10 @@
 
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
+#include <QRegularExpression>
+#include <QtNetwork/QNetworkProxy>
+#include <algorithm>
 
 // hard-coded languages
 std::map<QString, QString> langMapping = {
@@ -35,15 +39,69 @@ constexpr auto postfixes = {
 
 AyuLanguage *AyuLanguage::instance = nullptr;
 
-AyuLanguage::AyuLanguage() = default;
+AyuLanguage::AyuLanguage() {
+	Lang::GetInstance().idChanges() | rpl::on_next([=] {
+		syncLanguage();
+	}, _lifetime);
+	Lang::GetInstance().updated() | rpl::on_next([=] {
+		syncLanguage();
+	}, _lifetime);
+}
 
 void AyuLanguage::init() {
 	if (!instance) instance = new AyuLanguage;
-	instance->loadCachedLanguage();
+	instance->syncLanguage();
 }
 
 AyuLanguage *AyuLanguage::currentInstance() {
 	return instance;
+}
+
+namespace {
+
+QString NormalizeLanguage(QString id) {
+	id = id.toLower();
+	if (langMapping.contains(id)) id = langMapping[id];
+	static const auto valid = QRegularExpression(u"^[a-z0-9_-]+$"_q);
+	return valid.match(id).hasMatch() ? id : QString();
+}
+
+bool ValidLanguage(const QJsonDocument &doc) {
+	if (!doc.isObject() || doc.object().isEmpty()) return false;
+	const auto object = doc.object();
+	return std::all_of(object.begin(), object.end(), [](const QJsonValue &value) {
+		return value.isString();
+	});
+}
+
+} // namespace
+
+void AyuLanguage::syncLanguage() {
+	if (_applying) return;
+	const auto id = Lang::GetInstance().isCustom()
+		? QString()
+		: NormalizeLanguage(Lang::GetInstance().id().isEmpty()
+			? u"en"_q : Lang::GetInstance().id());
+	const auto baseId = NormalizeLanguage(Lang::GetInstance().baseId());
+	if (id == _currentLangId && baseId == _baseLangId) {
+		if (!_document.isNull()) {
+			_applying = true;
+			applyLanguageJson(_document);
+			_applying = false;
+		}
+		return;
+	}
+	if (_chkReply) {
+		const auto reply = _chkReply;
+		_chkReply = nullptr;
+		reply->abort();
+	}
+	_currentLangId = id;
+	_baseLangId = baseId;
+	_document = QJsonDocument();
+	if (id.isEmpty() || id == u"en"_q) return;
+	loadCachedLanguage();
+	fetchLanguage(id);
 }
 
 QString AyuLanguage::getCacheDir() const {
@@ -55,124 +113,63 @@ QString AyuLanguage::getCachePath(const QString &langId) const {
 }
 
 void AyuLanguage::loadCachedLanguage() {
-	const auto langPackId = Lang::GetInstance().id();
-	const auto langPackBaseId = Lang::GetInstance().baseId();
-	auto finalLangPackId = langMapping.contains(langPackId) ? langMapping[langPackId] : langPackId;
-
-	if (finalLangPackId.isEmpty()) {
-		finalLangPackId = langPackBaseId;
-	}
-	if (finalLangPackId.isEmpty()) {
+	for (const auto &id : { _currentLangId, _baseLangId }) {
+		if (id.isEmpty()) continue;
+		QFile file(getCachePath(id));
+		if (!file.open(QIODevice::ReadOnly)) continue;
+		const auto doc = QJsonDocument::fromJson(file.readAll());
+		if (!ValidLanguage(doc)) continue;
+		_document = doc;
+		LOG(("Loading AyuGram language: %1").arg(id));
+		applyLanguageJson(doc);
 		return;
-	}
-
-	const auto cachePath = getCachePath(finalLangPackId);
-	QFile file(cachePath);
-	if (!file.exists()) {
-		const auto basePath = getCachePath(langPackBaseId);
-		if (!QFile::exists(basePath)) {
-			return;
-		}
-		file.setFileName(basePath);
-	}
-
-	if (file.open(QIODevice::ReadOnly)) {
-		const auto data = file.readAll();
-		file.close();
-
-		QJsonParseError error{};
-		const auto doc = QJsonDocument::fromJson(data, &error);
-		if (error.error == QJsonParseError::NoError) {
-			LOG(("Loading cached AyuGram language: %1").arg(finalLangPackId));
-			applyLanguageJson(doc);
-		}
 	}
 }
 
 void AyuLanguage::saveCachedLanguage(const QByteArray &json, const QString &langId) {
-	const auto cacheDir = getCacheDir();
-	QDir().mkpath(cacheDir);
-
-	const auto cachePath = getCachePath(langId);
-	QFile file(cachePath);
-	if (file.open(QIODevice::WriteOnly)) {
-		file.write(json);
-		file.close();
+	QDir().mkpath(getCacheDir());
+	QSaveFile file(getCachePath(langId));
+	if (file.open(QIODevice::WriteOnly)
+		&& file.write(json) == json.size()
+		&& file.commit()) {
 		LOG(("Cached AyuGram language: %1").arg(langId));
 	}
 }
 
-void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
-	auto finalLangPackId = langMapping.contains(id) ? langMapping[id] : id;
-	_currentLangId = finalLangPackId.isEmpty() ? baseId : finalLangPackId;
-
+void AyuLanguage::fetchLanguage(const QString &id, bool mirror) {
+	networkManager.setProxy(QNetworkProxy::DefaultProxy);
 	if (Core::App().settings().proxy().isEnabled()) {
 		const auto proxy = Core::App().settings().proxy().selected();
-		if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
-			const auto networkProxy = ToNetworkProxy(ToDirectIpProxy(Core::App().settings().proxy().selected()));
-			networkManager.setProxy(networkProxy);
+		if (proxy.type == MTP::ProxyData::Type::Socks5
+			|| proxy.type == MTP::ProxyData::Type::Http) {
+			networkManager.setProxy(ToNetworkProxy(ToDirectIpProxy(proxy)));
 		}
 	}
-
-	// using `jsdelivr` since China (...and maybe other?) users have some problems with GitHub
-	// https://crowdin.com/project/ayugram/discussions/6
-	QUrl url;
-	if (!finalLangPackId.isEmpty() && !baseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
-			finalLangPackId));
-	} else {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
-			needFallback ? baseId : finalLangPackId));
-	}
-	_chkReply = networkManager.get(QNetworkRequest(url));
-	connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));
-	connect(_chkReply, SIGNAL(finished()), this, SLOT(fetchFinished()));
-}
-
-void AyuLanguage::fetchFinished() {
-	if (!_chkReply) return;
-
-	QString langPackBaseId = Lang::GetInstance().baseId();
-	QString langPackId = Lang::GetInstance().id();
-	auto statusCode = _chkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-	if (statusCode == 404 && !langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-		LOG(("AyuGram Language not found! Fallback to main language: %1...").arg(langPackBaseId));
-		needFallback = true;
-		_chkReply->disconnect();
-		fetchLanguage("", langPackBaseId);
-	} else {
-		const auto result = _chkReply->readAll().trimmed();
-		QJsonParseError error{};
-		const auto doc = QJsonDocument::fromJson(result, &error);
-		if (error.error == QJsonParseError::NoError) {
-			saveCachedLanguage(result, _currentLangId);
-			applyLanguageJson(doc);
-		} else {
-			LOG(("Incorrect language JSON File."));
-		}
-
+	const auto url = (mirror
+		? u"https://raw.githubusercontent.com/AyuGram/Languages/l10n_main/values/langs/%1/Shared.json"_q
+		: u"https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json"_q).arg(id);
+	auto request = QNetworkRequest(QUrl(url));
+	request.setTransferTimeout(10000);
+	const auto reply = networkManager.get(request);
+	_chkReply = reply;
+	connect(reply, &QNetworkReply::finished, this, [=] {
+		reply->deleteLater();
+		if (_chkReply != reply) return;
 		_chkReply = nullptr;
-	}
-}
-
-void AyuLanguage::fetchError(QNetworkReply::NetworkError e) {
-	LOG(("Network error: %1").arg(e));
-
-	if (e == QNetworkReply::NetworkError::ContentNotFoundError) {
-		const auto baseId = Lang::GetInstance().baseId();
-		const auto id = Lang::GetInstance().id();
-
-		if (!id.isEmpty() && !baseId.isEmpty() && !needFallback) {
-			LOG(("AyuGram Language not found! Fallback to main language: %1...").arg(baseId));
-			needFallback = true;
-			_chkReply->disconnect();
-			fetchLanguage("", baseId);
+		const auto data = reply->readAll();
+		const auto doc = QJsonDocument::fromJson(data);
+		if (reply->error() == QNetworkReply::NoError && ValidLanguage(doc)) {
+			saveCachedLanguage(data, id);
+			_document = doc;
+			applyLanguageJson(doc);
+		} else if (!mirror) {
+			fetchLanguage(id, true);
+		} else if (!_baseLangId.isEmpty() && id != _baseLangId) {
+			fetchLanguage(_baseLangId);
 		} else {
-			LOG(("AyuGram Language not found!"));
-			_chkReply = nullptr;
+			LOG(("AyuGram language unavailable: %1").arg(id));
 		}
-	}
+	});
 }
 
 void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
@@ -181,7 +178,7 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 		auto key = qsl("ayu_") + brokenKey;
 		auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&"));
 
-		if (key.endsWith("_Android")) {
+		if (val.isEmpty() || key.endsWith("_Android")) {
 			continue;
 		}
 
@@ -210,4 +207,9 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 		Lang::GetInstance().applyValue(key.toUtf8(), val.toUtf8());
 	}
 	Lang::GetInstance().updatePluralRules();
+	if (!_applying) {
+		_applying = true;
+		Lang::GetInstance().notifyUpdated();
+		_applying = false;
+	}
 }

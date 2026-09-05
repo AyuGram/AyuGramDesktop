@@ -86,6 +86,9 @@ public:
 	[[nodiscard]] rpl::producer<> updated() const {
 		return _updated.events();
 	}
+	void notifyUpdated() {
+		_updated.fire({});
+	}
 
 	QString getValue(ushort key) const {
 		Expects(key < _values.size());

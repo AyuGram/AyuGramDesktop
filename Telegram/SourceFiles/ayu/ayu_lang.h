@@ -8,6 +8,8 @@
 
 #include <QtNetwork/QNetworkReply>
 #include <QtXml/QDomDocument>
+#include <QJsonDocument>
+#include "rpl/lifetime.h"
 
 class AyuLanguage : public QObject
 {
@@ -19,24 +21,24 @@ public:
 	static void init();
 	static AyuLanguage *instance;
 
-	void fetchLanguage(const QString &id, const QString &baseId);
 	void applyLanguageJson(QJsonDocument doc);
-
-public Q_SLOTS:
-	void fetchFinished();
-	void fetchError(QNetworkReply::NetworkError e);
 
 private:
 	AyuLanguage();
 	~AyuLanguage() override = default;
 
 	void loadCachedLanguage();
+	void syncLanguage();
+	void fetchLanguage(const QString &id, bool mirror = false);
 	void saveCachedLanguage(const QByteArray &json, const QString &langId);
 	[[nodiscard]] QString getCacheDir() const;
 	[[nodiscard]] QString getCachePath(const QString &langId) const;
 
 	QNetworkAccessManager networkManager;
 	QNetworkReply *_chkReply = nullptr;
-	bool needFallback = false;
 	QString _currentLangId;
+	QString _baseLangId;
+	QJsonDocument _document;
+	bool _applying = false;
+	rpl::lifetime _lifetime;
 };
