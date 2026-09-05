@@ -91,7 +91,8 @@ constexpr auto kLinkProtocols = {
 // ignore tags for different users.
 [[nodiscard]] Fn<QString(QStringView)> FieldTagMimeProcessor(
 		not_null<Main::Session*> session,
-		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji) {
+		Fn<bool(not_null<DocumentData*>)> allowPremiumEmoji,
+		Fn<bool(QStringView)> keepCustomEmojiData) {
 	return [=](QStringView mimeTag) {
 		const auto id = session->userId().bare;
 		auto all = TextUtilities::SplitTags(mimeTag);
@@ -104,6 +105,10 @@ constexpr auto kLinkProtocols = {
 				continue;
 			} else if (Ui::InputField::IsCustomEmojiLink(tag)) {
 				const auto data = Ui::InputField::CustomEmojiEntityData(tag);
+				if (keepCustomEmojiData && keepCustomEmojiData(data)) {
+					++i;
+					continue;
+				}
 				const auto emoji = Data::ParseCustomEmojiData(data);
 				if (!emoji) {
 					i = all.erase(i);
@@ -204,6 +209,9 @@ void EditLinkBox(
 			fieldSt,
 			tr::lng_formatting_link_url(),
 			link));
+	url->setInputMethodHints(Qt::ImhUrlCharactersOnly
+		| Qt::ImhNoAutoUppercase
+		| Qt::ImhNoPredictiveText);
 	url->heightValue(
 	) | rpl::on_next([placeholder](int height) {
 		placeholder->resize(placeholder->width(), height);
@@ -315,6 +323,9 @@ void EditCodeLanguageBox(
 		st::settingsAddReplyField,
 		tr::lng_formatting_code_auto(),
 		now.trimmed()));
+	field->setInputMethodHints(Qt::ImhLatinOnly
+		| Qt::ImhNoAutoUppercase
+		| Qt::ImhNoPredictiveText);
 	box->setFocusCallback([=] {
 		field->setFocusFast();
 	});
@@ -534,11 +545,28 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 	};
 	const auto field = args.field;
 	const auto session = args.session;
-	field->setTagMimeProcessor(
-		FieldTagMimeProcessor(session, args.allowPremiumEmoji));
-	field->setCustomTextContext(Core::TextContext({
-		.session = session
-	}), [paused] {
+	field->setTagMimeProcessor(FieldTagMimeProcessor(
+		session,
+		args.allowPremiumEmoji,
+		std::move(args.keepCustomEmojiData)));
+	auto context = Core::TextContext({ .session = session });
+	if (args.customEmojiFactory) {
+		auto parent = std::move(context.customEmojiFactory);
+		context.customEmojiFactory = [
+			custom = std::move(args.customEmojiFactory),
+			parent = std::move(parent)
+		](
+				QStringView data,
+				const Ui::Text::MarkedContext &context
+		) -> std::unique_ptr<Ui::Text::CustomEmoji> {
+			auto result = custom(data, context);
+			if (!result && parent) {
+				result = parent(data, context);
+			}
+			return result;
+		};
+	}
+	field->setCustomTextContext(std::move(context), [paused] {
 		return On(PowerSaving::kEmojiChat) || paused();
 	}, [paused] {
 		return On(PowerSaving::kChatSpoiler) || paused();
@@ -550,7 +578,8 @@ auto InitMessageFieldHandlers(MessageFieldHandlersArgs &&args)
 	field->setMarkdownReplacesEnabled(rpl::single(Ui::MarkdownEnabledState{
 		Ui::MarkdownEnabled{
 			std::move(args.allowMarkdownTags),
-			args.allowTypedMarkdown
+			args.allowTypedMarkdown,
+			args.instantMarkdown
 		}
 	}));
 	if (const auto &show = args.show) {
@@ -1212,7 +1241,8 @@ void MessageLinksParser::applyRanges(const QString &text) {
 
 base::unique_qptr<Ui::RpWidget> CreateDisabledFieldView(
 		QWidget *parent,
-		not_null<PeerData*> peer) {
+		not_null<PeerData*> peer,
+		QWidget *toastParent) {
 	auto result = base::make_unique_q<Ui::AbstractButton>(parent);
 	const auto raw = result.get();
 	const auto label = CreateChild<Ui::FlatLabel>(
@@ -1258,6 +1288,7 @@ base::unique_qptr<Ui::RpWidget> CreateDisabledFieldView(
 	}, raw->lifetime());
 	using WeakToast = base::weak_ptr<Ui::Toast::Instance>;
 	const auto toast = raw->lifetime().make_state<WeakToast>();
+	const auto showToastOver = toastParent ? toastParent : parent;
 	raw->setClickedCallback([=] {
 		if (toast->get()) {
 			return;
@@ -1296,7 +1327,7 @@ base::unique_qptr<Ui::RpWidget> CreateDisabledFieldView(
 				lt_last,
 				list.back())
 			: list.back();
-		*toast = Ui::Toast::Show(parent, {
+		*toast = Ui::Toast::Show(showToastOver, {
 			.text = { tr::lng_send_text_no_about(tr::now, lt_types, types) },
 			.attach = RectPart::Bottom,
 			.duration = kTypesDuration,
@@ -1692,4 +1723,10 @@ Ui::InputField::MimeDataHook WrappedMessageFieldMimeHook(
 		}
 		return originalHook ? originalHook(data, action) : false;
 	};
+}
+
+bool PasteAsPlainTextRequested() {
+	const auto modifiers = QGuiApplication::keyboardModifiers();
+	return (modifiers & Qt::ControlModifier)
+		&& (modifiers & Qt::ShiftModifier);
 }

@@ -1254,6 +1254,12 @@ void Widget::scrollToDefaultChecked(bool verytop) {
 }
 
 void Widget::setupScrollUpButton() {
+	// The button floats over the bottom of the list, but it is created long
+	// before it, so the scroll has to order the two - and it is an overlay,
+	// not something laid out beside the list.
+	_scroll->setVisualTabOrder(true);
+	_scrollToTop->setVisualTabOrderOverlay(true);
+
 	_scrollToTop->setClickedCallback([=] { scrollToDefaultChecked(); });
 	_scrollToTop->setAccessibleName(tr::lng_sr_scroll_to_top(tr::now));
 	trackScroll(_scrollToTop);
@@ -2383,7 +2389,7 @@ void Widget::collectStoriesUserpicsViews(Data::StorySourcesList list) {
 		? _storiesUserpicsViewsHidden
 		: _storiesUserpicsViewsShown;
 	map.clear();
-	auto &owner = session().data();
+	const auto &owner = session().data();
 	for (const auto &source : owner.stories().sources(list)) {
 		if (const auto peer = owner.peerLoaded(source.id)) {
 			if (auto view = peer->activeUserpicView(); view.cloud) {
@@ -2837,6 +2843,12 @@ void Widget::updateStoriesVisibility() {
 		|| (pulledDown && hiddenAnimated);
 	const auto hidden = hiddenInstant || hiddenAnimated;
 	const auto changed = (_stories->toggledHidden() != hidden);
+	if (changed
+		&& hidden
+		&& (_storiesExplicitExpand
+			|| _storiesExplicitExpandValue.current() > 0)) {
+		storiesExplicitCollapse();
+	}
 	_stories->setToggledHidden(hiddenInstant, hiddenAnimated);
 	if (changed) {
 		using Type = Ui::ElasticScroll::OverscrollType;

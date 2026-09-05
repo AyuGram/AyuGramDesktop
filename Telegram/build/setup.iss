@@ -36,19 +36,27 @@ DisableProgramGroupPage=no
 WizardStyle=modern
 SignTool=sha256
 
+#ifndef MyOutputBaseFilename
+  #if MyBuildTarget == "winarm"
+    #define MyOutputBaseFilename "ayusetup-arm64." + MyAppVersionFull
+  #elif MyBuildTarget == "win64"
+    #define MyOutputBaseFilename "ayusetup-x64." + MyAppVersionFull
+  #else
+    #define MyOutputBaseFilename "ayusetup." + MyAppVersionFull
+  #endif
+#endif
+OutputBaseFilename={#MyOutputBaseFilename}
+
 #if MyBuildTarget == "winarm"
   ArchitecturesAllowed="arm64"
-  OutputBaseFilename=tsetup-arm64.{#MyAppVersionFull}
   #define ArchModulesFolder "arm64"
   AppVerName={#MyAppName} {#MyAppVersion} arm64
 #elif MyBuildTarget == "win64"
   ArchitecturesAllowed="x64compatible"
   ArchitecturesInstallIn64BitMode="x64compatible"
-  OutputBaseFilename=ayusetup-x64.{#MyAppVersionFull}
   #define ArchModulesFolder "x64"
   AppVerName={#MyAppName} {#MyAppVersion} 64bit
 #else
-  OutputBaseFilename=ayusetup.{#MyAppVersionFull}
   #define ArchModulesFolder "x86"
   AppVerName={#MyAppName} {#MyAppVersion} 32bit
 #endif

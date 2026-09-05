@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 class AudioMsgId;
 class DocumentData;
 class History;
+class HistoryItem;
 
 namespace Media {
 enum class RepeatMode;
@@ -65,6 +66,8 @@ void finish(not_null<Audio::Instance*> instance);
 void SaveLastPlaybackPosition(
 	not_null<DocumentData*> document,
 	const TrackState &state);
+
+[[nodiscard]] bool IsRealPlaybackContext(not_null<const HistoryItem*> item);
 
 not_null<Instance*> instance();
 
@@ -144,6 +147,7 @@ public:
 		return false;
 	}
 	void startSeeking(AudioMsgId::Type type);
+	void updateSeeking(AudioMsgId::Type type, float64 progress);
 	void finishSeeking(AudioMsgId::Type type, float64 progress);
 	void cancelSeeking(AudioMsgId::Type type);
 
@@ -241,6 +245,12 @@ private:
 	Streaming::PlaybackOptions streamingOptions(
 		const AudioMsgId &audioId,
 		crl::time position = -1);
+	[[nodiscard]] crl::time streamedDuration(
+		not_null<Streamed*> streamed) const;
+	void seekStreamed(
+		not_null<Data*> data,
+		float64 progress,
+		bool keepPaused);
 
 	// Observed notifications.
 	void handleSongUpdate(const AudioMsgId &audioId);

@@ -1382,7 +1382,8 @@ void ApplyChannelUpdate(
 		| Flag::StargiftsAvailable
 		| Flag::PaidMessagesAvailable
 		| (channel->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
-		| Flag::StarsPerMessageKnown;
+		| Flag::StarsPerMessageKnown
+		| Flag::HasWelcomeMessages;
 	channel->setFlags((channel->flags() & ~mask)
 		| (update.is_can_set_username() ? Flag::CanSetUsername : Flag())
 		| (update.is_can_view_participants()
@@ -1411,7 +1412,10 @@ void ApplyChannelUpdate(
 			? Flag::PaidMessagesAvailable
 			: Flag())
 		| (channel->starsPerMessage() ? Flag::HasStarsPerMessage : Flag())
-		| Flag::StarsPerMessageKnown);
+		| Flag::StarsPerMessageKnown
+		| (update.is_has_welcome_messages()
+			? Flag::HasWelcomeMessages
+			: Flag()));
 	channel->setUserpicPhoto(update.vchat_photo());
 	if (const auto migratedFrom = update.vmigrated_from_chat_id()) {
 		channel->addFlags(Flag::Megagroup);

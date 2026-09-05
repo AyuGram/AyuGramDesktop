@@ -128,6 +128,9 @@ void TabsHost::syncBodyNow() {
 	const auto widget = active->widget();
 	if (!widget->isHidden() && _body->height() != widget->height()) {
 		_body->resize(_body->width(), widget->height());
+		// setVisibleTopBottom clamps to the page height, so a page that
+		// grew after the last push keeps a stale short visible bottom.
+		pushViewportToActive();
 	}
 }
 
@@ -160,14 +163,18 @@ void TabsHost::scheduleVisibilitySync() {
 	});
 }
 
-void TabsHost::syncVisibilityNow() {
-	_visibilitySyncQueued = false;
-	scheduleHeightSync();
+void TabsHost::syncStripVisibility() {
 	if (_syncedTabsShown == _tabsShown) {
 		return;
 	}
 	refreshOrder();
 	syncStripTitles();
+}
+
+void TabsHost::syncVisibilityNow() {
+	_visibilitySyncQueued = false;
+	scheduleHeightSync();
+	syncStripVisibility();
 	if (!_pendingRestoreId.isEmpty()) {
 		const auto i = ranges::find(
 			_tabs,
@@ -529,6 +536,9 @@ Fn<void()> TabsHost::prepareSwitch(bool toNextTab) {
 }
 
 void TabsHost::activateTab(const QString &id, bool animated) {
+	// Visibility changes reach the strip through a queued sync, so it may
+	// not know yet about a tab that is already marked as shown.
+	syncStripVisibility();
 	if (_activeId == id) {
 		_strip->setActiveTab(id);
 		return;
@@ -692,10 +702,22 @@ void TabsHost::startSlideAnimation(
 }
 
 void TabsHost::paintEvent(QPaintEvent *e) {
+	auto p = QPainter(this);
+	if (const auto active = _activeTab.current()) {
+		const auto widget = active->widget();
+		const auto bottom = _body->y() + _body->height();
+		const auto filler = QRect(0, bottom, width(), height() - bottom);
+		if (!filler.isEmpty() && filler.intersects(e->rect())) {
+			p.setClipRect(filler);
+			p.translate(_body->pos() + widget->pos());
+			active->paintOverflow(p);
+			p.resetTransform();
+			p.setClipping(false);
+		}
+	}
 	if (!_slideAnimation) {
 		return;
 	}
-	auto p = QPainter(this);
 	p.fillRect(_slideRect, st::windowBg);
 	_slideAnimation->paintFrame(
 		p,
@@ -807,11 +829,16 @@ int TabsHost::resizeGetHeight(int newWidth) {
 	if (!ranges::contains(_tabsShown, true)) {
 		return 0;
 	}
-	if (const auto strip = _stripWeak.get()
-		; strip && strip->parentWidget() == this) {
-		const auto stripWidth = std::min(strip->naturalWidth(), newWidth);
-		strip->resizeToWidth(stripWidth);
-		strip->moveToLeft((newWidth - stripWidth) / 2, 0);
+	if (const auto strip = _stripWeak.get()) {
+		if (strip->parentWidget() == this) {
+			const auto stripWidth = std::min(
+				strip->naturalWidth(),
+				newWidth);
+			strip->resizeToWidth(stripWidth);
+			strip->moveToLeft((newWidth - stripWidth) / 2, 0);
+		}
+		// The saved messages page floats the strip from birth, so the
+		// reserved height must follow a lent out strip as well.
 		_stripHeight = strip->height();
 	}
 	const auto bodyTop = _stripHeight;
@@ -822,11 +849,14 @@ int TabsHost::resizeGetHeight(int newWidth) {
 	_searchContentFits = _searching && !_scrolledToTop && (natural < span);
 	if (_searchContentFits) {
 		_keepMinHeight = span;
-	} else if (_keepMinHeight
-		&& ((natural >= _keepMinHeight)
-			|| (natural >= _visibleBottom)
-			|| _scrolledToTop)) {
-		_keepMinHeight = 0;
+	} else if (_keepMinHeight) {
+		// Growing filler would add scroll room on every scroll to bottom.
+		_keepMinHeight = std::min(
+			_keepMinHeight,
+			std::max(_visibleBottom, 0));
+		if ((natural >= _keepMinHeight) || _scrolledToTop) {
+			_keepMinHeight = 0;
+		}
 	}
 	return std::max(natural, _keepMinHeight);
 }

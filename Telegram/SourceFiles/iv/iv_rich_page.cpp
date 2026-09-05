@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/flat_map.h"
 #include "base/qthelp_url.h"
 #include "base/unixtime.h"
-#include "base/variant.h"
 #include "data/data_document.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
@@ -39,6 +38,7 @@ namespace {
 
 using Block = RichPage::Block;
 using BlockKind = RichPage::BlockKind;
+using ButtonAlignment = RichPage::ButtonAlignment;
 using GroupedMediaIntent = RichPage::GroupedMediaIntent;
 using ListItem = RichPage::ListItem;
 using ListKind = RichPage::ListKind;
@@ -189,6 +189,7 @@ enum class OrderedMarkerType {
 const auto PhotoLargeLevels = u"ydxcwmbsa"_q;
 constexpr auto kDefaultMapWidth = 400;
 constexpr auto kDefaultMapHeight = 200;
+constexpr auto kMaxParsedBlockDepth = 64;
 
 [[nodiscard]] int NonZeroMapWidth(int width) {
 	return (width > 0) ? width : kDefaultMapWidth;
@@ -240,7 +241,9 @@ struct ParseContext {
 	};
 	base::flat_map<uint64, DocumentInfo> documentInfos;
 	bool dropRichTextClickHandlers = false;
+	bool keepRichTextFormattedDates = false;
 	bool displayTextDiff = false;
+	int blockDepth = 0;
 };
 
 struct RichMessageMetrics {
@@ -249,6 +252,7 @@ struct RichMessageMetrics {
 	int maxDepth = 0;
 	int mediaCount = 0;
 	int maxTableColumns = 0;
+	int maxRowButtons = 0;
 	int tableColumnMeasurementLimit = 0;
 };
 
@@ -258,6 +262,7 @@ using TableOccupancyGrid = std::vector<TableOccupancyRow>;
 enum class RichTextParseMode {
 	Normal,
 	DropClickHandlers,
+	DropClickHandlersKeepDates,
 };
 
 void AccumulateTextLength(
@@ -277,6 +282,7 @@ void AccumulateTextLength(
 	case BlockKind::Photo:
 	case BlockKind::Video:
 	case BlockKind::Audio:
+	case BlockKind::File:
 		return true;
 	default:
 		return false;
@@ -473,6 +479,12 @@ void AccumulateBlockMetrics(
 	AccumulateTextLength(metrics, block.text);
 	AccumulateTextLength(metrics, block.caption);
 	AccumulateTextLength(metrics, block.formula);
+	for (const auto &button : block.buttons) {
+		AccumulateTextLength(metrics, button.text);
+	}
+	metrics->maxRowButtons = std::max(
+		metrics->maxRowButtons,
+		int(block.buttons.size()));
 	if (IsMediaKind(block.kind)) {
 		++metrics->mediaCount;
 	}
@@ -802,7 +814,21 @@ void RememberWebPageMedia(
 		const MTPPageCaption &caption,
 		ParseContext *context);
 
-[[nodiscard]] bool AppendRichText(
+[[nodiscard]] bool AppendInlineTextObject(
+		TextWithEntities *text,
+		const Markdown::InlineTextObjectEntity &object,
+		const QString &fallback) {
+	const auto entityData = Markdown::SerializeInlineTextObjectEntity(object);
+	if (entityData.isEmpty()) {
+		text->append(fallback);
+		return true;
+	}
+	const auto from = text->text.size();
+	text->append(QChar::ObjectReplacementCharacter);
+	return AddEntity(text, from, EntityType::CustomEmoji, entityData);
+}
+
+bool AppendRichText(
 		const MTPRichText &text,
 		RichText *result,
 		ParseContext *context,
@@ -829,48 +855,30 @@ void RememberWebPageMedia(
 			result->text.append(replacementText);
 			return true;
 		}
-		const auto entityData = Markdown::SerializeInlineTextObjectEntity({
-			.kind = Markdown::InlineTextObjectKind::IvImage,
-			.data = Markdown::InlineTextObjectIvImageData{
-				.documentId = uint64(data.vdocument_id().v),
-				.width = data.vw().v,
-				.height = data.vh().v,
-				.replacementText = replacementText,
+		return AppendInlineTextObject(
+			&result->text,
+			{
+				.kind = Markdown::InlineTextObjectKind::IvImage,
+				.data = Markdown::InlineTextObjectIvImageData{
+					.documentId = uint64(data.vdocument_id().v),
+					.width = data.vw().v,
+					.height = data.vh().v,
+					.replacementText = replacementText,
+				},
 			},
-		});
-		if (entityData.isEmpty()) {
-			result->text.append(replacementText);
-			return true;
-		}
-		const auto from = result->text.text.size();
-		result->text.append(QChar::ObjectReplacementCharacter);
-		result->text.entities.push_back(EntityInText(
-			EntityType::CustomEmoji,
-			from,
-			1,
-			entityData));
-		return true;
+			replacementText);
 	}, [&](const MTPDtextMath &data) {
 		const auto source = FormulaTexFromSource(qs(data.vsource()));
-		const auto entityData = Markdown::SerializeInlineTextObjectEntity({
-			.kind = Markdown::InlineTextObjectKind::Formula,
-			.data = Markdown::InlineTextObjectFormulaData{
-				.copySource = Markdown::InlineFormulaCopySource(source),
-				.trimmedTex = source,
+		return AppendInlineTextObject(
+			&result->text,
+			{
+				.kind = Markdown::InlineTextObjectKind::Formula,
+				.data = Markdown::InlineTextObjectFormulaData{
+					.copySource = Markdown::InlineFormulaCopySource(source),
+					.trimmedTex = source,
+				},
 			},
-		});
-		if (entityData.isEmpty()) {
-			result->text.append(source);
-			return true;
-		}
-		const auto from = result->text.text.size();
-		result->text.append(QChar::ObjectReplacementCharacter);
-		result->text.entities.push_back(EntityInText(
-			EntityType::CustomEmoji,
-			from,
-			1,
-			entityData));
-		return true;
+			source);
 	}, [&](const MTPDtextCustomEmoji &data) {
 		result->text.append(Ui::Text::SingleCustomEmoji(
 			::Data::SerializeCustomEmojiId(uint64(data.vdocument_id().v)),
@@ -1009,7 +1017,8 @@ void RememberWebPageMedia(
 		if (!AppendRichText(data.vtext(), result, context, anchorId, anchorIds)) {
 			return false;
 		}
-		if (context->dropRichTextClickHandlers) {
+		if (context->dropRichTextClickHandlers
+			&& !context->keepRichTextFormattedDates) {
 			return true;
 		}
 		auto flags = FormattedDateFlags();
@@ -1098,6 +1107,51 @@ void RememberWebPageMedia(
 				inserted,
 				EntityType::Colorized,
 				QString(QChar(kTextDiffInsertedColorIndex)));
+	}, [&](const MTPDtextButton &data) {
+		const auto buttonStyle = data.vstyle();
+		const auto button = ParseInlineButton(
+			data.vtype(),
+			QString(),
+			ParseRichButtonVisual(buttonStyle));
+		if (!button) {
+			return AppendRichText(
+				data.vtext(),
+				result,
+				context,
+				anchorId,
+				anchorIds);
+		}
+		auto parsed = ParseRichText(
+			data.vtext(),
+			context,
+			RichTextParseMode::DropClickHandlersKeepDates);
+		const auto label = Markdown::NormalizeRichButtonLabel(
+			std::move(parsed.text));
+		if (label.empty()) {
+			return true;
+		}
+		using Type = HistoryMessageMarkupButton::Type;
+		const auto disabled = (button->type == Type::Disabled);
+		const auto link = buttonStyle
+			&& buttonStyle->data().is_link()
+			&& (disabled
+				|| button->type == Type::Callback
+				|| button->type == Type::CallbackWithPassword);
+		return AppendInlineTextObject(
+			&result->text,
+			{
+				.kind = Markdown::InlineTextObjectKind::Button,
+				.data = Markdown::InlineTextObjectButtonData{
+					.label = label,
+					.data = button->data,
+					.buttonId = button->buttonId,
+					.type = button->type,
+					.color = button->visual.color,
+					.peerTypes = button->peerTypes,
+					.link = link,
+				},
+			},
+			label.text);
 	});
 }
 
@@ -1109,16 +1163,19 @@ void RememberWebPageMedia(
 	auto anchorId = QString();
 	auto anchorIds = std::vector<QString>();
 	const auto wasDropClickHandlers = context->dropRichTextClickHandlers;
+	const auto wasKeepFormattedDates = context->keepRichTextFormattedDates;
 	context->dropRichTextClickHandlers
-		= (mode == RichTextParseMode::DropClickHandlers);
-	const auto parsed = AppendRichText(
+		= (mode != RichTextParseMode::Normal);
+	context->keepRichTextFormattedDates
+		= (mode == RichTextParseMode::DropClickHandlersKeepDates);
+	AppendRichText(
 		text,
 		&result,
 		context,
 		&anchorId,
 		&anchorIds);
 	context->dropRichTextClickHandlers = wasDropClickHandlers;
-	(void)parsed;
+	context->keepRichTextFormattedDates = wasKeepFormattedDates;
 	result.anchorId = std::move(anchorId);
 	result.anchorIds = std::move(anchorIds);
 	return result;
@@ -1130,14 +1187,14 @@ void RememberWebPageMedia(
 	auto result = RichText();
 	auto anchorId = QString();
 	auto anchorIds = std::vector<QString>();
-	(void)AppendRichText(
+	AppendRichText(
 		caption.data().vtext(),
 		&result,
 		context,
 		&anchorId,
 		&anchorIds);
 	auto credit = RichText();
-	(void)AppendRichText(
+	AppendRichText(
 		caption.data().vcredit(),
 		&credit,
 		context,
@@ -1159,6 +1216,24 @@ void AdoptAnchor(QString *anchorId, RichText *text) {
 		*anchorId = std::move(text->anchorId);
 		text->anchorId.clear();
 	}
+}
+
+[[nodiscard]] Block MakeDocumentBlock(
+		BlockKind kind,
+		uint64 documentId,
+		const MTPPageCaption &caption,
+		ParseContext *context) {
+	const auto info = FindDocumentInfo(*context, documentId);
+	auto parsed = MakeBlock(kind);
+	parsed.audioTitle = info.title;
+	parsed.audioPerformer = info.performer;
+	parsed.audioDuration = info.duration;
+	parsed.fileName = info.fileName;
+	parsed.documentId = documentId;
+	parsed.document = FindDocument(*context, documentId);
+	parsed.caption = ParseCaption(caption, context);
+	AdoptAnchor(&parsed.anchorId, &parsed.caption);
+	return parsed;
 }
 
 void AdoptLeadingParagraphListItemText(ListItem *item) {
@@ -1239,7 +1314,14 @@ void AppendBlocks(
 void AppendBlock(
 		const MTPPageBlock &block,
 		std::vector<Block> *result,
-	ParseContext *context) {
+		ParseContext *context) {
+	if (context->blockDepth >= kMaxParsedBlockDepth) {
+		result->push_back(MakeBlock(BlockKind::Unsupported));
+		return;
+	}
+	++context->blockDepth;
+	const auto depthGuard = gsl::finally([&] { --context->blockDepth; });
+
 	block.match([&](const MTPDpageBlockUnsupported &) {
 		result->push_back(MakeBlock(BlockKind::Unsupported));
 	}, [&](const MTPDpageBlockTitle &data) {
@@ -1325,6 +1407,7 @@ void AppendBlock(
 		result->push_back(std::move(parsed));
 	}, [&](const MTPDpageBlockBlockquote &data) {
 		auto parsed = MakeBlock(BlockKind::Quote);
+		parsed.collapsed = data.is_collapsed();
 		parsed.text = ParseRichText(data.vtext(), context);
 		AdoptAnchor(&parsed.anchorId, &parsed.text);
 		parsed.caption = ParseRichText(data.vcaption(), context);
@@ -1434,18 +1517,11 @@ void AppendBlock(
 		});
 		result->push_back(std::move(parsed));
 	}, [&](const MTPDpageBlockAudio &data) {
-		const auto documentId = uint64(data.vaudio_id().v);
-		const auto info = FindDocumentInfo(*context, documentId);
-		auto parsed = MakeBlock(BlockKind::Audio);
-		parsed.audioTitle = info.title;
-		parsed.audioPerformer = info.performer;
-		parsed.audioFileName = info.fileName;
-		parsed.documentId = documentId;
-		parsed.document = FindDocument(*context, documentId);
-		parsed.audioDuration = info.duration;
-		parsed.caption = ParseCaption(data.vcaption(), context);
-		AdoptAnchor(&parsed.anchorId, &parsed.caption);
-		result->push_back(std::move(parsed));
+		result->push_back(MakeDocumentBlock(
+			BlockKind::Audio,
+			uint64(data.vaudio_id().v),
+			data.vcaption(),
+			context));
 	}, [&](const MTPDpageBlockKicker &data) {
 		auto parsed = MakeHeadingBlock(5);
 		parsed.text = ParseRichText(data.vtext(), context);
@@ -1489,6 +1565,7 @@ void AppendBlock(
 		auto parsed = MakeBlock(BlockKind::Table);
 		parsed.bordered = data.is_bordered();
 		parsed.striped = data.is_striped();
+		parsed.compact = data.is_compact();
 		parsed.text = ParseRichText(data.vtitle(), context);
 		AdoptAnchor(&parsed.anchorId, &parsed.text);
 		parsed.tableRows.reserve(data.vrows().v.size());
@@ -1601,6 +1678,48 @@ void AppendBlock(
 		parsed.caption = ParseCaption(data.vcaption(), context);
 		AdoptAnchor(&parsed.anchorId, &parsed.caption);
 		result->push_back(std::move(parsed));
+	}, [&](const MTPDpageBlockButtonRow &data) {
+		auto parsed = MakeBlock(BlockKind::ButtonRow);
+		parsed.buttonAlignment = data.is_align_left()
+			? ButtonAlignment::Left
+			: data.is_align_center()
+			? ButtonAlignment::Center
+			: data.is_align_right()
+			? ButtonAlignment::Right
+			: ButtonAlignment::Stretch;
+		const auto &list = data.vbuttons().v;
+		const auto count = std::min(
+			int(list.size()),
+			RichMessageLimits().maxButtons);
+		parsed.buttons.reserve(count);
+		for (auto i = 0; i != count; ++i) {
+			const auto &fields = list[i].data();
+			auto button = ParseInlineButton(
+				fields.vtype(),
+				QString(),
+				ParseRichButtonVisual(fields.vstyle()));
+			if (!button) {
+				continue;
+			}
+			auto text = ParseRichText(
+				fields.vtext(),
+				context,
+				RichTextParseMode::DropClickHandlersKeepDates);
+			button->text = text.text.text;
+			parsed.buttons.push_back({
+				.text = std::move(text),
+				.button = std::move(*button),
+			});
+		}
+		if (!parsed.buttons.empty()) {
+			result->push_back(std::move(parsed));
+		}
+	}, [&](const MTPDpageBlockDocument &data) {
+		result->push_back(MakeDocumentBlock(
+			BlockKind::File,
+			uint64(data.vdocument_id().v),
+			data.vcaption(),
+			context));
 	}, [&](const MTPDinputPageBlockMap &) {
 		result->push_back(MakeBlock(BlockKind::Unsupported));
 	});
@@ -1616,61 +1735,11 @@ void AppendBlocks(
 	}
 }
 
-void ExpandInlineTextObjects(TextWithEntities *text, bool withIcons) {
-	auto &entities = text->entities;
-	for (auto i = entities.begin(); i != entities.end();) {
-		if (i->type() != EntityType::CustomEmoji) {
-			++i;
-			continue;
-		}
-		const auto object = Markdown::ParseInlineTextObjectEntity(
-			i->data());
-		if (!object) {
-			++i;
-			continue;
-		}
-		const auto replacement = v::match(object->data, [](
-				const Markdown::InlineTextObjectFormulaData &data) {
-			return data.trimmedTex;
-		}, [](const Markdown::InlineTextObjectIvImageData &data) {
-			return data.replacementText;
-		});
-		const auto offset = i->offset();
-		const auto length = i->length();
-		const auto delta = int(replacement.size()) - length;
-		text->text.replace(offset, length, replacement);
-		for (auto &entity : entities) {
-			if (&entity == &*i) {
-				continue;
-			} else if (entity.offset() > offset) {
-				entity.shiftRight(delta);
-			} else if (entity.offset() + entity.length() > offset) {
-				entity.shrinkFromRight(-delta);
-			}
-		}
-		const auto formula = (object->kind
-			== Markdown::InlineTextObjectKind::Formula);
-		if (withIcons && formula && !replacement.isEmpty()) {
-			const auto icon = Ui::Text::IconEmoji(
-				&st::ivSummaryMathIcon,
-				replacement);
-			*i = EntityInText(
-				EntityType::CustomEmoji,
-				offset,
-				int(replacement.size()),
-				icon.entities.front().data());
-			++i;
-		} else {
-			i = entities.erase(i);
-		}
-	}
-}
-
 void AppendSummaryLine(
 		TextWithEntities *result,
 		TextWithEntities &&line,
 		bool withIcons) {
-	ExpandInlineTextObjects(&line, withIcons);
+	Markdown::ExpandInlineTextObjects(&line, withIcons);
 	TextUtilities::Trim(line);
 	if (line.empty()) {
 		return;
@@ -1709,6 +1778,8 @@ void AppendSummaryLine(
 		return tr::lng_in_dlg_video(tr::now);
 	} else if (block.kind == BlockKind::Audio) {
 		return tr::lng_in_dlg_audio_file(tr::now);
+	} else if (block.kind == BlockKind::File) {
+		return tr::lng_in_dlg_file(tr::now);
 	} else if (block.kind == BlockKind::Map) {
 		return tr::lng_maps_point(tr::now);
 	} else if (block.kind == BlockKind::GroupedMedia) {
@@ -1856,11 +1927,12 @@ struct SimpleTextBuilder {
 			const QString &wrapData = QString()) {
 		AppendSimpleBlock(&result, TextWithEntities(text), wrap, wrapData);
 	}
-	void appendQuote(SimpleTextBuilder &&body) {
+	void appendQuote(SimpleTextBuilder &&body, bool collapsed) {
 		AppendSimpleBlock(
 			&result,
 			std::move(body.result),
-			EntityType::Blockquote);
+			EntityType::Blockquote,
+			collapsed ? u"1"_q : QString());
 	}
 	[[nodiscard]] int length() const {
 		return int(result.text.size());
@@ -1876,7 +1948,7 @@ struct SimpleTextCounter {
 			const QString & = QString()) {
 		appendLength(TrimmedLength(text));
 	}
-	void appendQuote(SimpleTextCounter &&body) {
+	void appendQuote(SimpleTextCounter &&body, bool) {
 		appendLength(body.result);
 	}
 	void appendLength(int length) {
@@ -1943,7 +2015,9 @@ template <typename Accumulator>
 			if (!CollectSimpleQuote(block, body)) {
 				return false;
 			}
-			to.appendQuote(std::move(body));
+			to.appendQuote(
+				std::move(body),
+				block.collapsed && RichBlockquoteIsCollapsible(block));
 			break;
 		}
 		default:
@@ -2009,6 +2083,11 @@ void AppendSummaryBlock(
 		AppendSummaryLine(result, std::move(line), withIcons);
 		return;
 	}
+	case BlockKind::ButtonRow:
+		for (const auto &button : block.buttons) {
+			AppendSummaryLine(result, button.text, withIcons);
+		}
+		return;
 	case BlockKind::List: {
 		auto ordered = OrderedListSequenceStart(block);
 		const auto step = block.orderedList.reversed ? -1 : 1;
@@ -2078,6 +2157,7 @@ void AppendSummaryBlock(
 	case BlockKind::Photo:
 	case BlockKind::Video:
 	case BlockKind::Audio:
+	case BlockKind::File:
 	case BlockKind::GroupedMedia:
 	case BlockKind::Map: {
 		if (!withIcons) {
@@ -2239,8 +2319,10 @@ std::shared_ptr<const RichPage> ParsePage(
 	case BlockKind::Photo:
 	case BlockKind::Video:
 	case BlockKind::Audio:
+	case BlockKind::File:
 	case BlockKind::GroupedMedia:
 	case BlockKind::Map:
+	case BlockKind::ButtonRow:
 		return false;
 	default:
 		break;
@@ -2375,6 +2457,8 @@ std::optional<RichMessageLimitError> ValidateRichMessage(
 		return RichMessageLimitError::Media;
 	} else if (metrics.maxTableColumns > limits.maxTableCols) {
 		return RichMessageLimitError::TableColumns;
+	} else if (metrics.maxRowButtons > limits.maxButtons) {
+		return RichMessageLimitError::Buttons;
 	}
 	return std::nullopt;
 }
@@ -2509,7 +2593,7 @@ TextWithEntities FlattenRichPageToSimpleText(const RichPage &page) {
 			// Code blocks are allowed at the top level as a Pre entity, but
 			// their content is sent as plain text without any inline entities.
 			auto inner = block.text.text;
-			ExpandInlineTextObjects(&inner, false);
+			Markdown::ExpandInlineTextObjects(&inner, false);
 			inner.entities.clear();
 			AppendSimpleBlock(
 				&result,
@@ -2555,6 +2639,21 @@ TextWithEntities FlattenRichPageToSimpleText(const RichPage &page) {
 
 bool DetermineRichPageRtl(const RichPage &page) {
 	return BlocksTextRtl(page.blocks).value_or(false);
+}
+
+bool RichDocumentIsAudio(DocumentData *document) {
+	return document
+		&& (document->isAudioFile() || document->isVoiceMessage());
+}
+
+bool RichBlockIsDocumentRow(RichPage::BlockKind kind) {
+	return (kind == BlockKind::Audio) || (kind == BlockKind::File);
+}
+
+bool RichBlockquoteIsCollapsible(const RichPage::Block &block) {
+	return (block.kind == BlockKind::Quote)
+		&& !block.pullquote
+		&& block.blocks.empty();
 }
 
 std::optional<TextWithEntities> SerializeAsSimple(
@@ -2661,6 +2760,7 @@ RichPage SplitTextIntoRichPage(TextWithEntities text) {
 			page.blocks.push_back(Block{
 				.kind = BlockKind::Quote,
 				.text = { std::move(body) },
+				.collapsed = !segment.data.isEmpty(),
 			});
 		}
 	}

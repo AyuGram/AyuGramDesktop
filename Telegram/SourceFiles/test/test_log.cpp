@@ -15,6 +15,7 @@ namespace Test {
 namespace {
 
 auto FailuresCount = 0;
+auto CompletedAtValue = crl::time(0);
 
 [[nodiscard]] QString EnsuredDir(const QString &path) {
 	QDir().mkpath(path);
@@ -52,8 +53,10 @@ void Step(const QString &text) {
 	LogRaw(u"TEST_STEP: %1"_q.arg(text));
 }
 
-void Pass(const QString &text) {
-	LogRaw(u"TEST_RESULT: PASS: %1"_q.arg(text));
+void Pass(const QString &text, const QString &details) {
+	LogRaw(details.isEmpty()
+		? u"TEST_RESULT: PASS: %1"_q.arg(text)
+		: u"TEST_RESULT: PASS: %1 - %2"_q.arg(text, details));
 }
 
 void Fail(const QString &text, const QString &details) {
@@ -65,7 +68,7 @@ void Fail(const QString &text, const QString &details) {
 
 void Check(bool ok, const QString &what, const QString &details) {
 	if (ok) {
-		Pass(what);
+		Pass(what, details);
 	} else {
 		Fail(what, details);
 	}
@@ -80,14 +83,15 @@ void CheckNear(
 		int expected,
 		int tolerance,
 		const QString &what) {
+	const auto ok = (std::abs(actual - expected) <= tolerance);
 	Check(
-		std::abs(actual - expected) <= tolerance,
+		ok,
 		u"%1 (actual %2, expected %3 ±%4)"_q.arg(
 			what,
 			QString::number(actual),
 			QString::number(expected),
 			QString::number(tolerance)),
-		u"out of tolerance"_q);
+		ok ? QString() : u"out of tolerance"_q);
 }
 
 void LogGeometry(const QString &name, const QRect &rect) {
@@ -104,7 +108,12 @@ int FailureCount() {
 }
 
 void Complete() {
+	CompletedAtValue = crl::now();
 	LogRaw(u"TEST_COMPLETE"_q);
+}
+
+crl::time CompletedAt() {
+	return CompletedAtValue;
 }
 
 } // namespace Test

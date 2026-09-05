@@ -57,6 +57,13 @@ if (WIN32)
     )
 endif()
 
+include(cmake/generate_update_keys.cmake)
+generate_update_keys(Telegram ${res_loc}/update)
+
+if (DESKTOP_APP_TEST_APPS OR DESKTOP_APP_SPECIAL_TARGET)
+    include(cmake/test_update_verify.cmake)
+endif()
+
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
 target_link_libraries(Telegram
@@ -354,6 +361,8 @@ PRIVATE
     api/api_suggest_post.h
     api/api_text_entities.cpp
     api/api_text_entities.h
+    api/api_rich_tasks.cpp
+    api/api_rich_tasks.h
     api/api_todo_lists.cpp
     api/api_todo_lists.h
     api/api_toggling_media.cpp
@@ -487,6 +496,8 @@ PRIVATE
     boxes/max_invite_box.h
     boxes/moderate_messages_box.cpp
     boxes/moderate_messages_box.h
+    boxes/music_attach_box.cpp
+    boxes/music_attach_box.h
     boxes/peer_list_box.cpp
     boxes/peer_list_box.h
     boxes/peer_list_controllers.cpp
@@ -662,6 +673,8 @@ PRIVATE
     chat_helpers/gifs_list_widget.h
     chat_helpers/message_field.cpp
     chat_helpers/message_field.h
+    chat_helpers/rich_paste_toast.cpp
+    chat_helpers/rich_paste_toast.h
     chat_helpers/share_message_phrase_factory.cpp
     chat_helpers/share_message_phrase_factory.h
     chat_helpers/spellchecker_common.cpp
@@ -701,6 +714,8 @@ PRIVATE
     core/click_handler_types.h
     core/core_cloud_password.cpp
     core/core_cloud_password.h
+    core/core_screenshot_protection.cpp
+    core/core_screenshot_protection.h
     core/core_settings.cpp
     core/core_settings.h
     core/core_settings_proxy.cpp
@@ -738,8 +753,13 @@ PRIVATE
     core/shortcuts.h
     core/ui_integration.cpp
     core/ui_integration.h
+    core/update_channel.h
     core/update_checker.cpp
     core/update_checker.h
+    core/update_keys.cpp
+    core/update_keys.h
+    core/update_verify.cpp
+    core/update_verify.h
     core/utils.cpp
     core/utils.h
     core/version.h
@@ -779,6 +799,8 @@ PRIVATE
     data/components/sponsored_messages.h
     data/components/top_peers.cpp
     data/components/top_peers.h
+    data/components/welcome_messages.cpp
+    data/components/welcome_messages.h
     data/notify/data_notify_settings.cpp
     data/notify/data_notify_settings.h
     data/notify/data_peer_notify_settings.cpp
@@ -918,7 +940,7 @@ PRIVATE
     data/data_sparse_ids.h
     data/data_star_gift.cpp
     data/data_star_gift.h
-    data/data_statistics.h
+    data/data_statistics_lists.h
     data/data_stories.cpp
     data/data_stories.h
     data/data_stories_ids.cpp
@@ -1022,6 +1044,18 @@ PRIVATE
     editor/photo_editor_layer_widget.h
     editor/scene/scene_item_sticker.cpp
     editor/scene/scene_item_sticker.h
+    editor/video/video_editor.cpp
+    editor/video/video_editor.h
+    editor/video/video_editor_common.cpp
+    editor/video/video_editor_common.h
+    editor/video/video_editor_layer.cpp
+    editor/video/video_editor_layer.h
+    editor/video/video_editor_quality.cpp
+    editor/video/video_editor_quality.h
+    editor/video/video_quality_slider.cpp
+    editor/video/video_quality_slider.h
+    editor/video/video_timeline.cpp
+    editor/video/video_timeline.h
     export/export_manager.cpp
     export/export_manager.h
     export/view/export_view_content.cpp
@@ -1043,12 +1077,16 @@ PRIVATE
     history/admin_log/history_admin_log_section.cpp
     history/admin_log/history_admin_log_section.h
     history/view/controls/compose_controls_common.h
+    history/view/controls/history_view_bottom_controls.cpp
+    history/view/controls/history_view_bottom_controls.h
     history/view/controls/history_view_compose_ai_button.cpp
     history/view/controls/history_view_compose_ai_button.h
     history/view/controls/history_view_compose_ai_tooltip.cpp
     history/view/controls/history_view_compose_ai_tooltip.h
     history/view/controls/history_view_compose_controls.cpp
     history/view/controls/history_view_compose_controls.h
+    history/view/controls/history_view_top_controls.cpp
+    history/view/controls/history_view_top_controls.h
     history/view/controls/history_view_compose_media_edit_manager.cpp
     history/view/controls/history_view_compose_media_edit_manager.h
     history/view/controls/history_view_compose_search.cpp
@@ -1063,6 +1101,8 @@ PRIVATE
     history/view/controls/history_view_suggest_options.h
     history/view/controls/history_view_ttl_button.cpp
     history/view/controls/history_view_ttl_button.h
+    history/view/controls/history_view_video_cover_uploader.cpp
+    history/view/controls/history_view_video_cover_uploader.h
     history/view/controls/history_view_voice_record_bar.cpp
     history/view/controls/history_view_voice_record_bar.h
     history/view/controls/history_view_webpage_processor.cpp
@@ -1142,8 +1182,14 @@ PRIVATE
     history/view/media/history_view_todo_list.h
     history/view/media/history_view_unique_gift.cpp
     history/view/media/history_view_unique_gift.h
+    history/view/media/history_view_unsupported_notice.cpp
+    history/view/media/history_view_unsupported_notice.h
     history/view/media/history_view_userpic_suggestion.cpp
     history/view/media/history_view_userpic_suggestion.h
+    history/view/media/history_view_video_message_seek.cpp
+    history/view/media/history_view_video_message_seek.h
+    history/view/media/history_view_video_status.cpp
+    history/view/media/history_view_video_status.h
     history/view/media/history_view_web_page.cpp
     history/view/media/history_view_web_page.h
     history/view/reactions/history_view_reactions.cpp
@@ -1256,6 +1302,8 @@ PRIVATE
     history/view/history_view_view_button.h
     history/view/history_view_webpage_preview.cpp
     history/view/history_view_webpage_preview.h
+    history/view/history_view_welcome_messages_section.cpp
+    history/view/history_view_welcome_messages_section.h
     history/history.cpp
     history/history.h
     history/history_drag_area.cpp
@@ -1406,6 +1454,8 @@ PRIVATE
     info/profile/tabs/adapters/info_profile_tab_stories.h
     info/profile/tabs/adapters/info_profile_tab_sub_controller.cpp
     info/profile/tabs/adapters/info_profile_tab_sub_controller.h
+    info/profile/tabs/adapters/info_profile_tab_chats.cpp
+    info/profile/tabs/adapters/info_profile_tab_chats.h
     info/profile/tabs/adapters/info_profile_tab_members.cpp
     info/profile/tabs/adapters/info_profile_tab_members.h
     info/profile/tabs/adapters/info_profile_tab_polls.cpp
@@ -1439,6 +1489,8 @@ PRIVATE
     info/similar_peers/info_similar_peers_widget.cpp
     info/similar_peers/info_similar_peers_widget.h
     info/statistics/info_statistics_common.h
+    info/statistics/info_statistics_export.cpp
+    info/statistics/info_statistics_export.h
     info/statistics/info_statistics_inner_widget.cpp
     info/statistics/info_statistics_inner_widget.h
     info/statistics/info_statistics_list_controllers.cpp
@@ -1521,6 +1573,8 @@ PRIVATE
     intro/intro_widget.h
     iv/iv_cached_media.cpp
     iv/iv_cached_media.h
+    iv/editor/iv_editor_button_box.cpp
+    iv/editor/iv_editor_button_box.h
     iv/editor/iv_editor_session.cpp
     iv/editor/iv_editor_session.h
     iv/iv_delegate_impl.cpp
@@ -1651,6 +1705,10 @@ PRIVATE
     media/streaming/media_streaming_video_track.cpp
     media/streaming/media_streaming_video_track.h
     media/streaming/media_streaming_native_frame_mac.h
+    media/media_video_encode.cpp
+    media/media_video_encode.h
+    media/media_video_frames.cpp
+    media/media_video_frames.h
     media/view/media_view_group_thumbs.cpp
     media/view/media_view_group_thumbs.h
     media/view/media_view_open_common.cpp
@@ -1690,10 +1748,14 @@ PRIVATE
     menu/menu_antispam_validator.h
     menu/menu_dock.cpp
     menu/menu_dock.h
+    menu/menu_emoji_status.cpp
+    menu/menu_emoji_status.h
     menu/menu_item_download_files.cpp
     menu/menu_item_download_files.h
     menu/menu_item_rate_transcribe_session.cpp
     menu/menu_item_rate_transcribe_session.h
+    menu/menu_mark_as_read.cpp
+    menu/menu_mark_as_read.h
     menu/menu_mute.cpp
     menu/menu_mute.h
     menu/menu_send.cpp
@@ -1715,6 +1777,8 @@ PRIVATE
     mtproto/core_types.h
     mtproto/dedicated_file_loader.cpp
     mtproto/dedicated_file_loader.h
+    mtproto/details/mtproto_web_proxy_socket.cpp
+    mtproto/details/mtproto_web_proxy_socket.h
     mtproto/facade.cpp
     mtproto/facade.h
     mtproto/mtp_instance.cpp
@@ -1729,6 +1793,12 @@ PRIVATE
     mtproto/special_config_request.cpp
     mtproto/special_config_request.h
     mtproto/type_utils.h
+    mtproto/web_proxy/web_proxy_frame.cpp
+    mtproto/web_proxy/web_proxy_frame.h
+    mtproto/web_proxy/web_proxy_transport.cpp
+    mtproto/web_proxy/web_proxy_transport.h
+    mtproto/web_proxy/web_proxy_webview.cpp
+    mtproto/web_proxy/web_proxy_webview.h
     overview/overview_checkbox.cpp
     overview/overview_checkbox.h
     overview/overview_layout.cpp
@@ -2045,17 +2115,37 @@ PRIVATE
     test/test_agent.h
     test/test_capture.cpp
     test/test_capture.h
+    test/test_custom_emoji.cpp
+    test/test_custom_emoji.h
+    test/test_history_fixtures.cpp
+    test/test_history_fixtures.h
+    test/test_hover.cpp
+    test/test_hover.h
+    test/test_ink.cpp
+    test/test_ink.h
     test/test_launch_fuse.cpp
     test/test_launch_fuse.h
+    test/test_layer_root.cpp
+    test/test_layer_root.h
     test/test_log.cpp
     test/test_log.h
+    test/test_menu.cpp
+    test/test_menu.h
     test/test_messages.cpp
     test/test_messages.h
     test/test_open_handoff.cpp
     test/test_open_handoff.h
+    test/test_panel.cpp
+    test/test_panel.h
+    test/test_probe.cpp
+    test/test_probe.h
     test/test_runner.cpp
     test/test_runner.h
     test/test_scenario.cpp
+    test/test_style.cpp
+    test/test_style.h
+    test/test_transfer.cpp
+    test/test_transfer.h
     test/test_widgets.cpp
     test/test_widgets.h
     ui/boxes/edit_invite_link_session.cpp
@@ -2189,6 +2279,10 @@ PRIVATE
     window/window_media_preview.h
     window/window_peer_menu.cpp
     window/window_peer_menu.h
+    window/window_restore_shell.cpp
+    window/window_restore_shell.h
+    window/window_saved_windows.cpp
+    window/window_saved_windows.h
     window/window_section_common.h
     window/window_separate_id.cpp
     window/window_separate_id.h
@@ -2199,6 +2293,8 @@ PRIVATE
     window/window_setup_email.cpp
     window/window_setup_email.h
     window/window_top_bar_wrap.h
+    window/window_unlock_passcode_box.cpp
+    window/window_unlock_passcode_box.h
     window/themes/window_theme.cpp
     window/themes/window_theme.h
     window/themes/window_theme_editor.cpp
@@ -2649,7 +2745,11 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         PRIVATE
             _other/packer.cpp
             _other/packer.h
+            core/update_verify.cpp
+            core/update_verify.h
         )
+
+        target_include_directories(Packer PRIVATE ${src_loc})
 
         target_link_libraries(Packer
         PRIVATE

@@ -161,7 +161,7 @@ RUN <<EOF
 git init patches
 cd patches
 git remote add origin https://github.com/desktop-app/patches.git
-git fetch --depth=1 origin 27efa67b60881c52b112cf924d705e573d03a0ab
+git fetch --depth=1 origin 73a88cdaa13995c8666c956b80e2129ee9b6b34d
 git reset --hard FETCH_HEAD
 rm -rf .git
 EOF
@@ -197,22 +197,6 @@ cmake --build build
 DESTDIR=/usr/src/xz-cache cmake --install build
 cd ..
 rm -rf xz
-EOF
-
-FROM builder AS protobuf
-RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v30.2 --depth=1 --recursive --shallow-submodules \
-	https://github.com/protocolbuffers/protobuf.git
-cd protobuf
-cmake -B build . \
-	-Dprotobuf_BUILD_TESTS=OFF \
-	-Dprotobuf_BUILD_PROTOBUF_BINARIES=ON \
-	-Dprotobuf_BUILD_LIBPROTOC=ON \
-	-Dprotobuf_WITH_ZLIB=OFF
-cmake --build build
-DESTDIR=/usr/src/protobuf-cache cmake --install build
-cd ..
-rm -rf protobuf
 EOF
 
 FROM builder AS lcms2
@@ -1019,7 +1003,6 @@ EOF
 FROM builder
 COPY --link --from=zlib /usr/src/zlib-cache /
 COPY --link --from=xz /usr/src/xz-cache /
-COPY --link --from=protobuf /usr/src/protobuf-cache /
 COPY --link --from=lcms2 /usr/src/lcms2-cache /
 COPY --link --from=brotli /usr/src/brotli-cache /
 COPY --link --from=highway /usr/src/highway-cache /

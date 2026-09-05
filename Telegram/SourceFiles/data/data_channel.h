@@ -89,6 +89,7 @@ enum class ChannelDataFlag : uint64 {
 	HasActiveVideoStream = (1ULL << 45),
 	Community = (1ULL << 46),
 	CommunityCollapsed = (1ULL << 47),
+	HasWelcomeMessages = (1ULL << 48),
 
 	AyuNoForwards = (1ULL << 63),
 };
@@ -296,6 +297,9 @@ public:
 	}
 	[[nodiscard]] bool starsPerMessageKnown() const {
 		return flags() & Flag::StarsPerMessageKnown;
+	}
+	[[nodiscard]] bool hasWelcomeMessages() const {
+		return flags() & Flag::HasWelcomeMessages;
 	}
 	[[nodiscard]] bool useSubsectionTabs() const;
 

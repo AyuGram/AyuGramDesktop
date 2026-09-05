@@ -49,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/basic_click_handlers.h"
 #include "window/window_session_controller.h"
 
+#include "rpl/event_stream.h"
 #include "rpl/filter.h"
 #include "rpl/lifetime.h"
 
@@ -366,6 +367,7 @@ private:
 	const std::shared_ptr<IvHistoryViewMediaHost> _host;
 	const std::vector<std::shared_ptr<void>> _keepAlive;
 	std::unique_ptr<HistoryView::Media> _media;
+	rpl::lifetime _itemDeathLifetime;
 	QRect _geometry;
 	int _requestedWidth = 0;
 	bool _supported = false;
@@ -395,6 +397,12 @@ IvHistoryViewBlock::IvHistoryViewBlock(
 		_media->initDimensions();
 	}
 	_supported = _media && probeSupport();
+
+	// We outlive the view our media is parented to, so drop the media while
+	// that view is still alive.
+	_host->itemDeath() | rpl::on_next([this] {
+		_media = nullptr;
+	}, _itemDeathLifetime);
 }
 
 IvHistoryViewBlock::~IvHistoryViewBlock() {
@@ -546,7 +554,7 @@ bool IvHistoryViewBlock::acceptsVoiceSeekHandler(
 	return _supported
 		&& _media
 		&& alive()
-		&& (_kind == IvHistoryViewMediaKind::Audio)
+		&& (_kind == IvHistoryViewMediaKind::DocumentRow)
 		&& std::dynamic_pointer_cast<VoiceSeekClickHandler>(handler);
 }
 
@@ -666,7 +674,7 @@ IvHistoryViewHit IvHistoryViewBlock::classifyHandler(
 		result.link = handler;
 		return result;
 	}
-	if (_kind == IvHistoryViewMediaKind::Audio
+	if (_kind == IvHistoryViewMediaKind::DocumentRow
 		&& std::dynamic_pointer_cast<DocumentOpenClickHandler>(handler)) {
 		result.link = handler;
 		return result;
@@ -708,7 +716,7 @@ bool IvHistoryViewBlock::probeSupport() {
 	case IvHistoryViewMediaKind::GroupedMedia:
 		return supportsHitClassification();
 	case IvHistoryViewMediaKind::Map:
-	case IvHistoryViewMediaKind::Audio:
+	case IvHistoryViewMediaKind::DocumentRow:
 		return true;
 	}
 	return false;
@@ -895,6 +903,7 @@ private:
 	const ::Data::FileOrigin _fileOrigin;
 	const bool _editMode = false;
 	std::vector<std::unique_ptr<HistoryView::Media>> _slides;
+	rpl::lifetime _itemDeathLifetime;
 	std::vector<QSize> _slideOriginalSizes;
 	QRect _geometry;
 	QRect _previousRect;
@@ -936,6 +945,16 @@ IvHistoryViewSlideshowBlock::IvHistoryViewSlideshowBlock(
 , _fileOrigin(descriptor.fileOrigin)
 , _editMode(descriptor.editMode)
 , _slideOriginalSizes(std::move(descriptor.slideOriginalSizes)) {
+	// Subscribed before the loop below, which can return early with some
+	// slides already created. We outlive the view they are parented to, so
+	// they must be dropped while it is still alive. Nulled in place rather
+	// than erased, so the slide indices stay valid.
+	_host->itemDeath() | rpl::on_next([this] {
+		for (auto &media : _slides) {
+			media = nullptr;
+		}
+	}, _itemDeathLifetime);
+
 	_slides.reserve(descriptor.slideMediaFactories.size());
 	for (const auto &factory : descriptor.slideMediaFactories) {
 		auto media = factory ? factory(_host->view()) : nullptr;
@@ -1883,6 +1902,7 @@ struct IvHistoryViewMediaHost::State {
 	bool itemDead = false;
 	bool itemTornDown = false;
 	rpl::lifetime itemDeathLifetime;
+	rpl::event_stream<> itemDeaths;
 };
 
 IvHistoryViewMediaHost::State::State(
@@ -1955,6 +1975,13 @@ void IvHistoryViewMediaHost::State::handleItemDeath() {
 	itemDead = true;
 	itemDeathLifetime.destroy();
 	bridgeLifetime.destroy();
+
+	// Blocks outlive the view and own medias parented to it, so they must
+	// drop them while it is still alive: ~Photo / ~Gif call
+	// _parent->checkHeavyPart(), which is what takes the view back out of
+	// Data::Session::_heavyViewParts.
+	itemDeaths.fire({});
+
 	view = nullptr;
 	realView = nullptr;
 	owned = {};
@@ -2005,6 +2032,10 @@ const QString &IvHistoryViewMediaHost::pageUrl() const {
 
 bool IvHistoryViewMediaHost::needsViewRequestBridge() const {
 	return _state->needsViewRequestBridge;
+}
+
+rpl::producer<> IvHistoryViewMediaHost::itemDeath() const {
+	return _state->itemDeaths.events();
 }
 
 void IvHistoryViewMediaHost::registerViewRequestBridge(MediaBlockHost *host) {
@@ -2064,13 +2095,13 @@ IvHistoryViewMediaBlockFactory::IvHistoryViewMediaBlockFactory(
 	base::weak_ptr<Window::SessionController> controller,
 	PhotoFactory createPhoto,
 	VideoFactory createVideo,
-	AudioFactory createAudio,
+	DocumentBlockFactory createDocument,
 	MapFactory createMap,
 	GroupedMediaFactory createGroupedMedia)
 : _controller(std::move(controller))
 , _createPhoto(std::move(createPhoto))
 , _createVideo(std::move(createVideo))
-, _createAudio(std::move(createAudio))
+, _createDocument(std::move(createDocument))
 , _createMap(std::move(createMap))
 , _createGroupedMedia(std::move(createGroupedMedia)) {
 }
@@ -2085,9 +2116,9 @@ std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::createVideo(
 	return create(prepared, _createVideo);
 }
 
-std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::createAudio(
-		const PreparedAudioBlockData &prepared) const {
-	return create(prepared, _createAudio);
+std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::createDocument(
+		const PreparedDocumentBlockData &prepared) const {
+	return create(prepared, _createDocument);
 }
 
 std::shared_ptr<MediaBlock> IvHistoryViewMediaBlockFactory::createMap(

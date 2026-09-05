@@ -40,6 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/components/credits.h"
+#include "data/components/welcome_messages.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_community.h"
@@ -51,6 +52,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_premium_limits.h"
 #include "data/data_user.h"
 #include "history/admin_log/history_admin_log_section.h"
+#include "history/view/history_view_welcome_messages_section.h"
+#include "history/history_item.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
 #include "info/bot/starref/info_bot_starref_join_widget.h"
 #include "info/bot/starref/info_bot_starref_setup_widget.h"
@@ -93,16 +96,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_boxes.h"
 #include "styles/style_info.h"
 
+#include <QtCore/QTextBoundaryFinder>
 #include <QtSvg/QSvgRenderer>
 
 namespace {
 
 constexpr auto kBotManagerUsername = "BotFather"_cs;
+constexpr auto kWelcomePreviewLength = 8;
 
 [[nodiscard]] auto ToPositiveNumberString() {
 	return rpl::map([](int count) {
 		return count ? QString::number(count) : QString();
 	});
+}
+
+[[nodiscard]] QString ElidedPreview(const QString &text, int max) {
+	auto finder = QTextBoundaryFinder(QTextBoundaryFinder::Grapheme, text);
+	auto clusters = 0;
+	while (finder.toNextBoundary() > 0) {
+		if (++clusters < max) {
+			continue;
+		}
+		const auto cut = finder.position();
+		return (cut < text.size())
+			? (text.left(cut).trimmed() + Ui::kQEllipsis)
+			: text;
+	}
+	return text;
 }
 
 [[nodiscard]] int EnableForumMinMembers(not_null<PeerData*> peer) {
@@ -705,6 +725,7 @@ object_ptr<Ui::RpWidget> Controller::createPhotoEdit() {
 			st::defaultUserpicButton),
 		st::editPeerPhotoMargins);
 	_controls.photo = photoWrap->entity();
+	_controls.photo->setVideoAllowed(true);
 	_controls.photo->showCustomOnChosen();
 
 	return photoWrap;
@@ -1559,6 +1580,11 @@ void Controller::fillManageSection() {
 			|| (channel->isBroadcast() && channel->canEditInformation()));
 	const auto canEditDirectMessages = isChannel
 		&& (channel->isBroadcast() && channel->canEditInformation());
+	const auto canEditWelcomeMessages = isChannel
+		? ((channel->isMegagroup()
+			|| (channel->isBroadcast() && channel->amIn()))
+			&& _peer->canManageWelcomeMessages())
+		: _peer->canManageWelcomeMessages();
 	const auto communityEligible = isChannel
 		&& (channel->isMegagroup() || channel->isBroadcast())
 		&& !channel->isMonoforum()
@@ -1629,6 +1655,34 @@ void Controller::fillManageSection() {
 			std::move(label),
 			[=] { editReactions(); },
 			{ &st::menuIconGroupReactions });
+	}
+	if (canEditWelcomeMessages) {
+		const auto history = _peer->owner().history(_peer);
+		const auto store = &_peer->session().welcomeMessages();
+		auto label = rpl::single(rpl::empty) | rpl::then(
+			store->updates(history)
+		) | rpl::map([=] {
+			const auto item = store->first(history);
+			const auto preview = item
+				? ElidedPreview(
+					item->notificationText().text.simplified(),
+					kWelcomePreviewLength)
+				: QString();
+			return preview.isEmpty()
+				? tr::lng_manage_monoforum_off(tr::now)
+				: preview;
+		});
+		auto callback = [=] {
+			_navigation->showSection(
+				std::make_shared<HistoryView::WelcomeMessagesMemento>(
+					history));
+		};
+		AddButtonWithCount(
+			_controls.buttonsLayout,
+			tr::lng_manage_peer_welcome_messages(),
+			std::move(label),
+			std::move(callback),
+			{ &st::menuIconWelcomeMessage });
 	}
 	if (canEditPermissions) {
 		AddButtonWithCount(
@@ -2992,10 +3046,14 @@ void Controller::savePhoto() {
 	auto image = _controls.photo
 		? _controls.photo->takeResultImage()
 		: QImage();
+	auto video = _controls.photo
+		? _controls.photo->takeResultVideo()
+		: nullptr;
 	if (!image.isNull()) {
-		_peer->session().api().peerPhoto().upload(
-			_peer,
-			{ std::move(image) });
+		_peer->session().api().peerPhoto().upload(_peer, {
+			.image = std::move(image),
+			.video = std::move(video),
+		});
 	}
 	_box->closeBox();
 }
