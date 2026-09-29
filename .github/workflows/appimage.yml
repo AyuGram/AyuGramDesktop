@@ -1,0 +1,217 @@
+name: AyuGram AppImage
+
+on:
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/appimage.yml'
+      - 'snap/**'
+      - 'Telegram/build/**'
+      - '!Telegram/build/docker/centos_env/**'
+      - 'Telegram/Resources/uwp/**'
+      - 'Telegram/Resources/winrc/**'
+      - 'Telegram/SourceFiles/platform/win/**'
+      - 'Telegram/SourceFiles/platform/mac/**'
+      - 'Telegram/Telegram/**'
+      - 'Telegram/configure.bat'
+      - 'Telegram/Telegram.plist'
+  workflow_dispatch:
+
+concurrency:
+  group: ayugram-appimage-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    name: Build AyuGram (dev) and pack AppImage
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: tdesktop:centos_env
+      APPDIR: AppDir
+
+    steps:
+      - name: Clone.
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: First set up.
+        run: |
+          sudo apt update
+          curl -sSL https://install.python-poetry.org | python3 -
+          cd Telegram/build/docker/centos_env
+          poetry install
+          DOCKERFILE=$(DEBUG= LTO= poetry run gen_dockerfile)
+          echo "$DOCKERFILE" > Dockerfile
+          rm -rf __pycache__
+
+      - name: Free up some disk space.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: true
+
+      - name: Set up Docker Buildx.
+        uses: docker/setup-buildx-action@v4
+
+      - name: Libraries cache.
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/.buildx-cache
+          key: ${{ runner.OS }}-ayugram-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
+          restore-keys: ${{ runner.OS }}-ayugram-libs-
+
+      - name: Libraries (docker environment).
+        uses: docker/build-push-action@v7
+        with:
+          context: Telegram/build/docker/centos_env
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=local,src=${{ runner.temp }}/.buildx-cache
+          cache-to: type=local,dest=${{ runner.temp }}/.buildx-cache-new,mode=max
+
+      - name: Move cache.
+        run: |
+          rm -rf ${{ runner.temp }}/.buildx-cache
+          mv ${{ runner.temp }}/.buildx-cache{-new,}
+
+      - name: AyuGram build (Release).
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
+            API_ARGS="-D TDESKTOP_API_ID=$API_ID -D TDESKTOP_API_HASH=$API_HASH"
+          else
+            echo "::warning::TDESKTOP_API_ID/HASH secrets are not set; building with the TEST API (works only with Telegram test servers)."
+            API_ARGS="-D TDESKTOP_API_TEST=ON"
+          fi
+          docker run --rm \
+          -u $(id -u) \
+          -v $PWD:/usr/src/tdesktop \
+          -e CONFIG=Release \
+          $IMAGE_TAG \
+          /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D CMAKE_BUILD_TYPE=Release \
+          $API_ARGS \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+
+      - name: Check binaries.
+        run: |
+          for f in out/Release/AyuGram; do
+            if test -f "$f"; then
+              echo "$f OK ($(stat -c %s "$f") bytes)"
+              file "$f"
+            else
+              echo "Missing: $f"
+              exit 1
+            fi
+          done
+
+      - name: Build AppDir.
+        run: |
+          set -e
+          mkdir -p \
+            $APPDIR/usr/bin \
+            $APPDIR/usr/share/applications \
+            $APPDIR/usr/share/icons/hicolor/512x512/apps
+          cp out/Release/AyuGram $APPDIR/usr/bin/
+          if test -f out/Release/Updater; then
+            cp out/Release/Updater $APPDIR/usr/bin/
+          fi
+
+          cp Telegram/Resources/art/icon256@2x.png $APPDIR/usr/share/icons/hicolor/512x512/apps/com.ayugram.desktop.png
+          cp lib/xdg/com.ayugram.desktop.desktop $APPDIR/usr/share/applications/
+          sed -i 's/^TryExec=.*/TryExec=AyuGram/; s/^Exec=.*/Exec=AyuGram/; s|^Icon=.*|Icon=com.ayugram.desktop|' \
+            $APPDIR/usr/share/applications/com.ayugram.desktop.desktop
+
+          cp $APPDIR/usr/share/icons/hicolor/512x512/apps/com.ayugram.desktop.png $APPDIR/.DirIcon
+          cp $APPDIR/usr/share/icons/hicolor/512x512/apps/com.ayugram.desktop.png $APPDIR/com.ayugram.desktop.png
+
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=AyuGram (dev)' \
+            'Comment=Rolling AyuGram dev build' \
+            'Exec=AyuGram' \
+            'Icon=com.ayugram.desktop' \
+            'Terminal=false' \
+            'Categories=Chat;Network;InstantMessaging;' \
+            'StartupWMClass=AyuGram' \
+            'Keywords=tg;chat;im;messaging;messenger;tdesktop;ayugram;' \
+            > $APPDIR/AyuGram.desktop
+
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'SELF=$(readlink -f "$0")' \
+            'HERE=${SELF%/*}' \
+            'exec "$HERE/usr/bin/AyuGram" "$@"' \
+            > $APPDIR/AppRun
+          chmod +x $APPDIR/AppRun
+
+      - name: Pack AppImage.
+        run: |
+          set -e
+          curl -sL -o /tmp/appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool-x86_64.AppImage
+          ARCH=x86_64 /tmp/appimagetool-x86_64.AppImage \
+            --appimage-extract-and-run \
+            $APPDIR AyuGram-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v7
+        name: Upload AppImage.
+        with:
+          name: AyuGram-x86_64.AppImage
+          path: AyuGram-x86_64.AppImage
+          if-no-files-found: error
+
+  release-rolling:
+    name: Publish rolling AppImage to Releases
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: AyuGram-x86_64.AppImage
+          path: appimage
+
+      - name: Publish release (actual dev version).
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          REPO="${{ github.repository }}"
+          SRC="https://github.com/$REPO"
+          VER=$(grep '^AppVersionStr ' Telegram/build/version | awk '{print $2}')
+          TAG="v${VER}-build-${{ github.run_number }}"
+          NOTES="Dev AppImage of [$REPO]($SRC) branch \`dev\`, commit \`$GITHUB_SHA\`, actual version \`v${VER}\`.
+
+          Rolling dev build: a fresh AppImage is produced on every push to the \`dev\` branch (and on manual workflow runs) and published here as a non-destructive rolling release.
+
+          [Project page](https://github.com/AyuGram/AyuGramDesktop)."
+          gh release create "$TAG" \
+            appimage/AyuGram-x86_64.AppImage \
+            --repo "$REPO" \
+            --title "AyuGram v${VER} (dev) - build ${{ github.run_number }}" \
+            --notes "$NOTES"
