@@ -45,6 +45,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h"
 #include "styles/style_dialogs.h" // ChildSkip().x() for new child windows.
 
+#include "ayu/ayu_settings.h"
+
 #ifdef Q_OS_MAC
 #include "platform/mac/global_menu_mac.h"
 #endif // Q_OS_MAC
@@ -68,9 +70,12 @@ constexpr auto kSaveWindowPositionTimeout = crl::time(1000);
 using Core::WindowPosition;
 
 [[nodiscard]] QPoint ChildSkip() {
-	const auto skipx = st::defaultDialogRow.padding.left()
-		+ st::defaultDialogRow.photoSize
-		+ st::defaultDialogRow.padding.left();
+	const auto &row = AyuSettings::getInstance().chatListCompact()
+		? st::compactDialogRow
+		: st::defaultDialogRow;
+	const auto skipx = row.padding.left()
+		+ row.photoSize
+		+ row.padding.left();
 	const auto skipy = st::windowTitleHeight;
 	return { skipx, skipy };
 }

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_widget.h"
 
+#include "ayu/ayu_settings.h"
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/options.h"
@@ -115,6 +116,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Dialogs {
 namespace {
+
+[[nodiscard]] int NarrowWidth() {
+	const auto &row = AyuSettings::getInstance().chatListCompact()
+		? st::compactDialogRow
+		: st::defaultDialogRow;
+	return row.padding.left() + row.photoSize + row.padding.left();
+}
 
 constexpr auto kSearchPerPage = 50;
 constexpr auto kStoriesExpandDuration = crl::time(200);
@@ -459,9 +467,7 @@ Widget::Widget(
 , _api(&controller->session().mtp())
 , _chooseByDragTimer([=] { _inner->chooseRow(); })
 , _layout(layout)
-, _narrowWidth(st::defaultDialogRow.padding.left()
-	+ st::defaultDialogRow.photoSize
-	+ st::defaultDialogRow.padding.left())
+, _narrowWidth(NarrowWidth())
 , _searchControls(this)
 , _mainMenu({
 	.toggle = object_ptr<Ui::IconButton>(
@@ -522,6 +528,12 @@ Widget::Widget(
 	}, _innerList->lifetime());
 	_scrollToTop->raise();
 	_lockUnlock->toggle(false, anim::type::instant);
+
+	AyuSettings::getInstance().chatListCompactChanges(
+	) | rpl::on_next([=] {
+		_narrowWidth = NarrowWidth();
+		updateControlsGeometry();
+	}, lifetime());
 
 	_inner->updated(
 	) | rpl::on_next([=] {

@@ -39,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_instance.h"
 #include "media/view/media_view_open_common.h"
 #include "data/components/gift_auctions.h"
+#include "ayu/ayu_settings.h"
 #include "data/components/recent_peers.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_document_resolver.h"
@@ -2592,9 +2593,10 @@ void SessionController::floatPlayerAreaUpdated() {
 }
 
 int SessionController::dialogsSmallColumnWidth() const {
-	return st::defaultDialogRow.padding.left()
-		+ st::defaultDialogRow.photoSize
-		+ st::defaultDialogRow.padding.left();
+	const auto &row = AyuSettings::getInstance().chatListCompact()
+		? st::compactDialogRow
+		: st::defaultDialogRow;
+	return row.padding.left() + row.photoSize + row.padding.left();
 }
 
 int SessionController::minimalThreeColumnWidth() const {

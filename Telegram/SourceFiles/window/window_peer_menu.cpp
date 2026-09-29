@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_peer_menu.h"
 
+#include "ayu/ayu_settings.h"
 #include "base/call_delayed.h"
 #include "menu/menu_check_item.h"
 #include "boxes/about_box.h"
@@ -1966,7 +1967,8 @@ void Filler::fillArchiveActions() {
 
 		const auto hidden = controller->session().settings().archiveCollapsed();
 		const auto inmenu = controller->session().settings().archiveInMainMenu();
-		if (!inmenu) {
+		if (!inmenu
+			&& !AyuSettings::getInstance().chatListCompact()) {
 			const auto text = hidden
 				? tr::lng_context_archive_expand(tr::now)
 				: tr::lng_context_archive_collapse(tr::now);

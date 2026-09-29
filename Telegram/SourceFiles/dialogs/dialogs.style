@@ -209,6 +209,16 @@ dialogsSpeakingDenominator: 8.;
 
 dialogsImportantBarHeight: 37px;
 
+compactDialogRow: DialogRow(defaultDialogRow) {
+	height: dialogsImportantBarHeight;
+	padding: margins(11px, 9px, 11px, 9px);
+	photoSize: dialogsUnreadHeight;
+	nameLeft: 41px;
+	nameTop: 11px;
+	textLeft: 41px;
+	textTop: 11px;
+}
+
 dialogsWidthDuration: universalDuration;
 dialogsTextWidthMin: 150px;
 

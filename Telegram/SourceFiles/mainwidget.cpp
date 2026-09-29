@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mainwidget.h"
 
+#include "ayu/ayu_settings.h"
 #include "api/api_updates.h"
 #include "api/api_views.h"
 #include "data/components/scheduled_messages.h"
@@ -292,6 +293,11 @@ MainWidget::MainWidget(
 	Core::App().calls().currentGroupCallValue(
 	) | rpl::on_next([=](Calls::GroupCall *call) {
 		setCurrentGroupCall(call);
+	}, lifetime());
+
+	AyuSettings::getInstance().chatListCompactChanges(
+	) | rpl::on_next([=] {
+		updateControlsGeometry();
 	}, lifetime());
 	if (_callTopBar) {
 		_callTopBar->finishAnimating();

@@ -34,6 +34,19 @@ struct PreviewState {
 	MessagePreview *widget = nullptr;
 };
 
+void BuildChatsList(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	builder.addSubsectionTitle(tr::ayu_CategoryChats());
+
+	ayu.addSettingToggle({
+		.id = u"ayu/chatListCompact"_q,
+		.title = tr::ayu_ChatListCompact(),
+		.getter = &AyuSettings::chatListCompact,
+		.setter = &AyuSettings::setChatListCompact,
+	});
+
+	ayu.addSectionDivider();
+}
+
 void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::lng_settings_stickers_emoji());
 
@@ -455,6 +468,7 @@ const auto kMeta = BuildHelper({
 	const auto previewState = std::make_shared<PreviewState>();
 
 	builder.addSkip();
+	BuildChatsList(builder, ayu);
 	BuildStickersAndEmoji(builder, ayu);
 	BuildGroupsAndChannels(builder, ayu);
 	BuildMarks(builder, ayu, previewState);
