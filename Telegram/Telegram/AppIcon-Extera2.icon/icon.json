@@ -1,0 +1,50 @@
+{
+  "fill-specializations" : [
+    {
+      "value" : {
+        "solid" : "display-p3:0.83720,0.26085,0.22885,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "display-p3:0.83720,0.26085,0.22885,1.00000"
+      }
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "app.svg",
+          "name" : "app",
+          "opacity" : 1,
+          "position" : {
+            "scale" : 0.95,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

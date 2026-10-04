@@ -1,0 +1,207 @@
+/*
+This file is part of Telegram Desktop,
+the official desktop application for the Telegram messaging service.
+
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+*/
+#include "ui/widgets/expandable_peer_list.h"
+
+#include "data/data_peer.h"
+#include "info/profile/info_profile_values.h"
+#include "lang/lang_text_entity.h"
+#include "ui/controls/userpic_button.h"
+#include "ui/rect.h"
+#include "ui/text/text_utilities.h"
+#include "ui/vertical_list.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/participants_check_view.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "styles/style_boxes.h"
+#include "styles/style_layers.h"
+#include "styles/style_moderate_messages_box.h"
+#include "styles/style_widgets.h"
+
+#include <cstdlib>
+
+namespace Ui {
+namespace {
+
+[[nodiscard]] TextWithEntities ParticipantsExpanderText(int count) {
+	return tr::marked()
+		.append(st::moderateBoxExpand)
+		.append(QString::number(std::abs(count)));
+}
+
+} // namespace
+
+void AddExpandablePeerList(
+		not_null<Ui::Checkbox*> checkbox,
+		not_null<ExpandablePeerListController*> controller,
+		not_null<Ui::VerticalLayout*> inner) {
+	const auto &participants = controller->data.participants;
+	const auto hideRightButton = controller->data.hideRightButton;
+	const auto checkTopOnAllInner = controller->data.checkTopOnAllInner;
+	const auto isSingle = controller->data.skipSingle
+		? false
+		: (participants.size() == 1);
+	if (isSingle) {
+		const auto p = participants.front();
+		controller->collectRequests = [=] { return Participants{ p }; };
+		return;
+	}
+	const auto count = int(participants.size());
+	const auto button = !hideRightButton
+		? Ui::CreateChild<Ui::ExpanderButton>(
+			inner,
+			ParticipantsExpanderText(count))
+		: nullptr;
+	if (button) {
+		button->resize(Ui::ExpanderButton::ComputeSize(
+			ParticipantsExpanderText(count)));
+	}
+
+	const auto overlay = Ui::CreateChild<Ui::AbstractButton>(inner);
+
+	checkbox->geometryValue(
+	) | rpl::on_next([=](const QRect &rect) {
+		overlay->setGeometry(rect);
+		overlay->raise();
+
+		if (button) {
+			button->moveToRight(
+				st::moderateBoxExpandRight,
+				rect.top() + (rect.height() - button->height()) / 2,
+				inner->width());
+			button->raise();
+		}
+	}, overlay->lifetime());
+
+	controller->toggleRequestsFromInner.events(
+	) | rpl::on_next([=](bool toggled) {
+		checkbox->setChecked(toggled);
+	}, checkbox->lifetime());
+	if (button) {
+		button->setClickedCallback([=] {
+			button->checkView()->setChecked(
+				!button->checkView()->checked(),
+				anim::type::normal);
+			controller->toggleRequestsFromTop.fire_copy(
+				button->checkView()->checked());
+		});
+	}
+	overlay->setClickedCallback([=] {
+		checkbox->setChecked(!checkbox->checked());
+		controller->checkAllRequests.fire_copy(checkbox->checked());
+	});
+	{
+		const auto wrap = inner->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				inner,
+				object_ptr<Ui::VerticalLayout>(inner)));
+		wrap->toggle(hideRightButton, anim::type::instant);
+
+		controller->toggleRequestsFromTop.events(
+		) | rpl::on_next([=](bool toggled) {
+			wrap->toggle(toggled, anim::type::normal);
+		}, wrap->lifetime());
+
+		const auto container = wrap->entity();
+		Ui::AddSkip(container);
+
+		auto &lifetime = wrap->lifetime();
+		const auto clicks = lifetime.make_state<rpl::event_stream<>>();
+		const auto checkboxes = ranges::views::all(
+			participants
+		) | ranges::views::transform([&](not_null<PeerData*> peer) {
+			const auto line = container->add(
+				object_ptr<Ui::AbstractButton>(container));
+			const auto &st = st::moderateBoxUserpic;
+			line->resize(line->width(), st.size.height());
+
+			using namespace Info::Profile;
+			auto name = controller->data.bold
+				? (NameValue(peer) | rpl::map(tr::bold) | rpl::type_erased)
+				: NameValue(peer) | rpl::map(tr::marked);
+			const auto userpic
+				= Ui::CreateChild<Ui::UserpicButton>(line, peer, st);
+			const auto checkbox = Ui::CreateChild<Ui::Checkbox>(
+				line,
+				controller->data.messagesCounts
+				? rpl::combine(
+					std::move(name),
+					rpl::duplicate(controller->data.messagesCounts)
+				) | rpl::map([=](const auto &richName, const auto &map) {
+					const auto it = map.find(peer->id);
+					return (it == map.end() || !it->second)
+						? richName
+						: TextWithEntities{
+							(u"(%1) "_q).arg(it->second)
+						}.append(richName);
+				})
+				: std::move(name) | rpl::type_erased,
+				st::defaultBoxCheckbox,
+				std::make_unique<Ui::CheckView>(
+					st::defaultCheck,
+					ranges::contains(controller->data.checked, peer->id)));
+			checkbox->setCheckAlignment(style::al_left);
+			rpl::combine(
+				line->widthValue(),
+				checkbox->widthValue()
+			) | rpl::on_next([=](int width, int) {
+				userpic->moveToLeft(
+					st::boxRowPadding.left()
+						+ checkbox->checkRect().width()
+						+ st::defaultBoxCheckbox.textPosition.x(),
+					0);
+				const auto skip = st::defaultBoxCheckbox.textPosition.x();
+				checkbox->resizeToWidth(width
+					- rect::right(userpic)
+					- skip
+					- st::boxRowPadding.right());
+				checkbox->moveToLeft(
+					rect::right(userpic) + skip,
+					((userpic->height() - checkbox->height()) / 2)
+						+ st::defaultBoxCheckbox.margin.top());
+			}, checkbox->lifetime());
+
+			userpic->setAttribute(Qt::WA_TransparentForMouseEvents);
+			checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+			line->setClickedCallback([=] {
+				checkbox->setChecked(!checkbox->checked());
+				clicks->fire({});
+			});
+
+			return checkbox;
+		}) | ranges::to_vector;
+
+		clicks->events(
+		) | rpl::on_next([=] {
+			controller->toggleRequestsFromInner.fire_copy(
+				checkTopOnAllInner
+				? ranges::all_of(checkboxes, &Ui::Checkbox::checked)
+				: ranges::any_of(checkboxes, &Ui::Checkbox::checked));
+		}, container->lifetime());
+
+		controller->checkAllRequests.events(
+		) | rpl::on_next([=](bool checked) {
+			for (const auto &c : checkboxes) {
+				c->setChecked(checked);
+			}
+		}, container->lifetime());
+
+		controller->collectRequests = [=] {
+			auto result = Participants();
+			for (auto i = 0; i < checkboxes.size(); i++) {
+				if (checkboxes[i]->checked()) {
+					result.push_back(participants[i]);
+				}
+			}
+			return result;
+		};
+	}
+}
+
+} // namespace Ui

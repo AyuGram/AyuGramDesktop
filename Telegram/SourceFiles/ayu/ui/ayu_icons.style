@@ -1,0 +1,82 @@
+/*
+ * This is the source code of AyuGram for Desktop.
+ *
+ * We do not and cannot prevent the use of our code,
+ * but be respectful and credit the original author.
+ *
+ * Copyright @Radolyn, 2025
+ */
+
+using "ui/colors.palette";
+using "ui/chat/chat.style";
+using "ui/widgets/widgets.style";
+using "dialogs/dialogs.style";
+
+ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
+ayuGhostModeGlobalIcon: icon {{ "ayu/ghost_mode_global", historyPeerUserpicFg }};
+ayuEditsHistoryIcon: icon {{ "ayu/edits_history", menuIconColor }};
+ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};
+ayuSReadMenuIcon: icon {{ "ayu/sread", menuIconColor }};
+ayuStreamerModeMenuIcon: icon {{ "ayu/streamer", menuIconColor }};
+ayuToBeginningMenuIcon: icon {{ "ayu/to_beginning", menuIconColor }};
+ayuRepeatMenuIcon: icon {{ "ayu/repeat", menuIconColor }};
+ayuContactsMutualIcon: icon {{ "ayu/contacts_mutual", contactsStatusFg }};
+ayuContactsMutualIconOver: icon {{ "ayu/contacts_mutual", contactsStatusFgOver }};
+
+messageFieldAttachIcon: icon {{ "ayu/message_field/attach", menuIconColor }};
+messageFieldCommandsIcon: icon {{ "ayu/message_field/commands", menuIconColor }};
+messageFieldEmojiIcon: icon {{ "ayu/message_field/emoji", menuIconColor }};
+messageFieldVoiceIcon: icon {{ "ayu/message_field/voice", menuIconColor }};
+messageFieldTTLIcon: icon {{ "ayu/message_field/ttl", menuIconColor }};
+messageFieldCocoonAiIcon: icon{
+	{ size(24px, 24px), transparent },
+	{ "chat/ai_letters-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star1-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star2-20x20", menuIconColor, point(2px, 2px) },
+};
+
+inChannelBadgeIcon: icon {{ "ayu/channel", msgInDateFg }};
+inChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgInDateFgSelected }};
+outChannelBadgeIcon: icon {{ "ayu/channel", msgOutDateFg }};
+outChannelBadgeSelectedIcon: icon {{ "ayu/channel", msgOutDateFgSelected }};
+
+infoExteraOfficialBadge: icon {{ "ayu/extera_official", profileVerifiedCheckBg }};
+infoExteraSupporterBadge: icon {{ "ayu/extera_badge", profileVerifiedCheckBg }};
+
+winEnterWithGuestIcon: icon {{ "ayu/ghost_tray", windowFg }};
+
+editedIcon: IconEmoji{
+    icon: icon{{ "ayu/edited", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+deletedIcon: IconEmoji{
+    icon: icon{{ "ayu/trash_bin", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+burntIcon: IconEmoji{
+    icon: icon{{ "ayu/burnt", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+dialogsExteraOfficialIcon: ThreeStateIcon {
+	icon: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBg }};
+	over: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBgOver }};
+	active: icon {{ "ayu/dialogs_extera_official", dialogsVerifiedIconBgActive }};
+}
+dialogsExteraSupporterIcon: ThreeStateIcon {
+	icon: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBg }};
+	over: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
+	active: icon {{ "ayu/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
+}
+
+ayuHistoryFileInPlugin: icon {{ "ayu/history_file_plugin", historyFileInIconFg }};
+ayuHistoryFileInPluginSelected: icon {{ "ayu/history_file_plugin", historyFileInIconFgSelected }};
+ayuHistoryFileOutPlugin: icon {{ "ayu/history_file_plugin", historyFileOutIconFg }};
+ayuHistoryFileOutPluginSelected: icon {{ "ayu/history_file_plugin", historyFileOutIconFgSelected }};
+
+menuIconClearAttention: icon {{ "menu/clear", menuIconAttentionColor }};

@@ -1,0 +1,597 @@
+/*
+This file is part of Telegram Desktop,
+the official desktop application for the Telegram messaging service.
+
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+*/
+using "ui/basic.style";
+
+using "ui/layers/layers.style";
+using "ui/widgets/widgets.style";
+using "ui/controls/userpic_button.style";
+using "intro/intro.style";
+
+UserpicsRow {
+	button: UserpicButton;
+	bg: color;
+	shift: pixels;
+	stroke: pixels;
+	complex: bool;
+	invert: bool;
+}
+ShortInfoBox {
+	label: FlatLabel;
+	labeled: FlatLabel;
+	labeledOneLine: FlatLabel;
+}
+
+boxPhotoTitlePosition: point(28px, 20px);
+boxPhotoPadding: margins(28px, 28px, 28px, 18px);
+boxPhotoCompressedSkip: 20px;
+boxPhotoCaptionSkip: 8px;
+
+confirmPhoneAboutLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 272px;
+}
+confirmPhoneCodeField: InputField(defaultInputField) {
+}
+
+aboutRevokePublicLabel: FlatLabel(defaultFlatLabel) {
+	align: align(topleft);
+	minWidth: 320px;
+}
+
+contactsPhotoSize: 42px;
+contactsPadding: margins(16px, 7px, 16px, 7px);
+contactsNameTop: 2px;
+contactsStatusTop: 23px;
+contactsStatusFont: font(fsize);
+contactsCheckPosition: point(8px, 16px);
+
+contactsSortButton: IconButton(defaultIconButton) {
+	width: 48px;
+	height: 54px;
+	icon: icon{{ "contacts_alphabet", boxTitleCloseFg }};
+	iconOver: icon{{ "contacts_alphabet", boxTitleCloseFgOver }};
+	iconPosition: point(10px, -1px);
+	rippleAreaPosition: point(1px, 6px);
+	rippleAreaSize: 42px;
+	ripple: defaultRippleAnimationBgOver;
+}
+contactsSortOnlineIcon: icon{{ "contacts_online", boxTitleCloseFg }};
+contactsSortOnlineIconOver: icon{{ "contacts_online", boxTitleCloseFgOver }};
+
+contactsSortHeaderHeight: 29px;
+contactsSortHeaderFont: font(13px);
+contactsSortHeaderPosition: point(16px, 7px);
+contactsSortHeaderFg: windowSubTextFg;
+
+membersMarginTop: 10px;
+membersMarginBottom: 10px;
+
+peerListBoxItem: PeerListItem(defaultPeerListItem) {
+	height: 56px;
+	photoSize: contactsPhotoSize;
+	photoPosition: point(16px, 7px);
+	namePosition: point(74px, 9px);
+	statusPosition: point(74px, 30px);
+	button: OutlineButton(defaultPeerListButton) {
+		textBg: contactsBg;
+		textBgOver: contactsBgOver;
+		ripple: defaultRippleAnimation;
+	}
+	statusFg: contactsStatusFg;
+	statusFgOver: contactsStatusFgOver;
+	statusFgActive: contactsStatusFgOnline;
+}
+peerListBox: PeerList(defaultPeerList) {
+	padding: margins(
+		0px,
+		membersMarginTop,
+		0px,
+		membersMarginBottom);
+	item: peerListBoxItem;
+}
+
+localStorageRowTitle: FlatLabel(defaultFlatLabel) {
+	textFg: windowBoldFg;
+	maxHeight: 20px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(14px semibold);
+	}
+}
+localStorageRowSize: FlatLabel(defaultFlatLabel) {
+	textFg: contactsStatusFg;
+	maxHeight: 20px;
+	style: TextStyle(defaultTextStyle) {
+		font: font(14px);
+	}
+}
+
+localStorageIslandMargin: margins(12px, 10px, 12px, 0px);
+localStorageIslandRadius: 12px;
+
+shareBoxListItem: PeerListItem(defaultPeerListItem) {
+	nameStyle: TextStyle(defaultTextStyle) {
+		font: font(11px);
+	}
+	nameFg: windowFg;
+	nameFgChecked: windowActiveTextFg;
+	checkbox: RoundImageCheckbox(defaultPeerListCheckbox) {
+		imageRadius: 28px;
+		imageSmallRadius: 24px;
+	}
+}
+
+membersAboutLimitPadding: margins(0px, 16px, 0px, 16px);
+membersAbout: FlatLabel(defaultFlatLabel) {
+	minWidth: 240px;
+	textFg: membersAboutLimitFg;
+	align: align(top);
+	style: boxLabelStyle;
+}
+
+fragmentBoxButton: RoundButton(introFragmentButton) {
+	width: 256px;
+}
+
+newGroupDescription: InputField(defaultInputField) {
+	textMargins: margins(1px, 26px, 1px, 4px);
+	heightMax: 116px;
+}
+
+themeWarningWidth: boxWideWidth;
+themeWarningHeight: 150px;
+themeWarningTextTop: 60px;
+
+aboutWidth: 390px;
+aboutVersionLink: LinkButton(defaultLinkButton) {
+	color: windowSubTextFg;
+	overColor: windowSubTextFg;
+}
+aboutTopSkip: 19px;
+aboutSkip: 14px;
+aboutLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 300px;
+	align: align(topleft);
+	style: TextStyle(defaultTextStyle) {
+		lineHeight: 22px;
+	}
+}
+
+autoDownloadTitleFont: font(15px semibold);
+autoDownloadLimitSlider: MediaSlider(defaultContinuousSlider) {
+	seekSize: size(15px, 15px);
+}
+autoDownloadLimitPadding: margins(22px, 8px, 22px, 8px);
+
+confirmMaxHeight: 245px;
+
+supportInfoField: InputField(defaultInputField) {
+	heightMax: 256px;
+}
+
+langsRadio: Radio(defaultRadio) {
+	bg: boxBg;
+}
+
+backgroundPadding: 10px;
+backgroundSize: size(108px, 193px);
+backgroundScroll: ScrollArea(boxScroll) {
+	deltax: 3px;
+	width: 10px;
+	deltat: 10px;
+	deltab: 10px;
+}
+
+sendMediaPreviewSize: 308px;
+sendMediaPreviewHeightMax: 1280;
+sendMediaRowSkip: 10px;
+
+editMediaHintLabel: FlatLabel(defaultFlatLabel) {
+	textFg: windowSubTextFg;
+	minWidth: sendMediaPreviewSize;
+}
+
+calendarTitleHeight: boxTitleHeight;
+calendarPrevious: IconButton {
+	width: calendarTitleHeight;
+	height: calendarTitleHeight;
+
+	icon: icon {{ "calendar_down-flip_vertical", boxTitleFg }};
+	iconPosition: point(-1px, -1px);
+
+	rippleAreaPosition: point(2px, 2px);
+	rippleAreaSize: 44px;
+	ripple: defaultRippleAnimationBgOver;
+}
+calendarPreviousDisabled: icon {{ "calendar_down-flip_vertical", menuIconFg }};
+calendarNext: IconButton(calendarPrevious) {
+	icon: icon {{ "calendar_down", boxTitleFg }};
+}
+CalendarSizes {
+	width: pixels;
+	daysHeight: pixels;
+	cellSize: size;
+	cellInner: pixels;
+	padding: margins;
+}
+calendarNextDisabled: icon {{ "calendar_down", menuIconFg }};
+defaultCalendarSizes: CalendarSizes {
+	width: boxWideWidth;
+	daysHeight: 40px;
+	cellSize: size(48px, 40px);
+	cellInner: 34px;
+	padding: margins(14px, 0px, 14px, 0px);
+}
+CalendarColors {
+	dayTextColor: color;
+	dayTextGrayedOutColor: color;
+
+	iconButtonNext: IconButton;
+	iconButtonNextDisabled: icon;
+	iconButtonPrevious: IconButton;
+	iconButtonPreviousDisabled: icon;
+
+	iconButtonRippleColorDisabled: color;
+
+	rippleColor: color;
+	rippleColorHighlighted: color;
+	rippleGrayedOutColor: color;
+
+	titleTextColor: color;
+}
+
+usernamePadding: margins(24px, 2px, 24px, 10px);
+usernameSkip: 44px;
+
+editMediaLabelMargins: margins(0px, 11px, 0px, 0px);
+editMediaCheckboxMargins: margins(0px, 15px, 23px, 15px);
+
+downloadPathSkip: 10px;
+
+changePhoneButton: RoundButton(defaultActiveButton) {
+	width: 256px;
+}
+changePhoneTitle: FlatLabel(boxTitle) {
+}
+changePhoneTitlePadding: margins(0px, 8px, 0px, 8px);
+changePhoneDescription: FlatLabel(defaultFlatLabel) {
+	minWidth: 332px;
+	align: align(top);
+	textFg: windowSubTextFg;
+}
+changePhoneDescriptionPadding: margins(0px, 1px, 0px, 8px);
+changePhoneIconPadding: margins(0px, 39px, 0px, 5px);
+changePhoneLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 275px;
+	textFg: windowSubTextFg;
+}
+changePhoneError: FlatLabel(changePhoneLabel) {
+	textFg: boxTextFgError;
+}
+
+normalBoxLottieSize: size(120px, 120px);
+
+proxyDropdownDownPosition: point(2px, 35px);
+proxyDropdownUpPosition: point(2px, 20px);
+
+proxyAboutPadding: margins(22px, 7px, 22px, 14px);
+
+proxyApplyBoxLabel : FlatLabel(defaultFlatLabel) {
+	maxHeight: 30px;
+}
+proxyApplyBoxButton: RoundButton(defaultActiveButton) {
+	height: 38px;
+	textTop: 10px;
+	style: semiboldTextStyle;
+}
+
+markdownLinkFieldPadding: margins(22px, 0px, 22px, 10px);
+markdownMathCheckboxMargin: margins(22px, 12px, 22px, 10px);
+markdownMathFieldMaxHeight: 140px;
+
+themesSmallSkip: 10px;
+themesMenuToggle: IconButton(defaultIconButton) {
+	width: 44px;
+	height: 44px;
+
+	icon: menuToggleIcon;
+	iconOver: menuToggleIconOver;
+	iconPosition: point(-1px, -1px);
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 36px;
+	ripple: defaultRippleAnimationBgOver;
+}
+themesMenuPosition: point(2px, 25px);
+
+urlAuthCheckbox: Checkbox(defaultBoxCheckbox) {
+	width: 240px;
+}
+
+blockUserConfirmation: FlatLabel(boxLabel) {
+	minWidth: 240px;
+}
+
+customBadgeField: InputField(defaultInputField) {
+	textMargins: margins(2px, 0px, 2px, 0px);
+
+	placeholderFg: placeholderFg;
+	placeholderFgActive: placeholderFgActive;
+	placeholderFgError: placeholderFgActive;
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	placeholderScale: 0.;
+	placeholderFont: normalFont;
+
+	border: 0px;
+	borderActive: 0px;
+
+	heightMin: 32px;
+}
+
+tagPreviewLineHeight: 8px;
+tagPreviewLineSpacing: 4px;
+tagPreviewInputSkip: 16px;
+
+inviteViaLinkButton: SettingsButton(defaultSettingsButton) {
+	textFg: lightButtonFg;
+	textFgOver: lightButtonFgOver;
+	textBg: windowBg;
+	textBgOver: windowBgOver;
+
+	style: TextStyle(defaultTextStyle) {
+		font: font(14px semibold);
+	}
+
+	height: 20px;
+	padding: margins(74px, 8px, 8px, 9px);
+
+	ripple: defaultRippleAnimation;
+}
+communityEditAddChatIconPosition: point(25px, 16px);
+peerListSingleRow: PeerList(peerListBox) {
+	padding: margins(0px, 0px, 0px, 0px);
+}
+peerListSmallSkips: PeerList(peerListBox) {
+	padding: margins(
+		0px,
+		defaultVerticalListSkip,
+		0px,
+		defaultVerticalListSkip);
+}
+
+scheduleDateField: InputField(defaultInputField) {
+	textMargins: margins(2px, 0px, 2px, 0px);
+	placeholderScale: 0.;
+	heightMin: 30px;
+	textAlign: align(top);
+}
+scheduleNotifyIconSize: 24px;
+scheduleNotifyTooltipShift: 5px;
+scheduleRepeatMargin: margins(0px, -4px, 0px, 10px);
+
+muteBoxTimeField: InputField(scheduleDateField) {
+	textMargins: margins(0px, 0px, 0px, 0px);
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	placeholderScale: 0.;
+	heightMin: 30px;
+	textAlign: align(left);
+}
+muteBoxTimeFieldPadding: margins(5px, 0px, 5px, 0px);
+
+boxAttentionDividerLabel: FlatLabel(boxDividerLabel) {
+	textFg: boxTextFgError;
+}
+
+sponsoredUrlButtonSkip: 11px;
+sponsoredUrlButton: RoundButton(defaultActiveButton) {
+	height: 32px;
+	width: -42px;
+	textBg: transparent;
+	textBgOver: transparent;
+	radius: roundRadiusLarge;
+	padding: margins(2px, 2px, 2px, 2px);
+	textFg: historyLinkInFg;
+	textFgOver: historyLinkInFg;
+	textTop: 7px;
+	style: defaultTextStyle;
+
+	ripple: defaultRippleAnimationBgOver;
+}
+
+contactsWithStories: PeerList(peerListBox) {
+	padding: margins(0px, 0px, 0px, 0px);
+	item: PeerListItem(peerListBoxItem) {
+		height: 52px;
+		photoPosition: point(18px, 5px);
+		namePosition: point(70px, 7px);
+		statusPosition: point(70px, 27px);
+
+		checkbox: RoundImageCheckbox(defaultPeerListCheckbox) {
+			imageRadius: 21px;
+			imageSmallRadius: 18px;
+			check: RoundCheckbox(defaultPeerListCheck) {
+				size: 0px;
+			}
+		}
+		nameFgChecked: contactsNameFg;
+	}
+}
+requestsAcceptButton: RoundButton(defaultActiveButton) {
+	width: -32px;
+	height: 28px;
+	textTop: 5px;
+}
+requestsRejectButton: RoundButton(defaultBoxButton) {
+	width: -32px;
+	height: 28px;
+	textTop: 5px;
+	style: semiboldTextStyle;
+}
+requestButtonsSkip: 9px;
+communityRequestsBoxItem: PeerListItem(peerListBoxItem) {
+	height: 89px;
+	button: OutlineButton(defaultPeerListButton) {
+		textBg: contactsBg;
+		textBgOver: contactsBg;
+		ripple: RippleAnimation(defaultRippleAnimation) {
+			color: contactsBgOver;
+		}
+	}
+}
+communityRequestsBoxList: PeerList(peerListBox) {
+	padding: margins(0px, 6px, 0px, 12px);
+	item: communityRequestsBoxItem;
+}
+communityRequestAcceptPosition: point(71px, 56px);
+
+ringtonesBoxButton: SettingsButton(defaultSettingsButton) {
+	textFg: lightButtonFg;
+	textFgOver: lightButtonFgOver;
+	padding: margins(56px, 10px, 22px, 8px);
+	iconLeft: 25px;
+}
+ringtonesBoxSkip: 7px;
+
+gradientButtonGlareDuration: 700;
+gradientButtonGlareTimeout: 2000;
+gradientButtonGlareWidth: 100px;
+
+infoLabeledOneLine: FlatLabel(defaultFlatLabel) {
+	maxHeight: 20px;
+	style: TextStyle(defaultTextStyle) {
+		lineHeight: 19px;
+	}
+	margin: margins(5px, 5px, 5px, 5px);
+}
+infoLabelSkip: 2px;
+infoLabeled: FlatLabel(infoLabeledOneLine) {
+	minWidth: 180px;
+	maxHeight: 0px;
+	margin: margins(5px, 5px, 5px, 5px);
+}
+infoLabel: FlatLabel(infoLabeled) {
+	textFg: windowSubTextFg;
+}
+
+shortInfoBox: ShortInfoBox {
+	label: infoLabel;
+	labeled: infoLabeled;
+	labeledOneLine: infoLabeledOneLine;
+}
+
+birthdayLabeled: FlatLabel(infoLabeled) {
+	margin: margins(0px, 0px, 0px, 0px);
+}
+birthdayLabel: FlatLabel(infoLabel) {
+	margin: margins(0px, 0px, 0px, 0px);
+}
+birthdayTodayIcon: icon {{ "menu/gift_premium", windowActiveTextFg }};
+
+collectibleCopy: RoundButton(defaultLightButton) {
+	height: 36px;
+	textTop: 9px;
+	radius: 6px;
+}
+collectibleBox: Box(defaultBox) {
+	buttonPadding: margins(24px, 12px, 24px, 12px);
+	buttonHeight: 36px;
+	button: collectibleCopy;
+}
+
+moderateBoxUserpic: UserpicButton(defaultUserpicButton) {
+	size: size(34px, 42px);
+	photoSize: 34px;
+	photoPosition: point(0px, 4px);
+}
+moderateBoxExpandHeight: 20px;
+moderateBoxExpandInnerSkip: 2px;
+moderateBoxExpandFont: font(11px);
+moderateBoxExpandTextStyle: TextStyle(boxTextStyle) {
+	font: moderateBoxExpandFont;
+}
+moderateBoxExpandToggleSize: 4px;
+moderateBoxExpandToggleFourStrokes: 3px;
+
+profileQrFont: font(fsize bold);
+profileQrBackgroundRadius: 12px;
+profileQrIcon: icon{{ "qr_mini", windowActiveTextFg }};
+profileQrBackgroundMargins: margins(36px, 12px, 36px, 12px);
+profileQrBackgroundPadding: margins(0px, 24px, 0px, 24px);
+
+foldersMenu: PopupMenu(popupMenuWithIcons) {
+	maxHeight: 320px;
+	menu: Menu(menuWithIcons) {
+		itemPadding: margins(54px, 8px, 44px, 8px);
+	}
+}
+
+futureOwnerBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 14px);
+	buttonHeight: 0px;
+}
+futureOwnerBoxSelect: collectibleBox;
+
+localAutomationBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 12px);
+	buttonHeight: 0px;
+}
+
+disableSharingIconPadding: margins(12px, 12px, 12px, 8px);
+disableSharingButtonLock: IconEmoji {
+	icon: icon {{ "emoji/premium_lock", activeButtonFg }};
+	padding: margins(-2px, 1px, 0px, 0px);
+}
+
+managedBotIconEmoji: IconEmoji {
+	icon: icon {{ "chat/code_tags", windowSubTextFg }};
+	padding: margins(-2px, -2px, -2px, 0px);
+}
+
+aiComposeButtonBgActive: windowActiveTextFg;
+aiComposeButtonFg: windowBoldFg;
+aiComposeButtonFgActive: windowActiveTextFg;
+
+aiToneFieldPadding: margins(16px, 12px, 16px, 12px);
+aiToneFieldsMargin: margins(16px, 0px, 16px, 0px);
+
+aiTonePromptField: InputField(newGroupDescription) {
+	textBg: transparent;
+	textBgActive: transparent;
+	textMargins: margins(16px, 12px, 16px, 12px);
+	border: 0px;
+	borderActive: 0px;
+	heightMin: 140px;
+	heightMax: 240px;
+}
+
+aiComposeEmojifyCheckbox: Checkbox(defaultBoxCheckbox) {
+	textFg: windowSubTextFg;
+	textFgActive: windowSubTextFg;
+	width: 0px;
+}
+
+aiComposeExpandIcon: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+
+aiComposeCopyIcon: icon{{ "menu/copy", windowActiveTextFg }};
+
+aiComposeBoxButton: RoundButton(defaultActiveButton) {
+	height: 42px;
+	textTop: 12px;
+	style: semiboldTextStyle;
+}
+aiComposeBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: aiComposeBoxButton;
+	shadowIgnoreTopSkip: true;
+	bg: boxDividerBg;
+}
+aiComposeBoxClose: IconButton(boxTitleClose) {
+	ripple: defaultRippleAnimation;
+}
+
+createAiSelectorArrowsIcon: icon{{ "arrows_select", windowSubTextFg }};

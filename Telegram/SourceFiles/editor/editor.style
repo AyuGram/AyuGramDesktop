@@ -1,0 +1,195 @@
+/*
+This file is part of Telegram Desktop,
+the official desktop application for the Telegram messaging service.
+
+For license and copyright information please follow this link:
+https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
+*/
+using "ui/basic.style";
+
+using "window/window.style";
+using "ui/widgets/widgets.style";
+using "ui/chat/chat.style";
+using "media/view/media_view.style";
+
+// photoEditorControlsBottomSkip * 2 + photoEditorControlsCenterSkip + photoEditorButtonBarHeight * 2
+photoEditorControlsHeight: 146px;
+
+photoEditorControlsBottomSkip: 20px;
+photoEditorControlsCenterSkip: 6px;
+
+photoEditorContentMargins: margins(
+	photoEditorControlsBottomSkip,
+	photoEditorControlsBottomSkip,
+	photoEditorControlsBottomSkip,
+	photoEditorControlsHeight);
+
+photoEditorBarAnimationDuration: 100;
+
+photoEditorButtonIconFg: mediaviewPipControlsFg;
+photoEditorButtonIconFgOver: mediaviewPipControlsFgOver;
+
+photoEditorButtonIconFgActive: lightButtonFg;
+photoEditorButtonIconFgInactive: mediaviewPipPlaybackInactive;
+photoEditorEdgeButtonBg: shadowFg;
+photoEditorEdgeButtonMargins: margins(4px, 4px, 4px, 4px);
+
+photoEditorButtonBarHeight: 48px;
+photoEditorButtonBarWidth: 422px;
+photoEditorButtonBarPadding: margins(2px, 0px, 2px, 0px);
+photoEditorTextButtonPadding: margins(22px, 0px, 22px, 0px);
+
+photoEditorButtonStyle: TextStyle(semiboldTextStyle) {
+	font: font(14px semibold);
+}
+
+photoEditorAbout: FlatLabel(defaultFlatLabel) {
+	textFg: mediaviewCaptionFg;
+	minWidth: 240px;
+	align: align(top);
+}
+photoEditorAboutMargin: margins(10px, 22px, 10px, 0px);
+
+photoEditorRotateButton: IconButton(defaultIconButton) {
+	width: photoEditorButtonBarHeight;
+	height: photoEditorButtonBarHeight;
+
+	icon: icon {{ "photo_editor/rotate-flip_horizontal", photoEditorButtonIconFg }};
+	iconOver: icon {{ "photo_editor/rotate-flip_horizontal", photoEditorButtonIconFgOver }};
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: universalRippleAnimation;
+}
+photoEditorFlipButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "photo_editor/flip", photoEditorButtonIconFg }};
+	iconOver: icon {{ "photo_editor/flip", photoEditorButtonIconFgOver }};
+}
+photoEditorFlipIconActive: icon {{ "photo_editor/flip", photoEditorButtonIconFgActive }};
+
+photoEditorPaintModeButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "photo_editor/paint", photoEditorButtonIconFg }};
+	iconOver: icon {{ "photo_editor/paint", photoEditorButtonIconFgOver }};
+}
+photoEditorPaintIconActive: icon {{ "photo_editor/paint", photoEditorButtonIconFgActive }};
+
+photoEditorUndoButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "menu/tabs_undo-24x24", photoEditorButtonIconFg }};
+	iconOver: icon {{ "menu/tabs_undo-24x24", photoEditorButtonIconFgOver }};
+}
+
+photoEditorRedoButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "menu/tabs_redo-24x24", photoEditorButtonIconFg }};
+	iconOver: icon {{ "menu/tabs_redo-24x24", photoEditorButtonIconFgOver }};
+}
+
+photoEditorStickersButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "settings/settings_stickers", photoEditorButtonIconFg }};
+	iconOver: icon {{ "settings/settings_stickers", photoEditorButtonIconFgOver }};
+}
+photoEditorStickersIconActive: icon {{ "settings/settings_stickers", photoEditorButtonIconFgActive }};
+
+photoEditorShapesButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "photo_editor/shapes-28x28", photoEditorButtonIconFg }};
+	iconOver: icon {{ "photo_editor/shapes-28x28", photoEditorButtonIconFgOver }};
+}
+photoEditorShapesIconActive: icon {{ "photo_editor/shapes-28x28", photoEditorButtonIconFgActive }};
+photoEditorShapeCircle: icon {{ "photo_editor/shape_circle-24x24", mediaviewMenuFg }};
+photoEditorShapeCircleFill: icon {{ "photo_editor/shape_circle_fill-24x24", mediaviewMenuFg }};
+photoEditorShapeRectangle: icon {{ "photo_editor/shape_rectangle-24x24", mediaviewMenuFg }};
+photoEditorShapeRectangleFill: icon {{ "photo_editor/shape_rectangle_fill-24x24", mediaviewMenuFg }};
+photoEditorShapeStar: icon {{ "photo_editor/shape_star-24x24", mediaviewMenuFg }};
+photoEditorShapeStarFill: icon {{ "photo_editor/shape_star_fill-24x24", mediaviewMenuFg }};
+photoEditorShapeBubble: icon {{ "photo_editor/shape_bubble-24x24", mediaviewMenuFg }};
+photoEditorShapeBubbleFill: icon {{ "photo_editor/shape_bubble_fill-24x24", mediaviewMenuFg }};
+photoEditorShapeArrow: icon {{ "photo_editor/shape_arrow-24x24", mediaviewMenuFg }};
+
+photoEditorCropRatioButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "photo_editor/ratio-23x23", photoEditorButtonIconFg, point(0px, 1px) }};
+	iconOver: icon {{ "photo_editor/ratio-23x23", photoEditorButtonIconFgOver, point(0px, 1px) }};
+}
+photoEditorCropRatioIconActive: icon {{ "photo_editor/ratio-23x23", photoEditorButtonIconFgActive, point(0px, 1px) }};
+
+photoEditorCornersButton: IconButton(photoEditorRotateButton) {
+	icon: icon {{ "photo_editor/corners-23x23", photoEditorButtonIconFg, point(0px, 1px) }};
+	iconOver: icon {{ "photo_editor/corners-23x23", photoEditorButtonIconFgOver, point(0px, 1px) }};
+}
+photoEditorCornersIconActive: icon {{ "photo_editor/corners-23x23", photoEditorButtonIconFgActive, point(0px, 1px) }};
+
+photoEditorCornersMenuAboutLabel: FlatLabel(defaultFlatLabel) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(11px);
+	}
+	minWidth: 136px;
+	textFg: groupCallMemberNotJoinedStatus;
+}
+photoEditorCornersMenuAboutPosition: point(12px, 4px);
+
+photoEditorMenuSubmenuArrow: icon {{ "menu/submenu_arrow", groupCallMemberNotJoinedStatus }};
+
+photoEditorMenuCheck: Check(defaultCheck) {
+	untoggledFg: groupCallMemberNotJoinedStatus;
+	toggledFg: groupCallActiveFg;
+	icon: icon {{ "default_checkbox_check", groupCallMembersFg, point(4px, 7px) }};
+}
+photoEditorMenuCheckLabel: FlatLabel(defaultFlatLabel) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+	}
+	minWidth: 100px;
+	textFg: groupCallMembersFg;
+}
+
+photoEditorCropRatioMenu: PopupMenu(mediaviewPopupMenu) {
+	menu: Menu(mediaviewMenu) {
+		widthMin: 108px;
+		arrow: photoEditorMenuSubmenuArrow;
+	}
+}
+
+photoEditorUndoButtonInactive: icon {{ "menu/tabs_undo-24x24", photoEditorButtonIconFgInactive }};
+photoEditorRedoButtonInactive: icon {{ "menu/tabs_redo-24x24", photoEditorButtonIconFgInactive }};
+
+photoEditorColorButtonSize: 24px;
+photoEditorColorButtonBorder: 1px;
+photoEditorColorButtonBorderFg: mediaviewCaptionFg;
+photoEditorColorPaletteItemSize: 20px;
+photoEditorColorPaletteGap: 6px;
+photoEditorColorPaletteSelectionWidth: 2px;
+photoEditorColorPalettePlusLine: 2px;
+photoEditorColorPalettePlusFg: mediaviewCaptionFg;
+
+photoEditorToolButtonSize: 20px;
+photoEditorToolButtonIconSize: 20px;
+photoEditorToolButtonGap: 18px;
+photoEditorToolButtonHoverDuration: 350;
+photoEditorToolButtonSelectDuration: 120;
+photoEditorToolButtonSelectedFg: mediaviewCaptionFg;
+photoEditorToolButtonSelectedWidth: 2px;
+photoEditorToolButtonSelectedPadding: 2px;
+photoEditorToolButtonSelectedOpacity: 0.35;
+photoEditorToolButtonSelectedExtra: 8px;
+
+photoEditorMarkerOpacity: 0.35;
+photoEditorMarkerSizeMultiplier: 2.5;
+photoEditorArrowHeadLengthFactor: 2.5;
+photoEditorArrowHeadMinDistanceFactor: 1.5;
+photoEditorArrowHeadAngleDegrees: 26;
+photoEditorEraserPreviewOpacity: 0.25;
+photoEditorBlurSizeMultiplier: 3.0;
+photoEditorBlurPreviewOpacity: 0.25;
+photoEditorBlurRadius: 20;
+
+photoEditorBrushSizeControlLeftSkip: -3px;
+photoEditorBrushSizeControlHeight: 280px;
+photoEditorBrushSizeControlCollapsedWidth: 6px;
+photoEditorBrushSizeControlExpandedTopWidth: 25px;
+photoEditorBrushSizeControlExpandedBottomWidth: 4px;
+photoEditorBrushSizeControlExpandShift: 14px;
+photoEditorBrushSizeControlHitPadding: 24px;
+photoEditorBrushSizeControlTopInset: 1px;
+
+photoEditorCropPointSize: 10px;
+photoEditorCropMinSize: 20px;
+
+photoEditorItemHandleSize: 10px;

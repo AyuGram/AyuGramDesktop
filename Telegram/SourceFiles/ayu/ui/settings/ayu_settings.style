@@ -1,0 +1,38 @@
+/*
+ * This is the source code of AyuGram for Desktop.
+ *
+ * We do not and cannot prevent the use of our code,
+ * but be respectful and credit the original author.
+ *
+ * Copyright @Radolyn, 2025
+ */
+
+using "ui/basic.style";
+using "ui/layers/layers.style";
+using "ui/widgets/widgets.style";
+using "info/info.style";
+
+centeredBoxLabelStyle: TextStyle(boxLabelStyle) {
+    font: font(13px);
+    lineHeight: 0px;
+}
+
+centeredBoxLabel: FlatLabel(defaultFlatLabel) {
+	minWidth: 256px;
+	align: align(center);
+	style: centeredBoxLabelStyle;
+}
+
+filtersAddIcon: IconButton(infoLayerTopBarClose) {
+	width: 40px;
+	icon: icon {{ "menu/add", boxTitleCloseFg }};
+	iconOver: icon {{ "menu/add", boxTitleCloseFgOver }};
+	iconPosition: point(8px, -1px);
+}
+
+filtersExcludeIcon: IconButton(infoLayerTopBarClose) {
+	width: 40px;
+	icon: icon {{ "menu/tag_remove", boxTitleCloseFg }};
+	iconOver: icon {{ "menu/tag_remove", boxTitleCloseFgOver }};
+	iconPosition: point(8px, -1px);
+}

@@ -1,0 +1,126 @@
+/*
+ * This is the source code of AyuGram for Desktop.
+ *
+ * We do not and cannot prevent the use of our code,
+ * but be respectful and credit the original author.
+ *
+ * Copyright @Radolyn, 2025
+ */
+
+using "ui/basic.style";
+using "ui/colors.palette";
+using "ui/widgets/widgets.style";
+using "info/info.style";
+using "settings/settings.style";
+
+iconPickerSelectedPadding: 2px;
+iconPickerSelectedRounding: 12px;
+iconPickerImagePadding: 4px;
+iconPickerIconSize: 64px;
+
+recentStickersLimitPadding: margins(22px, 4px, 22px, 8px);
+imageViewPadding: margins(22px, 10px, 22px, 10px);
+imageViewInnerPadding: margins(16px, 16px, 16px, 16px);
+
+botWebViewPanelHeightIncreased: 782px;
+botWebViewPanelWidthIncreased: 512px;
+
+stickerRoundingSize: 5px;
+
+messageShotPadding: 4px;
+
+topBarAdmins: IconButton {
+	width: 40px;
+	height: topBarHeight;
+
+	icon: icon {{ "ayu/top_bar_admins", menuIconFg }};
+	iconOver: icon {{ "ayu/top_bar_admins", menuIconFgOver }};
+	iconPosition: point(4px, 11px);
+
+	rippleAreaPosition: point(0px, 7px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
+
+topBarRecentActions: IconButton {
+	width: 40px;
+	height: topBarHeight;
+
+	icon: icon {{ "ayu/top_bar_recent_actions", menuIconFg }};
+	iconOver: icon {{ "ayu/top_bar_recent_actions", menuIconFgOver }};
+	iconPosition: point(4px, 11px);
+
+	rippleAreaPosition: point(0px, 7px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: windowBgOver;
+	}
+}
+
+exteraBadgeToast: Toast(defaultToast) {
+	minWidth: 40px;
+	maxWidth: 480px;
+	padding: margins(54px, 13px, 19px, 12px);
+}
+
+exteraBadgeToastBadge: InfoPeerBadge(infoPeerBadge) {
+	premiumFg: toastFg;
+}
+
+supportLogoSize: 96px;
+
+unreadPillPadding: 12px;
+
+infoProfileLabeledButtonRegistrationDate: IconButton(defaultIconButton) {
+	width: 34px;
+	height: 34px;
+	icon: icon {{ "menu/calendar", windowActiveTextFg }};
+	iconOver: icon {{ "menu/calendar", windowActiveTextFg }};
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 34px;
+	ripple: defaultRippleAnimation;
+}
+registrationDateImportantTooltipLabel: FlatLabel(defaultImportantTooltipLabel) {
+	style: TextStyle(defaultTextStyle) {
+		font: font(12px);
+	}
+}
+
+pluginShowInFolderIcon: icon {{ "menu/show_in_folder", boxTitleCloseFg }};
+pluginShowInFolderIconOver: icon {{ "menu/show_in_folder", boxTitleCloseFgOver }};
+pluginShowInFolder: IconButton(defaultIconButton) {
+	width: boxTitleHeight;
+	height: boxTitleHeight;
+
+	icon: pluginShowInFolderIcon;
+	iconOver: pluginShowInFolderIconOver;
+
+	rippleAreaPosition: point(4px, 4px);
+	rippleAreaSize: 40px;
+	ripple: defaultRippleAnimationBgOver;
+}
+maxPluginDescriptionHeight: 400px;
+pluginVersionAuthorLabel: FlatLabel(boxLabel) {
+    align: align(center);
+}
+pluginChipSkip: 6px;
+
+ghostPickerArrow: icon{{ "info/edit/expand_arrow_small", windowActiveTextFg }};
+
+ghostPickerButton: LinkButton(defaultLinkButton) {
+	color: windowActiveTextFg;
+	overColor: windowActiveTextFg;
+	font: font(boxFontSize);
+	overFont: font(boxFontSize);
+}
+
+ayuBetaBadgePadding: margins(4px, 1px, 4px, 1px);
+
+ayuServiceTimeBadgeFont: font(11px semibold);
+ayuServiceTimeBadgeHorizontalPadding: 7px;
+ayuServiceTimeBadgeVerticalPadding: 2px;
+ayuServiceTimeBadgeGap: 8px;
+ayuServiceTimeBadgeTrailingInset: 3px;
+ayuServiceTimeBadgeLastLineWidthAdd: 9px;
