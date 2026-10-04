@@ -122,6 +122,22 @@ dnf install ayugram-desktop
 
 Flatpak: https://github.com/0FL01/AyuGramDesktop-flatpak
 
+Flatpak из [FlatPark](https://flatpark.org/apps/com.ayugram.desktop/), обновления приходят через Flatpak:
+
+```bash
+flatpak remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak install flatpark com.ayugram.desktop
+```
+
+Или скачайте готовый бинарник `ayugram-<version>-x86_64.tar.zst` из [flatpark/ayugram-release](https://github.com/flatpark/ayugram-release/releases/latest) и запустите его:
+
+```bash
+tar --zstd -xf ayugram-*-x86_64.tar.zst
+./usr/bin/AyuGram
+```
+
+Примечание: пакеты FlatPark собираются не нами.
+
 Или следуйте [официальному руководству](https://github.com/AyuGram/AyuGramDesktop/blob/dev/docs/building-linux.md).
 
 ## Пожертвования
