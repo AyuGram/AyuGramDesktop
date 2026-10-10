@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_chat_participants.h"
 #include "apiwrap.h"
+#include "ayu/ayu_settings.h"
 #include "base/unixtime.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "boxes/choose_filter_box.h"
@@ -1119,35 +1120,19 @@ RecommendationsController::RecommendationsController(
 
 void RecommendationsController::prepare() {
 	setupPlainDivider(tr::lng_channels_recommended());
-	fill();
-}
-
-void RecommendationsController::load() {
-	if (_requested || countCurrent()) {
-		return;
-	}
-	_requested = true;
 	const auto participants = &session().api().chatParticipants();
-	participants->loadRecommendations();
 	participants->recommendationsLoaded(
-	) | rpl::take(1) | rpl::on_next([=] {
+	) | rpl::on_next([=] {
 		fill();
 	}, _lifetime);
-}
 
-void RecommendationsController::fill() {
-	const auto participants = &session().api().chatParticipants();
-	const auto &list = participants->recommendations().list;
-	if (list.empty()) {
-		return;
-	}
-	for (const auto &peer : list) {
-		if (const auto channel = peer->asBroadcast()) {
-			appendRow(channel);
+	AyuSettings::getInstance().hideSimilarChannelsValue(
+	) | rpl::on_next([=](bool hidden) {
+		fill();
+		if (!hidden && _requested) {
+			participants->loadRecommendations();
 		}
-	}
-	delegate()->peerListRefreshRows();
-	setCount(delegate()->peerListFullRowsCount());
+	}, _lifetime);
 
 	window()->activeChatValue() | rpl::on_next([=](const Key &key) {
 		const auto history = key.history();
@@ -1171,8 +1156,36 @@ void RecommendationsController::fill() {
 	}, _lifetime);
 }
 
+void RecommendationsController::load() {
+	if (_requested || countCurrent()) {
+		return;
+	}
+	_requested = true;
+	if (!AyuSettings::getInstance().hideSimilarChannels()) {
+		session().api().chatParticipants().loadRecommendations();
+	}
+}
+
+void RecommendationsController::fill() {
+	while (delegate()->peerListFullRowsCount()) {
+		delegate()->peerListRemoveRow(delegate()->peerListRowAt(0));
+	}
+	if (!AyuSettings::getInstance().hideSimilarChannels()) {
+		const auto participants = &session().api().chatParticipants();
+		const auto &list = participants->recommendations().list;
+		for (const auto &peer : list) {
+			if (const auto channel = peer->asBroadcast()) {
+				appendRow(channel);
+			}
+		}
+	}
+	delegate()->peerListRefreshRows();
+	setCount(delegate()->peerListFullRowsCount());
+}
+
 void RecommendationsController::appendRow(not_null<ChannelData*> channel) {
 	auto row = std::make_unique<ChannelRow>(channel);
+	row->setActive(_activeHistory && _activeHistory->peer == row->peer());
 	if (channel->membersCountKnown()) {
 		row->setCustomStatus((channel->isBroadcast()
 			? tr::lng_chat_status_subscribers
