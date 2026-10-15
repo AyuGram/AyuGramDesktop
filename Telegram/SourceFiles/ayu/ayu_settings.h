@@ -354,6 +354,8 @@ public:
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
+	[[nodiscard]] bool zipOnSave() const { return _zipOnSave.current(); }
+	[[nodiscard]] const QString &zipPassword() const { return _zipPassword.current(); }
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
 	void setSaveForBots(bool val);
@@ -440,6 +442,8 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setZipOnSave(bool val);
+	void setZipPassword(const QString &val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -615,6 +619,8 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<bool> zipOnSaveValue() const { return _zipOnSave.value(); }
+	[[nodiscard]] rpl::producer<QString> zipPasswordValue() const { return _zipPassword.value(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -712,6 +718,8 @@ private:
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
 
+	rpl::variable<bool> _zipOnSave = false;
+	rpl::variable<QString> _zipPassword;
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
 
