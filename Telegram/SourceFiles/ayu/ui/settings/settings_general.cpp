@@ -11,6 +11,7 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/features/veil/veil.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
 #include "lang/lang_text_entity.h"
@@ -154,6 +155,66 @@ void BuildShowPeerId(SectionBuilder &builder) {
 	});
 }
 
+QString VeilDelayText(int seconds) {
+	if (seconds < 0) {
+		return tr::ayu_VeilOff(tr::now);
+	} else if (seconds == 0) {
+		return tr::ayu_VeilImmediately(tr::now);
+	} else if (seconds < 60) {
+		return tr::ayu_VeilSeconds(tr::now, lt_count, seconds);
+	}
+	return tr::ayu_VeilMinutes(tr::now, lt_count, seconds / 60);
+}
+
+void BuildSecurity(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	auto *settings = &AyuSettings::getInstance();
+	const auto controller = builder.controller();
+
+	builder.addSubsectionTitle(tr::ayu_VeilTitle());
+
+	const auto delays = std::vector<int>{ -1, 0, 5, 30, 120 };
+	builder.addButton({
+		.id = u"ayu/veil"_q,
+		.title = tr::ayu_VeilTitle(),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->veilDelayValue() | rpl::map(VeilDelayText),
+		.onClick = [=] {
+			controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+				auto labels = std::vector<QString>();
+				labels.reserve(delays.size());
+				for (const auto seconds : delays) {
+					labels.push_back(VeilDelayText(seconds));
+				}
+				const auto current = ranges::find(delays, settings->veilDelay());
+				SingleChoiceBox(box, {
+					.title = tr::ayu_VeilTitle(),
+					.options = std::move(labels),
+					.initialSelection = (current != end(delays))
+						? int(current - begin(delays))
+						: 0,
+					.callback = [=](int index) {
+						AyuSettings::getInstance().setVeilDelay(delays[index]);
+					},
+				});
+			}));
+		},
+		.keywords = { u"veil"_q, u"privacy"_q, u"cover"_q, u"hide"_q },
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/veilLock"_q,
+		.title = tr::ayu_VeilLock(),
+		.getter = &AyuSettings::veilLock,
+		.setter = &AyuSettings::setVeilLock,
+	});
+	builder.addButton({
+		.id = u"ayu/veilPreview"_q,
+		.title = tr::ayu_VeilPreview(),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [] { AyuFeatures::Veil::Cover(); },
+	});
+	builder.addDividerText(tr::ayu_VeilAbout());
+}
+
 void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	auto *settings = &AyuSettings::getInstance();
 
@@ -271,6 +332,10 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	BuildSecurity(builder, ayu);
 
 	ayu.addSectionDivider();
 

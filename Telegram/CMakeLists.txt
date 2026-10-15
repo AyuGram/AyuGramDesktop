@@ -132,6 +132,8 @@ set(ayugram_files
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/toasts.cpp
+        ayu/features/veil/veil.cpp
+        ayu/features/veil/veil.h
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
         ayu/ui/ayu_userpic.h
