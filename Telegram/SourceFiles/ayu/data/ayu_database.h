@@ -21,6 +21,9 @@ namespace AyuDatabase {
 
 void initialize();
 
+// Closes the connection so the file can be encrypted or moved (it reopens on the next use).
+void shutdown();
+
 void addEditedMessage(const EditedMessage &message);
 std::vector<EditedMessage> getEditedMessages(ID userId, ID dialogId, ID messageId, ID minId, ID maxId, int totalLimit);
 bool hasRevisions(ID userId, ID dialogId, ID messageId);

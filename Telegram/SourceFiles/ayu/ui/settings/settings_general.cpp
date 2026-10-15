@@ -11,8 +11,11 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/ui/boxes/vault_boxes.h"
+#include "storage/storage_vault.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
+#include "settings.h"
 #include "lang/lang_text_entity.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
@@ -271,6 +274,73 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+	ayu.addSettingToggle({
+		.id = u"ayu/clearCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear cache on startup")),
+		.getter = &AyuSettings::clearCacheOnStartup,
+		.setter = &AyuSettings::setClearCacheOnStartup,
+		.keywords = {
+			u"cache"_q,
+			u"startup"_q,
+			u"wipe"_q,
+			u"storage"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearEmojiCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear emoji cache on startup")),
+		.getter = &AyuSettings::clearEmojiCacheOnStartup,
+		.setter = &AyuSettings::setClearEmojiCacheOnStartup,
+		.keywords = {
+			u"emoji"_q,
+			u"cache"_q,
+			u"startup"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearAyuDatabaseOnStartup"_q,
+		.title = rpl::single(QString("Clear Ayu history database on startup")),
+		.getter = &AyuSettings::clearAyuDatabaseOnStartup,
+		.setter = &AyuSettings::setClearAyuDatabaseOnStartup,
+		.keywords = {
+			u"ayudata"_q,
+			u"database"_q,
+			u"startup"_q,
+		},
+	});
+
+	if (Storage::Vault::Supported()) {
+		const auto vault = std::make_shared<rpl::variable<bool>>(
+			Storage::Vault::IsEnabled(cWorkingDir()));
+		builder.addButton({
+			.id = u"ayu/vault"_q,
+			.title = rpl::single(QString("Encrypt data when closed")),
+			.st = &st::settingsButtonNoIcon,
+			.label = vault->value() | rpl::map([](bool on) {
+				return QString(on ? "On" : "Off");
+			}),
+			.onClick = [=] {
+				const auto changed = [=] {
+					*vault = Storage::Vault::IsEnabled(cWorkingDir());
+				};
+				controller->show(vault->current()
+					? Box(AyuUi::VaultDisableBox, controller, changed)
+					: Box(AyuUi::VaultEnableBox, controller, changed));
+			},
+			.keywords = { u"vault"_q, u"encrypt"_q, u"password"_q, u"boot"_q },
+		});
+		ayu.addSettingToggle({
+			.id = u"ayu/vaultKeepCaches"_q,
+			.title = rpl::single(QString("Keep media caches (encrypted, slower to close)")),
+			.getter = &AyuSettings::vaultKeepCaches,
+			.setter = &AyuSettings::setVaultKeepCaches,
+		});
+	}
 
 	ayu.addSectionDivider();
 
