@@ -11,6 +11,7 @@
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/data/ayu_database.h"
+#include "ayu/features/veil/veil.h"
 #include "ayu/ui/ayu_logo.h"
 #include "features/translator/ayu_translator.h"
 #include "lang/lang_instance.h"
@@ -56,6 +57,10 @@ void initRCManager() {
 	RCManager::getInstance().start();
 }
 
+void initVeil() {
+	AyuFeatures::Veil::Start();
+}
+
 void initTranslator() {
 	Ayu::Translator::TranslateManager::init();
 }
@@ -74,6 +79,7 @@ void init() {
 	initIcon();
 	initWorker();
 	initRCManager();
+	initVeil();
 	initTranslator();
 }
 
