@@ -11,6 +11,8 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/features/zip/save_zip.h"
+#include "ayu/ui/boxes/zip_password_box.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
 #include "lang/lang_text_entity.h"
@@ -271,6 +273,44 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+	builder.addButton({
+		.id = u"ayu/zipOnSave"_q,
+		.title = rpl::single(QString("Zip files saved with Save As (7-Zip)")),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->zipOnSaveValue() | rpl::map([](bool on) {
+			return QString(on ? "On" : "Off");
+		}),
+		.onClick = [=] {
+			auto &current = AyuSettings::getInstance();
+			if (current.zipOnSave()) {
+				current.setZipOnSave(false);
+			} else if (AyuFeatures::Zip::FindSevenZip().isEmpty()) {
+				controller->showToast(QString("7-Zip is not installed. Install it from 7-zip.org first."));
+			} else if (current.zipPassword().isEmpty()) {
+				controller->showToast(QString("Set the zip password first."));
+			} else {
+				current.setZipOnSave(true);
+			}
+		},
+		.keywords = { u"zip"_q, u"7zip"_q, u"7-zip"_q, u"save"_q },
+	});
+	builder.addButton({
+		.id = u"ayu/zipPassword"_q,
+		.title = rpl::single(QString("Zip password")),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->zipPasswordValue() | rpl::map([](const QString &password) {
+			return QString(password.isEmpty() ? "Not set" : "Set");
+		}),
+		.onClick = [=] {
+			controller->show(Box(AyuUi::ZipPasswordBox, controller));
+		},
+		.keywords = { u"zip"_q, u"password"_q },
+	});
 
 	ayu.addSectionDivider();
 

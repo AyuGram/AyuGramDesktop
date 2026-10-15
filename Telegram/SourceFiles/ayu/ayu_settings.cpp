@@ -1069,6 +1069,21 @@ void AyuSettings::setStreamerMode(bool val) {
 	save();
 }
 
+void AyuSettings::setZipOnSave(bool val) {
+	if (_zipOnSave.current() == val) return;
+	_zipOnSave = val;
+	save();
+}
+
+void AyuSettings::setZipPassword(const QString &val) {
+	if (_zipPassword.current() == val) return;
+	_zipPassword = val;
+	if (val.isEmpty()) {
+		_zipOnSave = false;
+	}
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1165,6 +1180,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"zipOnSave", s._zipOnSave.current()},
+		{"zipPassword", s._zipPassword.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1269,6 +1286,8 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._zipOnSave = j.value("zipOnSave", defaults._zipOnSave.current());
+	s._zipPassword = j.value("zipPassword", defaults._zipPassword.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

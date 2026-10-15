@@ -132,6 +132,10 @@ set(ayugram_files
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/toasts.cpp
+        ayu/ui/boxes/zip_password_box.cpp
+        ayu/ui/boxes/zip_password_box.h
+        ayu/features/zip/save_zip.cpp
+        ayu/features/zip/save_zip.h
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
         ayu/ui/ayu_userpic.h
