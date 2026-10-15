@@ -136,6 +136,8 @@ set(ayugram_files
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/toasts.cpp
+        ayu/ui/boxes/vault_boxes.cpp
+        ayu/ui/boxes/vault_boxes.h
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
         ayu/ui/ayu_userpic.h
@@ -1920,6 +1922,8 @@ PRIVATE
     platform/win/notifications_manager_win.h
     platform/win/overlay_widget_win.h
     platform/win/specific_win.cpp
+    platform/win/vault_prompt_win.cpp
+    platform/win/vault_prompt_win.h
     platform/win/specific_win.h
     platform/win/translate_provider_win.h
     platform/win/tray_win.cpp
@@ -2092,6 +2096,8 @@ PRIVATE
     storage/storage_cloud_blob.h
     storage/storage_domain.cpp
     storage/storage_domain.h
+    storage/storage_vault.cpp
+    storage/storage_vault.h
     storage/storage_secure_wipe.cpp
     storage/storage_secure_wipe.h
     storage/storage_facade.cpp

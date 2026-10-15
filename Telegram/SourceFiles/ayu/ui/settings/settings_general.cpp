@@ -11,8 +11,11 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/ui/boxes/vault_boxes.h"
+#include "storage/storage_vault.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
+#include "settings.h"
 #include "lang/lang_text_entity.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
@@ -310,6 +313,34 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			u"startup"_q,
 		},
 	});
+
+	if (Storage::Vault::Supported()) {
+		const auto vault = std::make_shared<rpl::variable<bool>>(
+			Storage::Vault::IsEnabled(cWorkingDir()));
+		builder.addButton({
+			.id = u"ayu/vault"_q,
+			.title = rpl::single(QString("Encrypt data when closed")),
+			.st = &st::settingsButtonNoIcon,
+			.label = vault->value() | rpl::map([](bool on) {
+				return QString(on ? "On" : "Off");
+			}),
+			.onClick = [=] {
+				const auto changed = [=] {
+					*vault = Storage::Vault::IsEnabled(cWorkingDir());
+				};
+				controller->show(vault->current()
+					? Box(AyuUi::VaultDisableBox, controller, changed)
+					: Box(AyuUi::VaultEnableBox, controller, changed));
+			},
+			.keywords = { u"vault"_q, u"encrypt"_q, u"password"_q, u"boot"_q },
+		});
+		ayu.addSettingToggle({
+			.id = u"ayu/vaultKeepCaches"_q,
+			.title = rpl::single(QString("Keep media caches (encrypted, slower to close)")),
+			.getter = &AyuSettings::vaultKeepCaches,
+			.setter = &AyuSettings::setVaultKeepCaches,
+		});
+	}
 
 	ayu.addSectionDivider();
 

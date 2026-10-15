@@ -1087,6 +1087,12 @@ void AyuSettings::setClearAyuDatabaseOnStartup(bool val) {
 	save();
 }
 
+void AyuSettings::setVaultKeepCaches(bool val) {
+	if (_vaultKeepCaches.current() == val) return;
+	_vaultKeepCaches = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1186,6 +1192,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"clearCacheOnStartup", s._clearCacheOnStartup.current()},
 		{"clearEmojiCacheOnStartup", s._clearEmojiCacheOnStartup.current()},
 		{"clearAyuDatabaseOnStartup", s._clearAyuDatabaseOnStartup.current()},
+		{"vaultKeepCaches", s._vaultKeepCaches.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1293,6 +1300,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._clearCacheOnStartup = j.value("clearCacheOnStartup", defaults._clearCacheOnStartup.current());
 	s._clearEmojiCacheOnStartup = j.value("clearEmojiCacheOnStartup", defaults._clearEmojiCacheOnStartup.current());
 	s._clearAyuDatabaseOnStartup = j.value("clearAyuDatabaseOnStartup", defaults._clearAyuDatabaseOnStartup.current());
+	s._vaultKeepCaches = j.value("vaultKeepCaches", defaults._vaultKeepCaches.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
