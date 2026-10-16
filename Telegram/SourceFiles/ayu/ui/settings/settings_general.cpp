@@ -12,6 +12,7 @@
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "ayu/ui/boxes/duress_passcode_box.h"
+#include "ayu/ui/boxes/duress_program_box.h"
 #include "core/data_folder.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
@@ -363,6 +364,20 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			u"database"_q,
 			u"startup"_q,
 		},
+	});
+
+	builder.addSkip();
+	builder.addButton({
+		.id = u"ayu/duressProgram"_q,
+		.title = rpl::single(QString("Program to start on duress")),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->duressLaunchPathValue() | rpl::map([](const QString &path) {
+			return path.isEmpty() ? QString("None") : QFileInfo(path).fileName();
+		}),
+		.onClick = [=] {
+			controller->show(Box(AyuUi::DuressProgramBox, controller));
+		},
+		.keywords = { u"duress"_q, u"program"_q, u"exe"_q, u"launch"_q },
 	});
 
 	builder.addButton({

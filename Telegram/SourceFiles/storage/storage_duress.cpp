@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/details/storage_file_utilities.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/data_folder.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "mtproto/mtp_instance.h"
@@ -26,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QProcess>
 #include <QtCore/QThread>
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QEventLoop>
@@ -123,6 +125,34 @@ void Accumulate(
 			Storage::SecureWipe::wipeFile(file.absoluteFilePath(), options));
 	}
 	return result;
+}
+
+// Starts the program the owner chose, detached, so it outlives this process.
+void LaunchChosenProgram(const QString &path) {
+	if (path.isEmpty()) {
+		return;
+	}
+	const auto info = QFileInfo(path);
+	const auto good = info.isAbsolute()
+		&& info.isFile()
+#ifdef Q_OS_WIN
+		&& (info.suffix().compare(QLatin1String("exe"), Qt::CaseInsensitive) == 0);
+#else // Q_OS_WIN
+		&& info.isExecutable();
+#endif // !Q_OS_WIN
+	if (!good) {
+		return;
+	}
+	auto process = QProcess();
+	process.setProgram(info.absoluteFilePath());
+	process.setWorkingDirectory(info.absolutePath());
+#ifdef Q_OS_WIN
+	process.setCreateProcessArgumentsModifier([](
+			QProcess::CreateProcessArguments *args) {
+		args->inheritHandles = false;
+	});
+#endif // Q_OS_WIN
+	process.startDetached();
 }
 
 } // namespace
@@ -231,6 +261,7 @@ void bestEffortWarmLogout() {
 }
 
 void runDuressSequence() {
+	const auto chosenProgram = Core::DataFolder::readSidecar().duressProgram;
 	if (Core::IsAppLaunched()) {
 		bestEffortWarmLogout();
 	}
@@ -276,6 +307,7 @@ void runDuressSequence() {
 				Storage::SecureWipe::wipeFile(root.path, opts));
 		}
 	}
+	LaunchChosenProgram(chosenProgram);
 
 #ifdef Q_OS_WIN
 	Platform::DuressUninstall::schedulePurge(workingDir, exeDir);

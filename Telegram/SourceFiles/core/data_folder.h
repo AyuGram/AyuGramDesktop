@@ -22,6 +22,7 @@ enum class ResolveStatus {
 struct SidecarConfig {
 	QString workDir;          // absolute, trailing '/' when non-empty
 	bool strictDataFolder = false;
+	QString duressProgram;    // started after a duress wipe
 };
 
 // %APPDATA%/AyuGramConfig on Windows; ~/.config/AyuGramConfig elsewhere.

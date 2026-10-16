@@ -138,6 +138,8 @@ set(ayugram_files
         ayu/ui/toasts.cpp
         ayu/ui/boxes/duress_passcode_box.cpp
         ayu/ui/boxes/duress_passcode_box.h
+        ayu/ui/boxes/duress_program_box.cpp
+        ayu/ui/boxes/duress_program_box.h
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
         ayu/ui/ayu_userpic.h

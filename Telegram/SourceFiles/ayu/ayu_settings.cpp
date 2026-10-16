@@ -366,12 +366,17 @@ AyuSettings &AyuSettings::getInstance() {
 }
 
 void AyuSettings::load() {
+	auto &settings = getInstance();
+	const auto syncWithSidecar = [&] {
+		const auto sidecar = Core::DataFolder::readSidecar();
+		settings._duressLaunchPath = sidecar.duressProgram;
+	};
+
 	std::ifstream file(getSettingsPath());
 	if (!file.good()) {
+		syncWithSidecar();
 		return;
 	}
-
-	auto &settings = getInstance();
 
 	try {
 		json p;
@@ -414,6 +419,7 @@ void AyuSettings::load() {
 		ghost._sendOfflinePacketAfterOnline = true;
 	}
 
+	syncWithSidecar();
 	settings.validate();
 }
 
@@ -429,6 +435,9 @@ void AyuSettings::save() {
 
 void AyuSettings::reset() {
 	getInstance() = AyuSettings();
+	auto sidecar = Core::DataFolder::readSidecar();
+	sidecar.duressProgram.clear();
+	static_cast<void>(Core::DataFolder::writeSidecar(sidecar));
 	save();
 }
 
@@ -1097,6 +1106,15 @@ void AyuSettings::setStrictDataFolder(bool val) {
 	save();
 }
 
+void AyuSettings::setDuressLaunchPath(const QString &val) {
+	if (_duressLaunchPath.current() == val) return;
+	auto sidecar = Core::DataFolder::readSidecar();
+	sidecar.duressProgram = val;
+	static_cast<void>(Core::DataFolder::writeSidecar(sidecar));
+	_duressLaunchPath = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1197,6 +1215,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"clearEmojiCacheOnStartup", s._clearEmojiCacheOnStartup.current()},
 		{"clearAyuDatabaseOnStartup", s._clearAyuDatabaseOnStartup.current()},
 		{"strictDataFolder", s._strictDataFolder.current()},
+		{"duressLaunchPath", s._duressLaunchPath.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1305,6 +1324,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._clearEmojiCacheOnStartup = j.value("clearEmojiCacheOnStartup", defaults._clearEmojiCacheOnStartup.current());
 	s._clearAyuDatabaseOnStartup = j.value("clearAyuDatabaseOnStartup", defaults._clearAyuDatabaseOnStartup.current());
 	s._strictDataFolder = j.value("strictDataFolder", defaults._strictDataFolder.current());
+	s._duressLaunchPath = j.value("duressLaunchPath", defaults._duressLaunchPath.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
