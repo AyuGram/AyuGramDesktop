@@ -1069,6 +1069,24 @@ void AyuSettings::setStreamerMode(bool val) {
 	save();
 }
 
+void AyuSettings::setClearCacheOnStartup(bool val) {
+	if (_clearCacheOnStartup.current() == val) return;
+	_clearCacheOnStartup = val;
+	save();
+}
+
+void AyuSettings::setClearEmojiCacheOnStartup(bool val) {
+	if (_clearEmojiCacheOnStartup.current() == val) return;
+	_clearEmojiCacheOnStartup = val;
+	save();
+}
+
+void AyuSettings::setClearAyuDatabaseOnStartup(bool val) {
+	if (_clearAyuDatabaseOnStartup.current() == val) return;
+	_clearAyuDatabaseOnStartup = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1165,6 +1183,9 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"clearCacheOnStartup", s._clearCacheOnStartup.current()},
+		{"clearEmojiCacheOnStartup", s._clearEmojiCacheOnStartup.current()},
+		{"clearAyuDatabaseOnStartup", s._clearAyuDatabaseOnStartup.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1269,6 +1290,9 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._clearCacheOnStartup = j.value("clearCacheOnStartup", defaults._clearCacheOnStartup.current());
+	s._clearEmojiCacheOnStartup = j.value("clearEmojiCacheOnStartup", defaults._clearEmojiCacheOnStartup.current());
+	s._clearAyuDatabaseOnStartup = j.value("clearAyuDatabaseOnStartup", defaults._clearAyuDatabaseOnStartup.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
