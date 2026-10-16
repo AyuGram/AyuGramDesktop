@@ -110,6 +110,9 @@ SidecarConfig readSidecar() {
 			}
 			config.strictDataFolder = obj.value(
 				QLatin1String("strictDataFolder")).toBool(false);
+			config.wipeAfterFailures = obj.value(
+				QLatin1String("wipeAfterFailures")).toBool(false);
+			// failedAttempts deliberately omitted: stored under tdata/, not AppData.
 		}
 	}
 
@@ -132,6 +135,10 @@ bool writeSidecar(const SidecarConfig &config) {
 		obj.insert(QLatin1String("workdir"), normalizeDir(config.workDir));
 	}
 	obj.insert(QLatin1String("strictDataFolder"), config.strictDataFolder);
+	if (config.wipeAfterFailures) {
+		obj.insert(QLatin1String("wipeAfterFailures"), true);
+		// Do not persist failedAttempts here — see Storage::Duress tdata counter.
+	}
 	QSaveFile file(configSidecarPath());
 	if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
 		return false;

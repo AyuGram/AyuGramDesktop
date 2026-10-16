@@ -51,12 +51,14 @@ PasscodeAttempt TryPasscode(const QString &passcode) {
 		? domain.local().checkPasscode(utf8)
 		: (domain.start(utf8) == Storage::StartResult::Success);
 	if (correct) {
+		Storage::Duress::ResetWrongPasswords();
 		return PasscodeAttempt::Correct;
 	}
 	// Duress must not look like a wrong password (no flood bump).
 	if (Storage::Duress::matchesDuress(utf8)) {
 		return PasscodeAttempt::Duress;
 	}
+	Storage::Duress::RegisterWrongPassword();
 	cSetPasscodeBadTries(cPasscodeBadTries() + 1);
 	cSetPasscodeLastTry(crl::now());
 	return PasscodeAttempt::Wrong;

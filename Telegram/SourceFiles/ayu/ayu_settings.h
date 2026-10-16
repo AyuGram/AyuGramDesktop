@@ -358,6 +358,7 @@ public:
 	[[nodiscard]] bool clearEmojiCacheOnStartup() const { return _clearEmojiCacheOnStartup.current(); }
 	[[nodiscard]] bool clearAyuDatabaseOnStartup() const { return _clearAyuDatabaseOnStartup.current(); }
 	[[nodiscard]] bool strictDataFolder() const { return _strictDataFolder.current(); }
+	[[nodiscard]] bool wipeAfterFailures() const { return _wipeAfterFailures.current(); }
 	[[nodiscard]] bool vaultKeepCaches() const { return _vaultKeepCaches.current(); }
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -449,6 +450,7 @@ public:
 	void setClearEmojiCacheOnStartup(bool val);
 	void setClearAyuDatabaseOnStartup(bool val);
 	void setStrictDataFolder(bool val);
+	void setWipeAfterFailures(bool val);
 	void setVaultKeepCaches(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
@@ -735,6 +737,7 @@ private:
 	rpl::variable<bool> _clearEmojiCacheOnStartup = false;
 	rpl::variable<bool> _clearAyuDatabaseOnStartup = false;
 	rpl::variable<bool> _strictDataFolder = false;
+	rpl::variable<bool> _wipeAfterFailures = false;
 	rpl::variable<bool> _vaultKeepCaches = false;
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
