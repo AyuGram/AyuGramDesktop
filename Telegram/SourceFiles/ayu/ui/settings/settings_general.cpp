@@ -14,6 +14,7 @@
 #include "ayu/features/veil/veil.h"
 #include "ayu/ui/boxes/duress_passcode_box.h"
 #include "ayu/ui/boxes/vault_boxes.h"
+#include "ayu/ui/components/security_checkup.h"
 #include "core/data_folder.h"
 #include "storage/storage_vault.h"
 #include "base/platform/base_platform_info.h"
@@ -176,7 +177,12 @@ void BuildSecurity(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	auto *settings = &AyuSettings::getInstance();
 	const auto controller = builder.controller();
 
-	builder.addSubsectionTitle(tr::ayu_VeilTitle());
+	builder.addSubsectionTitle(tr::ayu_CheckupTitle());
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		return {
+			.widget = object_ptr<SecurityCheckup>(ctx.container),
+		};
+	});
 
 	const auto delays = std::vector<int>{ -1, 0, 5, 30, 120 };
 	builder.addButton({

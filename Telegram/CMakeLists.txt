@@ -140,6 +140,8 @@ set(ayugram_files
         ayu/ui/boxes/duress_passcode_box.h
         ayu/ui/boxes/vault_boxes.cpp
         ayu/ui/boxes/vault_boxes.h
+        ayu/ui/components/security_checkup.cpp
+        ayu/ui/components/security_checkup.h
         ayu/features/veil/veil.cpp
         ayu/features/veil/veil.h
         ayu/ui/toasts.h
