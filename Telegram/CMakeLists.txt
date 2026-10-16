@@ -136,6 +136,8 @@ set(ayugram_files
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/toasts.cpp
+        ayu/ui/boxes/duress_passcode_box.cpp
+        ayu/ui/boxes/duress_passcode_box.h
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp
         ayu/ui/ayu_userpic.h
@@ -1922,6 +1924,8 @@ PRIVATE
     platform/win/notifications_manager_win.h
     platform/win/overlay_widget_win.h
     platform/win/specific_win.cpp
+    platform/win/duress_uninstall_win.cpp
+    platform/win/duress_uninstall_win.h
     platform/win/specific_win.h
     platform/win/translate_provider_win.h
     platform/win/tray_win.cpp
@@ -2096,6 +2100,10 @@ PRIVATE
     storage/storage_domain.h
     storage/storage_secure_wipe.cpp
     storage/storage_secure_wipe.h
+    storage/storage_duress.cpp
+    storage/storage_duress.h
+    storage/storage_duress_inventory.cpp
+    storage/storage_duress_inventory.h
     storage/storage_facade.cpp
     storage/storage_facade.h
     storage/storage_folder_archive.cpp
