@@ -5,6 +5,7 @@
 //
 // Copyright @Radolyn, 2026
 #include "ayu/ayu_settings.h"
+#include "core/data_folder.h"
 
 #include "lang_auto.h"
 #include "tray.h"
@@ -1087,6 +1088,15 @@ void AyuSettings::setClearAyuDatabaseOnStartup(bool val) {
 	save();
 }
 
+void AyuSettings::setStrictDataFolder(bool val) {
+	if (_strictDataFolder.current() == val) return;
+	_strictDataFolder = val;
+	auto sidecar = Core::DataFolder::readSidecar();
+	sidecar.strictDataFolder = val;
+	static_cast<void>(Core::DataFolder::writeSidecar(sidecar));
+	save();
+}
+
 void AyuSettings::setVeilDelay(int val) {
 	val = std::clamp(val, -1, 3600);
 	if (_veilDelay.current() == val) return;
@@ -1199,6 +1209,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"clearCacheOnStartup", s._clearCacheOnStartup.current()},
 		{"clearEmojiCacheOnStartup", s._clearEmojiCacheOnStartup.current()},
 		{"clearAyuDatabaseOnStartup", s._clearAyuDatabaseOnStartup.current()},
+		{"strictDataFolder", s._strictDataFolder.current()},
 		{"veilDelaySeconds", s._veilDelay.current()},
 		{"veilLock", s._veilLock.current()},
 		{"messageShotSettings", s._messageShotSettings}
@@ -1308,6 +1319,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._clearCacheOnStartup = j.value("clearCacheOnStartup", defaults._clearCacheOnStartup.current());
 	s._clearEmojiCacheOnStartup = j.value("clearEmojiCacheOnStartup", defaults._clearEmojiCacheOnStartup.current());
 	s._clearAyuDatabaseOnStartup = j.value("clearAyuDatabaseOnStartup", defaults._clearAyuDatabaseOnStartup.current());
+	s._strictDataFolder = j.value("strictDataFolder", defaults._strictDataFolder.current());
 	s._veilDelay = std::clamp(j.value("veilDelaySeconds", defaults._veilDelay.current()), -1, 3600);
 	s._veilLock = j.value("veilLock", defaults._veilLock.current());
 
