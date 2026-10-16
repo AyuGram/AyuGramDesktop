@@ -744,6 +744,8 @@ PRIVATE
     core/file_utilities.h
     core/launcher.cpp
     core/launcher.h
+    core/data_folder.cpp
+    core/data_folder.h
     core/local_url_handlers.cpp
     core/local_url_handlers.h
     core/phone_click_handler.cpp
@@ -1916,6 +1918,8 @@ PRIVATE
     platform/win/notifications_manager_win.h
     platform/win/overlay_widget_win.h
     platform/win/specific_win.cpp
+    platform/win/veracrypt_mount_win.cpp
+    platform/win/veracrypt_mount_win.h
     platform/win/specific_win.h
     platform/win/translate_provider_win.h
     platform/win/tray_win.cpp

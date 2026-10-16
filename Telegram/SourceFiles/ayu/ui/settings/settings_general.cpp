@@ -11,8 +11,14 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "core/data_folder.h"
+#ifdef Q_OS_WIN
+#include "platform/win/veracrypt_mount_win.h"
+#endif
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
+#include "settings.h"
 #include "lang/lang_text_entity.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
@@ -271,6 +277,110 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+#ifdef Q_OS_WIN
+	builder.addButton({
+		.id = u"ayu/veracryptMount"_q,
+		.title = rpl::single(QString("Mount VeraCrypt volume")),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto exe = Platform::VeraCrypt::findExecutable();
+			if (exe.isEmpty()) {
+				controller->showToast(QString("VeraCrypt.exe not found"));
+				return;
+			}
+			FileDialog::GetOpenPath(
+				controller->window().widget().get(),
+				QString("Choose VeraCrypt volume"),
+				FileDialog::AllFilesFilter(),
+				[=](FileDialog::OpenResult &&result) {
+					if (result.paths.isEmpty()) {
+						return;
+					}
+					auto cfg = Core::DataFolder::readSidecar();
+					cfg.veracryptVolume = QDir::toNativeSeparators(result.paths.front());
+					if (!Core::DataFolder::writeSidecar(cfg)) {
+						controller->showToast(QString("Could not remember the volume."));
+					}
+					const auto native = QDir::toNativeSeparators(
+						cfg.workDir.isEmpty() ? cWorkingDir() : cfg.workDir);
+					if (native.size() < 2
+						|| native.at(1) != QLatin1Char(':')
+						|| native.at(0).toUpper() < QLatin1Char('A')
+						|| native.at(0).toUpper() > QLatin1Char('Z')) {
+						controller->showToast(
+							QString("Set a data folder with a drive letter first."));
+						return;
+					}
+					const auto drive = native.left(1).toUpper();
+					const auto mount = Platform::VeraCrypt::mountVolume({
+						.volumePath = result.paths.front(),
+						.driveLetter = drive,
+						.veracryptExe = exe,
+					});
+					controller->showToast(mount.message);
+				});
+		},
+		.keywords = { u"veracrypt"_q, u"mount"_q, u"volume"_q },
+	});
+#endif // Q_OS_WIN
+
+	ayu.addSettingToggle({
+		.id = u"ayu/strictDataFolder"_q,
+		.title = rpl::single(QString("Require data folder (strict)")),
+		.getter = &AyuSettings::strictDataFolder,
+		.setter = &AyuSettings::setStrictDataFolder,
+		.keywords = {
+			u"veracrypt"_q,
+			u"workdir"_q,
+			u"strict"_q,
+			u"volume"_q,
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/dataFolder"_q,
+		.title = rpl::single(QString("Data folder")),
+		.st = &st::settingsButtonNoIcon,
+		.label = rpl::single([] {
+			const auto sidecar = Core::DataFolder::readSidecar();
+			if (!sidecar.workDir.isEmpty()) {
+				return sidecar.workDir;
+			}
+			return cWorkingDir();
+		}()),
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto handle = [=](QString &&path) {
+				if (path.isEmpty()) {
+					return;
+				}
+				auto cfg = Core::DataFolder::readSidecar();
+				cfg.workDir = path;
+				cfg.strictDataFolder = AyuSettings::getInstance().strictDataFolder();
+				if (!Core::DataFolder::writeSidecar(cfg)) {
+					controller->showToast(QString("Could not save the data folder."));
+					return;
+				}
+				controller->showToast(
+					QString("Data folder saved. Restart to apply."));
+			};
+			FileDialog::GetFolder(
+				controller->window().widget().get(),
+				QString("Choose data folder"),
+				cWorkingDir(),
+				handle);
+		},
+		.keywords = { u"workdir"_q, u"veracrypt"_q, u"data"_q },
+	});
 
 	ayu.addSectionDivider();
 

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_specific.h"
 #include "core/crash_reports.h"
 #include "core/launcher.h"
+#include "core/data_folder.h"
 #include "core/version.h"
 #include "mtproto/facade.h"
 
@@ -361,6 +362,30 @@ void start() {
 	}
 
 	LogsData = new LogsDataFields();
+
+	// AyuGram sidecar before default profile selection so strict mode
+	// never creates tdata under %APPDATA%\AyuGram Desktop by accident.
+	// CLI -workdir still wins via validateCustomWorkingDir() below.
+	if (!launcher.customWorkingDir()) {
+		using Core::DataFolder::ResolveStatus;
+		auto status = Core::DataFolder::applySidecarWorkDir(false);
+		if ((status == ResolveStatus::StrictUnavailable
+			|| status == ResolveStatus::SidecarUnavailable)
+			&& Core::DataFolder::tryAutoMount()) {
+			status = Core::DataFolder::applySidecarWorkDir(false);
+		}
+		while (status == ResolveStatus::StrictUnavailable
+			&& Core::DataFolder::promptStrictUnavailable(
+				Core::DataFolder::readSidecar().workDir)) {
+			status = Core::DataFolder::applySidecarWorkDir(false);
+		}
+		if (status == ResolveStatus::StrictUnavailable) {
+			delete LogsData;
+			LogsData = nullptr;
+			return;
+		}
+	}
+
 	if (cWorkingDir().isEmpty()) {
 #if (!defined Q_OS_WIN && !defined _DEBUG) || defined Q_OS_WINRT || defined OS_WIN_STORE || defined OS_MAC_STORE
 		cForceWorkingDir(psAppDataPath());
