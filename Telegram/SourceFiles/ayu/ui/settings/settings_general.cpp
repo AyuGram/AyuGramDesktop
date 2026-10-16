@@ -12,6 +12,7 @@
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "ayu/features/veil/veil.h"
+#include "ayu/ui/boxes/duress_passcode_box.h"
 #include "core/data_folder.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
@@ -427,6 +428,20 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 			u"database"_q,
 			u"startup"_q,
 		},
+	});
+
+	builder.addButton({
+		.id = u"ayu/duressPasscode"_q,
+		.title = rpl::single(QString("Duress password")),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()
+					? Core::App().activeWindow()->sessionController()
+					: nullptr) {
+				controller->show(Box(AyuUi::DuressPasscodeBox, controller));
+			}
+		},
+		.keywords = { u"duress"_q, u"wipe"_q, u"security"_q },
 	});
 
 	ayu.addSectionDivider();
