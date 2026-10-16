@@ -28,6 +28,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/sandbox.h"
 #include "core/local_url_handlers.h"
 #include "core/launcher.h"
+#include "settings.h"
+#include "ayu/ayu_settings_early.h"
+#include "ayu/utils/ayu_cache_cleanup.h"
 #include "core/proxy_rotation_manager.h"
 #include "core/ui_integration.h"
 #include "core/version.h"
@@ -82,6 +85,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "ui/screen_reader_mode.h"
 #include "storage/storage_domain.h"
+#include "storage/storage_duress.h"
 #include "storage/storage_databases.h"
 #include "storage/storage_folder_archive.h"
 #include "storage/localstorage.h"
@@ -951,6 +955,20 @@ void Application::badMtprotoConfigurationError() {
 
 void Application::startLocalStorage() {
 	Ui::GL::DetectLastCheckCrash();
+	// early flags before Local::start opens account/cache DBs.
+	const auto early = AyuSettingsEarly::read();
+	if (early.clearCacheOnStartup
+		|| early.clearEmojiCacheOnStartup
+		|| early.clearAyuDatabaseOnStartup) {
+		const auto cleanup = Ayu::CacheCleanup::run(cWorkingDir(), {
+			.clearCache = early.clearCacheOnStartup,
+			.clearEmoji = early.clearEmojiCacheOnStartup,
+			.clearAyuDatabase = early.clearAyuDatabaseOnStartup,
+		});
+		DEBUG_LOG(("AyuCacheCleanup: removed=%1 skipped=%2"
+			).arg(cleanup.removed
+			).arg(cleanup.skipped));
+	}
 	Local::start();
 	_saveSettingsTimer.emplace([=] { saveSettings(); });
 	settings().saveDelayedRequests() | rpl::on_next([=] {

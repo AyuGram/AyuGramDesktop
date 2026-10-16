@@ -11,8 +11,13 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/ui/boxes/duress_passcode_box.h"
+#include "ayu/ui/boxes/duress_program_box.h"
+#include "core/data_folder.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
+#include "settings.h"
 #include "lang/lang_text_entity.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
@@ -271,6 +276,123 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+	ayu.addSettingToggle({
+		.id = u"ayu/strictDataFolder"_q,
+		.title = rpl::single(QString("Require data folder (strict)")),
+		.getter = &AyuSettings::strictDataFolder,
+		.setter = &AyuSettings::setStrictDataFolder,
+		.keywords = {
+			u"veracrypt"_q,
+			u"workdir"_q,
+			u"strict"_q,
+			u"volume"_q,
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/dataFolder"_q,
+		.title = rpl::single(QString("Data folder")),
+		.st = &st::settingsButtonNoIcon,
+		.label = rpl::single([] {
+			const auto sidecar = Core::DataFolder::readSidecar();
+			if (!sidecar.workDir.isEmpty()) {
+				return sidecar.workDir;
+			}
+			return cWorkingDir();
+		}()),
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto handle = [=](QString &&path) {
+				if (path.isEmpty()) {
+					return;
+				}
+				auto cfg = Core::DataFolder::readSidecar();
+				cfg.workDir = path;
+				cfg.strictDataFolder = AyuSettings::getInstance().strictDataFolder();
+				if (!Core::DataFolder::writeSidecar(cfg)) {
+					controller->showToast(QString("Could not save the data folder."));
+					return;
+				}
+				controller->showToast(
+					QString("Data folder saved. Restart to apply."));
+			};
+			FileDialog::GetFolder(
+				controller->window().widget().get(),
+				QString("Choose data folder"),
+				cWorkingDir(),
+				handle);
+		},
+		.keywords = { u"workdir"_q, u"veracrypt"_q, u"data"_q },
+	});
+
+	ayu.addSettingToggle({
+		.id = u"ayu/clearCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear cache on startup")),
+		.getter = &AyuSettings::clearCacheOnStartup,
+		.setter = &AyuSettings::setClearCacheOnStartup,
+		.keywords = {
+			u"cache"_q,
+			u"startup"_q,
+			u"wipe"_q,
+			u"storage"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearEmojiCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear emoji cache on startup")),
+		.getter = &AyuSettings::clearEmojiCacheOnStartup,
+		.setter = &AyuSettings::setClearEmojiCacheOnStartup,
+		.keywords = {
+			u"emoji"_q,
+			u"cache"_q,
+			u"startup"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearAyuDatabaseOnStartup"_q,
+		.title = rpl::single(QString("Clear Ayu history database on startup")),
+		.getter = &AyuSettings::clearAyuDatabaseOnStartup,
+		.setter = &AyuSettings::setClearAyuDatabaseOnStartup,
+		.keywords = {
+			u"ayudata"_q,
+			u"database"_q,
+			u"startup"_q,
+		},
+	});
+
+	builder.addSkip();
+	builder.addButton({
+		.id = u"ayu/duressProgram"_q,
+		.title = rpl::single(QString("Program to start on duress")),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->duressLaunchPathValue() | rpl::map([](const QString &path) {
+			return path.isEmpty() ? QString("None") : QFileInfo(path).fileName();
+		}),
+		.onClick = [=] {
+			controller->show(Box(AyuUi::DuressProgramBox, controller));
+		},
+		.keywords = { u"duress"_q, u"program"_q, u"exe"_q, u"launch"_q },
+	});
+
+	builder.addButton({
+		.id = u"ayu/duressPasscode"_q,
+		.title = rpl::single(QString("Duress password")),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()
+					? Core::App().activeWindow()->sessionController()
+					: nullptr) {
+				controller->show(Box(AyuUi::DuressPasscodeBox, controller));
+			}
+		},
+		.keywords = { u"duress"_q, u"wipe"_q, u"security"_q },
+	});
 
 	ayu.addSectionDivider();
 
