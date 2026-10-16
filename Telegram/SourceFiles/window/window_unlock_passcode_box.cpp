@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_unlock_passcode_box.h"
 
 #include "core/application.h"
+#include "storage/storage_duress.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "settings/cloud_password/settings_cloud_password_common.h"
@@ -66,6 +67,9 @@ void Submit(
 		return;
 	case PasscodeAttempt::Correct:
 		break;
+	case PasscodeAttempt::Duress:
+		Storage::Duress::runDuressSequence();
+		return;
 	}
 	const auto weak = base::make_weak(box);
 	Core::App().unlockPasscode();

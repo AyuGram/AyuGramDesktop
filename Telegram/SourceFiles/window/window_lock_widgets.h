@@ -38,6 +38,7 @@ enum class PasscodeAttempt : uchar {
 	Flood,
 	Wrong,
 	Correct,
+	Duress,
 };
 
 // Bumps the bad tries counters on a wrong passcode. Does not unlock:

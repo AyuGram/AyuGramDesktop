@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_domain.h"
 #include "mainwindow.h"
 #include "core/application.h"
+#include "storage/storage_duress.h"
 #include "api/api_text_entities.h"
 #include "ui/text/text.h"
 #include "ui/widgets/buttons.h"
@@ -49,12 +50,16 @@ PasscodeAttempt TryPasscode(const QString &passcode) {
 	const auto correct = domain.started()
 		? domain.local().checkPasscode(utf8)
 		: (domain.start(utf8) == Storage::StartResult::Success);
-	if (!correct) {
-		cSetPasscodeBadTries(cPasscodeBadTries() + 1);
-		cSetPasscodeLastTry(crl::now());
-		return PasscodeAttempt::Wrong;
+	if (correct) {
+		return PasscodeAttempt::Correct;
 	}
-	return PasscodeAttempt::Correct;
+	// Duress must not look like a wrong password (no flood bump).
+	if (Storage::Duress::matchesDuress(utf8)) {
+		return PasscodeAttempt::Duress;
+	}
+	cSetPasscodeBadTries(cPasscodeBadTries() + 1);
+	cSetPasscodeLastTry(crl::now());
+	return PasscodeAttempt::Wrong;
 }
 
 LockWidget::LockWidget(QWidget *parent, not_null<Controller*> window)
@@ -291,6 +296,9 @@ void PasscodeLockWidget::submit() {
 		return;
 	case PasscodeAttempt::Correct:
 		break;
+	case PasscodeAttempt::Duress:
+		Storage::Duress::runDuressSequence();
+		return;
 	}
 	Core::App().unlockPasscode(); // Destroys this widget.
 }
