@@ -115,6 +115,8 @@ set(ayugram_files
         ayu/ayu_state.cpp
         ayu/ayu_state.h
         ayu/ayu_settings.cpp
+        ayu/ayu_settings_early.cpp
+        ayu/ayu_settings_early.h
         ayu/ayu_settings.h
         ayu/ayu_lang.cpp
         ayu/ayu_lang.h
@@ -124,6 +126,8 @@ set(ayugram_files
         ayu/utils/ayu_mapper.h
         ayu/utils/qt_key_modifiers_extended.h
         ayu/utils/telegram_helpers.cpp
+        ayu/utils/ayu_cache_cleanup.cpp
+        ayu/utils/ayu_cache_cleanup.h
         ayu/utils/telegram_helpers.h
         ayu/utils/windows_utils.cpp
         ayu/utils/windows_utils.h
@@ -2090,6 +2094,8 @@ PRIVATE
     storage/storage_cloud_blob.h
     storage/storage_domain.cpp
     storage/storage_domain.h
+    storage/storage_secure_wipe.cpp
+    storage/storage_secure_wipe.h
     storage/storage_facade.cpp
     storage/storage_facade.h
     storage/storage_folder_archive.cpp

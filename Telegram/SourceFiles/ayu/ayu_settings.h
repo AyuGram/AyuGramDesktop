@@ -354,6 +354,9 @@ public:
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
+	[[nodiscard]] bool clearCacheOnStartup() const { return _clearCacheOnStartup.current(); }
+	[[nodiscard]] bool clearEmojiCacheOnStartup() const { return _clearEmojiCacheOnStartup.current(); }
+	[[nodiscard]] bool clearAyuDatabaseOnStartup() const { return _clearAyuDatabaseOnStartup.current(); }
 	// Privacy veil: -1 is off, otherwise seconds out of focus before it covers the chats.
 	[[nodiscard]] int veilDelay() const { return _veilDelay.current(); }
 	[[nodiscard]] bool veilLock() const { return _veilLock.current(); }
@@ -444,6 +447,9 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setClearCacheOnStartup(bool val);
+	void setClearEmojiCacheOnStartup(bool val);
+	void setClearAyuDatabaseOnStartup(bool val);
 	void setVeilDelay(int val);
 	void setVeilLock(bool val);
 
@@ -621,6 +627,12 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearCacheOnStartupValue() const { return _clearCacheOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearCacheOnStartupChanges() const { return _clearCacheOnStartup.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearEmojiCacheOnStartupValue() const { return _clearEmojiCacheOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearEmojiCacheOnStartupChanges() const { return _clearEmojiCacheOnStartup.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearAyuDatabaseOnStartupValue() const { return _clearAyuDatabaseOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearAyuDatabaseOnStartupChanges() const { return _clearAyuDatabaseOnStartup.changes(); }
 	[[nodiscard]] rpl::producer<int> veilDelayValue() const { return _veilDelay.value(); }
 	[[nodiscard]] rpl::producer<int> veilDelayChanges() const { return _veilDelay.changes(); }
 
@@ -720,6 +732,9 @@ private:
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
 
+	rpl::variable<bool> _clearCacheOnStartup = false;
+	rpl::variable<bool> _clearEmojiCacheOnStartup = false;
+	rpl::variable<bool> _clearAyuDatabaseOnStartup = false;
 	rpl::variable<int> _veilDelay = -1;
 	rpl::variable<bool> _veilLock = false;
 	rpl::variable<bool> _useGlobalGhostMode = true;
