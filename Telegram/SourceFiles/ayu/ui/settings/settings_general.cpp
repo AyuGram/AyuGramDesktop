@@ -274,6 +274,45 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 
 	ayu.addSectionDivider();
 
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+	ayu.addSettingToggle({
+		.id = u"ayu/clearCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear cache on startup")),
+		.getter = &AyuSettings::clearCacheOnStartup,
+		.setter = &AyuSettings::setClearCacheOnStartup,
+		.keywords = {
+			u"cache"_q,
+			u"startup"_q,
+			u"wipe"_q,
+			u"storage"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearEmojiCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear emoji cache on startup")),
+		.getter = &AyuSettings::clearEmojiCacheOnStartup,
+		.setter = &AyuSettings::setClearEmojiCacheOnStartup,
+		.keywords = {
+			u"emoji"_q,
+			u"cache"_q,
+			u"startup"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearAyuDatabaseOnStartup"_q,
+		.title = rpl::single(QString("Clear Ayu history database on startup")),
+		.getter = &AyuSettings::clearAyuDatabaseOnStartup,
+		.setter = &AyuSettings::setClearAyuDatabaseOnStartup,
+		.keywords = {
+			u"ayudata"_q,
+			u"database"_q,
+			u"startup"_q,
+		},
+	});
+
+	ayu.addSectionDivider();
+
 	builder.addSubsectionTitle(rpl::single(QString("Webview")));
 
 	ayu.addSettingToggle({
