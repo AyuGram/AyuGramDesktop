@@ -229,6 +229,15 @@ void moveCurrentDatabase() {
 	}
 }
 
+void shutdown() {
+	std::lock_guard lock(databaseMutex);
+	try {
+		storage.close_forever();
+	} catch (const std::exception &ex) {
+		LOG(("AyuDatabase: could not close, %1").arg(ex.what()));
+	}
+}
+
 void initialize() {
 	std::lock_guard lock(databaseMutex);
 	try {

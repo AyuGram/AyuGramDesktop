@@ -1110,6 +1110,12 @@ void AyuSettings::setVeilLock(bool val) {
 	save();
 }
 
+void AyuSettings::setVaultKeepCaches(bool val) {
+	if (_vaultKeepCaches.current() == val) return;
+	_vaultKeepCaches = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1212,6 +1218,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"strictDataFolder", s._strictDataFolder.current()},
 		{"veilDelaySeconds", s._veilDelay.current()},
 		{"veilLock", s._veilLock.current()},
+		{"vaultKeepCaches", s._vaultKeepCaches.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1322,6 +1329,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._strictDataFolder = j.value("strictDataFolder", defaults._strictDataFolder.current());
 	s._veilDelay = std::clamp(j.value("veilDelaySeconds", defaults._veilDelay.current()), -1, 3600);
 	s._veilLock = j.value("veilLock", defaults._veilLock.current());
+	s._vaultKeepCaches = j.value("vaultKeepCaches", defaults._vaultKeepCaches.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);
