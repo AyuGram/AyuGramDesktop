@@ -362,6 +362,7 @@ public:
 	[[nodiscard]] int veilDelay() const { return _veilDelay.current(); }
 	[[nodiscard]] bool veilLock() const { return _veilLock.current(); }
 
+	[[nodiscard]] bool wipeAfterFailures() const { return _wipeAfterFailures.current(); }
 	[[nodiscard]] bool vaultKeepCaches() const { return _vaultKeepCaches.current(); }
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -455,6 +456,7 @@ public:
 	void setStrictDataFolder(bool val);
 	void setVeilDelay(int val);
 	void setVeilLock(bool val);
+	void setWipeAfterFailures(bool val);
 	void setVaultKeepCaches(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
@@ -745,6 +747,7 @@ private:
 	rpl::variable<bool> _strictDataFolder = false;
 	rpl::variable<int> _veilDelay = -1;
 	rpl::variable<bool> _veilLock = false;
+	rpl::variable<bool> _wipeAfterFailures = false;
 	rpl::variable<bool> _vaultKeepCaches = false;
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

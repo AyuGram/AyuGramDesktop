@@ -1362,6 +1362,7 @@ void Application::maybeLockByPasscode() {
 }
 
 void Application::unlockPasscode() {
+	Storage::Duress::ResetWrongPasswords();
 	clearPasscodeLock();
 	enumerateWindows([&](not_null<Window::Controller*> w) {
 		w->clearPasscodeLock();

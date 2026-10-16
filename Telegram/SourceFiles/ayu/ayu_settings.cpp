@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #include "ayu/ayu_settings.h"
 #include "core/data_folder.h"
+#include "storage/storage_duress.h"
 
 #include "lang_auto.h"
 #include "tray.h"
@@ -366,12 +367,17 @@ AyuSettings &AyuSettings::getInstance() {
 }
 
 void AyuSettings::load() {
+	auto &settings = getInstance();
+	const auto syncWithSidecar = [&] {
+		const auto sidecar = Core::DataFolder::readSidecar();
+		settings._wipeAfterFailures = sidecar.wipeAfterFailures;
+	};
+
 	std::ifstream file(getSettingsPath());
 	if (!file.good()) {
+		syncWithSidecar();
 		return;
 	}
-
-	auto &settings = getInstance();
 
 	try {
 		json p;
@@ -414,6 +420,7 @@ void AyuSettings::load() {
 		ghost._sendOfflinePacketAfterOnline = true;
 	}
 
+	syncWithSidecar();
 	settings.validate();
 }
 
@@ -429,6 +436,10 @@ void AyuSettings::save() {
 
 void AyuSettings::reset() {
 	getInstance() = AyuSettings();
+	auto sidecar = Core::DataFolder::readSidecar();
+	sidecar.wipeAfterFailures = false;
+	static_cast<void>(Core::DataFolder::writeSidecar(sidecar));
+	Storage::Duress::ResetWrongPasswords();
 	save();
 }
 
@@ -1110,6 +1121,18 @@ void AyuSettings::setVeilLock(bool val) {
 	save();
 }
 
+void AyuSettings::setWipeAfterFailures(bool val) {
+	if (_wipeAfterFailures.current() == val) return;
+	auto sidecar = Core::DataFolder::readSidecar();
+	sidecar.wipeAfterFailures = val;
+	if (!Core::DataFolder::writeSidecar(sidecar)) {
+		return;
+	}
+	Storage::Duress::ResetWrongPasswords();
+	_wipeAfterFailures = val;
+	save();
+}
+
 void AyuSettings::setVaultKeepCaches(bool val) {
 	if (_vaultKeepCaches.current() == val) return;
 	_vaultKeepCaches = val;
@@ -1218,6 +1241,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"strictDataFolder", s._strictDataFolder.current()},
 		{"veilDelaySeconds", s._veilDelay.current()},
 		{"veilLock", s._veilLock.current()},
+		{"wipeAfterFailures", s._wipeAfterFailures.current()},
 		{"vaultKeepCaches", s._vaultKeepCaches.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
@@ -1329,6 +1353,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._strictDataFolder = j.value("strictDataFolder", defaults._strictDataFolder.current());
 	s._veilDelay = std::clamp(j.value("veilDelaySeconds", defaults._veilDelay.current()), -1, 3600);
 	s._veilLock = j.value("veilLock", defaults._veilLock.current());
+	s._wipeAfterFailures = j.value("wipeAfterFailures", defaults._wipeAfterFailures.current());
 	s._vaultKeepCaches = j.value("vaultKeepCaches", defaults._vaultKeepCaches.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {

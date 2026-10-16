@@ -432,6 +432,15 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		},
 	});
 
+	builder.addSkip();
+	ayu.addSettingToggle({
+		.id = u"ayu/wipeAfterFailures"_q,
+		.title = rpl::single(QString("Wipe everything after 5 wrong passwords")),
+		.getter = &AyuSettings::wipeAfterFailures,
+		.setter = &AyuSettings::setWipeAfterFailures,
+		.keywords = { u"wipe"_q, u"duress"_q, u"wrong"_q, u"password"_q, u"attempts"_q },
+	});
+
 	if (Storage::Vault::Supported()) {
 		const auto vault = std::make_shared<rpl::variable<bool>>(
 			Storage::Vault::IsEnabled(cWorkingDir()));

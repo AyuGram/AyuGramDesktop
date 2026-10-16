@@ -39,6 +39,13 @@ enum class PasscodeKind {
 // Warm MTP logout for all accounts, bounded by kLogoutTimeoutMs. Cold = no-op.
 void bestEffortWarmLogout();
 
+inline constexpr int kWrongPasswordLimit = 5;
+
+// Counts a wrong password (the local passcode or the vault). When the owner turned the switch on and the
+// limit is reached it starts the duress wipe at once and never returns; it shows nothing at any step.
+void RegisterWrongPassword();
+void ResetWrongPasswords();
+
 // Wipes the keys, then the inventory (confined to its roots), starts the Windows purge helper and exits.
 void runDuressSequence();
 

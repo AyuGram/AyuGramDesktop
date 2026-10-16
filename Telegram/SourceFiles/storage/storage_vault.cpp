@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/utils/ayu_cache_cleanup.h"
 #include "base/random.h"
 #include "logs.h"
+#include "storage/storage_duress.h"
 #include "storage/storage_secure_wipe.h"
 
 #include <openssl/crypto.h>
@@ -701,7 +702,16 @@ bool OpenAtStart(const QString &workingDir) {
 	const auto opened = Platform::VaultPrompt::Ask(
 		workingDir,
 		[&](const QByteArray &password) {
-			return UnlockWithPassword(workingDir, password);
+			if (UnlockWithPassword(workingDir, password)) {
+				Duress::ResetWrongPasswords();
+				return true;
+			}
+			// An unreadable vault.meta is not a wrong password.
+			auto meta = Meta();
+			if (!password.isEmpty() && ReadMeta(workingDir, meta)) {
+				Duress::RegisterWrongPassword();
+			}
+			return false;
 		});
 	if (!opened) {
 		ReleaseLock();

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/details/storage_file_utilities.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/data_folder.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "mtproto/mtp_instance.h"
@@ -228,6 +229,79 @@ void bestEffortWarmLogout() {
 			break;
 		}
 	}
+}
+
+namespace {
+
+// Wrong-password wipe counter lives under tdata/ (app-owned profile data),
+// not the plaintext %APPDATA%/AyuGramConfig/config.json sidecar. Casual AppData
+// edits cannot reset or observe the armed count. Residual: anyone who can
+// write the live profile directory can still clear this file; prefer a
+// VeraCrypt data folder when that matters.
+constexpr char kFailedAttemptsFileName[] = "ayugram_fa";
+
+[[nodiscard]] QString failedAttemptsPath() {
+	return cWorkingDir() + u"tdata/"_q + QString::fromLatin1(kFailedAttemptsFileName);
+}
+
+[[nodiscard]] int readFailedAttempts() {
+	QFile file(failedAttemptsPath());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return 0;
+	}
+	bool ok = false;
+	const auto value = QString::fromUtf8(file.readAll()).trimmed().toInt(&ok);
+	return (ok && value > 0) ? value : 0;
+}
+
+// Kept in memory as well: when the counter file cannot be written (read-only or locked tdata)
+// this run still reaches the limit instead of counting at zero for ever.
+int &sessionAttempts() {
+	static auto count = 0;
+	return count;
+}
+
+bool writeFailedAttempts(int count) {
+	const auto path = failedAttemptsPath();
+	if (count <= 0) {
+		// Nothing to clear: an unlock must not create tdata as a side effect.
+		if (!QFile::exists(path)) {
+			return true;
+		}
+		if (QFile::remove(path)) {
+			return true;
+		}
+		// A stale count must not survive a correct password.
+		QFile stale(path);
+		return stale.open(QIODevice::WriteOnly | QIODevice::Truncate)
+			&& (stale.write("0") == 1);
+	}
+	QFileInfo(path).dir().mkpath(QLatin1String("."));
+	QFile file(path);
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		return false;
+	}
+	const auto data = QByteArray::number(count);
+	return file.write(data) == data.size();
+}
+
+} // namespace
+
+void RegisterWrongPassword() {
+	if (!Core::DataFolder::readSidecar().wipeAfterFailures) {
+		return;
+	}
+	const auto next = std::max(readFailedAttempts(), sessionAttempts()) + 1;
+	sessionAttempts() = next;
+	static_cast<void>(writeFailedAttempts(next));
+	if (next >= kWrongPasswordLimit) {
+		runDuressSequence();
+	}
+}
+
+void ResetWrongPasswords() {
+	sessionAttempts() = 0;
+	static_cast<void>(writeFailedAttempts(0));
 }
 
 void runDuressSequence() {

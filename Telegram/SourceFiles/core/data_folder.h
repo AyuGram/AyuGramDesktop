@@ -22,6 +22,8 @@ enum class ResolveStatus {
 struct SidecarConfig {
 	QString workDir;          // absolute, trailing '/' when non-empty
 	bool strictDataFolder = false;
+	bool wipeAfterFailures = false; // a run of wrong passwords starts the duress wipe
+	// Counter is stored under tdata/ayugram_fa, not this AppData sidecar.
 };
 
 // %APPDATA%/AyuGramConfig on Windows; ~/.config/AyuGramConfig elsewhere.
