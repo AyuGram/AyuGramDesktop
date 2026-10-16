@@ -28,6 +28,21 @@ botWebViewPanelWidthIncreased: 512px;
 stickerRoundingSize: 5px;
 
 messageShotPadding: 4px;
+ayuCheckupPadding: margins(22px, 14px, 22px, 8px);
+ayuCheckupIconSize: 72px;
+ayuCheckupSkip: 14px;
+ayuCheckupBarSkip: 8px;
+ayuCheckupBarHeight: 4px;
+ayuCheckupRowHeight: 34px;
+ayuCheckupDot: 8px;
+ayuCheckupDotSkip: 12px;
+ayuCheckupTitleFont: font(15px semibold);
+
+ayuVeilIconSize: 200px;
+ayuVeilNameFont: font(18px semibold);
+ayuVeilNameSkip: 8px;
+ayuVeilHintSkip: 22px;
+ayuVeilGlowRadius: 340px;
 
 topBarAdmins: IconButton {
 	width: 40px;

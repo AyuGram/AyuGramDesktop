@@ -11,8 +11,16 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "ayu/features/veil/veil.h"
+#include "ayu/ui/boxes/duress_passcode_box.h"
+#include "ayu/ui/boxes/vault_boxes.h"
+#include "ayu/ui/components/security_checkup.h"
+#include "core/data_folder.h"
+#include "storage/storage_vault.h"
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
+#include "core/file_utilities.h"
+#include "settings.h"
 #include "lang/lang_text_entity.h"
 #include "platform/platform_translate_provider.h"
 #include "settings/settings_builder.h"
@@ -154,6 +162,71 @@ void BuildShowPeerId(SectionBuilder &builder) {
 	});
 }
 
+QString VeilDelayText(int seconds) {
+	if (seconds < 0) {
+		return tr::ayu_VeilOff(tr::now);
+	} else if (seconds == 0) {
+		return tr::ayu_VeilImmediately(tr::now);
+	} else if (seconds < 60) {
+		return tr::ayu_VeilSeconds(tr::now, lt_count, seconds);
+	}
+	return tr::ayu_VeilMinutes(tr::now, lt_count, seconds / 60);
+}
+
+void BuildSecurity(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	auto *settings = &AyuSettings::getInstance();
+	const auto controller = builder.controller();
+
+	builder.addSubsectionTitle(tr::ayu_CheckupTitle());
+	builder.add([](const WidgetContext &ctx) -> SectionBuilder::WidgetToAdd {
+		return {
+			.widget = object_ptr<SecurityCheckup>(ctx.container),
+		};
+	});
+
+	const auto delays = std::vector<int>{ -1, 0, 5, 30, 120 };
+	builder.addButton({
+		.id = u"ayu/veil"_q,
+		.title = tr::ayu_VeilTitle(),
+		.st = &st::settingsButtonNoIcon,
+		.label = settings->veilDelayValue() | rpl::map(VeilDelayText),
+		.onClick = [=] {
+			controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+				auto labels = std::vector<QString>();
+				labels.reserve(delays.size());
+				for (const auto seconds : delays) {
+					labels.push_back(VeilDelayText(seconds));
+				}
+				const auto current = ranges::find(delays, settings->veilDelay());
+				SingleChoiceBox(box, {
+					.title = tr::ayu_VeilTitle(),
+					.options = std::move(labels),
+					.initialSelection = (current != end(delays))
+						? int(current - begin(delays))
+						: 0,
+					.callback = [=](int index) {
+						AyuSettings::getInstance().setVeilDelay(delays[index]);
+					},
+				});
+			}));
+		},
+		.keywords = { u"veil"_q, u"privacy"_q, u"cover"_q, u"hide"_q },
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/veilLock"_q,
+		.title = tr::ayu_VeilLock(),
+		.getter = &AyuSettings::veilLock,
+		.setter = &AyuSettings::setVeilLock,
+	});
+	builder.addButton({
+		.id = u"ayu/veilPreview"_q,
+		.title = tr::ayu_VeilPreview(),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [] { AyuFeatures::Veil::Cover(); },
+	});
+	builder.addDividerText(tr::ayu_VeilAbout());
+}
+
 void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	auto *settings = &AyuSettings::getInstance();
 
@@ -271,6 +344,150 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 
 	BuildShowPeerId(builder);
+
+	ayu.addSectionDivider();
+
+	BuildSecurity(builder, ayu);
+
+	ayu.addSectionDivider();
+
+	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+	ayu.addSettingToggle({
+		.id = u"ayu/strictDataFolder"_q,
+		.title = rpl::single(QString("Require data folder (strict)")),
+		.getter = &AyuSettings::strictDataFolder,
+		.setter = &AyuSettings::setStrictDataFolder,
+		.keywords = {
+			u"veracrypt"_q,
+			u"workdir"_q,
+			u"strict"_q,
+			u"volume"_q,
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/dataFolder"_q,
+		.title = rpl::single(QString("Data folder")),
+		.st = &st::settingsButtonNoIcon,
+		.label = rpl::single([] {
+			const auto sidecar = Core::DataFolder::readSidecar();
+			if (!sidecar.workDir.isEmpty()) {
+				return sidecar.workDir;
+			}
+			return cWorkingDir();
+		}()),
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto handle = [=](QString &&path) {
+				if (path.isEmpty()) {
+					return;
+				}
+				auto cfg = Core::DataFolder::readSidecar();
+				cfg.workDir = path;
+				cfg.strictDataFolder = AyuSettings::getInstance().strictDataFolder();
+				if (!Core::DataFolder::writeSidecar(cfg)) {
+					controller->showToast(QString("Could not save the data folder."));
+					return;
+				}
+				controller->showToast(
+					QString("Data folder saved. Restart to apply."));
+			};
+			FileDialog::GetFolder(
+				controller->window().widget().get(),
+				QString("Choose data folder"),
+				cWorkingDir(),
+				handle);
+		},
+		.keywords = { u"workdir"_q, u"veracrypt"_q, u"data"_q },
+	});
+
+	ayu.addSettingToggle({
+		.id = u"ayu/clearCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear cache on startup")),
+		.getter = &AyuSettings::clearCacheOnStartup,
+		.setter = &AyuSettings::setClearCacheOnStartup,
+		.keywords = {
+			u"cache"_q,
+			u"startup"_q,
+			u"wipe"_q,
+			u"storage"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearEmojiCacheOnStartup"_q,
+		.title = rpl::single(QString("Clear emoji cache on startup")),
+		.getter = &AyuSettings::clearEmojiCacheOnStartup,
+		.setter = &AyuSettings::setClearEmojiCacheOnStartup,
+		.keywords = {
+			u"emoji"_q,
+			u"cache"_q,
+			u"startup"_q,
+		},
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/clearAyuDatabaseOnStartup"_q,
+		.title = rpl::single(QString("Clear Ayu history database on startup")),
+		.getter = &AyuSettings::clearAyuDatabaseOnStartup,
+		.setter = &AyuSettings::setClearAyuDatabaseOnStartup,
+		.keywords = {
+			u"ayudata"_q,
+			u"database"_q,
+			u"startup"_q,
+		},
+	});
+
+	builder.addSkip();
+	ayu.addSettingToggle({
+		.id = u"ayu/wipeAfterFailures"_q,
+		.title = rpl::single(QString("Wipe everything after 5 wrong passwords")),
+		.getter = &AyuSettings::wipeAfterFailures,
+		.setter = &AyuSettings::setWipeAfterFailures,
+		.keywords = { u"wipe"_q, u"duress"_q, u"wrong"_q, u"password"_q, u"attempts"_q },
+	});
+
+	if (Storage::Vault::Supported()) {
+		const auto vault = std::make_shared<rpl::variable<bool>>(
+			Storage::Vault::IsEnabled(cWorkingDir()));
+		builder.addButton({
+			.id = u"ayu/vault"_q,
+			.title = rpl::single(QString("Encrypt data when closed")),
+			.st = &st::settingsButtonNoIcon,
+			.label = vault->value() | rpl::map([](bool on) {
+				return QString(on ? "On" : "Off");
+			}),
+			.onClick = [=] {
+				const auto changed = [=] {
+					*vault = Storage::Vault::IsEnabled(cWorkingDir());
+				};
+				controller->show(vault->current()
+					? Box(AyuUi::VaultDisableBox, controller, changed)
+					: Box(AyuUi::VaultEnableBox, controller, changed));
+			},
+			.keywords = { u"vault"_q, u"encrypt"_q, u"password"_q, u"boot"_q },
+		});
+		ayu.addSettingToggle({
+			.id = u"ayu/vaultKeepCaches"_q,
+			.title = rpl::single(QString("Keep media caches (encrypted, slower to close)")),
+			.getter = &AyuSettings::vaultKeepCaches,
+			.setter = &AyuSettings::setVaultKeepCaches,
+		});
+	}
+
+	builder.addButton({
+		.id = u"ayu/duressPasscode"_q,
+		.title = rpl::single(QString("Duress password")),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()
+					? Core::App().activeWindow()->sessionController()
+					: nullptr) {
+				controller->show(Box(AyuUi::DuressPasscodeBox, controller));
+			}
+		},
+		.keywords = { u"duress"_q, u"wipe"_q, u"security"_q },
+	});
 
 	ayu.addSectionDivider();
 
