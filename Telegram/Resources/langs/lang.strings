@@ -9191,3 +9191,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+
+"ayu_VeilTitle" = "Privacy veil";
+"ayu_VeilAbout" = "The veil covers your chats with a calm screen when this window loses focus. Click it or press a key to bring them back.";
+"ayu_VeilOff" = "Off";
+"ayu_VeilImmediately" = "Immediately";
+"ayu_VeilSeconds#one" = "After {count} second";
+"ayu_VeilSeconds#other" = "After {count} seconds";
+"ayu_VeilMinutes#one" = "After {count} minute";
+"ayu_VeilMinutes#other" = "After {count} minutes";
+"ayu_VeilLock" = "Lock with passcode when the veil appears";
+"ayu_VeilPreview" = "Show the veil now";
+"ayu_VeilHint" = "Click or press any key to reveal";
