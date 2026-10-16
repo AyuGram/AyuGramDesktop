@@ -22,6 +22,7 @@ enum class ResolveStatus {
 struct SidecarConfig {
 	QString workDir;          // absolute, trailing '/' when non-empty
 	bool strictDataFolder = false;
+	QString veracryptVolume;  // the volume file to mount at start when the data folder is missing
 };
 
 // %APPDATA%/AyuGramConfig on Windows; ~/.config/AyuGramConfig elsewhere.
@@ -39,6 +40,10 @@ struct SidecarConfig {
 // Apply sidecar when -workdir was not provided. Call after portable/default
 // workdir selection and before mkpath(tdata). May call cForceWorkingDir.
 [[nodiscard]] ResolveStatus applySidecarWorkDir(bool hasCliWorkDir);
+
+// Mounts the remembered VeraCrypt volume (it asks for its password in its own window)
+// and waits for the data folder to appear. Windows only; false when nothing was mounted.
+[[nodiscard]] bool tryAutoMount();
 
 [[nodiscard]] bool startupBlocked();
 void clearStartupBlocked();

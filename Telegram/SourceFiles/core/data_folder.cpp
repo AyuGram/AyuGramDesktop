@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QStandardPaths>
 
 #ifdef Q_OS_WIN
+#include "platform/win/veracrypt_mount_win.h"
 #include <windows.h>
 #endif // Q_OS_WIN
 
@@ -110,6 +111,8 @@ SidecarConfig readSidecar() {
 			}
 			config.strictDataFolder = obj.value(
 				QLatin1String("strictDataFolder")).toBool(false);
+			config.veracryptVolume = obj.value(
+				QLatin1String("veracryptVolume")).toString();
 		}
 	}
 
@@ -132,6 +135,9 @@ bool writeSidecar(const SidecarConfig &config) {
 		obj.insert(QLatin1String("workdir"), normalizeDir(config.workDir));
 	}
 	obj.insert(QLatin1String("strictDataFolder"), config.strictDataFolder);
+	if (!config.veracryptVolume.isEmpty()) {
+		obj.insert(QLatin1String("veracryptVolume"), config.veracryptVolume);
+	}
 	QSaveFile file(configSidecarPath());
 	if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
 		return false;
@@ -201,6 +207,42 @@ ResolveStatus applySidecarWorkDir(bool hasCliWorkDir) {
 	LOG(("DataFolder: sidecar workdir unavailable, strict off, keeping default: %1"
 		).arg(sidecar.workDir));
 	return ResolveStatus::SidecarUnavailable;
+}
+
+bool tryAutoMount() {
+#ifdef Q_OS_WIN
+	// Cap wait so a cancelled VeraCrypt password cannot stall log init for minutes.
+	constexpr auto kWaitMs = 20000;
+	constexpr auto kPollMs = 500;
+	const auto sidecar = readSidecar();
+	if (sidecar.workDir.isEmpty() || sidecar.veracryptVolume.isEmpty()) {
+		return false;
+	}
+	const auto native = QDir::toNativeSeparators(sidecar.workDir);
+	if (native.size() < 2
+		|| native.at(1) != QLatin1Char(':')
+		|| native.at(0).toUpper() < QLatin1Char('A')
+		|| native.at(0).toUpper() > QLatin1Char('Z')) {
+		return false;
+	}
+	const auto drive = native.left(1).toUpper();
+	const auto mount = Platform::VeraCrypt::mountVolume({
+		.volumePath = sidecar.veracryptVolume,
+		.driveLetter = drive,
+	});
+	if (!mount.ok) {
+		return false;
+	}
+	for (auto waited = 0; waited < kWaitMs; waited += kPollMs) {
+		if (isDataFolderRootAvailable(sidecar.workDir)) {
+			return true;
+		}
+		Sleep(kPollMs);
+	}
+	return false;
+#else // Q_OS_WIN
+	return false;
+#endif // !Q_OS_WIN
 }
 
 bool promptStrictUnavailable(const QString &workDir) {

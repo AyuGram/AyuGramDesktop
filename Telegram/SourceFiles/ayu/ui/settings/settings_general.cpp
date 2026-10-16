@@ -12,6 +12,9 @@
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "core/data_folder.h"
+#ifdef Q_OS_WIN
+#include "platform/win/veracrypt_mount_win.h"
+#endif
 #include "base/platform/base_platform_info.h"
 #include "core/application.h"
 #include "core/file_utilities.h"
@@ -278,6 +281,56 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	ayu.addSectionDivider();
 
 	builder.addSubsectionTitle(rpl::single(QString("Storage")));
+
+#ifdef Q_OS_WIN
+	builder.addButton({
+		.id = u"ayu/veracryptMount"_q,
+		.title = rpl::single(QString("Mount VeraCrypt volume")),
+		.st = &st::settingsButtonNoIcon,
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto exe = Platform::VeraCrypt::findExecutable();
+			if (exe.isEmpty()) {
+				controller->showToast(QString("VeraCrypt.exe not found"));
+				return;
+			}
+			FileDialog::GetOpenPath(
+				controller->window().widget().get(),
+				QString("Choose VeraCrypt volume"),
+				FileDialog::AllFilesFilter(),
+				[=](FileDialog::OpenResult &&result) {
+					if (result.paths.isEmpty()) {
+						return;
+					}
+					auto cfg = Core::DataFolder::readSidecar();
+					cfg.veracryptVolume = QDir::toNativeSeparators(result.paths.front());
+					if (!Core::DataFolder::writeSidecar(cfg)) {
+						controller->showToast(QString("Could not remember the volume."));
+					}
+					const auto native = QDir::toNativeSeparators(
+						cfg.workDir.isEmpty() ? cWorkingDir() : cfg.workDir);
+					if (native.size() < 2
+						|| native.at(1) != QLatin1Char(':')
+						|| native.at(0).toUpper() < QLatin1Char('A')
+						|| native.at(0).toUpper() > QLatin1Char('Z')) {
+						controller->showToast(
+							QString("Set a data folder with a drive letter first."));
+						return;
+					}
+					const auto drive = native.left(1).toUpper();
+					const auto mount = Platform::VeraCrypt::mountVolume({
+						.volumePath = result.paths.front(),
+						.driveLetter = drive,
+						.veracryptExe = exe,
+					});
+					controller->showToast(mount.message);
+				});
+		},
+		.keywords = { u"veracrypt"_q, u"mount"_q, u"volume"_q },
+	});
+#endif // Q_OS_WIN
 
 	ayu.addSettingToggle({
 		.id = u"ayu/strictDataFolder"_q,

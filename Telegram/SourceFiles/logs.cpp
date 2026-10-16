@@ -369,6 +369,11 @@ void start() {
 	if (!launcher.customWorkingDir()) {
 		using Core::DataFolder::ResolveStatus;
 		auto status = Core::DataFolder::applySidecarWorkDir(false);
+		if ((status == ResolveStatus::StrictUnavailable
+			|| status == ResolveStatus::SidecarUnavailable)
+			&& Core::DataFolder::tryAutoMount()) {
+			status = Core::DataFolder::applySidecarWorkDir(false);
+		}
 		while (status == ResolveStatus::StrictUnavailable
 			&& Core::DataFolder::promptStrictUnavailable(
 				Core::DataFolder::readSidecar().workDir)) {
