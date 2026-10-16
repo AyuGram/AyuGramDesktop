@@ -358,6 +358,7 @@ public:
 	[[nodiscard]] bool clearEmojiCacheOnStartup() const { return _clearEmojiCacheOnStartup.current(); }
 	[[nodiscard]] bool clearAyuDatabaseOnStartup() const { return _clearAyuDatabaseOnStartup.current(); }
 	[[nodiscard]] bool strictDataFolder() const { return _strictDataFolder.current(); }
+	[[nodiscard]] bool vaultKeepCaches() const { return _vaultKeepCaches.current(); }
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
 	void setSaveForBots(bool val);
@@ -448,6 +449,7 @@ public:
 	void setClearEmojiCacheOnStartup(bool val);
 	void setClearAyuDatabaseOnStartup(bool val);
 	void setStrictDataFolder(bool val);
+	void setVaultKeepCaches(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -631,6 +633,7 @@ public:
 	[[nodiscard]] rpl::producer<bool> clearAyuDatabaseOnStartupChanges() const { return _clearAyuDatabaseOnStartup.changes(); }
 	[[nodiscard]] rpl::producer<bool> strictDataFolderValue() const { return _strictDataFolder.value(); }
 	[[nodiscard]] rpl::producer<bool> strictDataFolderChanges() const { return _strictDataFolder.changes(); }
+	[[nodiscard]] rpl::producer<bool> vaultKeepCachesValue() const { return _vaultKeepCaches.value(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -732,6 +735,7 @@ private:
 	rpl::variable<bool> _clearEmojiCacheOnStartup = false;
 	rpl::variable<bool> _clearAyuDatabaseOnStartup = false;
 	rpl::variable<bool> _strictDataFolder = false;
+	rpl::variable<bool> _vaultKeepCaches = false;
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
 
