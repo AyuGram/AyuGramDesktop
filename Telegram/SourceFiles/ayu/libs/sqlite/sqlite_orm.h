@@ -17771,6 +17771,15 @@ namespace sqlite_orm {
             }
 
             /**
+             *  Undoes `open_forever`: the connection is closed as soon as nothing else uses it.
+             */
+            void close_forever() {
+                if (this->isOpenedForever) {
+                    this->isOpenedForever = false;
+                    this->connection->release();
+                }
+            }
+            /**
              * Create an application-defined scalar SQL function.
              * Can be called at any time no matter whether the database connection is opened or not.
              * 

@@ -354,6 +354,12 @@ public:
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
+	[[nodiscard]] bool clearCacheOnStartup() const { return _clearCacheOnStartup.current(); }
+	[[nodiscard]] bool clearEmojiCacheOnStartup() const { return _clearEmojiCacheOnStartup.current(); }
+	[[nodiscard]] bool clearAyuDatabaseOnStartup() const { return _clearAyuDatabaseOnStartup.current(); }
+	[[nodiscard]] bool strictDataFolder() const { return _strictDataFolder.current(); }
+	[[nodiscard]] bool wipeAfterFailures() const { return _wipeAfterFailures.current(); }
+	[[nodiscard]] bool vaultKeepCaches() const { return _vaultKeepCaches.current(); }
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
 	void setSaveForBots(bool val);
@@ -440,6 +446,12 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setClearCacheOnStartup(bool val);
+	void setClearEmojiCacheOnStartup(bool val);
+	void setClearAyuDatabaseOnStartup(bool val);
+	void setStrictDataFolder(bool val);
+	void setWipeAfterFailures(bool val);
+	void setVaultKeepCaches(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -615,6 +627,15 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearCacheOnStartupValue() const { return _clearCacheOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearCacheOnStartupChanges() const { return _clearCacheOnStartup.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearEmojiCacheOnStartupValue() const { return _clearEmojiCacheOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearEmojiCacheOnStartupChanges() const { return _clearEmojiCacheOnStartup.changes(); }
+	[[nodiscard]] rpl::producer<bool> clearAyuDatabaseOnStartupValue() const { return _clearAyuDatabaseOnStartup.value(); }
+	[[nodiscard]] rpl::producer<bool> clearAyuDatabaseOnStartupChanges() const { return _clearAyuDatabaseOnStartup.changes(); }
+	[[nodiscard]] rpl::producer<bool> strictDataFolderValue() const { return _strictDataFolder.value(); }
+	[[nodiscard]] rpl::producer<bool> strictDataFolderChanges() const { return _strictDataFolder.changes(); }
+	[[nodiscard]] rpl::producer<bool> vaultKeepCachesValue() const { return _vaultKeepCaches.value(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -712,6 +733,12 @@ private:
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
 
+	rpl::variable<bool> _clearCacheOnStartup = false;
+	rpl::variable<bool> _clearEmojiCacheOnStartup = false;
+	rpl::variable<bool> _clearAyuDatabaseOnStartup = false;
+	rpl::variable<bool> _strictDataFolder = false;
+	rpl::variable<bool> _wipeAfterFailures = false;
+	rpl::variable<bool> _vaultKeepCaches = false;
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
 
