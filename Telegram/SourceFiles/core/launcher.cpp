@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/launcher.h"
 
+#include "core/data_folder.h"
+
 #include "platform/platform_launcher.h"
 #include "platform/platform_specific.h"
 #include "base/options.h"
@@ -395,6 +397,10 @@ int Launcher::exec() {
 
 	// Must be started before Platform is started.
 	Logs::start();
+	// Strict data folder missing and the user cancelled: never fall back to a default profile.
+	if (Core::DataFolder::startupBlocked()) {
+		return 1;
+	}
 	base::options::init(cWorkingDir() + "tdata/experimental_options.json");
 
 	// Must be called after options are inited.
