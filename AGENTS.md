@@ -1,84 +1,10 @@
-# Agent Guide for Telegram Desktop
+# Agent Guide for AyuGram Desktop
 
-This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
+This guide defines repository-wide instructions for coding agents working with the AyuGram Desktop (Telegram Desktop fork) codebase.
 
 Avoid building the project.
 
 If you're asked to create a Pull Request, then clearly state in PR description that it was AI generated.
-
-## AI Tasks
-
-In this repository "task" is a specific term. It always means one work record in
-the sibling `ai-tdesktop` repository, never a `TODO` comment, a checklist item,
-or a unit of work invented during the current conversation. "The tasks", "the
-queue", "the board", "what's most pressing", and a bare task slug all refer to
-that queue.
-
-- The queue lives in `../ai-tdesktop`, a sibling of this checkout, with one
-  record per directory under `tasks/YYYY/MM/DD/<slug>/`. A task id is that dated
-  path, for example `2026/07/18/fix-community-forward`, and it is the only
-  durable link between a source commit and its task. Linked slot worktrees live
-  in `../ai-tdesktop-worktrees`. Read `../ai-tdesktop/AGENTS.md` before doing
-  anything inside that repository.
-- Each record holds `task.md` — one `# ` title line, then one self-contained
-  paragraph that is the task's description wherever it is summarized — and
-  `state.yaml` with `status`, `type`, `depends_on`, `claimed_by`, and dates.
-  Open statuses are `todo`, `in-progress`, `blocked`, and `split-required`;
-  `approved` is completed history, and `split.yaml` / `superseded.yaml` mark
-  retired records.
-- To browse the queue, read those files directly. Do not run `python3 ai.py`: it
-  is a full-screen browser for the user's own terminal and refuses to run in a
-  pipe. A compact open listing:
-
-```bash
-cd ../ai-tdesktop && for state in tasks/*/*/*/*/state.yaml; do
-  status=$(sed -n 's/^status: //p' "$state")
-  case "$status" in todo|in-progress|blocked|split-required)
-    dir=$(dirname "$state")
-    printf '%-14s %-70s %s\n' "$status" "${dir#tasks/}" \
-      "$(sed -n '1s/^# //p' "$dir/task.md")";;
-  esac
-done | sort
-```
-
-- When ranking open work by urgency, use `in-progress`, then `blocked`, then
-  `split-required`, then ready `todo` (no `claimed_by`, and every `depends_on`
-  already `approved`), then `todo` still waiting on a dependency. Say who owns
-  claimed work. This checkout's tag is the `Telegram/build/ai-machine-tag` value
-  plus the checkout folder name, such as `macbook-tdesktop`, and work claimed by
-  another checkout is never taken over without an explicit human reassignment.
-- Browsing is read-only. Listing, summarizing, comparing, or recommending tasks
-  never edits `state.yaml`, publishes a lifecycle commit, or starts
-  implementation, no matter how small the task looks.
-- Acting on tasks goes through the workflow skills instead of by hand:
-  `perform-task <slug or full id>` starts or resumes and performs exactly one
-  known task, `continue` processes the inbox and drains eligible shared work,
-  and new requests are written to the ignored `../ai-tdesktop/inbox/inbox.md`
-  and routed by `process-inbox`. Source commits owned by a task use the
-  three-line form described under `## Commits`.
-- Never guess between similarly named tasks. Report the matching full ids and
-  let the user choose.
-
-## Working from Codex on Windows + WSL
-
-This checkout may be opened in Codex Desktop through the Windows UNC path `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop`, while the real Linux path is `/home/{user}/Telegram/tdesktop`. Treat it as a WSL/Linux checkout first, not as a native Windows checkout.
-
-- Prefer running repository-aware commands through WSL:
-
-```powershell
-wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- <command>
-```
-
-- PowerShell can read and write files through the UNC path, but native Windows tools may see different ownership, path, executable, or line-ending behavior than Linux tools.
-- Git from PowerShell over `\\wsl.localhost\...` can fail with `detected dubious ownership`. Use WSL Git instead. Do not change global Git `safe.directory` settings unless the user explicitly asks for that.
-- Keep path styles matched to the shell. Use `/home/{user}/Telegram/tdesktop/...` with WSL commands, and quoted `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop\...` paths with native Windows commands. Avoid passing UNC paths to Linux tools or Linux paths to native Windows tools unless the tool explicitly supports them.
-- If a command behaves strangely from the PowerShell UNC working directory, retry the same command through `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- ...` before concluding the repository or command is broken.
-- Recursive searches and repo inspection are usually faster and more faithful through WSL, for example `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- rg ...`.
-- Do not assume the WSL host has the build toolchain installed directly. In this setup, WSL may not have `cmake`, while Windows may have `cmake`, and the configured `out/` tree may still target the Linux Docker toolchain. Do not run native Windows `cmake --build out` against a Linux/Docker build tree.
-- For WSL/Linux builds, use the Docker build entry point from the repository root: `Telegram/build/docker/centos_env/build_debug.sh`. The Docker daemon must be reachable from WSL; checking `docker info` is fine, but do not start a build unless the user asked for one.
-- Existing build outputs may be Linux binaries, for example `out/Debug/Telegram` as an ELF executable, not `Telegram.exe`. Verify the build tree before assuming which platform produced it.
-- Be careful with text file line endings. In a WSL/Linux checkout, files should remain LF-only unless the file already uses another convention. CRLF finishing applies only to native, non-WSL Windows runs/checkouts. Do not let PowerShell or Windows tools silently rewrite WSL files to CRLF. If a file becomes mixed, normalize it back to the convention appropriate for the current checkout, without adding a UTF-8 BOM.
-- When using the local `perform-task` skill from this WSL checkout, keep external AI task artifacts and edited project text files LF-only. Treat its Windows text-normalization phase as not applicable to WSL, except to record that line endings were checked and kept LF/no-BOM. Run CRLF normalization only in a native, non-WSL Windows checkout.
 
 ## Build System Structure
 
@@ -177,8 +103,8 @@ older `kKeysCount`. The characteristic failure is:
   `Lang::Instance::applyValue()`, `fillFromSerialized()`, and
   `Local::readLangPack()`.
 
-If this exact startup failure repeats twice, do not change the implementation,
-test overlay, or portable account. Stop only this checkout's exact Telegram
+If this exact startup failure repeats twice, do not change the implementation
+or portable account. Stop only this checkout's exact Telegram
 process. Because Xcode's `CONFIGURATION_BUILD_DIR` is `out/Debug`, make a
 safety copy of every existing portable folder outside `out/` before cleaning:
 
@@ -212,16 +138,7 @@ diagnosis or report the blocker. Do not loop clean rebuilds.
 
 ### Build output locks
 
-For builds owned by the autonomous `continue` / `perform-task` workflow, read
-and follow `.agents/shared/build-lock-recovery.md`. PDB, EXE, OBJ, and other
-build-output lock errors are recoverable: stop only the exact checkout
-executable or verified build-tree holders, delete only exact named artifacts
-inside that checkout's build tree, and retry within the bounded recovery
-budget. Never stop an installed Telegram client, another checkout, an IDE, or
-an unknown process.
-
-Outside that autonomous workflow, an exact checkout executable may be running
-because the user is testing it. Do not terminate it or delete locked build
+An exact checkout executable may be running because the user is testing it. Do not terminate it or delete locked build
 outputs without explicit permission. Report the exact locked path and ask the
 user to close that checkout's Telegram/debugger before rebuilding.
 
@@ -233,18 +150,17 @@ user to close that checkout's Telegram/debugger before rebuilding.
 ## Debug-Only Code
 
 Production translation units stay free of debug machinery. The permanent test
-harness lives in `Telegram/SourceFiles/test/`, and the disposable `-testagent`
-overlay owns per-task instrumentation; production code carries at most a thin
-single-call seam (a `Test::Fire()`-style waitpoint or a live-object
+harness lives in `Telegram/SourceFiles/test/`; production code carries at most
+a thin single-call seam (a `Test::Fire()`-style waitpoint or a live-object
 publication at a construction seam).
 
 - Do not add `#ifdef _DEBUG` blocks, debug-only types, debug state, mutexes,
   counters, or observation structs to production headers or sources. When a
   behavior cannot be observed without such machinery, that is a harness gap:
-  extend the `test/` helpers or the overlay instead.
+  extend the `test/` helpers instead.
 - Never commit debugging machinery interleaved with working code in the same
   translation unit. A permanent helper belongs under `test/`; a temporary one
-  belongs in the overlay and is never retained.
+  is never retained.
 - Exceptions exist — a few `#ifdef _DEBUG` hooks are deliberately kept in
   production files — but they are exceptions and each new one needs a solid,
   stated reason. "The test needed it" is not one.
@@ -258,29 +174,8 @@ publication at a construction seam).
 ## Commits
 
 - Subject: one concise, plain-language line summarizing the change, ~50-60 characters, matching the style of recent `git log` subjects. This is usually the entire message.
-- Decide the `[ai] ` prefix separately for each commit. Use it only when every
-  retained change in that commit, and the commit's purpose, are exclusively
-  about the AI workflow: the agent harness, skills, prompts, custom commands,
-  agent documentation, or AI testing infrastructure. Typical qualifying paths
-  include `Telegram/SourceFiles/test/`, `.agents/`, `.claude/`, `.grok/`,
-  `AGENTS.md`, `CLAUDE.md`, and `GROK.md`, but paths alone do not decide the
-  prefix. Product-specific test seams, app code, and build-system integration do
-  not qualify merely because agents use them for verification. Split mixed
-  workflow and product work into separate commits when practical; otherwise the
-  mixed commit must not use `[ai] `. Do not count the disposable test overlay or
-  external AI task artifacts. Every other commit must not contain `[ai]`
-  anywhere.
-- The `[ai] ` prefix marks the commit's scope, never its authorship. It does
-  not mean "authored by an AI": an AI-authored product fix takes a plain
-  subject, and a workflow-only commit takes the prefix no matter who wrote it.
-- For ordinary work not associated with an AI task, add a short plain-language body only when the subject can't carry it (what was done, not the technical how) — a line or two at most.
+- Add a short plain-language body only when the subject can't carry it (what was done, not the technical how) — a line or two at most.
 - Never add a `Co-Authored-By:` line or any tool/assistant attribution trailer.
-- Never add `Autotask:`/attempt or other internal run markers. A commit owned by
-  an `ai-tdesktop` task has exactly three lines: the concise subject, a blank
-  line, and `Task: <task-id>`. Do not add a body. Keep rationale and
-  implementation notes out of the commit message; put a short durable note
-  under `tasks/<task-id>.md` only when useful. Do not copy commit hashes into
-  that note or any AI task artifact; the task id is the cross-repository link.
 
 ## Local Storage Serialization
 
@@ -322,6 +217,28 @@ _limit = kDefaultLimit; // the server rejects anything larger
 // WHY: the server sends the id before the peer exists, so the row is
 // created empty and filled on the next update, or the list flickers
 // on every reconnect.
+```
+
+**AyuGram includes in upstream files:**
+
+When an upstream (Telegram Desktop) file needs an extra include for AyuGram
+code, never mix it into the upstream include list. Put all such includes in a
+separate block after the last upstream include, headed by `// AyuGram includes`,
+with one empty line before the marker and two empty lines after the block.
+If the file already has this block, append to it instead of creating another.
+Files under `Telegram/SourceFiles/ayu/` don't need the marker.
+
+```cpp
+#include "storage/file_upload.h"
+#include "storage/storage_account.h"
+
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+#include "window/window_controller.h"
+
+
+namespace {
 ```
 
 **Style and formatting rules** are in `REVIEW.md` — see that file for empty-line-before-closing-brace, operator placement in multi-line expressions, if-with-initializer, and other mechanical style rules.
