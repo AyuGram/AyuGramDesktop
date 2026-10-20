@@ -207,11 +207,18 @@ private:
 
 	void requestMessagesCount(int localSplitIndex);
 	void checkFirstMessageDate(int localSplitIndex, int count);
+	void requestMessagesCountInRange(int localSplitIndex, int count);
+	void requestMessagesCountSince(
+		int localSplitIndex,
+		TimeId date,
+		int unboundedCount,
+		Fn<void(std::optional<int>)> done);
 	void messagesCountLoaded(int localSplitIndex, int count);
 	void requestMessagesSlice();
 	void requestChatMessages(
 		int splitIndex,
 		int offsetId,
+		TimeId offsetDate,
 		int addOffset,
 		int limit,
 		FnMut<void(MTPmessages_Messages&&)> done);
@@ -223,8 +230,14 @@ private:
 		int32 rawId,
 		const MTPmessages_Messages &result);
 	void requestTopicMessagesSlice();
+	void requestTopicMessagesCountInRange(int count, Fn<void(int)> done);
+	void requestTopicMessagesCountSince(
+		TimeId date,
+		int unboundedCount,
+		Fn<void(std::optional<int>)> done);
 	void requestTopicReplies(
 		int offsetId,
+		TimeId offsetDate,
 		int addOffset,
 		int limit,
 		FnMut<void(MTPmessages_Messages&&)> done);

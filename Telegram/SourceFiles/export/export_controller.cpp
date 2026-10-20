@@ -29,6 +29,14 @@ Settings NormalizeSettings(const Settings &settings) {
 	return result;
 }
 
+int CountMessagesInRange(
+		const Data::MessagesSlice &slice,
+		const Settings &settings) {
+	return int(ranges::count_if(slice.list, [&](const Data::Message &m) {
+		return !Data::SkipMessageByDate(m, settings);
+	}));
+}
+
 } // namespace
 
 class ControllerObject {
@@ -605,7 +613,7 @@ void ControllerObject::exportNextDialog() {
 			if (ioCatchError(_writer->writeDialogSlice(result))) {
 				return false;
 			}
-			_messagesWritten += result.list.size();
+			_messagesWritten += CountMessagesInRange(result, _settings);
 			setState(stateDialogs(DownloadProgress()));
 			return true;
 		}, [=] {
@@ -790,7 +798,7 @@ void ControllerObject::exportTopic() {
 			if (ioCatchError(_writer->writeDialogSlice(slice))) {
 				return false;
 			}
-			_messagesWritten += slice.list.size();
+			_messagesWritten += CountMessagesInRange(slice, _settings);
 			setState(stateTopic(DownloadProgress()));
 			return true;
 		},
