@@ -154,7 +154,7 @@ rpl::producer<bool> SetupSavedMusic(
 			};
 
 			if (divider->entity()->count() > 0) {
-				const auto first = divider->entity()->widgetAt(0);
+				const auto first = divider->entity()->widgetAt(0).get();
 				auto *existing = dynamic_cast<Profile::AyuMusicButton*>(first);
 				if (!existing) {
 					if (const auto wrap = dynamic_cast<Ui::SlideWrap<Profile::AyuMusicButton>*>(first)) {
@@ -176,11 +176,7 @@ rpl::producer<bool> SetupSavedMusic(
 				}
 			}
 
-			while (divider->entity()->count()) {
-				const auto widget = divider->entity()->widgetAt(0);
-				divider->entity()->removeWidget(widget);
-				widget->deleteLater();
-			}
+			divider->entity()->clear();
 
 			auto musicButton = divider->entity()->add(object_ptr<Ui::SlideWrap<Profile::AyuMusicButton>>(
 				divider->entity(),
@@ -249,11 +245,7 @@ rpl::producer<bool> SetupSavedMusic(
 
 			shown = true;
 		} else {
-			while (divider->entity()->count()) {
-				const auto widget = divider->entity()->widgetAt(0);
-				divider->entity()->removeWidget(widget);
-				widget->deleteLater();
-			}
+			divider->entity()->clear();
 		}
 
 		if (!shown && state->savedItem) {
