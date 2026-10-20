@@ -51,10 +51,7 @@ void resetShotConfig() {
 	config = nullptr;
 }
 
-std::optional<ShotConfig> getShotConfig() {
-	if (!config) {
-		return std::nullopt;
-	}
+ShotConfig getShotConfig() {
 	return *config;
 }
 
