@@ -76,7 +76,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QBuffer>
 
 // AyuGram includes
+#include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_userpic.h"
+#include "ayu/ui/boxes/now_playing_box.h"
+#include "ayu/utils/now_playing_client.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_info.h"
 
@@ -519,6 +522,43 @@ void SetupBirthday(
 			tr::marked)));
 }
 
+void SetupScrobbling(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Window::SessionController*> controller) {
+	const auto bareId = getBareID(controller->session().user());
+	if (!isExteraPeer(bareId) && !isSupporterPeer(bareId) && !isCustomBadgePeer(bareId)) {
+		return;
+	}
+
+	Ayu::NowPlaying::FetchProfile(bareId, [](NowPlayingServiceType service, const QString &username) {
+		AyuSettings::getInstance().setNowPlayingService(service);
+		AyuSettings::getInstance().setNowPlayingUsername(username);
+	});
+
+	const auto scrobblingValue = AyuSettings::getInstance().nowPlayingServiceValue(
+	) | rpl::map([](NowPlayingServiceType service) {
+		switch (service) {
+		case NowPlayingServiceType::LastFm:
+			return TextWithEntities{ tr::ayu_ScrobblingLastFm(tr::now) };
+		case NowPlayingServiceType::StatsFm:
+			return TextWithEntities{ tr::ayu_ScrobblingStatsFm(tr::now) };
+		case NowPlayingServiceType::None:
+		default:
+			return TextWithEntities{ tr::ayu_ScrobblingNone(tr::now) };
+		}
+	});
+
+	AddRow(
+		container,
+		tr::ayu_ScrobblingService(),
+		std::move(scrobblingValue),
+		tr::lng_mediaview_copy(tr::now),
+		[=] {
+			controller->show(Box(Ui::SetupNowPlayingBox, controller));
+		},
+		{ &st::menuIconSoundSelect });
+}
+
 void SetupChatAutomation(
 		not_null<Ui::VerticalLayout*> container,
 		not_null<Window::SessionController*> controller,
@@ -587,8 +627,6 @@ void SetupPersonalChannel(
 		not_null<Window::SessionController*> controller,
 		not_null<UserData*> self,
 		InformationHighlightTargets *targets) {
-	Ui::AddSkip(container);
-
 	auto value = rpl::combine(
 		Info::Profile::PersonalChannelValue(self),
 		tr::lng_settings_channel_add()
@@ -1393,6 +1431,8 @@ void Information::setupContent() {
 		SetupPhoto(container, controller, self, &targets);
 		SetupBio(container, self, &targets);
 		SetupRows(container, controller, self, &targets);
+		Ui::AddSkip(container);
+		SetupScrobbling(container, controller);
 		SetupPersonalChannel(container, controller, self, &targets);
 		SetupBirthday(container, controller, self, &targets);
 		SetupAccountsWrap(container, controller, &targets);

@@ -18,6 +18,8 @@ namespace Api {
 struct SendOptions;
 }
 
+enum class NowPlayingServiceType;
+
 using UsernameResolverCallback = Fn<void(const QString &, PeerData *)>;
 
 class TimedCountDownLatch
@@ -132,3 +134,9 @@ void applyGhostScheduling(
 	Api::SendAction &action,
 	const QString &text = QString(),
 	int delaySeconds = 12);
+
+void updateNowPlayingService(
+	not_null<Main::Session*> session,
+	NowPlayingServiceType service,
+	const QString &username,
+	Fn<void(bool)> callback);

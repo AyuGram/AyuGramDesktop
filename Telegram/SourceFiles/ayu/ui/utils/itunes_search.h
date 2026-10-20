@@ -6,13 +6,26 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
+#include <QtGui/QImage>
 #include <QtGui/QPixmap>
 
 namespace Ayu::Ui::Itunes {
 
-QPixmap FetchCover(const QString &performer,
-                   const QString &title,
-                   int sizeHintPx = 300,
-                   int timeoutMs = 5000);
+struct TrackInfo {
+	QImage cover;
+	QString album;
+};
+
+TrackInfo FetchTrackInfo(
+	const QString &performer,
+	const QString &title,
+	int sizeHintPx = 300,
+	int timeoutMs = 5000);
+
+QPixmap FetchCover(
+	const QString &performer,
+	const QString &title,
+	int sizeHintPx = 300,
+	int timeoutMs = 5000);
 
 }

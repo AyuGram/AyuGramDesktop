@@ -203,7 +203,6 @@ void MessageShotBox::setupContent() {
 		}
 	}
 
-	const auto firstPreviewLatch = std::make_shared<TimedCountDownLatch>(1);
 	const auto generation = content->lifetime().make_state<int>(0);
 	const auto weak = base::make_weak(this);
 
@@ -218,8 +217,9 @@ void MessageShotBox::setupContent() {
 
 			if (final || imageView->getImage().isNull()) {
 				imageView->setImage(image);
+				const auto boxWidth = image.width() / style::DevicePixelRatio() + (st::boxPadding.left() + st::boxPadding.right()) * 4;
+				setDimensionsToContent(boxWidth, content);
 			}
-			firstPreviewLatch->countDown();
 		});
 	};
 
@@ -423,9 +423,6 @@ void MessageShotBox::setupContent() {
 			  });
 
 	updatePreview();
-	firstPreviewLatch->await(std::chrono::seconds(1));
-
-	const auto boxWidth = imageView->getImage().width() / style::DevicePixelRatio() + (st::boxPadding.left() + st::boxPadding.right()) * 4;
 
 	boxClosing() | rpl::on_next(
 		[=]
@@ -438,7 +435,7 @@ void MessageShotBox::setupContent() {
 		},
 		content->lifetime());
 
-	setDimensionsToContent(boxWidth, content);
+	setDimensionsToContent(st::boxWideWidth, content);
 
 	scrollToWidget(latestToggle);
 }

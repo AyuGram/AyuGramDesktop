@@ -10,6 +10,12 @@
 #include <qjsondocument.h>
 #include <QTimer>
 
+#include "core/application.h"
+#include "main/main_session.h"
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/now_playing_client.h"
+#include "ayu/utils/telegram_helpers.h" 
+
 namespace {
 
 constexpr auto kPrimaryUrl = "https://update.ayugram.one/rc/current/desktop2";
@@ -209,6 +215,18 @@ bool RCManager::applyResponse(const QByteArray &response) {
 
 	LOG(("RCManager: Loaded %1 developers, %2 official channels"
 	).arg(_developers.size()).arg(_officialChannels.size()));
+
+	if (Core::IsAppLaunched()) {
+		if (const auto session = Core::App().maybePrimarySession()) {
+			const auto id = session->userId().bare;
+			if (isExteraPeer(id) || isSupporterPeer(id) || isCustomBadgePeer(id)) {
+				Ayu::NowPlaying::FetchProfile(id, [](NowPlayingServiceType service, const QString &username) {
+					AyuSettings::getInstance().setNowPlayingService(service);
+					AyuSettings::getInstance().setNowPlayingUsername(username);
+				});
+			}
+		}
+	}
 
 	return true;
 }

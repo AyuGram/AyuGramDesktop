@@ -132,6 +132,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/utils/now_playing_client.h"
+#include "ayu/utils/telegram_helpers.h" 
 
 
 namespace Window {
@@ -1622,6 +1624,14 @@ SessionController::SessionController(
 				ShowCommunityAdminBox(this, community);
 			});
 		}, _lifetime);
+	}
+
+	const auto npUserId = session->userId().bare;
+	if (isExteraPeer(npUserId) || isSupporterPeer(npUserId) || isCustomBadgePeer(npUserId)) {
+		Ayu::NowPlaying::FetchProfile(npUserId, [](NowPlayingServiceType service, const QString &username) {
+			AyuSettings::getInstance().setNowPlayingService(service);
+			AyuSettings::getInstance().setNowPlayingUsername(username);
+		});
 	}
 
 	_authedName = session->user()->name();

@@ -229,9 +229,13 @@ PeerData *LoadedPeerFromDialogId(not_null<Data::Session*> data, ID dialogId) {
 
 void ResolveFilterBackupPeers(const std::vector<QString> &peerHints) {
 	auto session = currentSession();
+	if (!session) {
+		return;
+	}
+	const auto userId = session->userId();
 	auto hintsCopy = peerHints;
 
-	crl::async([=]
+	crl::async([hintsCopy = std::move(hintsCopy), userId]
 	{
 		for (const auto &entry : hintsCopy) {
 			const auto hint = ParsePeerResolveHint(entry);
@@ -251,20 +255,25 @@ void ResolveFilterBackupPeers(const std::vector<QString> &peerHints) {
 
 			crl::on_main([=]
 			{
+				const auto current = currentSession();
+				if (!current || current->userId() != userId) {
+					latch->countDown();
+					return;
+				}
 				if (hint->type == PeerResolveHintType::Username) {
-					session->api().request(MTPcontacts_ResolveUsername(
+					current->api().request(MTPcontacts_ResolveUsername(
 						MTP_flags(0),
 						MTP_string(hint->value),
 						MTP_string()
 					)).done([=](const MTPcontacts_ResolvedPeer &result)
 					{
 						const auto &data = result.data();
-						session->data().processUsers(data.vusers());
-						session->data().processChats(data.vchats());
+						current->data().processUsers(data.vusers());
+						current->data().processChats(data.vchats());
 						latch->countDown();
 					}).fail(onFail).send();
 				} else {
-					session->api().checkChatInvite(
+					current->api().checkChatInvite(
 						hint->value,
 						[=](const MTPChatInvite &invite)
 						{
@@ -272,10 +281,10 @@ void ResolveFilterBackupPeers(const std::vector<QString> &peerHints) {
 							{
 							}, [=](const MTPDchatInviteAlready &data)
 							{
-								session->data().processChat(data.vchat());
+								current->data().processChat(data.vchat());
 							}, [=](const MTPDchatInvitePeek &data)
 							{
-								session->data().processChat(data.vchat());
+								current->data().processChat(data.vchat());
 							});
 							latch->countDown();
 						},

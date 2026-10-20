@@ -82,6 +82,19 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
 	{SendWithoutSoundOption::Always, 2},
 })
 
+enum class NowPlayingServiceType {
+	None = 0,
+	LastFm = 1,
+	StatsFm = 2,
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(NowPlayingServiceType, {
+	{NowPlayingServiceType::None, 0},
+	{NowPlayingServiceType::LastFm, 1},
+	{NowPlayingServiceType::StatsFm, 2},
+})
+
+
 class GhostModeAccountSettings {
 public:
 	GhostModeAccountSettings();
@@ -353,6 +366,8 @@ public:
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] NowPlayingServiceType nowPlayingService() const { return _nowPlayingService.current(); }
+	[[nodiscard]] const QString &nowPlayingUsername() const { return _nowPlayingUsername.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -440,6 +455,8 @@ public:
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
+	void setNowPlayingService(NowPlayingServiceType val);
+	void setNowPlayingUsername(const QString &val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -615,6 +632,10 @@ public:
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
+	[[nodiscard]] rpl::producer<NowPlayingServiceType> nowPlayingServiceValue() const { return _nowPlayingService.value(); }
+	[[nodiscard]] rpl::producer<NowPlayingServiceType> nowPlayingServiceChanges() const { return _nowPlayingService.changes(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingUsernameValue() const { return _nowPlayingUsername.value(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingUsernameChanges() const { return _nowPlayingUsername.changes(); }
 
 	friend void to_json(nlohmann::json &j, const AyuSettings &s);
 	friend void from_json(const nlohmann::json &j, AyuSettings &s);
@@ -711,6 +732,8 @@ private:
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<NowPlayingServiceType> _nowPlayingService = NowPlayingServiceType::None;
+	rpl::variable<QString> _nowPlayingUsername;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

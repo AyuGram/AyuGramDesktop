@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #pragma once
 
+#include <optional>
 #include "ayu/features/message_shot/message_shot_theme_state.h"
 #include "history/view/history_view_list_widget.h"
 #include "ui/chat/chat_style.h"
@@ -31,7 +32,7 @@ enum RenderPart
 
 void setShotConfig(ShotConfig &config);
 void resetShotConfig();
-ShotConfig getShotConfig();
+std::optional<ShotConfig> getShotConfig();
 
 bool ignoreRender(RenderPart part);
 bool isTakingShot();

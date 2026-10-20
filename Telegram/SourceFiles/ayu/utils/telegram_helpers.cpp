@@ -6,6 +6,8 @@
 // Copyright @Radolyn, 2026
 #include "ayu/utils/telegram_helpers.h"
 
+#include <QtCore/QRegularExpression>
+
 #include "apiwrap.h"
 #include "lang_auto.h"
 #include "api/api_common.h"
@@ -1606,4 +1608,87 @@ void applyGhostScheduling(
 		return;
 	}
 	applyGhostScheduling(session, action.options, delaySeconds);
+}
+
+void updateNowPlayingService(
+		not_null<Main::Session*> session,
+		NowPlayingServiceType service,
+		const QString &username,
+		Fn<void(bool)> callback) {
+	static const auto kValidUsername = QRegularExpression(u"^[a-zA-Z0-9_\\-]{1,64}$"_q);
+	const auto cleanUsername = username.trimmed();
+	if (service != NowPlayingServiceType::None && !kValidUsername.match(cleanUsername).hasMatch()) {
+		callback(false);
+		return;
+	}
+
+	QString query;
+	if (service == NowPlayingServiceType::None) {
+		query = u"clear_now_playing"_q;
+	} else if (service == NowPlayingServiceType::LastFm) {
+		query = u"set_now_playing LAST_FM "_q + cleanUsername;
+	} else if (service == NowPlayingServiceType::StatsFm) {
+		query = u"set_now_playing STATS_FM "_q + cleanUsername;
+	} else {
+		callback(false);
+		return;
+	}
+
+	const auto sendQuery = [=](not_null<UserData*> bot) {
+		session->api().request(MTPmessages_GetInlineBotResults(
+			MTP_flags(0),
+			bot->inputUser(),
+			MTP_inputPeerEmpty(),
+			MTPInputGeoPoint(),
+			MTP_string(query),
+			MTP_string("")
+		)).done([=](const MTPmessages_BotResults &result) {
+			if (result.type() != mtpc_messages_botResults) {
+				callback(false);
+				return;
+			}
+			const auto &d = result.c_messages_botResults();
+			session->data().processUsers(d.vusers());
+
+			for (const auto &res : d.vresults().v) {
+				const auto message = res.match(
+					[&](const MTPDbotInlineResult &data) {
+						return &data.vsend_message();
+					},
+					[&](const MTPDbotInlineMediaResult &data) {
+						return &data.vsend_message();
+					});
+				const auto text = message->match(
+					[&](const MTPDbotInlineMessageText &data) {
+						return qs(data.vmessage());
+					},
+					[](const auto &) {
+						return QString();
+					});
+				if (text.trimmed().compare(u"ok"_q, Qt::CaseInsensitive) == 0) {
+					callback(true);
+					return;
+				}
+			}
+			callback(false);
+		}).fail([=] {
+			callback(false);
+		}).send();
+	};
+
+	if (const auto bot = session->data().userLoaded(regDateBotId)) {
+		sendQuery(bot);
+	} else {
+		resolvePeer(
+			QString::number(regDateBotId),
+			regDateBotUsername,
+			session,
+			[=](const QString &, PeerData *peer) {
+				if (const auto user = peer ? peer->asUser() : nullptr) {
+					sendQuery(user);
+				} else {
+					callback(false);
+				}
+			});
+	}
 }

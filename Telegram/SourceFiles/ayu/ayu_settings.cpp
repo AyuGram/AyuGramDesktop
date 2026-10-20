@@ -22,6 +22,7 @@
 #include "window/window_controller.h"
 
 #include <fstream>
+#include <QtCore/QSaveFile>
 #include <QApplication>
 
 using json = nlohmann::json;
@@ -420,10 +421,12 @@ void AyuSettings::save() {
 	auto &settings = getInstance();
 	json p = settings;
 
-	std::ofstream file;
-	file.open(getSettingsPath());
-	file << p.dump(4);
-	file.close();
+	QSaveFile file(QString::fromStdString(getSettingsPath()));
+	if (file.open(QIODevice::WriteOnly)) {
+		const auto data = p.dump(4);
+		file.write(data.data(), data.size());
+		file.commit();
+	}
 }
 
 void AyuSettings::reset() {
@@ -499,6 +502,7 @@ void AyuSettings::validate() {
 	};
 
 	validateEnum(_showPeerId, defaults._showPeerId);
+	validateEnum(_nowPlayingService, defaults._nowPlayingService);
 	validateEnum(_channelBottomButton, defaults._channelBottomButton);
 	validateEnum(_showReactionsPanelInContextMenu, defaults._showReactionsPanelInContextMenu);
 	validateEnum(_showViewsPanelInContextMenu, defaults._showViewsPanelInContextMenu);
@@ -1069,6 +1073,18 @@ void AyuSettings::setStreamerMode(bool val) {
 	save();
 }
 
+void AyuSettings::setNowPlayingService(NowPlayingServiceType val) {
+	if (_nowPlayingService.current() == val) return;
+	_nowPlayingService = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingUsername(const QString &val) {
+	if (_nowPlayingUsername.current() == val) return;
+	_nowPlayingUsername = val;
+	save();
+}
+
 void to_json(nlohmann::json &j, const AyuSettings &s) {
 	auto ghostAccounts = nlohmann::json::object();
 	for (const auto &[key, value] : s._ghostAccounts) {
@@ -1165,6 +1181,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"nowPlayingService", s._nowPlayingService.current()},
+		{"nowPlayingUsername", s._nowPlayingUsername.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1269,6 +1287,8 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._nowPlayingService = j.value("nowPlayingService", defaults._nowPlayingService.current());
+	s._nowPlayingUsername = j.value("nowPlayingUsername", defaults._nowPlayingUsername.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

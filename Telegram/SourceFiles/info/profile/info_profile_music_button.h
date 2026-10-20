@@ -11,6 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_song_name.h"
 #include "ui/text/text.h"
 
+namespace Main {
+class Session;
+} // namespace Main
+
 namespace Data {
 class DocumentMedia;
 }
@@ -18,11 +22,20 @@ class DocumentMedia;
 namespace Info::Profile {
 
 struct MusicButtonData {
-	Ui::Text::FormatSongName name;
+	Ui::Text::FormatSongName name = Ui::Text::FormatSongName(QString(), QString(), QString());
 	QString title;
 	QString performer;
+	QString album = QString();
 	FullMsgId msgId;
 	std::shared_ptr<Data::DocumentMedia> mediaView;
+	DocumentId patternEmojiId = 0;
+	Main::Session *session = nullptr;
+	QString songUrl;
+	QString previewUrl;
+	QString coverUrl;
+	QString platform;
+	bool isLiveTrack = false;
+	bool isPremium = false;
 };
 
 class MusicButton final : public Ui::RippleButton {

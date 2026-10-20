@@ -7,6 +7,12 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <optional>
+#include <memory>
+#include <QtCore/QByteArray>
+#include <QtCore/QJsonObject>
+#include <QtCore/QString>
 
 using ID = long long;
 
@@ -92,7 +98,7 @@ public:
 	}
 	[[nodiscard]] QJsonObject toJson() const {
 		QJsonObject json;
-		json["id"] = QString::fromUtf8(id.data());
+		json["id"] = QString(QByteArray(id.data(), static_cast<qsizetype>(id.size())).toHex());
 		json["text"] = QString::fromStdString(text);
 		json["enabled"] = enabled;
 		json["reversed"] = reversed;
