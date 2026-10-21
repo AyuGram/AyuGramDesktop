@@ -101,7 +101,7 @@ QColor GetNoCoverBgColor(std::optional<QColor> overrideBg) {
 			st::infoProfileTopBarActionButtonBgOpacity);
 	}
 
-	return st::shadowFg->c;
+	return Window::Theme::IsNightMode() ? st::shadowFg->c : st::windowBgOver->c;
 }
 
 struct Cover {
@@ -164,7 +164,7 @@ struct Colors {
 	QColor accent;
 };
 
-Colors ExtractColorsFromCover(const QImage &cover, const QColor &fallbackBg, const QColor &fallbackAccent) {
+Colors ExtractColorsFromCover(const QImage &cover, const QColor &fallbackBg, const QColor &fallbackAccent, bool isNightMode) {
 	if (cover.isNull()) {
 		return { fallbackBg, fallbackAccent };
 	}
@@ -177,57 +177,71 @@ Colors ExtractColorsFromCover(const QImage &cover, const QColor &fallbackBg, con
 	const auto *darkMuted = palette.darkMutedSwatch();
 	const auto *vibrant = palette.vibrantSwatch();
 	const auto *lightVibrant = palette.lightVibrantSwatch();
+	const auto *lightMuted = palette.lightMutedSwatch();
 
 	const Ayu::Ui::Swatch *swatch = nullptr;
-	if (darkVibrant) {
-		swatch = darkVibrant;
-	} else if (muted) {
-		swatch = muted;
-	} else if (dominant) {
-		swatch = dominant;
-	} else if (darkMuted) {
-		swatch = darkMuted;
-	} else if (vibrant) {
-		swatch = vibrant;
-	} else if (lightVibrant) {
-		swatch = lightVibrant;
+	if (isNightMode) {
+		if (darkVibrant) {
+			swatch = darkVibrant;
+		} else if (muted) {
+			swatch = muted;
+		} else if (dominant) {
+			swatch = dominant;
+		} else if (darkMuted) {
+			swatch = darkMuted;
+		} else if (vibrant) {
+			swatch = vibrant;
+		} else if (lightVibrant) {
+			swatch = lightVibrant;
+		}
+	} else {
+		if (lightVibrant) {
+			swatch = lightVibrant;
+		} else if (vibrant) {
+			swatch = vibrant;
+		} else if (lightMuted) {
+			swatch = lightMuted;
+		} else if (muted) {
+			swatch = muted;
+		} else if (dominant) {
+			swatch = dominant;
+		} else if (darkVibrant) {
+			swatch = darkVibrant;
+		}
 	}
 
 	auto bg = fallbackBg;
 	if (swatch) {
-		const auto extractedColor = swatch->rgb();
-		constexpr auto whiteColor = qRgb(255, 255, 255);
-		const auto contrast = Ayu::Ui::ColorUtils::calculateContrast(whiteColor, extractedColor);
-
-		auto adjustedColor = extractedColor;
-		if (contrast > 15.0f) {
-			adjustedColor = AdjustHsl(extractedColor, 2.0f);
-		} else if (contrast < 10.0f) {
-			adjustedColor = AdjustHsl(extractedColor, 0.5f);
-		}
-
-		if (Ayu::Ui::ColorUtils::calculateContrast(whiteColor, adjustedColor) < 3.0f) {
-			adjustedColor = BlendARGB(adjustedColor, qRgb(0, 0, 0), 0.3f);
-		}
-		bg = QColor::fromRgb(adjustedColor);
+		bg = QColor::fromRgb(swatch->rgb());
 	}
 
-	// WHY: Android darkens the card background to maintain high contrast with white text and match dark theme.
 	auto bgHsl = Ayu::Ui::ColorUtils::colorToHSL(bg.rgb());
-	bgHsl[1] = std::clamp(bgHsl[1], 0.35f, 0.60f);
-	if (bgHsl[2] > 0.20f) {
-		bgHsl[2] = 0.18f;
-	} else if (bgHsl[2] < 0.12f) {
-		bgHsl[2] = 0.15f;
-	}
-	bg = QColor::fromRgb(Ayu::Ui::ColorUtils::HSLToRGB(bgHsl));
 
-	const auto accent = QColor::fromRgb(AdjustHsl(bg.rgb(), 2.5f));
-	return { bg, accent };
+	if (isNightMode) {
+		bgHsl[1] = std::clamp(bgHsl[1], 0.35f, 0.60f);
+		if (bgHsl[2] > 0.20f) {
+			bgHsl[2] = 0.18f;
+		} else if (bgHsl[2] < 0.12f) {
+			bgHsl[2] = 0.15f;
+		}
+		bg = QColor::fromRgb(Ayu::Ui::ColorUtils::HSLToRGB(bgHsl));
+		const auto accent = QColor::fromRgb(AdjustHsl(bg.rgb(), 2.5f));
+		return { bg, accent };
+	} else {
+		bgHsl[1] = std::clamp(bgHsl[1], 0.25f, 0.50f);
+		bgHsl[2] = std::clamp(bgHsl[2], 0.90f, 0.94f);
+		bg = QColor::fromRgb(Ayu::Ui::ColorUtils::HSLToRGB(bgHsl));
+
+		auto accentHsl = bgHsl;
+		accentHsl[1] = std::clamp(bgHsl[1] * 1.6f, 0.65f, 0.95f);
+		accentHsl[2] = 0.42f;
+		const auto accent = QColor::fromRgb(Ayu::Ui::ColorUtils::HSLToRGB(accentHsl));
+		return { bg, accent };
+	}
 }
 
-Colors ExtractColorsFromCover(const QPixmap &cover, const QColor &fallbackBg, const QColor &fallbackAccent) {
-	return ExtractColorsFromCover(cover.toImage(), fallbackBg, fallbackAccent);
+Colors ExtractColorsFromCover(const QPixmap &cover, const QColor &fallbackBg, const QColor &fallbackAccent, bool isNightMode) {
+	return ExtractColorsFromCover(cover.toImage(), fallbackBg, fallbackAccent, isNightMode);
 }
 
 } // namespace
@@ -404,6 +418,7 @@ void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 void AyuMusicButton::makeCover() {
 	const auto weak = base::make_weak(this);
 	const auto coverSize = style::ConvertScale(64);
+	const auto isNightMode = Window::Theme::IsNightMode();
 	const auto fallbackAccent = st::windowActiveTextFg->c;
 	const auto fallbackBg = GetNoCoverBgColor(_overrideBg);
 	crl::async([=,
@@ -447,12 +462,12 @@ void AyuMusicButton::makeCover() {
 		if (loadedCoverImage.isNull() || !settings.adaptiveCoverColor()) {
 			bgColor = fallbackBg;
 		} else {
-			const auto colors = ExtractColorsFromCover(loadedCoverImage, fallbackBg, accentColor);
+			const auto colors = ExtractColorsFromCover(loadedCoverImage, fallbackBg, accentColor, isNightMode);
 			bgColor = colors.bg;
 			accentColor = colors.accent;
 		}
 
-		crl::on_main([weak, loadedCoverImage = std::move(loadedCoverImage), mediaView, bgColor, accentColor, albumName, overrideBg = _overrideBg, coverSize]() mutable {
+		crl::on_main([weak, isNightMode, loadedCoverImage = std::move(loadedCoverImage), mediaView, bgColor, accentColor, albumName, overrideBg = _overrideBg, coverSize]() mutable {
 			const auto strong = weak.get();
 			if (!strong) {
 				return;
@@ -475,7 +490,7 @@ void AyuMusicButton::makeCover() {
 			if (cover.noCover || !settings2.adaptiveCoverColor()) {
 				bgColor = GetNoCoverBgColor(overrideBg);
 			} else if (!hadLoadedCover && !cover.noCover) {
-				const auto colors = ExtractColorsFromCover(cover.pixToBg, GetNoCoverBgColor(overrideBg), accentColor);
+				const auto colors = ExtractColorsFromCover(cover.pixToBg, GetNoCoverBgColor(overrideBg), accentColor, isNightMode);
 				bgColor = colors.bg;
 				accentColor = colors.accent;
 			}
@@ -501,10 +516,16 @@ void AyuMusicButton::makeCover() {
 			const auto &cover2 = *strong->_currentCover;
 
 			if (!cover2.noCover && settings2.adaptiveCoverColor() && !cover2.pix.isNull()) {
-				const auto subColor = QColor(255, 255, 255, 153);
-				strong->_title->setTextColorOverride(Qt::white);
-				strong->_performer->setTextColorOverride(subColor);
-				strong->_album->setTextColorOverride(subColor);
+				if (isNightMode) {
+					const auto subColor = QColor(255, 255, 255, 153);
+					strong->_title->setTextColorOverride(Qt::white);
+					strong->_performer->setTextColorOverride(subColor);
+					strong->_album->setTextColorOverride(subColor);
+				} else {
+					strong->_title->setTextColorOverride(st::windowBoldFg->c);
+					strong->_performer->setTextColorOverride(st::windowSubTextFg->c);
+					strong->_album->setTextColorOverride(st::windowSubTextFg->c);
+				}
 			} else {
 				const auto baseColor = overrideBg ? st::groupCallMembersFg->c : st::windowBoldFg->c;
 				const auto subColor = overrideBg ? st::groupCallMembersFg->c : st::windowSubTextFg->c;
@@ -547,9 +568,10 @@ void AyuMusicButton::preparePatternImage() {
 
 	auto painter = QPainter(&_patternImage);
 	auto hq = PainterHighQualityEnabler(painter);
+	const auto isNight = Window::Theme::IsNightMode();
 	const auto textColor = (_currentCover && _currentCover->accent.isValid())
 		? _currentCover->accent
-		: Qt::white;
+		: (isNight ? Qt::white : st::windowActiveTextFg->c);
 	const auto drawX = padding + (emojiSize - emojiW) / 2;
 	const auto drawY = padding + (emojiSize - emojiW) / 2;
 	_patternEmoji->paint(painter, {
@@ -599,7 +621,11 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		const auto radius = cardRect.width() * 2.0;
 		QRadialGradient gradient(QPointF(centerX, centerY), radius);
 		gradient.setColorAt(0.0, cover.bg);
-		gradient.setColorAt(1.0, QColor::fromRgb(AdjustHsl(cover.bg.rgb(), 1.4f)));
+		const auto isNight = Window::Theme::IsNightMode();
+		const auto endColor = isNight
+			? QColor::fromRgb(AdjustHsl(cover.bg.rgb(), 1.4f))
+			: QColor::fromRgb(AdjustHsl(cover.bg.rgb(), 0.95f));
+		gradient.setColorAt(1.0, endColor);
 		p.fillPath(cardPath, gradient);
 		paintRipple(p, QPoint());
 	}
@@ -613,7 +639,8 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		const auto right = cardRect.left() + cardW;
 		const auto centerY = cardRect.top() + (cardH / 2.0f);
 
-		const auto baseAlpha = cover.noCover ? 0.4f : 1.0f;
+		const auto isNight = Window::Theme::IsNightMode();
+		const auto baseAlpha = cover.noCover ? 0.4f : (isNight ? 1.0f : 0.65f);
 		for (const auto &pt : kNowPlayingPattern) {
 			const auto s = style::ConvertScaleExact(pt.size);
 			const auto xOff = style::ConvertScaleExact(pt.xOffset);
@@ -657,9 +684,12 @@ void AyuMusicButton::paintPlayButton(Painter &p) {
 	auto hq = PainterHighQualityEnabler(p);
 
 	const auto cover = _currentCover.value_or(ResultCover{});
+	const auto isNight = Window::Theme::IsNightMode();
 	auto btnBg = cover.accent.isValid()
 		? cover.accent
-		: (cover.bg.isValid() ? cover.bg.lighter(130) : st::windowActiveTextFg->c);
+		: (cover.bg.isValid()
+			? (isNight ? cover.bg.lighter(130) : cover.bg.darker(130))
+			: st::windowActiveTextFg->c);
 
 	if (_playButtonPressed) {
 		btnBg = btnBg.darker(115);
