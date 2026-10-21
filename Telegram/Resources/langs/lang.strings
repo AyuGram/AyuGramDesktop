@@ -9191,3 +9191,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+"ayu_ScrobblingService" = "Scrobbling Service";
+"ayu_SelectServiceTitle" = "Select service";
+"ayu_SelectServiceInfo" = "Displays the current track in the profile as a card obtained from the scrobbling service.";
+"ayu_EnterUsername" = "Enter username";
+"ayu_EnterUsernameInfo" = "You can obtain your username on the {link}.";
+"ayu_EnterUsernameOfficialWebsite" = "official website";
+"ayu_ScrobblingSavedToast" = "Scrobbling settings saved successfully.";
+"ayu_ScrobblingErrorToast" = "Failed to update scrobbling settings. Please try again.";
+"ayu_ScrobblingNone" = "None";
+"ayu_ScrobblingLastFm" = "Last.fm";
+"ayu_ScrobblingStatsFm" = "Stats.fm";
+"ayu_ScrobblingOpenWebsite" = "Open {link} website";
+

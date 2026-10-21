@@ -330,6 +330,10 @@ Swatch ColorCutQuantizer::Vbox::averageColor() const {
 		blueSum += colorPopulation * quantizedBlue(color);
 	}
 
+	if (totalPopulation == 0) {
+		return Swatch(0, 0);
+	}
+
 	const auto redMean = static_cast<int>(std::round(redSum / static_cast<float>(totalPopulation)));
 	const auto greenMean = static_cast<int>(std::round(greenSum / static_cast<float>(totalPopulation)));
 	const auto blueMean = static_cast<int>(std::round(blueSum / static_cast<float>(totalPopulation)));

@@ -18,14 +18,21 @@
 #include <QtGui/QPixmap>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
+#include <mutex>
 
 namespace Ayu::Ui::Itunes {
 namespace {
 
 struct CacheEntry
 {
-	QPixmap pix;
+	QImage img;
+	QString album;
 };
+
+std::mutex &cacheMutex() {
+	static std::mutex m;
+	return m;
+}
 
 QCache<QString, CacheEntry> &cache() {
 	static QCache<QString, CacheEntry> c(50);
@@ -682,16 +689,22 @@ QList<ItunesTrack> parseTracks(const QByteArray &json) {
 	return out;
 }
 
-QString pickArtworkUrl(const QList<ItunesTrack> &tracks,
-					   const QString &targetTitle,
-					   const QStringList &baseArtists) {
+ItunesTrack pickTrack(const QList<ItunesTrack> &tracks,
+					  const QString &targetTitle,
+					  const QStringList &baseArtists) {
 	if (tracks.isEmpty()) return {};
 	for (const auto &t : tracks) {
 		if (!t.trackName.compare(targetTitle, Qt::CaseInsensitive) && hasCommonArtist(baseArtists, t.artistName)) {
-			return t.artworkUrl100;
+			return t;
 		}
 	}
-	return tracks.first().artworkUrl100;
+	return tracks.first();
+}
+
+QString pickArtworkUrl(const QList<ItunesTrack> &tracks,
+					   const QString &targetTitle,
+					   const QStringList &baseArtists) {
+	return pickTrack(tracks, targetTitle, baseArtists).artworkUrl100;
 }
 
 QUrl buildItunesUrl(const QString &performer, const QString &title) {
@@ -713,14 +726,17 @@ QString upgradeArtworkSize(QString url, int sizeHint) {
 
 } // namespace
 
-QPixmap FetchCover(const QString &performer, const QString &title, int sizeHintPx, int timeoutMs) {
+TrackInfo FetchTrackInfo(const QString &performer, const QString &title, int sizeHintPx, int timeoutMs) {
 	const auto perf = performer.trimmed();
 	const auto titl = title.trimmed();
 	if (perf.isEmpty() && titl.isEmpty()) return {};
 
 	const auto key = perf + QString::fromUtf8(" - ") + titl;
-	if (auto *entry = cache().object(key)) {
-		return entry->pix;
+	{
+		const auto lock = std::lock_guard(cacheMutex());
+		if (auto *entry = cache().object(key)) {
+			return { entry->img, entry->album };
+		}
 	}
 
 	const auto url = buildItunesUrl(perf, titl);
@@ -730,8 +746,9 @@ QPixmap FetchCover(const QString &performer, const QString &title, int sizeHintP
 	if (tracks.isEmpty()) return {};
 
 	const auto baseArtists = splitArtists(perf);
-	auto artwork = pickArtworkUrl(tracks, titl, baseArtists);
-	artwork = upgradeArtworkSize(std::move(artwork), sizeHintPx);
+	const auto selectedTrack = pickTrack(tracks, titl, baseArtists);
+	auto artwork = upgradeArtworkSize(selectedTrack.artworkUrl100, sizeHintPx);
+	const auto album = selectedTrack.collectionName;
 	if (artwork.isEmpty()) return {};
 
 	QByteArray contentType;
@@ -740,11 +757,20 @@ QPixmap FetchCover(const QString &performer, const QString &title, int sizeHintP
 
 	QImage img;
 	if (!img.loadFromData(imgBytes)) return {};
-	QPixmap pix = QPixmap::fromImage(img);
 
-	auto *stored = new CacheEntry{pix};
-	cache().insert(key, stored);
-	return pix;
+	auto *stored = new CacheEntry{img, album};
+	{
+		const auto lock = std::lock_guard(cacheMutex());
+		if (!cache().insert(key, stored)) {
+			delete stored;
+		}
+	}
+	return { img, album };
+}
+
+QPixmap FetchCover(const QString &performer, const QString &title, int sizeHintPx, int timeoutMs) {
+	const auto info = FetchTrackInfo(performer, title, sizeHintPx, timeoutMs);
+	return info.cover.isNull() ? QPixmap() : QPixmap::fromImage(info.cover);
 }
 
 }

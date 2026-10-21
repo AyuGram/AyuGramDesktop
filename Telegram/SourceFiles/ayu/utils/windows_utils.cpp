@@ -86,6 +86,7 @@ void processNewPinned(const QString &iconPath) {
 	if (findHandle == INVALID_HANDLE_VALUE) {
 		return;
 	}
+	const auto closeHandle = gsl::finally([findHandle] { FindClose(findHandle); });
 
 	do {
 		std::wstring fname = native + findData.cFileName;
@@ -130,7 +131,6 @@ void processNewPinned(const QString &iconPath) {
 	if (errorCode && errorCode != ERROR_NO_MORE_FILES) {
 		return;
 	}
-	FindClose(findHandle);
 }
 
 void processNewShortcuts(const QString &iconPath) {

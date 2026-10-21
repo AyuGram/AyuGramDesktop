@@ -129,6 +129,8 @@ set(ayugram_files
         ayu/utils/windows_utils.h
         ayu/utils/rc_manager.cpp
         ayu/utils/rc_manager.h
+        ayu/utils/now_playing_client.cpp
+        ayu/utils/now_playing_client.h
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
         ayu/ui/toasts.cpp
@@ -193,6 +195,8 @@ set(ayugram_files
         ayu/ui/boxes/donate_qr_box.h
         ayu/ui/boxes/donate_info_box.cpp
         ayu/ui/boxes/donate_info_box.h
+        ayu/ui/boxes/now_playing_box.cpp
+        ayu/ui/boxes/now_playing_box.h
         ayu/ui/boxes/plugin_info_box.cpp
         ayu/ui/boxes/plugin_info_box.h
         ayu/ui/components/image_view.cpp
