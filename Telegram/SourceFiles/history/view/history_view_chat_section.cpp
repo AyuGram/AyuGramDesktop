@@ -807,14 +807,14 @@ ChatWidget::ChatWidget(
 				}
 			}
 			if (action.options.scheduled) {
-				if (AyuSettings::ghost(&session()).isUseScheduledMessages()) {
-					_composeControls->cancelReplyMessage();
-				} else if (_topic) {
+				const auto &ghost = AyuSettings::ghost(&session());
+				if (_topic && !ghost.isUseScheduledMessages()) {
 					crl::on_main(this, [=, t = _topic] {
 						controller->showSection(
 							std::make_shared<HistoryView::ScheduledMemento>(t));
 					});
-				} else if (mode() == Mode::History) {
+				} else if (mode() == Mode::History
+						&& !ghost.isUseScheduledMessages()) {
 					crl::on_main(this, [=, history = action.history] {
 						controller->showSection(
 							std::make_shared<HistoryView::ScheduledMemento>(
