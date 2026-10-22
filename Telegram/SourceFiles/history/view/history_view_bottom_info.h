@@ -32,7 +32,7 @@ struct TextState;
 class BottomInfo final : public Object {
 public:
 	struct Data {
-		enum class Flag : uint16 {
+		enum class Flag : uint32 {
 			Edited         = 0x001,
 			OutLayout      = 0x002,
 			Sending        = 0x004,
@@ -47,8 +47,9 @@ public:
 			EditedPrimary  = 0x800,
 			Ephemeral      = 0x1000,
 			Updated        = 0x2000,
-			AyuDeleted     = 0x4000,
-			AyuBurnt       = 0x8000,
+			FullDate       = 0x4000,
+			AyuDeleted     = 0x8000,
+			AyuBurnt       = 0x10000,
 			//Unread, // We don't want to pass and update it in Date for now.
 		};
 		friend inline constexpr bool is_flag_type(Flag) { return true; };

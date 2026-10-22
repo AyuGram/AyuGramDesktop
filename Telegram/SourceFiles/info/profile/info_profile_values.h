@@ -54,6 +54,7 @@ rpl::producer<not_null<PeerData*>> MigratedOrMeValue(
 	not_null<Data::ForumTopic*> topic);
 [[nodiscard]] rpl::producer<TextWithEntities> PhoneValue(
 	not_null<UserData*> user);
+[[nodiscard]] QString PublicLinkByPhone(not_null<UserData*> user);
 [[nodiscard]] rpl::producer<TextWithEntities> PhoneOrHiddenValue(
 	not_null<UserData*> user);
 [[nodiscard]] rpl::producer<TextWithEntities> PhoneWithSpoilerValue(
@@ -146,6 +147,9 @@ enum class BadgeType : ushort;
 	not_null<PeerData*> peer);
 
 [[nodiscard]] rpl::producer<QString> BirthdayLabelText(
+	rpl::producer<Data::Birthday> birthday);
+[[nodiscard]] rpl::producer<TextWithEntities> BirthdayValueMarkedText(
+	not_null<UserData*> user,
 	rpl::producer<Data::Birthday> birthday);
 [[nodiscard]] rpl::producer<QString> BirthdayValueText(
 	rpl::producer<Data::Birthday> birthday,

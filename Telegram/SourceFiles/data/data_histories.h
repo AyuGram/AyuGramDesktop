@@ -66,6 +66,13 @@ public:
 	void sendPendingReadInbox(not_null<History*> history);
 	void reportDelivery(not_null<HistoryItem*> item);
 
+	struct ShownRead {
+		not_null<HistoryItem*> shown;
+		MsgId wasReadTill = 0;
+		MsgId readTill = 0;
+	};
+	[[nodiscard]] rpl::producer<ShownRead> shownReads() const;
+
 	void requestDialogEntry(not_null<Data::Folder*> folder);
 	void requestDialogEntry(
 		not_null<History*> history,
@@ -165,7 +172,7 @@ private:
 	};
 	struct DelayedByTopicMessage {
 		uint64 randomId = 0;
-		FullMsgId replyTo;
+		FullReplyTo replyTo;
 		Fn<PreparedMessage(not_null<History*>, FullReplyTo)> message;
 		Fn<void(const MTPUpdates&, const MTP::Response&)> done;
 		Fn<void(const MTP::Error&, const MTP::Response&)> fail;
@@ -193,6 +200,10 @@ private:
 	}
 
 	void readInboxTill(not_null<History*> history, MsgId tillId, bool force);
+	void readShownTill(
+		not_null<HistoryItem*> shown,
+		MsgId tillId,
+		bool force);
 	void sendReadRequests();
 	void sendReadRequest(not_null<History*> history, State &state);
 	[[nodiscard]] State *lookup(not_null<History*> history);
@@ -216,6 +227,7 @@ private:
 	void cancelDelayedByTopicRequest(int id);
 
 	const not_null<Session*> _owner;
+	rpl::event_stream<ShownRead> _shownReads;
 
 	std::unordered_map<PeerId, std::unique_ptr<History>> _map;
 	base::flat_map<not_null<History*>, State> _states;

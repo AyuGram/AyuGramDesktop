@@ -861,7 +861,7 @@ bool AddReplyToMessageAction(
 	const auto &quote = request.quote;
 	auto text = (todoListTaskId
 		? tr::lng_context_reply_to_task
-		: quote.highlight.quote.empty()
+		: !quote
 		? tr::lng_context_reply_msg
 		: tr::lng_context_quote_and_reply)(
 			tr::now,
@@ -872,6 +872,7 @@ bool AddReplyToMessageAction(
 			.quote = quote.highlight.quote,
 			.quoteOffset = quote.highlight.quoteOffset,
 			.todoItemId = todoListTaskId,
+			.richQuote = quote.highlight.richQuote,
 		}, base::IsCtrlPressed());
 	}, &st::menuIconReply);
 	return true;
@@ -1882,30 +1883,16 @@ void FillContextMenuItems(
 			result->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
 				QGuiApplication::clipboard()->setText(phone);
 			}, &st::menuIconCopy);
-		} else if (const auto gift = itemMedia
-			? itemMedia->gift()
-			: nullptr) {
-			const auto peer = view->data()->history()->peer;
-			const auto user = peer->asUser();
-			if (!user
-				|| (!user->isInaccessible()
-					&& !user->isNotificationsUser())) {
-				const auto controller = list->controller();
-				const auto starGiftUpgrade = gift->upgrade
-					&& (gift->type == Data::GiftType::StarGift);
-				const auto isGift = gift->slug.isEmpty() || !gift->channel;
-				const auto out = view->data()->out();
-				const auto outgoingGift = isGift
-					&& (starGiftUpgrade ? !out : out);
-				if (outgoingGift
-					&& gift->type != Data::GiftType::BirthdaySuggest) {
-					result->addAction(
-						tr::lng_context_gift_send(tr::now),
-						crl::guard(controller, [=] {
-							Ui::ShowStarGiftBox(controller, peer);
-						}),
-						&st::menuIconGiftPremium);
-				}
+		} else if (itemMedia && itemMedia->gift()) {
+			AddGiftMessageAction(result, view->data(), list->controller());
+		}
+		if (view->data()->isRegular()
+			&& view->data()->Has<HistoryServiceGramTransfer>()) {
+			if (const auto user = view->data()->history()->peer->asUser()) {
+				Window::AddSendMoneyAction(
+					list->controller(),
+					user,
+					Ui::Menu::CreateAddActionCallback(result));
 			}
 		}
 		if (const auto document = media ? media->getDocument() : nullptr) {
@@ -2347,6 +2334,43 @@ void AttachPollOptionTabs(
 			reposition();
 		}
 	}, tabs->lifetime());
+}
+
+void AddGiftMessageAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<HistoryItem*> item,
+		not_null<Window::SessionController*> controller) {
+	const auto media = item->media();
+	const auto gift = media ? media->gift() : nullptr;
+	if (!gift || gift->type == Data::GiftType::BirthdaySuggest) {
+		return;
+	}
+	const auto peer = item->history()->peer;
+	const auto user = peer->asUser();
+	const auto isGift = gift->slug.isEmpty() || !gift->channel;
+	if (!isGift
+		|| (user
+			&& (user->isInaccessible() || user->isNotificationsUser()))) {
+		return;
+	}
+	const auto starGiftUpgrade = gift->upgrade
+		&& (gift->type == Data::GiftType::StarGift);
+	const auto out = item->out();
+	const auto outgoingGift = starGiftUpgrade ? !out : out;
+	if (!outgoingGift
+		&& (gift->type == Data::GiftType::ChatTheme
+			|| gift->type == Data::GiftType::GiftOffer
+			|| !Ui::CanSendStarGiftTo(peer))) {
+		return;
+	}
+	menu->addAction(
+		(outgoingGift
+			? tr::lng_context_gift_send(tr::now)
+			: tr::lng_gift_send_title(tr::now)),
+		crl::guard(controller, [=] {
+			Ui::ShowStarGiftBox(controller, peer);
+		}),
+		&st::menuIconGiftPremium);
 }
 
 void AddPollActions(

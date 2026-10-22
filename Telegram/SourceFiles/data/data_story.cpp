@@ -30,11 +30,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/color_int_conversion.h"
 
 namespace Data {
-namespace {
 
-using UpdateFlag = StoryUpdate::Flag;
-
-[[nodiscard]] StoryArea ParseArea(const MTPMediaAreaCoordinates &area) {
+StoryArea ParseArea(const MTPMediaAreaCoordinates &area) {
 	const auto &data = area.data();
 	const auto center = QPointF(data.vx().v, data.vy().v);
 	const auto size = QSizeF(data.vw().v, data.vh().v);
@@ -45,6 +42,24 @@ using UpdateFlag = StoryUpdate::Flag;
 		.radius = data.vradius().value_or_empty(),
 	};
 }
+
+MTPMediaAreaCoordinates SerializeArea(const StoryArea &area) {
+	using Flag = MTPDmediaAreaCoordinates::Flag;
+	const auto &geometry = area.geometry;
+	const auto center = geometry.center() * 100.;
+	return MTP_mediaAreaCoordinates(
+		MTP_flags((area.radius > 0.) ? Flag::f_radius : Flag()),
+		MTP_double(center.x()),
+		MTP_double(center.y()),
+		MTP_double(geometry.width() * 100.),
+		MTP_double(geometry.height() * 100.),
+		MTP_double(area.rotation),
+		MTP_double(area.radius));
+}
+
+namespace {
+
+using UpdateFlag = StoryUpdate::Flag;
 
 [[nodiscard]] TextWithEntities StripLinks(TextWithEntities text) {
 	const auto link = [&](const EntityInText &entity) {

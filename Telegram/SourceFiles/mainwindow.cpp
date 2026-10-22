@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/shadow.h"
 #include "ui/widgets/tooltip.h"
+#include "ui/effects/layer_backdrop.h"
 #include "ui/emoji_config.h"
 #include "ui/ui_utility.h"
 #include "lang/lang_cloud_manager.h"
@@ -38,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_updates.h"
 #include "settings/settings_intro.h"
 #include "base/options.h"
+#include "wallet/wallet_panel.h"
 #include "window/notifications_manager.h"
 #include "window/themes/window_theme.h"
 #include "window/themes/window_theme_warning.h"
@@ -226,6 +228,7 @@ void MainWindow::setupSetupEmailLock() {
 	}
 	if (const auto sessionController = controller().sessionController()) {
 		sessionController->session().attachWebView().closeAll();
+		Wallet::CloseWallet(&sessionController->session());
 	}
 }
 
@@ -530,7 +533,7 @@ bool MainWindow::showMediaPreview(
 		updateControlsGeometry();
 	}
 	if (_mediaPreview->isHidden()) {
-		fixOrder();
+		raiseMediaPreview();
 	}
 	_mediaPreview->showPreview(origin, document);
 	return true;
@@ -544,7 +547,7 @@ bool MainWindow::showMediaPreview(
 		updateControlsGeometry();
 	}
 	if (_mediaPreview->isHidden()) {
-		fixOrder();
+		raiseMediaPreview();
 	}
 	_mediaPreview->showPreview(origin, photo);
 	return true;
@@ -613,7 +616,9 @@ void MainWindow::checkActivation() {
 
 bool MainWindow::contentOverlapped(const QRect &globalRect) {
 	return (_main && _main->contentOverlapped(globalRect))
-		|| (_layer && _layer->contentOverlapped(globalRect));
+		|| (_layer
+			&& !Ui::CapturingUnderLayer()
+			&& _layer->contentOverlapped(globalRect));
 }
 
 void MainWindow::setInnerFocus() {
@@ -711,6 +716,10 @@ void MainWindow::fixOrder() {
 	if (_setupEmailLock) _setupEmailLock->raise();
 	if (_passcodeLock) _passcodeLock->raise();
 	if (_layer) _layer->raise();
+	raiseMediaPreview();
+}
+
+void MainWindow::raiseMediaPreview() {
 	if (_mediaPreview) _mediaPreview->raise();
 	if (_testingThemeWarning) _testingThemeWarning->raise();
 }

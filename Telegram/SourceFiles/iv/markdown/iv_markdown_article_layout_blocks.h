@@ -151,6 +151,7 @@ struct LaidOutBlock {
 	QString collapseToggleId;
 	std::vector<QString> anchorIds;
 	int textWidth = 0;
+	int skipBlockLength = 0;
 	int labelWidth = 0;
 	int subtitleWidth = 0;
 	int actionWidth = 0;
@@ -183,6 +184,7 @@ struct LaidOutBlock {
 	int horizontalScrollLeft = 0;
 	int horizontalScrollMax = 0;
 	int horizontalScrollAncestorShift = 0;
+	int centeredShift = 0;
 	int segmentIndex = -1;
 	int secondarySegmentIndex = -1;
 	int tertiarySegmentIndex = -1;
@@ -334,6 +336,7 @@ struct LayoutContext {
 	int articleWidth = 0;
 	int inlineButtonWidthCap = 0;
 	int collapsibleQuoteLines = 0;
+	QSize skipBlock;
 	double mediaPixelScale = 1.;
 	bool tightList = false;
 	bool useArticleBands = false;
@@ -379,6 +382,7 @@ private:
 	const QString &text,
 	const Ui::Text::String &leaf);
 [[nodiscard]] bool IsAnchorOnlyBlock(const PreparedBlock &block);
+[[nodiscard]] bool TakesMessageSkipBlock(const PreparedBlock &block);
 [[nodiscard]] bool PreparedBlockHasInlineButton(const PreparedBlock &prepared);
 [[nodiscard]] bool IsFlowKind(PreparedBlockKind kind);
 [[nodiscard]] bool QuoteHasCollapseControl(const LaidOutBlock &block);
@@ -494,6 +498,7 @@ struct TableCellMinimumWidthConstraint {
 	const LaidOutBlock &block,
 	const style::Markdown &st);
 [[nodiscard]] QString CodeBlockDisplayText(const QString &text);
+[[nodiscard]] std::vector<int> CodeBlockDisplayOffsets(const QString &text);
 [[nodiscard]] TextWithEntities CodeBlockDisplayText(TextWithEntities text);
 [[nodiscard]] int BlockSkip(
 	const PreparedBlock &block,
@@ -512,12 +517,29 @@ struct TableCellMinimumWidthConstraint {
 [[nodiscard]] TextWithEntities EditPlaceholderTextValue(
 	const PreparedBlock &block,
 	const QString &text);
-void CopyCachedTextLeafs(
-	const std::vector<PreparedBlock> &preparedBlocks,
-	std::vector<LaidOutBlock> *blocks,
-	const style::Markdown &st,
-	CachedTextLeafPool *pool,
+[[nodiscard]] CachedTextLeafSourceSignature MarkedTextLeafSourceSignature(
+	TextWithEntities text,
+	const style::TextStyle &textStyle,
+	int minResizeWidth,
 	bool rtl);
+[[nodiscard]] CachedTextLeafSourceSignature PlainTextLeafSourceSignature(
+	const QString &text,
+	const style::TextStyle &textStyle,
+	int minResizeWidth,
+	bool rtl);
+[[nodiscard]] CachedTextLeafSourceSignature CodeTextLeafSourceSignature(
+	const PreparedBlock &prepared,
+	const style::Markdown &st);
+[[nodiscard]] CachedTextLeafKey BlockCachedTextLeafKey(
+	CachedTextLeafSlot slot,
+	const PreparedBlock &prepared,
+	const std::vector<int> &preparedPath);
+[[nodiscard]] CachedTextLeafKey TableCellCachedTextLeafKey(
+	CachedTextLeafSlot slot,
+	const PreparedTableCell &prepared,
+	const std::vector<int> &preparedPath,
+	int tableRowIndex,
+	int tableCellIndex);
 void BuildOrReuseMarkedTextLeaf(
 	Ui::Text::String *leaf,
 	CachedTextLeafSlot slot,
@@ -550,19 +572,6 @@ void BuildOrReuseEditPlaceholderLeaf(
 void ApplyPreparedEditSources(
 	LaidOutBlock *block,
 	const PreparedBlock &prepared);
-void LayoutMediaCaption(
-	LaidOutBlock *block,
-	const PreparedBlock &prepared,
-	const std::vector<PreparedFormulaSlot> *formulas,
-	InlineFormulaObjectCache *inlineFormulaObjects,
-	const std::shared_ptr<MediaRuntime> &mediaRuntime,
-	const style::Markdown &st,
-	int left,
-	int top,
-	int width,
-	int skip,
-	int *bottom,
-	LayoutContext context = {});
 void FillMediaCaptionContent(
 	LaidOutBlock *block,
 	const PreparedBlock &prepared,

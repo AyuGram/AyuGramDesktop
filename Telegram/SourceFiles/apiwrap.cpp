@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_todo_lists.h"
 #include "api/api_self_destruct.h"
 #include "api/api_sensitive_content.h"
+#include "api/api_share_themes.h"
 #include "api/api_global_privacy.h"
 #include "api/api_reactions_notify_settings.h"
 #include "api/api_updates.h"
@@ -240,7 +241,8 @@ ApiWrap::ApiWrap(not_null<Main::Session*> session)
 , _premium(std::make_unique<Api::Premium>(this))
 , _usernames(std::make_unique<Api::Usernames>(this))
 , _websites(std::make_unique<Api::Websites>(this))
-, _peerColors(std::make_unique<Api::PeerColors>(this)) {
+, _peerColors(std::make_unique<Api::PeerColors>(this))
+, _shareThemes(std::make_unique<Api::ShareThemes>(this)) {
 	crl::on_main(session, [=] {
 		// You can't use _session->lifetime() in the constructor,
 		// only queued, because it is not constructed yet.
@@ -2174,7 +2176,12 @@ void ApiWrap::saveDraftToCloudDelayed(not_null<Data::Thread*> thread) {
 	if (ShouldSkipPlainDraftCloudSave(_session, thread)) {
 		return;
 	}
-	_draftsSaveRequestIds.emplace(base::make_weak(thread), 0);
+	const auto [i, inserted] = _draftSaves.emplace(
+		base::make_weak(thread),
+		DraftSaveState());
+	if (!inserted && i->second.requestId) {
+		i->second.changedWhileSaving = true;
+	}
 	if (!_draftsSaveTimer.isActive()) {
 		_draftsSaveTimer.callOnce(kSaveCloudDraftTimeout);
 	}
@@ -2235,7 +2242,9 @@ void ApiWrap::clearHistory(not_null<PeerData*> peer, bool revoke) {
 }
 
 void ApiWrap::deleteConversation(not_null<PeerData*> peer, bool revoke) {
-	if (const auto chat = peer->asChat()) {
+	const auto chat = peer->asChat();
+	// Leaving first hands a legacy group to its successor at once.
+	if (chat && !(revoke && chat->amCreator())) {
 		request(MTPmessages_DeleteChatUser(
 			MTP_flags(0),
 			chat->inputChat(),
@@ -2408,7 +2417,7 @@ mtpRequestId ApiWrap::saveDraftToCloud(
 	if (!requestId) {
 		return 0;
 	}
-	_draftsSaveRequestIds.emplace_or_assign(weak, requestId);
+	_draftSaves.emplace_or_assign(weak, DraftSaveState{ requestId });
 	return requestId;
 }
 
@@ -2511,9 +2520,9 @@ mtpRequestId ApiWrap::savePreparedDraftToCloud(
 		if (cloudDraft) {
 			cloudDraft->saveRequestId = id;
 		}
-		const auto i = _draftsSaveRequestIds.find(weak);
-		if (i != _draftsSaveRequestIds.cend()) {
-			i->second = id;
+		const auto i = _draftSaves.find(weak);
+		if (i != _draftSaves.cend()) {
+			i->second.requestId = id;
 		}
 	};
 	const auto failCleanup = [=](
@@ -2535,11 +2544,17 @@ mtpRequestId ApiWrap::savePreparedDraftToCloud(
 				}
 			}
 		}
-		const auto i = _draftsSaveRequestIds.find(weak);
-		if (i != _draftsSaveRequestIds.cend()
-			&& i->second == requestId) {
-			_draftsSaveRequestIds.erase(i);
+		const auto i = _draftSaves.find(weak);
+		if (i != _draftSaves.cend()
+			&& i->second.requestId == requestId) {
+			const auto changed = i->second.changedWhileSaving;
+			_draftSaves.erase(i);
 			checkQuitPreventFinished();
+			if (changed) {
+				if (const auto strong = weak.get()) {
+					saveDraftToCloudDelayed(strong);
+				}
+			}
 		}
 		if (callbacks && callbacks->fail) {
 			callbacks->fail(error);
@@ -2576,11 +2591,17 @@ mtpRequestId ApiWrap::savePreparedDraftToCloud(
 					history->draftSavedToCloud(topicRootId, monoforumPeerId);
 				}
 			}
-			const auto i = _draftsSaveRequestIds.find(weak);
-			if (i != _draftsSaveRequestIds.cend()
-				&& i->second == requestId) {
-				_draftsSaveRequestIds.erase(i);
+			const auto i = _draftSaves.find(weak);
+			if (i != _draftSaves.cend()
+				&& i->second.requestId == requestId) {
+				const auto changed = i->second.changedWhileSaving;
+				_draftSaves.erase(i);
 				checkQuitPreventFinished();
+				if (changed) {
+					if (const auto strong = weak.get()) {
+						saveDraftToCloudDelayed(strong);
+					}
+				}
 			}
 			if (callbacks && callbacks->done) {
 				callbacks->done();
@@ -2621,18 +2642,18 @@ mtpRequestId ApiWrap::savePreparedDraftToCloud(
 }
 
 void ApiWrap::saveDraftsToCloud() {
-	for (auto i = begin(_draftsSaveRequestIds); i != end(_draftsSaveRequestIds);) {
+	for (auto i = begin(_draftSaves); i != end(_draftSaves);) {
 		const auto weak = i->first;
 		const auto thread = weak.get();
 		if (!thread) {
-			i = _draftsSaveRequestIds.erase(i);
+			i = _draftSaves.erase(i);
 			continue;
-		} else if (i->second) {
+		} else if (i->second.requestId) {
 			++i;
 			continue; // sent already - keep in-flight saves tracked so
 			          // quit prevention waits for their done/fail handler.
 		} else if (ShouldSkipPlainDraftCloudSave(_session, thread)) {
-			i = _draftsSaveRequestIds.erase(i);
+			i = _draftSaves.erase(i);
 			continue;
 		}
 
@@ -2652,26 +2673,30 @@ void ApiWrap::saveDraftsToCloud() {
 				monoforumPeerId,
 				nullptr);
 		}
-		i->second = savePreparedDraftToCloud(thread, *cloudDraft, true);
-		if (!i->second) {
-			i = _draftsSaveRequestIds.erase(i);
+		const auto requestId = savePreparedDraftToCloud(
+			thread,
+			*cloudDraft,
+			true);
+		if (!requestId) {
+			i = _draftSaves.erase(i);
 			continue;
 		}
+		i->second = DraftSaveState{ requestId };
 		++i;
 	}
 }
 
 bool ApiWrap::isQuitPrevent() {
-	if (_draftsSaveRequestIds.empty()) {
+	if (_draftSaves.empty()) {
 		return false;
 	}
 	LOG(("ApiWrap prevents quit, saving drafts..."));
 	saveDraftsToCloud();
-	return !_draftsSaveRequestIds.empty();
+	return !_draftSaves.empty();
 }
 
 void ApiWrap::checkQuitPreventFinished() {
-	if (_draftsSaveRequestIds.empty()) {
+	if (_draftSaves.empty()) {
 		if (Core::Quitting()) {
 			LOG(("ApiWrap doesn't prevent quit any more."));
 		}
@@ -3488,6 +3513,16 @@ void ApiWrap::resolveJumpToDate(
 		Dialogs::Key chat,
 		const QDate &date,
 		Fn<void(not_null<PeerData*>, MsgId)> callback) {
+	resolveJumpToTime(
+		chat,
+		TimeId(date.startOfDay().toSecsSinceEpoch()),
+		std::move(callback));
+}
+
+void ApiWrap::resolveJumpToTime(
+		Dialogs::Key chat,
+		TimeId when,
+		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto peer = chat.peer()) {
 		const auto topic = chat.topic();
 		const auto sublist = chat.sublist();
@@ -3495,27 +3530,27 @@ void ApiWrap::resolveJumpToDate(
 		const auto monoforumPeerId = sublist
 			? sublist->sublistPeer()->id
 			: PeerId();
-		resolveJumpToHistoryDate(
+		resolveJumpToHistoryTime(
 			peer,
 			rootId,
 			monoforumPeerId,
-			date,
+			when,
 			std::move(callback));
 	}
 }
 
 template <typename Callback>
-void ApiWrap::requestMessageAfterDate(
+void ApiWrap::requestMessageAfterTime(
 	not_null<PeerData*> peer,
 	MsgId topicRootId,
 	PeerId monoforumPeerId,
-	const QDate &date,
+	TimeId when,
 	Callback &&callback) {
 	// API returns a message with date <= offset_date.
 	// So we request a message with offset_date = desired_date - 1 and add_offset = -1.
 	// This should give us the first message with date >= desired_date.
 	const auto offsetId = 0;
-	const auto offsetDate = static_cast<int>(date.startOfDay().toSecsSinceEpoch()) - 1;
+	const auto offsetDate = when - 1;
 	const auto addOffset = -1;
 	const auto limit = 1;
 	const auto maxId = 0;
@@ -3603,37 +3638,37 @@ void ApiWrap::requestMessageAfterDate(
 	}
 }
 
-void ApiWrap::resolveJumpToHistoryDate(
+void ApiWrap::resolveJumpToHistoryTime(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
 		PeerId monoforumPeerId,
-		const QDate &date,
+		TimeId when,
 		Fn<void(not_null<PeerData*>, MsgId)> callback) {
 	if (const auto channel = peer->migrateTo()) {
-		return resolveJumpToHistoryDate(
+		return resolveJumpToHistoryTime(
 			channel,
 			topicRootId,
 			monoforumPeerId,
-			date,
+			when,
 			std::move(callback));
 	}
 	const auto jumpToDateInPeer = [=] {
-		requestMessageAfterDate(
+		requestMessageAfterTime(
 			peer,
 			topicRootId,
 			monoforumPeerId,
-			date,
+			when,
 			[=](MsgId itemId) { callback(peer, itemId); });
 	};
 	const auto migrated = (topicRootId || monoforumPeerId)
 		? nullptr
 		: peer->migrateFrom();
 	if (migrated) {
-		requestMessageAfterDate(
+		requestMessageAfterTime(
 			migrated,
 			MsgId(),
 			PeerId(),
-			date,
+			when,
 			[=](MsgId itemId) {
 				if (itemId) {
 					callback(migrated, itemId);
@@ -3755,6 +3790,45 @@ void ApiWrap::requestSharedMedia(
 	_sharedMediaRequests.emplace(key);
 }
 
+void ApiWrap::requestPinnedMessagesIfNeeded(
+		not_null<PeerData*> peer,
+		MsgId messageId,
+		MsgId topicRootId,
+		PeerId monoforumPeerId) {
+	if (!IsServerMsgId(messageId)) {
+		return;
+	}
+	const auto requestOne = [&](MsgId topic, PeerId mono) {
+		const auto snapshot = _session->storage().snapshot(
+			Storage::SharedMediaQuery(
+				Storage::SharedMediaKey(
+					peer->id,
+					topic,
+					mono,
+					SharedMediaType::Pinned,
+					messageId),
+				0,
+				0));
+		if (!snapshot.count || snapshot.messageIds.contains(messageId)) {
+			return;
+		}
+		requestSharedMedia(
+			peer,
+			topic,
+			mono,
+			SharedMediaType::Pinned,
+			messageId,
+			SliceType::Around);
+	};
+	requestOne(MsgId(0), PeerId(0));
+	if (topicRootId && peer->forumTopicFor(topicRootId)) {
+		requestOne(topicRootId, PeerId(0));
+	}
+	if (monoforumPeerId && peer->monoforumSublistFor(monoforumPeerId)) {
+		requestOne(MsgId(0), monoforumPeerId);
+	}
+}
+
 void ApiWrap::sharedMediaDone(
 		not_null<PeerData*> peer,
 		MsgId topicRootId,
@@ -3827,7 +3901,7 @@ void ApiWrap::sendAction(const SendAction &action) {
 			: nullptr;
 		if (topic) {
 			topic->readTillEnd();
-		} else if (sublist) {
+		} else if (sublist && sublist->parentChat()) {
 			sublist->readTillEnd();
 		} else {
 			_session->data().histories().readInbox(action.history);
@@ -5958,4 +6032,8 @@ Api::Websites &ApiWrap::websites() {
 
 Api::PeerColors &ApiWrap::peerColors() {
 	return *_peerColors;
+}
+
+Api::ShareThemes &ApiWrap::shareThemes() {
+	return *_shareThemes;
 }

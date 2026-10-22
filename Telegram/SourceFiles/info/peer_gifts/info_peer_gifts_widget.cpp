@@ -446,15 +446,29 @@ void InnerWidget::loadCollections() {
 void InnerWidget::subscribeToUpdates() {
 	_peer->owner().giftUpdates(
 	) | rpl::on_next([=](const Data::GiftUpdate &update) {
-		applyUpdateTo(_all, update);
 		using Action = Data::GiftUpdate::Action;
+		if (update.action == Action::HostChange) {
+			const auto invalidate = [](Entries &entries) {
+				entries.filter = std::nullopt;
+				entries.allLoaded = false;
+			};
+			invalidate(_all);
+			for (auto &[_, entries] : _perCollection) {
+				invalidate(entries);
+			}
+			switchTo(_descriptor.current().collectionId);
+			return;
+		}
+		applyUpdateTo(_all, update);
 		if (update.action == Action::Pin
 			|| update.action == Action::Unpin
+			|| update.action == Action::Convert
+			|| update.action == Action::Transfer
 			|| update.action == Action::Delete) {
 			for (auto &[_, entries] : _perCollection) {
 				applyUpdateTo(entries, update);
 			}
-		};
+		}
 	}, lifetime());
 }
 
@@ -470,24 +484,32 @@ void InnerWidget::applyUpdateTo(
 			? entry.gift.info.unique->slug
 			: QString();
 	};
+	const auto removal = (update.action == Action::Convert)
+		|| (update.action == Action::Transfer)
+		|| (update.action == Action::Delete);
+	auto &list = removal ? entries.list : *_list;
 	const auto i = update.id
-		? ranges::find(*_list, update.id, savedId)
-		: ranges::find(*_list, update.slug, bySlug);
-	if (i == end(*_list)) {
+		? ranges::find(list, update.id, savedId)
+		: ranges::find(list, update.slug, bySlug);
+	if (i == end(list)) {
 		return;
 	}
-	const auto index = int(i - begin(*_list));
-	if (update.action == Action::Convert
-		|| update.action == Action::Transfer
-		|| update.action == Action::Delete) {
-		_list->erase(i);
+	const auto index = int(i - begin(list));
+	if (removal) {
+		list.erase(i);
 		if (entries.total > 0) {
 			--entries.total;
+		}
+		if (&entries != _entries.get()) {
+			return;
 		}
 		for (auto &view : _views) {
 			if (view.index >= index) {
 				--view.index;
 			}
+		}
+		if (list.empty()) {
+			refreshAbout();
 		}
 	} else if (update.action == Action::Save
 		|| update.action == Action::Unsave) {
@@ -683,8 +705,9 @@ void InnerWidget::loadMore() {
 	}).fail([=] {
 		_loadMoreRequestId = 0;
 		_collectionsLoadedCallback = nullptr;
-		_entries->filter = _descriptor.current().filter;
-		_entries->allLoaded = true;
+		if (_entries->filter == _descriptor.current().filter) {
+			_entries->allLoaded = true;
+		}
 	}).send();
 }
 
@@ -708,6 +731,7 @@ void InnerWidget::loaded(const MTPpayments_SavedStarGifts &result) {
 	}
 	if (_entries->filter != filter) {
 		_entries->filter = filter;
+		cancelDragging();
 		_list->clear();
 	}
 	_list->reserve(_list->size() + data.vgifts().v.size());

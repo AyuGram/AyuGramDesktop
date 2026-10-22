@@ -55,7 +55,6 @@ struct TopControlsDescriptor {
 	MsgId repliesRootId = 0;
 	Data::ForumTopic *topic = nullptr;
 	Data::SavedSublist *sublist = nullptr;
-	PeerId monoforumPeerId = 0;
 	Ui::ElasticScroll *scroll = nullptr;
 	ListWidget *list = nullptr;
 	Fn<int()> keyboardReservedHeight;
@@ -116,7 +115,6 @@ private:
 	void resetPinnedState();
 	void updateLayout();
 	void updateZOrder();
-	void applyHeightChange(int was, int now, bool preserveTop);
 	void applyHeightChangeWithTopMoved(int was, int now);
 	void applyHeightChangeWithRelayout(int was, int now);
 

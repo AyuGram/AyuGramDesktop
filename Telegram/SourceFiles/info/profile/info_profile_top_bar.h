@@ -25,7 +25,6 @@ class SavedStarGiftId;
 } // namespace Data
 
 namespace Info::Profile {
-class BadgeTooltip;
 class TopicIconView;
 } // namespace Info::Profile
 
@@ -58,6 +57,7 @@ struct FlatLabel;
 namespace Ui {
 class AnimatedString;
 class FlatLabel;
+class GlareTooltip;
 class IconButton;
 class InputField;
 class LabelWithNumbers;
@@ -86,6 +86,7 @@ struct MenuCallback;
 namespace Info::Profile {
 
 class Badge;
+class BalancePill;
 class StatusLabel;
 class TopBarActionButton;
 
@@ -265,10 +266,13 @@ private:
 	const std::unique_ptr<Badge> _exteraBadge;
 
 	const bool _hasActions;
+	const bool _hasBalance;
+	const int _balanceReserve;
 	const int _minForProgress;
+	std::unique_ptr<BalancePill> _balancePill;
 
-	std::unique_ptr<BadgeTooltip> _badgeTooltip;
-	std::vector<std::unique_ptr<BadgeTooltip>> _badgeOldTooltips;
+	std::unique_ptr<Ui::GlareTooltip> _badgeTooltip;
+	std::vector<std::unique_ptr<Ui::GlareTooltip>> _badgeOldTooltips;
 	uint64 _badgeCollectibleId = 0;
 
 	object_ptr<Ui::MarqueeLabel> _title;

@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/mac/base_confirm_quit.h"
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/platform/base_platform_info.h"
+#include "platform/mac/wallet_protection_mac.h"
 
 #include <QtCore/QDirIterator>
 #include <QtGui/QDesktopServices>
@@ -263,6 +264,7 @@ namespace Platform {
 
 void start() {
 	objc_start();
+	RegisterWalletProtectionProvider();
 }
 
 void finish() {
@@ -435,6 +437,10 @@ void IgnoreApplicationActivationRightNow() {
 	objc_ignoreApplicationActivationRightNow();
 }
 
+int64 ClipboardChangeCount() {
+	return [[NSPasteboard generalPasteboard] changeCount];
+}
+
 void AutostartToggle(bool enabled, Fn<void(bool)> done) {
 	if (done) {
 		done(false);
@@ -524,6 +530,24 @@ void LaunchMaps(const Data::LocationPoint &point, Fn<void()> fail) {
 			point.latAsString(),
 			point.lonAsString()))) {
 		fail();
+	}
+}
+
+QString LocalizedCurrencyName(
+		const QString &currency,
+		const QString &languageId) {
+	@autoreleasepool {
+		NSLocale *locale = [NSLocale localeWithLocaleIdentifier:
+			Q2NSString(languageId)];
+		// An unknown language falls back to the system one, not to English.
+		NSString *language = locale.languageCode;
+		if (!language || ![[NSLocale availableLocaleIdentifiers]
+				containsObject:language]) {
+			return QString();
+		}
+		NSString *name = [locale localizedStringForCurrencyCode:
+			Q2NSString(currency)];
+		return name ? NS2QString(name) : QString();
 	}
 }
 

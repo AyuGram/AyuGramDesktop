@@ -11,6 +11,9 @@ add_library(tdesktop::td_iv ALIAS td_iv)
 add_library(td_iv_reorder_warning_off INTERFACE)
 target_compile_options(td_iv_reorder_warning_off
 INTERFACE
+    $<$<CXX_COMPILER_ID:MSVC>:/wd5038>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4265>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4005>
     $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-reorder-ctor>
     $<$<CXX_COMPILER_ID:GNU>:-Wno-reorder>
 )
@@ -84,12 +87,16 @@ PRIVATE
     iv/markdown/iv_markdown_common.h
     iv/markdown/iv_markdown_article.cpp
     iv/markdown/iv_markdown_article.h
+    iv/markdown/iv_markdown_article_caption_hit.cpp
+    iv/markdown/iv_markdown_article_caption_hit.h
     iv/markdown/iv_markdown_article_layout_blocks.cpp
     iv/markdown/iv_markdown_article_layout_blocks.h
     iv/markdown/iv_markdown_article_layout_structure.cpp
     iv/markdown/iv_markdown_article_layout_structure.h
     iv/markdown/iv_markdown_article_paint.cpp
     iv/markdown/iv_markdown_article_paint.h
+    iv/markdown/iv_markdown_article_quote.cpp
+    iv/markdown/iv_markdown_article_quote.h
     iv/markdown/iv_markdown_article_scroll_forwarder.cpp
     iv/markdown/iv_markdown_article_scroll_forwarder.h
     iv/markdown/iv_markdown_article_selection.cpp

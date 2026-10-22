@@ -310,8 +310,24 @@ public:
 		return _parent;
 	}
 
+	void setJumpToMessageCallback(Fn<void()> callback) {
+		_jumpToMessageCallback = std::move(callback);
+	}
+	void notifyJumpToMessage() {
+		if (const auto callback = _jumpToMessageCallback) {
+			callback();
+		}
+	}
+
+protected:
+	using SearchQuery = Api::DelayedSearchController::Query;
+
+	[[nodiscard]] SearchQuery produceSearchQuery(
+		const QString &query) const;
+
 private:
 	not_null<Window::SessionController*> _parent;
+	Fn<void()> _jumpToMessageCallback;
 
 };
 
@@ -382,10 +398,7 @@ public:
 	~Controller();
 
 private:
-	using SearchQuery = Api::DelayedSearchController::Query;
-
 	void updateSearchControllers(not_null<ContentMemento*> memento);
-	SearchQuery produceSearchQuery(const QString &query) const;
 	void setupMigrationViewer();
 	void setupTopicViewer();
 

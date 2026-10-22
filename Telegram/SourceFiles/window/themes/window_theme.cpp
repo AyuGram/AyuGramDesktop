@@ -32,6 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_domain.h" // Domain::activeSessionValue.
 #include "lang/lang_keys.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/chat/chat_theme_readability.h"
 #include "ui/image/image.h"
 #include "ui/style/style_palette_colorizer.h"
 #include "ui/ui_utility.h"
@@ -231,6 +232,20 @@ bool loadColorScheme(
 	});
 }
 
+void EnsureAccentReadable(
+		const style::palette &palette,
+		const QByteArray &content) {
+	auto reference = Instance();
+	if (!loadColorScheme(content, style::colorizer(), &reference)) {
+		return;
+	}
+	reference.palette.finalize();
+	Ui::EnsureBubblesReadable(palette, {
+		.dark = Ui::IsDarkPalette(reference.palette),
+		.reference = &reference.palette,
+	});
+}
+
 void applyBackground(QImage &&background, bool tiled, Instance *out) {
 	if (out) {
 		out->background = std::move(background);
@@ -274,12 +289,38 @@ bool loadBackground(zlib::FileToRead &file, QByteArray *outBackground, bool *out
 	return true;
 }
 
+std::optional<QByteArray> ReadPaletteContent(
+		zlib::FileToRead &file,
+		const QByteArray &content,
+		const std::optional<QByteArray> &editedPalette) {
+	unz_global_info globalInfo = { 0 };
+	file.getGlobalInfo(&globalInfo);
+	if (file.error() != UNZ_OK) {
+		// Looks like it is not a .zip theme.
+		return editedPalette.value_or(content);
+	}
+	auto schemeContent = editedPalette.value_or(QByteArray());
+	if (schemeContent.isEmpty()) {
+		schemeContent = file.readFileContent("colors.tdesktop-theme", zlib::kCaseInsensitive, kThemeSchemeSizeLimit);
+	}
+	if (schemeContent.isEmpty()) {
+		file.clearError();
+		schemeContent = file.readFileContent("colors.tdesktop-palette", zlib::kCaseInsensitive, kThemeSchemeSizeLimit);
+	}
+	if (file.error() != UNZ_OK) {
+		LOG(("Theme Error: could not read 'colors.tdesktop-theme' or 'colors.tdesktop-palette' in the theme file."));
+		return std::nullopt;
+	}
+	return schemeContent;
+}
+
 bool LoadTheme(
 		const QByteArray &content,
 		const style::colorizer &colorizer,
 		const std::optional<QByteArray> &editedPalette,
 		Cached *cache = nullptr,
-		Instance *out = nullptr) {
+		Instance *out = nullptr,
+		bool ensureReadable = false) {
 	if (content.size() < 4) {
 		LOG(("Theme Error: Bad theme content size: %1").arg(content.size()));
 		return false;
@@ -292,30 +333,20 @@ bool LoadTheme(
 
 	const auto emptyColorizer = style::colorizer();
 	const auto &paletteColorizer = editedPalette ? emptyColorizer : colorizer;
-
-	unz_global_info globalInfo = { 0 };
-	file.getGlobalInfo(&globalInfo);
+	const auto paletteContent = ReadPaletteContent(
+		file,
+		content,
+		editedPalette);
+	if (!paletteContent) {
+		return false;
+	} else if (!loadColorScheme(*paletteContent, paletteColorizer, out)) {
+		DEBUG_LOG(("Theme: Could not loadColorScheme."));
+		return false;
+	}
+	if (!out) {
+		Background()->saveAdjustableColors();
+	}
 	if (file.error() == UNZ_OK) {
-		auto schemeContent = editedPalette.value_or(QByteArray());
-		if (schemeContent.isEmpty()) {
-			schemeContent = file.readFileContent("colors.tdesktop-theme", zlib::kCaseInsensitive, kThemeSchemeSizeLimit);
-		}
-		if (schemeContent.isEmpty()) {
-			file.clearError();
-			schemeContent = file.readFileContent("colors.tdesktop-palette", zlib::kCaseInsensitive, kThemeSchemeSizeLimit);
-		}
-		if (file.error() != UNZ_OK) {
-			LOG(("Theme Error: could not read 'colors.tdesktop-theme' or 'colors.tdesktop-palette' in the theme file."));
-			return false;
-		}
-		if (!loadColorScheme(schemeContent, paletteColorizer, out)) {
-			DEBUG_LOG(("Theme: Could not loadColorScheme."));
-			return false;
-		}
-		if (!out) {
-			Background()->saveAdjustableColors();
-		}
-
 		auto backgroundTiled = false;
 		auto backgroundContent = QByteArray();
 		if (!loadBackground(file, &backgroundContent, &backgroundTiled)) {
@@ -353,18 +384,14 @@ bool LoadTheme(
 			}
 			applyBackground(std::move(background), backgroundTiled, out);
 		}
-	} else {
-		// Looks like it is not a .zip theme.
-		if (!loadColorScheme(editedPalette.value_or(content), paletteColorizer, out)) {
-			DEBUG_LOG(("Theme: Could not loadColorScheme from non-zip."));
-			return false;
-		}
-		if (!out) {
-			Background()->saveAdjustableColors();
-		}
 	}
 	if (out) {
 		out->palette.finalize(paletteColorizer);
+	}
+	if (ensureReadable && paletteColorizer) {
+		EnsureAccentReadable(
+			out ? out->palette : *style::main_palette::get(),
+			*paletteContent);
 	}
 	if (cache) {
 		if (out) {
@@ -445,7 +472,13 @@ bool InitializeFromSaved(Saved &&saved) {
 	}
 
 	const auto colorizer = ColorizerForTheme(saved.object.pathAbsolute);
-	if (!LoadTheme(saved.object.content, colorizer, editing, &saved.cache)) {
+	if (!LoadTheme(
+			saved.object.content,
+			colorizer,
+			editing,
+			&saved.cache,
+			nullptr,
+			true)) {
 		DEBUG_LOG(("Theme: Could not load from saved."));
 		return false;
 	}
@@ -1112,7 +1145,16 @@ void ChatBackground::setTestingDefaultTheme() {
 }
 
 void ChatBackground::applyDefaultThemeAccentColorizer() {
-	style::main_palette::reset(ColorizerForTheme(QString()));
+	const auto colorizer = ColorizerForTheme(QString());
+	style::main_palette::reset(colorizer);
+	if (colorizer) {
+		auto reference = style::palette();
+		reference.finalize();
+		Ui::EnsureBubblesReadable(*style::main_palette::get(), {
+			.dark = Ui::IsDarkPalette(reference),
+			.reference = &reference,
+		});
+	}
 	saveAdjustableColors();
 }
 
@@ -1232,7 +1274,8 @@ void ChatBackground::reapplyWithNightMode(
 			ColorizerForTheme(path),
 			std::nullopt,
 			&preview->instance.cached,
-			&preview->instance);
+			&preview->instance,
+			true);
 		if (!loaded) {
 			return false;
 		}
@@ -1292,6 +1335,24 @@ ChatBackground *Background() {
 
 bool IsEmbeddedTheme(const QString &path) {
 	return path.isEmpty() || path.startsWith(u":/gui/"_q);
+}
+
+std::optional<EmbeddedType> CurrentEmbeddedType() {
+	if (Background()->editingTheme().has_value()) {
+		return std::nullopt;
+	}
+	const auto &object = AreTestingTheme()
+		? GlobalApplying.data.object
+		: Background()->themeObject();
+	if (object.cloud.id) {
+		return std::nullopt;
+	}
+	const auto schemes = EmbeddedThemes();
+	const auto i = ranges::find(
+		schemes,
+		object.pathAbsolute,
+		&EmbeddedScheme::path);
+	return (i != end(schemes)) ? std::make_optional(i->type) : std::nullopt;
 }
 
 bool Initialize(Saved &&saved) {
@@ -1483,8 +1544,17 @@ bool LoadFromFile(
 		not_null<Instance*> out,
 		Cached *outCache,
 		QByteArray *outContent) {
-	const auto colorizer = ColorizerForTheme(path);
-	return LoadFromFile(path, out, outCache, outContent, colorizer);
+	const auto content = readThemeContent(path);
+	if (outContent) {
+		*outContent = content;
+	}
+	return LoadTheme(
+		content,
+		ColorizerForTheme(path),
+		std::nullopt,
+		outCache,
+		out,
+		true);
 }
 
 bool LoadFromFile(
@@ -1510,6 +1580,15 @@ bool LoadFromContent(
 		std::nullopt,
 		outCache,
 		out);
+}
+
+std::optional<QByteArray> ReadPaletteContent(const QString &path) {
+	const auto content = readThemeContent(path);
+	if (content.isEmpty()) {
+		return std::nullopt;
+	}
+	auto file = zlib::FileToRead(content);
+	return ReadPaletteContent(file, content, std::nullopt);
 }
 
 rpl::producer<bool> IsThemeDarkValue() {

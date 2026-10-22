@@ -9,14 +9,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/algorithm.h"
 #include "data/data_file_click_handler.h"
+#include "iv/markdown/iv_markdown_article_caption_hit.h"
 #include "iv/markdown/iv_markdown_article_layout_structure.h"
 #include "iv/markdown/iv_markdown_article_paint.h"
+#include "iv/markdown/iv_markdown_article_quote.h"
 #include "iv/markdown/iv_markdown_article_selection.h"
 #include "iv/markdown/iv_markdown_article_text.h"
 #include "iv/markdown/iv_markdown_button_row.h"
 #include "iv/markdown/iv_markdown_media_reuse.h"
 #include "iv/markdown/iv_markdown_prepare_links.h"
-#include "iv/markdown/iv_markdown_prepare_serialize.h"
 #include "lang/lang_keys.h"
 #include "ui/style/style_core_color.h"
 #include "ui/style/style_core_scale.h"
@@ -124,20 +125,6 @@ struct MarkdownArticleHorizontalScrollLookup {
 	const LaidOutBlock *block = nullptr;
 };
 
-[[nodiscard]] bool TextDependsOnMediaRuntime(
-		const TextWithEntities &text) {
-	for (const auto &entity : text.entities) {
-		if (entity.type() != EntityType::CustomEmoji) {
-			continue;
-		}
-		const auto parsed = ParseInlineTextObjectEntity(entity.data());
-		if (parsed && (parsed->kind == InlineTextObjectKind::IvImage)) {
-			return true;
-		}
-	}
-	return false;
-}
-
 [[nodiscard]] TextWithEntities DisplayMathFallbackText() {
 	auto result = TextWithEntities::Simple(u"Invalid formula"_q);
 	result.entities.push_back(EntityInText(
@@ -151,111 +138,6 @@ struct MarkdownArticleHorizontalScrollLookup {
 	return open
 		? tr::lng_iv_details_state_expanded(tr::now)
 		: tr::lng_iv_details_state_collapsed(tr::now);
-}
-
-[[nodiscard]] size_t TextStyleKey(const style::TextStyle &style) {
-	return reinterpret_cast<size_t>(&style);
-}
-
-[[nodiscard]] CachedTextLeafSourceSignature MarkedTextLeafSourceSignature(
-		TextWithEntities text,
-		const style::TextStyle &textStyle,
-		int minResizeWidth,
-		bool rtl) {
-	auto result = CachedTextLeafSourceSignature();
-	result.dependsOnMediaRuntime = TextDependsOnMediaRuntime(text);
-	result.dependsOnInlineButtonColumn = TextHasInlineButton(text);
-	result.text = std::move(text);
-	result.minResizeWidth = minResizeWidth;
-	result.styleKey = TextStyleKey(textStyle);
-	result.rtl = rtl;
-	return result;
-}
-
-[[nodiscard]] CachedTextLeafSourceSignature PlainTextLeafSourceSignature(
-		const QString &text,
-		const style::TextStyle &textStyle,
-		int minResizeWidth,
-		bool rtl) {
-	return MarkedTextLeafSourceSignature(
-		TextWithEntities::Simple(text),
-		textStyle,
-		minResizeWidth,
-		rtl);
-}
-
-[[nodiscard]] CachedTextLeafSourceSignature CodeTextLeafSourceSignature(
-		const PreparedBlock &prepared,
-		const style::Markdown &st) {
-	auto result = MarkedTextLeafSourceSignature(
-		CodeBlockDisplayText(prepared.text),
-		st.code,
-		CodeTextMinResizeWidth(st),
-		false);
-	result.codeLanguage = prepared.codeLanguage;
-	return result;
-}
-
-[[nodiscard]] CachedTextLeafKey BlockCachedTextLeafKey(
-		CachedTextLeafSlot slot,
-		const PreparedBlock &prepared,
-		const std::vector<int> &preparedPath) {
-	auto result = CachedTextLeafKey();
-	result.slot = slot;
-	if ((slot == CachedTextLeafSlot::Leaf
-			|| slot == CachedTextLeafSlot::Placeholder
-			|| slot == CachedTextLeafSlot::Fallback)
-		&& prepared.editLeaf) {
-		result.identityKind = CachedTextLeafIdentityKind::EditLeaf;
-		result.editLeaf = *prepared.editLeaf;
-		return result;
-	}
-	if ((slot == CachedTextLeafSlot::Marker) && prepared.editListItem) {
-		result.identityKind = CachedTextLeafIdentityKind::EditListItem;
-		result.editListItem = *prepared.editListItem;
-		return result;
-	}
-	if (prepared.editBlock) {
-		result.identityKind = CachedTextLeafIdentityKind::EditBlock;
-		result.editBlock = *prepared.editBlock;
-		return result;
-	}
-	if (prepared.editListItem) {
-		result.identityKind = CachedTextLeafIdentityKind::EditListItem;
-		result.editListItem = *prepared.editListItem;
-		return result;
-	}
-	if (prepared.editLeaf) {
-		result.identityKind = CachedTextLeafIdentityKind::EditLeaf;
-		result.editLeaf = *prepared.editLeaf;
-		return result;
-	}
-	result.preparedPath = preparedPath;
-	return result;
-}
-
-[[nodiscard]] CachedTextLeafKey TableCellCachedTextLeafKey(
-		CachedTextLeafSlot slot,
-		const PreparedTableCell &prepared,
-		const std::vector<int> &preparedPath,
-		int tableRowIndex,
-		int tableCellIndex) {
-	auto result = CachedTextLeafKey();
-	result.slot = slot;
-	result.tableRowIndex = tableRowIndex;
-	result.tableCellIndex = tableCellIndex;
-	if (prepared.editLeaf) {
-		result.identityKind = CachedTextLeafIdentityKind::EditLeaf;
-		result.editLeaf = *prepared.editLeaf;
-		return result;
-	}
-	if (prepared.editCell) {
-		result.identityKind = CachedTextLeafIdentityKind::EditTableCell;
-		result.editTableCell = *prepared.editCell;
-		return result;
-	}
-	result.preparedPath = preparedPath;
-	return result;
 }
 
 void StoreCachedTextLeaf(
@@ -382,6 +264,7 @@ void HarvestCachedTextLeafs(
 		const auto &placeholderStyle = EditPlaceholderTextStyleFor(
 			prepared,
 			st);
+		block->leaf.removeSkipBlock();
 		storeBlockLeaf(
 			CachedTextLeafSlot::Leaf,
 			MarkedTextLeafSourceSignature(
@@ -1400,10 +1283,12 @@ void RebuildVisibleSegmentLookup(
 		result.state.link = nullptr;
 	}
 	result.preparedLink = ExtractPreparedLink(result.state.link);
-	if (!result.preparedLink
-		&& dynamic_cast<Ui::Text::CustomEmojiClickHandler*>(
-			result.state.link.get())) {
-		result.inlineButton = point;
+	if (!result.preparedLink) {
+		if (const auto custom = dynamic_cast<Ui::Text::CustomEmojiClickHandler*>(
+				result.state.link.get())) {
+			result.inlineButton = point;
+			result.buttonUrl = InlineButtonUrl(custom->entityData());
+		}
 	}
 	if (!result.preparedLink
 		&& !result.inlineButton
@@ -1470,6 +1355,8 @@ void RebuildVisibleSegmentLookup(
 				const auto &runtime = segment.block->buttonRowRuntime;
 				if (runtime && (index < int(runtime->handlers.size()))) {
 					result.state.link = runtime->handlers[index];
+					const auto &record = runtime->buttons[index];
+					result.buttonUrl = RichButtonUrl(record.type, record.data);
 				}
 				result.buttonRow = {
 					.id = segment.block->buttonRowId,
@@ -2086,6 +1973,122 @@ void CollectUnsupportedNoticeRects(
 		}
 	}
 	return false;
+}
+
+[[nodiscard]] bool ExpectsMediaBlock(const PreparedBlock &prepared) {
+	switch (prepared.kind) {
+	case PreparedBlockKind::Photo:
+		return prepared.photo.id
+			&& prepared.photo.viewerOpen
+			&& prepared.photo.urlOverride.isEmpty();
+	case PreparedBlockKind::Video:
+		return bool(prepared.video.id);
+	case PreparedBlockKind::Map:
+		return bool(prepared.map.id);
+	case PreparedBlockKind::Document:
+		return bool(prepared.document.id);
+	case PreparedBlockKind::GroupedMedia:
+		return bool(prepared.groupedMedia.id);
+	default:
+		return false;
+	}
+}
+
+[[nodiscard]] MarkdownArticleEdgeBlock EdgeBlockOf(
+		const PreparedBlock &block,
+		bool top) {
+	switch (block.kind) {
+	case PreparedBlockKind::Photo:
+	case PreparedBlockKind::Video:
+	case PreparedBlockKind::Map:
+	case PreparedBlockKind::GroupedMedia: {
+		const auto caption = !block.text.text.isEmpty()
+			|| block.forceTextSegment;
+		return (!ExpectsMediaBlock(block) || (!top && caption))
+			? MarkdownArticleEdgeBlock::Line
+			: MarkdownArticleEdgeBlock::VisualMedia;
+	}
+	case PreparedBlockKind::CodeBlock:
+		return MarkdownArticleEdgeBlock::CodeFrame;
+	case PreparedBlockKind::Quote:
+		return MarkdownArticleEdgeBlock::QuoteFrame;
+	case PreparedBlockKind::Table: {
+		const auto captionOnly = block.tableRows.empty()
+			|| (block.tableColumnCount <= 0);
+		const auto hasTitle = !block.text.text.isEmpty()
+			|| block.forceTextSegment;
+		return (captionOnly || (top && hasTitle))
+			? MarkdownArticleEdgeBlock::Line
+			: MarkdownArticleEdgeBlock::QuoteFrame;
+	}
+	case PreparedBlockKind::Paragraph:
+	case PreparedBlockKind::Thinking:
+	case PreparedBlockKind::Heading:
+	case PreparedBlockKind::Rule:
+	case PreparedBlockKind::ButtonRow:
+	case PreparedBlockKind::List:
+	case PreparedBlockKind::ListItem:
+	case PreparedBlockKind::DisplayMath:
+	case PreparedBlockKind::Details:
+	case PreparedBlockKind::Document:
+	case PreparedBlockKind::Channel:
+	case PreparedBlockKind::RelatedArticle:
+	case PreparedBlockKind::EmbedPost:
+	case PreparedBlockKind::Placeholder:
+		return MarkdownArticleEdgeBlock::Line;
+	}
+	Unexpected("Block kind in EdgeBlockOf.");
+}
+
+struct EdgeBlockIndices {
+	int first = -1;
+	int last = -1;
+};
+
+[[nodiscard]] EdgeBlockIndices FindEdgeBlockIndices(
+		const std::vector<PreparedBlock> &blocks) {
+	auto result = EdgeBlockIndices();
+	for (auto i = 0, count = int(blocks.size()); i != count; ++i) {
+		if (!IsAnchorOnlyBlock(blocks[i])) {
+			if (result.first < 0) {
+				result.first = i;
+			}
+			result.last = i;
+		}
+	}
+	return result;
+}
+
+[[nodiscard]] MarkdownArticleEdgeBlocks CollectEdgeBlocks(
+		const std::vector<PreparedBlock> &blocks) {
+	const auto indices = FindEdgeBlockIndices(blocks);
+	if (indices.first < 0) {
+		return {};
+	}
+	return {
+		.top = EdgeBlockOf(blocks[indices.first], true),
+		.bottom = EdgeBlockOf(blocks[indices.last], false),
+	};
+}
+
+[[nodiscard]] Ui::BubbleRounding EdgeMediaRounding(
+		Ui::BubbleRounding corners,
+		QRect media,
+		int articleWidth) {
+	using Corner = Ui::BubbleCornerRounding;
+	const auto keep = [](Corner corner, int gap) {
+		return (gap < Ui::BubbleCornerRadius(corner))
+			? corner
+			: Corner::None;
+	};
+	const auto left = media.x();
+	const auto right = articleWidth - (media.x() + media.width());
+	return Ui::BubbleRounding{
+		.topLeft = keep(corners.topLeft, left),
+		.topRight = keep(corners.topRight, right),
+		.bottomLeft = keep(corners.bottomLeft, left),
+		.bottomRight = keep(corners.bottomRight, right),
+	};
 }
 
 [[nodiscard]] PreparedEditHit EditFallbackHitForBlock(
@@ -3751,25 +3754,6 @@ void CollectCodeBlockHighlightKeys(
 	}
 }
 
-[[nodiscard]] bool ExpectsMediaBlock(const PreparedBlock &prepared) {
-	switch (prepared.kind) {
-	case PreparedBlockKind::Photo:
-		return prepared.photo.id
-			&& prepared.photo.viewerOpen
-			&& prepared.photo.urlOverride.isEmpty();
-	case PreparedBlockKind::Video:
-		return bool(prepared.video.id);
-	case PreparedBlockKind::Map:
-		return bool(prepared.map.id);
-	case PreparedBlockKind::Document:
-		return bool(prepared.document.id);
-	case PreparedBlockKind::GroupedMedia:
-		return bool(prepared.groupedMedia.id);
-	default:
-		return false;
-	}
-}
-
 } // namespace
 
 PlaceholderBlockRuntime::PlaceholderBlockRuntime(Fn<void()> repaint)
@@ -3861,6 +3845,12 @@ public:
 	[[nodiscard]] std::vector<QRect> buttonRowControlRects() const;
 	[[nodiscard]] std::vector<QRect> unsupportedNoticeRects() const;
 	[[nodiscard]] bool hasUnsupportedNotices() const;
+	void setBubbleEdges(MarkdownArticleBubbleEdges edges);
+	[[nodiscard]] MarkdownArticleBubbleEdges bubbleEdges() const;
+	[[nodiscard]] MarkdownArticleEdgeBlocks edgeBlocks() const;
+	bool updateSkipBlock(int width, int height);
+	bool removeSkipBlock();
+	[[nodiscard]] bool hasSkipBlock() const;
 	void setGroupedActiveIndex(
 		const PreparedEditBlockSource &source,
 		int index);
@@ -3940,6 +3930,13 @@ public:
 
 	[[nodiscard]] int segmentIndexForEditableLeaf(
 		const PreparedEditLeafSource &source) const;
+
+	[[nodiscard]] QuoteLeafLookup quoteLeaf(
+		const PreparedEditLeafSource &source,
+		int segmentIndex) const;
+	[[nodiscard]] int groupedCaptionSegment(int segmentIndex) const;
+	[[nodiscard]] QRect displayRangesRect(
+		const std::vector<MarkdownArticleSearchMatch> &ranges) const;
 
 	[[nodiscard]] QRect textSegmentRect(int segmentIndex) const;
 	[[nodiscard]] QRect logicalSegmentRect(int segmentIndex) const;
@@ -4043,6 +4040,7 @@ private:
 	void releasePressedHandler();
 
 	void refreshMediaBlockHosts();
+	void refreshMediaBlockBubbleRounding();
 
 	void clearPlaceholderRuntimes();
 
@@ -4231,6 +4229,8 @@ private:
 	bool _editableTextEmptyOverride = true;
 	int _editableHeightOverrideIndex = -1;
 	int _editableHeightOverride = 0;
+	MarkdownArticleBubbleEdges _bubbleEdges;
+	QSize _skipBlock;
 	bool _blocksPainted = false;
 
 };
@@ -4372,7 +4372,9 @@ void MarkdownArticle::Impl::updatePreparedLeaf(
 		const MarkdownArticleContent &prepared) {
 	if (!ValidBlockPath(source.block)
 		|| (_content.mediaRuntime != prepared.mediaRuntime)
-		|| (_content.editMode != prepared.editMode)) {
+		|| (_content.editMode != prepared.editMode)
+		|| IsQuotableNativeContent(_content)
+		|| IsQuotableNativeContent(prepared)) {
 		setContent(prepared);
 		return;
 	}
@@ -4718,6 +4720,20 @@ MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTestSegments(
 			return result;
 		}
 	}
+	const auto band = HitScrolledCaptionBand(
+		_segments,
+		span,
+		point,
+		[&](int index) {
+			const auto owner = findHorizontalScrollOwner(index);
+			return owner ? owner->block : nullptr;
+		},
+		[&](const SelectableSegment &segment) {
+			return HitTextSegment(segment, point, flags);
+		});
+	if (band.valid()) {
+		return band;
+	}
 	if (flags & Ui::Text::StateRequest::Flag::LookupSymbol) {
 		return HitSegmentFallback(_segments, span, point);
 	}
@@ -4728,10 +4744,6 @@ MarkdownArticleHitTestResult MarkdownArticle::Impl::hitTest(
 		QPoint point,
 		Ui::Text::StateRequest::Flags flags) const {
 	auto result = hitTestSegments(point, flags);
-	if (result.inlineButton && result.customTooltip.isEmpty()) {
-		result.customTooltip = InlineButtonTooltip(
-			_inlineButtonPaintState->lookedUpButton);
-	}
 	if ((flags & Ui::Text::StateRequest::Flag::LookupLink)
 		&& !result.state.link
 		&& !result.preparedLink
@@ -4772,6 +4784,53 @@ std::vector<QRect> MarkdownArticle::Impl::unsupportedNoticeRects() const {
 
 bool MarkdownArticle::Impl::hasUnsupportedNotices() const {
 	return PreparedBlocksHaveUnsupportedNotices(_content.blocks.blocks);
+}
+
+void MarkdownArticle::Impl::setBubbleEdges(
+		MarkdownArticleBubbleEdges edges) {
+	if (_bubbleEdges == edges) {
+		return;
+	}
+	_bubbleEdges = edges;
+	refreshMediaBlockBubbleRounding();
+}
+
+MarkdownArticleBubbleEdges MarkdownArticle::Impl::bubbleEdges() const {
+	return _bubbleEdges;
+}
+
+MarkdownArticleEdgeBlocks MarkdownArticle::Impl::edgeBlocks() const {
+	return CollectEdgeBlocks(_content.blocks.blocks);
+}
+
+bool MarkdownArticle::Impl::updateSkipBlock(int width, int height) {
+	const auto size = QSize(width, height);
+	if (size.isEmpty()) {
+		return removeSkipBlock();
+	} else if (_skipBlock == size) {
+		return false;
+	}
+	_skipBlock = size;
+	invalidateLayout();
+	return true;
+}
+
+bool MarkdownArticle::Impl::removeSkipBlock() {
+	if (_skipBlock.isEmpty()) {
+		return false;
+	}
+	_skipBlock = QSize();
+	invalidateLayout();
+	return true;
+}
+
+bool MarkdownArticle::Impl::hasSkipBlock() const {
+	if (_skipBlock.isEmpty()) {
+		return false;
+	}
+	const auto &blocks = _content.blocks.blocks;
+	const auto last = FindEdgeBlockIndices(blocks).last;
+	return (last >= 0) && TakesMessageSkipBlock(blocks[last]);
 }
 
 void MarkdownArticle::Impl::setGroupedActiveIndex(
@@ -5095,6 +5154,40 @@ int MarkdownArticle::Impl::segmentIndexForEditableLeaf(
 	return -1;
 }
 
+QuoteLeafLookup MarkdownArticle::Impl::quoteLeaf(
+		const PreparedEditLeafSource &source,
+		int segmentIndex) const {
+	const auto prepared = FindPreparedArticleLeaf(
+		_content.blocks.blocks,
+		source);
+	return {
+		.content = &_content,
+		.segment = FindSegment(&_segments, segmentIndex),
+		.block = prepared.block,
+		.cell = prepared.cell,
+	};
+}
+
+int MarkdownArticle::Impl::groupedCaptionSegment(int segmentIndex) const {
+	return GroupedCaptionSegment(_segments, segmentIndex);
+}
+
+QRect MarkdownArticle::Impl::displayRangesRect(
+		const std::vector<MarkdownArticleSearchMatch> &ranges) const {
+	return DisplayRangesRect(
+		_segments,
+		ranges,
+		layoutStyle(),
+		currentDevicePixelRatio(),
+		[&](int index) {
+			const auto owner = findHorizontalScrollOwner(index);
+			return QuoteSegmentGeometry{
+				.logical = logicalSegmentRect(index),
+				.scrollOwner = owner ? owner->block : nullptr,
+			};
+		});
+}
+
 QRect MarkdownArticle::Impl::textSegmentRect(int segmentIndex) const {
 	const auto segment = FindSegment(&_segments, segmentIndex);
 	return (segment && segment->isTextLeaf()) ? segment->textRect : QRect();
@@ -5250,7 +5343,16 @@ TextSelection MarkdownArticle::Impl::adjustSelection(
 	if (!segment || !segment->isTextLeaf()) {
 		return selection;
 	}
-	return segment->leaf->adjustSelection(selection, selectionType);
+	const auto adjusted = segment->leaf->adjustSelection(
+		selection,
+		selectionType);
+	const auto length = SegmentLength(*segment);
+	if (length == segment->leaf->length()) {
+		return adjusted;
+	}
+	return TextSelection(
+		uint16(std::min(int(adjusted.from), length)),
+		uint16(std::min(int(adjusted.to), length)));
 }
 
 bool MarkdownArticle::Impl::selectionContains(
@@ -5693,6 +5795,45 @@ void MarkdownArticle::Impl::refreshMediaBlockHosts() {
 			block->setLayoutStyle(layoutStyle());
 			block->setHost(_mediaBlockHost);
 		}
+	}
+}
+
+void MarkdownArticle::Impl::refreshMediaBlockBubbleRounding() {
+	for (const auto &[id, block] : _mediaBlocks) {
+		if (block) {
+			block->setBubbleRounding(Ui::BubbleRounding());
+		}
+	}
+	const auto &prepared = _content.blocks.blocks;
+	if (_blocks.empty() || (_blocks.size() != prepared.size())) {
+		return;
+	}
+	const auto apply = [&](int index, bool top) {
+		const auto &laidOut = _blocks[index];
+		const auto &block = laidOut.mediaBlock;
+		if (!block
+			|| (EdgeBlockOf(prepared[index], top)
+				!= MarkdownArticleEdgeBlock::VisualMedia)) {
+			return;
+		}
+		const auto edge = EdgeMediaRounding(
+			_bubbleEdges.corners,
+			laidOut.mediaRect,
+			_width);
+		auto rounding = block->bubbleRounding();
+		if (top) {
+			rounding.topLeft = edge.topLeft;
+			rounding.topRight = edge.topRight;
+		} else {
+			rounding.bottomLeft = edge.bottomLeft;
+			rounding.bottomRight = edge.bottomRight;
+		}
+		block->setBubbleRounding(rounding);
+	};
+	const auto indices = FindEdgeBlockIndices(prepared);
+	if (indices.first >= 0) {
+		apply(indices.first, true);
+		apply(indices.last, false);
 	}
 }
 
@@ -6620,6 +6761,7 @@ void MarkdownArticle::Impl::finalizeRelayout(int heightBottom) {
 	RefreshScrollableSegmentRects(_blocks, &_segments);
 	rebuildVisibleSegmentLookup();
 	_nextFormattedDateUpdate = CountBlocksFormattedDateUpdate(_blocks);
+	refreshMediaBlockBubbleRounding();
 }
 
 int MarkdownArticle::Impl::inlineButtonWidthCap() const {
@@ -6679,6 +6821,7 @@ void MarkdownArticle::Impl::relayout(int width) {
 		.spoilerLinkFilter = _textSpoilerLinkFilter,
 		.inlineButtonPaintState = _inlineButtonPaintState,
 	};
+	context.skipBlock = _skipBlock;
 	if (_editableMaxLineWidthOverrideLeaf
 		&& (_editableMaxLineWidthOverride > 0)) {
 		context.editableMaxLineWidthOverride
@@ -6773,6 +6916,7 @@ void MarkdownArticle::Impl::relayoutRetained(int width) {
 		.spoilerLinkFilter = _textSpoilerLinkFilter,
 		.inlineButtonPaintState = _inlineButtonPaintState,
 	};
+	context.skipBlock = _skipBlock;
 	if (_editableMaxLineWidthOverrideLeaf
 		&& (_editableMaxLineWidthOverride > 0)) {
 		context.editableMaxLineWidthOverride
@@ -7137,6 +7281,36 @@ int MarkdownArticle::segmentIndexForEditableLeaf(
 	return _impl->segmentIndexForEditableLeaf(source);
 }
 
+void MarkdownArticle::appendDisplayRangesForLeafText(
+		const PreparedEditLeafSource &source,
+		std::span<const MarkdownArticleTextRange> ranges,
+		not_null<std::vector<MarkdownArticleSearchMatch>*> result) const {
+	const auto segmentIndex = _impl->segmentIndexForEditableLeaf(source);
+	const auto leaf = _impl->quoteLeaf(source, segmentIndex);
+	AppendDisplayRangesForLeafText(leaf, source, ranges, result);
+}
+
+std::optional<MarkdownArticleLeafPoint> MarkdownArticle::leafPointForDisplay(
+		int segmentIndex,
+		int offset,
+		MarkdownArticleTextEdge edge) const {
+	const auto source = _impl->editableLeafForSegment(segmentIndex);
+	if (!source) {
+		return std::nullopt;
+	}
+	const auto leaf = _impl->quoteLeaf(*source, segmentIndex);
+	return LeafPointForDisplay(leaf, *source, offset, edge);
+}
+
+int MarkdownArticle::groupedCaptionSegment(int segmentIndex) const {
+	return _impl->groupedCaptionSegment(segmentIndex);
+}
+
+QRect MarkdownArticle::displayRangesRect(
+		const std::vector<MarkdownArticleSearchMatch> &ranges) const {
+	return _impl->displayRangesRect(ranges);
+}
+
 QRect MarkdownArticle::textSegmentRect(int segmentIndex) const {
 	return _impl->textSegmentRect(segmentIndex);
 }
@@ -7164,6 +7338,30 @@ std::vector<QRect> MarkdownArticle::unsupportedNoticeRects() const {
 
 bool MarkdownArticle::hasUnsupportedNotices() const {
 	return _impl->hasUnsupportedNotices();
+}
+
+void MarkdownArticle::setBubbleEdges(MarkdownArticleBubbleEdges edges) {
+	_impl->setBubbleEdges(edges);
+}
+
+MarkdownArticleBubbleEdges MarkdownArticle::bubbleEdges() const {
+	return _impl->bubbleEdges();
+}
+
+MarkdownArticleEdgeBlocks MarkdownArticle::edgeBlocks() const {
+	return _impl->edgeBlocks();
+}
+
+bool MarkdownArticle::updateSkipBlock(int width, int height) {
+	return _impl->updateSkipBlock(width, height);
+}
+
+bool MarkdownArticle::removeSkipBlock() {
+	return _impl->removeSkipBlock();
+}
+
+bool MarkdownArticle::hasSkipBlock() const {
+	return _impl->hasSkipBlock();
 }
 
 void MarkdownArticle::setGroupedActiveIndex(
