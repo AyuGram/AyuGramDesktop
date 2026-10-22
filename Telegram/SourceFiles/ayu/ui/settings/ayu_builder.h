@@ -40,6 +40,8 @@ public:
 		IconDescriptor icon;
 		QStringList keywords;
 		rpl::producer<bool> shown;
+		bool disabled = false;
+		QString tooltip;
 	};
 	Ui::SettingsButton *addToggle(ToggleArgs &&args);
 

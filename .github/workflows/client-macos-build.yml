@@ -1,0 +1,80 @@
+name: Client macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_id:
+        description: TDESKTOP_API_ID (my.telegram.org)
+        required: false
+        default: "2040"
+      api_hash:
+        description: TDESKTOP_API_HASH (my.telegram.org)
+        required: false
+        default: "b18441a1ff607e10a989891a5462e627"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+
+      - name: First set up
+        run: |
+          sudo chown -R `whoami`:admin /usr/local/share
+
+          brew update
+          brew upgrade || true
+          brew install automake libtool cmake wget pkg-config gnu-tar meson nasm ninja
+
+          # Disable spotlight.
+          sudo mdutil -a -i off
+
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+          sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' /opt/homebrew/share/cmake/Modules/Compiler/GNU.cmake
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: macos-libs-v1-${{ hashFiles('Telegram/build/prepare/mac.sh', 'Telegram/build/prepare/prepare.py', 'Telegram/build/qt_version.py') }}
+          restore-keys: |
+            macos-libs-v1-
+
+      - name: Prepare libraries
+        run: Telegram/build/prepare/mac.sh skip-release silent
+
+      - name: Configure
+        run: >
+          Telegram/configure.sh
+          -D TDESKTOP_API_ID=${{ inputs.api_id }}
+          -D TDESKTOP_API_HASH=${{ inputs.api_hash }}
+          -D CMAKE_CONFIGURATION_TYPES=Debug
+          -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF
+          -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF
+
+      - name: Build
+        run: cmake --build out --config Debug -- -jobs "$(sysctl -n hw.ncpu)"
+
+      - name: Package
+        run: |
+          app=$(find out -maxdepth 4 -iname "AyuGram.app" -type d | head -n1)
+          test -n "$app" || { echo "::error::AyuGram.app not found under out/"; exit 1; }
+          dest=package
+          mkdir -p "$dest"
+          ditto "$app" "$dest/AyuGram.app"
+          ditto -c -k --sequesterRsrc --keepParent "$dest/AyuGram.app" AyuGram-macos.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AyuGram-macos
+          path: AyuGram-macos.zip

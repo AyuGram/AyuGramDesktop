@@ -185,6 +185,8 @@
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone so that you can record voice messages and make calls.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>We need access to speech recognition to transcribe voice and video messages locally on your device.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera so that you can record video messages and make video calls.</string>
 	<key>NSLocationUsageDescription</key>

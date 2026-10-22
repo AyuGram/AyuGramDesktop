@@ -7,6 +7,7 @@
 #include "ayu/ui/settings/settings_ayu.h"
 
 #include "lang_auto.h"
+#include "base/event_filter.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ui/ayu_userpic.h"
 #include "ayu/ui/settings/ayu_builder.h"
@@ -37,7 +38,18 @@
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/wrap/vertical_layout.h"
+#include "window/window_controller.h"
 #include "window/window_session_controller.h"
+#include "ayu/features/stt/download_helper.h"
+#include "ayu/features/stt/ggml_backend_detector.h"
+#include "ayu/features/stt/ggml_backend_manager.h"
+#include "ayu/features/stt/stt_manager.h"
+#include "ayu/features/stt/whisper_service.h"
+
+#include <QtCore/QFile>
+
+#include "range/v3/algorithm/find.hpp"
+#include "rpl/combine.h"
 
 namespace Settings {
 
@@ -661,6 +673,341 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 }
 
+void BuildSTT(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	auto *settings = &AyuSettings::getInstance();
+
+	const auto ggmlKind = Ayu::STT::BestAvailableGgmlBackendKind();
+	const auto backendProgress = std::make_shared<rpl::variable<int>>(-1);
+	const auto startDownloadIfNeeded = [=] {
+		if (!ggmlKind
+				|| !settings->sttEnabled()
+				|| !settings->sttHardwareAcceleration()
+				|| backendProgress->current() >= 0
+				|| Ayu::STT::GgmlBackendManager::isDownloaded(*ggmlKind)) {
+			return;
+		}
+		LOG(("AyuGram STT: downloading GPU backend, kind=%1"
+			).arg(static_cast<int>(*ggmlKind)));
+		*backendProgress = 0;
+		Ayu::STT::GgmlBackendManager::download(
+			*ggmlKind,
+			[=](const int percent) {
+				*backendProgress = percent;
+			},
+			[=](const bool ok) {
+				LOG(("AyuGram STT: GPU backend download %1, kind=%2"
+					).arg(ok ? u"ok"_q : u"failed"_q).arg(static_cast<int>(*ggmlKind)));
+				*backendProgress = -1;
+			});
+	};
+	startDownloadIfNeeded();
+
+	builder.addSubsectionTitle(tr::ayu_SttSectionTitle());
+
+	ayu.addToggle({
+		.id = u"ayu/sttEnabled"_q,
+		.title = tr::ayu_SttEnabled(),
+		.getter = [=] { return settings->sttEnabled(); },
+		.setter = [=](const bool val) {
+			settings->setSttEnabled(val);
+			if (val) {
+				Ayu::STT::STTManager::requestPermission();
+				startDownloadIfNeeded();
+			} else {
+				Ayu::STT::WhisperService::instance().freeContext(true);
+			}
+		},
+	});
+
+	const auto isEnabled = [=] {
+		return AyuSettings::getInstance().sttEnabledValue();
+	};
+
+#if defined(Q_OS_MAC)
+	const auto isWhisper = [=] {
+		return AyuSettings::getInstance().sttEngineValue()
+			| rpl::map([](const STTEngine e) { return e == STTEngine::Whisper; });
+	};
+#else
+	const auto isWhisper = [=]() {
+		return rpl::single(true);
+	};
+#endif
+
+	builder.addSkip();
+	builder.addDividerText(tr::ayu_SttSectionDescription());
+
+#if defined(Q_OS_MAC)
+	const auto engineOptions = std::vector<QString>{
+		u"Apple Speech"_q,
+		u"Whisper"_q,
+	};
+
+	auto currentEngine = AyuSettings::getInstance().sttEngineValue()
+		| rpl::map([=](STTEngine val) {
+			return engineOptions[static_cast<int>(val)];
+		});
+
+	builder.addButton({
+		.id = u"ayu/sttEngine"_q,
+		.title = tr::ayu_SttEngine(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(currentEngine),
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()->sessionController()) {
+				controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+					SingleChoiceBox(box, {
+						.title = tr::ayu_SttEngine(),
+						.options = engineOptions,
+						.initialSelection = static_cast<int>(settings->sttEngine()),
+						.callback = [=](int index) {
+							settings->setSttEngine(static_cast<STTEngine>(index));
+							Ayu::STT::STTManager::requestPermission();
+							if (static_cast<STTEngine>(index) != STTEngine::Whisper) {
+								Ayu::STT::WhisperService::instance().freeContext();
+							}
+						},
+					});
+				}));
+			}
+		},
+		.shown = isEnabled(),
+	});
+#endif
+
+	auto accelerationTitle = rpl::combine(
+		tr::ayu_SttHardwareAcceleration(),
+		backendProgress->value()
+	) | rpl::map([](const QString &title, const int percent) {
+		return (percent >= 0)
+			? title + u" ("_q + QString::number(percent) + u"%)"_q
+			: title;
+	});
+
+	ayu.addToggle({
+		.id = u"ayu/sttHardwareAcceleration"_q,
+		.title = std::move(accelerationTitle),
+		// No GPU backend detected - hardware acceleration will not be enabled.
+		.getter = [=] { return ggmlKind && settings->sttHardwareAcceleration(); },
+		.setter = [=](const bool val) {
+			settings->setSttHardwareAcceleration(val);
+			Ayu::STT::WhisperService::instance().freeContext(!val);
+			if (val) {
+				startDownloadIfNeeded();
+			}
+		},
+		.shown = rpl::combine(isEnabled(), isWhisper())
+			| rpl::map([](const bool e, const bool w) { return e && w; }),
+		.disabled = !ggmlKind,
+		.tooltip = ggmlKind
+			? QString()
+			: tr::ayu_SttHardwareAccelerationUnavailable(tr::now),
+	});
+
+	builder.addDividerText(tr::ayu_SttHardwareAccelerationDescription());
+
+	const auto whisperModelOptions = std::vector<QString>{
+		u"Tiny (~75 MB)"_q,
+		u"Base (~142 MB)"_q,
+		u"Small (~466 MB)"_q,
+	};
+
+	auto currentModel = AyuSettings::getInstance().whisperModelTypeValue()
+		| rpl::map([=](WhisperModel val) {
+			return whisperModelOptions[static_cast<int>(val)];
+		});
+
+	builder.addButton({
+		.id = u"ayu/whisperModel"_q,
+		.title = tr::ayu_SttWhisperModel(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(currentModel),
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()->sessionController()) {
+				controller->show(Box([=](const not_null<Ui::GenericBox*> box) {
+					SingleChoiceBox(box, {
+						.title = tr::ayu_SttWhisperModel(),
+						.options = whisperModelOptions,
+						.initialSelection = static_cast<int>(settings->whisperModelType()),
+						.callback = [=](int index) {
+							settings->setWhisperModelType(static_cast<WhisperModel>(index));
+						},
+					});
+				}));
+			}
+		},
+		.shown = rpl::combine(isEnabled(), isWhisper())
+			| rpl::map([](const bool e, const bool w) { return e && w; }),
+	});
+
+	// -1 = idle, 0-100 = downloading progress percent
+	const auto downloadProgress = std::make_shared<rpl::variable<int>>(-1);
+
+	auto downloadLabelStream = rpl::combine(
+		AyuSettings::getInstance().whisperModelTypeValue(),
+		downloadProgress->value()
+	) | rpl::map([=](WhisperModel model, const int progress) -> QString {
+		if (progress >= 0) {
+			return QString::number(progress) + u"%..."_q;
+		}
+
+		return Ayu::STT::STTManager::modelExists(static_cast<int>(model))
+			? tr::ayu_SttModelDownloaded(tr::now)
+			: tr::ayu_SttDownloadModel(tr::now);
+	});
+
+	const auto downloadButton = builder.addButton({
+		.id = u"ayu/sttDownloadModel"_q,
+		.title = tr::ayu_SttModelTitle(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(downloadLabelStream),
+		.onClick = [=] {
+			if (downloadProgress->current() >= 0) {
+				return;
+			}
+
+			const auto modelType = static_cast<int>(settings->whisperModelType());
+			if (Ayu::STT::STTManager::modelExists(modelType)) {
+				if (const auto controller = Core::App().activeWindow()->sessionController()) {
+					controller->showToast(tr::ayu_SttModelAlreadyDownloaded(tr::now));
+				}
+				return;
+			}
+
+			const auto url = Ayu::STT::STTManager::modelUrl(modelType);
+			const auto dest = Ayu::STT::STTManager::modelPath(modelType);
+
+			*downloadProgress = 0;
+			Ayu::STT::DownloadWithProgress(
+				url,
+				dest,
+				QString(), // no known sha256 for these files
+				[=](const int percent) {
+					*downloadProgress = percent;
+				},
+				[=](const bool ok) {
+					if (const auto controller = Core::App().activeWindow()->sessionController()) {
+						controller->showToast(ok
+							? tr::ayu_SttDownloadComplete(tr::now)
+							: tr::ayu_SttDownloadFailed(tr::now));
+					}
+					*downloadProgress = -1;
+				});
+		},
+		.shown = rpl::combine(isEnabled(), isWhisper())
+			| rpl::map([](bool e, bool w) { return e && w; }),
+	});
+
+	// AyuGram: right-click the model row to delete the downloaded file.
+	const auto modelContextMenu = downloadButton->lifetime()
+		.make_state<base::unique_qptr<Ui::PopupMenu>>();
+	const auto showModelContextMenu = [=] {
+		if (downloadProgress->current() >= 0) {
+			return false;
+		}
+		const auto modelType = static_cast<int>(settings->whisperModelType());
+		if (!Ayu::STT::STTManager::modelExists(modelType)) {
+			return false;
+		}
+		*modelContextMenu = base::make_unique_q<Ui::PopupMenu>(
+			downloadButton,
+			st::popupMenuWithIcons);
+		modelContextMenu->get()->addAction(
+			tr::lng_selected_delete(tr::now),
+			[=] {
+				Ayu::STT::WhisperService::instance().freeContext();
+				QFile::remove(Ayu::STT::STTManager::modelPath(modelType));
+				*downloadProgress = 0;
+				*downloadProgress = -1;
+			},
+			&st::menuIconDelete);
+		modelContextMenu->get()->popup(QCursor::pos());
+		return true;
+	};
+	base::install_event_filter(downloadButton, [=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::ContextMenu && showModelContextMenu()) {
+			return base::EventFilterResult::Cancel;
+		}
+		return base::EventFilterResult::Continue;
+	});
+
+	const auto langOptions = std::vector<std::pair<QString, QString>>{
+		{u"auto"_q, tr::ayu_SttLanguageAuto(tr::now)},
+		{u"en"_q,   u"English"_q},
+		{u"zh"_q,   u"中文"_q},
+		{u"hi"_q,   u"हिन्दी"_q},
+		{u"es"_q,   u"Español"_q},
+		{u"fr"_q,   u"Français"_q},
+		{u"ar"_q,   u"العربية"_q},
+		{u"ru"_q,   u"Русский"_q},
+		{u"pt"_q,   u"Português"_q},
+		{u"id"_q,   u"Indonesia"_q},
+		{u"de"_q,   u"Deutsch"_q},
+		{u"ja"_q,   u"日本語"_q},
+		{u"tr"_q,   u"Türkçe"_q},
+		{u"ko"_q,   u"한국어"_q},
+		{u"vi"_q,   u"Tiếng Việt"_q},
+		{u"it"_q,   u"Italiano"_q},
+		{u"fa"_q,   u"فارسی"_q},
+		{u"uk"_q,   u"Українська"_q},
+		{u"nl"_q,   u"Nederlands"_q},
+		{u"el"_q,   u"Ελληνικά"_q},
+		{u"he"_q,   u"עברית"_q},
+	};
+	auto langLabels = std::vector<QString>();
+	langLabels.reserve(langOptions.size());
+	for (const auto &val: langOptions | std::views::values) {
+		langLabels.push_back(val);
+	}
+
+	const auto getLangIndex = [=](const QString &lang) {
+		const auto it = ranges::find(langOptions, lang, &std::pair<QString, QString>::first);
+		return (it != end(langOptions)) ? static_cast<int>(it - begin(langOptions)) : 0;
+	};
+
+	const auto autoLabel = [=]() -> QString {
+#if defined(Q_OS_MAC)
+		return settings->sttEngine() == STTEngine::AppleSpeech
+			? tr::ayu_SttLanguageSystem(tr::now)
+			: tr::ayu_SttLanguageAuto(tr::now);
+#else
+		return tr::ayu_SttLanguageAuto(tr::now);
+#endif
+	};
+
+	auto currentLang = rpl::combine(
+		AyuSettings::getInstance().sttLanguageValue(),
+		AyuSettings::getInstance().sttEngineValue()
+	) | rpl::map([=](const QString &lang, STTEngine) {
+		const auto idx = getLangIndex(lang);
+		return idx == 0 ? autoLabel() : langOptions[idx].second;
+	});
+
+	builder.addButton({
+		.id = u"ayu/sttLanguage"_q,
+		.title = tr::ayu_SttLanguage(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(currentLang),
+		.onClick = [=] {
+			if (const auto controller = Core::App().activeWindow()->sessionController()) {
+				controller->show(Box([=](const not_null<Ui::GenericBox*> box) {
+					auto labels = langLabels;
+					labels[0] = autoLabel();
+					SingleChoiceBox(box, {
+						.title = tr::ayu_SttLanguage(),
+						.options = labels,
+						.initialSelection = getLangIndex(settings->sttLanguage()),
+						.callback = [=](const int index) {
+							settings->setSttLanguage(langOptions[index].first);
+						},
+					});
+				}));
+			}
+		},
+		.shown = isEnabled(),
+	});
+}
+
 void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::ayu_MessageSavingOtherHeader());
 
@@ -691,6 +1038,9 @@ const auto kMeta = BuildHelper({
 
 	builder.addSkip();
 	BuildSpyEssentials(builder, ayu);
+
+	ayu.addSectionDivider();
+	BuildSTT(builder, ayu);
 
 	ayu.addSectionDivider();
 	BuildOther(builder, ayu);

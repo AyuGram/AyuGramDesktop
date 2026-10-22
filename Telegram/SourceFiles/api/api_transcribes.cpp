@@ -22,7 +22,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "spellcheck/spellcheck_types.h"
 
+// AyuGram includes
+#include "ayu/features/stt/stt_transcribe_provider.h"
+#include "base/weak_ptr.h"
+
 namespace Api {
+namespace {
+
+// AyuGram: fake non-zero requestId to mark a local transcription in flight.
+constexpr mtpRequestId kLocalRequestId = -1;
+
+} // namespace
 
 Transcribes::Transcribes(not_null<ApiWrap*> api)
 : _session(&api->session())
@@ -185,6 +195,36 @@ void Transcribes::load(not_null<HistoryItem*> item) {
 		}
 	};
 	const auto id = item->fullId();
+
+	// AyuGram: route through the local STT engine when enabled, instead of
+	// the MTP request below.
+	if (Ayu::STT::ShouldTranscribeLocally(item)) {
+		auto &entry = _map.emplace(id).first->second;
+		entry.requestId = kLocalRequestId;
+		entry.shown = true;
+		entry.failed = false;
+		entry.pending = false;
+		toggleRound(item, entry);
+		_session->data().requestItemResize(item);
+
+		const auto weak = base::make_weak(_session);
+		Ayu::STT::RequestLocalTranscribe(item, [=](const QString &text) {
+			if (!weak) {
+				return;
+			}
+			auto &entry = _map[id];
+			entry.requestId = 0;
+			entry.pending = false;
+			entry.failed = text.isEmpty();
+			entry.result = text;
+			if (const auto item = _session->data().message(id)) {
+				toggleRound(item, entry);
+				_session->data().requestItemResize(item);
+			}
+		});
+		return;
+	}
+
 	const auto requestId = _api.request(MTPmessages_TranscribeAudio(
 		item->history()->peer->input(),
 		MTP_int(item->id)

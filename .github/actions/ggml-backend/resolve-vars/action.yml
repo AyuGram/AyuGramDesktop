@@ -1,0 +1,34 @@
+name: Resolve whisper.cpp submodule vars
+description: Computes pinned whisper.cpp commit + GGML_BACKEND_API_VERSION. Submodule must already be checked out.
+
+outputs:
+  short-sha:
+    description: First 7 chars of pinned commit.
+    value: ${{ steps.vars.outputs.short_sha }}
+  full-sha:
+    description: Full pinned commit hash.
+    value: ${{ steps.vars.outputs.full_sha }}
+  api-version:
+    description: GGML_BACKEND_API_VERSION of pinned commit.
+    value: ${{ steps.vars.outputs.api_version }}
+  version:
+    description: Nearest tag (e.g. "v1.9.1") or "<tag>-<N>-g<sha>". Empty if no tags reachable.
+    value: ${{ steps.vars.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: vars
+      shell: bash
+      run: |
+        set -euo pipefail
+        FULL_SHA=$(git submodule status Telegram/ThirdParty/whisper.cpp | awk '{print $1}' | sed 's/^[+-]//')
+        API_VERSION=$(sed -n 's/.*#define GGML_BACKEND_API_VERSION \([0-9]*\).*/\1/p' \
+          Telegram/ThirdParty/whisper.cpp/ggml/src/ggml-backend-impl.h)
+        VERSION=$(git -C Telegram/ThirdParty/whisper.cpp describe --tags --exact-match 2>/dev/null \
+          || git -C Telegram/ThirdParty/whisper.cpp describe --tags 2>/dev/null \
+          || echo "")
+        echo "full_sha=$FULL_SHA" >> "$GITHUB_OUTPUT"
+        echo "short_sha=${FULL_SHA:0:7}" >> "$GITHUB_OUTPUT"
+        echo "api_version=$API_VERSION" >> "$GITHUB_OUTPUT"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
