@@ -56,6 +56,14 @@ extern "C" {
 #include <openssl/err.h>
 } // extern "C"
 
+#ifndef TDESKTOP_DISABLE_AUTOUPDATE
+#if defined Q_OS_WIN && !defined TDESKTOP_USE_PACKAGED // use Lzma SDK for win
+#include <LzmaLib.h>
+#else // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+#include <lzma.h>
+#endif // else of Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+#endif // !TDESKTOP_DISABLE_AUTOUPDATE
+
 #ifndef Q_OS_WIN
 #include <unistd.h>
 #endif // !Q_OS_WIN
@@ -348,12 +356,24 @@ QString FindUpdateFile() {
 	}
 	const auto list = updates.entryInfoList(QDir::Files);
 	for (const auto &info : list) {
+		static const auto RegExp = QRegularExpression(
+			"^("
+			"tupdate|"
+			"tx64upd|"
+			"tarm64upd|"
+			"tmacupd|"
+			"tarmacupd|"
+			"tlinuxupd|"
+			")\\d+(_[a-z\\d]+)?$",
+			QRegularExpression::CaseInsensitiveOption
+		);
 		static const auto RegExpV2 = QRegularExpression(
 			"^td-update-(win|mac|linux)-(x86|x64|arm)-\\d+"
 			"(-beta|-canary-\\d+(-private)?)?$",
 			QRegularExpression::CaseInsensitiveOption
 		);
-		if (RegExpV2.match(info.fileName()).hasMatch()) {
+		if (RegExp.match(info.fileName()).hasMatch()
+			|| RegExpV2.match(info.fileName()).hasMatch()) {
 			return info.absoluteFilePath();
 		}
 	}
@@ -410,10 +430,144 @@ enum class ManifestAdoption {
 	Immediate,
 };
 
+// The data must point to the exact v1 post-signature layout, which is also
+// the v2 payload layout: [lzma props on Windows,] original size, compressed
+// bytes. Callers only pass authenticated bytes here.
+[[nodiscard]] std::optional<QByteArray> DecompressUpdatePayload(
+		const char *data,
+		int32 size) {
+#if defined Q_OS_WIN && !defined TDESKTOP_USE_PACKAGED // use Lzma SDK for win
+	const int32 hPropsLen = LZMA_PROPS_SIZE;
+#else // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+	const int32 hPropsLen = 0;
+#endif // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+	const int32 hOriginalSizeLen = sizeof(int32);
+	const int32 hSize = hPropsLen + hOriginalSizeLen;
+	const int32 compressedLen = size - hSize;
+	if (compressedLen <= 0) {
+		LOG(("Update Error: bad compressed size: %1").arg(size));
+		return std::nullopt;
+	}
+
+	QByteArray uncompressed;
+
+	int32 uncompressedLen;
+	memcpy(&uncompressedLen, data + hPropsLen, hOriginalSizeLen);
+	if (uncompressedLen <= 0 || uncompressedLen > 1024 * 1024 * 1024) {
+		LOG(("Update Error: bad uncompressed size: %1").arg(uncompressedLen));
+		return std::nullopt;
+	}
+	uncompressed.resize(uncompressedLen);
+
+	size_t resultLen = uncompressed.size();
+#if defined Q_OS_WIN && !defined TDESKTOP_USE_PACKAGED // use Lzma SDK for win
+	SizeT srcLen = compressedLen;
+	int uncompressRes = LzmaUncompress((uchar*)uncompressed.data(), &resultLen, (const uchar*)(data + hSize), &srcLen, (const uchar*)data, LZMA_PROPS_SIZE);
+	if (uncompressRes != SZ_OK) {
+		LOG(("Update Error: could not uncompress lzma, code: %1").arg(uncompressRes));
+		return std::nullopt;
+	}
+#else // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+	lzma_stream stream = LZMA_STREAM_INIT;
+
+	lzma_ret ret = lzma_stream_decoder(&stream, UINT64_MAX, LZMA_CONCATENATED);
+	if (ret != LZMA_OK) {
+		const char *msg;
+		switch (ret) {
+		case LZMA_MEM_ERROR: msg = "Memory allocation failed"; break;
+		case LZMA_OPTIONS_ERROR: msg = "Specified preset is not supported"; break;
+		case LZMA_UNSUPPORTED_CHECK: msg = "Specified integrity check is not supported"; break;
+		default: msg = "Unknown error, possibly a bug"; break;
+		}
+		LOG(("Error initializing the decoder: %1 (error code %2)").arg(msg).arg(ret));
+		return std::nullopt;
+	}
+
+	stream.avail_in = compressedLen;
+	stream.next_in = (uint8_t*)(data + hSize);
+	stream.avail_out = resultLen;
+	stream.next_out = (uint8_t*)uncompressed.data();
+
+	lzma_ret res = lzma_code(&stream, LZMA_FINISH);
+	if (stream.avail_in) {
+		LOG(("Error in decompression, %1 bytes left in _in of %2 whole.").arg(stream.avail_in).arg(compressedLen));
+		return std::nullopt;
+	} else if (stream.avail_out) {
+		LOG(("Error in decompression, %1 bytes free left in _out of %2 whole.").arg(stream.avail_out).arg(resultLen));
+		return std::nullopt;
+	}
+	lzma_end(&stream);
+	if (res != LZMA_OK && res != LZMA_STREAM_END) {
+		const char *msg;
+		switch (res) {
+		case LZMA_MEM_ERROR: msg = "Memory allocation failed"; break;
+		case LZMA_FORMAT_ERROR: msg = "The input data is not in the .xz format"; break;
+		case LZMA_OPTIONS_ERROR: msg = "Unsupported compression options"; break;
+		case LZMA_DATA_ERROR: msg = "Compressed file is corrupt"; break;
+		case LZMA_BUF_ERROR: msg = "Compressed data is truncated or otherwise corrupt"; break;
+		default: msg = "Unknown error, possibly a bug"; break;
+		}
+		LOG(("Error in decompression: %1 (error code %2)").arg(msg).arg(res));
+		return std::nullopt;
+	}
+#endif // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+
+	return uncompressed;
+}
+
+[[nodiscard]] bool ExtractUpdateFiles(
+		QDataStream &stream,
+		quint32 filesCount,
+		const QString &tempDirPath) {
+	for (uint32 i = 0; i < filesCount; ++i) {
+		QString relativeName;
+		quint32 fileSize;
+		QByteArray fileInnerData;
+		bool executable = false;
+
+		stream >> relativeName >> fileSize >> fileInnerData;
+#ifndef Q_OS_WIN
+		stream >> executable;
+#endif // !Q_OS_WIN
+		if (stream.status() != QDataStream::Ok) {
+			LOG(("Update Error: cant read file from downloaded stream, status: %1").arg(stream.status()));
+			return false;
+		}
+		if (fileSize != quint32(fileInnerData.size())) {
+			LOG(("Update Error: bad file size %1 not matching data size %2").arg(fileSize).arg(fileInnerData.size()));
+			return false;
+		}
+
+		QFile f(tempDirPath + '/' + relativeName);
+		if (!QDir().mkpath(QFileInfo(f).absolutePath())) {
+			LOG(("Update Error: cant mkpath for file '%1'").arg(tempDirPath + '/' + relativeName));
+			return false;
+		}
+		if (!f.open(QIODevice::WriteOnly)) {
+			LOG(("Update Error: cant open file '%1' for writing").arg(tempDirPath + '/' + relativeName));
+			return false;
+		}
+		auto writtenBytes = f.write(fileInnerData);
+		if (writtenBytes != fileSize) {
+			f.close();
+			LOG(("Update Error: cant write file '%1', desiredSize: %2, write result: %3").arg(tempDirPath + '/' + relativeName).arg(fileSize).arg(writtenBytes));
+			return false;
+		}
+		f.close();
+		if (executable) {
+			QFileDevice::Permissions p = f.permissions();
+			p |= QFileDevice::ExeOwner | QFileDevice::ExeUser | QFileDevice::ExeGroup | QFileDevice::ExeOther;
+			f.setPermissions(p);
+		}
+	}
+	return true;
+}
+
 [[nodiscard]] bool WriteUpdateVersionFile(
 		QDir &tempDir,
 		const QString &tempDirPath,
 		quint32 version,
+		quint64 alphaVersion,
 		quint64 canaryVersion) {
 	// create tdata/version file
 	tempDir.mkdir(QDir(tempDirPath + u"/tdata"_q).absolutePath());
@@ -434,6 +588,8 @@ enum class ManifestAdoption {
 	fVersion.write((const char*)&versionNum, sizeof(VersionInt));
 	if (canaryVersion) {
 		fVersion.write((const char*)&canaryVersion, sizeof(quint64));
+	} else if (versionNum == 0x7FFFFFFF) { // alpha version
+		fVersion.write((const char*)&alphaVersion, sizeof(quint64));
 	} else {
 		fVersion.write((const char*)&versionLen, sizeof(VersionInt));
 		fVersion.write((const char*)&versionStr[0], versionLen);
@@ -534,6 +690,7 @@ enum class ManifestAdoption {
 			tempDir,
 			tempDirPath,
 			Updates::UpdateVersionBase(verified->envelope.version),
+			0,
 			canary ? verified->envelope.version : 0)) {
 		return false;
 	}
@@ -594,11 +751,134 @@ bool UnpackUpdate(const QString &filepath) {
 	input.close();
 #endif // Q_OS_WIN || Q_OS_MAC
 
-	if (!Updates::IsV2UpdateFile(compressed)) {
-		LOG(("Update Error: unsupported update format (missing v2 magic)."));
+#if defined Q_OS_WIN && !defined TDESKTOP_USE_PACKAGED // use Lzma SDK for win
+	const int32 hSigLen = 128, hShaLen = 20, hPropsLen = LZMA_PROPS_SIZE, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hPropsLen + hOriginalSizeLen; // header
+#else // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+	const int32 hSigLen = 128, hShaLen = 20, hPropsLen = 0, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hOriginalSizeLen; // header
+#endif // Q_OS_WIN && !TDESKTOP_USE_PACKAGED
+
+	if (false && Updates::IsV2UpdateFile(compressed)) {
+		if (UnpackUpdateV2(filepath, compressed, ManifestAdoption::Queued)) {
+			return true;
+		} else if (BuildIsCanary) {
+			return false;
+		}
+		// A v1 file whose RSA signature happens to begin with the magic
+		// bytes lands here too, so a failed v2 parse falls through to the
+		// v1 path below: it accepts nothing without a valid RSA signature
+		// over these same bytes.
+		LOG(("Update Info: trying v1 unpacking for a file with v2 magic."));
+	} else if (BuildIsCanary) {
+		// The channel policy lives in the v2 envelope only, a classical
+		// RSA package has no channel and would let any official v1 file
+		// posted to the canary channel jump a canary off its lane.
+		LOG(("Update Error: canary builds accept only v2 updates."));
 		return false;
 	}
-	return UnpackUpdateV2(filepath, compressed, ManifestAdoption::Queued);
+
+	int32 compressedLen = compressed.size() - hSize;
+	if (compressedLen <= 0) {
+		LOG(("Update Error: bad compressed size: %1").arg(compressed.size()));
+		return false;
+	}
+
+	QString tempDirPath = cWorkingDir() + u"tupdates/temp"_q, readyFilePath = cWorkingDir() + u"tupdates/temp/ready"_q;
+	base::Platform::DeleteDirectory(tempDirPath);
+
+	QDir tempDir(tempDirPath);
+	if (tempDir.exists() || QFile(readyFilePath).exists()) {
+		LOG(("Update Error: cant clear tupdates/temp dir!"));
+		return false;
+	}
+
+	uchar sha1Buffer[20];
+	bool goodSha1 = !memcmp(compressed.constData() + hSigLen, hashSha1(compressed.constData() + hSigLen + hShaLen, compressedLen + hPropsLen + hOriginalSizeLen, sha1Buffer), hShaLen);
+	if (!goodSha1) {
+		LOG(("Update Error: bad SHA1 hash of update file!"));
+		return false;
+	}
+
+	RSA *pbKey = [] {
+		const auto bio = MakeBIO(
+			const_cast<char*>(
+					UpdatesPublicKey),
+			-1);
+		return PEM_read_bio_RSAPublicKey(bio.get(), 0, 0, 0);
+	}();
+	if (!pbKey) {
+		LOG(("Update Error: cant read public rsa key!"));
+		return false;
+	}
+	if (RSA_verify(NID_sha1, (const uchar*)(compressed.constData() + hSigLen), hShaLen, (const uchar*)(compressed.constData()), hSigLen, pbKey) != 1) { // verify signature
+        RSA_free(pbKey);
+        LOG(("Update Error: bad RSA signature of update file!"));
+        return false;
+	}
+	RSA_free(pbKey);
+
+	const auto uncompressed = DecompressUpdatePayload(
+		compressed.constData() + hSigLen + hShaLen,
+		compressed.size() - hSigLen - hShaLen);
+	if (!uncompressed) {
+		return false;
+	}
+
+	tempDir.mkdir(tempDir.absolutePath());
+
+	quint32 version;
+	{
+		QDataStream stream(*uncompressed);
+		stream.setVersion(QDataStream::Qt_5_1);
+
+		stream >> version;
+		if (stream.status() != QDataStream::Ok) {
+			LOG(("Update Error: cant read version from downloaded stream, status: %1").arg(stream.status()));
+			return false;
+		}
+
+		quint64 alphaVersion = 0;
+		if (version == 0x7FFFFFFF) { // alpha version
+			stream >> alphaVersion;
+			if (stream.status() != QDataStream::Ok) {
+				LOG(("Update Error: cant read alpha version from downloaded stream, status: %1").arg(stream.status()));
+				return false;
+			}
+			if (!cAlphaVersion() || alphaVersion <= cAlphaVersion()) {
+				LOG(("Update Error: downloaded alpha version %1 is not greater, than mine %2").arg(alphaVersion).arg(cAlphaVersion()));
+				return false;
+			}
+		} else if (int32(version) <= AppVersion) {
+			LOG(("Update Error: downloaded version %1 is not greater, than mine %2").arg(version).arg(AppVersion));
+			return false;
+		}
+
+		quint32 filesCount;
+		stream >> filesCount;
+		if (stream.status() != QDataStream::Ok) {
+			LOG(("Update Error: cant read files count from downloaded stream, status: %1").arg(stream.status()));
+			return false;
+		}
+		if (!filesCount) {
+			LOG(("Update Error: update is empty!"));
+			return false;
+		}
+		if (!ExtractUpdateFiles(stream, filesCount, tempDirPath)
+			|| !WriteUpdateVersionFile(
+				tempDir,
+				tempDirPath,
+				version,
+				alphaVersion,
+				0)) {
+			return false;
+		}
+	}
+
+	if (!WriteUpdateReadyFile(readyFilePath)) {
+		return false;
+	}
+	QFile(filepath).remove();
+
+	return true;
 #else // !TDESKTOP_DISABLE_AUTOUPDATE
 	return false;
 #endif // TDESKTOP_DISABLE_AUTOUPDATE
