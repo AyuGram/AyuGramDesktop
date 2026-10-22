@@ -1662,6 +1662,20 @@ void History::mainViewRemoved(
 }
 
 void History::newItemAdded(not_null<HistoryItem*> item, NewAddType type) {
+	// WHY: count it before addToMessagesIndex and notifyNewItemAdded: both
+	// let a shown chat read it synchronously, and readInboxTill trusts the
+	// unread count.
+	if (!item->out()) {
+		if (item->unread(this)) {
+			if (unreadCountKnown()) {
+				setUnreadCount(unreadCount() + 1);
+			} else if (!isForum()) {
+				owner().histories().requestDialogEntry(this);
+			}
+		} else {
+			inboxRead(item);
+		}
+	}
 	item->indexAsNewItem();
 	item->addToMessagesIndex();
 	if (const auto from = item->from() ? item->from()->asUser() : nullptr) {
@@ -1699,16 +1713,6 @@ void History::newItemAdded(not_null<HistoryItem*> item, NewAddType type) {
 		}
 		if (item->changesWallPaper()) {
 			peer->updateFullForced();
-		}
-	} else {
-		if (item->unread(this)) {
-			if (unreadCountKnown()) {
-				setUnreadCount(unreadCount() + 1);
-			} else if (!isForum()) {
-				owner().histories().requestDialogEntry(this);
-			}
-		} else {
-			inboxRead(item);
 		}
 	}
 	if (type != NewAddType::StreamedDraftFinish) {
