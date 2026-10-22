@@ -9,7 +9,7 @@
 	<key>CFBundleIconFile</key>
 	<string>AppIcon-Default.icns</string>
 	<key>CFBundleIconName</key>
-	<string>AppIcon-Default.icns</string>
+	<string>AppIcon-Default</string>
     <key>CFBundleIcons</key>
     <dict>
         <key>CFBundlePrimaryIcon</key>

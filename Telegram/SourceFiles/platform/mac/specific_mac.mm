@@ -73,7 +73,7 @@ namespace {
 
 [[nodiscard]] QImage ResolveBundleIconDefault() {
 	NSString *path = [[NSBundle mainBundle] bundlePath];
-	NSString *icon = [path stringByAppendingString:@"/Contents/Resources/Icon.icns"];
+	NSString *icon = [path stringByAppendingString:@"/Contents/Resources/AppIcon-Default.icns"];
 	NSImage *image = [[NSImage alloc] initWithContentsOfFile:icon];
 	if (!image) {
 		return Window::Logo();

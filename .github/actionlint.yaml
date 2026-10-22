@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - depot-ubuntu-latest
+    - depot-ubuntu-latest-32
+    - depot-windows-latest-32
+    - depot-macos-latest
