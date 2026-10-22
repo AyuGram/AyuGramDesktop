@@ -44,6 +44,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/hidden_folders/hidden_folders.h"
 
 
 namespace Ui {
@@ -67,16 +68,16 @@ void ShowMenu(
 		not_null<Ui::RpWidget*> parent,
 		not_null<Window::SessionController*> controller,
 		not_null<State*> state,
+		const std::vector<Data::ChatFilter> &visibleList,
 		int index) {
 	const auto session = &controller->session();
 
 	auto id = FilterId(0);
 	{
-		const auto &list = session->data().chatsFilters().list();
-		if (index < 0 || index >= list.size()) {
+		if (index < 0 || index >= int(visibleList.size())) {
 			return;
 		}
-		id = list[index].id();
+		id = visibleList[index].id();
 	}
 	state->menu = base::make_unique_q<Ui::PopupMenu>(
 		parent,
@@ -95,6 +96,8 @@ void ShowMenu(
 			MarkAsReadMenu::ChatListKind::Folder,
 			[=] { return session->data().chatsFilters().chatsList(id); },
 			addAction);
+
+		AyuFeatures::HiddenFolders::AddToggleAction(addAction, id);
 
 		auto showRemoveBox = [=] {
 			state->removeApi.request(base::make_weak(parent), controller, id);
@@ -232,9 +235,15 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 				? st::dialogsSearchTabs
 				: st::chatsFiltersTabs));
 	const auto state = wrap->lifetime().make_state<State>();
+
+	const auto visibleFilters = [=] {
+		return AyuFeatures::HiddenFolders::VisibleOnly(
+			session->data().chatsFilters().list());
+	};
+
 	const auto reassignUnreadValue = [=] {
 		state->reorderLifetime.destroy();
-		const auto &list = session->data().chatsFilters().list();
+		const auto list = visibleFilters();
 		auto includeMuted = Data::IncludeMutedCounterFoldersValue();
 		auto hideCounters = AyuSettings::getInstance().hideNotificationCountersValue();
 		for (auto i = 0; i < list.size(); i++) {
@@ -279,15 +288,17 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 					filters->moveAllToFront();
 				}
 			}
-			Assert(oldPosition >= 0 && oldPosition < list.size());
-			Assert(newPosition >= 0 && newPosition < list.size());
 
 			auto order = ranges::views::all(
 				list
 			) | ranges::views::transform(
 				&Data::ChatFilter::id
 			) | ranges::to_vector;
-			base::reorder(order, oldPosition, newPosition);
+			order = AyuFeatures::HiddenFolders::ReorderVisible(
+				std::move(order),
+				oldPosition,
+				newPosition,
+				AyuFeatures::HiddenFolders::IsHidden);
 
 			state->ignoreRefresh = true;
 			filters->saveOrder(order);
@@ -322,8 +333,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 						? slider->lookupSectionLeft(i + 1)
 						: slider->width();
 					if (x >= left && x < right) {
-						const auto &list
-							= session->data().chatsFilters().list();
+						const auto list = visibleFilters();
 						return (i < list.size())
 							? list[i].id()
 							: FilterId();
@@ -333,7 +343,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			},
 			[=] { return state->lastFilterId.value_or(FilterId()); },
 			[=](FilterId id) {
-				const auto &list = session->data().chatsFilters().list();
+				const auto list = visibleFilters();
 				for (auto i = 0; i < list.size(); i++) {
 					if (list[i].id() == id) {
 						slider->selectSection(i);
@@ -380,14 +390,14 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		choose(filter.id());
 	};
 
-	const auto filterByIndex = [=](int index) -> const Data::ChatFilter& {
-		const auto &list = session->data().chatsFilters().list();
+	const auto filterByIndex = [=](int index) -> Data::ChatFilter {
+		const auto list = visibleFilters();
 		Assert(index >= 0 && index < list.size());
 		return list[index];
 	};
 
 	const auto rebuild = [=] {
-		const auto &list = session->data().chatsFilters().list();
+		const auto list = visibleFilters();
 		if ((list.size() <= 1 && !slider->width()) || state->ignoreRefresh) {
 			return;
 		}
@@ -476,7 +486,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		if (trackActiveFilterAndUnreadAndReorder) {
 			controller->activeChatsFilter(
 			) | rpl::on_next([=](FilterId id) {
-				const auto &list = session->data().chatsFilters().list();
+				const auto list = visibleFilters();
 				for (auto i = 0; i < list.size(); ++i) {
 					if (list[i].id() == id) {
 						slider->setActiveSection(i);
@@ -503,7 +513,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		}, state->rebuildLifetime);
 		slider->contextMenuRequested() | rpl::on_next([=](int index) {
 			if (trackActiveFilterAndUnreadAndReorder) {
-				ShowMenu(wrap, controller, state, index);
+				ShowMenu(wrap, controller, state, list, index);
 			} else {
 				ShowFiltersListMenu(
 					wrap,
