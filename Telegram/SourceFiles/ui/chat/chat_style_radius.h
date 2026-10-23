@@ -9,12 +9,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Ui {
 
+enum class BubbleCornerRounding : uchar;
+
 void SetAppliedBubbleRadius(int value);
 void SetBubbleRadiusOverride(int value);
 void ClearBubbleRadiusOverride();
 
 [[nodiscard]] int BubbleRadiusSmall();
 [[nodiscard]] int BubbleRadiusLarge();
+[[nodiscard]] int BubbleCornerRadius(BubbleCornerRounding corner);
 
 [[nodiscard]] int MsgFileThumbRadiusSmall();
 [[nodiscard]] int MsgFileThumbRadiusLarge();

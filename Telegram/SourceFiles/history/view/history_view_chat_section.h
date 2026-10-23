@@ -66,6 +66,8 @@ class ForumTopic;
 struct DrawToReplyRequest;
 } // namespace Data
 
+class SendFilesBox;
+
 namespace Support {
 class Autocomplete;
 struct Contact;
@@ -75,6 +77,7 @@ namespace HistoryView {
 
 namespace Controls {
 struct VoiceToSend;
+class StashManager;
 } // namespace Controls
 
 class Element;
@@ -322,6 +325,7 @@ private:
 	void onScroll();
 	void scrollToCurrentVoiceMessage(FullMsgId fromId, FullMsgId toId);
 	void closeCurrent();
+	void sublistDestroyed();
 	void unreadCountUpdated();
 	void updateInnerVisibleArea();
 	void updateControlsGeometry();
@@ -340,7 +344,7 @@ private:
 		Data::MessagePosition position,
 		FullMsgId originItemId,
 		const Window::SectionShow &params);
-	void finishSending();
+	void finishSending(const Api::SendOptions &options);
 
 	void setupComposeControls();
 	void setupSwipeReplyAndBack();
@@ -353,6 +357,7 @@ private:
 
 	void setupDragArea();
 	void setupShortcuts();
+	void setupComposeStash();
 
 	void searchRequested();
 	void searchInTopic();
@@ -598,6 +603,8 @@ private:
 
 	FullMsgId _lastShownAt;
 	HistoryView::CornerButtons _cornerButtons;
+	std::unique_ptr<Controls::StashManager> _stash;
+	QPointer<SendFilesBox> _sendFilesBox;
 	std::unique_ptr<Support::Autocomplete> _supportAutocomplete;
 	rpl::lifetime _topicLifetime;
 	rpl::lifetime _historySponsoredPreloading;

@@ -107,7 +107,7 @@ void SendRequest(
 			first,
 			last,
 			user->nameOrPhone,
-			user->username());
+			user->editableUsername());
 		user->session().api().applyUpdates(result);
 		if (const auto settings = user->barSettings()) {
 			const auto flags = PeerBarSetting::AddContact
@@ -837,7 +837,7 @@ void Controller::showPhotoMenu(bool suggest) {
 					[=](QImage &&editedImage) {
 						processChosenPhoto(std::move(editedImage), suggest);
 					},
-					qvariant_cast<QImage>(data->imageData()));
+					QGuiApplication::clipboard()->image());
 			};
 			_photoMenu->addAction(
 				tr::lng_profile_photo_from_clipboard(tr::now),

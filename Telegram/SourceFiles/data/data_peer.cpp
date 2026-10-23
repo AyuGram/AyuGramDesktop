@@ -207,20 +207,6 @@ PeerData *PeerFromInputMTP(
 	});
 }
 
-UserData *UserFromInputMTP(
-		not_null<Session*> owner,
-		const MTPInputUser &input) {
-	return input.match([&](const MTPDinputUser &data) {
-		const auto user = owner->user(data.vuser_id().v);
-		user->setAccessHash(data.vaccess_hash().v);
-		return user.get();
-	}, [&](const MTPDinputUserSelf &data) {
-		return owner->session().user().get();
-	}, [](const auto &data) {
-		return (UserData*)nullptr;
-	});
-}
-
 Ui::ColorCollectible ParseColorCollectible(
 		const MTPDpeerColorCollectible &data) {
 	return {
@@ -1670,6 +1656,9 @@ Data::SavedSublist *PeerData::monoforumSublistFor(
 		PeerId sublistPeerId) const {
 	if (!sublistPeerId) {
 		return nullptr;
+	} else if (isSelf()) {
+		return owner().savedMessages().sublistLoaded(
+			owner().peer(sublistPeerId));
 	} else if (const auto monoforum = this->monoforum()) {
 		return monoforum->sublistLoaded(owner().peer(sublistPeerId));
 	}
@@ -2158,14 +2147,35 @@ void SetTopPinnedMessageId(
 			0);
 		session.saveSettingsDelayed();
 	}
-	session.storage().add(Storage::SharedMediaAddExisting(
-		peer->id,
-		MsgId(0), // topicRootId
-		PeerId(0), // monoforumPeerId
-		Storage::SharedMediaType::Pinned,
+	ApplyPinnedMessageId(
+		peer,
 		messageId,
-		{ messageId, ServerMaxMsgId }));
-	peer->owner().history(peer)->setHasPinnedMessages(true);
+		MsgId(0), // topicRootId
+		PeerId(0)); // monoforumPeerId
+}
+
+void ApplyPinnedMessageId(
+		not_null<PeerData*> peer,
+		MsgId messageId,
+		MsgId topicRootId,
+		PeerId monoforumPeerId) {
+	auto &session = peer->session();
+	if (const auto item = peer->owner().message(peer->id, messageId)) {
+		item->setIsPinned(true);
+		session.storage().add(Storage::SharedMediaAddSlice(
+			peer->id,
+			MsgId(0), // topicRootId
+			PeerId(0), // monoforumPeerId
+			Storage::SharedMediaType::Pinned,
+			{},
+			{ messageId, ServerMaxMsgId }));
+	} else {
+		session.api().requestPinnedMessagesIfNeeded(
+			peer,
+			messageId,
+			topicRootId,
+			monoforumPeerId);
+	}
 }
 
 FullMsgId ResolveTopPinnedId(

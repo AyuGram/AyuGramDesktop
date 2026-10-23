@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/random.h"
 #include "core/core_cloud_password.h"
+#include "mtproto/mtproto_response.h"
 #include "passport/passport_encryption.h"
 
 #include "base/unixtime.h"
@@ -41,27 +42,53 @@ void CloudPassword::apply(Core::CloudPasswordState state) {
 	_stateChanges.fire_copy(*_state);
 }
 
-void CloudPassword::reload() {
-	if (_requestId) {
+void CloudPassword::reload(
+		Fn<void(std::optional<Core::CloudPasswordState>)> callback) {
+	if (callback) {
+		_callbacks.push_back(std::move(callback));
+	}
+	if (_reloadRequestId || _cancelEmailRequestId) {
 		return;
 	}
-	_requestId = _api.request(MTPaccount_GetPassword(
-	)).done([=](const MTPaccount_Password &result) {
-		_requestId = 0;
-		apply(ProcessMtpState(result));
-	}).fail([=] {
-		_requestId = 0;
+	_reloadRequestId = _api.request(MTPaccount_GetPassword(
+	)).done([=](const MTPaccount_Password &result, mtpRequestId requestId) {
+		if (_reloadRequestId != requestId) {
+			return;
+		}
+		_reloadRequestId = 0;
+		const auto callbacks = base::take(_callbacks);
+		const auto state = ProcessMtpState(result);
+		apply(state);
+		for (const auto &callback : callbacks) {
+			callback(state);
+		}
+	}).fail([=](const MTP::Error &error, mtpRequestId requestId) {
+		if (_reloadRequestId != requestId) {
+			return;
+		}
+		_reloadRequestId = 0;
+		for (const auto &callback : base::take(_callbacks)) {
+			callback(std::nullopt);
+		}
 	}).send();
 }
 
 void CloudPassword::clearUnconfirmedPassword() {
-	_requestId = _api.request(MTPaccount_CancelPasswordEmail(
-	)).done([=] {
-		_requestId = 0;
-		reload();
-	}).fail([=] {
-		_requestId = 0;
-		reload();
+	if (_cancelEmailRequestId) {
+		return;
+	}
+	_api.request(base::take(_reloadRequestId)).cancel();
+	const auto finished = [=](mtpRequestId requestId) {
+		if (_cancelEmailRequestId == requestId) {
+			_cancelEmailRequestId = 0;
+			reload();
+		}
+	};
+	_cancelEmailRequestId = _api.request(MTPaccount_CancelPasswordEmail(
+	)).done([=](const MTPBool &result, mtpRequestId requestId) {
+		finished(requestId);
+	}).fail([=](const MTP::Error &error, mtpRequestId requestId) {
+		finished(requestId);
 	}).send();
 }
 
@@ -78,7 +105,7 @@ auto CloudPassword::stateCurrent() const
 		: std::nullopt;
 }
 
-auto CloudPassword::resetPassword()
+auto CloudPassword::resetPassword(bool ignoreSilentErrors)
 -> rpl::producer<CloudPassword::ResetRetryDate, QString> {
 	return [=](auto consumer) {
 		_api.request(MTPaccount_ResetPassword(
@@ -100,7 +127,9 @@ auto CloudPassword::resetPassword()
 			});
 			consumer.put_done();
 		}).fail([=](const MTP::Error &error) {
-			consumer.put_error_copy(error.type());
+			consumer.put_error_copy((ignoreSilentErrors && MTP::IgnoreError(error))
+				? QString()
+				: error.type());
 		}).send();
 
 		return rpl::lifetime();

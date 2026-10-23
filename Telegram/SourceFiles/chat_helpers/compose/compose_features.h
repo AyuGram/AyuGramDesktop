@@ -23,6 +23,8 @@ struct ComposeFeatures {
 	bool stickersSettings : 1 = true;
 	bool openStickerSets : 1 = true;
 	bool photoButton : 1 = false;
+	bool audioButton : 1 = false;
+	bool linkButton : 1 = false;
 	bool autocompleteHashtags : 1 = true;
 	bool autocompleteMentions : 1 = true;
 	bool autocompleteCommands : 1 = true;
@@ -31,6 +33,7 @@ struct ComposeFeatures {
 	bool recordMediaMessage : 1 = true;
 	bool editMessageStars : 1 = false;
 	bool emojiOnlyPanel : 1 = false;
+	bool allCustomEmojiPremium : 1 = false;
 	bool videoStream : 1 = false;
 	bool richEditor : 1 = true;
 };

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_article_paint.h"
 #include "iv/markdown/iv_markdown_article.h"
+#include "iv/markdown/iv_markdown_article_quote.h"
 #include "iv/markdown/iv_markdown_article_text.h"
 #include "ui/dynamic_image.h"
 #include "ui/effects/path_shift_gradient.h"
@@ -14,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/integration.h"
 #include "ui/style/style_core_scale.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/round_rect.h"
 
 #include "styles/palette.h"
 #include "styles/style_chat.h"
@@ -205,6 +207,15 @@ bool PaintRelatedArticleImage(
 	auto result = context;
 	result.clip = clip;
 	return result;
+}
+
+[[nodiscard]] MarkdownArticlePaintContext ChildrenPaintContext(
+		const MarkdownArticlePaintContext &context,
+		const LaidOutBlock &block) {
+	const auto clip = ChildrenPaintClip(block);
+	return clip
+		? ClippedContext(context, context.clip.intersected(*clip))
+		: context;
 }
 
 [[nodiscard]] MarkdownArticlePaintContext RevealSuppressedContext(
@@ -799,6 +810,9 @@ void PaintTextLeaf(
 	drawContext.selection = selection.value_or(TextSelection());
 	drawContext.linePostprocess = linePostprocess ? &*linePostprocess : nullptr;
 	leaf.draw(p, drawContext);
+	if (context.quoteRanges) {
+		AppendQuoteTextHighlight(p, leaf, makeContext(), context, segmentIndex);
+	}
 	const auto searchRanges = PaintSearchRangesForSegmentIndex(
 		context.selectionState,
 		context.searchState,
@@ -1476,30 +1490,6 @@ void PaintTableCaption(
 		&& (block.horizontalScrollLeft < block.horizontalScrollMax);
 }
 
-[[nodiscard]] QRect HorizontalOverflowContentClip(
-		const LaidOutBlock &block,
-		const style::Markdown &st,
-		QRect viewport) {
-	if (block.horizontalScrollMax <= 0 || viewport.isEmpty()) {
-		return viewport;
-	}
-	const auto indicatorWidth = std::min(
-		std::max(OverflowIndicatorWidth(block, st), 1),
-		viewport.width());
-	const auto left = (block.horizontalScrollLeft > 0)
-		? indicatorWidth
-		: 0;
-	const auto right = HorizontalRightEdgeHidden(block)
-		? indicatorWidth
-		: 0;
-	const auto width = std::max(viewport.width() - left - right, 0);
-	return QRect(
-		viewport.x() + left,
-		viewport.y(),
-		width,
-		viewport.height());
-}
-
 [[nodiscard]] QRect HorizontalScrollLogicalPaintRect(
 		const LaidOutBlock &block) {
 	if (block.insideHorizontalScroll) {
@@ -1887,6 +1877,10 @@ void PaintDisplayMathBlock(
 				&& (formulaContext.hiddenSegmentIndex == block.segmentIndex)) {
 				return;
 			}
+			AppendQuoteFormulaHighlight(
+				block.visibleFormulaRect,
+				formulaContext,
+				block.segmentIndex);
 			const auto &paintSt = PaintStyle(formulaContext, st);
 			const auto formula = PreparedFormulaFor(formulas, block.formulaIndex);
 			p.setPen(paintSt.textColor->c);
@@ -2030,9 +2024,7 @@ void PaintQuoteBlock(
 		}
 	}
 
-	auto local = ClippedContext(
-		context,
-		context.clip.intersected(block.contentRect));
+	auto local = ChildrenPaintContext(context, block);
 	local.caches.supplementaryColorOverride
 		= NonPullquoteQuoteCaptionColor(context, st);
 	PaintBlocks(
@@ -2300,6 +2292,22 @@ void PaintPlaceholderBlock(
 	return path;
 }
 
+[[nodiscard]] QPainterPath MediaRoundedRectPath(
+		QRect rect,
+		Ui::BubbleRounding rounding,
+		int radius) {
+	const auto corner = [&](Ui::BubbleCornerRounding value) {
+		const auto bubble = Ui::BubbleCornerRadius(value);
+		return bubble ? bubble : radius;
+	};
+	return Ui::ComplexRoundedRectPath(
+		rect,
+		corner(rounding.topLeft),
+		corner(rounding.topRight),
+		corner(rounding.bottomLeft),
+		corner(rounding.bottomRight));
+}
+
 void PaintEmbedPostBlock(
 		Painter &p,
 		const LaidOutBlock &block,
@@ -2418,12 +2426,7 @@ void PaintEmbedPostBlock(
 		}
 	}
 	if (!block.bodyRect.isEmpty()) {
-		const auto bodyContext = ClippedContext(
-			context,
-			context.clip.intersected(
-				block.scrollViewportRect.isEmpty()
-					? block.bodyRect
-					: block.scrollViewportRect));
+		const auto bodyContext = ChildrenPaintContext(context, block);
 		PaintBlocks(
 			p,
 			block.children,
@@ -2509,7 +2512,19 @@ void PaintPersistentMediaBlock(
 				&& WholeSegmentSelected(
 					mediaContext.selectionState,
 					block.segmentIndex)) {
-				p.fillRect(block.mediaRect, p.textPalette().selectOverlay);
+				const auto rounding = block.mediaBlock
+					? block.mediaBlock->bubbleRounding()
+					: Ui::BubbleRounding();
+				if (rounding == Ui::BubbleRounding()) {
+					p.fillRect(
+						block.mediaRect,
+						p.textPalette().selectOverlay);
+				} else {
+					auto hq = PainterHighQualityEnabler(p);
+					p.fillPath(
+						MediaRoundedRectPath(block.mediaRect, rounding, 0),
+						p.textPalette().selectOverlay);
+				}
 			}
 		});
 }
@@ -2725,9 +2740,20 @@ void PaintGroupedMediaBlock(
 						style.overlayOpacity,
 						0.,
 						1.));
-					p.fillPath(
-						RoundedRectPath(block.mediaRect, style.radius),
-						overlay);
+					const auto rounding = block.mediaBlock->bubbleRounding();
+					if (rounding == Ui::BubbleRounding()) {
+						p.fillPath(
+							RoundedRectPath(block.mediaRect, style.radius),
+							overlay);
+					} else {
+						auto hq = PainterHighQualityEnabler(p);
+						p.fillPath(
+							MediaRoundedRectPath(
+								block.mediaRect,
+								rounding,
+								style.radius),
+							overlay);
+					}
 				}
 			}
 		});
@@ -2812,9 +2838,7 @@ void PaintDetailsBlock(
 	p.restore();
 
 	if (!block.bodyRect.isEmpty()) {
-		const auto bodyContext = ClippedContext(
-			context,
-			context.clip.intersected(block.bodyRect));
+		const auto bodyContext = ChildrenPaintContext(context, block);
 		PaintBlocks(
 			p,
 			block.children,
@@ -2913,7 +2937,7 @@ void PaintThinkingBlock(
 		PaintSelectableTextLeaf(
 			maskPainter,
 			block.leaf,
-			ClippedContext(context, logicalRect),
+			ClippedContext(context, contentClip),
 			block.textRect,
 			block.textWidth,
 			block.segmentIndex,
@@ -3105,11 +3129,7 @@ void PaintBlock(
 		break;
 	case PreparedBlockKind::List:
 		{
-			const auto childContext = block.scrollViewportRect.isEmpty()
-				? context
-				: ClippedContext(
-					context,
-					context.clip.intersected(block.scrollViewportRect));
+			const auto childContext = ChildrenPaintContext(context, block);
 			PaintBlocks(
 				p,
 				block.children,
@@ -3149,11 +3169,7 @@ void PaintBlock(
 			}
 		}
 		{
-			const auto childContext = block.scrollViewportRect.isEmpty()
-				? context
-				: ClippedContext(
-					context,
-					context.clip.intersected(block.scrollViewportRect));
+			const auto childContext = ChildrenPaintContext(context, block);
 			PaintBlocks(
 				p,
 				block.children,
@@ -3252,6 +3268,64 @@ void PaintBlock(
 }
 
 } // namespace
+
+QRect HorizontalOverflowContentClip(
+		const LaidOutBlock &block,
+		const style::Markdown &st,
+		QRect viewport) {
+	if (block.horizontalScrollMax <= 0 || viewport.isEmpty()) {
+		return viewport;
+	}
+	const auto indicatorWidth = std::min(
+		std::max(OverflowIndicatorWidth(block, st), 1),
+		viewport.width());
+	const auto left = (block.horizontalScrollLeft > 0)
+		? indicatorWidth
+		: 0;
+	const auto right = HorizontalRightEdgeHidden(block)
+		? indicatorWidth
+		: 0;
+	const auto width = std::max(viewport.width() - left - right, 0);
+	return QRect(
+		viewport.x() + left,
+		viewport.y(),
+		width,
+		viewport.height());
+}
+
+std::optional<QRect> ChildrenPaintClip(const LaidOutBlock &block) {
+	const auto list = (block.kind == PreparedBlockKind::List)
+		|| (block.kind == PreparedBlockKind::ListItem);
+	if (block.kind == PreparedBlockKind::Details) {
+		return block.bodyRect;
+	} else if (block.kind == PreparedBlockKind::Quote) {
+		return block.contentRect;
+	} else if (block.kind == PreparedBlockKind::EmbedPost) {
+		return block.scrollViewportRect.isEmpty()
+			? block.bodyRect
+			: block.scrollViewportRect;
+	} else if (list && !block.scrollViewportRect.isEmpty()) {
+		return block.scrollViewportRect;
+	}
+	return std::nullopt;
+}
+
+std::optional<QRect> DescendantPaintClip(
+		const LaidOutBlock &ancestor,
+		const LaidOutBlock *block,
+		QRect clip) {
+	if (const auto own = ChildrenPaintClip(ancestor)) {
+		clip = clip.intersected(*own);
+	}
+	for (const auto &child : ancestor.children) {
+		if (&child == block) {
+			return clip;
+		} else if (const auto found = DescendantPaintClip(child, block, clip)) {
+			return found;
+		}
+	}
+	return std::nullopt;
+}
 
 QColor NonPullquoteQuoteCaptionColor(
 		const MarkdownArticlePaintContext &context,

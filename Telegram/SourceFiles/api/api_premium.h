@@ -74,6 +74,17 @@ struct GiftOptionData {
 	int months = 0;
 };
 
+struct NoPaidTokenExport {
+	bool revoke = false;
+	bool temporary = false;
+};
+
+struct NoPaidMessagesToken {
+	QString token;
+	QString url;
+	TimeId expires = 0;
+};
+
 class Premium final {
 public:
 	explicit Premium(not_null<ApiWrap*> api);
@@ -120,7 +131,22 @@ public:
 		-> rpl::producer<>;
 	void resolveMessageMoneyRestrictions(not_null<UserData*> user);
 
+	void importNoPaidMessagesToken(
+		not_null<UserData*> user,
+		const QString &token,
+		Fn<void(bool priceRemoved)> done,
+		Fn<void(const MTP::Error &)> fail);
+	void exportNoPaidMessagesToken(
+		NoPaidTokenExport args,
+		Fn<void(NoPaidMessagesToken)> done,
+		Fn<void(const MTP::Error &)> fail);
+
 private:
+	struct NoPaidTokenImportCallbacks {
+		Fn<void(bool priceRemoved)> done;
+		Fn<void(const MTP::Error &)> fail;
+	};
+
 	void reloadPromo();
 	void reloadStickers();
 	void reloadCloudSet();
@@ -170,7 +196,12 @@ private:
 	rpl::event_stream<> _someMessageMoneyRestrictionsResolved;
 	base::flat_set<not_null<UserData*>> _resolveMessageMoneyRequiredUsers;
 	base::flat_set<not_null<UserData*>> _resolveMessageMoneyRequestedUsers;
+	base::flat_set<not_null<UserData*>> _resolveMessageMoneySupersededUsers;
 	bool _messageMoneyRequestScheduled = false;
+
+	base::flat_map<
+		std::pair<not_null<UserData*>, QString>,
+		std::vector<NoPaidTokenImportCallbacks>> _noPaidTokenImports;
 
 };
 

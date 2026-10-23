@@ -2025,6 +2025,14 @@ State::ListSelectionInfo State::listSelectionInfo(
 			return EffectiveOrderedListType(*owner, item)
 				== result.listOrderedType;
 		});
+	result.listRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		0,
+		int(owner->listItems.size()));
+	result.selectedRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		validated->from,
+		validated->till);
 	result.allOrderedDecimal = true;
 	result.allOrderedLowerAlpha = true;
 	result.allOrderedUpperAlpha = true;
@@ -3987,7 +3995,10 @@ bool State::canLiftActiveLineOutOfContainer() const {
 		return false;
 	}
 	const auto owner = block(descriptor->leaf.block);
+	const auto parent = block(*container);
 	return owner
+		&& parent
+		&& (parent->kind == BlockKind::Quote)
 		&& JoinableTextBlockKind(owner->kind)
 		&& (descriptor->leaf.block.index == 0);
 }
@@ -8852,19 +8863,6 @@ State::TextSelectionDropResult State::moveTextSelectionToDropTarget(
 		target);
 }
 
-void State::insertHeading1AfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Heading,
-		.headingLevel = 1,
-	});
-}
-
-void State::insertBlockquoteAfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Blockquote,
-	});
-}
-
 bool State::insertBlocksAfterActiveWithContextUnchecked(
 		std::vector<Block> &blocks,
 		const ActiveTextInsertContext &context) {
@@ -9133,12 +9131,6 @@ bool State::insertBlockAfterActive(
 			.result = applied,
 		};
 	});
-}
-
-bool State::insertPreparedBlockAfterActive(Block block) {
-	auto blocks = std::vector<Block>();
-	blocks.push_back(std::move(block));
-	return insertPreparedBlocksAfterActive(std::move(blocks));
 }
 
 bool State::insertPreparedBlocksAfterActive(

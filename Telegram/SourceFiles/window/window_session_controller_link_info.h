@@ -39,6 +39,7 @@ struct PeerByLinkInfo {
 	std::variant<QString, ChannelId> usernameOrId;
 	QString phone;
 	QString chatLinkSlug;
+	QString contactToken;
 	MsgId messageId = ShowAtUnreadMsgId;
 	QByteArray pollOption;
 	QString storyParam;
@@ -49,6 +50,7 @@ struct PeerByLinkInfo {
 	RepliesByLinkInfo repliesInfo;
 	ResolveType resolveType = ResolveType::Default;
 	QString referral;
+	QString noPaidToken;
 	QString startToken;
 	ChatAdminRights startAdminRights;
 	bool startAutoSubmit = false;

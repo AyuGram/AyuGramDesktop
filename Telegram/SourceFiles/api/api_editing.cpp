@@ -417,6 +417,7 @@ void EditMessageWithUploadedMedia(
 		if (item) {
 			item->removeFromSharedMediaIndex();
 			item->clearSavedMedia();
+			item->addToSharedMediaIndex();
 			item->setIsLocalUpdateMedia(true);
 			applyUpdates();
 			item->setIsLocalUpdateMedia(false);

@@ -151,9 +151,6 @@ struct AllowedReactions {
 [[nodiscard]] PeerData *PeerFromInputMTP(
 	not_null<Session*> owner,
 	const MTPInputPeer &input);
-[[nodiscard]] UserData *UserFromInputMTP(
-	not_null<Session*> owner,
-	const MTPInputUser &input);
 
 [[nodiscard]] Ui::ColorCollectible ParseColorCollectible(
 	const MTPDpeerColorCollectible &data);
@@ -684,6 +681,11 @@ namespace Data {
 void SetTopPinnedMessageId(
 	not_null<PeerData*> peer,
 	MsgId messageId);
+void ApplyPinnedMessageId(
+	not_null<PeerData*> peer,
+	MsgId messageId,
+	MsgId topicRootId = 0,
+	PeerId monoforumPeerId = 0);
 [[nodiscard]] FullMsgId ResolveTopPinnedId(
 	not_null<PeerData*> peer,
 	MsgId topicRootId,

@@ -87,6 +87,9 @@ void TopBar::setTitle(TitleDescriptor descriptor) {
 	if (_subtitle) {
 		delete _subtitle;
 	}
+	if (_badge) {
+		delete _badge;
+	}
 	const auto withSubtitle = !!descriptor.subtitle;
 	if (withSubtitle) {
 		_subtitle = Ui::CreateChild<Ui::FadeWrap<Ui::FlatLabel>>(
@@ -118,6 +121,27 @@ void TopBar::setTitle(TitleDescriptor descriptor) {
 	registerToggleControlCallback(_title.data(), [=] {
 		return !selectionMode() && !storiesTitle() && !searchMode();
 	});
+	if (descriptor.badge) {
+		_badge = Ui::CreateChild<Ui::FadeWrap<Ui::FlatLabel>>(
+			this,
+			object_ptr<Ui::FlatLabel>(
+				this,
+				std::move(descriptor.badge),
+				_st.badge),
+			st::infoTopBarScale);
+		_badge->setDuration(st::infoTopBarDuration);
+		_badge->toggle(
+			!selectionMode() && !storiesTitle(),
+			anim::type::instant);
+		registerToggleControlCallback(_badge.data(), [=] {
+			return !selectionMode() && !storiesTitle() && !searchMode();
+		});
+		_badge->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_badge->widthValue(
+		) | rpl::on_next([=] {
+			updateControlsGeometry(width());
+		}, _badge->lifetime());
+	}
 
 	if (_back) {
 		_title->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -380,6 +404,14 @@ void TopBar::updateDefaultControlsGeometry(int newWidth) {
 		}
 		button->moveToRight(right, 0, newWidth);
 		right += button->width();
+	}
+	if (_badge) {
+		right += _st.badgeSkip;
+		_badge->moveToRight(
+			right,
+			(_st.height - _badge->height()) / 2,
+			newWidth);
+		right += _badge->width() + _st.badgeSkip;
 	}
 	if (_back) {
 		_back->setGeometryToLeft(

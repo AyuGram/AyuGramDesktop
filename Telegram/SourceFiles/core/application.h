@@ -289,6 +289,8 @@ public:
 
 	// Internal links.
 	void checkStartUrls();
+	[[nodiscard]] QPointer<QWidget> checkStartUrlsActivating();
+	void registerWindowActivation(not_null<QWidget*> window);
 	bool openLocalUrl(const QString &url, QVariant context);
 	bool openInternalUrl(const QString &url, QVariant context);
 	[[nodiscard]] QString changelogLink() const;
@@ -359,6 +361,9 @@ public:
 	// Global runtime variables.
 	void setScreenIsLocked(bool locked);
 	bool screenIsLocked() const;
+	[[nodiscard]] rpl::producer<bool> screenIsLockedValue() const;
+	void notifySystemSleep();
+	[[nodiscard]] rpl::producer<> systemSleepEvents() const;
 
 	static void RegisterUrlScheme();
 
@@ -470,12 +475,14 @@ private:
 
 	rpl::variable<bool> _passcodeLock;
 	rpl::variable<bool> _setupEmailLock;
-	bool _screenIsLocked = false;
+	rpl::variable<bool> _screenIsLocked = false;
+	rpl::event_stream<> _systemSleep;
 
 	crl::time _shouldLockAt = 0;
 	base::Timer _autoLockTimer;
 
 	QList<QUrl> _urlsToOpen;
+	std::optional<QPointer<QWidget>> _startUrlActivated;
 
 	std::optional<base::Timer> _saveSettingsTimer;
 

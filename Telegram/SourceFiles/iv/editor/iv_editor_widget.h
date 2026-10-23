@@ -113,6 +113,7 @@ struct WidgetServices {
 	Fn<void(not_null<Widget*>, uint64 /*mediaId*/)> cancelMediaUpload;
 	Fn<void(not_null<Widget*>, State::BlockPath, QPointer<QWidget>)>
 		addMediaAndGroupWithBlock;
+	Fn<void()> submit;
 	rpl::producer<> imeCompositionStarts;
 };
 
@@ -131,12 +132,10 @@ public:
 
 	void activateInitialNode();
 	void activateInitialNodeAtEnd();
-	void activateSegment(int segmentIndex, int cursorOffset);
 	[[nodiscard]] State::ApplyResult commitInlineField();
 	[[nodiscard]] State::ApplyResult commitInlineFieldForClose();
 	[[nodiscard]] bool closeSearch();
 	void refreshPreparedContent();
-	void refreshPreparedLeafAtActiveSource();
 	void applyExternalRichPageMutation(Fn<bool(RichPage&)> mutation);
 	void syncInlineFieldGeometry();
 	[[nodiscard]] bool canInsertListAtCaret() const;
@@ -147,6 +146,7 @@ public:
 	void insertPreparedBlock(RichPage::Block block);
 	void replacePreparedBlock(State::ReplaceTarget target, RichPage::Block block);
 	void insertPreparedBlocks(std::vector<RichPage::Block> blocks);
+	void pasteImportedBlocks(BlocksImportResult &&imported);
 	void pasteStructuredClipboardData(const ClipboardData &data);
 	[[nodiscard]] bool hasActiveSelection() const;
 	[[nodiscard]] rpl::producer<bool> hasSelectionValue() const;
@@ -156,14 +156,10 @@ public:
 		std::shared_ptr<const RichPage> page);
 	[[nodiscard]] TextWithEntities textSpanForCurrentSelection();
 	void replaceCurrentSelectionWithText(TextWithEntities text);
-	void pastePreparedBlock(
-		RichPage::Block block,
-		PreparedMediaPasteTarget target);
 	void pastePreparedBlocks(
 		std::vector<RichPage::Block> blocks,
 		PreparedMediaPasteTarget target);
 	void groupBlocksIntoGroup(State::BlockPath anchor, int insertedCount);
-	void insertHeading1();
 	void insertBlockquote();
 	void insertEmoji(EmojiPtr emoji);
 	void insertCustomEmoji(not_null<DocumentData*> document);
@@ -592,7 +588,6 @@ private:
 		Fn<void()> afterRefresh);
 	bool showLastLimitToast();
 	void hideInlineField();
-	void acceptInlineField();
 	void hideInlineFieldAndRefresh();
 	void toggleSearch();
 	void createSearchController();
@@ -626,6 +621,7 @@ private:
 	void applyStructuralMonospaceAction();
 	void insertCodeBlock();
 	[[nodiscard]] bool handleFieldKey(QKeyEvent *e);
+	[[nodiscard]] bool handleSubmitShortcut(QKeyEvent *e);
 
 	[[nodiscard]] bool handleFieldInputRule(QKeyEvent *e);
 	[[nodiscard]] bool undoLastInputRule();
@@ -683,7 +679,6 @@ private:
 		const BlocksImportResult &imported,
 		not_null<const QMimeData*> data) const
 	-> std::optional<BlocksImportResult>;
-	void pasteImportedBlocks(BlocksImportResult &&imported);
 	void resolveImportedLocalMedia(BlocksImportResult &&imported);
 	[[nodiscard]] bool handleIvClipboardMime(
 		not_null<const QMimeData*> data,
@@ -778,6 +773,11 @@ private:
 		const State::LeafPath &leaf,
 		State::FieldMode mode,
 		const InlineFieldStyleKey &styleKey);
+	void restoreInlineFieldAfterMutation(
+		const std::optional<State::LeafPath> &restoreLeaf,
+		const std::optional<InlineFieldStyleKey> &restoreStyleKey,
+		State::FieldMode restoreMode,
+		const std::optional<HistoryLeafSelection> &restoreSelection);
 	void pruneRetainedLeafFields();
 	void removeRetainedLeafFieldsAfter(int historyIndex);
 	void moveRetainedLeafFields(
@@ -1015,6 +1015,7 @@ private:
 	const Fn<void(not_null<Widget*>, uint64)> _cancelMediaUpload;
 	const Fn<void(not_null<Widget*>, State::BlockPath, QPointer<QWidget>)>
 		_addMediaAndGroupWithBlock;
+	const Fn<void()> _submit;
 	const not_null<PeerData*> _peer;
 	const std::shared_ptr<State> _state;
 	const Fn<void(RichMessageLimitError)> _showLimitToast;
@@ -1081,6 +1082,7 @@ private:
 	bool _settingField = false;
 	bool _preparedContentStaleAfterCommit = false;
 	bool _trackingPointerPress = false;
+	bool _fieldBandSelecting = false;
 	bool _inlineFieldExternalInteractionActive = false;
 	bool _keyboardStructuralSelectionActive = false;
 	Markdown::MarkdownArticleEditControlHit _pressedControl;

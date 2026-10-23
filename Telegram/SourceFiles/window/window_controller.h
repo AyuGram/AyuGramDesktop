@@ -61,8 +61,6 @@ public:
 	}
 	[[nodiscard]] auto sessionControllerValue() const
 		-> rpl::producer<SessionController*>;
-	[[nodiscard]] auto sessionControllerChanges() const
-		-> rpl::producer<SessionController*>;
 	[[nodiscard]] bool locked() const;
 
 	[[nodiscard]] Adaptive &adaptive() const;
@@ -76,6 +74,7 @@ public:
 	void clearSetupEmailLock();
 
 	void showLogoutConfirmation();
+	void showPasscodeClearFailed(Fn<bool()> retry);
 
 	void showSettings();
 
@@ -186,6 +185,7 @@ private:
 	std::unique_ptr<SessionController> _sessionController;
 	rpl::variable<SessionController*> _sessionControllerValue;
 	base::weak_qptr<Ui::BoxContent> _termsBox;
+	base::weak_qptr<Ui::BoxContent> _passcodeClearFailedBox;
 
 	rpl::event_stream<Media::View::OpenRequest> _openInMediaViewRequests;
 
@@ -199,5 +199,7 @@ private:
 	rpl::lifetime _lifetime;
 
 };
+
+[[nodiscard]] QString LogoutConfirmationText(Main::Account *account);
 
 } // namespace Window

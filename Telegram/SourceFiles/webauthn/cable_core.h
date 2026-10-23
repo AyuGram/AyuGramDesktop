@@ -122,7 +122,6 @@ struct EcKeyDeleter {
 using EcKeyPtr = std::unique_ptr<EC_KEY, EcKeyDeleter>;
 
 [[nodiscard]] bool RandomBytes(uint8_t *out, size_t size);
-[[nodiscard]] std::array<uint8_t, 20> Sha1Digest(ByteSpan data);
 [[nodiscard]] std::array<uint8_t, 32> Sha256Digest(ByteSpan data);
 [[nodiscard]] std::array<uint8_t, 32> HmacSha256(
 	ByteSpan key,
@@ -240,12 +239,6 @@ private:
 
 };
 
-[[nodiscard]] std::optional<HandshakeResult> RespondToHandshake(
-	ByteSpan psk32,
-	ByteSpan peerIdentityX962,
-	ByteSpan message,
-	Bytes *outResponse);
-
 struct QRKey {
 	EcKeyPtr identity;
 	std::array<uint8_t, kQRSecretSize> secret = {};
@@ -258,7 +251,6 @@ struct QRKey {
 	int64_t nowUnixSeconds);
 
 [[nodiscard]] std::string BytesToDigits(ByteSpan bytes);
-[[nodiscard]] std::optional<Bytes> DigitsToBytes(const std::string &digits);
 
 struct EidComponents {
 	std::array<uint8_t, kNonceSize> nonce = {};

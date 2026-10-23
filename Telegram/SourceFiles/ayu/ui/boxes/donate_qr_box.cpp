@@ -145,7 +145,7 @@ void FillDonateQrBox(
 		Fn<base::unique_qptr<Ui::PopupMenu>()>());
 	box->verticalLayout()->add(label->take(), st::boxRowPadding);
 
-	const auto copyButton = box->addButton(tr::lng_chat_link_copy(), [=] {
+	const auto copyButton = box->addButton(tr::lng_context_copy_link(), [=] {
 		QGuiApplication::clipboard()->setText(address);
 		Ui::Toast::Show(tr::lng_text_copied(tr::now));
 	});
