@@ -2727,6 +2727,8 @@ if (WIN32)
     if (DESKTOP_APP_WIN7_BASELINE)
         # The loader reads the subsystem version as the minimal Windows.
         target_link_options(Telegram PRIVATE /SUBSYSTEM:WINDOWS,6.01)
+        # AyuGram: static Qt Network's DNS lookup imports Dnsapi, absent from the baseline list.
+        target_link_libraries(Telegram PRIVATE Dnsapi)
     endif()
 elseif (APPLE)
     if (NOT DESKTOP_APP_USE_PACKAGED)
