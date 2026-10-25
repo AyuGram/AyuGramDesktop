@@ -190,6 +190,8 @@ public:
 	[[nodiscard]] bool showColorfulReplies() const { return _showColorfulReplies.current(); }
 	[[nodiscard]] bool revealSpoilers() const { return _revealSpoilers.current(); }
 	[[nodiscard]] int embeddedThemeType() const { return _embeddedThemeType.current(); }
+	[[nodiscard]] int scale() const { return _scale.current(); }
+	void setScale(int val);
 	[[nodiscard]] uint32 embeddedThemeAccentColor() const { return _embeddedThemeAccentColor.current(); }
 	[[nodiscard]] uint64 cloudThemeId() const { return _cloudThemeId.current(); }
 	[[nodiscard]] uint64 cloudThemeAccessHash() const { return _cloudThemeAccessHash.current(); }
@@ -223,6 +225,7 @@ private:
 	rpl::variable<bool> _showColorfulReplies = true;
 	rpl::variable<bool> _revealSpoilers = true;
 
+	rpl::variable<int> _scale = 2;
 	rpl::variable<int> _embeddedThemeType = -1;
 	rpl::variable<uint32> _embeddedThemeAccentColor = 0;
 

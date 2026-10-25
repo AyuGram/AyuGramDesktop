@@ -11,6 +11,7 @@
 #include "ayu/ui/boxes/theme_selector_box.h"
 #include "ayu/ui/components/image_view.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ui/widgets/discrete_sliders.h"
 #include "boxes/abstract_box.h"
 #include "data/data_chat.h"
 #include "data/data_channel.h"
@@ -293,6 +294,38 @@ void MessageShotBox::setupContent() {
 
 			Ui::show(std::move(box), Ui::LayerOption::KeepOther);
 		});
+	auto scaleWrap = content->add(
+		object_ptr<Ui::VerticalLayout>(content),
+		st::boxPadding);
+
+	scaleWrap->add(
+		object_ptr<Ui::FlatLabel>(
+			scaleWrap,
+			qsl("Масштаб снимка"),
+			st::settingsSubsectionTitle),
+		st::defaultSubsectionTitlePadding);
+
+	const auto scaleSlider = scaleWrap->add(
+		object_ptr<Ui::SettingsSlider>(scaleWrap, st::defaultSettingsSlider),
+		st::settingsSliderPadding);
+
+	scaleSlider->setSections({ "1x", "2x", "3x", "4x" });
+	const auto initialScale = std::clamp(shotSettings.scale(), 1, 4);
+	scaleSlider->setActiveSection(initialScale - 1);
+
+	scaleSlider->sectionActivated() | rpl::on_next(
+		[=](int index)
+		{
+			const auto newScale = index + 1;
+			if (AyuSettings::getInstance().messageShotSettings().scale() != newScale) {
+				AyuSettings::getInstance().messageShotSettings().setScale(newScale);
+				updatePreview();
+			}
+		},
+		content->lifetime());
+
+	AddSkip(content);
+
 	AddButtonWithIcon(
 		content,
 		tr::ayu_MessageShotShowBackground(),

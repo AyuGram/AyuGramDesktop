@@ -261,6 +261,13 @@ void MessageShotSettings::setRevealSpoilers(bool val) {
 	AyuSettings::save();
 }
 
+void MessageShotSettings::setScale(int val) {
+	val = std::clamp(val, 1, 4);
+	if (_scale.current() == val) return;
+	_scale = val;
+	AyuSettings::save();
+}
+
 bool MessageShotSettings::isCloudThemeEmpty() const {
 	return !_cloudThemeId.current()
 		&& !_cloudThemeAccessHash.current()
@@ -323,6 +330,7 @@ void MessageShotSettings::clearTheme() {
 void to_json(nlohmann::json &j, const MessageShotSettings &s) {
 	j = nlohmann::json{
 		{"showBackground", s._showBackground.current()},
+		{"scale", s._scale.current()},
 		{"showDate", s._showDate.current()},
 		{"showReactions", s._showReactions.current()},
 		{"showHeaderDecorations", s._showHeaderDecorations.current()},
@@ -340,6 +348,7 @@ void to_json(nlohmann::json &j, const MessageShotSettings &s) {
 
 void from_json(const nlohmann::json &j, MessageShotSettings &s) {
 	s._showBackground = j.value("showBackground", true);
+	s._scale = std::clamp(j.value("scale", 2), 1, 4);
 	s._showDate = j.value("showDate", false);
 	s._showReactions = j.value("showReactions", false);
 	s._showHeaderDecorations = j.value("showHeaderDecorations", true);

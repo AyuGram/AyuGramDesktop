@@ -303,101 +303,110 @@ void Make(not_null<QWidget*> box, const ShotConfig &config, const Fn<void(QImage
 	}
 
 	const auto showBackground = AyuSettings::getInstance().messageShotSettings().showBackground();
+	const auto scaleFactor = std::clamp(AyuSettings::getInstance().messageShotSettings().scale(), 1, 4);
 	auto render = [=, messages = std::move(messages), delegate = std::move(delegate)](bool final)
 	{
 		takingShot = true;
 
-		// calculate the size of the image
-		int width = st::msgMaxWidth + (st::boxPadding.left() + st::boxPadding.right());
-		int height = 0;
+		// calculate the logical size of the image
+		const int logicalWidth = st::msgMaxWidth + (st::boxPadding.left() + st::boxPadding.right());
+		int logicalHeight = 0;
 
 		for (int i = 0; i < messages.size(); i++) {
 			const auto &message = messages[i];
 			const auto view = getView(message);
 
 			view->itemDataChanged(); // refresh reactions
-			height += view->resizeGetHeight(width);
+			logicalHeight += view->resizeGetHeight(logicalWidth);
 			if (AyuSettings::getInstance().messageShotSettings().revealSpoilers()) {
 				view->revealSpoilers();
 			}
 		}
 
-		width *= style::DevicePixelRatio();
-		height *= style::DevicePixelRatio();
+		const int baseDpr = style::DevicePixelRatio();
+		const int effectiveDpr = baseDpr * scaleFactor;
 
-		// create the image
-		QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
-		image.setDevicePixelRatio(style::DevicePixelRatio());
+		const int pixelWidth = logicalWidth * effectiveDpr;
+		const int pixelHeight = logicalHeight * effectiveDpr;
+
+		// create the image with high pixel density
+		QImage image(pixelWidth, pixelHeight, QImage::Format_ARGB32_Premultiplied);
+		image.setDevicePixelRatio(effectiveDpr);
 		image.fill(Qt::transparent);
 
-		const auto viewport = QRect(0, 0, width, height);
+		const auto viewport = QRect(0, 0, logicalWidth, logicalHeight);
 
 		base::flat_map<not_null<PeerData*>, Ui::PeerUserpicView> userpics;
 		base::flat_map<MsgId, Ui::PeerUserpicView> hiddenSenderUserpics;
 
-		Painter p(&image);
+		{
+			ScopedDprOverride dprOverride(effectiveDpr);
+			Painter p(&image);
 
-		// draw the messages
-		int y = 0;
-		for (int i = 0; i < messages.size(); i++) {
-			const auto &message = messages[i];
-			const auto view = getView(message);
+			// draw the messages
+			int y = 0;
+			for (int i = 0; i < messages.size(); i++) {
+				const auto &message = messages[i];
+				const auto view = getView(message);
 
-			const auto displayUserpic = view->displayFromPhoto() || message->isPost();
+				const auto displayUserpic = view->displayFromPhoto() || message->isPost();
 
-			const auto rect = QRect(0, 0, width, view->height());
+				const auto rect = QRect(0, 0, logicalWidth, view->height());
 
-			auto context = controller->defaultChatTheme()->preparePaintContext(
-				st.get(),
-				viewport,
-				rect,
-				rect,
-				true);
+				auto context = controller->defaultChatTheme()->preparePaintContext(
+					st.get(),
+					viewport,
+					rect,
+					rect,
+					true);
 
-			p.translate(0, y);
-			view->draw(p, context);
-			p.translate(0, -y);
+				p.translate(0, y);
+				view->draw(p, context);
+				p.translate(0, -y);
 
-			if (displayUserpic) {
-				const auto picX = st::msgMargin.left();
-				const auto picY = y + view->height() - st::msgPhotoSize;
+				if (displayUserpic) {
+					const auto picX = st::msgMargin.left();
+					const auto picY = y + view->height() - st::msgPhotoSize;
 
-				if (const auto from = message->displayFrom()) {
-					Dialogs::Ui::PaintUserpic(
-						p,
-						from,
-						nullptr,
-						userpics[from],
-						picX,
-						picY,
-						width,
-						st::msgPhotoSize,
-						context.paused);
-				} else if (const auto info = message->displayHiddenSenderInfo()) {
-					if (info->customUserpic.empty()) {
-						info->emptyUserpic.paintCircle(
+					if (const auto from = message->displayFrom()) {
+						Dialogs::Ui::PaintUserpic(
 							p,
+							from,
+						nullptr,
+							userpics[from],
 							picX,
 							picY,
-							width,
-							st::msgPhotoSize);
+							logicalWidth,
+							st::msgPhotoSize,
+							context.paused);
+					} else if (const auto info = message->displayHiddenSenderInfo()) {
+						if (info->customUserpic.empty()) {
+							info->emptyUserpic.paintCircle(
+								p,
+								picX,
+								picY,
+								logicalWidth,
+								st::msgPhotoSize);
+						}
 					}
 				}
-			}
 
-			y += view->height();
+				y += view->height();
+			}
 		}
 
 		takingShot = false;
 
-		auto result = addPadding(removeEmptySpaceAround(image));
+		auto cropped = removeEmptySpaceAround(image);
+		cropped.setDevicePixelRatio(effectiveDpr);
+		auto result = addPadding(cropped, effectiveDpr);
 		if (!showBackground) {
 			callback(result, final);
 			return;
 		}
 
 		auto newResult = QImage(result.size(), QImage::Format_ARGB32_Premultiplied);
-		newResult.setDevicePixelRatio(style::DevicePixelRatio());
+		newResult.setDevicePixelRatio(effectiveDpr);
 		newResult.fill(makeDefaultBackgroundColor());
 
 		Painter painter(&newResult);

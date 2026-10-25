@@ -36,7 +36,11 @@ void ImageView::setImage(const QImage &image) {
 			this->newDiffImage = QImage();
 		}
 
-		const auto size = image.size() / style::DevicePixelRatio();
+		const auto dpr = image.devicePixelRatio() > 0 ? image.devicePixelRatio() : 1.0;
+		const auto size = QSize(
+			int(std::round(image.width() / dpr)),
+			int(std::round(image.height() / dpr))
+		);
 		setMinimumSize(size.grownBy(st::imageViewInnerPadding));
 
 		if (this->animation.animating()) {
