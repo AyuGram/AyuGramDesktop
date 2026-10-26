@@ -124,6 +124,7 @@ private:
 	};
 
 	void parseThemes(const QVector<MTPTheme> &list);
+	void loadPrebuiltThemes();
 	void checkCurrentTheme();
 	void checkAppliedChatTheme();
 

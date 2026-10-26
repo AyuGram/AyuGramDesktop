@@ -961,8 +961,8 @@ topBarInfoActive: icon {{ "top_bar_profile", windowActiveTextFg }};
 topBarActionSkip: 10px;
 topBarActionButtonLargeRadius: 8px;
 
-topBarInfoButtonSize: size(52px, topBarHeight);
-topBarInfoButtonInnerSize: 42px;
+topBarInfoButtonSize: size(46px, topBarHeight);
+topBarInfoButtonInnerSize: 36px;
 topBarInfoButtonInnerPosition: point(2px, -1px);
 topBarInfoButton: UserpicButton(defaultUserpicButton) {
 	size: topBarInfoButtonSize;

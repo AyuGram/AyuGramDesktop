@@ -506,6 +506,38 @@ void CloudThemes::parseThemes(const QVector<MTPTheme> &list) {
 		_list.push_back(CloudTheme::Parse(_session, theme, true));
 	}
 	checkCurrentTheme();
+	loadPrebuiltThemes();
+}
+
+void CloudThemes::loadPrebuiltThemes() {
+	static const auto kPrebuiltSlugs = std::vector<QString>{
+		u"RDifhXXEiN24RFvF"_q,
+		u"n4nOLil3usSDxJrh"_q,
+		u"JVQ0iTGZ51OlPyNN"_q,
+		u"QFWDy3jUxd60e6SO"_q,
+		u"iUW14KTLHSIyW2IT"_q,
+		u"au4FDpGfXsDJAqD1"_q,
+		u"j8aqERTVjRim978Z"_q,
+		u"xiLU9ZGr1sCIu1Kw"_q,
+	};
+	for (const auto &slug : kPrebuiltSlugs) {
+		const auto exists = ranges::contains(_list, slug, &CloudTheme::slug);
+		if (exists) {
+			continue;
+		}
+		_session->api().request(MTPaccount_GetTheme(
+			MTP_string(Format()),
+			MTP_inputThemeSlug(MTP_string(slug))
+		)).done([=](const MTPTheme &result) {
+			result.match([&](const MTPDtheme &data) {
+				auto parsed = CloudTheme::Parse(_session, data, true);
+				if (!ranges::contains(_list, parsed.id, &CloudTheme::id)) {
+					_list.push_back(std::move(parsed));
+					_updates.fire({});
+				}
+			}, [](const auto &) {});
+		}).send();
+	}
 }
 
 void CloudThemes::refreshChatThemes() {

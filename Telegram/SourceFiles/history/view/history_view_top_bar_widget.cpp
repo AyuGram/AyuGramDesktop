@@ -292,6 +292,13 @@ TopBarWidget::TopBarWidget(
 		updateConnectingState();
 	}, lifetime());
 
+	AyuSettings::getInstance().showTopBarAvatarChanges(
+	) | rpl::on_next([=] {
+		updateControlsVisibility();
+		updateControlsGeometry();
+		update();
+	}, lifetime());
+
 	setCursor(style::cur_pointer);
 	_call->setAccessibleName(tr::lng_profile_action_short_call(tr::now));
 	_groupCall->setAccessibleName(tr::lng_group_call_title(tr::now));
@@ -1160,7 +1167,9 @@ void TopBarWidget::updateInfoButtonVisibility() {
 	}
 	const auto shown = (communityChatsListBar() && !rootChatsListBar())
 		? communityUserpicShown()
-		: (_controller->adaptive().isOneColumn() || !_primaryWindow);
+		: (_controller->adaptive().isOneColumn()
+			|| !_primaryWindow
+			|| AyuSettings::getInstance().showTopBarAvatar());
 	_info->setVisible(!_chooseForReportReason && shown);
 }
 
@@ -1257,7 +1266,9 @@ void TopBarWidget::updateControlsGeometry() {
 		_cancelChoose->moveToLeft(_leftTaken, otherButtonsTop);
 		_leftTaken += _cancelChoose->width();
 	} else if (_back->isHidden()) {
-		_leftTaken = st::topBarArrowPadding.right();
+		_leftTaken = (_info && !_info->isHidden())
+			? st::topBarActionSkip
+			: st::topBarArrowPadding.right();
 	} else {
 		_leftTaken = anim::interpolate(
 			0,

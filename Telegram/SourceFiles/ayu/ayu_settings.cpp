@@ -1062,6 +1062,20 @@ void AyuSettings::setSingleCornerRadius(bool val) {
 	save();
 }
 
+void AyuSettings::setShowTopBarAvatar(bool val) {
+	if (_showTopBarAvatar.current() == val) return;
+	_showTopBarAvatar = val;
+	repaintApp();
+	save();
+}
+
+void AyuSettings::setRoundedInnerCorners(bool val) {
+	if (_roundedInnerCorners.current() == val) return;
+	_roundedInnerCorners = val;
+	repaintApp();
+	save();
+}
+
 void AyuSettings::setStreamerMode(bool val) {
 	if (_streamerMode.current() == val) return;
 	_streamerMode = val;
@@ -1164,6 +1178,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"showTopBarAvatar", s._showTopBarAvatar.current()},
+		{"roundedInnerCorners", s._roundedInnerCorners.current()},
 		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
@@ -1268,6 +1284,8 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._showTopBarAvatar = j.value("showTopBarAvatar", defaults._showTopBarAvatar.current());
+	s._roundedInnerCorners = j.value("roundedInnerCorners", defaults._roundedInnerCorners.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {

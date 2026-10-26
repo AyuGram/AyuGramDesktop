@@ -464,6 +464,7 @@ Widget::Widget(
 	+ st::defaultDialogRow.photoSize
 	+ st::defaultDialogRow.padding.left())
 , _searchControls(this)
+, _innerCorner(this)
 , _mainMenu({
 	.toggle = object_ptr<Ui::IconButton>(
 		_searchControls,
@@ -555,6 +556,28 @@ Widget::Widget(
 		}
 	}) | rpl::on_next([=](const Data::HistoryUpdate &update) {
 		jumpToTop(true);
+	}, lifetime());
+
+	if (_innerCorner) {
+		_innerCorner->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_innerCorner->paintRequest() | rpl::on_next([=] {
+			auto p = QPainter(_innerCorner);
+			PainterHighQualityEnabler hq(p);
+			const auto width = _innerCorner->width();
+			const auto height = _innerCorner->height() + width;
+			auto mask = QPainterPath();
+			mask.addRect(0, 0, width, _innerCorner->height());
+			auto rounded = QPainterPath();
+			rounded.addRoundedRect(0, 0, width * 2, height, width, width);
+			p.setPen(Qt::NoPen);
+			p.setBrush(st::windowFiltersButton.textBg);
+			p.drawPath(mask.subtracted(rounded));
+		}, _innerCorner->lifetime());
+	}
+	AyuSettings::getInstance().roundedInnerCornersChanges(
+	) | rpl::on_next([=] {
+		updateControlsGeometry();
+		update();
 	}, lifetime());
 
 	_inner->scrollByDeltaRequests(
@@ -4665,6 +4688,19 @@ void Widget::updateControlsGeometry() {
 		- filterRight;
 	const auto filterAreaHeight = st::topBarHeight;
 	_searchControls->setGeometry(0, filterAreaTop, ratiow, filterAreaHeight);
+	if (_innerCorner) {
+		const auto shouldShowCorner = (controller()->filtersWidth() > 0)
+			&& AyuSettings::getInstance().roundedInnerCorners()
+			&& (narrowRatio == 0.);
+		if (shouldShowCorner) {
+			const auto cornerRadius = 14;
+			_innerCorner->setGeometry(0, 0, cornerRadius, cornerRadius);
+			_innerCorner->raise();
+			_innerCorner->show();
+		} else {
+			_innerCorner->hide();
+		}
+	}
 	if (_subsectionTopBar) {
 		_subsectionTopBar->setGeometryWithNarrowRatio(
 			_searchControls->geometry(),

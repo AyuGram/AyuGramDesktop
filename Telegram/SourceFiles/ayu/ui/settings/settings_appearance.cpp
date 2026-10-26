@@ -210,6 +210,18 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::hidePremiumStatuses,
 		.setter = &AyuSettings::setHidePremiumStatuses,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/showTopBarAvatar"_q,
+		.title = tr::ayu_ShowTopBarAvatar(),
+		.getter = &AyuSettings::showTopBarAvatar,
+		.setter = &AyuSettings::setShowTopBarAvatar,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/roundedInnerCorners"_q,
+		.title = tr::ayu_RoundedInnerCorners(),
+		.getter = &AyuSettings::roundedInnerCorners,
+		.setter = &AyuSettings::setRoundedInnerCorners,
+	});
 
 	const auto controller = builder.controller();
 	builder.addButton({
