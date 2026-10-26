@@ -113,6 +113,14 @@ base::options::toggle OptionDisableTouchbar({
 	.restartRequired = true,
 });
 
+base::options::toggle OptionStableSeparateWindowTitles({
+	.id = kOptionStableSeparateWindowTitles,
+	.name = "Stable titles for chat windows",
+	.description = "Title separate chat windows as \"Chat @ AyuGram\""
+		" without unread counters, so window managers can match them.",
+	.restartRequired = true,
+});
+
 [[nodiscard]] QString TitleFromSeparateSharedMedia(
 		const Core::WindowTitleContent &settings,
 		const SeparateId &id) {
@@ -139,6 +147,8 @@ base::options::toggle OptionDisableTouchbar({
 
 const char kOptionNewWindowsSizeAsFirst[] = "new-windows-size-as-first";
 const char kOptionDisableTouchbar[] = "touchbar-disabled";
+const char kOptionStableSeparateWindowTitles[]
+	= "stable-separate-window-titles";
 
 QImage Logo() {
 	return AyuAssets::currentAppLogo();
@@ -932,6 +942,11 @@ void MainWindow::updateTitle() {
 		? tr::lng_saved_messages(tr::now)
 		: history->peer->name();
 	const auto wrapped = st::wrap_rtl(name);
+	if (OptionStableSeparateWindowTitles.value()
+		&& !session->windowId().primary()) {
+		setTitle(wrapped + u" @ AyuGram"_q + suffix);
+		return;
+	}
 	const auto threadCounter = thread->chatListBadgesState().unreadCounter;
 	const auto primary = (threadCounter > 0)
 		? u"(%1) %2"_q.arg(threadCounter).arg(wrapped)
