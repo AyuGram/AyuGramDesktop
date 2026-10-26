@@ -252,6 +252,16 @@ set(ayugram_files
         ayu/data/entities.h
         ayu/data/ayu_database.cpp
         ayu/data/ayu_database.h
+        ayu/mcp/mcp_auth.cpp
+        ayu/mcp/mcp_auth.h
+        ayu/mcp/mcp_protocol.cpp
+        ayu/mcp/mcp_protocol.h
+        ayu/mcp/mcp_registry.cpp
+        ayu/mcp/mcp_registry.h
+        ayu/mcp/mcp_server.cpp
+        ayu/mcp/mcp_server.h
+        ayu/mcp/tools/mcp_tools.h
+        ayu/mcp/tools/mcp_tools_chats.cpp
 
         info/profile/info_profile_music_button.cpp
         info/profile/info_profile_music_button.h

@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/mcp/mcp_server.h"
 #include "ayu/ui/ayu_userpic.h"
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
@@ -38,6 +39,9 @@
 #include "ui/widgets/menu/menu_item_base.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
+
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 
 namespace Settings {
 
@@ -678,6 +682,28 @@ void BuildOther(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	});
 }
 
+void BuildMcp(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+	builder.addSubsectionTitle(tr::ayu_McpHeader());
+
+	ayu.addSettingToggle({
+		.id = u"ayu/mcpEnabled"_q,
+		.title = tr::ayu_McpEnabled(),
+		.getter = &AyuSettings::mcpEnabled,
+		.setter = &AyuSettings::setMcpEnabled,
+	});
+	builder.addButton({
+		.id = u"ayu/mcpCopyConfig"_q,
+		.title = tr::ayu_McpCopyConfig(),
+		.onClick = [] {
+			QGuiApplication::clipboard()->setText(AyuMcp::clientConfig());
+			Ui::Toast::Show(tr::ayu_McpConfigCopied(tr::now));
+		},
+		.shown = AyuSettings::getInstance().mcpEnabledValue(),
+	});
+	builder.addSkip();
+	builder.addDividerText(tr::ayu_McpDescription());
+}
+
 const auto kMeta = BuildHelper({
 	.id = AyuGhost::Id(),
 	.parentId = AyuMain::Id(),
@@ -694,7 +720,9 @@ const auto kMeta = BuildHelper({
 
 	ayu.addSectionDivider();
 	BuildOther(builder, ayu);
-	builder.addSkip();
+
+	ayu.addSectionDivider();
+	BuildMcp(builder, ayu);
 });
 
 } // namespace
