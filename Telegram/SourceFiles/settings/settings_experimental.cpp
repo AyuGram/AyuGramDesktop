@@ -525,6 +525,7 @@ void SetupExperimental(
 #endif
 				Window::kOptionDisableTouchbar,
 				Window::kOptionNewWindowsSizeAsFirst,
+				Window::kOptionStableSeparateWindowTitles,
 			}
 		},
 		{
