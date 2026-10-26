@@ -86,6 +86,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
+#include "ayu/data/messages_storage.h"
 
 
 namespace {
@@ -1850,13 +1851,14 @@ void History::addEdgesToSharedMedia() {
 }
 
 void History::addOlderSlice(const QVector<MTPMessage> &slice) {
-	if (slice.isEmpty()) {
+	const auto added = AyuMessages::restoreDeletedMessages(this, slice, false);
+	if (slice.isEmpty() && added.empty()) {
 		_loadedAtTop = true;
 		checkLocalMessages();
 		return;
 	}
 
-	if (const auto added = createItems(slice); !added.empty()) {
+	if (!added.empty()) {
 		addCreatedOlderSlice(added);
 	} else {
 		// If no items were added it means we've loaded everything old.
@@ -1890,15 +1892,16 @@ void History::addCreatedOlderSlice(
 
 void History::addNewerSlice(const QVector<MTPMessage> &slice) {
 	bool wasLoadedAtBottom = loadedAtBottom();
+	const auto added = AyuMessages::restoreDeletedMessages(this, slice, true);
 
-	if (slice.isEmpty()) {
+	if (slice.isEmpty() && added.empty()) {
 		_loadedAtBottom = true;
 		if (!lastMessage()) {
 			setLastMessage(lastAvailableMessage());
 		}
 	}
 
-	if (const auto added = createItems(slice); !added.empty()) {
+	if (!added.empty()) {
 		Assert(!isBuildingFrontBlock());
 
 		for (const auto &item : added) {
@@ -4390,6 +4393,45 @@ std::vector<MsgId> History::collectMessagesFromParticipantToDelete(
 		}
 	}
 	return result;
+}
+
+void History::unloadDeletedMessagesLater() {
+	if (Core::Quitting() || (_flags & Flag::UnloadDeletedMessagesScheduled)) {
+		return;
+	}
+	_flags |= Flag::UnloadDeletedMessagesScheduled;
+	const auto session = &this->session();
+	const auto peerId = peer->id;
+	crl::on_main(session, [=] {
+		if (Core::Quitting()) {
+			return;
+		}
+		if (const auto loaded = session->data().historyLoaded(peerId)) {
+			loaded->unloadDeletedMessages();
+		}
+	});
+}
+
+void History::unloadDeletedMessages() {
+	_flags &= ~Flag::UnloadDeletedMessagesScheduled;
+	if (_delegateMixin->hasCurrent()) {
+		return;
+	}
+	auto archived = std::vector<FullMsgId>();
+	for (const auto &item : _items) {
+		if (AyuMessages::canUnloadDeletedMessage(item.get())) {
+			archived.push_back(item->fullId());
+		}
+	}
+	if (archived.empty()) {
+		return;
+	}
+	clear(ClearType::Unload);
+	for (const auto id : archived) {
+		if (const auto item = owner().message(id)) {
+			item->destroy();
+		}
+	}
 }
 
 void History::clear(ClearType type, bool markEmpty) {

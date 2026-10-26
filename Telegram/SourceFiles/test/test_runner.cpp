@@ -339,16 +339,17 @@ void Runner::captureAndInspect(
 			return true;
 		},
 		.then = [=] {
-			if (!capture->save(name) || !inspect) {
-				return;
+			const auto saved = capture->save(name);
+			if (saved && inspect) {
+				if (const auto widget = capture->widget()) {
+					inspect(widget, capture->image());
+				} else {
+					Fail(
+						u"inspect capture %1"_q.arg(name),
+						u"accepted target was destroyed before inspection"_q);
+				}
 			}
-			if (const auto widget = capture->widget()) {
-				inspect(widget, capture->image());
-			} else {
-				Fail(
-					u"inspect capture %1"_q.arg(name),
-					u"accepted target was destroyed before inspection"_q);
-			}
+			capture->invalidate(QString());
 		},
 		.timeout = timeout,
 		.timeoutDetails = [=] { return capture->pendingReason(); },

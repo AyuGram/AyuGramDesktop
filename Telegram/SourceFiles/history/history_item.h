@@ -92,6 +92,7 @@ struct HistoryItemCommonFields {
 	PeerId from = 0;
 	FullReplyTo replyTo;
 	TimeId date = 0;
+	TimeId editDate = 0;
 	TimeId scheduleRepeatPeriod = 0;
 	BusinessShortcutId shortcutId = 0;
 	int starsPaid = 0;
@@ -468,8 +469,9 @@ public:
 		MsgId replyToTop,
 		bool isForumPost);
 	void setPostAuthor(const QString &author);
-	void setDeleted();
+	void setDeleted(bool saved = false);
 	[[nodiscard]] bool isDeleted() const;
+	[[nodiscard]] bool isDeletedSaved() const { return _deletedSaved; }
 	[[nodiscard]] bool isBurnt() const;
 	[[nodiscard]] bool wasDeletedAnimated() const;
 	void markDeletedAnimated();
@@ -829,6 +831,7 @@ private:
 
 	bool _deleted = false;
 	bool _deletedAnimated = false;
+	bool _deletedSaved = false;
 
 	TimeId _date = 0;
 	TimeId _ttlDestroyAt = 0;

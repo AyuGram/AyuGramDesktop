@@ -28,6 +28,10 @@ auto storage = make_storage(
 			   column<DeletedMessage>(&DeletedMessage::dialogId),
 			   column<DeletedMessage>(&DeletedMessage::topicId),
 			   column<DeletedMessage>(&DeletedMessage::messageId)),
+	make_index("idx_deleted_message_userId_dialogId_messageId",
+		column<DeletedMessage>(&DeletedMessage::userId),
+		column<DeletedMessage>(&DeletedMessage::dialogId),
+		column<DeletedMessage>(&DeletedMessage::messageId)),
 	make_index("idx_edited_message_userId_dialogId_messageId",
 			   column<EditedMessage>(&EditedMessage::userId),
 			   column<EditedMessage>(&EditedMessage::dialogId),
@@ -66,7 +70,9 @@ auto storage = make_storage(
 		make_column("documentSerialized", &DeletedMessage::documentSerialized),
 		make_column("thumbsSerialized", &DeletedMessage::thumbsSerialized),
 		make_column("documentAttributesSerialized", &DeletedMessage::documentAttributesSerialized),
-		make_column("mimeType", &DeletedMessage::mimeType)
+		make_column("mimeType", &DeletedMessage::mimeType),
+		make_column("snapshot", &DeletedMessage::snapshot,
+			default_value(std::vector<char>()))
 	),
 	make_table<EditedMessage>(
 		"EditedMessage",
@@ -307,18 +313,59 @@ bool hasRevisions(ID userId, ID dialogId, ID messageId) {
 	}
 }
 
-void addDeletedMessage(const DeletedMessage &message) {
+bool addDeletedMessage(const DeletedMessage &message) {
 	std::lock_guard lock(databaseMutex);
 	try {
 		storage.begin_transaction();
+		storage.remove_all<DeletedMessage>(where(
+			column<DeletedMessage>(&DeletedMessage::userId) == message.userId
+			and column<DeletedMessage>(&DeletedMessage::dialogId) == message.dialogId
+			and column<DeletedMessage>(&DeletedMessage::messageId) == message.messageId));
 		storage.insert(message);
 		storage.commit();
+		return true;
 	} catch (std::exception &ex) {
 		try {
 			storage.rollback();
 		} catch (...) {
 		}
-		LOG(("Failed to save edited message for some reason: %1").arg(ex.what()));
+		LOG(("Failed to save deleted message: %1").arg(ex.what()));
+		return false;
+	}
+}
+
+std::vector<DeletedMessage> getDeletedMessagesSlice(
+		ID userId,
+		ID dialogId,
+		ID minId,
+		ID maxId,
+		int totalLimit,
+		bool ascending) {
+	std::lock_guard lock(databaseMutex);
+	try {
+		const auto order = order_by(
+			column<DeletedMessage>(&DeletedMessage::messageId));
+		const auto condition = where(
+			column<DeletedMessage>(&DeletedMessage::userId) == userId
+			and column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId
+			and column<DeletedMessage>(&DeletedMessage::messageId) > minId
+			and column<DeletedMessage>(&DeletedMessage::messageId) < maxId);
+		const auto grouped = group_by(
+			column<DeletedMessage>(&DeletedMessage::messageId));
+		return ascending
+			? storage.get_all<DeletedMessage>(
+				condition,
+				grouped,
+				order.asc(),
+				limit(totalLimit))
+			: storage.get_all<DeletedMessage>(
+				condition,
+				grouped,
+				order.desc(),
+				limit(totalLimit));
+	} catch (const std::exception &ex) {
+		LOG(("Failed to load deleted message slice: %1").arg(ex.what()));
+		return {};
 	}
 }
 

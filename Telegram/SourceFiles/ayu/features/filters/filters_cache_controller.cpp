@@ -211,6 +211,9 @@ void invalidateSingle(not_null<HistoryItem*> item) {
 	}
 
 	dialogIt->second.erase(it);
+	if (dialogIt->second.empty()) {
+		filteredMessages.erase(dialogIt);
+	}
 }
 
 void invalidate(not_null<HistoryItem*> item) {
