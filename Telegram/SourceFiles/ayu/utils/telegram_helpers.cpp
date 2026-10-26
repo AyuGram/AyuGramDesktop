@@ -733,8 +733,10 @@ void processMessageDelete(not_null<HistoryItem*> item) {
 		if (item->ttlDestroyAt() > 0) {
 			item->applyTTL(0);
 		}
-		item->setDeleted();
-		AyuMessages::addDeletedMessage(item);
+		if (!item->isDeletedSaved()) {
+			item->setDeleted(AyuMessages::addDeletedMessage(item));
+			item->history()->unloadDeletedMessagesLater();
+		}
 	}
 }
 

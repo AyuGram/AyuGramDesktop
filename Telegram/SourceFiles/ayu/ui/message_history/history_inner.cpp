@@ -12,6 +12,7 @@
 #include "api/api_attached_stickers.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/ui/message_history/history_section.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "base/call_delayed.h"
 #include "base/unixtime.h"
 #include "base/platform/base_platform_info.h"
@@ -245,12 +246,12 @@ InnerWidget::InnerWidget(
 	QWidget *parent,
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer,
-	HistoryItem *item,
+	MsgId itemId,
 	ID topicId)
 	: RpWidget(parent),
 	  _controller(controller),
 	  _peer(peer),
-	  _item(item),
+	  _itemId(itemId),
 	  _topicId(topicId),
 	  _history(peer->owner().history(peer)),
 	  _api(&_peer->session().mtp()),
@@ -653,7 +654,7 @@ bool InnerWidget::elementHideTopicButton(not_null<const Element*> view) {
 }
 
 void InnerWidget::saveState(not_null<SectionMemento*> memento) {
-	if (!_item) {
+	if (!_itemId) {
 		memento->setItems({}, {}, false, true);
 		memento->setSearchQuery(base::take(_searchQuery));
 		_items.clear();
@@ -678,7 +679,7 @@ void InnerWidget::saveState(not_null<SectionMemento*> memento) {
 }
 
 void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
-	if (!_item) {
+	if (!_itemId) {
 		_items.clear();
 		_messageIds.clear();
 		_itemsByData.clear();
@@ -707,7 +708,7 @@ void InnerWidget::restoreState(not_null<SectionMemento*> memento) {
 }
 
 void InnerWidget::applySearch(const QString &query) {
-	if (_item) {
+	if (_itemId) {
 		return;
 	}
 	if (_searchQuery != query) {
@@ -745,8 +746,9 @@ void InnerWidget::preloadMore(Direction direction) {
 
 	const auto reqNum = ++_loadRequestNum;
 
-	const auto item = _item;
-	const auto peer = _peer;
+	const auto itemId = _itemId;
+	const auto userId = ID(_peer->session().userId().bare & PeerId::kChatTypeMask);
+	const auto dialogId = getDialogIdFromPeer(_peer);
 	const auto topicId = _topicId;
 	const auto searchQuery = _searchQuery;
 
@@ -754,10 +756,23 @@ void InnerWidget::preloadMore(Direction direction) {
 
 	crl::async([=] {
 		std::vector<AyuMessageBase> messages;
-		if (item) { // viewing edited history
-			messages = AyuMessages::getEditedMessages(item, minId, maxId, perPage);
+		if (itemId) { // viewing edited history
+			messages = AyuMessages::getEditedMessages(
+				userId,
+				dialogId,
+				itemId.bare,
+				minId,
+				maxId,
+				perPage);
 		} else { // viewing deleted messages
-			messages = AyuMessages::getDeletedMessages(peer, topicId, minId, maxId, perPage, searchQuery);
+			messages = AyuMessages::getDeletedMessages(
+				userId,
+				dialogId,
+				topicId,
+				minId,
+				maxId,
+				perPage,
+				searchQuery);
 		}
 
 		crl::on_main([=, messages = std::move(messages)]() mutable
@@ -796,7 +811,7 @@ void InnerWidget::addMessages(Direction direction, const std::vector<AyuMessageB
 	addToItems.reserve(oldItemsCount + messages.size() * 2);
 
 	for (const auto &message : messages) {
-		const auto id = _item
+		const auto id = _itemId
 							? message.fakeId // viewing edited history
 							: message.messageId; // viewing deleted messages
 		if (_messageIds.find(id) != _messageIds.end()) {

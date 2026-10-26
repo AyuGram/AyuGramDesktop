@@ -52,7 +52,7 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		HistoryItem *item,
+		MsgId itemId,
 		ID topicId);
 
 	[[nodiscard]] Main::Session &session() const;
@@ -265,7 +265,7 @@ private:
 
 	const not_null<Window::SessionController*> _controller;
 	const not_null<PeerData*> _peer;
-	HistoryItem *_item;
+	MsgId _itemId;
 	ID _topicId;
 	const not_null<History*> _history;
 	MTP::Sender _api;

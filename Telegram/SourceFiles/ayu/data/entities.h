@@ -52,6 +52,9 @@ public:
 
 class DeletedMessage : public AyuMessageBase
 {
+public:
+	std::vector<char> snapshot;
+
 };
 
 class EditedMessage : public AyuMessageBase

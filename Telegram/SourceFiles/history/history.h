@@ -125,6 +125,7 @@ public:
 		ClearHistory,
 	};
 	void clear(ClearType type, bool markEmpty = false);
+	void unloadDeletedMessagesLater();
 	void clearUpTill(MsgId availableMinId);
 
 	void applyGroupAdminChanges(const base::flat_set<UserId> &changes);
@@ -528,6 +529,7 @@ private:
 		ResolveChatListMessage = (1 << 7),
 		MonoAndForumUnreadInvalidatePending = (1 << 8),
 		HasGuestChatBotMessages = (1 << 9),
+		UnloadDeletedMessagesScheduled = (1 << 10),
 	};
 	using Flags = base::flags<Flag>;
 	friend inline constexpr auto is_flag_type(Flag) {
@@ -535,6 +537,7 @@ private:
 	};
 
 	void cacheTopPromoted(bool promoted);
+	void unloadDeletedMessages();
 
 	// when this item is destroyed scrollTopItem just points to the next one
 	// and scrollTopOffset remains the same

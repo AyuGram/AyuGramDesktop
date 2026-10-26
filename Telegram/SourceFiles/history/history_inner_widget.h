@@ -90,6 +90,8 @@ public:
 		_widget = widget;
 	}
 
+	[[nodiscard]] bool hasCurrent() const { return _widget != nullptr; }
+
 	virtual not_null<HistoryView::ElementDelegate*> delegate() = 0;
 	virtual ~HistoryMainElementDelegateMixin();
 

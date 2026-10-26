@@ -5007,8 +5007,10 @@ HistoryInner::~HistoryInner() {
 		}
 	}
 	_history->delegateMixin()->setCurrent(nullptr);
+	_history->unloadDeletedMessagesLater();
 	if (_migrated) {
 		_migrated->delegateMixin()->setCurrent(nullptr);
+		_migrated->unloadDeletedMessagesLater();
 	}
 	delete _menu;
 	_mouseAction = MouseAction::None;

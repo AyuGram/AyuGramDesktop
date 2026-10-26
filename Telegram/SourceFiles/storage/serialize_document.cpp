@@ -227,7 +227,13 @@ DocumentData *Document::readFromStreamHelper(
 	}
 	const auto storage = std::get_if<StorageFileLocation>(
 		&thumb->file().data);
+	const auto cover = std::get_if<AudioAlbumThumbLocation>(
+		&thumb->file().data);
+	const auto songCover = (type == SongDocument)
+		&& cover
+		&& cover->documentId == id;
 	if (thumb->valid()
+		&& !songCover
 		&& (!storage || !storage->isDocumentThumbnail())) {
 		stream.setStatus(QDataStream::ReadCorruptData);
 		// We can't convert legacy thumbnail location to modern, because

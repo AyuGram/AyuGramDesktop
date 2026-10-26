@@ -4125,9 +4125,10 @@ void HistoryItem::setPostAuthor(const QString &postAuthor) {
 	history()->owner().requestItemResize(this);
 }
 
-void HistoryItem::setDeleted() {
+void HistoryItem::setDeleted(bool saved) {
 	_deleted = true;
 	_deletedAnimated = true;
+	_deletedSaved = saved;
 
 	// cleanup mentions and reactions as they tend to bug with deleted messages (e.g. can't remove mention)
 	if (isUnreadMention()) {
@@ -5375,6 +5376,7 @@ TextWithEntities HistoryItem::withLocalEntities(
 void HistoryItem::createComponentsHelper(HistoryItemCommonFields &&fields) {
 	const auto &replyTo = fields.replyTo;
 	auto config = CreateConfig();
+	config.editDate = fields.editDate;
 	config.viaBotId = fields.viaBotId;
 	config.scheduleRepeatPeriod = fields.scheduleRepeatPeriod;
 	if (fields.flags & MessageFlag::HasReplyInfo) {

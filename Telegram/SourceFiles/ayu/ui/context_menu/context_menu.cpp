@@ -307,7 +307,7 @@ void AddAyuGramActions(PeerData *peerData,
 						if (const auto window = sessionController->session().tryResolveWindow()) {
 							window->showSection(std::make_shared<MessageHistory::SectionMemento>(
 								peerData,
-								nullptr,
+								MsgId(),
 								topicId));
 						}
 					},
@@ -507,7 +507,7 @@ void AddHistoryAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		{
 			if (const auto window = item->history()->session().tryResolveWindow()) {
 				window->showSection(
-					std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item, 0));
+					std::make_shared<MessageHistory::SectionMemento>(item->history()->peer, item->id, 0));
 			}
 		},
 		&st::ayuEditsHistoryIcon);

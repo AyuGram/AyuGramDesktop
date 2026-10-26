@@ -35,7 +35,7 @@ public:
 		QWidget *parent,
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
-		HistoryItem *item,
+		MsgId itemId,
 		ID topicId);
 
 	not_null<PeerData*> channel() const;
@@ -78,7 +78,7 @@ private:
 	QPointer<InnerWidget> _inner;
 	object_ptr<FixedBar> _fixedBar;
 	object_ptr<Ui::PlainShadow> _fixedBarShadow;
-	HistoryItem *_item;
+	MsgId _itemId;
 	ID _topicId;
 
 };
@@ -88,9 +88,9 @@ class SectionMemento : public Window::SectionMemento
 public:
 	using Element = HistoryView::Element;
 
-	SectionMemento(not_null<PeerData*> peer, HistoryItem *item, ID topicId)
+	SectionMemento(not_null<PeerData*> peer, MsgId itemId, ID topicId)
 		: _peer(peer),
-		  _item(item),
+		  _itemId(itemId),
 		  _topicId(topicId) {
 	}
 
@@ -149,7 +149,7 @@ public:
 
 private:
 	not_null<PeerData*> _peer;
-	HistoryItem *_item;
+	MsgId _itemId;
 	ID _topicId;
 	int _scrollTop = 0;
 	std::vector<OwnedItem> _items;
