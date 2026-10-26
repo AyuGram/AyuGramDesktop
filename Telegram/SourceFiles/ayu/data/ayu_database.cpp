@@ -326,7 +326,9 @@ std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicI
 	std::lock_guard lock(databaseMutex);
 	try {
 		if (searchQuery.empty()) {
-			return storage.get_all<DeletedMessage>(
+			// Sorting the index alone first, so only the selected rows are read.
+			const auto ids = storage.select(
+				column<DeletedMessage>(&DeletedMessage::fakeId),
 				where(
 					column<DeletedMessage>(&DeletedMessage::userId) == userId and
 					column<DeletedMessage>(&DeletedMessage::dialogId) == dialogId and
@@ -336,6 +338,13 @@ std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicI
 				),
 				order_by(column<DeletedMessage>(&DeletedMessage::messageId)).desc(),
 				limit(totalLimit)
+			);
+			if (ids.empty()) {
+				return {};
+			}
+			return storage.get_all<DeletedMessage>(
+				where(in(column<DeletedMessage>(&DeletedMessage::fakeId), ids)),
+				order_by(column<DeletedMessage>(&DeletedMessage::messageId)).desc()
 			);
 		}
 
