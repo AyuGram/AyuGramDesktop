@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_document.h"
+#include "ayu/ayu_settings.h"
 
 #include "data/data_document_resolver.h"
 #include "data/data_session.h"
@@ -1092,6 +1093,9 @@ void DocumentData::setForbidsFileSave() {
 }
 
 bool DocumentData::forbidsFileSave() const {
+	if (AyuSettings::getInstance().bypassContentProtection() || AyuSettings::getInstance().permanentViewOnceMedia()) {
+		return false;
+	}
 	return (_flags & Flag::FileSaveForbidden);
 }
 

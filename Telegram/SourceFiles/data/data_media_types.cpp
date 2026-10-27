@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_media_types.h"
+#include "ayu/ayu_settings.h"
 
 #include "base/random.h"
 #include "boxes/send_credits_box.h" // CreditsEmoji.
@@ -1013,6 +1014,9 @@ crl::time MediaPhoto::ttlSeconds() const {
 }
 
 bool MediaPhoto::allowsForward() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return true;
+	}
 	return !ttlSeconds();
 }
 

@@ -6093,6 +6093,9 @@ void OverlayWidget::setSystemMediaControls(
 }
 
 bool OverlayWidget::contentNeedsScreenshotProtection() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return false;
+	}
 	if (const auto story = _stories ? _stories->story() : nullptr) {
 		return story->forbidsForward();
 	}
@@ -7900,6 +7903,9 @@ void OverlayWidget::setSession(not_null<Main::Session*> session) {
 			&& ((_photo && media->photo() == _photo)
 				|| (_document && media->document() == _document));
 		if (same) {
+			return;
+		}
+		if (AyuSettings::getInstance().permanentViewOnceMedia()) {
 			return;
 		}
 		const auto playing = _streamed

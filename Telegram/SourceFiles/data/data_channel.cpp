@@ -785,6 +785,9 @@ bool ChannelData::isAyuNoForwards() const {
 }
 
 bool ChannelData::allowsForwarding() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return true;
+	}
 	return !(flags() & Flag::NoForwards);
 }
 

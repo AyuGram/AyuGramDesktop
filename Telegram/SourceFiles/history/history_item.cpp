@@ -1838,6 +1838,8 @@ bool HistoryItem::isTtlCoveredMedia() const {
 	const auto media = _media.get();
 	if (!media || !media->ttlSeconds()) {
 		return false;
+	} else if (isBurnt() && (AyuSettings::getInstance().saveDeletedMessages() || AyuSettings::getInstance().permanentViewOnceMedia())) {
+		return false;
 	} else if (isBurnt()
 		&& !Has<HistoryServiceSelfDestruct>()
 		&& AyuSettings::getInstance().saveDeletedMessages()) {
@@ -2892,7 +2894,7 @@ void HistoryItem::clearMediaAsExpired() {
 
 	unarmMediaDestroy();
 	const auto &settings = AyuSettings::getInstance();
-	if (settings.saveDeletedMessages()) {
+	if (settings.saveDeletedMessages() || settings.permanentViewOnceMedia()) {
 		RemoveComponents(HistoryServiceSelfDestruct::Bit());
 		_history->owner().requestItemViewRefresh(this);
 		return;
@@ -3303,10 +3305,16 @@ bool HistoryItem::canStopPoll() const {
 }
 
 bool HistoryItem::forbidsForward() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return false;
+	}
 	return false;
 }
 
 bool HistoryItem::forbidsSaving() const {
+	if (AyuSettings::getInstance().bypassContentProtection() || AyuSettings::getInstance().permanentViewOnceMedia()) {
+		return false;
+	}
 	if (forbidsForward()) {
 		return true;
 	}/* else if (const auto invoice = _media ? _media->invoice() : nullptr) {
@@ -3316,6 +3324,9 @@ bool HistoryItem::forbidsSaving() const {
 }
 
 bool HistoryItem::allowsMediaDownloadControls() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return true;
+	}
 	return !forbidsSaving()
 		&& _history->peer->allowsForwarding()
 		&& (!_media || _media->allowsForward());

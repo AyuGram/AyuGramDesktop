@@ -650,6 +650,18 @@ void BuildSpyEssentials(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::saveMessagesHistory,
 		.setter = &AyuSettings::setSaveMessagesHistory,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/bypassContentProtection"_q,
+		.title = tr::ayu_BypassContentProtection(),
+		.getter = &AyuSettings::bypassContentProtection,
+		.setter = &AyuSettings::setBypassContentProtection,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/permanentViewOnceMedia"_q,
+		.title = tr::ayu_PermanentViewOnceMedia(),
+		.getter = &AyuSettings::permanentViewOnceMedia,
+		.setter = &AyuSettings::setPermanentViewOnceMedia,
+	});
 
 	ayu.addSectionDivider();
 

@@ -9191,3 +9191,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+"ayu_BypassContentProtection" = "Bypass Restricted Content";
+"ayu_BypassContentProtectionDescription" = "Allows copying text, forwarding, and saving media from protected channels and groups.";
+"ayu_PermanentViewOnceMedia" = "Permanent View-Once Media";
+"ayu_PermanentViewOnceMediaDescription" = "Prevents self-destructing and view-once media from auto-deleting, keeping them saved in chat.";

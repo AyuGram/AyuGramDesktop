@@ -74,6 +74,9 @@ bool ChatData::isAyuNoForwards() const {
 }
 
 bool ChatData::allowsForwarding() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return true;
+	}
 	return !(flags() & Flag::NoForwards);
 }
 

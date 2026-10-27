@@ -352,6 +352,8 @@ public:
 	[[nodiscard]] bool crashReporting() const { return _crashReporting.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
+	[[nodiscard]] bool bypassContentProtection() const { return _bypassContentProtection.current(); }
+	[[nodiscard]] bool permanentViewOnceMedia() const { return _permanentViewOnceMedia.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
 	void setSaveDeletedMessages(bool val);
@@ -439,6 +441,8 @@ public:
 	void setCrashReporting(bool val);
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
+	void setBypassContentProtection(bool val);
+	void setPermanentViewOnceMedia(bool val);
 	void setStreamerMode(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
@@ -613,6 +617,10 @@ public:
 	[[nodiscard]] rpl::producer<int> avatarCornersChanges() const { return _avatarCorners.changes(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusValue() const { return _singleCornerRadius.value(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
+	[[nodiscard]] rpl::producer<bool> bypassContentProtectionValue() const { return _bypassContentProtection.value(); }
+	[[nodiscard]] rpl::producer<bool> bypassContentProtectionChanges() const { return _bypassContentProtection.changes(); }
+	[[nodiscard]] rpl::producer<bool> permanentViewOnceMediaValue() const { return _permanentViewOnceMedia.value(); }
+	[[nodiscard]] rpl::producer<bool> permanentViewOnceMediaChanges() const { return _permanentViewOnceMedia.changes(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
 
@@ -710,6 +718,8 @@ private:
 	rpl::variable<bool> _crashReporting = true;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
+	rpl::variable<bool> _bypassContentProtection = true;
+	rpl::variable<bool> _permanentViewOnceMedia = true;
 	rpl::variable<bool> _streamerMode = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;

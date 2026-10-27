@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_peer.h"
+#include "ayu/ayu_settings.h"
 
 #include "api/api_sensitive_content.h"
 #include "data/data_user.h"
@@ -1727,6 +1728,9 @@ bool PeerData::isAyuNoForwards() const {
 }
 
 bool PeerData::allowsForwarding() const {
+	if (AyuSettings::getInstance().bypassContentProtection()) {
+		return true;
+	}
 	if (const auto user = asUser()) {
 		return user->allowsForwarding();
 	} else if (const auto channel = asChannel()) {
