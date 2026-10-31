@@ -39,6 +39,17 @@ jobs:
           submodules: recursive
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
 
+      - name: Fix MSYS2 packages (MINGW64 is gone, use UCRT64).
+        shell: bash
+        run: |
+          F="$TBUILD/$REPO_NAME/$PREPARE_PATH"
+          sed -i 's/mingw-w64-x86_64-/mingw-w64-ucrt-x86_64-/g' "$F"
+          sed -i '/ThirdParty.*msys64.*mingw64.*bin/s/mingw64/ucrt64/' "$F"
+          sed -i 's#download/2025-08-30/msys2-base-x86_64-20250830#download/2026-09-27/msys2-base-x86_64-20260927#' "$F"
+          grep -n "ucrt\|20260927" "$F"
+          grep -q "ucrt64" "$F"
+          grep -q "20260927" "$F"
+
       - name: First set up.
         shell: bash
         run: |
