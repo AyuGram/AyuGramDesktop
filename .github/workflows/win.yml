@@ -14,7 +14,7 @@ jobs:
     env:
       # Phase 1: "true"  - only build and cache the libraries (takes hours).
       # Phase 2: "false" - build the app itself from the cached libraries.
-      ONLY_CACHE: "true"
+      ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
     defaults:
