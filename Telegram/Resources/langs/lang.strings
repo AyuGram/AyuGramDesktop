@@ -9191,3 +9191,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AboutText1" = "ToS breaking Telegram client based on {api_link}.";
 "ayu_UpdateAyuGram" = "Update AyuGram";
 "ayu_UtilityRestartRequired" = "The app will close in 5 seconds.";
+"ayu_ProxyRecheckPing" = "Recheck ping";
+"ayu_ProxyImportChannel" = "Import from channel…";
+"ayu_ProxyImportTitle" = "Import proxies from channel";
+"ayu_ProxyImportAbout" = "Reads recent posts of a public channel, skips duplicates and adds only the proxies that respond.";
+"ayu_ProxyImportPlaceholder" = "Channel username or link";
+"ayu_ProxyImportStart" = "Import";
+"ayu_ProxyImportNoSession" = "Log in to import proxies from a channel.";
+"ayu_ProxyImportBadChannel" = "Enter a public channel username or t.me link.";
+"ayu_ProxyImportFailed" = "Could not read the channel.";
+"ayu_ProxyImportNothing" = "No proxy links found in the channel.";
+"ayu_ProxyImportWorking" = "Reading the channel and checking proxies…";
+"ayu_ProxyImportResult" = "Added: {added}, duplicates: {duplicates}, unavailable: {unavailable}.";

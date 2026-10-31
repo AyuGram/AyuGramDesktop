@@ -908,7 +908,8 @@ void AddReadUntilAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 		|| readItem->isLocal()
 		|| readItem->out()
 		|| readItem->isDeleted()
-		|| readItem->history()->peer->isSelf()) {
+		|| readItem->history()->peer->isSelf()
+		|| !readItem->unread(readItem->notificationThread())) {
 		return;
 	}
 

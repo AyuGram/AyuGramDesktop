@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings_proxy.h"
 #include "mtproto/connection_abstract.h"
 #include "mtproto/mtproto_proxy_data.h"
+#include "mtproto/sender.h"
 
 namespace Ui {
 class Show;
@@ -99,6 +100,8 @@ public:
 
 	[[nodiscard]] bool contains(const ProxyData &proxy) const;
 	void addNewItem(const ProxyData &proxy);
+	void recheckAll();
+	object_ptr<Ui::BoxContent> importFromChannelBox();
 
 	rpl::producer<ItemView> views() const;
 
@@ -119,6 +122,17 @@ private:
 
 	};
 
+	struct ImportState;
+
+	void addImportedItem(const ProxyData &proxy, int ping);
+	void importFromChannel(const QString &channel);
+	void startImport(const std::vector<QString> &links);
+	void pumpImport();
+	void importCandidateDone(int id, bool ok, int ping);
+	void finishImport();
+	void failImport(const QString &text);
+	void showToast(const QString &text);
+
 	std::vector<Item>::iterator findById(int id);
 	std::vector<Item>::iterator findByProxy(const ProxyData &proxy);
 	void setDeleted(int id, bool deleted);
@@ -135,6 +149,7 @@ private:
 		const ProxyData &proxy);
 
 	const not_null<Main::Account*> _account;
+	MTP::Sender _api;
 	Core::SettingsProxy &_settings;
 	int _idCounter = 0;
 	std::vector<Item> _list;
@@ -142,6 +157,8 @@ private:
 	base::Timer _saveTimer;
 	rpl::event_stream<ProxyData::Settings> _proxySettingsChanges;
 	std::shared_ptr<Ui::Show> _show;
+	std::shared_ptr<ImportState> _import;
+	bool _importing = false;
 
 	ProxyData _lastSelectedProxy;
 	bool _lastSelectedProxyUsed = false;
