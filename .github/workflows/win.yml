@@ -63,6 +63,17 @@ jobs:
           git config --global user.email "you@example.com"
           git config --global user.name "Sample"
 
+      # breakpad (dump_syms) требует ATL (atlbase.h), а на раннере его нет.
+      # Ставим до msvc-dev-cmd, чтобы INCLUDE/LIB уже содержали atlmfc.
+      - name: Install ATL for MSVC 14.44.
+        run: |
+          "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\setup.exe" modify ^
+          --installPath "%ProgramFiles%\Microsoft Visual Studio\18\Enterprise" ^
+          --add Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL ^
+          --quiet --norestart --nocache --noUpdateInstaller
+          if %ERRORLEVEL% neq 0 if %ERRORLEVEL% neq 3010 exit /b %ERRORLEVEL%
+          dir "%ProgramFiles%\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC\14.44.35207\atlmfc\include\atlbase.h"
+
       - uses: Eden-CI/msvc-dev-cmd@master
         name: Native Tools Command Prompt.
         with:
