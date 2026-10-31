@@ -12,9 +12,9 @@ jobs:
     timeout-minutes: 360
 
     env:
-      # Phase 1: "true"  - only build and cache the libraries (takes hours).
-      # Phase 2: "false" - build the app itself from the cached libraries.
-      ONLY_CACHE: "false"
+      # Фаза 1: "true"  - только собрать и закэшировать библиотеки (занимает часы).
+      # Фаза 2: "false" - собрать само приложение из закэшированных библиотек.
+      ONLY_CACHE: "true"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
     defaults:
@@ -83,6 +83,8 @@ jobs:
           key: ${{ runner.OS }}-${{ runner.arch }}-third-party-${{ env.CACHE_KEY }}
           restore-keys: ${{ runner.OS }}-${{ runner.arch }}-third-party-
 
+      # Ключ изменён с libs-v2 на libs-v3, чтобы не восстановился старый
+      # кэш, в котором есть только Debug-библиотеки.
       - name: Libraries cache.
         id: cache-libs
         uses: actions/cache@v6
@@ -93,9 +95,10 @@ jobs:
             !${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\*
             !${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-libs-v2-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-libs-v2-
+          key: ${{ runner.OS }}-x64-libs-v3-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-libs-v3-
 
+      # Ключ Qt тоже сменён (добавлено v2) по той же причине.
       - name: Qt cache.
         id: cache-qt
         uses: actions/cache@v6
@@ -103,12 +106,14 @@ jobs:
           path: |
             ${{ env.LibrariesPath }}\[qQ]t[_-]*
             ${{ env.LibrariesPath }}\cache_keys\[qQ]t[_-]*
-          key: ${{ runner.OS }}-x64-qt-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-x64-qt-
+          key: ${{ runner.OS }}-x64-qt-v2-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-x64-qt-v2-
 
+      # Убрано skip-release: теперь собираются и Release-версии библиотек
+      # (tg_angle, libavif и др.), которые нужны для --config Release.
       - name: Libraries.
         run: |
-          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat skip-release silent
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent
 
       - name: Free up some disk space.
         shell: bash
