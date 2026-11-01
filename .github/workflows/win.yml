@@ -14,7 +14,7 @@ jobs:
     env:
       # Фаза 1: "true"  - только собрать и закэшировать библиотеки (занимает часы).
       # Фаза 2: "false" - собрать само приложение из закэшированных библиотек.
-      ONLY_CACHE: "true"
+      ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
 
     defaults:
