@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/connection_box.h"
 
+#include "apiwrap.h"
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/qthelp_regex.h"
@@ -15,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/local_url_handlers.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
@@ -97,6 +100,79 @@ using ProxyData = MTP::ProxyData;
 	}
 
 	return urls;
+}
+
+constexpr auto kImportHistoryLimit = 100;
+constexpr auto kImportMaxCandidates = 60;
+constexpr auto kImportParallel = 8;
+constexpr auto kImportCheckTimeout = crl::time(12000);
+
+[[nodiscard]] QString &LastImportChannel() {
+	static auto result = QString();
+	return result;
+}
+
+[[nodiscard]] QString ChannelUsernameFromInput(const QString &input) {
+	static const auto linkRegex = QRegularExpression(
+		R"(^(?:https?:\/\/)?(?:t\.me|telegram\.me|telegram\.dog)\/(?:s\/)?([A-Za-z][A-Za-z0-9_]{3,31})(?:[\/?#].*)?$)",
+		QRegularExpression::CaseInsensitiveOption);
+	static const auto nameRegex = QRegularExpression(
+		R"(^@?([A-Za-z][A-Za-z0-9_]{3,31})$)");
+	const auto trimmed = input.trimmed();
+	const auto link = linkRegex.match(trimmed);
+	if (link.hasMatch()) {
+		return link.captured(1);
+	}
+	const auto name = nameRegex.match(trimmed);
+	return name.hasMatch() ? name.captured(1) : QString();
+}
+
+[[nodiscard]] std::vector<QString> CollectProxyLinks(
+		const MTPmessages_Messages &result) {
+	auto links = std::vector<QString>();
+	const auto add = [&](const QString &text) {
+		for (const auto &link : ExtractLinkCandidates(text)) {
+			if (ranges::find(links, link) == end(links)) {
+				links.push_back(link);
+			}
+		}
+	};
+	const auto addMessage = [&](const MTPMessage &message) {
+		if (message.type() != mtpc_message) {
+			return;
+		}
+		const auto &data = message.c_message();
+		add(QString::fromUtf8(data.vmessage().v));
+		if (const auto entities = data.ventities()) {
+			for (const auto &entity : entities->v) {
+				if (entity.type() == mtpc_messageEntityTextUrl) {
+					const auto &url = entity.c_messageEntityTextUrl();
+					add(QString::fromUtf8(url.vurl().v));
+				}
+			}
+		}
+		if (const auto markup = data.vreply_markup()) {
+			markup->match([&](const MTPDreplyInlineMarkup &inlineMarkup) {
+				for (const auto &row : inlineMarkup.vrows().v) {
+					for (const auto &button : row.data().vbuttons().v) {
+						button.data().vtype().match([&](
+								const MTPDinlineButtonTypeUrl &url) {
+							add(QString::fromUtf8(url.vurl().v));
+						}, [](const auto &) {
+						});
+					}
+				}
+			}, [](const auto &) {
+			});
+		}
+	};
+	result.match([](const MTPDmessages_messagesNotModified &) {
+	}, [&](const auto &data) {
+		for (const auto &message : data.vmessages().v) {
+			addMessage(message);
+		}
+	});
+	return links;
 }
 
 [[nodiscard]] bool ProxyDataIsShareable(const ProxyData &proxy) {
@@ -661,6 +737,7 @@ private:
 	void createNoRowsLabel();
 	void addNewProxy();
 	void applyView(View &&view);
+	void resortRow(const View &view);
 	void setupButtons(int id, not_null<ProxyRow*> button);
 	int rowHeight() const;
 	void refreshProxyForCalls();
@@ -681,6 +758,10 @@ private:
 	int _currentProxySupportsCallsId = 0;
 
 	base::flat_map<int, base::unique_qptr<ProxyRow>> _rows;
+
+	// Rows from top to bottom and their sort keys (see resortRow).
+	std::vector<int> _order;
+	base::flat_map<int, std::pair<int, int>> _sortKeys;
 
 	QPointer<Ui::RpWidget> _addProxyButton;
 	QPointer<Ui::RpWidget> _shareListButton;
@@ -1146,7 +1227,19 @@ void ProxiesBox::setupTopButton() {
 			.handler = [=] { AddProxyFromClipboard(_controller, uiShow()); },
 			.icon = &st::menuIconImportTheme,
 		});
+		addAction({
+			.text = tr::ayu_ProxyImportChannel(tr::now),
+			.handler = [=] {
+				uiShow()->showBox(_controller->importFromChannelBox());
+			},
+			.icon = &st::menuIconDownload,
+		});
 		if (!_rows.empty()) {
+			addAction({
+				.text = tr::ayu_ProxyRecheckPing(tr::now),
+				.handler = [=] { _controller->recheckAll(); },
+				.icon = &st::menuIconRestore,
+			});
 			addAction({
 				.text = tr::lng_group_invite_context_delete_all(tr::now),
 				.handler = [=] { _controller->deleteItems(); },
@@ -1397,6 +1490,7 @@ void ProxiesBox::applyView(View &&view) {
 	refreshProxyForCalls();
 
 	const auto id = view.id;
+	const auto sortView = view;
 	const auto i = _rows.find(id);
 	if (i == _rows.end()) {
 		const auto wrap = _wrap
@@ -1413,12 +1507,69 @@ void ProxiesBox::applyView(View &&view) {
 			_noRows.reset();
 		}
 		wrap->resizeToWidth(width());
+		_order.insert(_order.begin(), id);
+		resortRow(sortView);
 	} else if (view.host.isEmpty()) {
 		_rows.erase(i);
+		_order.erase(ranges::remove(_order, id), _order.end());
+		if (const auto j = _sortKeys.find(id); j != _sortKeys.end()) {
+			_sortKeys.erase(j);
+		}
 	} else {
 		i->second->updateFields(std::move(view));
+		resortRow(sortView);
 	}
 	refreshProxyRotation();
+}
+
+void ProxiesBox::resortRow(const View &view) {
+	// Rows with a known ping go first (fastest on top), then the ones
+	// that are still being checked or were not tested, unavailable last.
+	// Called on every view update, so a row moves to its place as soon as
+	// its own ping arrives, without waiting for the other proxies.
+	if (view.deleted) {
+		return;
+	}
+	using State = ProxiesBoxController::ItemState;
+	const auto rank = [&] {
+		switch (view.state) {
+		case State::Online:
+		case State::Connecting:
+		case State::Available: return 0;
+		case State::Checking:
+		case State::NotTested:
+		case State::WaitingForBrowser: return 1;
+		case State::Unavailable: return 2;
+		}
+		return 1;
+	}();
+	const auto ping = (rank == 0) ? view.ping : 0;
+	const auto id = view.id;
+	_sortKeys[id] = { rank, ping };
+
+	const auto wrap = _wrap ? _wrap.data() : _initialWrap.data();
+	const auto from = int(ranges::find(_order, id) - _order.begin());
+	if (!wrap || from >= int(_order.size())) {
+		return;
+	}
+	const auto key = _sortKeys[id];
+	auto others = _order;
+	others.erase(others.begin() + from);
+	// Insert after all rows with an equal or better key (stable order).
+	auto to = 0;
+	while (to < int(others.size())) {
+		const auto i = _sortKeys.find(others[to]);
+		if (i != _sortKeys.end() && i->second > key) {
+			break;
+		}
+		++to;
+	}
+	if (to == from) {
+		return;
+	}
+	_order.erase(_order.begin() + from);
+	_order.insert(_order.begin() + to, id);
+	wrap->reorderRows(from, to);
 }
 
 void ProxiesBox::createNoRowsLabel() {
@@ -1829,8 +1980,26 @@ using Checker = MTP::ProxyCheckConnection;
 
 } // namespace
 
+struct ProxiesBoxController::ImportState {
+	struct Candidate {
+		int id = 0;
+		ProxyData data;
+		MTP::ProxyCheckConnection v4;
+		MTP::ProxyCheckConnection v6;
+		base::Timer timer;
+	};
+
+	std::vector<std::shared_ptr<Candidate>> pending;
+	std::vector<std::shared_ptr<Candidate>> active;
+	int idCounter = 0;
+	int added = 0;
+	int duplicates = 0;
+	int unavailable = 0;
+};
+
 ProxiesBoxController::ProxiesBoxController(not_null<Main::Account*> account)
 : _account(account)
+, _api(&account->mtp())
 , _settings(Core::App().settings().proxy())
 , _saveTimer([] { Local::writeSettings(); }) {
 	_list = ranges::views::all(
@@ -2464,6 +2633,251 @@ void ProxiesBoxController::addNewItem(const ProxyData &proxy) {
 	_list.push_back({ ++_idCounter, proxy });
 	refreshChecker(_list.back());
 	applyItem(_list.back().id);
+}
+
+void ProxiesBoxController::recheckAll() {
+	for (auto &item : _list) {
+		if (item.deleted) {
+			continue;
+		}
+		refreshChecker(item);
+		updateView(item);
+	}
+}
+
+void ProxiesBoxController::addImportedItem(
+		const ProxyData &proxy,
+		int ping) {
+	_settings.addToList(proxy);
+
+	_list.push_back({ ++_idCounter, proxy });
+	auto &item = _list.back();
+	item.state = ItemState::Available;
+	item.ping = ping;
+	updateView(item);
+	saveDelayed();
+}
+
+object_ptr<Ui::BoxContent> ProxiesBoxController::importFromChannelBox() {
+	return Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(tr::ayu_ProxyImportTitle());
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			tr::ayu_ProxyImportAbout(),
+			st::boxLabel));
+		const auto field = box->addRow(object_ptr<Ui::InputField>(
+			box,
+			st::defaultInputField,
+			tr::ayu_ProxyImportPlaceholder(),
+			LastImportChannel()));
+		field->selectAll();
+		box->setFocusCallback([=] { field->setFocusFast(); });
+		const auto submit = [=] {
+			const auto text = field->getLastText().trimmed();
+			LastImportChannel() = text;
+			box->closeBox();
+			importFromChannel(text);
+		};
+		field->submits() | rpl::on_next(submit, field->lifetime());
+		box->addButton(tr::ayu_ProxyImportStart(), submit);
+		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
+	});
+}
+
+void ProxiesBoxController::importFromChannel(const QString &channel) {
+	if (_importing) {
+		return;
+	}
+	const auto username = ChannelUsernameFromInput(channel);
+	if (username.isEmpty()) {
+		showToast(tr::ayu_ProxyImportBadChannel(tr::now));
+		return;
+	} else if (!_account->sessionExists()) {
+		showToast(tr::ayu_ProxyImportNoSession(tr::now));
+		return;
+	}
+	_importing = true;
+	showToast(tr::ayu_ProxyImportWorking(tr::now));
+
+	const auto session = &_account->session();
+	_api.request(MTPcontacts_ResolveUsername(
+		MTP_flags(0),
+		MTP_string(username),
+		MTP_string()
+	)).done([=](const MTPcontacts_ResolvedPeer &result) {
+		const auto &resolved = result.data();
+		session->data().processUsers(resolved.vusers());
+		session->data().processChats(resolved.vchats());
+		const auto peer = session->data().peerLoaded(
+			peerFromMTP(resolved.vpeer()));
+		if (!peer || !peer->isChannel()) {
+			failImport(tr::ayu_ProxyImportFailed(tr::now));
+			return;
+		}
+		_api.request(MTPmessages_GetHistory(
+			peer->input(),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(kImportHistoryLimit),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_long(0)
+		)).done([=](const MTPmessages_Messages &messages) {
+			startImport(CollectProxyLinks(messages));
+		}).fail([=] {
+			failImport(tr::ayu_ProxyImportFailed(tr::now));
+		}).send();
+	}).fail([=] {
+		failImport(tr::ayu_ProxyImportFailed(tr::now));
+	}).send();
+}
+
+void ProxiesBoxController::startImport(const std::vector<QString> &links) {
+	auto state = std::make_shared<ImportState>();
+	auto seen = std::vector<ProxyData>();
+	for (const auto &link : links) {
+		const auto proxy = ProxyFromLink(link);
+		if (!proxy
+			|| proxy.type == Type::None
+			|| proxy.type == Type::Web) {
+			continue;
+		} else if (contains(proxy)
+			|| ranges::find(seen, proxy) != end(seen)) {
+			++state->duplicates;
+			continue;
+		} else if (int(seen.size()) >= kImportMaxCandidates) {
+			break;
+		}
+		seen.push_back(proxy);
+		auto candidate = std::make_shared<ImportState::Candidate>();
+		candidate->id = ++state->idCounter;
+		candidate->data = proxy;
+		state->pending.push_back(std::move(candidate));
+	}
+	if (state->pending.empty()) {
+		_importing = false;
+		showToast(state->duplicates
+			? tr::ayu_ProxyImportResult(
+				tr::now,
+				lt_added,
+				QString::number(0),
+				lt_duplicates,
+				QString::number(state->duplicates),
+				lt_unavailable,
+				QString::number(0))
+			: tr::ayu_ProxyImportNothing(tr::now));
+		return;
+	}
+	std::reverse(state->pending.begin(), state->pending.end());
+	_import = std::move(state);
+	pumpImport();
+}
+
+void ProxiesBoxController::pumpImport() {
+	const auto state = _import;
+	if (!state) {
+		return;
+	}
+	while (int(state->active.size()) < kImportParallel
+		&& !state->pending.empty()) {
+		auto candidate = std::move(state->pending.back());
+		state->pending.pop_back();
+		state->active.push_back(candidate);
+		const auto id = candidate->id;
+		const auto raw = candidate.get();
+		MTP::StartProxyCheck(
+			&_account->mtp(),
+			raw->data,
+			Core::App().settings().proxy().tryIPv6(),
+			raw->v4,
+			raw->v6,
+			[this, id](Connection *, int ping) {
+				importCandidateDone(id, true, ping);
+			},
+			[this, id](Connection *checker) {
+				const auto current = _import;
+				if (!current) {
+					return;
+				}
+				const auto i = ranges::find(
+					current->active,
+					id,
+					[](const auto &item) { return item->id; });
+				if (i == end(current->active)) {
+					return;
+				}
+				MTP::DropProxyChecker((*i)->v4, (*i)->v6, checker);
+				if (!MTP::HasProxyCheckers((*i)->v4, (*i)->v6)) {
+					importCandidateDone(id, false, 0);
+				}
+			});
+		if (!MTP::HasProxyCheckers(raw->v4, raw->v6)) {
+			state->active.pop_back();
+			++state->unavailable;
+			continue;
+		}
+		raw->timer.setCallback([this, id] {
+			importCandidateDone(id, false, 0);
+		});
+		raw->timer.callOnce(kImportCheckTimeout);
+	}
+	if (state->pending.empty() && state->active.empty()) {
+		finishImport();
+	}
+}
+
+void ProxiesBoxController::importCandidateDone(int id, bool ok, int ping) {
+	const auto state = _import;
+	if (!state) {
+		return;
+	}
+	const auto i = ranges::find(
+		state->active,
+		id,
+		[](const auto &item) { return item->id; });
+	if (i == end(state->active)) {
+		return;
+	}
+	const auto candidate = *i;
+	state->active.erase(i);
+	candidate->timer.cancel();
+	crl::on_main([keep = candidate] {});
+	if (ok) {
+		addImportedItem(candidate->data, ping);
+		++state->added;
+	} else {
+		++state->unavailable;
+	}
+	pumpImport();
+}
+
+void ProxiesBoxController::finishImport() {
+	const auto state = base::take(_import);
+	_importing = false;
+	if (!state) {
+		return;
+	}
+	showToast(tr::ayu_ProxyImportResult(
+		tr::now,
+		lt_added,
+		QString::number(state->added),
+		lt_duplicates,
+		QString::number(state->duplicates),
+		lt_unavailable,
+		QString::number(state->unavailable)));
+}
+
+void ProxiesBoxController::failImport(const QString &text) {
+	_import = nullptr;
+	_importing = false;
+	showToast(text);
+}
+
+void ProxiesBoxController::showToast(const QString &text) {
+	if (_show) {
+		_show->showToast({ .text = { text } });
+	}
 }
 
 bool ProxiesBoxController::setProxySettings(ProxyData::Settings value) {
