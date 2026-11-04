@@ -1,0 +1,4 @@
+(version 1)
+(allow default)
+(deny network*)
+(allow network* (local unix-socket) (remote unix-socket))

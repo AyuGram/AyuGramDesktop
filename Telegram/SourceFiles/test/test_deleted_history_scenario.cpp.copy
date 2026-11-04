@@ -1,0 +1,661 @@
+/*
+Disposable Debug overlay for test_scenario.cpp. Do not add it to app sources
+or replace the repository's no-op scenario permanently. Run only with the
+deny-network sandbox profile and a fresh, explicitly marked work directory.
+*/
+#ifdef _DEBUG
+
+#include "test/test_runner.h"
+
+#include "ayu/data/ayu_database.h"
+#include "ayu/data/deleted_history.h"
+#include "ayu/utils/ayu_mapper.h"
+#include "ayu/ayu_settings.h"
+#include "base/options.h"
+#include "core/application.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_inner_widget.h"
+#include "history/history_item.h"
+#include "history/history_widget.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
+#include "settings.h"
+#include "test/test_capture.h"
+#include "test/test_deleted_history_rpc.h"
+#include "test/test_log.h"
+#include "test/test_widgets.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
+
+#include <QtCore/QCryptographicHash>
+#include <QtCore/QDataStream>
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QFileInfo>
+#include <QtCore/QPointer>
+
+#include "styles/style_basic.h"
+
+namespace Test {
+namespace {
+
+constexpr auto kSelf = int64(9000000001);
+constexpr auto kPeer = int64(9000000002);
+constexpr auto kCloudEmpty = int64(9000000003);
+constexpr auto kPlaceholder = int64(9000000004);
+constexpr auto kOtherSelf = int64(9000000011);
+constexpr auto kOtherDialog = int64(9000000012);
+constexpr auto kLast = 1201;
+constexpr auto kCloudLast = 241;
+constexpr auto kSnapshots = 8;
+constexpr auto kForeignId = 2001;
+
+struct State {
+	bool valid = false;
+	int phase = 0;
+	Main::Session *session = nullptr;
+	History *mixed = nullptr;
+	History *cloudEmpty = nullptr;
+	History *placeholder = nullptr;
+	std::unique_ptr<DeletedHistoryRpcFixture> rpc;
+	QPointer<HistoryWidget> widget;
+	QPointer<HistoryInner> inner;
+	QByteArray initialDigest;
+	QString root;
+	int mark = 0;
+	bool pageWasFinished = false;
+	crl::time scrollStarted = 0;
+	crl::time scrollStableSince = 0;
+	int lastScrollTop = 0;
+};
+
+[[nodiscard]] DeletedMessage Stored(
+		int64 account,
+		int64 dialog,
+		int id,
+		int snapshot = kSnapshots - 1) {
+	auto result = DeletedMessage();
+	result.userId = account;
+	result.dialogId = dialog;
+	result.peerId = dialog;
+	result.fromId = dialog;
+	result.messageId = id;
+	result.date = 1700000000 + id * 10;
+	result.entityCreateDate = result.date + snapshot;
+	result.text = "synthetic saved " + std::to_string(id)
+		+ " snapshot " + std::to_string(snapshot);
+	return result;
+}
+
+[[nodiscard]] QByteArray Digest() {
+	auto bytes = QByteArray();
+	auto stream = QDataStream(&bytes, QIODevice::WriteOnly);
+	const auto blob = [](const std::vector<char> &value) {
+		return QByteArray(value.data(), int(value.size()));
+	};
+	const auto text = [](const std::string &value) {
+		return QString::fromStdString(value);
+	};
+	for (const auto account : { kSelf, kOtherSelf }) {
+		for (const auto dialog : { kPeer, kCloudEmpty, kPlaceholder, kOtherDialog }) {
+			auto rows = AyuDatabase::getDeletedMessages(
+				account, dialog, 0, 0, 0, 100000);
+			ranges::sort(rows, std::less<>(), &DeletedMessage::fakeId);
+			for (const auto &row : rows) {
+				stream << qint64(row.fakeId) << qint64(row.userId)
+					<< qint64(row.dialogId) << qint64(row.groupedId)
+					<< qint64(row.peerId) << qint64(row.fromId) << qint64(row.topicId)
+					<< row.messageId << row.date << row.flags << row.editDate
+					<< row.views << row.fwdFlags << qint64(row.fwdFromId)
+					<< text(row.fwdName) << row.fwdDate << text(row.fwdPostAuthor)
+					<< text(row.postAuthor) << row.replyFlags << row.replyMessageId
+					<< qint64(row.replyPeerId) << row.replyTopId << row.replyForumTopic
+					<< blob(row.replySerialized) << blob(row.replyMarkupSerialized)
+					<< row.entityCreateDate << text(row.text) << blob(row.textEntities)
+					<< text(row.mediaPath) << text(row.hqThumbPath) << row.documentType
+					<< blob(row.documentSerialized) << blob(row.thumbsSerialized)
+					<< blob(row.documentAttributesSerialized) << text(row.mimeType);
+			}
+		}
+	}
+	return QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex();
+}
+
+[[nodiscard]] History *CreateHistory(
+		not_null<Main::Session*> session,
+		int64 id,
+		const QString &name,
+		int readTill = kForeignId + 1) {
+	const auto peer = session->data().user(UserId(id));
+	peer->setName(name, QString(), QString(), QString());
+	peer->setAccessHash(1);
+	peer->setLoadedStatus(PeerData::LoadedStatus::Full);
+	const auto history = session->data().history(peer);
+	history->applyDialogFields(nullptr, 0, MsgId(readTill), MsgId(readTill));
+	return history;
+}
+
+[[nodiscard]] MTPMessage LiveMessage(not_null<History*> history, int id) {
+	auto row = Stored(kSelf, kPeer, id);
+	row.text = "synthetic cloud " + std::to_string(id);
+	return AyuMapper::DeletedMessageToMTP(history->peer, row);
+}
+
+[[nodiscard]] Window::SessionController *Controller(State *state) {
+	const auto window = Core::App().activePrimaryWindow();
+	return (window && window->maybeSession() == state->session)
+		? window->sessionController()
+		: nullptr;
+}
+
+[[nodiscard]] bool Resolve(State *state, History *history) {
+	state->widget = nullptr;
+	state->inner = nullptr;
+	const auto window = Core::App().activePrimaryWindow();
+	if (!Controller(state) || !window) {
+		return false;
+	}
+	for (const auto widget : FindVisible<HistoryWidget>(window->widget())) {
+		if (widget->history() != history) {
+			continue;
+		}
+		const auto inners = FindVisible<HistoryInner>(widget);
+		if (inners.size() == 1) {
+			state->widget = widget;
+			state->inner = inners.front();
+			return true;
+		}
+	}
+	return false;
+}
+
+[[nodiscard]] std::vector<int> BlockIds(not_null<History*> history) {
+	auto ids = std::vector<int>();
+	for (const auto &block : history->blocks) {
+		for (const auto &view : block->messages) {
+			const auto item = view->data();
+			if (IsServerMsgId(item->id)) {
+				ids.push_back(int(item->id.bare));
+			}
+		}
+	}
+	return ids;
+}
+
+[[nodiscard]] QString Details(State *state, History *history) {
+	const auto ids = BlockIds(history);
+	const auto stamps = state->rpc ? state->rpc->stamps()
+		: std::vector<DeletedHistoryRpcStamp>();
+	return u"phase=%1 count=%2 min=%3 max=%4 top=%5 bottom=%6 "
+		"requests=%7 pending=%8 widget=%9 inner=%10"_q
+		.arg(state->phase).arg(ids.size())
+		.arg(ids.empty() ? 0 : ids.front()).arg(ids.empty() ? 0 : ids.back())
+		.arg(history->loadedAtTop()).arg(history->loadedAtBottom())
+		.arg(stamps.size()).arg(state->rpc ? state->rpc->pending() : -1)
+		.arg(bool(state->widget)).arg(bool(state->inner));
+}
+
+void CheckRows(
+		State *state,
+		not_null<History*> history,
+		int last,
+		bool mixed) {
+	const auto ids = BlockIds(history);
+	auto expected = std::vector<int>();
+	for (auto id = 1; id <= last; ++id) {
+		expected.push_back(id);
+	}
+	Check(
+		ids == expected,
+		u"all fixture IDs render exactly once in order"_q,
+		Details(state, history));
+	Check(
+		history->loadedAtTop() && history->loadedAtBottom(),
+		u"both history frontiers finish after all fixture rows"_q,
+		Details(state, history));
+	auto correctFlags = true;
+	auto correctText = true;
+	for (const auto id : ids) {
+		const auto item = history->owner().message(history->peer, MsgId(id));
+		const auto live = mixed && (id == 400 || id == 900);
+		correctFlags &= item && !item->isUnavailable()
+			&& (item->isDeleted() != live);
+		if (item) {
+			const auto text = live
+				? "synthetic cloud " + std::to_string(id)
+				: Stored(kSelf, 0, id).text;
+			correctText &= item->originalText().text
+				== QString::fromStdString(text);
+		}
+	}
+	Check(
+		correctFlags,
+		u"live anchors win; every restored row is deleted"_q,
+		Details(state, history));
+	Check(
+		correctText,
+		u"latest snapshot text survives duplicate-heavy storage"_q,
+		Details(state, history));
+	Check(
+		!history->owner().message(history->peer, MsgId(kForeignId)),
+		u"other account and dialog rows are absent from this history"_q,
+		u"foreignId=%1 self=%2 dialog=%3"_q
+		.arg(kForeignId).arg(kSelf).arg(history->peer->id.value));
+}
+
+[[nodiscard]] QString Invalid(State *state) {
+	return state->valid ? QString() : u"isolated fixture setup failed"_q;
+}
+
+void AppendPaging(
+		not_null<Runner*> runner,
+		State *state,
+		History **history,
+		bool newer,
+		int pages) {
+	for (auto page = 0; page != pages; ++page) {
+		runner->add({
+			.name = u"page fixture %1 %2"_q
+				.arg(newer ? u"newer"_q : u"older"_q).arg(page),
+			.skipReason = [=] { return Invalid(state); },
+			.run = [=] {
+				state->mark = state->rpc->stamps().size();
+				state->pageWasFinished = newer
+					? (*history)->loadedAtBottom()
+					: (*history)->loadedAtTop();
+				if (!state->pageWasFinished && state->widget) {
+					if (newer) {
+						state->widget->loadMessagesDown();
+					} else {
+						state->widget->loadMessages();
+					}
+				}
+			},
+			.until = [=] {
+				return state->pageWasFinished
+					|| (state->rpc->stamps().size() > state->mark
+						&& !state->rpc->pending());
+			},
+			.then = [=] {
+				const auto ids = BlockIds(*history);
+				Check(
+					std::adjacent_find(ids.begin(), ids.end(),
+					std::greater_equal<>()) == ids.end(),
+					u"page contains no repeated or reversed IDs"_q,
+					Details(state, *history));
+				if (*history == state->mixed
+					&& !ids.empty() && ids.back() >= 900 && ids.back() < kLast) {
+					Check(
+						!(*history)->loadedAtBottom(),
+						u"live cloud anchor cannot hide a newer local tail"_q,
+						Details(state, *history));
+				}
+			},
+			.timeoutDetails = [=] { return Details(state, *history); },
+		});
+	}
+}
+
+void AppendCapture(
+		not_null<Runner*> runner,
+		State *state,
+		History **history,
+		int id,
+		const QString &tag) {
+	runner->add({
+		.name = u"show owned fixture row %1"_q.arg(tag),
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] {
+			Controller(state)->showPeerHistory(*history,
+				Window::SectionShow::Way::ClearStack, MsgId(id));
+		},
+		.until = [=] { return Resolve(state, *history); },
+		.then = [=] {
+			const auto item = (*history)->owner().message(
+				(*history)->peer, MsgId(id));
+			const auto view = item ? state->inner->viewByItem(item) : nullptr;
+			Check(
+				view && view->data() == item,
+				u"visible legacy list owns the exact fixture item"_q,
+				u"tag=%1 id=%2 item=%3 view=%4"_q
+				.arg(tag).arg(id).arg(bool(item)).arg(bool(view)));
+			if (view) {
+				state->inner->scrollToElementLocalY(view, 0);
+			}
+			state->scrollStarted = crl::now();
+			state->scrollStableSince = state->scrollStarted;
+			state->lastScrollTop = state->inner->historyScrollTop();
+		},
+		.timeoutDetails = [=] { return Details(state, *history); },
+	});
+	runner->captureAndInspect(
+		u"deleted_history_%1_phase%2"_q.arg(tag).arg(state->phase),
+		[=]() -> QWidget* { return state->widget.data(); },
+		[=](QWidget *widget) {
+			if (!state->inner || state->widget != widget
+				|| state->widget->history() != *history || state->rpc->pending()) {
+				return false;
+			}
+			const auto top = state->inner->historyScrollTop();
+			if (top != state->lastScrollTop) {
+				state->lastScrollTop = top;
+				state->scrollStableSince = crl::now();
+			}
+			return crl::now() - state->scrollStarted >= st::slideDuration
+				&& crl::now() - state->scrollStableSince >= 100;
+		},
+		[=](QWidget *widget, const QImage &) {
+			const auto item = (*history)->owner().message(
+				(*history)->peer, MsgId(id));
+			const auto inner = state->inner.data();
+			const auto view = item && inner ? inner->viewByItem(item) : nullptr;
+			const auto top = view ? inner->itemTop(view) : -1;
+			const auto height = view ? view->height() : 0;
+			const auto owned = view && view->data() == item
+				&& view->history() == *history
+				&& view->delegate() == (*history)->delegateMixin()->delegate();
+			const auto rect = QRect(0, top, inner ? inner->width() : 0, height);
+			const auto visible = inner && inner->visibleRegion().intersects(rect);
+			Check(
+				owned && top >= 0 && height > 0 && visible,
+				u"captured paint owner displays the restored fixture row"_q,
+				u"tag=%1 id=%2 owned=%3 top=%4 height=%5 visible=%6"_q
+				.arg(tag).arg(id).arg(owned).arg(top).arg(height).arg(visible));
+			if (owned && visible) {
+				CaptureMappedRect(widget, inner, rect,
+					u"deleted_row_%1_phase%2"_q.arg(tag).arg(state->phase));
+			}
+		},
+		kDefaultStageTimeout,
+		[=](QWidget *) {
+			return Details(state, *history) + u" scrollTop=%1 stableMs=%2"_q
+				.arg(state->lastScrollTop)
+				.arg(crl::now() - state->scrollStableSince);
+		});
+}
+
+} // namespace
+
+void SetupScenario(not_null<Runner*> runner) {
+	const auto state = new State();
+	state->phase = qEnvironmentVariableIntValue("AYU_DELETED_HISTORY_PHASE");
+	runner->waitEvent(u"launch_finished"_q);
+	runner->add({
+		.name = u"validate disposable no-network fixture directory"_q,
+		.run = [=] {
+			state->root = QDir(cWorkingDir()).canonicalPath();
+			state->phase = qEnvironmentVariableIntValue("AYU_DELETED_HISTORY_PHASE");
+			state->valid = !state->root.isEmpty()
+				&& state->root == QDir(qEnvironmentVariable(
+					"AYU_DELETED_HISTORY_WORKDIR")).canonicalPath()
+				&& QFile::exists(state->root + "/ayu-deleted-history-fixture")
+				&& QFile::exists(state->root + "/testing")
+				&& qEnvironmentVariable("AYU_DELETED_HISTORY_NO_NETWORK") == "1"
+				&& (state->phase == 1 || state->phase == 2);
+			Check(
+				state->valid,
+				u"fixture is explicitly isolated and marked"_q,
+				u"root=%1 phase=%2 networkPolicyMarker=%3"_q.arg(state->root)
+				.arg(state->phase).arg(qEnvironmentVariable(
+					"AYU_DELETED_HISTORY_NO_NETWORK")));
+			Note(u"Network-policy marker is a launch prerequisite; the external "
+				"sandbox enforces it, this assertion does not measure egress."_q);
+		},
+	});
+	runner->add({
+		.name = u"seed once or reopen the same synthetic SQLite rows"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] {
+			const auto path = state->root + "/fixture.sha256";
+			if (state->phase == 1) {
+				const auto existing = AyuDatabase::getDeletedMessages(
+					kSelf, kPeer, 0, 0, 0, 1);
+				state->valid = existing.empty() && !QFile::exists(path);
+				Check(
+					state->valid,
+					u"phase one starts with fresh synthetic storage"_q);
+				if (!state->valid) {
+					return;
+				}
+				for (auto id = 1; id <= kLast; ++id) {
+					for (auto snapshot = 0; snapshot < kSnapshots; ++snapshot) {
+						AyuDatabase::addDeletedMessage(Stored(kSelf, kPeer, id,
+							snapshot));
+					}
+				}
+				for (auto id = 1; id <= kCloudLast; ++id) {
+					AyuDatabase::addDeletedMessage(Stored(kSelf, kCloudEmpty, id));
+				}
+				AyuDatabase::addDeletedMessage(Stored(kSelf, kPlaceholder, 120));
+				AyuDatabase::addDeletedMessage(Stored(kOtherSelf, kPeer, kForeignId));
+				AyuDatabase::addDeletedMessage(Stored(kSelf, kOtherDialog, kForeignId));
+				state->initialDigest = Digest();
+				auto file = QFile(path);
+				Check(
+					file.open(QIODevice::WriteOnly)
+					&& file.write(state->initialDigest) == state->initialDigest.size(),
+					u"phase one records the persisted synthetic payload digest"_q);
+			} else {
+				auto file = QFile(path);
+				state->valid = QFile::exists(state->root + "/phase1-complete")
+					&& file.open(QIODevice::ReadOnly);
+				Check(
+					state->valid,
+					u"phase two reuses a completed first process"_q);
+				if (!state->valid) {
+					return;
+				}
+				state->initialDigest = file.readAll().trimmed();
+				Check(
+					Digest() == state->initialDigest,
+					u"second process reopens identical persisted synthetic rows"_q,
+					u"sha256=%1"_q.arg(QString::fromLatin1(Digest())));
+			}
+			const auto rows = AyuDatabase::getDeletedMessages(
+				kSelf, kPeer, 0, 0, 0, 100000);
+			Check(
+				rows.size() == kLast * kSnapshots,
+				u"duplicate-heavy fixture has all persisted snapshots"_q,
+				u"raw=%1 uniqueExpected=%2"_q.arg(rows.size()).arg(kLast));
+		},
+		.timeout = 30000,
+	});
+	runner->add({
+		.name = u"create only a synthetic account and peers"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] {
+			auto &account = Core::App().domain().active();
+			if (!account.sessionExists()) {
+				account.setSessionUserId(UserId(kSelf));
+				account.createSession(UserId(kSelf), QByteArray(), 0,
+					std::make_unique<Main::SessionSettings>());
+			}
+			state->session = &account.session();
+			state->valid = state->session->userId().bare == kSelf;
+			Check(
+				state->valid,
+				u"session belongs exclusively to the synthetic account"_q,
+				u"self=%1"_q.arg(state->session->userId().bare));
+			if (!state->valid) {
+				return;
+			}
+			base::options::lookup<bool>(kOptionUseNewChatView).set(false);
+			AyuSettings::getInstance().setSaveDeletedMessages(true);
+			state->mixed = CreateHistory(state->session, kPeer,
+				u"Synthetic mixed history"_q);
+			state->cloudEmpty = CreateHistory(state->session, kCloudEmpty,
+				u"Synthetic cloud-empty history"_q);
+			state->cloudEmpty->applyDialogTopMessage(MsgId(0));
+			state->placeholder = CreateHistory(state->session, kPlaceholder,
+				u"Synthetic unavailable placeholder"_q, 0);
+			state->rpc = std::make_unique<DeletedHistoryRpcFixture>(
+				&state->session->mtp(), std::vector<DeletedHistoryRpcDialog>{
+					{ kPeer, { LiveMessage(state->mixed, 400),
+						LiveMessage(state->mixed, 900) } },
+					{ kCloudEmpty, {} },
+					{ kPlaceholder, {} },
+				});
+		},
+	});
+	runner->add({
+		.name = u"replace cached unavailable row without unread mutation"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] {
+			const auto history = state->placeholder;
+			const auto empty = MTP_messageEmpty(
+				MTP_flags(MTPDmessageEmpty::Flag::f_peer_id),
+				MTP_int(120), peerToMTP(history->peer->id));
+			const auto item = history->createItem(MsgId(120), empty,
+				MessageFlag::ClientSideUnread, false);
+			Check(
+				item && item->isUnavailable(),
+				u"cached fixture initially is an unavailable server placeholder"_q);
+			history->applyDialogTopMessage(MsgId(0));
+			history->setInboxReadTill(MsgId(0));
+			history->setUnreadCount(7);
+			const auto before = history->unreadCount();
+			Check(
+				item && item->unread(history),
+				u"cached placeholder carries the forced client-side unread flag"_q,
+				u"id=120 inboxRead=%1"_q.arg(history->inboxReadTillId().bare));
+			const auto page = AyuMessages::RestoreDeletedHistory(history->peer,
+				QVector<MTPMessage>(), { .limit = 30 }, false);
+			history->addOlderSlice(page.messages);
+			AyuMessages::ApplyDeletedHistory(history, page);
+			const auto restored = history->owner().message(history->peer, MsgId(120));
+			Check(
+				restored && restored->isDeleted() && !restored->isUnavailable()
+				&& restored->originalText().text
+					== QString::fromStdString(Stored(kSelf, kPlaceholder, 120).text),
+				u"cached placeholder is replaced with the saved incoming payload"_q);
+			Check(
+				history->unreadCount() == before,
+				u"replacement and attachment preserve unrelated unread count"_q,
+				u"before=%1 after=%2"_q.arg(before).arg(history->unreadCount()));
+			Check(
+				history->lastServerMessageKnown() && !history->lastServerMessage(),
+				u"restored incoming row does not become a cloud top message"_q);
+			const auto afterEnd = AyuMessages::RestoreDeletedHistory(
+				state->mixed->peer,
+				QVector<MTPMessage>{ LiveMessage(state->mixed, 400),
+					LiveMessage(state->mixed, 900) },
+				{ .offsetId = kLast + 1, .addOffset = -30, .limit = 30 },
+				true);
+			Check(
+				afterEnd.messages.isEmpty(),
+				u"newer continuation beyond archive end rejects old cloud anchors"_q,
+				u"offset=%1 returned=%2"_q
+				.arg(kLast + 1).arg(afterEnd.messages.size()));
+		},
+	});
+	runner->add({
+		.name = u"wait for synthetic session's real window controller"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.until = [=] { return Controller(state) != nullptr; },
+		.then = [=] {
+			state->mark = state->rpc->stamps().size();
+			Controller(state)->showPeerHistory(state->mixed,
+				Window::SectionShow::Way::ClearStack, MsgId(650));
+		},
+	});
+	runner->add({
+		.name = u"consume a real around-target history request callback"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.until = [=] {
+			return Resolve(state, state->mixed)
+				&& state->rpc->stamps().size() > state->mark
+				&& !state->rpc->pending();
+		},
+		.then = [=] {
+			const auto item = state->mixed->owner().message(
+				state->mixed->peer, MsgId(650));
+			Check(
+				item && item->isDeleted(),
+				u"around-target getHistory restores the requested local row"_q,
+				Details(state, state->mixed));
+			const auto stamps = state->rpc->stamps();
+			Check(
+				ranges::any_of(stamps, [](const auto &stamp) {
+					return stamp.offsetId == 650 && stamp.addOffset < 0
+						&& stamp.answered;
+				}),
+				u"actual around-target request parameters were observed"_q);
+		},
+		.timeoutDetails = [=] { return Details(state, state->mixed); },
+	});
+	AppendPaging(runner, state, &state->mixed, false, 30);
+	AppendPaging(runner, state, &state->mixed, true, 30);
+	runner->add({
+		.name = u"validate complete mixed chat"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] { CheckRows(state, state->mixed, kLast, true); },
+	});
+	AppendCapture(runner, state, &state->mixed, 10, u"old_prefix"_q);
+	AppendCapture(runner, state, &state->mixed, 650, u"between_live_anchors"_q);
+	AppendCapture(runner, state, &state->mixed, 1190, u"newer_local_tail"_q);
+	runner->add({
+		.name = u"open real cloud-empty history with saved local rows"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] {
+			state->mark = state->rpc->stamps().size();
+			Controller(state)->showPeerHistory(state->cloudEmpty,
+				Window::SectionShow::Way::ClearStack, ShowAtTheEndMsgId);
+		},
+		.until = [=] {
+			return Resolve(state, state->cloudEmpty)
+				&& state->rpc->stamps().size() > state->mark
+				&& !state->rpc->pending();
+		},
+		.then = [=] {
+			Check(
+				state->cloudEmpty->lastServerMessageKnown()
+				&& !state->cloudEmpty->lastServerMessage(),
+				u"cloud stays known empty after actual UI callback"_q,
+				Details(state, state->cloudEmpty));
+		},
+		.timeoutDetails = [=] { return Details(state, state->cloudEmpty); },
+	});
+	AppendPaging(runner, state, &state->cloudEmpty, false, 8);
+	AppendPaging(runner, state, &state->cloudEmpty, true, 8);
+	runner->add({
+		.name = u"validate complete local-only chat"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.run = [=] { CheckRows(state, state->cloudEmpty, kCloudLast, false); },
+	});
+	AppendCapture(runner, state, &state->cloudEmpty, 120, u"cloud_empty"_q);
+	runner->add({
+		.name = u"verify read-only restoration and dispose synthetic RPC fixture"_q,
+		.skipReason = [=] { return Invalid(state); },
+		.until = [=] { return !state->rpc->pending(); },
+		.then = [=] {
+			Check(
+				Digest() == state->initialDigest,
+				u"rendering and paging leave persisted source snapshots unchanged"_q,
+				u"sha256=%1"_q.arg(QString::fromLatin1(Digest())));
+			Check(
+				state->rpc->stamps().size() >= 20,
+				u"GUI proof used multiple actual history request callbacks"_q,
+				u"requests=%1"_q.arg(state->rpc->stamps().size()));
+			state->rpc.reset();
+			if (!FailureCount()) {
+				auto file = QFile(state->root + (state->phase == 1
+					? "/phase1-complete" : "/phase2-complete"));
+				Check(
+					file.open(QIODevice::WriteOnly) && file.write("ok\n") == 3,
+					u"process phase completed without failed assertions"_q);
+			}
+		},
+	});
+}
+
+} // namespace Test
+
+#endif // _DEBUG

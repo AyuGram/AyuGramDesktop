@@ -21,6 +21,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/fields/input_field.h"
 #include "mtproto/sender.h"
 
+namespace AyuMessages {
+struct HistoryPageRequest;
+} // namespace AyuMessages
+
 enum class SendMediaType;
 class MessageLinksParser;
 struct InlineBotQuery;
@@ -677,7 +681,11 @@ private:
 	void editDraftOptions();
 	void jumpToReply(FullReplyTo to);
 
-	void messagesReceived(not_null<PeerData*> peer, const MTPmessages_Messages &messages, int requestId);
+	void messagesReceived(
+		not_null<PeerData*> peer,
+		const MTPmessages_Messages &messages,
+		int requestId,
+		AyuMessages::HistoryPageRequest request);
 	void messagesFailed(const MTP::Error &error, int requestId);
 	void addMessagesToFront(not_null<PeerData*> peer, const QVector<MTPMessage> &messages);
 	void addMessagesToBack(not_null<PeerData*> peer, const QVector<MTPMessage> &messages);

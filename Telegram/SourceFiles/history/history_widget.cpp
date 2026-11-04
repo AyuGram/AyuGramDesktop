@@ -218,6 +218,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 
 // AyuGram includes
+#include "ayu/data/deleted_history.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/utils/telegram_helpers.h"
@@ -3516,6 +3517,9 @@ void HistoryWidget::showHistory(
 		setupGroupCallBar();
 		setupRequestsBar();
 		checkMessagesTTL();
+		if (_history->isEmpty() && AyuMessages::HasDeletedHistory(_peer)) {
+			_history->setNotLoadedAtBottom();
+		}
 		if (_history->scrollTopItem
 			|| (_migrated && _migrated->scrollTopItem)
 			|| _history->isReadyFor(_showAtMsgId)) {
@@ -4796,7 +4800,8 @@ void HistoryWidget::messagesFailed(const MTP::Error &error, int requestId) {
 void HistoryWidget::messagesReceived(
 		not_null<PeerData*> peer,
 		const MTPmessages_Messages &messages,
-		int requestId) {
+		int requestId,
+		AyuMessages::HistoryPageRequest request) {
 	// Expects(_history != nullptr);
 	if (!_history || !_peer) {
 		return; // AyuGram: fix crash when using `saveDeletedMessages`
@@ -4852,15 +4857,26 @@ void HistoryWidget::messagesReceived(
 	case mtpc_messages_messagesNotModified: {
 		LOG(("API Error: received messages.messagesNotModified! "
 			"(HistoryWidget::messagesReceived)"));
+		request.limit = 0;
 	} break;
 	}
 
+	const auto restored = AyuMessages::RestoreDeletedHistory(
+		peer,
+		*histList,
+		request,
+		requestId == _preloadDownRequest);
+	histList = &restored.messages;
+	const auto history = _history->owner().history(peer);
+
 	if (_preloadRequest == requestId) {
 		addMessagesToFront(peer, *histList);
+		AyuMessages::ApplyDeletedHistory(history, restored);
 		_preloadRequest = 0;
 		preloadHistoryIfNeeded();
 	} else if (_preloadDownRequest == requestId) {
 		addMessagesToBack(peer, *histList);
+		AyuMessages::ApplyDeletedHistory(history, restored);
 		_preloadDownRequest = 0;
 		preloadHistoryIfNeeded();
 		if (_history->loadedAtBottom()) {
@@ -4873,6 +4889,7 @@ void HistoryWidget::messagesReceived(
 			_migrated->clear(History::ClearType::Unload);
 		}
 		addMessagesToFront(peer, *histList);
+		AyuMessages::ApplyDeletedHistory(history, restored);
 		_firstLoadRequest = 0;
 		if (_firstLoadFromTheStart && !toMigrated) {
 			_history->markLoadedAtTop();
@@ -4896,6 +4913,7 @@ void HistoryWidget::messagesReceived(
 		_history->getReadyFor(_delayedShowAtMsgId);
 		if (_history->isEmpty()) {
 			addMessagesToFront(peer, *histList);
+			AyuMessages::ApplyDeletedHistory(history, restored);
 			if (_firstLoadFromTheStart && !toMigrated) {
 				_history->markLoadedAtTop();
 			}
@@ -5037,7 +5055,15 @@ void HistoryWidget::firstLoadMessages() {
 			MTP_int(minId),
 			MTP_long(historyHash)
 		)).done([=](const MTPmessages_Messages &result) {
-			messagesReceived(history->peer, result, _firstLoadRequest);
+			messagesReceived(
+				history->peer,
+				result,
+				_firstLoadRequest,
+				{
+					.offsetId = int(offsetId.bare),
+					.addOffset = offset,
+					.limit = loadCount,
+				});
 			finish();
 		}).fail([=](const MTP::Error &error) {
 			messagesFailed(error, _firstLoadRequest);
@@ -5095,7 +5121,15 @@ void HistoryWidget::loadMessages() {
 			MTP_int(minId),
 			MTP_long(historyHash)
 		)).done([=](const MTPmessages_Messages &result) {
-			messagesReceived(history->peer, result, _preloadRequest);
+			messagesReceived(
+				history->peer,
+				result,
+				_preloadRequest,
+				{
+					.offsetId = int(offsetId.bare),
+					.addOffset = addOffset,
+					.limit = loadCount,
+				});
 			finish();
 		}).fail([=](const MTP::Error &error) {
 			messagesFailed(error, _preloadRequest);
@@ -5195,7 +5229,15 @@ void HistoryWidget::loadMessagesDown() {
 			MTP_int(minId),
 			MTP_long(historyHash)
 		)).done([=](const MTPmessages_Messages &result) {
-			messagesReceived(history->peer, result, _preloadDownRequest);
+			messagesReceived(
+				history->peer,
+				result,
+				_preloadDownRequest,
+				{
+					.offsetId = int((offsetId + 1).bare),
+					.addOffset = addOffset,
+					.limit = loadCount,
+				});
 			finish();
 		}).fail([=](const MTP::Error &error) {
 			messagesFailed(error, _preloadDownRequest);
@@ -5275,7 +5317,15 @@ void HistoryWidget::delayedShowAt(
 			MTP_int(minId),
 			MTP_long(historyHash)
 		)).done([=](const MTPmessages_Messages &result) {
-			messagesReceived(history->peer, result, _delayedShowAtRequest);
+			messagesReceived(
+				history->peer,
+				result,
+				_delayedShowAtRequest,
+				{
+					.offsetId = int(offsetId.bare),
+					.addOffset = offset,
+					.limit = loadCount,
+				});
 			finish();
 		}).fail([=](const MTP::Error &error) {
 			messagesFailed(error, _delayedShowAtRequest);

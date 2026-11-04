@@ -649,6 +649,7 @@ HistoryItem::HistoryItem(
 	PreparedServiceText{ tr::lng_message_empty(
 		tr::now,
 		tr::marked) }) {
+	_unavailable = true;
 }
 
 HistoryItem::HistoryItem(
@@ -2366,6 +2367,7 @@ void HistoryItem::clearMainView() {
 }
 
 void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
+	_unavailable = false;
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	int keyboardTop = -1;
@@ -2564,6 +2566,7 @@ void HistoryItem::setStoryFields(not_null<Data::Story*> story) {
 }
 
 void HistoryItem::applyEdition(const MTPDmessageService &message) {
+	_unavailable = false;
 	const auto wasNfr = Get<HistoryServiceNoForwardsRequest>();
 	const auto wasActionTaken = wasNfr && wasNfr->actionTaken;
 	const auto wasSublist = savedSublist();
@@ -2669,6 +2672,7 @@ void HistoryItem::applyEdition(
 }
 
 void HistoryItem::applySentMessage(const MTPDmessage &data) {
+	_unavailable = false;
 	history()->session().ephemeralMessages().revertAnchored(this);
 
 	if (data.is_invert_media()) {

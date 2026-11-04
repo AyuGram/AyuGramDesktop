@@ -84,6 +84,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_dialogs.h"
 
 // AyuGram includes
+#include "ayu/data/deleted_history.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
 
@@ -275,7 +276,8 @@ void History::itemVanished(not_null<HistoryItem*> item) {
 	if (lastKeyboardId == item->id) {
 		clearLastKeyboard();
 	}
-	if ((!item->out() || item->isPost())
+	if (!item->isUnavailable()
+		&& (!item->out() || item->isPost())
 		&& item->unread(this)
 		&& unreadCount() > 0) {
 		setUnreadCount(unreadCount() - 1);
@@ -585,6 +587,11 @@ not_null<HistoryItem*> History::createItem(
 		bool detachExistingItem,
 		bool newMessage) {
 	owner().fillMessagePeers(peer->id, message);
+	if (const auto existing = owner().message(peer, id)) {
+		if (existing->isUnavailable() && message.type() == mtpc_message) {
+			existing->destroy();
+		}
+	}
 	if (const auto result = owner().message(peer, id)) {
 		if (detachExistingItem) {
 			result->removeMainView(Data::ViewRemovalReason::Detached);
@@ -3103,7 +3110,7 @@ void History::setLastMessage(HistoryItem *item) {
 		return;
 	}
 	_lastMessage = item;
-	if (!item || item->isRegular()) {
+	if (!item || (item->isRegular() && !item->isDeleted())) {
 		_lastServerMessage = item;
 	}
 	if (peer->migrateTo()) {
@@ -3530,7 +3537,28 @@ void History::dialogEntryApplied() {
 		return;
 	}
 	if (!chatListMessage()) {
-		clear(ClearType::Unload, true);
+		const auto restoreDeleted = AyuMessages::HasDeletedHistory(peer);
+		if (restoreDeleted) {
+			auto hasHistoryEntries = false;
+			auto allHistoryEntriesDeleted = true;
+			for (const auto &block : blocks) {
+				for (const auto &view : block->messages) {
+					const auto item = view->data();
+					if (item->isHistoryEntry() && item->id > 0) {
+						hasHistoryEntries = true;
+						allHistoryEntriesDeleted &= item->isDeleted();
+					}
+				}
+			}
+			if (hasHistoryEntries && allHistoryEntriesDeleted) {
+				setLastMessage(lastAvailableMessage());
+				return;
+			}
+		}
+		clear(ClearType::Unload, !restoreDeleted);
+		if (restoreDeleted) {
+			return;
+		}
 		addNewerSlice(QVector<MTPMessage>());
 		addOlderSlice(QVector<MTPMessage>());
 		if (const auto channel = peer->asChannel()) {

@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "base/timer.h"
 #include "base/network_reachability.h"
+#include "test/test_deleted_history_rpc.h"
 #include "test/test_rpc_retry.h"
 
 namespace MTP {
@@ -1046,6 +1047,7 @@ void Instance::Private::sendRequest(
 		}
 	}
 
+	Test::ObserveDeletedHistoryRpc(_instance, requestId, request);
 	session->sendPrepared(request, msCanWait);
 }
 
