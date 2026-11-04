@@ -220,6 +220,8 @@ menuIconRemovedUsers: icon {{ "menu/removed_users-24x24", menuIconColor }};
 menuIconWelcomeMessage: icon {{ "menu/welcome_message-24x24", menuIconColor }};
 menuIconStar: icon {{ "menu/star", menuIconColor }};
 
+// AyuGram: the context menu still uses the plain auto-delete icon.
+menuIconTTLAny: icon {{ "menu/auto_delete_plain", menuIconColor }};
 menuIconTTL: icon {{ "menu/auto_delete", menuIconColor }};
 
 menuIconMuteForAny: icon {{ "menu/mute_for_plain", menuIconColor }};

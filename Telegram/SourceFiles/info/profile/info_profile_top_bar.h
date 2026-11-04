@@ -150,6 +150,9 @@ public:
 
 	rpl::producer<int> desiredHeightValue() const override;
 
+	// AyuGram: the profile music row follows the top bar color.
+	rpl::producer<std::optional<QColor>> edgeColor() const;
+
 protected:
 	void resizeEvent(QResizeEvent *e) override;
 	void paintEvent(QPaintEvent *e) override;

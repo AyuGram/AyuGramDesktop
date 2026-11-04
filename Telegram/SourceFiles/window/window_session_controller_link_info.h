@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_chat_participant_status.h"
+
 namespace InlineBots {
 struct WebViewContext;
 } // namespace InlineBots
