@@ -8,9 +8,12 @@
 
 #include "apiwrap.h"
 #include "api/api_text_entities.h"
+#include "ayu/data/entities.h"
+#include "data/data_peer.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "main/main_session.h"
 #include "mtproto/connection_abstract.h"
 #include "mtproto/details/mtproto_dump_to_text.h"
 
@@ -206,6 +209,77 @@ int mapItemFlagsToMTPFlags(not_null<HistoryItem*> item) {
 	}
 
 	return flags;
+}
+
+MTPMessage DeletedMessageToMTP(
+		not_null<PeerData*> peer,
+		const AyuMessageBase &message) {
+	Expects(peer->asUser() != nullptr);
+
+	const auto outgoing = (message.flags & kMessageFlagOut) != 0;
+	const auto self = peer->session().userPeerId();
+	auto from = outgoing ? self : peer->id;
+	if (message.fromId == peer->session().userId().bare) {
+		from = self;
+	} else if (message.fromId == peerToUser(peer->id).bare) {
+		from = peer->id;
+	}
+
+	auto flags = MTPDmessage::Flags(MTPDmessage::Flag::f_from_id);
+	if (outgoing) {
+		flags |= MTPDmessage::Flag::f_out;
+	}
+	if (message.flags & kMessageFlagIsSilent) {
+		flags |= MTPDmessage::Flag::f_silent;
+	}
+	if ((message.flags & kMessageFlagEdited) && message.editDate > 0) {
+		flags |= MTPDmessage::Flag::f_edit_date;
+	}
+
+	auto entities = MTP_vector<MTPMessageEntity>();
+	if (!message.textEntities.empty()) {
+		entities = deserializeTextWithEntities(message.textEntities);
+		if (!entities.v.empty()) {
+			flags |= MTPDmessage::Flag::f_entities;
+		}
+	}
+
+	return MTP_message(
+		MTP_flags(flags),
+		MTP_int(message.messageId),
+		peerToMTP(from),
+		MTPint(), // from_boosts_applied
+		MTPstring(), // from_rank
+		peerToMTP(peer->id),
+		MTPPeer(), // saved_peer_id
+		MTPMessageFwdHeader(), // fwd_from
+		MTPlong(), // via_bot_id
+		MTPlong(), // via_business_bot_id
+		MTPPeer(), // guestchat_via_from
+		MTPMessageReplyHeader(), // reply_to
+		MTP_int(message.date),
+		MTP_string(QString::fromStdString(message.text)),
+		MTP_messageMediaEmpty(),
+		MTPReplyMarkup(), // reply_markup
+		entities,
+		MTPint(), // views
+		MTPint(), // forwards
+		MTPMessageReplies(), // replies
+		MTP_int(message.editDate),
+		MTPstring(), // post_author
+		MTPlong(), // grouped_id
+		MTPMessageReactions(), // reactions
+		MTPVector<MTPRestrictionReason>(), // restriction_reason
+		MTPint(), // ttl_period
+		MTPint(), // quick_reply_shortcut_id
+		MTPlong(), // effect
+		MTPFactCheck(), // factcheck
+		MTPint(), // report_delivery_until_date
+		MTPlong(), // paid_message_stars
+		MTPSuggestedPost(), // suggested_post
+		MTPint(), // schedule_repeat_period
+		MTPstring(), // summary_from_language
+		MTPRichMessage());
 }
 
 }

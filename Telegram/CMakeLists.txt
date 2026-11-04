@@ -249,6 +249,10 @@ set(ayugram_files
         ayu/features/filters/filters_utils.h
         ayu/data/messages_storage.cpp
         ayu/data/messages_storage.h
+        ayu/data/deleted_history.cpp
+        ayu/data/deleted_history.h
+        ayu/data/deleted_history_query.h
+        ayu/data/history_page.h
         ayu/data/entities.h
         ayu/data/ayu_database.cpp
         ayu/data/ayu_database.h
@@ -2152,6 +2156,8 @@ PRIVATE
     test/test_probe.h
     test/test_rpc_retry.cpp
     test/test_rpc_retry.h
+    test/test_deleted_history_rpc.cpp
+    test/test_deleted_history_rpc.h
     test/test_runner.cpp
     test/test_runner.h
     test/test_scenario.cpp

@@ -470,6 +470,9 @@ public:
 	void setPostAuthor(const QString &author);
 	void setDeleted();
 	[[nodiscard]] bool isDeleted() const;
+	[[nodiscard]] bool isUnavailable() const {
+		return _unavailable;
+	}
 	[[nodiscard]] bool isBurnt() const;
 	[[nodiscard]] bool wasDeletedAnimated() const;
 	void markDeletedAnimated();
@@ -829,6 +832,7 @@ private:
 
 	bool _deleted = false;
 	bool _deletedAnimated = false;
+	bool _unavailable : 1 = false;
 
 	TimeId _date = 0;
 	TimeId _ttlDestroyAt = 0;

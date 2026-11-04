@@ -6,6 +6,7 @@
 // Copyright @Radolyn, 2026
 #include "ayu/data/ayu_database.h"
 
+#include "ayu/data/deleted_history_query.h"
 #include "ayu/data/entities.h"
 #include "ayu/libs/sqlite/sqlite_orm.h"
 #include "base/unixtime.h"
@@ -362,6 +363,29 @@ std::vector<DeletedMessage> getDeletedMessages(ID userId, ID dialogId, ID topicI
 		);
 	} catch (std::exception &ex) {
 		LOG(("Failed to get deleted messages: %1").arg(ex.what()));
+		return {};
+	}
+}
+
+std::vector<DeletedMessage> getDeletedHistoryMessages(
+		ID userId,
+		ID dialogId,
+		ID minId,
+		ID maxId,
+		int totalLimit,
+		bool ascending) {
+	std::lock_guard lock(databaseMutex);
+	try {
+		return GetDeletedHistoryMessages<DeletedMessage>(
+			storage,
+			userId,
+			dialogId,
+			minId,
+			maxId,
+			totalLimit,
+			ascending);
+	} catch (const std::exception &ex) {
+		LOG(("Failed to get deleted history messages: %1").arg(ex.what()));
 		return {};
 	}
 }
