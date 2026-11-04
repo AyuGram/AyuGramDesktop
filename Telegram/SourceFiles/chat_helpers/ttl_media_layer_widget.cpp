@@ -173,6 +173,10 @@ PreviewWrap::PreviewWrap(
 			update(_elementGeometry);
 		}
 	}, lifetime());
+	session->data().peerDecorationsUpdated(
+	) | rpl::on_next([=] {
+		update(_elementGeometry);
+	}, lifetime());
 	session->data().itemViewRefreshRequest(
 	) | rpl::on_next([=](not_null<const HistoryItem*> item) {
 		if (item == _item) {

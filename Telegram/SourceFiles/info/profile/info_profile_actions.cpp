@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "history/history_location_manager.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/reactions/history_view_reactions_list.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
@@ -2443,12 +2444,16 @@ void DetailsFiller::addMainApp(not_null<UserData*> user) {
 		}
 		return text;
 	});
-	auto setup = [url](not_null<Ui::FlatLabel*> label) {
+	auto setup = [url, controller](not_null<Ui::FlatLabel*> label) {
 		label->setClickHandlerFilter([=](
 				const ClickHandlerPtr &link,
 				Qt::MouseButton) {
 			if (link && link->url() == url) {
-				UrlClickHandler::Open(url);
+				HiddenUrlClickHandler::OpenTranslated(
+					tr::lng_mini_apps_tos_url,
+					QVariant::fromValue(ClickHandlerContext{
+						.sessionWindow = controller,
+					}));
 				return false;
 			}
 			return true;
@@ -3232,7 +3237,10 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 			}
 		}
 		if (!sendBotCommand(u"privacy"_q)) {
-			openUrl(tr::lng_profile_bot_privacy_url(tr::now));
+			HiddenUrlClickHandler::OpenTranslatedWithIv(
+				&user->session(),
+				tr::lng_profile_bot_privacy_url,
+				makeOtherContext());
 		}
 	};
 	AddActionButton(

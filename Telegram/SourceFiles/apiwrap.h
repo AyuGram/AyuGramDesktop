@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "mtproto/sender.h"
 #include "data/stickers/data_stickers_set.h"
-#include "data/data_messages.h"
 
 class TaskQueue;
 class HistoryItem;
@@ -30,6 +29,8 @@ struct RichPage;
 } // namespace Iv
 
 namespace Data {
+enum class LoadDirection : char;
+struct MessagePosition;
 struct ReactionId;
 struct UpdatedFileReferences;
 class WallPaper;
@@ -269,7 +270,6 @@ public:
 
 	void requestWebPageDelayed(not_null<WebPageData*> page);
 	void clearWebPageRequest(not_null<WebPageData*> page);
-	void clearWebPageRequests();
 
 	void scheduleStickerSetRequest(uint64 setId, uint64 access);
 	void requestStickerSets();

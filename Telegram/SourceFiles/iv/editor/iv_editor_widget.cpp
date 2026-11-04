@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_file_utilities.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
 #include "storage/storage_media_prepare.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
@@ -61,6 +62,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/image/image_location.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_entity.h"
 #include "ui/text/text_html_tags.h"
 #include "ui/text/text_utilities.h"
@@ -264,6 +266,38 @@ struct SplitCommittedFieldOffset {
 		};
 	}
 	return std::nullopt;
+}
+
+[[nodiscard]] auto CaptureCommittedFieldSelection(
+		const Ui::InputField &field,
+		const State &state,
+		const Widget &widget,
+		int (Widget::*richOffset)(const TextWithEntities &, int) const)
+-> std::optional<CommittedFieldSelectionCapture> {
+	if (field.isHidden()
+		|| (state.activeFieldMode() != State::FieldMode::Rich)) {
+		return std::optional<CommittedFieldSelectionCapture>();
+	}
+	const auto leaf = state.activeLeafPath();
+	if (!leaf) {
+		return std::optional<CommittedFieldSelectionCapture>();
+	}
+	const auto text = ConvertEditorTagsToRichText(
+		field.getTextWithAppliedMarkdown());
+	const auto cursor = field.textCursor();
+	const auto length = int(text.text.size());
+	return std::make_optional(CommittedFieldSelectionCapture{
+		.leaf = *leaf,
+		.text = text,
+		.anchorOffset = std::clamp(
+			(widget.*richOffset)(text, cursor.anchor()),
+			0,
+			length),
+		.cursorOffset = std::clamp(
+			(widget.*richOffset)(text, cursor.position()),
+			0,
+			length),
+	});
 }
 
 [[nodiscard]] std::optional<CommittedFieldSelectionRestore>
@@ -2132,7 +2166,11 @@ auto Widget::markdownForLiteralHtmlImport(
 
 void Widget::pasteImportedBlocks(BlocksImportResult &&imported) {
 	if (!imported.localMedia.empty()) {
-		resolveImportedLocalMedia(std::move(imported));
+		if (CanPasteWithoutConfirmation(imported)) {
+			resolveImportedLocalMedia(std::move(imported));
+		} else {
+			confirmImportedLocalMedia(std::move(imported));
+		}
 		return;
 	}
 	if (!imported.blocks.empty()) {
@@ -2143,6 +2181,88 @@ void Widget::pasteImportedBlocks(BlocksImportResult &&imported) {
 	if (imported.truncated) {
 		_show->showToast(tr::lng_article_paste_truncated(tr::now));
 	}
+}
+
+namespace {
+
+constexpr auto kConfirmPathsLabelLimit = 16 * 1024; // text parses 32k max
+
+void ConfirmImportedMediaBox(
+		not_null<Ui::GenericBox*> box,
+		const QStringList &paths,
+		Fn<void(bool confirmed)> done) {
+	Ui::ConfirmBox(box, {
+		.text = tr::lng_article_paste_attach_files(
+			tr::now,
+			lt_count,
+			paths.size()),
+		.confirmed = [=](Fn<void()> close) {
+			close();
+			done(true);
+		},
+		.cancelled = [=](Fn<void()> close) {
+			close();
+			done(false);
+		},
+		.confirmText = tr::lng_continue(),
+	});
+	const auto padding = st::boxPadding;
+	const auto lineHeight = st::boxLabel.style.font->height;
+	const auto addChunk = [&](const QString &text, bool last) {
+		const auto label = box->addRow(
+			object_ptr<Ui::FlatLabel>(box, text, st::boxLabel),
+			QMargins(
+				padding.left(),
+				0,
+				padding.right(),
+				last ? padding.bottom() : lineHeight));
+		label->setSelectable(true);
+		label->setBreakEverywhere(true);
+	};
+	auto chunk = QString();
+	for (auto i = 0; i != paths.size(); ++i) {
+		const auto line = u"%1. %2"_q.arg(i + 1).arg(paths[i]);
+		if (!chunk.isEmpty()
+			&& chunk.size() + line.size() > kConfirmPathsLabelLimit) {
+			addChunk(chunk, false);
+			chunk = QString();
+		}
+		if (!chunk.isEmpty()) {
+			chunk += u"\n\n"_q;
+		}
+		chunk += line;
+	}
+	addChunk(chunk, true);
+}
+
+} // namespace
+
+void Widget::confirmImportedLocalMedia(BlocksImportResult &&imported) {
+	if (!_show) {
+		imported.blocks = DropImportedMediaPlaceholders(
+			std::move(imported.blocks),
+			{});
+		imported.localMedia.clear();
+		pasteImportedBlocks(std::move(imported));
+		return;
+	}
+	const auto paths = ImportedMediaPathsToConfirm(imported);
+	const auto shared = std::make_shared<BlocksImportResult>(
+		std::move(imported));
+	const auto weak = QPointer<Widget>(this);
+	if (_keyboardStructuralSelectionActive) {
+		releaseKeyboard();
+	}
+	_show->showBox(Box(ConfirmImportedMediaBox, paths, [=](bool confirmed) {
+		if (!weak) {
+			return;
+		} else if (weak->_keyboardStructuralSelectionActive) {
+			weak->grabKeyboard();
+		}
+		if (confirmed) {
+			weak->resolveImportedLocalMedia(std::move(*shared));
+		}
+	}));
 }
 
 void Widget::resolveImportedLocalMedia(BlocksImportResult &&imported) {
@@ -8295,32 +8415,11 @@ std::optional<PreparedEditHit> Widget::boundaryHitFromTarget(
 }
 
 bool Widget::enterStructuralSelectionFromField(bool forward, bool page) {
-	const auto committedSelection = [&]() {
-		if (_field->isHidden()
-			|| (_state->activeFieldMode() != State::FieldMode::Rich)) {
-			return std::optional<CommittedFieldSelectionCapture>();
-		}
-		const auto leaf = _state->activeLeafPath();
-		if (!leaf) {
-			return std::optional<CommittedFieldSelectionCapture>();
-		}
-		const auto text = ConvertEditorTagsToRichText(
-			_field->getTextWithAppliedMarkdown());
-		const auto cursor = _field->textCursor();
-		const auto length = int(text.text.size());
-		return std::make_optional(CommittedFieldSelectionCapture{
-			.leaf = *leaf,
-			.text = text,
-			.anchorOffset = std::clamp(
-				richOffsetForFieldOffset(text, cursor.anchor()),
-				0,
-				length),
-			.cursorOffset = std::clamp(
-				richOffsetForFieldOffset(text, cursor.position()),
-				0,
-				length),
-		});
-	}();
+	const auto committedSelection = CaptureCommittedFieldSelection(
+		*_field,
+		*_state,
+		*this,
+		&Widget::richOffsetForFieldOffset);
 	const auto committed = commitInlineFieldForClose();
 	if (committed == ApplyResult::Failed) {
 		return false;
@@ -9337,32 +9436,11 @@ bool Widget::moveListItemDepth(bool deeper) {
 
 bool Widget::removeBoundaryOwner(bool forward) {
 	auto handled = false;
-	const auto committedSelection = [&]() {
-		if (_field->isHidden()
-			|| (_state->activeFieldMode() != State::FieldMode::Rich)) {
-			return std::optional<CommittedFieldSelectionCapture>();
-		}
-		const auto leaf = _state->activeLeafPath();
-		if (!leaf) {
-			return std::optional<CommittedFieldSelectionCapture>();
-		}
-		const auto text = ConvertEditorTagsToRichText(
-			_field->getTextWithAppliedMarkdown());
-		const auto cursor = _field->textCursor();
-		const auto length = int(text.text.size());
-		return std::make_optional(CommittedFieldSelectionCapture{
-			.leaf = *leaf,
-			.text = text,
-			.anchorOffset = std::clamp(
-				richOffsetForFieldOffset(text, cursor.anchor()),
-				0,
-				length),
-			.cursorOffset = std::clamp(
-				richOffsetForFieldOffset(text, cursor.position()),
-				0,
-				length),
-		});
-	}();
+	const auto committedSelection = CaptureCommittedFieldSelection(
+		*_field,
+		*_state,
+		*this,
+		&Widget::richOffsetForFieldOffset);
 	beginArticleRelayoutDeferral();
 	const auto relayoutGuard = gsl::finally([&] {
 		endArticleRelayoutDeferral();
@@ -11154,26 +11232,28 @@ void Widget::removeStructuralSelectionAndReposition(bool forward) {
 	const auto origin = [&]() -> std::optional<BoundarySelectionOrigin> {
 		if (_boundarySelectionOrigin
 			&& _boundarySelectionOrigin->forward == forward) {
-			return _boundarySelectionOrigin;
+			auto result = *_boundarySelectionOrigin;
+			result.leafSelection.leaf = _state->shiftLeafAfterRemovedSelection(
+				_structuralSelection,
+				result.leafSelection.leaf);
+			return result;
 		}
 		return std::nullopt;
 	}();
+	const auto historyIndex = _historyIndex;
 	const auto target = removeCurrentStructuralSelection(forward);
 	if (hasStructuralSelection()) {
 		return;
 	}
-	if (origin) {
-		const auto ordinal = _state->textOrdinalForLeafPath(
-			origin->leafSelection.leaf);
-		if (ordinal >= 0 && ordinal < _state->textNodeCount()) {
-			activateTextOrdinal(
-				ordinal,
-				origin->leafSelection.anchorOffset,
-				origin->leafSelection.cursorOffset);
-			return;
-		}
-	}
-	if (target) {
+	const auto originOrdinal = origin
+		? _state->textOrdinalForLeafPath(origin->leafSelection.leaf)
+		: -1;
+	if (originOrdinal >= 0 && originOrdinal < _state->textNodeCount()) {
+		activateTextOrdinal(
+			originOrdinal,
+			origin->leafSelection.anchorOffset,
+			origin->leafSelection.cursorOffset);
+	} else if (target) {
 		if (forward) {
 			activateTextOrdinal(*target, 0);
 		} else {
@@ -11181,6 +11261,11 @@ void Widget::removeStructuralSelectionAndReposition(bool forward) {
 		}
 	} else {
 		activateInitialNode();
+	}
+	if (_historyIndex != historyIndex
+		&& _historyIndex >= 0
+		&& _historyIndex < int(_history.size())) {
+		_history[_historyIndex].viewState = captureHistoryViewState();
 	}
 }
 

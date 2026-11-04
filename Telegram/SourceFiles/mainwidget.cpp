@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_saved_windows.h"
 #include "window/window_separate_id.h"
 #include "window/window_slide_animation.h"
+#include "window/window_text_drop.h"
 #include "window/window_history_hider.h"
 #include "window/window_controller.h"
 #include "window/window_peer_menu.h"
@@ -124,13 +125,14 @@ base::options::toggle ForceComposeSearchOneColumn({
 base::options::toggle OptionUseNewChatView({
 	.id = kOptionUseNewChatView,
 	.name = "New chat view",
-	.description = "Open chats through the new section."
+	.description = "Open chats through the new section.",
+	.defaultValue = true,
 });
 
 } // namespace
 
 const char kForceComposeSearchOneColumn[] = "force-compose-search-one-column";
-const char kOptionUseNewChatView[] = "use-new-chat-view";
+const char kOptionUseNewChatView[] = "use-modern-chat-view";
 
 enum StackItemType {
 	HistoryStackItem,
@@ -746,6 +748,24 @@ bool MainWidget::filesOrForwardDrop(
 			: _history->confirmSendingFiles(data));
 		return true;
 	}
+}
+
+void MainWidget::textDrop(
+		not_null<Data::Thread*> thread,
+		not_null<const QMimeData*> data) {
+	const auto text = data->text();
+	if (text.isEmpty()) {
+		return;
+	}
+	Window::DropTextToThread(
+		_controller,
+		thread,
+		text,
+		[=](const QString &text) {
+			(_mainSection
+				? _mainSection->insertTextAtCursor(text)
+				: _history->insertTextAtCursor(text));
+		});
 }
 
 bool MainWidget::notify_switchInlineBotButtonReceived(const QString &query, UserData *samePeerBot, MsgId samePeerReplyTo) {
@@ -1491,7 +1511,7 @@ void MainWidget::showHistory(
 					const auto wasState
 						= _controller->dialogsEntryStateCurrent();
 					if (wasState.key) {
-						info->inlineReturnTo = wasState;
+						info->setInlineReturnTo(wasState);
 					}
 				}
 			}
@@ -1893,9 +1913,19 @@ void MainWidget::showSection(
 	//	return;
 	}
 
-	if (preventsCloseSection(
-		[=] { showSection(memento, params); },
-		params)) {
+	const auto thread = [&]() -> base::weak_ptr<Data::Thread> {
+		if (const auto topic = memento->topicForRemoveRequests()) {
+			return topic;
+		}
+		return memento->sublistForRemoveRequests();
+	}();
+	if (preventsCloseSection([=] {
+		// The confirmation can outlive the topic or sublist to be shown.
+		const auto info = dynamic_cast<Info::Memento*>(memento.get());
+		if ((thread.null() || thread) && (!info || info->stackSize() > 0)) {
+			showSection(memento, params);
+		}
+	}, params)) {
 		return;
 	}
 

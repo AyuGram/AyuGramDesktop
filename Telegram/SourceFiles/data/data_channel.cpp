@@ -331,14 +331,15 @@ void ChannelData::setLocation(const MTPChannelLocation &data) {
 	const auto was = mgInfo->getLocation();
 	const auto wasValue = was ? *was : ChannelLocation();
 	data.match([&](const MTPDchannelLocation &data) {
-		data.vgeo_point().match([&](const MTPDgeoPoint &point) {
+		const auto point = Data::LocationPoint::FromMTP(data.vgeo_point());
+		if (point) {
 			mgInfo->setLocation({
 				qs(data.vaddress()),
-				Data::LocationPoint(point)
+				*point
 			});
-		}, [&](const MTPDgeoPointEmpty &) {
+		} else {
 			mgInfo->setLocation(ChannelLocation());
-		});
+		}
 	}, [&](const MTPDchannelLocationEmpty &) {
 		mgInfo->setLocation(ChannelLocation());
 	});
@@ -939,9 +940,16 @@ void ChannelData::setAdminRights(ChatAdminRights rights) {
 		this,
 		UpdateFlag::Rights | UpdateFlag::Admins | UpdateFlag::BannedUsers);
 	if (isBroadcast() && _monoforumLink) {
-		const auto flags = _monoforumLink->flags();
-		_monoforumLink->setFlags((flags & ~Flag::MonoforumAdmin)
-			| (canAccessMonoforum() ? Flag::MonoforumAdmin : Flag()));
+		if (canAccessMonoforum()) {
+			_monoforumLink->addFlags(Flag::MonoforumAdmin);
+		} else if (_monoforumLink->amMonoforumAdmin()) {
+			// A reply may revoke these rights while still using the sublists.
+			Core::App().postponeCall(crl::guard(&session(), [=] {
+				if (_monoforumLink && !canAccessMonoforum()) {
+					_monoforumLink->removeFlags(Flag::MonoforumAdmin);
+				}
+			}));
+		}
 	}
 }
 

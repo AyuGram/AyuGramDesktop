@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/platform/base_platform_info.h"
 #include "calls/group/calls_group_common.h"
+#include "chat_helpers/spellchecker_locale_ids.h"
 #include "history/view/history_view_quick_action.h"
 #include "lang/lang_keys.h"
 #include "platform/platform_notifications_manager.h"
@@ -30,6 +31,59 @@ namespace {
 constexpr auto kInitialVideoQuality = 480; // Start with SD.
 constexpr auto kMinIvZoom = 25;
 constexpr auto kMaxIvZoom = 400;
+constexpr auto kLanguageCodesFormat = qint32(1);
+
+[[nodiscard]] QString SerializeLanguage(QLocale::Language language) {
+	return (language > QLocale::C)
+		? QLocale::languageToCode(language)
+		: QString();
+}
+
+[[nodiscard]] std::vector<LanguageId> DeserializeLanguages(
+		const QStringList &codes) {
+	auto result = std::vector<LanguageId>();
+	for (const auto &code : codes) {
+		const auto language = QLocale::codeToLanguage(code);
+		if (language <= QLocale::C) {
+			LOG(("Translate Settings: Skipping unknown language code: %1"
+				).arg(code));
+			continue;
+		}
+		const auto id = LanguageId{ language };
+		if (!ranges::contains(result, id)) {
+			result.push_back(id);
+		}
+	}
+	return result;
+}
+
+[[nodiscard]] std::vector<LanguageId> MigrateTranslationLanguages(
+		std::vector<LanguageId> &&list,
+		int scheme) {
+	auto result = std::vector<LanguageId>();
+	for (const auto &id : list) {
+		const auto raw = quint64(id.value);
+		const auto recovered = Spellchecker::RecoverLangIdFromSerialized(
+			raw,
+			scheme);
+		if (!recovered) {
+			LOG(("Translate Settings: Dropped unknown language id: %1"
+				).arg(raw));
+			continue;
+		}
+		if (recovered != int(id.value)) {
+			LOG(("Translate Settings: Migrated language id %1 -> %2"
+				).arg(int(id.value)).arg(recovered));
+		}
+		const auto language = LanguageId{ QLocale::Language(recovered) };
+		if (!ranges::contains(result, language)) {
+			result.push_back(language);
+		}
+	}
+	ranges::sort(result);
+	result.erase(std::unique(result.begin(), result.end()), result.end());
+	return result;
+}
 
 [[nodiscard]] int DefaultIvZoom() {
 	const auto exact = cScale() * 100 / cScreenScale();
@@ -203,6 +257,13 @@ QByteArray Settings::serialize() const {
 		begin(_noWarningExtensions),
 		end(_noWarningExtensions)
 	).join(' ');
+	const auto translateToCode = SerializeLanguage(
+		QLocale::Language(_translateToRaw.current()));
+	const auto skipTranslationLanguageCodes = ranges::views::all(
+		skipLanguages
+	) | ranges::views::transform([](LanguageId id) {
+		return SerializeLanguage(id.value);
+	}) | ranges::to<QStringList>;
 
 	auto size = Serialize::bytearraySize(themesAccentColors)
 		+ sizeof(qint32) // _adaptiveForWide
@@ -349,7 +410,14 @@ QByteArray Settings::serialize() const {
 	size += sizeof(qint32) // _audioPlaybackSpeed
 		+ sizeof(qint32) // _mediaGridZoomStep
 		+ sizeof(qint32) // _pullToNextChannel
-		+ sizeof(qint32); // _chatFiltersTabsMode
+		+ sizeof(qint32) // _chatFiltersTabsMode
+		+ sizeof(qint32)		+ sizeof(qint32)		+ ranges::accumulate(
+			skipTranslationLanguageCodes,
+			0,
+			[](int sum, const QString &code) {
+				return sum + Serialize::stringSize(code);
+			})
+		+ Serialize::stringSize(translateToCode);
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -529,13 +597,22 @@ QByteArray Settings::serialize() const {
 		stream << qint32(_mediaGridZoomStep);
 		stream << qint32(_pullToNextChannel.current() ? 1 : 0);
 		stream << qint32(_chatFiltersTabsMode.current());
+
+		stream << kLanguageCodesFormat;
+		stream << qint32(skipTranslationLanguageCodes.size());
+		for (const auto &code : skipTranslationLanguageCodes) {
+			stream << code;
+		}
+		stream << translateToCode;
 	}
 
 	Ensures(result.size() == size);
 	return result;
 }
 
-void Settings::addFromSerialized(const QByteArray &serialized) {
+void Settings::addFromSerialized(
+		const QByteArray &serialized,
+		int writerVersion) {
 	if (serialized.isEmpty()) {
 		return;
 	}
@@ -673,6 +750,9 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		: 0;
 	qint32 usePlatformTranslation = _usePlatformTranslation ? 1 : 0;
 	qint32 systemTextReplace = _systemTextReplace.current() ? 1 : 0;
+	qint32 languageCodesFormat = 0;
+	QStringList skipTranslationLanguageCodes;
+	QString translateToCode;
 
 	stream >> themesAccentColors;
 	if (!stream.atEnd()) {
@@ -1075,6 +1155,37 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 	if (!stream.atEnd()) {
 		stream >> chatFiltersTabsMode;
 	}
+	if (!stream.atEnd()) {
+		auto tail = stream.device()->readAll();
+		auto tailStream = QDataStream(&tail, QIODevice::ReadOnly);
+		tailStream.setVersion(QDataStream::Qt_5_1);
+		auto format = qint32();
+		tailStream >> format;
+		if (tailStream.status() == QDataStream::Ok
+			&& format == kLanguageCodesFormat) {
+			auto count = qint32();
+			tailStream >> count;
+			if (tailStream.status() == QDataStream::Ok
+				&& count >= 0
+				&& count < 10000) {
+				for (auto i = 0; i != count; ++i) {
+					auto code = QString();
+					tailStream >> code;
+					if (tailStream.status() != QDataStream::Ok) {
+						break;
+					}
+					skipTranslationLanguageCodes.push_back(code);
+				}
+			}
+			if (tailStream.status() == QDataStream::Ok
+				&& skipTranslationLanguageCodes.size() == count) {
+				tailStream >> translateToCode;
+				if (tailStream.status() == QDataStream::Ok) {
+					languageCodesFormat = format;
+				}
+			}
+		}
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for Core::Settings::constructFromSerialized()"));
@@ -1167,7 +1278,35 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 			: speed;
 	}
 	_videoPipGeometry = (videoPipGeometry);
-	_dictionariesEnabled = std::move(dictionariesEnabled);
+	{
+		auto list = std::move(dictionariesEnabled);
+		const auto local = Spellchecker::LocalIdScheme();
+		auto scheme = Spellchecker::LangIdSchemeForAppVersion(writerVersion);
+		if (const auto stored = readPrefGeneric(
+				Spellchecker::kDictionariesIdSchemePref)) {
+			auto ok = false;
+			const auto parsed = stored->toInt(&ok);
+			if (ok && (parsed == 5 || parsed == 6)) {
+				scheme = parsed;
+			}
+		}
+		if (scheme != local) {
+			auto converted = std::vector<int>();
+			for (const auto id : list) {
+				const auto value = Spellchecker::ConvertLangId(
+					id,
+					scheme,
+					local);
+				if (!value || ranges::contains(converted, value)) {
+					continue;
+				}
+				converted.push_back(value);
+			}
+			list = std::move(converted);
+		}
+		writePref<int>(Spellchecker::kDictionariesIdSchemePref, local);
+		_dictionariesEnabled = std::move(list);
+	}
 	_autoDownloadDictionaries = (autoDownloadDictionaries == 1);
 	_mainMenuAccountsShown = (mainMenuAccountsShown == 1);
 	_tabbedSelectorSectionEnabled = (tabbedSelectorSectionEnabled == 1);
@@ -1286,11 +1425,40 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 				QLocale::Language(std::abs(legacySkipTranslationForLanguage))
 			});
 		}
-		_skipTranslationLanguages = std::move(skipTranslationLanguages);
+	}
+	if (languageCodesFormat == kLanguageCodesFormat) {
+		_skipTranslationLanguages = DeserializeLanguages(
+			skipTranslationLanguageCodes);
+	} else {
+		_skipTranslationLanguages = MigrateTranslationLanguages(
+			std::move(skipTranslationLanguages),
+			Spellchecker::LangIdSchemeForAppVersion(writerVersion));
 	}
 	_rememberedDeleteMessageOnlyForYou = (rememberedDeleteMessageOnlyForYou == 1);
 	_translateChatEnabled = (translateChatEnabled == 1);
-	_translateToRaw = int(QLocale::Language(translateToRaw));
+	if (languageCodesFormat == kLanguageCodesFormat) {
+		if (!translateToCode.isEmpty()) {
+			const auto language = QLocale::codeToLanguage(translateToCode);
+			if (language <= QLocale::C) {
+				LOG(("Translate Settings: Skipping unknown language code: %1"
+					).arg(translateToCode));
+				_translateToRaw = 0;
+			} else {
+				_translateToRaw = int(language);
+			}
+		} else {
+			_translateToRaw = 0;
+		}
+	} else {
+		const auto recovered = Spellchecker::RecoverLangIdFromSerialized(
+			translateToRaw,
+			Spellchecker::LangIdSchemeForAppVersion(writerVersion));
+		if (translateToRaw && !recovered) {
+			LOG(("Translate Settings: Dropped unknown target language: %1"
+				).arg(translateToRaw));
+		}
+		_translateToRaw = recovered;
+	}
 	_windowTitleContent = WindowTitleContent{
 		.hideChatName = (hideChatName == 1),
 		.hideAccountName = (hideAccountName == 1),
@@ -1369,6 +1537,22 @@ std::optional<bool> Settings::readPrefImpl<bool>(std::string_view key) {
 template <>
 void Settings::writePrefImpl<bool>(std::string_view key, bool value) {
 	writePrefGeneric(key, value ? "\x1"_q : QByteArray());
+}
+
+template <>
+std::optional<int> Settings::readPrefImpl<int>(std::string_view key) {
+	if (const auto data = readPrefGeneric(key)) {
+		auto ok = false;
+		if (const auto result = data->toInt(&ok); ok) {
+			return result;
+		}
+	}
+	return {};
+}
+
+template <>
+void Settings::writePrefImpl<int>(std::string_view key, int value) {
+	writePrefGeneric(key, QByteArray::number(value));
 }
 
 template <>
@@ -1481,12 +1665,6 @@ QString Settings::deviceModel() const {
 
 rpl::producer<QString> Settings::deviceModelChanges() const {
 	return customDeviceModelChanges() | rpl::map([=] {
-		return deviceModel();
-	});
-}
-
-rpl::producer<QString> Settings::deviceModelValue() const {
-	return customDeviceModelValue() | rpl::map([=] {
 		return deviceModel();
 	});
 }

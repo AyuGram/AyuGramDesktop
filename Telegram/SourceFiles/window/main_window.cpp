@@ -77,7 +77,7 @@ using Core::WindowPosition;
 	// When the last monitor is removed Qt keeps delivering resize events
 	// while QGuiApplication has no screens at all, so screen() is nullptr.
 	const auto screen = widget->screen();
-	return screen ? screen->availableGeometry() : QRect();
+	return screen ? Platform::ScreenAvailableGeometry(screen) : QRect();
 }
 
 [[nodiscard]] QPoint ChildSkip() {
@@ -841,7 +841,8 @@ void MainWindow::firstShow() {
 		show();
 		return;
 	}
-	const auto geometry = countInitialGeometry(initialPosition());
+	const auto position = initialPosition();
+	const auto geometry = countInitialGeometry(position);
 	DEBUG_LOG(("Window Pos: Setting first %1, %2, %3, %4"
 		).arg(geometry.x()
 		).arg(geometry.y()
@@ -849,6 +850,23 @@ void MainWindow::firstShow() {
 		).arg(geometry.height()));
 	setGeometry(geometry);
 	show();
+
+	InvokeQueued(this, [=] {
+		const auto counted = countInitialGeometry(position);
+		if (counted != geometry) {
+			DEBUG_LOG(("Window Pos: Correcting first %1, %2, %3, %4 "
+				"to %5, %6, %7, %8"
+				).arg(geometry.x()
+				).arg(geometry.y()
+				).arg(geometry.width()
+				).arg(geometry.height()
+				).arg(counted.x()
+				).arg(counted.y()
+				).arg(counted.width()
+				).arg(counted.height()));
+			setGeometry(counted);
+		}
+	});
 }
 
 void MainWindow::positionUpdated() {

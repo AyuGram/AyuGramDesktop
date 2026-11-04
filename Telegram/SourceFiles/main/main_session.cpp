@@ -611,6 +611,7 @@ void Session::addWindow(not_null<Window::SessionController*> controller) {
 	) | rpl::map([=](Dialogs::Key chat) {
 		return chat.peer();
 	}) | rpl::distinct_until_changed());
+	_windowAdded.fire({});
 }
 
 bool Session::uploadsInProgress() const {
@@ -668,6 +669,10 @@ void Session::uploadsStop() {
 auto Session::windows() const
 -> const base::flat_set<not_null<Window::SessionController*>> & {
 	return _windows;
+}
+
+rpl::producer<> Session::windowAdded() const {
+	return _windowAdded.events();
 }
 
 Window::SessionController *Session::tryResolveWindow(

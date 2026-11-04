@@ -239,7 +239,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - Everything inside a bubble beyond text: photos, videos, GIFs, round videos, documents, voice, stickers, albums, web pages, polls, to-do lists, locations, games, invoices, calls, and service boxes for gifts, giveaways, suggestions and TON transfers. It must not own playback, downloads or the media viewer.
 
 ### history/compose — chat compose area
-- Paths: `SourceFiles/history/view/controls/`, `SourceFiles/history/view/history_view_webpage_preview*`, `SourceFiles/ui/controls/round_video_recorder*`, `SourceFiles/api/api_suggest_post*`
+- Paths: `SourceFiles/history/view/controls/`, `SourceFiles/ui/controls/round_video_recorder*`, `SourceFiles/api/api_suggest_post*`
 - The field with send, attach, emoji and bot-menu buttons, reply, edit and forward panels with draft options, link previews, voice and round recording, suggested-post options, the draft stash, media editing with covers, search in chat and the join, mute and unblock bars. It must not own reusable field helpers.
 
 ### history/reactions — reactions UI
@@ -390,4 +390,5 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 
 ### test — test tooling
 - Paths: `SourceFiles/test/`, `SourceFiles/tests/`
+- Start with the short `test/README.md`; helper contracts and task-specific guides live under `test/docs/`. New or changed helper documentation follows `test/docs/adding-helpers.md`.
 - The Debug-only `-testagent` harness (scenario runner, evidence log, session and RPC fixtures, widget probes and pixel captures, wallet fixtures and the secrecy scan) and the standalone unit tests for the text engine and the updater. Product code must not depend on it. Today it also exposes hooks that `core/application.cpp`, `data_document.cpp`, `mtp_instance.cpp` and `platform_file_utilities.cpp` call directly; those belong behind seams owned by the calling areas.

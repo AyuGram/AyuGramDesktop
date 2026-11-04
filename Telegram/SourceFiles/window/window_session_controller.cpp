@@ -52,6 +52,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_folder.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_chat_participant_status.h"
 #include "data/data_user.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -63,6 +64,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_chat_filters.h"
 #include "data/data_replies_list.h"
+#include "data/data_report.h"
 #include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
 #include "data/data_web_page.h"
@@ -521,8 +523,13 @@ void SessionNavigation::resolveChatLink(
 		_resolveRequestId = 0;
 		parentController()->hideLayer();
 		const auto &data = result.data();
-		_session->data().processUsers(data.vusers());
-		_session->data().processChats(data.vchats());
+		const auto weak = base::make_weak(this);
+		const auto owner = &_session->data();
+		owner->processUsers(data.vusers());
+		owner->processChats(data.vchats());
+		if (!weak) {
+			return;
+		}
 
 		using namespace Api;
 		const auto peerId = peerFromMTP(data.vpeer());
@@ -575,8 +582,13 @@ void SessionNavigation::resolveDone(
 	_resolveRequestId = 0;
 	parentController()->hideLayer();
 	result.match([&](const MTPDcontacts_resolvedPeer &data) {
-		_session->data().processUsers(data.vusers());
-		_session->data().processChats(data.vchats());
+		const auto weak = base::make_weak(this);
+		const auto owner = &_session->data();
+		owner->processUsers(data.vusers());
+		owner->processChats(data.vchats());
+		if (!weak) {
+			return;
+		}
 		if (const auto peerId = peerFromMTP(data.vpeer())) {
 			done(_session->data().peer(peerId));
 		}
@@ -602,7 +614,11 @@ void SessionNavigation::resolveChannelById(
 			MTP_inputChannel(MTP_long(channelId.bare), MTP_long(0)))
 	)).done([=](const MTPmessages_Chats &result) {
 		result.match([&](const auto &data) {
+			const auto weak = base::make_weak(this);
 			const auto peer = _session->data().processChats(data.vchats());
+			if (!weak) {
+				return;
+			}
 			if (peer && peer->id == peerFromChannel(channelId)) {
 				const auto channel = peer->asChannel();
 				if (channel->isForbidden() && !channel->isPublic()) {
@@ -629,13 +645,48 @@ void SessionNavigation::showMessageByLinkResolved(
 	params.highlight.pollOption = info.pollOption;
 	const auto peer = item->history()->peer;
 	const auto topicId = peer->isForum() ? item->topicRootId() : 0;
-	if (topicId) {
+	if (topicId && !(peer->isBot() && peer->forum()->topicDeleted(topicId))) {
 		const auto messageId = (item->id == topicId) ? MsgId() : item->id;
 		showRepliesForMessage(item->history(), topicId, messageId, params);
 	} else {
 		showPeerHistory(peer, params, item->id);
 	}
 }
+
+namespace {
+
+void OpenPeerWithSidebar(
+		not_null<SessionNavigation*> navigation,
+		not_null<PeerData*> peer,
+		std::optional<Storage::SharedMediaType> media,
+		const SectionShow &params,
+		MsgId msgId) {
+	auto &settings = Core::App().settings();
+	const auto tabbedPinned = settings.tabbedSelectorSectionEnabled();
+	settings.setThirdSectionInfoEnabled(true);
+	if (tabbedPinned) {
+		settings.setTabbedSelectorSectionEnabled(true);
+	}
+	Core::App().saveSettingsDelayed();
+	const auto controller = navigation->parentController();
+	if (!controller->adaptive().isThreeColumn()) {
+		controller->resizeForThirdSection();
+	}
+	if (tabbedPinned) {
+		settings.setTabbedReplacedWithInfo(true);
+	}
+	if (const auto forum = peer->forum()) {
+		controller->showForum(forum, params, msgId);
+	} else {
+		navigation->showPeerHistory(peer, params, msgId);
+	}
+	auto memento = media
+		? std::make_shared<Info::Memento>(peer, Info::Section(*media))
+		: Info::Memento::Default(peer);
+	navigation->showSection(std::move(memento), params.withThirdColumn());
+}
+
+} // namespace
 
 void SessionNavigation::showPeerByLinkResolved(
 		not_null<PeerData*> peer,
@@ -668,17 +719,26 @@ void SessionNavigation::showPeerByLinkResolved(
 				Data::PeerUpdate::Flag::BotStartToken);
 		}
 	};
+	const auto botForumPost = bot
+		&& bot->isForum()
+		&& (info.resolveType == ResolveType::Default)
+		&& IsServerMsgId(info.messageId)
+		&& !info.attachBotToggleCommand;
+	const auto botLinkAction = bot
+		&& !botForumPost
+		&& (info.attachBotToggleCommand || !info.text.isEmpty());
 
 	// t.me/username/012345 - we thought it was a channel post link, but
 	// after resolving the username we found out it is a bot.
 	const auto resolveType = (bot
+		&& !botForumPost
 		&& !info.botAppName.isEmpty()
 		&& info.resolveType == ResolveType::Default)
 		? ResolveType::BotApp
 		: info.resolveType;
 
-	// Show specific posts only in channels / supergroups.
-	const auto useRequestedMessageId = peer->isChannel();
+	// Show specific posts only in channels / supergroups / bot forums.
+	const auto useRequestedMessageId = peer->isChannel() || botForumPost;
 	const auto msgId = useRequestedMessageId
 		? info.messageId
 		: info.startAutoSubmit
@@ -703,8 +763,23 @@ void SessionNavigation::showPeerByLinkResolved(
 	} else if (const auto commentId = std::get_if<CommentId>(&replies)) {
 		const auto history = peer->owner().history(peer);
 		showRepliesForMessage(history, msgId, commentId->id, params);
+	} else if (info.sidebar && resolveType == ResolveType::Default) {
+		OpenPeerWithSidebar(this, peer, info.sharedMediaTab, params, msgId);
 	} else if (resolveType == ResolveType::Profile) {
-		showPeerInfo(peer, params);
+		if (const auto media = info.sharedMediaTab) {
+			showSection(
+				Info::Memento::ProfileWithMediaTab(peer, *media),
+				params);
+		} else {
+			showPeerInfo(peer, params);
+		}
+	} else if (resolveType == ResolveType::Default
+		&& info.sharedMediaTab) {
+		showSection(
+			std::make_shared<Info::Memento>(
+				peer,
+				Info::Section(*info.sharedMediaTab)),
+			params);
 	} else if (resolveType == ResolveType::HashtagSearch) {
 		searchMessages(info.text, peer->owner().history(peer));
 	} else if (info.storyParam == u"live"_q) {
@@ -772,7 +847,7 @@ void SessionNavigation::showPeerByLinkResolved(
 			info.startAdminRights);
 	} else if (resolveType == ResolveType::Boost && peer->isChannel()) {
 		resolveBoostState(peer->asChannel());
-	} else if (peer->isForum()) {
+	} else if (peer->isForum() && !botLinkAction) {
 		if (!msgId || !useRequestedMessageId) {
 			applyBotStartToken();
 			parentController()->showForum(peer->forum(), params, msgId);
@@ -782,6 +857,9 @@ void SessionNavigation::showPeerByLinkResolved(
 			const auto callback = crl::guard(this, [=] {
 				if (const auto item = peer->owner().message(peer, msgId)) {
 					showMessageByLinkResolved(item, info);
+				} else if (bot) {
+					const auto history = peer->owner().history(peer);
+					showRepliesForMessage(history, msgId, MsgId(), params);
 				} else {
 					showPeerHistory(peer, params, msgId);
 				}
@@ -1022,7 +1100,11 @@ void SessionNavigation::resolveConferenceCall(
 			const auto call = session().data().sharedConferenceCall(
 				data.vid().v,
 				data.vaccess_hash().v);
+			const auto weak = base::make_weak(this);
 			call->processFullCall(result);
+			if (!weak) {
+				return;
+			}
 			const auto join = [=](Fn<void()> close) {
 				const auto &appConfig = call->session().appConfig();
 				const auto conferenceLimit = appConfig.confcallSizeLimit();
@@ -1096,8 +1178,13 @@ void SessionNavigation::applyBoost(
 	_api.request(MTPpremium_GetMyBoosts(
 	)).done([=](const MTPpremium_MyBoosts &result) {
 		const auto &data = result.data();
-		_session->data().processUsers(data.vusers());
-		_session->data().processChats(data.vchats());
+		const auto weak = base::make_weak(this);
+		const auto owner = &_session->data();
+		owner->processUsers(data.vusers());
+		owner->processChats(data.vchats());
+		if (!weak) {
+			return;
+		}
 		const auto slots = ParseForChannelBoostSlots(
 			channel,
 			data.vmy_boosts().v);
@@ -1218,7 +1305,11 @@ void SessionNavigation::joinVoiceChatFromLink(
 	_resolveRequestId = _api.request(
 		MTPchannels_GetFullChannel(peer->asChannel()->inputChannel())
 	).done([=](const MTPmessages_ChatFull &result) {
+		const auto weak = base::make_weak(this);
 		_session->api().processFullPeer(peer, result);
+		if (!weak) {
+			return;
+		}
 		const auto call = peer->groupCall();
 		if (!call) {
 			bad();
@@ -1242,7 +1333,9 @@ void SessionNavigation::joinVoiceChatFromLink(
 				if (!now->loaded()) {
 					now->processFullCall(result);
 				}
-				join();
+				if (weak) {
+					join();
+				}
 			} else {
 				bad();
 			}
@@ -1271,9 +1364,13 @@ void SessionNavigation::showRepliesForMessage(
 			return;
 		}
 	}
+	const auto bot = history->peer->asBot();
 	if (_showingRepliesRequestId
 		&& _showingRepliesHistory == history.get()
 		&& _showingRepliesRootId == rootId) {
+		return;
+	} else if (bot && bot->isForum() && IsServerMsgId(rootId)) {
+		loadAndShowBotTopic(history, rootId, commentId, params);
 		return;
 	} else if (!history->peer->asChannel()) {
 		// HistoryView::ChatWidget replies right now handles only channels.
@@ -1291,9 +1388,11 @@ void SessionNavigation::showRepliesForMessage(
 	).done([=](const MTPmessages_DiscussionMessage &result) {
 		_showingRepliesRequestId = 0;
 		result.match([&](const MTPDmessages_discussionMessage &data) {
-			_session->data().processUsers(data.vusers());
-			_session->data().processChats(data.vchats());
-			_session->data().processMessages(
+			const auto weak = base::make_weak(this);
+			const auto owner = &_session->data();
+			owner->processUsers(data.vusers());
+			owner->processChats(data.vchats());
+			owner->processMessages(
 				data.vmessages(),
 				NewMessageType::Existing);
 			const auto list = data.vmessages().v;
@@ -1311,16 +1410,16 @@ void SessionNavigation::showRepliesForMessage(
 			}
 			auto item = deleted
 				? nullptr
-				: _session->data().message(peer, id);
+				: owner->message(peer, id);
 			if (comments && !item) {
 				return;
 			}
-			const auto &groups = _session->data().groups();
+			const auto &groups = owner->groups();
 			if (const auto group = item ? groups.find(item) : nullptr) {
 				item = group->items.front();
 			}
 			if (comments) {
-				const auto post = _session->data().message(postPeer, rootId);
+				const auto post = owner->message(postPeer, rootId);
 				if (post) {
 					post->setCommentsItemId(item->fullId());
 					if (const auto maxId = data.vmax_id()) {
@@ -1329,6 +1428,9 @@ void SessionNavigation::showRepliesForMessage(
 					post->setCommentsInboxReadTill(
 						data.vread_inbox_max_id().value_or_empty());
 				}
+			}
+			if (!weak) {
+				return;
 			}
 			if (deleted || item) {
 				using namespace HistoryView;
@@ -1603,6 +1705,22 @@ SessionController::SessionController(
 , _chatStyle(std::make_unique<Ui::ChatStyle>(session->colorIndicesValue())) {
 	init();
 
+	// WHY: the window keeps a raw pointer to its root topic or sublist, and
+	// subscribing before its sections lets this close destroy their later
+	// subscriptions before they run, so it stays the only rooted close.
+	if (const auto root = window->id().thread) {
+		const auto topic = root->asTopic();
+		const auto sublist = root->asSublist();
+		if (topic || sublist) {
+			auto destroyed = topic
+				? topic->destroyed()
+				: sublist->destroyed();
+			std::move(destroyed) | rpl::on_next([=] {
+				Core::App().closeWindow(_window);
+			}, _lifetime);
+		}
+	}
+
 	_chatStyleTheme = _defaultChatTheme;
 	_chatStyle->apply(_defaultChatTheme.get());
 
@@ -1716,11 +1834,11 @@ SessionController::SessionController(
 			}
 		}
 		for (auto &entry : _chatEntryHistory) {
-			if (const auto topic = entry.key.topic()) {
-				if (topic->rootId() == change.oldId) {
-					entry.key = Dialogs::Key(
-						topic->forum()->topicFor(change.newId.msg));
-				}
+			const auto topic = entry.thread ? entry.row.key.topic() : nullptr;
+			if (topic && topic->rootId() == change.oldId) {
+				const auto real = topic->forum()->topicFor(change.newId.msg);
+				entry.row.key = Dialogs::Key(real);
+				entry.thread = real;
 			}
 		}
 	}, lifetime());
@@ -2216,7 +2334,14 @@ bool SessionController::showForumInDifferentWindow(
 	if (windowId().forum() == forum) {
 		return false;
 	}
-	const auto window = Core::App().windowForShowingForum(forum);
+	const auto found = Core::App().windowForShowingForum(forum);
+
+	// A separate chat window has no chats list to show the topics in.
+	const auto window = (found
+		&& params.forceTopicsList
+		&& !found->id().hasChatsList())
+		? nullptr
+		: found;
 	if (window == _window) {
 		return false;
 	} else if (window) {
@@ -2439,7 +2564,8 @@ bool SessionController::chatEntryHistoryMove(int steps) {
 		return false;
 	}
 	_chatEntryHistoryPosition = position;
-	return jumpToChatListEntry(_chatEntryHistory[position]);
+	const auto &entry = _chatEntryHistory[position];
+	return entry.thread && jumpToChatListEntry(entry.row);
 }
 
 bool SessionController::jumpToChatListEntry(Dialogs::RowDescriptor row) {
@@ -2455,11 +2581,14 @@ bool SessionController::jumpToChatListEntry(Dialogs::RowDescriptor row) {
 
 void SessionController::setDialogsEntryState(
 		Dialogs::EntryState state) {
-	_dialogsEntryState = state;
+	_dialogsEntryThread = state.key.thread();
+	_dialogsEntryState = std::move(state);
 }
 
 Dialogs::EntryState SessionController::dialogsEntryStateCurrent() const {
-	return _dialogsEntryState.current();
+	return _dialogsEntryThread
+		? _dialogsEntryState.current()
+		: Dialogs::EntryState();
 }
 
 bool SessionController::switchInlineQuery(
@@ -2555,12 +2684,16 @@ Dialogs::RowDescriptor SessionController::resolveChatPrevious(
 }
 
 void SessionController::pushToChatEntryHistory(Dialogs::RowDescriptor row) {
-	if (!_chatEntryHistory.empty()
-		&& _chatEntryHistory[_chatEntryHistoryPosition] == row) {
-		return;
+	const auto thread = row.key.thread();
+	if (!_chatEntryHistory.empty()) {
+		const auto &current = _chatEntryHistory[_chatEntryHistoryPosition];
+		// A new topic can reuse a freed one's address.
+		if (current.row == row && current.thread.get() == thread) {
+			return;
+		}
 	}
 	_chatEntryHistory.resize(++_chatEntryHistoryPosition);
-	_chatEntryHistory.push_back(row);
+	_chatEntryHistory.push_back({ row, thread });
 	if (_chatEntryHistory.size() > kMaxChatEntryHistorySize) {
 		_chatEntryHistory.pop_front();
 		--_chatEntryHistoryPosition;
@@ -2764,6 +2897,13 @@ void SessionController::resizeForThirdSection() {
 
 	auto &settings = Core::App().settings();
 	auto layout = computeColumnLayout();
+	const auto oneColumn
+		= (layout.windowLayout == Adaptive::WindowLayout::OneColumn);
+	// WHY: a one-column window grows back to three columns, so the
+	// deficit covers the dialogs and chat columns (third one included).
+	const auto deficit = oneColumn
+		? (minimalThreeColumnWidth() - layout.bodyWidth)
+		: 0;
 	auto tabbedSelectorSectionEnabled
 		= settings.tabbedSelectorSectionEnabled();
 	auto thirdSectionInfoEnabled
@@ -2771,8 +2911,8 @@ void SessionController::resizeForThirdSection() {
 	settings.setTabbedSelectorSectionEnabled(false);
 	settings.setThirdSectionInfoEnabled(false);
 
-	auto wanted = countThirdColumnWidthFromRatio(layout.bodyWidth);
-	auto minimal = st::columnMinimalWidthThird;
+	auto wanted = countThirdColumnWidthFromRatio(layout.bodyWidth) + deficit;
+	auto minimal = deficit ? deficit : st::columnMinimalWidthThird;
 	auto extendBy = wanted;
 	auto extendedBy = [&] {
 		// Best - extend by third column without moving the window.
@@ -2791,7 +2931,9 @@ void SessionController::resizeForThirdSection() {
 	}();
 	if (extendedBy) {
 		if (extendBy != settings.thirdColumnWidth()) {
-			settings.setThirdColumnWidth(extendBy);
+			settings.setThirdColumnWidth(std::max(
+				extendBy - deficit,
+				st::columnMinimalWidthThird));
 		}
 		const auto nochat = !mainSectionShown();
 		auto newBodyWidth = layout.bodyWidth + extendedBy;
@@ -2800,7 +2942,9 @@ void SessionController::resizeForThirdSection() {
 			(currentRatio * layout.bodyWidth) / newBodyWidth,
 			nochat);
 	}
-	auto savedValue = (extendedBy == extendBy) ? -1 : extendedBy;
+	auto savedValue = (extendedBy == extendBy && !oneColumn)
+		? -1
+		: extendedBy;
 	settings.setThirdSectionExtendedBy(savedValue);
 
 	settings.setTabbedSelectorSectionEnabled(

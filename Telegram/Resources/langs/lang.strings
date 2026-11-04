@@ -1994,6 +1994,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_media_song_empty_search" = "No music files found";
 "lng_media_file_empty_search" = "No files found";
 "lng_media_link_empty_search" = "No shared links found";
+"lng_media_audio_empty_search" = "No voice messages found";
 
 "lng_manage_group_title" = "Manage group";
 "lng_manage_channel_title" = "Manage Channel";
@@ -2440,10 +2441,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_manage_messages_ttl_title" = "Auto-delete messages";
 "lng_manage_messages_ttl_disable" = "Disable";
-"lng_manage_messages_ttl_after1" = "1 day";
-"lng_manage_messages_ttl_after2" = "1 week";
-"lng_manage_messages_ttl_after3" = "1 month";
-"lng_manage_messages_ttl_after4" = "1 month";
 "lng_manage_messages_ttl_after_custom" = "Custom";
 "lng_manage_messages_ttl_menu" = "Auto-Delete";
 
@@ -5263,6 +5260,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 "lng_open_this_link" = "Open this link?";
 "lng_open_link" = "Open";
+"lng_open_link_unsupported" = "Telegram can't open this link.";
 "lng_open_link_suspicious_chars" = "Highlighted characters are from a different alphabet than the rest of the address.";
 "lng_allow_bot_pass" = "Allow {bot_name} to pass your Telegram name and ID (not your phone number) to the web pages you open via this bot?";
 "lng_allow_bot" = "Allow";
@@ -5412,11 +5410,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_maps_select_on_map" = "Select on the Map";
 "lng_maps_point_send" = "Send This Location";
 "lng_maps_point_set" = "Set This Location";
-"lng_maps_or_choose" = "Or choose a venue";
-"lng_maps_places_in_area" = "Places in this area";
-"lng_maps_no_places" = "No places found";
-"lng_maps_choose_to_search" = "Choose location to see places nearby.";
-"lng_maps_venues_source" = "Powered by Foursquare";
 "lng_live_location" = "Live Location";
 "lng_live_location_now" = "updated just now";
 "lng_live_location_minutes#one" = "updated {count} minute ago";
@@ -7712,6 +7705,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_article_limit_buttons" = "The article row has too many buttons.";
 "lng_article_table_truncated" = "The pasted table didn't fit and was truncated.";
 "lng_article_paste_truncated" = "The pasted content didn't fit and was truncated.";
+"lng_article_paste_attach_files#one" = "Pasting this content will attach {count} file from your computer to the message:";
+"lng_article_paste_attach_files#other" = "Pasting this content will attach {count} files from your computer to the message:";
 "lng_article_submit_empty" = "The article can't be empty.";
 "lng_article_premium_required" = "Subscribe to {link} to be able to send rich articles.";
 "lng_article_premium_required_link" = "Telegram Premium";
@@ -8074,6 +8069,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_photo_editor_audio_remove" = "Remove Audio";
 "lng_photo_editor_trim_shortest" = "Trim to shortest";
 
+"lng_video_editor_gif_too_large" = "Videos larger than {size} can't be converted to a GIF";
+
 "lng_photo_editor_keys_tooltip" = "Keyboard shortcuts";
 "lng_photo_editor_keys_gesture" = "{modifier}-{gesture}";
 "lng_photo_editor_keys_gesture_drag" = "drag";
@@ -8293,9 +8290,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_request_peer_requirements" = "Requirements";
 "lng_request_peer_rights" = "You must have these admin rights: {rights}.";
 "lng_request_peer_rights_and" = "{rights} and {last}";
+"lng_request_peer_rights_other" = "other administrator rights";
 "lng_request_peer_confirm" = "Are you sure you want to send {chat} to {bot}?";
 "lng_request_peer_confirm_add" = "This will also add {bot} to {chat}.";
+"lng_request_peer_confirm_add_maybe" = "This will also add {bot} to {chat} if it is not already a member.";
 "lng_request_peer_confirm_rights" = "This will also add {bot} to {chat} with the following rights: {rights}.";
+"lng_request_peer_confirm_many#one" = "Are you sure you want to send {count} chat to {bot}?";
+"lng_request_peer_confirm_many#other" = "Are you sure you want to send {count} chats to {bot}?";
 "lng_request_peer_confirm_send" = "Send";
 "lng_request_user_title" = "Choose User";
 "lng_request_users_title" = "Choose Users";
@@ -8323,6 +8324,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_request_group_manage_video_chats" = "manage video chats";
 "lng_request_group_anonymous" = "remain anonymous";
 "lng_request_group_add_admins" = "add new admins";
+"lng_request_group_post_stories" = "post stories";
+"lng_request_group_edit_stories" = "edit stories of others";
+"lng_request_group_delete_stories" = "delete stories of others";
 "lng_request_group_create" = "Create a New Group for This";
 "lng_request_channel_title" = "Choose a Channel";
 "lng_request_channel_no" = "No such channels";
@@ -8338,6 +8342,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_request_channel_manage_livestreams" = "manage live streams";
 "lng_request_channel_manage_direct" = "manage direct messages";
 "lng_request_channel_add_admins" = "add new admins";
+"lng_request_channel_post_stories" = "post stories";
+"lng_request_channel_edit_stories" = "edit stories of others";
+"lng_request_channel_delete_stories" = "delete stories of others";
 "lng_request_channel_create" = "Create a New Channel for This";
 
 "lng_userpic_builder_color_subtitle" = "Choose background";
@@ -9250,6 +9257,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_mac_always_open_with" = "Always Open With";
 "lng_mac_this_app_can_open" = "This application can open \"{file}\".";
 "lng_mac_not_known_app" = "It's not known if this application can open \"{file}\".";
+"lng_mac_cant_open_chooser" = "Couldn't open the application chooser.";
 
 "lng_mac_menu_services" = "Services";
 "lng_mac_menu_hide_telegram" = "Hide {telegram}";

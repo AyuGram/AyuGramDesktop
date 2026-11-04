@@ -9,8 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/timer.h"
 #include "chat_helpers/compose/compose_show.h"
-#include "data/data_chat_participant_status.h"
-#include "data/data_report.h"
 #include "dialogs/dialogs_key.h"
 #include "mtproto/sender.h"
 #include "settings/settings_type.h"
@@ -30,6 +28,7 @@ enum class WindowLayout;
 namespace Data {
 struct StoriesContext;
 struct DrawToReplyRequest;
+struct ReportInput;
 class SavedMessages;
 enum class StorySourcesList : uchar;
 } // namespace Data
@@ -374,6 +373,11 @@ private:
 	void showPeerByLinkResolved(
 		not_null<PeerData*> peer,
 		const PeerByLinkInfo &info);
+	void loadAndShowBotTopic(
+		not_null<History*> history,
+		MsgId rootId,
+		MsgId commentId,
+		const SectionShow &params);
 	void joinVoiceChatFromLink(
 		not_null<PeerData*> peer,
 		const PeerByLinkInfo &info);
@@ -399,6 +403,7 @@ private:
 	History *_showingRepliesHistory = nullptr;
 	MsgId _showingRepliesRootId = 0;
 	mtpRequestId _showingRepliesRequestId = 0;
+	int _botTopicLoads = 0;
 
 	ChannelData *_boostStateResolving = nullptr;
 	int _boostsToLift = 0;
@@ -764,6 +769,10 @@ public:
 private:
 	struct CachedThemeKey;
 	struct CachedTheme;
+	struct ChatEntryHistoryItem {
+		Dialogs::RowDescriptor row;
+		base::weak_ptr<Data::Thread> thread;
+	};
 
 	void init();
 	void setupShortcuts();
@@ -859,11 +868,13 @@ private:
 	rpl::lifetime _activeHistoryLifetime;
 	rpl::variable<bool> _mainSectionShown = false;
 	rpl::variable<bool> _chatsForceDisplayWide = false;
-	std::deque<Dialogs::RowDescriptor> _chatEntryHistory;
+	std::deque<ChatEntryHistoryItem> _chatEntryHistory;
 	int _chatEntryHistoryPosition = -1;
 	bool _filtersActivated = false;
 
 	rpl::variable<Dialogs::EntryState> _dialogsEntryState;
+	// A topic or sublist can be freed without a destroyed() event.
+	base::weak_ptr<Data::Thread> _dialogsEntryThread;
 
 	base::Timer _invitePeekTimer;
 

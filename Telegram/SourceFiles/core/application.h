@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/timer.h"
-#include "mtproto/mtproto_auth_key.h"
 #include "mtproto/mtproto_proxy_data.h"
 #include "window/window_separate_id.h"
 
@@ -238,7 +237,7 @@ public:
 	void proxyRotationSettingsChanged();
 	void checkProxyRotation(not_null<Main::Account*> account, int32 state);
 	[[nodiscard]] rpl::producer<ProxyChange> proxyChanges() const;
-	void badMtprotoConfigurationError();
+	void badMtprotoConfigurationError(const MTP::ProxyData &proxy);
 
 	// Databases.
 	[[nodiscard]] Storage::Databases &databases() {
@@ -464,6 +463,7 @@ private:
 	const std::unique_ptr<Lang::CloudManager> _langCloudManager;
 	const std::unique_ptr<ChatHelpers::EmojiKeywords> _emojiKeywords;
 	std::unique_ptr<Lang::Translator> _translator;
+	std::optional<MTP::ProxyData> _badProxyConfiguration;
 	base::weak_qptr<Ui::BoxContent> _badProxyDisableBox;
 	base::weak_qptr<Ui::BoxContent> _webProxyFallbackBox;
 

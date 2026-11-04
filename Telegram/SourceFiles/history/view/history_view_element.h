@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/runtime_composer.h"
 #include "base/flags.h"
 #include "base/weak_ptr.h"
-#include "iv/iv_rich_page.h"
 #include "ui/userpic_view.h"
 
 // AyuGram includes
@@ -35,6 +34,7 @@ struct ReactionId;
 
 namespace Iv {
 struct BuiltRichQuote;
+struct RichPageBlocksSlice;
 } // namespace Iv
 
 namespace Window {
@@ -758,7 +758,6 @@ public:
 		Data::ReactionId,
 		std::unique_ptr<Ui::ReactionFlyAnimation>>;
 
-	void animateUnreadEffect();
 	[[nodiscard]] virtual auto takeEffectAnimation()
 	-> std::unique_ptr<Ui::ReactionFlyAnimation>;
 
