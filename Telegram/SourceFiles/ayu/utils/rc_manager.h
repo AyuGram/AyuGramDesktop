@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #pragma once
 
 #include "ayu/data/entities.h"
@@ -36,17 +33,11 @@ public:
 	void start();
 
 	[[nodiscard]] const std::unordered_set<ID> &developers() const {
-		if (!initialized) {
-			return default_developers;
-		}
-		return _developers;
+		return default_developers;
 	}
 
 	[[nodiscard]] const std::unordered_set<ID> &channels() const {
-		if (!initialized) {
-			return default_channels;
-		}
-		return _officialChannels;
+		return default_channels;
 	}
 
 	[[nodiscard]] const std::unordered_set<ID> &supporters() const {
@@ -62,19 +53,19 @@ public:
 	}
 
 	[[nodiscard]] QString donateUsername() const {
-		return _donateUsername;
+		return QString();
 	}
 
 	[[nodiscard]] QString donateAmountUsd() const {
-		return _donateAmountUsd;
+		return QString();
 	}
 
 	[[nodiscard]] QString donateAmountTon() const {
-		return _donateAmountTon;
+		return QString();
 	}
 
 	[[nodiscard]] QString donateAmountRub() const {
-		return _donateAmountRub;
+		return QString();
 	}
 
 private:
@@ -99,10 +90,11 @@ private:
 	std::unordered_set<ID> _supporterChannels = {};
 	std::unordered_map<ID, CustomBadge> _customBadges = {};
 
-	QString _donateUsername = QString("@ayugramOwner");
-	QString _donateAmountUsd = QString("5.00");
-	QString _donateAmountTon = QString("3.50");
-	QString _donateAmountRub = QString("386");
+	// Donate fields intentionally empty - no AyuGram links
+	QString _donateUsername;
+	QString _donateAmountUsd;
+	QString _donateAmountTon;
+	QString _donateAmountRub;
 
 	QTimer* _timer = nullptr;
 
@@ -110,5 +102,4 @@ private:
 	QNetworkReply *_reply = nullptr;
 	bool _useExteraFallback = false;
 	bool _retryAttempted = false;
-
 };
