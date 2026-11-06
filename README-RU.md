@@ -1,37 +1,47 @@
+<div align="center">
+
 # Drakeygram
 
-Независимый форк Telegram Desktop.
+**Независимый клиент Telegram Desktop — приватность, контроль, без стороннего трекинга**
+
+</div>
+
+---
+
+## Зачем Drakeygram?
+
+Это **самодостаточный** форк Telegram Desktop.  
+Клиент **не** обращается к серверам AyuGram и сторонним config/CDN. Удалённые конфиги, внешние language pack и donate-трекинг отключены.
 
 ## Возможности
 
-- Полноценный ghost mode (гибкий)
-- История сообщений
-- Anti-recall
-- Кастомизация шрифтов
-- Режим стримера
-- Локальный Telegram Premium
-- Переводчик
-- Предпросмотр медиа и быстрая реакция (macOS)
-- Улучшенный внешний вид
-
-И многое другое.
-
-## Важно
-
-Это полностью независимый форк.  
-**Нет никаких соединений с серверами, доменами или сервисами AyuGram.**
-
-Ве удалённый конфиг, загрузка языковых пакетов с внешних CDN AyuGram, списки разработчиков и ссылки на донаты были удалены или отключены.
+- Ghost Mode (read/online/typing/stories)
+- Anti-recall и история правок сообщений
+- Локальные фильтры
+- Кастомизация шрифтов и внешнего вида
+- Streamer mode
+- Локальный Premium-вид
+- Переводчик (по выбору пользователя)
+- Умный forward и message shot
 
 ## Сборка
 
-Следуйте стандартным инструкциям по сборке Telegram Desktop для вашей платформы.
+Как у официального [Telegram Desktop](https://github.com/telegramdesktop/tdesktop).  
+Имя бинарника: **Drakeygram**. Desktop ID: `com.drakeygram.desktop`.
 
-## Благодарности
+```bash
+git clone --recursive https://github.com/sqdq2/Drakeygram.git
+cd Drakeygram
+```
 
-Основано на отличной работе:
+## Независимость
 
-- [Telegram Desktop](https://github.com/telegramdesktop/tdesktop)
-- Сообщество форков, добавивших функции приватности и кастомизации
+- RCManager — без сети  
+- Внешний language CDN — выключен  
+- Брендинг — Drakeygram  
 
-Проект поддерживается независимо.
+Папка `ayu/` в исходниках — только путь, не сетевая зависимость.
+
+## Лицензия
+
+GPL-3.0. Проект не связан с Telegram FZ-LLC.
