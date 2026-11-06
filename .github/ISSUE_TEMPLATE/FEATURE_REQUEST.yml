@@ -1,29 +1,33 @@
----
-name: 💡 Feature request
-description: Suggest an idea.
+name: Feature request
+description: Suggest an idea for Drakeygram Desktop.
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature ideas for **Drakeygram** — independent Telegram Desktop client.
+        Please keep privacy and no third-party tracking in mind.
   - type: textarea
     attributes:
       label: Is your feature request related to a problem?
-      placeholder: A clear and concise description of what the problem is.
+      placeholder: A clear description of the problem.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Describe the solution you'd like
-      placeholder: A clear and concise description of what you want to happen.
+      placeholder: What you want to happen.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Describe alternatives you've considered
-      placeholder: A clear and concise description of any alternative solutions or features you've considered.
+      placeholder: Other approaches you thought about.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Additional context
-      placeholder: Add any other context or screenshots about the feature request here.
+      placeholder: Screenshots or extra notes.
     validations:
       required: false
