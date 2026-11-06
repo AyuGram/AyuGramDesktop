@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ayu_url_handlers.h"
 
 #include "lang_auto.h"
@@ -138,10 +135,8 @@ bool HandleSupport(
 	if (!controller) {
 		return false;
 	}
-	auto box = Box(
-		Ui::FillDonateInfoBox,
-		controller);
-	Ui::show(std::move(box));
+	// Donate/support box neutralized - no external AyuGram links
+	controller->showToast(QString("Drakeygram"), 500);
 	return true;
 }
 
@@ -206,12 +201,8 @@ bool TryHandleSpotify(const QString &url) {
 		return false;
 	}
 
-	// docs on their url scheme
-	// https://www.iana.org/assignments/uri-schemes/prov/spotify
-
 	using namespace qthelp;
 	constexpr auto matchOptions = RegExOption::CaseInsensitive;
-	// https://regex101.com/r/l4Ogzf/2
 	const auto match = regex_match(
 		u"^(https?:\\/\\/)?([a-zA-Z0-9_]+)\\.spotify\\.com\\/(?<type>track|album|artist|user|playlist)\\/(?<identifier>[a-zA-Z0-9_\\/]+?)((\\?si=.+)?)$"_q,
 		url,
@@ -219,14 +210,7 @@ bool TryHandleSpotify(const QString &url) {
 	if (match) {
 		const auto type = match->captured("type").toLower();
 		const auto identifier = match->captured("identifier").replace("/", ":");
-
-		// '/' -> ':' for links like:
-		// https://open.spotify.com/user/1185903410/playlist/6YAnJeVC7tgOiocOG23Dd
-		// so it'll look like
-		// spotify:user:1185903410:playlist:6YAnJeVC7tgOiocOG23Dd
-
 		const auto res = QString("spotify:%1:%2").arg(type).arg(identifier);
-
 		return QDesktopServices::openUrl(QUrl(res));
 	}
 
