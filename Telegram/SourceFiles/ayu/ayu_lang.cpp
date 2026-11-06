@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ayu_lang.h"
 
 #include "qjsondocument.h"
@@ -47,7 +44,7 @@ AyuLanguage *AyuLanguage::currentInstance() {
 }
 
 QString AyuLanguage::getCacheDir() const {
-	return cWorkingDir() + u"tdata/ayu/languages/"_q;
+	return cWorkingDir() + u"tdata/drakey/languages/"_q;
 }
 
 QString AyuLanguage::getCachePath(const QString &langId) const {
@@ -83,7 +80,7 @@ void AyuLanguage::loadCachedLanguage() {
 		QJsonParseError error{};
 		const auto doc = QJsonDocument::fromJson(data, &error);
 		if (error.error == QJsonParseError::NoError) {
-			LOG(("Loading cached AyuGram language: %1").arg(finalLangPackId));
+			LOG(("Loading cached Drakeygram language: %1").arg(finalLangPackId));
 			applyLanguageJson(doc);
 		}
 	}
@@ -98,81 +95,30 @@ void AyuLanguage::saveCachedLanguage(const QByteArray &json, const QString &lang
 	if (file.open(QIODevice::WriteOnly)) {
 		file.write(json);
 		file.close();
-		LOG(("Cached AyuGram language: %1").arg(langId));
+		LOG(("Cached Drakeygram language: %1").arg(langId));
 	}
 }
 
 void AyuLanguage::fetchLanguage(const QString &id, const QString &baseId) {
+	// NETWORK FETCH DISABLED.
+	// Previously pulled from AyuGram CDN / jsDelivr.
+	// Now only uses local cache if present. No remote requests.
 	auto finalLangPackId = langMapping.contains(id) ? langMapping[id] : id;
 	_currentLangId = finalLangPackId.isEmpty() ? baseId : finalLangPackId;
 
-	if (Core::App().settings().proxy().isEnabled()) {
-		const auto proxy = Core::App().settings().proxy().selected();
-		if (proxy.type == MTP::ProxyData::Type::Socks5 || proxy.type == MTP::ProxyData::Type::Http) {
-			const auto networkProxy = ToNetworkProxy(ToDirectIpProxy(Core::App().settings().proxy().selected()));
-			networkManager.setProxy(networkProxy);
-		}
-	}
-
-	// using `jsdelivr` since China (...and maybe other?) users have some problems with GitHub
-	// https://crowdin.com/project/ayugram/discussions/6
-	QUrl url;
-	if (!finalLangPackId.isEmpty() && !baseId.isEmpty() && !needFallback) {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
-			finalLangPackId));
-	} else {
-		url.setUrl(qsl("https://cdn.jsdelivr.net/gh/AyuGram/Languages@l10n_main/values/langs/%1/Shared.json").arg(
-			needFallback ? baseId : finalLangPackId));
-	}
-	_chkReply = networkManager.get(QNetworkRequest(url));
-	connect(_chkReply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(fetchError(QNetworkReply::NetworkError)));
-	connect(_chkReply, SIGNAL(finished()), this, SLOT(fetchFinished()));
+	// Intentionally do nothing network-related.
+	// Language strings will come from built-in / local cache only.
+	LOG(("Drakeygram: remote language fetch disabled"));
 }
 
 void AyuLanguage::fetchFinished() {
-	if (!_chkReply) return;
-
-	QString langPackBaseId = Lang::GetInstance().baseId();
-	QString langPackId = Lang::GetInstance().id();
-	auto statusCode = _chkReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
-	if (statusCode == 404 && !langPackId.isEmpty() && !langPackBaseId.isEmpty() && !needFallback) {
-		LOG(("AyuGram Language not found! Fallback to main language: %1...").arg(langPackBaseId));
-		needFallback = true;
-		_chkReply->disconnect();
-		fetchLanguage("", langPackBaseId);
-	} else {
-		const auto result = _chkReply->readAll().trimmed();
-		QJsonParseError error{};
-		const auto doc = QJsonDocument::fromJson(result, &error);
-		if (error.error == QJsonParseError::NoError) {
-			saveCachedLanguage(result, _currentLangId);
-			applyLanguageJson(doc);
-		} else {
-			LOG(("Incorrect language JSON File."));
-		}
-
-		_chkReply = nullptr;
-	}
+	// no-op - network disabled
+	_chkReply = nullptr;
 }
 
 void AyuLanguage::fetchError(QNetworkReply::NetworkError e) {
-	LOG(("Network error: %1").arg(e));
-
-	if (e == QNetworkReply::NetworkError::ContentNotFoundError) {
-		const auto baseId = Lang::GetInstance().baseId();
-		const auto id = Lang::GetInstance().id();
-
-		if (!id.isEmpty() && !baseId.isEmpty() && !needFallback) {
-			LOG(("AyuGram Language not found! Fallback to main language: %1...").arg(baseId));
-			needFallback = true;
-			_chkReply->disconnect();
-			fetchLanguage("", baseId);
-		} else {
-			LOG(("AyuGram Language not found!"));
-			_chkReply = nullptr;
-		}
-	}
+	// no-op - network disabled
+	_chkReply = nullptr;
 }
 
 void AyuLanguage::applyLanguageJson(QJsonDocument doc) {

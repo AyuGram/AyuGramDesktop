@@ -1,5 +1,5 @@
-# This file is part of Telegram Desktop,
-# the official desktop application for the Telegram messaging service.
+# This file is part of Drakeygram Desktop,
+# an independent Telegram Desktop fork.
 #
 # For license and copyright information please follow this link:
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
@@ -19,8 +19,8 @@ endif()
 project(Telegram
     LANGUAGES C CXX
     VERSION ${desktop_app_version_cmake}
-    DESCRIPTION "AyuGram Desktop"
-    HOMEPAGE_URL "https://ayugram.one"
+    DESCRIPTION "Drakeygram Desktop"
+    HOMEPAGE_URL "https://github.com/sqdq2/Drakeygram"
 )
 
 if (APPLE)
