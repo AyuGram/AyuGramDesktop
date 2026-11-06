@@ -1,22 +1,15 @@
 [Desktop Entry]
-Name=AyuGram Desktop
-Comment=Desktop version of AyuGram - ToS breaking Telegram client
-TryExec=AyuGram
-Exec=env DESKTOPINTEGRATION=1 AyuGram -- %U
-Icon=com.ayugram.desktop
+# DEPRECATED - replaced by com.drakeygram.desktop.desktop
+# This file is kept only for compatibility and does nothing useful.
+Name=Drakeygram Desktop
+Comment=Independent Telegram Desktop client - no external tracking
+TryExec=Drakeygram
+Exec=env DESKTOPINTEGRATION=1 Drakeygram -- %U
+Icon=com.drakeygram.desktop
 Terminal=false
-StartupWMClass=AyuGram
+StartupWMClass=Drakeygram
 Type=Application
 Categories=Chat;Network;InstantMessaging;Qt;
 MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
-Keywords=tg;chat;im;messaging;messenger;sms;telegram;tdesktop;
-Actions=quit;
-DBusActivatable=true
-SingleMainWindow=true
-X-GNOME-UsesNotifications=true
-X-GNOME-SingleWindow=true
-
-[Desktop Action quit]
-Exec=AyuGram -quit
-Name=Quit AyuGram
-Icon=application-exit
+Keywords=tg;chat;im;messaging;messenger;sms;telegram;tdesktop;drakeygram;
+NoDisplay=true

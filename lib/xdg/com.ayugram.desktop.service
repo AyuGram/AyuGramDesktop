@@ -1,3 +1,4 @@
 [D-BUS Service]
-Name=com.ayugram.desktop
-Exec=@CMAKE_INSTALL_FULL_BINDIR@/AyuGram
+# DEPRECATED - replaced by com.drakeygram.desktop.service
+Name=com.drakeygram.desktop
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/Drakeygram

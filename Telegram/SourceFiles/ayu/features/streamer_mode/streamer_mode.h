@@ -1,17 +1,14 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #pragma once
 
-class QWidget;
+namespace AyuFeatures {
+namespace StreamerMode {
 
-namespace AyuFeatures::StreamerMode {
+void enable();
+void disable();
+bool isEnabled();
 
-void apply(bool enabled);
-void hideWidgetWindow(QWidget *widget);
-void showWidgetWindow(QWidget *widget);
-
-} // namespace AyuFeatures::StreamerMode
+} // namespace StreamerMode
+} // namespace AyuFeatures
