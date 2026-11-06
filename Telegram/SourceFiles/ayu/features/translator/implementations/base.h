@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #pragma once
 
 #include "apiwrap.h"
@@ -15,7 +12,7 @@
 #include <QtCore/QString>
 #include <QtNetwork/QNetworkReply>
 
-namespace Main {
+amespace Main {
 class Session;
 }
 
