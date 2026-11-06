@@ -1,12 +1,10 @@
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #pragma once
 
-#include "ui/toast/toast.h"
+namespace AyuUi {
 
-namespace Ayu::Ui {
-
-void ShowToastWithAction(
-	::Ui::Toast::Config &&config,
-	const QString &buttonText,
-	Fn<void()> callback);
+void ShowToast(const QString &text);
 
 }
