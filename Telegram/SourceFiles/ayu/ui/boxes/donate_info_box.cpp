@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ui/boxes/donate_info_box.h"
 
 #include "lang_auto.h"
@@ -89,46 +86,10 @@ object_ptr<Ui::RpWidget> CreateTopLogoWidget(
 	return w;
 }
 
-object_ptr<Ui::RpWidget> InfoRow(
-	not_null<Ui::RpWidget*> parent,
-	not_null<Main::Session*> session,
-	const QString &title,
-	const TextWithEntities &text,
-	not_null<const style::icon*> icon,
-	const Text::MarkedContext &context) {
-	auto row = object_ptr<Ui::VerticalLayout>(parent);
-	const auto raw = row.data();
-
-	raw->add(
-		object_ptr<Ui::FlatLabel>(
-			raw,
-			rpl::single(tr::bold(title)),
-			st::defaultFlatLabel),
-		st::settingsPremiumRowTitlePadding);
-
-	const auto label = raw->add(
-		object_ptr<Ui::FlatLabel>(
-			raw,
-			st::boxDividerLabel),
-		st::settingsPremiumRowAboutPadding);
-
-	label->setMarkedText(
-		text,
-		std::move(context)
-	);
-
-	object_ptr<Info::Profile::FloatingIcon>(
-		raw,
-		*icon,
-		st::starrefInfoIconPosition);
-
-	return row;
-}
-
 } // namespace
 
 void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionController*> controller) {
-	// box->setStyle(st::starrefFooterBox);
+	// Fully neutralized. No external donate links, no AyuGram usernames, no remote amounts.
 	box->setStyle(st::giveawayGiftCodeBox);
 	box->setNoContentMargin(true);
 	box->setWidth(int(st::aboutWidth * 1.1));
@@ -141,7 +102,6 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 
 	const auto logoWidget = box->verticalLayout()->add(
 		CreateTopLogoWidget(box->verticalLayout()));
-
 	logoWidget->resize(st::supportLogoSize, st::supportLogoSize);
 
 	Ui::AddSkip(box->verticalLayout());
@@ -149,7 +109,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 	box->verticalLayout()->add(
 		object_ptr<Ui::FlatLabel>(
 			box->verticalLayout(),
-			tr::ayu_SupportBoxHeader(tr::bold),
+			QString("Drakeygram"),
 			st::boxTitle),
 		st::boxRowPadding,
 		style::al_top);
@@ -157,82 +117,12 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 	box->verticalLayout()->add(
 		object_ptr<Ui::FlatLabel>(
 			box->verticalLayout(),
-			tr::ayu_SupportBoxInfo(),
+			QString("Independent Telegram Desktop client.\nNo external tracking. No remote donate links."),
 			st::starrefCenteredText),
 		st::boxRowPadding);
 
 	Ui::AddSkip(box->verticalLayout());
 	Ui::AddSkip(box->verticalLayout());
-	Ui::AddSkip(box->verticalLayout());
-
-	auto emojiHelper = Ui::Text::CustomEmojiHelper();
-	const auto tonSymbol = emojiHelper.paletteDependent({
-		.factory = [=]
-		{
-			return Ui::Earn::IconCurrencyColored(
-				st::boxDividerLabel.style.font,
-				st::boxDividerLabel.textFg->c);
-		},
-		.margin = st::channelEarnCurrencyLearnMargins
-	});
-
-	const auto dollarAmount = RCManager::getInstance().donateAmountUsd().prepend("$");
-	const auto tonAmount = RCManager::getInstance().donateAmountTon();
-	const auto rubleAmount = RCManager::getInstance().donateAmountRub().append("₽");
-
-	const auto innerText = TextWithEntities{}.append(tonSymbol).append(tonAmount).append(", ").append(rubleAmount);
-	const auto str = tr::ayu_SupportBoxMakeDonationInfo(
-		tr::now,
-		lt_amount1,
-		TextWithEntities{dollarAmount},
-		lt_amount2,
-		innerText,
-		tr::rich
-	);
-
-	box->verticalLayout()->add(InfoRow(
-		box->verticalLayout(),
-		&controller->session(),
-		tr::ayu_SupportBoxMakeDonationHeader(tr::now),
-		str,
-		&st::menuIconEarn,
-		emojiHelper.context()));
-
-	Ui::AddSkip(box->verticalLayout());
-
-	const auto username = RCManager::getInstance().donateUsername();
-	auto usernameTrimmed = username;
-	if (usernameTrimmed.startsWith('@')) {
-		usernameTrimmed.remove(0, 1);
-	}
-	const TextWithEntities proofText = tr::ayu_SupportBoxSendProofInfo(
-		tr::now,
-		lt_item,
-		Ui::Text::Link(username, controller->session().createInternalLinkFull(usernameTrimmed)),
-		tr::rich);
-	box->verticalLayout()->add(InfoRow(
-		box->verticalLayout(),
-		&controller->session(),
-		tr::ayu_SupportBoxSendProofHeader(tr::now),
-		proofText,
-		&st::menuIconPhoto,
-		Core::TextContext({
-			.session = std::move(&controller->session()),
-		})));
-
-	Ui::AddSkip(box->verticalLayout());
-
-	box->verticalLayout()->add(InfoRow(
-		box->verticalLayout(),
-		&controller->session(),
-		tr::ayu_SupportBoxReceiveBadgeHeader(tr::now),
-		TextWithEntities{
-			tr::ayu_SupportBoxReceiveBadgeInfo(tr::now)
-		},
-		&st::menuIconStarRefShare,
-		Core::TextContext({
-			.session = std::move(&controller->session()),
-		})));
 
 	const auto closeButton = box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	const auto buttonWidth = box->width()
