@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ui/ayu_logo.h"
 
 #include "ayu/ayu_settings.h"
@@ -21,7 +18,7 @@ namespace AyuAssets {
 QString appIcoPath() {
 	const auto &settings = AyuSettings::getInstance();
 	return cWorkingDir()
-		+ u"tdata/AyuGram-"_q
+		+ u"tdata/Drakeygram-"_q
 		+ settings.appIcon()
 		+ u".ico"_q;
 }

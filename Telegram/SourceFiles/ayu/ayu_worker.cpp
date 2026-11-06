@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ayu_worker.h"
 
 #include "apiwrap.h"
@@ -75,7 +72,7 @@ void runOnce() {
 					)).send();
 					state[id] = false;
 
-					DEBUG_LOG(("[AyuGram] Sent offline for account with id %1").arg(id));
+					DEBUG_LOG(("[Drakeygram] Sent offline for account with id %1").arg(id));
 				}
 			}
 		}

@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ayu_infra.h"
 
 #include "ayu/ayu_lang.h"
@@ -53,6 +50,7 @@ void initWorker() {
 }
 
 void initRCManager() {
+	// Local-only. Network tracking fully disabled.
 	RCManager::getInstance().start();
 }
 
