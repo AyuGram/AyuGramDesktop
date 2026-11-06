@@ -1,9 +1,6 @@
-// This is the source code of AyuGram for Desktop.
-//
-// We do not and cannot prevent the use of our code,
-// but be respectful and credit the original author.
-//
-// Copyright @Radolyn, 2026
+// Drakeygram Desktop
+// Fully independent fork. No external tracking.
+
 #include "ayu/ui/settings/settings_main.h"
 
 #include "settings/sections/settings_main.h"
@@ -70,7 +67,7 @@ void BuildVersionInfo(SectionBuilder &builder) {
 			.widget = object_ptr<Ui::FlatLabel>(
 				ctx.container,
 				rpl::single(
-					QString("AyuGram Desktop v")
+					QString("Drakeygram Desktop v")
 					+ QString::fromLatin1(AppVersionStr)),
 				st::boxTitle),
 			.align = style::al_top,
@@ -83,7 +80,7 @@ void BuildVersionInfo(SectionBuilder &builder) {
 		return {
 			.widget = object_ptr<Ui::FlatLabel>(
 				ctx.container,
-				tr::ayu_SettingsDescription(),
+				QString("Independent Telegram Desktop client.\nNo external tracking."),
 				st::centeredBoxLabel),
 			.align = style::al_top,
 		};
@@ -101,7 +98,7 @@ void BuildCategories(SectionBuilder &builder) {
 	builder.addSubsectionTitle(tr::ayu_CategoriesHeader());
 
 	builder.addSectionButton({
-		.title = rpl::single(QString("AyuGram")),
+		.title = rpl::single(QString("Drakeygram")),
 		.targetSection = AyuGhost::Id(),
 		.icon = { &st::menuIconGroupReactions },
 	});
@@ -133,54 +130,22 @@ void BuildCategories(SectionBuilder &builder) {
 }
 
 void BuildLinks(SectionBuilder &builder) {
+	// All external AyuGram links removed.
+	// No channels, no docs.ayugram.one, no translate.ayugram.one.
 	builder.addSkip();
 	builder.addDivider();
 	builder.addSkip();
 
-	builder.addSubsectionTitle(tr::ayu_LinksHeader());
-
-	const auto controller = builder.controller();
+	builder.addSubsectionTitle(rpl::single(QString("About")));
 
 	builder.addButton({
-		.id = u"ayu/channel"_q,
-		.title = tr::ayu_LinksChannel(),
-		.icon = { &st::menuIconChannel },
-		.label = rpl::single(QString("@ayugram")),
-		.onClick = [=] {
-			controller->showPeerByLink(Window::PeerByLinkInfo{
-				.usernameOrId = QString("ayugram"),
-			});
-		},
-	});
-	builder.addButton({
-		.id = u"ayu/chat"_q,
-		.title = tr::ayu_LinksChats(),
-		.icon = { &st::menuIconChats },
-		.label = rpl::single(QString("@ayugramchat")),
-		.onClick = [=] {
-			controller->showPeerByLink(Window::PeerByLinkInfo{
-				.usernameOrId = QString("ayugramchat"),
-			});
-		},
-	});
-	builder.addButton({
-		.id = u"ayu/crowdin"_q,
-		.title = tr::ayu_LinksTranslate(),
-		.icon = { &st::menuIconTranslate },
-		.label = rpl::single(QString("Crowdin")),
-		.onClick = [=] {
-			QDesktopServices::openUrl(
-				QString("https://translate.ayugram.one"));
-		},
-	});
-	builder.addButton({
-		.id = u"ayu/website"_q,
-		.title = tr::ayu_LinksDocumentation(),
+		.id = u"drakey/repo"_q,
+		.title = rpl::single(QString("Source Code")),
 		.icon = { &st::menuIconIpAddress },
-		.label = rpl::single(QString("docs.ayugram.one")),
+		.label = rpl::single(QString("GitHub")),
 		.onClick = [=] {
 			QDesktopServices::openUrl(
-				QString("https://docs.ayugram.one"));
+				QString("https://github.com/sqdq2/Drakeygram"));
 		},
 	});
 
