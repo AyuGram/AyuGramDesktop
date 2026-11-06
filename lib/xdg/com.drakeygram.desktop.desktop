@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=Drakeygram Desktop
+Comment=Independent Telegram Desktop client - no external tracking
+TryExec=Drakeygram
+Exec=env DESKTOPINTEGRATION=1 Drakeygram -- %U
+Icon=com.drakeygram.desktop
+Terminal=false
+StartupWMClass=Drakeygram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;sms;telegram;tdesktop;drakeygram;
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=Drakeygram -quit
+Name=Quit Drakeygram
+Icon=application-exit
