@@ -250,7 +250,9 @@ void InnerWidget::preloadArchiveCount() {
 	) | rpl::take_while([=] {
 		return !stories->albumIdsCountKnown(_peer->id, kArchive);
 	}) | rpl::on_next([=] {
-		refreshAlbumsTabs();
+		if (_albumsWrap) { // The archive section has no album tabs.
+			refreshAlbumsTabs();
+		}
 	}, lifetime());
 }
 

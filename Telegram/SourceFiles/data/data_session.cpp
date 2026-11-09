@@ -26,6 +26,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "export/export_manager.h"
 #include "export/view/export_view_panel_controller.h"
 #include "mtproto/mtproto_config.h"
+#include "tgw/tgw_storage.h"
 #include "wallet/wallet_session.h"
 #include "wallet/wallet_transfer_messages.h"
 #include "window/notifications_manager.h"
@@ -1251,6 +1252,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		}
 	}, [&](const MTPDchannelForbidden &data) {
 		const auto channel = result->asChannel();
+		Tgw::ClearChatStorage(_session, channel->id);
 
 		auto wasInChannel = channel->amIn();
 		auto canViewAdmins = channel->canViewAdmins();
@@ -1717,6 +1719,7 @@ History *Session::historyLoaded(const PeerData *peer) {
 }
 
 void Session::deleteConversationLocally(not_null<PeerData*> peer) {
+	Tgw::DeleteChatStorage(_session, peer->id);
 	const auto markLeft = [&] {
 		if (const auto channel = peer->asMegagroup()) {
 			channel->addFlags(ChannelDataFlag::Left);
@@ -2138,9 +2141,11 @@ HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {
 	return item;
 }
 
-bool Session::queryItemVisibility(not_null<HistoryItem*> item) const {
+bool Session::queryItemVisibility(
+		not_null<HistoryItem*> item,
+		const ViewElement *view) const {
 	auto result = false;
-	_itemVisibilityQueries.fire({ item, &result });
+	_itemVisibilityQueries.fire({ item, &result, view });
 	return result;
 }
 
@@ -2164,10 +2169,12 @@ bool Session::queryDocumentVisibility(
 }
 
 void Session::itemVisibilitiesUpdated() {
-	// This could be rewritten in a more generic form, like:
-	// rpl::producer<> itemVisibilitiesUpdates()
-	// if someone else requires those methods, using fast for now.
 	Core::App().downloadManager().itemVisibilitiesUpdated(_session);
+	_itemVisibilitiesUpdates.fire({});
+}
+
+rpl::producer<> Session::itemVisibilitiesUpdates() const {
+	return _itemVisibilitiesUpdates.events();
 }
 
 void Session::notifyItemIdChange(IdChange event) {
@@ -3386,6 +3393,7 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
+	Tgw::ClearMessagesStorage(_session, peerId, data);
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
@@ -3423,6 +3431,7 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
+	Tgw::ClearNonChannelStorage(_session, data);
 	auto toDestroy = std::vector<not_null<HistoryItem*>>();
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
