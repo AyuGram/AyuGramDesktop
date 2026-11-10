@@ -9,6 +9,7 @@
 #include "ayu/data/entities.h"
 
 #include <functional>
+#include <optional>
 
 class SchemaVersion
 {
@@ -55,6 +56,10 @@ void deleteAllExclusions();
 
 bool hasFilters();
 bool hasPerDialogFilters();
+
+void setLocalRead(ID peerId, ID untilId);
+std::optional<ID> getLocalRead(ID peerId);
+void clearLocalRead(ID peerId);
 
 void moveCurrentDatabase();
 
