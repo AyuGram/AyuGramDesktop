@@ -2211,7 +2211,7 @@ void Panel::createWebviewBottom() {
 }
 
 bool Panel::createWebview(const Webview::ThemeParams &params) {
-	RpWidget *container = nullptr;
+	auto container = (RpWidget*)nullptr;
 	if (_externalShell) {
 		_externalWebviewParent = std::make_unique<RpWidget>();
 		container = _externalWebviewParent.get();

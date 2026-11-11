@@ -75,6 +75,7 @@ if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
         endif()
     endif()
 endif()
+include(cmake/test_iv_editor_state.cmake)
 include(cmake/test_iv_editor_table_grid.cmake)
 include(cmake/test_wallet_card_tint.cmake)
 include(cmake/test_wallet_phrase_shares.cmake)
@@ -2693,6 +2694,8 @@ PRIVATE
     window/window_chat_preview.h
     window/window_chat_switch_process.cpp
     window/window_chat_switch_process.h
+    window/window_columns.cpp
+    window/window_columns.h
     window/window_connecting_widget.cpp
     window/window_connecting_widget.h
     window/window_controller.cpp
