@@ -23,6 +23,11 @@ auto storage = make_storage(
 		make_column("id", &SchemaVersion::id, primary_key()),
 		make_column("version", &SchemaVersion::version)
 	),
+	make_table<LocalRead>(
+		"LocalRead",
+		make_column("peerId", &LocalRead::peerId, primary_key()),
+		make_column("untilId", &LocalRead::untilId)
+	),
 	make_index("idx_deleted_message_userId_dialogId_topicId_messageId",
 			   column<DeletedMessage>(&DeletedMessage::userId),
 			   column<DeletedMessage>(&DeletedMessage::dialogId),
@@ -212,6 +217,36 @@ void runMigrations(decltype(storage) &storage) {
 }
 
 namespace AyuDatabase {
+
+void setLocalRead(ID peerId, ID untilId) {
+	std::lock_guard lock(databaseMutex);
+	try {
+		storage.replace(LocalRead{peerId, untilId});
+	} catch (const std::exception &ex) {
+		LOG(("Failed to save local read: %1").arg(ex.what()));
+	}
+}
+
+std::optional<ID> getLocalRead(ID peerId) {
+	std::lock_guard lock(databaseMutex);
+	try {
+		if (const auto row = storage.get_pointer<LocalRead>(peerId)) {
+			return row->untilId;
+		}
+	} catch (const std::exception &ex) {
+		LOG(("Failed to read local read: %1").arg(ex.what()));
+	}
+	return std::nullopt;
+}
+
+void clearLocalRead(ID peerId) {
+	std::lock_guard lock(databaseMutex);
+	try {
+		storage.remove<LocalRead>(peerId);
+	} catch (const std::exception &ex) {
+		LOG(("Failed to clear local read: %1").arg(ex.what()));
+	}
+}
 
 void moveCurrentDatabase() {
 	const auto time = base::unixtime::now();

@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/notifications_manager.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "history/history_unread_things.h"
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_element.h"
 #include "core/application.h"
@@ -36,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/data/ayu_database.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/utils/telegram_helpers.h"
@@ -274,6 +276,9 @@ void Histories::readInboxTill(
 					).arg(tillId.bare));
 				if (last->id == tillId) {
 					DEBUG_LOG(("Reading: locally marked as read."));
+					AyuDatabase::setLocalRead(
+						qint64(history->peer->id.value),
+						tillId.bare);
 					history->setUnreadCount(0);
 					history->updateChatListEntry();
 				}
@@ -471,12 +476,32 @@ void Histories::sendDialogRequests() {
 	}).send();
 }
 
+void Histories::applyLocalRead(not_null<History*> history) {
+	if (history->unreadCount() <= 0) {
+		return;
+	}
+	const auto until = AyuDatabase::getLocalRead(qint64(history->peer->id.value));
+	if (!until) {
+		return;
+	}
+	const auto last = history->lastServerMessage();
+	if (!last || qint64(last->id.bare) > *until) {
+		return;
+	}
+	DEBUG_LOG(("Reading: applying local read till %1.").arg(*until));
+	history->setUnreadCount(0);
+	history->unreadMentions().clear();
+	history->unreadReactions().clear();
+	history->updateChatListEntry();
+}
+
 void Histories::dialogEntryApplied(not_null<History*> history) {
 	const auto state = lookup(history);
 	if (state && state->postponedRequestEntry) {
 		return;
 	}
 	history->dialogEntryApplied();
+	applyLocalRead(history);
 	if (const auto callbacks = _dialogRequestsPending.take(history)) {
 		for (const auto &callback : *callbacks) {
 			callback();
@@ -705,6 +730,11 @@ void Histories::sendReadRequests() {
 		auto histories = std::vector<not_null<History*>>();
 		histories.reserve(_states.size());
 		for (auto &[history, state] : _states) {
+			if (state.willReadTill) {
+				AyuDatabase::setLocalRead(
+					qint64(history->peer->id.value),
+					state.willReadTill.bare);
+			}
 			state.willReadTill = 0;
 			state.willReadWhen = 0;
 			histories.push_back(history);

@@ -71,6 +71,7 @@ public:
 		not_null<History*> history,
 		Fn<void()> callback = nullptr);
 	void dialogEntryApplied(not_null<History*> history);
+	void applyLocalRead(not_null<History*> history);
 	void changeDialogUnreadMark(not_null<History*> history, bool unread);
 	void changeSublistUnreadMark(
 		not_null<Data::SavedSublist*> sublist,

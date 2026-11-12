@@ -135,3 +135,10 @@ public:
 	int messageId;
 	int entityCreateDate;
 };
+
+struct LocalRead
+{
+	ID peerId;
+	ID untilId;
+
+};
