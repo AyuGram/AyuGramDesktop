@@ -559,6 +559,15 @@ public:
 		return false;
 	}
 
+	virtual bool rowDragSelectStart(not_null<PeerListRow*> row) {
+		return false;
+	}
+	virtual void rowDragSelectUpdate(
+			const std::vector<not_null<PeerListRow*>> &rows) {
+	}
+	virtual void rowDragSelectFinish() {
+	}
+
 	virtual void loadMoreRows() {
 	}
 	virtual void itemDeselectedHook(not_null<PeerData*> peer) {
@@ -935,6 +944,10 @@ private:
 	void clearAllContent();
 	void handleMouseMove(QPoint globalPosition);
 	void mousePressReleased(Qt::MouseButton button);
+	void updateDragSelect(QPoint globalPosition);
+	void finishDragSelect();
+	[[nodiscard]] int dragSelectIndexAt(QPoint globalPosition) const;
+	[[nodiscard]] int dragSelectScrollDelta(QPoint globalPosition) const;
 	void initDecorateWidget(Ui::RpWidget *widget);
 
 	const style::PeerList &_st;
@@ -954,6 +967,7 @@ private:
 	std::optional<QPoint> _lastMousePosition;
 	Qt::MouseButton _pressButton = Qt::LeftButton;
 	std::optional<QPoint> _trackPressStart;
+	std::optional<PeerListRowId> _dragSelectFrom;
 
 	rpl::event_stream<Ui::ScrollToRequest> _scrollToRequests;
 

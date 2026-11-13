@@ -49,7 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/outline_segments.h"
 #include "ui/wrap/slide_wrap.h"
 #include "window/window_separate_id.h"
-#include "window/window_session_controller.h" // showAddContact()
+#include "window/window_session_controller.h" // showPeerHistory()
 #include "base/unixtime.h"
 #include "styles/style_boxes.h"
 #include "styles/style_dialogs.h"
@@ -57,65 +57,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 
-// AyuGram includes
-#include "styles/style_ayu_icons.h"
-
-
 namespace {
 
 constexpr auto kSortByOnlineThrottle = 3 * crl::time(1000);
 constexpr auto kSearchPerPage = 50;
-
-class ContactsMutualRow final : public PeerListRow {
-public:
-	using PeerListRow::PeerListRow;
-
-protected:
-	QSize rightActionSize() const override {
-		return isMutualContact()
-			? QSize(st::ayuContactsMutualIcon.width(), st::ayuContactsMutualIcon.height())
-			: QSize();
-	}
-
-	QMargins rightActionMargins() const override {
-		const auto size = rightActionSize();
-		if (size.isEmpty()) {
-			return QMargins();
-		}
-		const auto right = st::contactsWithStories.item.photoPosition.x();
-		return QMargins(
-			right,
-			(st::contactsWithStories.item.height - size.height()) / 2,
-			right,
-			0);
-	}
-
-	bool rightActionDisabled() const override {
-		return false;
-	}
-
-	void rightActionPaint(
-			Painter &p,
-			int x,
-			int y,
-			int outerWidth,
-			bool selected,
-			bool actionSelected) override {
-		if (!isMutualContact()) {
-			return;
-		}
-		(selected || actionSelected
-			? st::ayuContactsMutualIconOver
-			: st::ayuContactsMutualIcon).paint(p, x, y, outerWidth);
-	}
-
-private:
-	[[nodiscard]] bool isMutualContact() const {
-		const auto user = peer()->asUser();
-		return user && (user->flags() & UserDataFlag::MutualContact);
-	}
-
-};
 
 void ShowChooseTopicBox(
 		not_null<PeerListController*> controller,
@@ -170,86 +115,6 @@ Data::CommunityInfo *JoinedCommunityChats(not_null<PeerData*> peer) {
 		? channel->communityInfo()
 		: nullptr;
 	return (info && !info->histories().empty()) ? info : nullptr;
-}
-
-object_ptr<Ui::BoxContent> PrepareContactsBox(
-		not_null<Window::SessionController*> window) {
-	using Mode = ContactsBoxController::SortMode;
-	class Controller final : public ContactsBoxController {
-	public:
-		using ContactsBoxController::ContactsBoxController;
-
-		[[nodiscard]] rpl::producer<not_null<PeerData*>> wheelClicks() const {
-			return _wheelClicks.events();
-		}
-
-	protected:
-		std::unique_ptr<PeerListRow> createRow(
-				not_null<UserData*> user) override {
-			return !user->isSelf()
-				? std::make_unique<ContactsMutualRow>(user)
-				: nullptr;
-		}
-
-		void rowMiddleClicked(
-				not_null<PeerListRow*> row) override {
-			_wheelClicks.fire(row->peer());
-		}
-
-		void rowRightActionClicked(
-				not_null<PeerListRow*> row) override {
-			if (const auto user = row->peer()->asUser();
-				user && (user->flags() & UserDataFlag::MutualContact)) {
-				delegate()->peerListUiShow()->showToast(
-					tr::ayu_MutualContactInfo(tr::now));
-			}
-		}
-
-	private:
-		rpl::event_stream<not_null<PeerData*>> _wheelClicks;
-
-	};
-	auto controller = std::make_unique<Controller>(
-		&window->session());
-	controller->setStyleOverrides(&st::contactsWithStories);
-	controller->setStoriesShown(true);
-	controller->setSectionHeadersShown(true);
-	const auto raw = controller.get();
-	auto init = [=](not_null<PeerListBox*> box) {
-		struct State {
-			QPointer<::Ui::IconButton> toggleSort;
-			rpl::variable<Mode> mode = Mode::Online;
-			::Ui::Animations::Simple scrollAnimation;
-		};
-
-		const auto state = box->lifetime().make_state<State>();
-		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
-		box->addLeftButton(
-			tr::lng_profile_add_contact(),
-			[=] { window->showAddContact(); });
-		state->toggleSort = box->addTopButton(st::contactsSortButton, [=] {
-			const auto online = (state->mode.current() == Mode::Online);
-			const auto mode = online ? Mode::Alphabet : Mode::Online;
-			state->mode = mode;
-			raw->setSortMode(mode);
-			state->toggleSort->setIconOverride(
-				online ? &st::contactsSortOnlineIcon : nullptr,
-				online ? &st::contactsSortOnlineIconOver : nullptr);
-		});
-		raw->setSortMode(Mode::Online);
-
-		raw->wheelClicks() | rpl::on_next([=](not_null<PeerData*> p) {
-			window->showInNewWindow(p);
-		}, box->lifetime());
-
-		raw->setShowFinishedCallback([=] {
-			window->checkHighlightControl(
-				u"contacts/sort"_q,
-				state->toggleSort,
-				{ .rippleShape = true });
-		});
-	};
-	return Box<PeerListBox>(std::move(controller), std::move(init));
 }
 
 QBrush PeerListStoriesGradient(const style::PeerList &st) {

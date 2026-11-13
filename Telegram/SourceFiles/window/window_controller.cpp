@@ -493,6 +493,10 @@ bool Controller::isLayerShown() const {
 	return _widget.ui_isLayerShown();
 }
 
+rpl::producer<bool> Controller::layerShownValue() const {
+	return _widget.ui_layerShownValue();
+}
+
 rpl::producer<bool> Controller::boxShownValue() const {
 	return _widget.ui_boxShownValue();
 }
