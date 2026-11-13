@@ -466,6 +466,11 @@ void Uploader::runTranscode(FullMsgId itemId) {
 							return !std::get_if<QImage>(&layer);
 						}),
 					end(fallback.overlay));
+				using StillSource = Media::Encode::StillSource;
+				if (const auto still = std::get_if<StillSource>(
+						&fallback.source)) {
+					still->music.clear();
+				}
 				result = Media::Encode::Run(std::move(fallback), nullptr);
 			}
 			bytes = std::move(result.bytes);
@@ -857,6 +862,7 @@ auto Uploader::sendSlicedPart(not_null<Entry*> entry, uchar dcIndex)
 	), {
 		.itemId = itemId,
 		.bytes = partBytes,
+		.part = index,
 		.dcIndex = dcIndex,
 	});
 	return SendResult::Success;

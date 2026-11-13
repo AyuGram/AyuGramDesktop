@@ -332,13 +332,15 @@ bool CheckEditCloudPassword(not_null<::Main::Session*> session) {
 	return !current->outdatedClient;
 }
 
-object_ptr<Ui::BoxContent> EditCloudPasswordBox(not_null<::Main::Session*> session) {
+object_ptr<Ui::BoxContent> EditCloudPasswordBox(
+		not_null<::Main::Session*> session,
+		std::shared_ptr<Ui::Show> show) {
 	const auto current = session->api().cloudPassword().stateCurrent();
 	Assert(current.has_value());
 
-	auto result = Box<PasscodeBox>(
-		session,
-		PasscodeBox::CloudFields::From(*current));
+	auto fields = PasscodeBox::CloudFields::From(*current);
+	fields.customShow = std::move(show);
+	auto result = Box<PasscodeBox>(session, fields);
 	const auto box = result.data();
 
 	rpl::merge(
@@ -381,6 +383,7 @@ void OpenFileConfirmationsBox(not_null<Ui::GenericBox*> box) {
 		tr::lng_settings_edit_ip_confirm(),
 		st::settingsButtonNoIcon
 	))->toggleOn(rpl::single(settings->ipRevealWarning()));
+	ip->setAllowTextLines();
 	Ui::AddSkip(layout);
 	Ui::AddDividerText(layout, tr::lng_settings_edit_ip_confirm_about());
 
@@ -407,34 +410,6 @@ void OpenFileConfirmationsBox(not_null<Ui::GenericBox*> box) {
 
 	});
 	box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
-}
-
-void RemoveCloudPassword(not_null<Window::SessionController*> controller) {
-	const auto session = &controller->session();
-	const auto current = session->api().cloudPassword().stateCurrent();
-	Assert(current.has_value());
-
-	if (!current->hasPassword) {
-		session->api().cloudPassword().clearUnconfirmedPassword();
-		return;
-	}
-	auto fields = PasscodeBox::CloudFields::From(*current);
-	fields.turningOff = true;
-	auto box = Box<PasscodeBox>(session, fields);
-
-	rpl::merge(
-		box->newPasswordSet() | rpl::to_empty,
-		box->passwordReloadNeeded()
-	) | rpl::on_next([=] {
-		session->api().cloudPassword().reload();
-	}, box->lifetime());
-
-	box->clearUnconfirmedPassword(
-	) | rpl::on_next([=] {
-		session->api().cloudPassword().clearUnconfirmedPassword();
-	}, box->lifetime());
-
-	controller->show(std::move(box));
 }
 
 object_ptr<Ui::BoxContent> CloudPasswordAppOutdatedBox() {
@@ -631,7 +606,7 @@ void BuildSecuritySection(
 	auto passcodeHas = rpl::single(rpl::empty) | rpl::then(
 		session->domain().local().localPasscodeChanged()
 	) | rpl::map([=] {
-		return session->domain().local().hasLocalPasscode();
+		return session->domain().local().hasPasscode();
 	});
 	auto passcodeLabel = rpl::combine(
 		tr::lng_settings_cloud_password_on(),

@@ -182,7 +182,6 @@ private:
 	mutable TooltipFilename _tooltipFilename;
 
 	TtlPaintCallback _drawTtl;
-	std::shared_ptr<rpl::lifetime> _ttlLifetime;
 
 	mutable float64 _voiceHoverProgress = -1;
 

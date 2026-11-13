@@ -16,10 +16,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "info/info_top_bar.h"
 #include "settings/cloud_password/settings_cloud_password_email_confirm.h"
+#include "boxes/keys_legend.h"
 #include "settings/sections/settings_chat.h"
 #include "settings/sections/settings_information.h"
 #include "settings/sections/settings_main.h"
 #include "settings/sections/settings_premium.h"
+#include "settings/sections/settings_shortcuts.h"
 #include "settings/settings_search.h"
 #include "ui/effects/ripple_animation.h" // MaskByDrawer.
 #include "ui/widgets/menu/menu_add_action_callback.h"
@@ -47,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_changes.h"
 #include "data/data_user.h"
 #include "data/data_forum_topic.h"
+#include "data/data_saved_sublist.h"
 #include "mainwidget.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_numbers_animation.h"
@@ -86,6 +89,16 @@ const style::InfoTopBar &TopBarStyle(Wrap wrap) {
 			&& controller->key().storiesAlbumId() != Stories::ArchiveId()
 			&& controller->key().storiesPeer()
 			&& controller->key().storiesPeer()->isSelf());
+}
+
+[[nodiscard]] bool CloseWindowRootedAt(
+		not_null<Window::SessionController*> controller,
+		not_null<Data::Thread*> thread) {
+	if (controller->windowId().thread != thread) {
+		return false;
+	}
+	Core::App().closeWindow(&controller->window());
+	return true;
 }
 
 [[nodiscard]] Fn<Ui::StringWithNumbers(int)> SelectedTitleForMedia(
@@ -156,21 +169,99 @@ WrapWidget::WrapWidget(
 		});
 	}, lifetime());
 	restoreHistoryStack(memento->takeStack());
+	subscribeToThreadDestroyed();
+}
 
+void WrapWidget::subscribeToThreadDestroyed() {
+	_threadDestroyedLifetime.destroy();
+	_mementoThreadLifetimes.clear();
 	if (const auto topic = _controller->topic()) {
+		_mementoThreadLifetimes.push_back(Memento::WatchThread(
+			topic,
+			topic->destroyed()));
 		topic->destroyed(
 		) | rpl::on_next([=] {
 			if (_wrap.current() == Wrap::Layer) {
 				_controller->parentController()->hideSpecialLayer();
 			} else if (_wrap.current() == Wrap::Narrow) {
-				_controller->parentController()->showBackFromStack(
+				const auto parent = _controller->parentController();
+				if (CloseWindowRootedAt(parent, topic)) {
+					return;
+				}
+				parent->showBackFromStack(
 					Window::SectionShow(
 						anim::type::normal,
 						anim::activation::background));
 			} else {
 				_removeRequests.fire({});
 			}
-		}, lifetime());
+		}, _threadDestroyedLifetime);
+	} else if (const auto sublist = _controller->sublist()) {
+		_mementoThreadLifetimes.push_back(Memento::WatchThread(
+			sublist,
+			sublist->destroyed()));
+		sublist->destroyed(
+		) | rpl::on_next([=] {
+			const auto parent = _controller->parentController();
+			if (CloseWindowRootedAt(parent, sublist)) {
+				return;
+			}
+			auto keep = base::take(_threadDestroyedLifetime);
+			auto removeRequests = base::take(_removeRequests);
+			parent->hideSpecialLayer();
+			parent->showBackFromStack(
+				Window::SectionShow(
+					anim::type::instant,
+					anim::activation::background));
+			parent->clearSectionStack(Window::SectionShow(
+				Window::SectionShow::Way::ClearStack,
+				anim::type::instant));
+			removeRequests.fire({});
+		}, _threadDestroyedLifetime);
+	}
+	subscribeToStackThreadsDestroyed();
+}
+
+void WrapWidget::subscribeToStackThreadsDestroyed() {
+	auto topics = base::flat_set<not_null<Data::ForumTopic*>>();
+	auto sublists = base::flat_set<not_null<Data::SavedSublist*>>();
+	for (const auto &item : _historyStack) {
+		if (const auto topic = item.section->topic()) {
+			topics.emplace(topic);
+		} else if (const auto sublist = item.section->sublist()) {
+			sublists.emplace(sublist);
+		}
+	}
+	const auto remove = [=](not_null<Data::Thread*> thread) {
+		removeThreadFromStack(thread);
+	};
+	for (const auto &topic : topics) {
+		_mementoThreadLifetimes.push_back(Memento::WatchThread(
+			topic,
+			topic->destroyed(),
+			remove));
+	}
+	for (const auto &sublist : sublists) {
+		_mementoThreadLifetimes.push_back(Memento::WatchThread(
+			sublist,
+			sublist->destroyed(),
+			remove));
+	}
+}
+
+void WrapWidget::removeThreadFromStack(not_null<Data::Thread*> thread) {
+	const auto was = _historyStack.size();
+	for (auto i = begin(_historyStack); i != end(_historyStack);) {
+		const auto content = i->section.get();
+		if ((content->topic() == thread) || (content->sublist() == thread)) {
+			i = _historyStack.erase(i);
+		} else {
+			++i;
+		}
+	}
+	if (_historyStack.size() != was && !hasStackHistory() && _content) {
+		setupTop();
+		finishShowContent();
 	}
 }
 
@@ -452,21 +543,29 @@ void WrapWidget::setupTopBarMenuToggle() {
 			button->addClickHandler([=] {
 				_controller->showSettings(::Settings::Search::Id());
 			});
+		} else if (section.settingsType() == ::Settings::ShortcutsId()) {
+			const auto &st = (wrap() == Wrap::Layer)
+				? st::infoLayerTopBarKeysLegend
+				: st::infoTopBarKeysLegend;
+			const auto button = _topBar->addButton(
+				base::make_unique_q<Ui::IconButton>(_topBar, st));
+			button->setAccessibleName(tr::lng_keys_legend_title(tr::now));
+			button->addClickHandler([=] {
+				ShowKeysLegend(&_controller->parentController()->window());
+			});
 		} else if (section.settingsType() == ::Settings::InformationId()) {
 			const auto controller = _controller->parentController();
 			const auto self = controller->session().user();
-			if (!self->username().isEmpty()) {
-				const auto show = controller->uiShow();
-				const auto &st = (wrap() == Wrap::Layer)
-					? st::infoLayerTopBarQr
-					: st::infoTopBarQr;
-				const auto button = _topBar->addButton(
-					base::make_unique_q<Ui::IconButton>(_topBar, st));
-				button->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
-				button->addClickHandler([show, self] {
-					Ui::DefaultShowFillPeerQrBoxCallback(show, self);
-				});
-			}
+			const auto show = controller->uiShow();
+			const auto &st = (wrap() == Wrap::Layer)
+				? st::infoLayerTopBarQr
+				: st::infoTopBarQr;
+			const auto button = _topBar->addButton(
+				base::make_unique_q<Ui::IconButton>(_topBar, st));
+			button->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
+			button->addClickHandler([show, self] {
+				Ui::DefaultShowFillPeerQrBoxCallback(show, self);
+			});
 		} else if (section.settingsType() == ::Settings::AyuFiltersList::Id()) {
 			const auto controller = _controller->parentController();
 			const auto &st = st::filtersAddIcon;
@@ -589,12 +688,8 @@ void WrapWidget::addTopBarMenuButton() {
 	Expects(_topBar != nullptr);
 	Expects(_content != nullptr);
 
-	{
-		const auto guard = gsl::finally([&] { _topBarMenu = nullptr; });
-		showTopBarMenu(true);
-		if (!_topBarMenu) {
-			return;
-		}
+	if (!topBarMenuHasActions()) {
+		return;
 	}
 
 	_topBarMenuToggle.reset(_topBar->addButton(
@@ -605,7 +700,7 @@ void WrapWidget::addTopBarMenuButton() {
 				: st::infoTopBarMenu))));
 	_topBarMenuToggle->setAccessibleName(tr::lng_sr_profile_menu(tr::now));
 	_topBarMenuToggle->addClickHandler([this] {
-		showTopBarMenu(false);
+		showTopBarMenu();
 	});
 
 	Shortcuts::Requests(
@@ -616,7 +711,7 @@ void WrapWidget::addTopBarMenuButton() {
 
 		request->check(Command::ShowChatMenu, 1) && request->handle([=] {
 			Window::ActivateWindow(_controller->parentController());
-			showTopBarMenu(false);
+			showTopBarMenu();
 			return true;
 		});
 	}, _topBarMenuToggle->lifetime());
@@ -659,7 +754,15 @@ void WrapWidget::addProfileCallsButton() {
 	}
 }
 
-void WrapWidget::showTopBarMenu(bool check) {
+bool WrapWidget::topBarMenuHasActions() const {
+	const auto menu = base::make_unique_q<Ui::PopupMenu>(
+		QWidget::window(),
+		st::popupMenuExpandedSeparator);
+	_content->fillTopBarMenu(Ui::Menu::CreateAddActionCallback(menu));
+	return !menu->empty();
+}
+
+void WrapWidget::showTopBarMenu() {
 	if (_topBarMenu) {
 		_topBarMenu->hideMenu(true);
 		return;
@@ -678,8 +781,6 @@ void WrapWidget::showTopBarMenu(bool check) {
 	_content->fillTopBarMenu(Ui::Menu::CreateAddActionCallback(_topBarMenu));
 	if (_topBarMenu->empty()) {
 		_topBarMenu = nullptr;
-		return;
-	} else if (check) {
 		return;
 	}
 	_topBarMenu->setForcedOrigin(Ui::PanelAnimation::Origin::TopRight);
@@ -738,10 +839,6 @@ void WrapWidget::removeFromStack(const std::vector<Section> &sections) {
 	}
 }
 
-not_null<Ui::RpWidget*> WrapWidget::topWidget() const {
-	return _topBar;
-}
-
 void WrapWidget::showContent(object_ptr<ContentWidget> content) {
 	if (auto old = std::exchange(_content, std::move(content))) {
 		if (Ui::InFocusChain(old)) {
@@ -770,6 +867,7 @@ void WrapWidget::finishShowContent() {
 		_topBar->setTitle({
 			.title = _content->title(),
 			.subtitle = _content->subtitle(),
+			.badge = _content->titleBadge(),
 		});
 		_topBar->setStories(_content->titleStories());
 	}
@@ -922,7 +1020,7 @@ void WrapWidget::showFinishedHook() {
 		}();
 		if (!highlightId.isEmpty()
 			&& controller->takeHighlightControlId(highlightId)) {
-			showTopBarMenu(false);
+			showTopBarMenu();
 			if (_topBarMenu) {
 				const auto menu = _topBarMenu->menu();
 				for (const auto &action : menu->actions()) {
@@ -968,12 +1066,6 @@ bool WrapWidget::showInternal(
 	return false;
 }
 
-void WrapWidget::highlightTopBar() {
-	if (_topBar) {
-		_topBar->highlight();
-	}
-}
-
 std::shared_ptr<Window::SectionMemento> WrapWidget::createMemento() {
 	auto stack = std::vector<std::shared_ptr<ContentMemento>>();
 	stack.reserve(_historyStack.size() + 1);
@@ -990,7 +1082,9 @@ std::shared_ptr<Window::SectionMemento> WrapWidget::createMemento() {
 	// after it.
 	_mementoTaken = true;
 
-	return std::make_shared<Memento>(std::move(stack));
+	return std::make_shared<Memento>(
+		std::move(stack),
+		base::take(_mementoThreadLifetimes));
 }
 
 SendMenu::Details WrapWidget::sendMenuDetails() const {
@@ -1022,6 +1116,8 @@ bool WrapWidget::returnToFirstStackFrame(
 	const auto first = _historyStack.front().section.get();
 	if (first->peer() == memento->peer()
 		&& first->savedMessages() == memento->savedMessages()
+		&& first->topic() == memento->topic()
+		&& first->sublist() == memento->sublist()
 		&& first->section().type() == memento->section().type()
 		&& first->section().type() == Section::Type::Profile) {
 		_historyStack.resize(1);
@@ -1097,6 +1193,7 @@ void WrapWidget::showNewContent(
 			showNewContent(memento);
 		}
 	}
+	subscribeToThreadDestroyed();
 
 	if (animationParams) {
 		if (Ui::InFocusChain(this)) {

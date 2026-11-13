@@ -14,13 +14,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/video/video_editor_common.h"
 #include "ui/rp_widget.h"
 
-namespace Media::Streaming {
-class Instance;
-struct Update;
-} // namespace Media::Streaming
-
 namespace Ui {
 class IconButton;
+class ImportantTooltip;
 class LayerWidget;
 class RippleButton;
 class FlatLabel;
@@ -29,6 +25,8 @@ class FlatLabel;
 namespace Editor {
 
 class Crop;
+class SegmentPlayer;
+class TimelineSeeker;
 class VideoTimeline;
 class VideoQualitySlider;
 
@@ -63,13 +61,14 @@ public:
 private:
 	void setupStreaming();
 	void setupControls();
+	void setupGifButton();
+	void showGifTooltip();
+	void hideGifTooltip();
 	void setupTimeline();
 	void setupQuality();
 	void setupSizeEstimate();
 	void refreshSizeEstimate();
 	void refreshQualityLevels();
-	void handleUpdate(Media::Streaming::Update &&update);
-	void restart(crl::time position);
 	void setupTapToPause();
 	void updateBubble();
 	void startCapture();
@@ -78,7 +77,6 @@ private:
 	void refreshCoverPreview();
 	void invalidateCoverPreview();
 	void togglePause();
-	[[nodiscard]] bool held() const;
 	void paintPlayBadge(QPainter &p);
 	void applyGeometry();
 	void paint(QPainter &p);
@@ -98,18 +96,20 @@ private:
 	crl::time _from = 0;
 	crl::time _till = 0;
 	crl::time _cover = 0;
-	crl::time _position = 0;
 	bool _gif = false;
+	bool _gifAllowed = true;
 
-	std::unique_ptr<Media::Streaming::Instance> _instance;
+	std::unique_ptr<SegmentPlayer> _player;
 	base::unique_qptr<Crop> _crop;
 	base::unique_qptr<VideoTimeline> _timeline;
+	std::unique_ptr<TimelineSeeker> _seeker;
 	base::unique_qptr<VideoQualitySlider> _quality;
 	base::unique_qptr<Ui::RpWidget> _controls;
 	base::unique_qptr<Ui::RpWidget> _bar;
 	base::unique_qptr<Ui::IconButton> _rotate;
 	base::unique_qptr<Ui::IconButton> _flip;
 	base::unique_qptr<Ui::IconButton> _gifButton;
+	base::unique_qptr<Ui::ImportantTooltip> _gifTooltip;
 	base::unique_qptr<Ui::RippleButton> _confirm;
 	base::unique_qptr<Ui::RippleButton> _cancelButton;
 	base::unique_qptr<Ui::FlatLabel> _about;
@@ -122,7 +122,6 @@ private:
 	QRect _frameRect;
 	QTransform _frameMatrix;
 	QRect _innerRect;
-	QImage _lastFrame;
 	bool _dragging = false;
 	bool _userPaused = false;
 	crl::time _bubbleCover = -1;

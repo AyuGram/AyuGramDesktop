@@ -251,10 +251,6 @@ rpl::producer<bool> Authorizations::callsDisabledHereValue() const {
 	return _callsDisabledHere.value();
 }
 
-rpl::producer<bool> Authorizations::callsDisabledHereChanges() const {
-	return _callsDisabledHere.changes();
-}
-
 QString Authorizations::ActiveDateString(TimeId active) {
 	const auto now = QDateTime::currentDateTime();
 	const auto lastTime = base::unixtime::parse(active);

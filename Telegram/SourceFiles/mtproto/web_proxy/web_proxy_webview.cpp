@@ -60,7 +60,7 @@ static_assert(kMaxMessageBytes >= kMaxFrameMessageBytes);
 	return result.toString(QUrl::FullyEncoded);
 }
 
-#ifndef NDEBUG
+#ifdef _DEBUG
 [[nodiscard]] QByteArray RestrictionsProbeScript() {
 	return R"JS((()=>{try{
 const probe=w=>typeof w.RTCPeerConnection==='undefined'&&typeof w.WebTransport==='undefined'&&typeof w.WebAssembly==='undefined';
@@ -71,7 +71,7 @@ try{ok=ok&&!!frame.contentWindow&&probe(frame.contentWindow)}finally{frame.remov
 window.external.invoke('d'+(ok?'1':'0'));
 }catch(error){window.external.invoke('d0')}})())JS";
 }
-#endif // !NDEBUG
+#endif // _DEBUG
 
 [[nodiscard]] QByteArray BridgeScript() {
 	return R"JS((()=>{
@@ -172,7 +172,7 @@ WebviewCarrier::WebviewCarrier(
 	_window->setMessageHandler([=](Webview::Message message) {
 		handleMessage(std::move(message.text), std::move(message.sourceUrl));
 	});
-	_window->setNavigationStartHandler([=](QString url, bool newWindow) {
+	_window->setNavigationPolicyHandler([=](QString url, bool newWindow) {
 		return !newWindow && validNavigation(url);
 	});
 	_window->setNavigationDoneHandler([=](bool success) {
@@ -206,7 +206,7 @@ void WebviewCarrier::close() {
 	_callbacks = Callbacks();
 	if (_window && _window->valid()) {
 		_window->setMessageHandler(Fn<void(Webview::Message)>());
-		_window->setNavigationStartHandler([](QString, bool) {
+		_window->setNavigationPolicyHandler([](QString, bool) {
 			return false;
 		});
 		_window->setNavigationDoneHandler(nullptr);
@@ -253,7 +253,7 @@ void WebviewCarrier::handleMessage(
 		}
 		probeRestrictions();
 		return;
-#ifndef NDEBUG
+#ifdef _DEBUG
 	case 'd':
 		if (data != "d1") {
 			LOG(("Web Proxy Error: "
@@ -261,7 +261,7 @@ void WebviewCarrier::handleMessage(
 				).arg(QString::fromUtf8(data)));
 		}
 		return;
-#endif // !NDEBUG
+#endif // _DEBUG
 	case 'f':
 		fail("bridge script failure");
 		return;
@@ -346,13 +346,13 @@ void WebviewCarrier::extendHandshake() {
 }
 
 void WebviewCarrier::probeRestrictions() {
-#ifndef NDEBUG
+#ifdef _DEBUG
 	if (_probed) {
 		return;
 	}
 	_probed = true;
 	_window->eval(RestrictionsProbeScript());
-#endif // !NDEBUG
+#endif // _DEBUG
 }
 
 void WebviewCarrier::handleBinary(QByteArray frame) {

@@ -74,6 +74,7 @@ struct ChatThemeBackgroundData {
 struct ChatThemeBubblesData {
 	std::vector<QColor> colors;
 	std::optional<QColor> accent;
+	bool dark = false;
 };
 
 struct CacheBackgroundRequest {
@@ -218,6 +219,7 @@ private:
 	ChatThemeKey _key;
 	std::unique_ptr<style::palette> _palette;
 	ChatThemeBackground _mutableBackground;
+	std::optional<QColor> _backgroundAverage;
 	BackgroundState _backgroundState;
 	Animations::Simple _backgroundFade;
 	CacheBackgroundRequest _backgroundCachingRequest;
@@ -229,6 +231,7 @@ private:
 
 	CachedBackground _bubblesBackground;
 	QImage _bubblesBackgroundPrepared;
+	std::optional<QColor> _bubblesBackgroundAverage;
 	CacheBackgroundRequest _bubblesCachingRequest;
 	QSize _cacheBubblesArea;
 	crl::time _lastBubblesAreaChangeTime = 0;
@@ -287,6 +290,8 @@ struct BackgroundImageFields {
 	int rotation);
 [[nodiscard]] ChatThemeBackground PrepareBackgroundImage(
 	const ChatThemeBackgroundData &data);
+[[nodiscard]] std::vector<QColor> BubblesGradientColors(
+	const ChatThemeBubblesData &data);
 [[nodiscard]] QImage PrepareBubblesBackground(
 	const ChatThemeBubblesData &data);
 [[nodiscard]] QImage PrepareGiftSymbol(

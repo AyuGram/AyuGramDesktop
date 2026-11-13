@@ -601,6 +601,10 @@ void DownloadManager::deleteAll() {
 		while (!data.downloading.empty()) {
 			cancel(data, data.downloading.end() - 1);
 		}
+		// resolveNeeded / resolveSentTotal index into downloaded, and
+		// resolve requests may still be in flight, so drop them together.
+		data.resolveNeeded = 0;
+		data.resolveSentTotal = 0;
 		for (auto &id : base::take(data.downloaded)) {
 			const auto object = id.object.get();
 			const auto document = object ? object->document : nullptr;
@@ -678,10 +682,6 @@ auto DownloadManager::loadingList() const
 			return &id;
 		});
 	}) | ranges::views::join;
-}
-
-DownloadProgress DownloadManager::loadingProgress() const {
-	return _loadingProgress.current();
 }
 
 rpl::producer<> DownloadManager::loadingListChanges() const {

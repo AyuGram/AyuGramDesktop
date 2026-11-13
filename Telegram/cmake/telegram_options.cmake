@@ -5,6 +5,7 @@
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 option(TDESKTOP_API_TEST "Use test API credentials." OFF)
+option(TDESKTOP_BUILD_UPDATE_TESTS "Build the focused update verification test." OFF)
 set(TDESKTOP_API_ID "0" CACHE STRING "Provide 'api_id' for the Telegram API access.")
 set(TDESKTOP_API_HASH "" CACHE STRING "Provide 'api_hash' for the Telegram API access.")
 
@@ -51,6 +52,16 @@ endif()
 if (DESKTOP_APP_SPECIAL_TARGET)
     target_compile_definitions(Telegram PRIVATE TDESKTOP_ALLOW_CLOSED_ALPHA)
 endif()
+
+option(TDESKTOP_RELEASE_TEST_HARNESS "Compile the -testagent test harness into Release builds, for local measurements only." OFF)
+if (TDESKTOP_RELEASE_TEST_HARNESS)
+    if (DESKTOP_APP_ENABLE_LTO)
+        message(FATAL_ERROR "TDESKTOP_RELEASE_TEST_HARNESS can't be combined with DESKTOP_APP_ENABLE_LTO, the official release builds' setting: the test harness must never ship.")
+    endif()
+    target_compile_definitions(Telegram PRIVATE $<$<CONFIG:Release>:TDESKTOP_RELEASE_TEST_HARNESS>)
+endif()
+
+set(TDESKTOP_L10N_CAPTURE "" CACHE PATH "Path to an l10n-tdesktop checkout, compiles its localization capture into the -testagent harness.")
 
 option(DESKTOP_APP_DISABLE_SWIFT6 "Disable local on-device translation (build without Swift 6 on macOS)." OFF)
 if (DESKTOP_APP_DISABLE_SWIFT6)

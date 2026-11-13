@@ -33,18 +33,16 @@ public:
 	rpl::producer<QString> mediaSourceQueryValue() const override;
 
 	void applySearchQuery(const QString &query);
+	[[nodiscard]] Storage::SharedMediaType mediaSourceType() const;
+	void setMediaSourceType(Storage::SharedMediaType type);
 
 private:
-	using SearchQuery = Api::DelayedSearchController::Query;
-
-	[[nodiscard]] SearchQuery produceSearchQuery(
-		const QString &query) const;
-
 	const not_null<AbstractController*> _parent;
 	const Key _key;
 	const ::Info::Section _section;
 	PeerData * const _migrated = nullptr;
 	std::unique_ptr<Api::DelayedSearchController> _search;
+	rpl::variable<Storage::SharedMediaType> _sourceType;
 
 };
 

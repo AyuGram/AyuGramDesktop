@@ -23,11 +23,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_keyboard_text_selection.h"
 #include "history/view/history_view_top_bar_widget.h"
+#include "history/view/history_view_touch_scroll.h"
 
 #include <QtGui/QPainterPath>
 
 struct ClickContext;
 struct ClickHandlerContext;
+struct HistorySelectedTextParts;
 
 namespace Data {
 struct Group;
@@ -45,6 +47,7 @@ enum class ElementChatMode : char;
 class ElementOverlayHost;
 class EmptyPainter;
 class Element;
+class GramReadLine;
 class TranslateTracker;
 class ReadMetricsTracker;
 struct PinnedId;
@@ -62,6 +65,13 @@ namespace HistoryView::ReplyButton {
 class Manager;
 struct ButtonParameters;
 } // namespace HistoryView::ReplyButton
+
+namespace Tgw {
+class ListSelection;
+class ListTouch;
+class WidgetSelection;
+class WidgetTouch;
+} // namespace Tgw
 
 namespace Window {
 class SessionController;
@@ -128,6 +138,7 @@ public:
 	QString accessibilityChildName(int index) const override;
 	QAccessible::State accessibilityChildState(int index) const override;
 	QAccessible::Role accessibilityChildRole() const override;
+	QAccessible::Role accessibilityChildRoleAt(int index) const override;
 	QRect accessibilityChildRect(int index) const override;
 	int accessibilityChildColumnCount(int row) const override;
 	QAccessible::Role accessibilityChildSubItemRole() const override;
@@ -236,6 +247,7 @@ public:
 	void elementStartEffect(
 		not_null<const Element*> view,
 		Element *replacing);
+	HistoryView::GramReadLine *elementGramReadLine();
 
 	void startEffectOnRead(not_null<HistoryItem*> item);
 	void updateBotInfo(bool recount = true);
@@ -310,12 +322,12 @@ protected:
 	void contextMenuEvent(QContextMenuEvent *e) override;
 
 private:
-	[[nodiscard]] std::vector<Element*> accessibleElements() const;
+	friend class Tgw::ListSelection;
+	friend class Tgw::ListTouch;
+
+	[[nodiscard]] const std::vector<Element*> &accessibleElements() const;
+	void invalidateAccessibleElements();
 	[[nodiscard]] int accessibilityUnreadBarIndex() const;
-	[[nodiscard]] HistoryItem *accessibilityItemAtIndex(
-		int index,
-		const std::vector<Element*> &elements,
-		int barIndex) const;
 	void toggleMessageSelection();
 	void playPauseFocusedMedia();
 	void setAccessibilityFocusedItem(int index, HistoryItem *item);
@@ -413,10 +425,16 @@ private:
 	void scrollDateHideByTimer();
 	void scrollDateCheckDownward();
 	bool canHaveFromUserpics() const;
-	void mouseActionStart(const QPoint &screenPos, Qt::MouseButton button);
+	void mouseActionStart(
+		const QPoint &screenPos,
+		Qt::MouseButton button,
+		bool fromTouch = false);
 	void mouseActionUpdate();
 	void mouseActionUpdate(const QPoint &screenPos);
-	void mouseActionFinish(const QPoint &screenPos, Qt::MouseButton button);
+	void mouseActionFinish(
+		const QPoint &screenPos,
+		Qt::MouseButton button,
+		bool fromTouch = false);
 	void mouseActionCancel();
 	std::unique_ptr<QMimeData> prepareDrag();
 	void performDrag();
@@ -468,6 +486,7 @@ private:
 		not_null<HistoryItem*> item) const;
 	[[nodiscard]] MessageSelection getSelectedTextSelection(
 		not_null<HistoryItem*> item) const;
+	[[nodiscard]] HistorySelectedTextParts getSelectedTextParts() const;
 	[[nodiscard]] bool isPressInSelectedText(
 		not_null<const Element*> view,
 		TextState state) const;
@@ -535,7 +554,7 @@ private:
 	void reportAsGroup(FullMsgId itemId);
 	void blockSenderItem(FullMsgId itemId);
 	void blockSenderAsGroup(FullMsgId itemId);
-	void copySelectedText();
+	void copySelectedText(bool withImageText = false);
 	void editCaptionUploadLayer(not_null<HistoryItem*> item);
 
 	[[nodiscard]] auto reactionButtonParameters(
@@ -575,6 +594,9 @@ private:
 		not_null<const HistoryItem*>,
 		quintptr> _accessibilityIdentities;
 	mutable quintptr _accessibilityIdentityCounter = 0;
+	mutable std::optional<std::vector<Element*>> _accessibleElements;
+	mutable const Element *_accessibilityUnreadBar = nullptr;
+	mutable int _accessibilityUnreadBarIndex = -1;
 	mutable const HistoryView::Element *_activeColumnsView = nullptr;
 	mutable std::vector<HistoryView::MessageSubItem> _activeColumns;
 
@@ -627,6 +649,7 @@ private:
 	std::optional<Data::ReportInput> _chooseForReportReason;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
+	std::unique_ptr<HistoryView::GramReadLine> _gramReadLine;
 	QPainterPath _highlightPathCache;
 	bool _isChatWide = false;
 	bool _removeFromUserpics = false;
@@ -679,6 +702,8 @@ private:
 	QPoint _touchStart, _touchPrevPos, _touchPos;
 	rpl::variable<bool> _touchMaybeSelecting;
 	base::Timer _touchSelectTimer;
+	std::unique_ptr<Tgw::WidgetTouch> _widgetTouch;
+	std::unique_ptr<Tgw::WidgetSelection> _widgetSelection;
 
 	Ui::DraggingScrollManager _selectScroll;
 
@@ -692,6 +717,7 @@ private:
 	crl::time _touchAccelerationTime = 0;
 	crl::time _touchTime = 0;
 	base::Timer _touchScrollTimer;
+	HistoryView::TouchScroll _touchElastic;
 	Ui::MiddleClickAutoscroll _middleClickAutoscroll;
 
 	Ui::Controls::SwipeContextData _gestureHorizontal;

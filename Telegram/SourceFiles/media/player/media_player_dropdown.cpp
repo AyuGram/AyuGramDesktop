@@ -26,6 +26,10 @@ namespace Media::Player {
 namespace {
 
 constexpr auto kSpeedDebounceTimeout = crl::time(600);
+constexpr auto kSpeedBoostHoldDelay = crl::time(200);
+constexpr auto kSpeedBoostValue = 2.0;
+constexpr auto kSpeedBoostThrottle = crl::time(200);
+constexpr auto kSpeedBoostSettle = crl::time(120);
 
 [[nodiscard]] float64 SpeedToSliderValue(float64 speed) {
 	return (speed - kSpeedMin) / (kSpeedMax - kSpeedMin);
@@ -360,6 +364,16 @@ bool Dropdown::overlaps(const QRect &globalRect) {
 	return rect().marginsRemoved(getMargin()).contains(QRect(mapFromGlobal(globalRect.topLeft()), globalRect.size()));
 }
 
+void Dropdown::hideFast() {
+	_showTimer.cancel();
+	_hideTimer.cancel();
+	if (!isHidden()) {
+		_hiding = false;
+		_a_appearance.stop();
+		hidingFinished();
+	}
+}
+
 void Dropdown::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
@@ -580,6 +594,11 @@ void WithDropdownController::showBack() {
 	}
 }
 
+void WithDropdownController::setOtherDropdownCheck(
+		Fn<bool(QPoint globalPosition)> check) {
+	_otherDropdownCheck = std::move(check);
+}
+
 void WithDropdownController::showMenu() {
 	if (_menu) {
 		return;
@@ -593,6 +612,9 @@ void WithDropdownController::showMenu() {
 			_menuOverCallback(true);
 		} else if (type == QEvent::Leave) {
 			_menuOverCallback(false);
+		} else if (type == QEvent::MouseMove) {
+			const auto mouse = static_cast<QMouseEvent*>(e.get());
+			handleMenuMove(mouse->globalPos());
 		}
 	}, _menu->lifetime());
 	_menu->setHiddenCallback([=]{
@@ -625,6 +647,18 @@ void WithDropdownController::showMenu() {
 	}();
 	_menu->showAnimated(origin);
 	_menuToggled = true;
+}
+
+void WithDropdownController::handleMenuMove(QPoint globalPosition) {
+	if (!_menu || !_otherDropdownCheck) {
+		return;
+	}
+	const auto local = _button->mapFromGlobal(globalPosition);
+	if (_button->rect().contains(local)
+		|| !_otherDropdownCheck(globalPosition)) {
+		return;
+	}
+	_menu->hideFast();
 }
 
 OrderController::OrderController(
@@ -738,7 +772,9 @@ SpeedController::SpeedController(
 	Expects(_qualities.empty() || (_lookupQuality && _changeQuality));
 
 	button->setClickedCallback([=] {
-		if (_lookup && !_lookupQuality && !_changeQuality) {
+		if (base::take(_speedBoostConsumedClick)) {
+			return;
+		} else if (_lookup && !_lookupQuality && !_changeQuality) {
 			toggleDefault();
 			save();
 			if (const auto current = menu()) {
@@ -763,6 +799,7 @@ rpl::producer<float64> SpeedController::realtimeValue() const {
 }
 
 void SpeedController::reloadFromLookup() {
+	stopSpeedBoost();
 	if (const auto lookup = _lookup) {
 		setSpeed(lookup(false));
 		_speed = lookup(true);
@@ -779,10 +816,6 @@ float64 SpeedController::speed() const {
 
 bool SpeedController::isDefault() const {
 	return _isDefault;
-}
-
-float64 SpeedController::lastNonDefaultSpeed() const {
-	return _speed;
 }
 
 void SpeedController::toggleDefault() {
@@ -802,6 +835,128 @@ void SpeedController::save() {
 		change(speed());
 	}
 	_saved.fire({});
+}
+
+void SpeedController::setApplySpeed(Fn<void(float64)> apply) {
+	_applySpeed = std::move(apply);
+	if (!_applySpeed || !_lookup) {
+		return;
+	}
+	_speedBoostTimer.setCallback([=] {
+		startSpeedBoost();
+	});
+	_speedBoostSettleTimer.setCallback([=] {
+		commitSpeedBoost();
+	});
+	button()->events(
+	) | rpl::filter([=](not_null<QEvent*> e) {
+		const auto type = e->type();
+		return (type == QEvent::MouseButtonPress)
+			|| (type == QEvent::MouseButtonRelease)
+			|| (type == QEvent::MouseMove);
+	}) | rpl::on_next([=](not_null<QEvent*> e) {
+		handleSpeedBoostEvent(e.get());
+	}, button()->lifetime());
+}
+
+void SpeedController::showMenu() {
+	if (_speedBoostActive) {
+		return;
+	}
+	WithDropdownController::showMenu();
+}
+
+void SpeedController::handleSpeedBoostEvent(not_null<QEvent*> e) {
+	const auto mouse = static_cast<QMouseEvent*>(e.get());
+	switch (e->type()) {
+	case QEvent::MouseButtonPress:
+		if (mouse->button() == Qt::LeftButton) {
+			_speedBoostConsumedClick = false;
+			_speedBoostLastPosition = mouse->pos();
+			_speedBoostTimer.callOnce(kSpeedBoostHoldDelay);
+		}
+		break;
+	case QEvent::MouseButtonRelease:
+		if (mouse->button() == Qt::LeftButton) {
+			_speedBoostTimer.cancel();
+			if (_speedBoostActive) {
+				_speedBoostConsumedClick = true;
+				stopSpeedBoost();
+			}
+		}
+		break;
+	case QEvent::MouseMove: {
+		if (!(mouse->buttons() & Qt::LeftButton)) {
+			return;
+		}
+		const auto position = mouse->pos();
+		const auto delta = position.x() - _speedBoostLastPosition.x();
+		_speedBoostLastPosition = position;
+		if (!_speedBoostActive) {
+			return;
+		}
+		const auto perUnit = float64(st::mediaPlayerSpeedBoostDragPerUnit);
+		if (perUnit <= 0.) {
+			return;
+		}
+		const auto speed = std::clamp(
+			_speedBoostSpeed + delta / perUnit,
+			kSpeedMin,
+			kSpeedMax);
+		_speedBoostSpeed = speed;
+		_speedChanged.fire_copy(speed);
+		if (speed != _speedBoostAppliedSpeed) {
+			if (crl::now() - _speedBoostLastCommit >= kSpeedBoostThrottle) {
+				_speedBoostSettleTimer.cancel();
+				commitSpeedBoost();
+			} else {
+				_speedBoostSettleTimer.callOnce(kSpeedBoostSettle);
+			}
+		} else {
+			_speedBoostSettleTimer.cancel();
+		}
+	} break;
+	default:
+		break;
+	}
+}
+
+void SpeedController::startSpeedBoost() {
+	if (_speedBoostActive || !_applySpeed) {
+		return;
+	}
+	_speedBoostActive = true;
+	_speedBoostSpeed = kSpeedBoostValue;
+	_speedBoostAppliedSpeed = kSpeedBoostValue;
+	_speedBoostLastCommit = crl::now();
+	_speedBoostSettleTimer.cancel();
+	_applySpeed(_speedBoostSpeed);
+	_speedChanged.fire_copy(_speedBoostSpeed);
+	if (const auto current = menu()) {
+		current->hideFast();
+	}
+}
+
+void SpeedController::stopSpeedBoost() {
+	if (!_speedBoostActive) {
+		return;
+	}
+	_speedBoostActive = false;
+	_speedBoostTimer.cancel();
+	_speedBoostSettleTimer.cancel();
+	if (_applySpeed && _lookup) {
+		_applySpeed(_lookup(false));
+	}
+	_speedChanged.fire_copy(speed());
+}
+
+void SpeedController::commitSpeedBoost() {
+	if (!_speedBoostActive || _speedBoostAppliedSpeed == _speedBoostSpeed) {
+		return;
+	}
+	_speedBoostAppliedSpeed = _speedBoostSpeed;
+	_speedBoostLastCommit = crl::now();
+	_applySpeed(_speedBoostSpeed);
 }
 
 void SpeedController::setQuality(VideoQuality quality) {

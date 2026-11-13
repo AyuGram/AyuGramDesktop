@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "boxes/edit_privacy_box.h"
 #include "boxes/peers/edit_peer_info_box.h" // EditPeerInfoBox::Available.
+#include "ui/boxes/confirm_box.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/empty_userpic.h"
 #include "data/data_photo.h"
@@ -286,21 +287,21 @@ bool UserpicButton::canSuggestPhoto(not_null<UserData*> user) const {
 
 bool UserpicButton::hasPersonalPhotoLocally() const {
 	if (const auto user = _peer->asUser()) {
-		return _overrideHasPersonalPhoto.value_or(user->hasPersonalPhoto());
+		return user->hasPersonalPhoto();
 	}
 	return false;
 }
 
 void UserpicButton::setClickHandlerByRole() {
-	requestSuggestAvailability();
-
 	switch (_role) {
 	case Role::ChoosePhoto:
 	case Role::ChangePhoto:
+		requestSuggestAvailability();
 		addClickHandler([=] { choosePhotoLocally(); });
 		break;
 
 	case Role::OpenPhoto:
+		requestSuggestAvailability();
 		addClickHandler([=] { openPeerPhoto(); });
 		break;
 	}
@@ -413,7 +414,7 @@ void UserpicButton::choosePhotoLocally() {
 						_window,
 						editorData(type),
 						callback(type),
-						qvariant_cast<QImage>(data->imageData()));
+						QGuiApplication::clipboard()->image());
 				});
 				_menu->addAction(
 					std::move(text)(tr::now),
@@ -445,7 +446,7 @@ void UserpicButton::choosePhotoLocally() {
 		addUserpicBuilder(ChosenType::Set);
 		if (hasPersonalPhotoLocally()) {
 			_menu->addSeparator(&st::expandedMenuSeparator);
-			_menu->addAction(makeResetToOriginalAction());
+			_menu->addAction(makeResetToOriginalAction(user));
 		}
 	} else {
 		const auto hasCamera = IsCameraAvailable();
@@ -501,7 +502,7 @@ void UserpicButton::choosePhotoLocally() {
 	_menu->popup(position);
 }
 
-auto UserpicButton::makeResetToOriginalAction()
+auto UserpicButton::makeResetToOriginalAction(not_null<UserData*> user)
 -> base::unique_qptr<Menu::ItemBase> {
 	auto item = base::make_unique_q<Menu::Action>(
 		_menu->menu(),
@@ -509,7 +510,19 @@ auto UserpicButton::makeResetToOriginalAction()
 		Menu::CreateAction(
 			_menu.get(),
 			tr::lng_profile_photo_reset(tr::now),
-			[=] { _resetPersonalRequests.fire({}); }),
+			[=] {
+				_controller->show(Ui::MakeConfirmBox({
+					.text = tr::lng_profile_photo_reset_sure(
+						tr::now,
+						lt_user,
+						user->shortName()),
+					.confirmed = [user](Fn<void()> close) {
+						user->session().api().peerPhoto().clearPersonal(user);
+						close();
+					},
+					.confirmText = tr::lng_profile_photo_reset_button(tr::now),
+				}));
+			}),
 		nullptr,
 		nullptr);
 	const auto icon = CreateChild<UserpicButton>(
@@ -1193,16 +1206,6 @@ void UserpicButton::showSource(Source source) {
 
 	prepareUserpicPixmap();
 	update();
-}
-
-void UserpicButton::overrideHasPersonalPhoto(bool has) {
-	Expects(_peer && _peer->isUser());
-
-	_overrideHasPersonalPhoto = has;
-}
-
-rpl::producer<> UserpicButton::resetPersonalRequests() const {
-	return _resetPersonalRequests.events();
 }
 
 void UserpicButton::showUploadProgress() {

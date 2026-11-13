@@ -776,6 +776,18 @@ QString InlineButtonClickHandler::tooltip() const {
 	return InlineButtonTooltip(_data);
 }
 
+[[nodiscard]] Ui::Text::CustomEmojiLinkTexts InlineButtonLinkTexts(
+		QStringView data) {
+	const auto url = InlineButtonUrl(data);
+	return {
+		.tooltip = InlineButtonTooltip(data),
+		.copyText = url,
+		.copyContextItemText = (url.isEmpty()
+			? QString()
+			: tr::lng_context_copy_link(tr::now)),
+	};
+}
+
 [[nodiscard]] QString InlineButtonPlainEmojiPrefix() {
 	return u"iv-markdown:inline-button-emoji:"_q;
 }
@@ -2346,6 +2358,11 @@ QString InlineButtonTooltip(QStringView data) {
 		: QString();
 }
 
+QString InlineButtonUrl(QStringView data) {
+	const auto button = ActionableInlineButtonDataFor(data);
+	return button ? RichButtonUrl(button->type, button->data) : QString();
+}
+
 void SetTextLeaf(
 		Ui::Text::String *leaf,
 		const style::TextStyle &textStyle,
@@ -2361,7 +2378,8 @@ void SetTextLeaf(
 		Fn<void()> repaint,
 		Fn<void(QRect)> repaintRect,
 		Fn<bool(const ClickContext&)> spoilerLinkFilter,
-		bool richButtonLabel) {
+		bool richButtonLabel,
+		bool keepLeadingSpaces) {
 	*leaf = Ui::Text::String(TextMinResizeWidth(minResizeWidth));
 	auto context = mediaRuntime
 		? mediaRuntime->textContext()
@@ -2444,10 +2462,14 @@ void SetTextLeaf(
 	const auto resolved = richButtonLabel
 		? ResolveRichButtonLabelDates(text, context.formattedDateFactory)
 		: TextWithEntities();
+	auto options = rtl ? kIvMarkedTextOptionsRtl : kIvMarkedTextOptions;
+	if (keepLeadingSpaces) {
+		options.flags |= TextParseKeepLeadingSpaces;
+	}
 	leaf->setMarkedText(
 		textStyle,
 		richButtonLabel ? resolved : text,
-		rtl ? kIvMarkedTextOptionsRtl : kIvMarkedTextOptions,
+		options,
 		context);
 	SetTextLeafSpoilerLinkFilter(leaf, std::move(spoilerLinkFilter));
 	if (inlineButtonPaintState
@@ -2456,15 +2478,10 @@ void SetTextLeaf(
 			return (entity.type() == EntityType::CustomEmoji)
 				&& InlineButtonActionable(entity.data());
 		})) {
-		leaf->setCustomEmojiClickHandler([
-			state = inlineButtonPaintState
-		](QStringView data) {
-			if (!InlineButtonActionable(data)) {
-				return false;
-			}
-			state->lookedUpButton = data.toString();
-			return true;
-		}, ActivateInlineButton);
+		leaf->setCustomEmojiClickHandler(
+			InlineButtonActionable,
+			ActivateInlineButton,
+			InlineButtonLinkTexts);
 	}
 }
 

@@ -15,16 +15,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "api/api_text_entities.h"
 #include "base/event_filter.h"
-#include "base/qt_signal_producer.h"
 #include "base/random.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
 #include "boxes/filters/edit_filter_chats_list.h"
 #include "boxes/peers/edit_peer_color_box.h"
 #include "boxes/peers/prepare_short_info_box.h"
-#include "boxes/gift_premium_box.h"
 #include "boxes/peer_list_controllers.h"
-#include "boxes/premium_preview_box.h"
 #include "boxes/send_credits_box.h"
 #include "boxes/star_gift_auction_box.h"
 #include "boxes/star_gift_preview_box.h"
@@ -37,8 +34,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/stickers_lottie.h"
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
-#include "core/application.h"
-#include "core/click_handler_types.h"
 #include "core/ui_integration.h"
 #include "data/components/gift_auctions.h"
 #include "data/components/promo_suggestions.h"
@@ -50,7 +45,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_emoji_statuses.h"
-#include "data/data_file_origin.h"
 #include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
@@ -73,7 +67,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_single_player.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
-#include "menu/gift_resale_filter.h"
 #include "payments/payments_form.h"
 #include "payments/payments_checkout_process.h"
 #include "payments/payments_non_panel_process.h"
@@ -97,7 +90,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/premium_stars_colored.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
-#include "ui/new_badges.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/text/custom_emoji_helper.h"
@@ -108,17 +100,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/fields/number_input.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
-#include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/table_layout.h"
 #include "window/themes/window_theme.h"
 #include "window/section_widget.h"
-#include "window/window_controller.h"
 #include "window/window_session_controller.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
@@ -2498,6 +2487,24 @@ void ChooseStarGiftRecipient(
 	});
 }
 
+bool CanSendStarGiftTo(not_null<PeerData*> peer) {
+	if (const auto user = peer->asUser()) {
+		return !user->isInaccessible()
+			&& !user->isSelf()
+			&& !user->isBot()
+			&& !user->isServiceUser()
+			&& !user->isNotificationsUser()
+			&& !user->isRepliesChat()
+			&& !user->isVerifyCodes()
+			&& user->session().premiumCanBuy();
+	} else if (const auto channel = peer->asBroadcast()) {
+		return !channel->isForbidden()
+			&& channel->stargiftsAvailable()
+			&& !channel->amCreator();
+	}
+	return false;
+}
+
 void ShowStarGiftBox(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer) {
@@ -2761,13 +2768,15 @@ void AttachGiftSenderBadge(
 		const auto margin = st::msgServiceMargin;
 		const auto padding = st::msgServicePadding;
 		const auto available = outer.marginsRemoved(margin).width();
+		const auto minTop = margin.top() * 2;
 		badge->resizeToWidth(std::min(
 			available - padding.left() - padding.right(),
 			badge->textMaxWidth()));
+		box->setMinimalTopSkip(minTop + badge->height() + margin.top());
 		const auto inner = Ui::MapFrom(parent, box, box->rect());
 		const auto top = std::max(
 			inner.y() - badge->height() - margin.top(),
-			outer.y() + (margin.top() * 2));
+			outer.y() + minTop);
 		const auto left = margin.left() + (available - badge->width()) / 2;
 		badge->move(left, top);
 	};
@@ -4658,7 +4667,8 @@ void DefaultGiftHandler(
 				.recipientId = peer->id,
 				.forceTon = star->forceTon,
 			},
-			Settings::CreditsEntryBoxStyleOverrides()));
+			Settings::CreditsEntryBoxStyleOverrides(),
+			nullptr));
 	} else if (unique && star->mine && !peer->isSelf()) {
 		if (ShowTransferGiftLater(window->uiShow(), unique)) {
 			return;

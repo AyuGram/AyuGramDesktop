@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "chat_helpers/message_field.h"
 #include "lang/lang_keys.h"
+#include "base/qt_signal_producer.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/platform/ui_platform_utility.h"
@@ -97,11 +98,22 @@ Manager::Manager(System *system)
 	) | rpl::on_next([=](ChangeType change) {
 		settingsChanged(change);
 	}, _lifetime);
+
+	// Notifications are kept in the queue while there are no screens.
+	base::qt_signal_producer(
+		qApp,
+		&QGuiApplication::screenAdded
+	) | rpl::filter([=] {
+		return !_queuedNotifications.empty();
+	}) | rpl::on_next([=] {
+		showNextFromQueue();
+	}, _lifetime);
 }
 
 Manager::QueuedNotification::QueuedNotification(NotificationFields &&fields)
 : history(fields.item->history())
 , topicRootId(fields.item->topicRootId())
+, monoforumPeerId(ItemContextId(fields.item).monoforumPeerId)
 , peer(history->peer)
 , reaction(fields.reactionId)
 , author(!fields.reactionFrom
@@ -223,6 +235,10 @@ void Manager::stopAllHiding() {
 }
 
 void Manager::showNextFromQueue() {
+	if (!QGuiApplication::primaryScreen()) {
+		// Creating a window without screens is a Qt fatal error.
+		return;
+	}
 	auto guard = gsl::finally([this] {
 		if (_positionsOutdated) {
 			moveWidgets();
@@ -409,7 +425,7 @@ void Manager::doClearFromTopic(not_null<Data::ForumTopic*> topic) {
 
 void Manager::doClearFromSublist(not_null<Data::SavedSublist*> sublist) {
 	const auto history = sublist->owningHistory();
-	const auto sublistPeerId = sublist->sublistPeer()->id;
+	const auto sublistPeerId = SublistContextId(sublist).monoforumPeerId;
 	for (auto i = _queuedNotifications.begin(); i != _queuedNotifications.cend();) {
 		if (i->history == history && i->monoforumPeerId == sublistPeerId) {
 			i = _queuedNotifications.erase(i);
@@ -487,8 +503,22 @@ void Manager::doMaybeFlashBounce(Fn<void()> flashBounce) {
 }
 
 void Manager::doUpdateAll() {
+	const auto locked = Core::App().passcodeLocked();
+	auto unlinked = false;
 	for (const auto &notification : _notifications) {
-		notification->updateNotifyDisplay();
+		if (locked
+			&& (notification->isReplying() || notification->isUnlinked())) {
+			notification->hide();
+			if (notification->unlinkHistory()) {
+				unlinked = true;
+			}
+		} else {
+			notification->updateNotifyDisplay();
+		}
+	}
+	if (unlinked) {
+		_positionsOutdated = true;
+		showNextFromQueue();
 	}
 }
 
@@ -1112,7 +1142,7 @@ void Notification::toggleActionButtons(bool visible) {
 }
 
 void Notification::showReplyField() {
-	if (!_item) {
+	if (!canReply()) {
 		return;
 	}
 	raise();

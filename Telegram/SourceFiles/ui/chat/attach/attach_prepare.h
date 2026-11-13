@@ -66,6 +66,7 @@ struct PreparedFileArchive {
 	QString folder;
 	QString root;
 	QStringList paths;
+	QStringList names;
 };
 
 struct PreparedFile {
@@ -95,11 +96,13 @@ struct PreparedFile {
 	[[nodiscard]] bool isGifv() const;
 	[[nodiscard]] bool canUseHighQualityPhoto() const;
 	[[nodiscard]] bool hasAnimatedEditScene() const;
+	[[nodiscard]] bool hasAudioEditScene() const;
 	[[nodiscard]] bool sendsVideoAsGif() const;
 
 	[[nodiscard]] bool canEditVideo() const;
 
 	[[nodiscard]] int videoQuality() const;
+	[[nodiscard]] int64 memoryUsage() const;
 
 	// Assigned on demand, so deferred work can find this entry back.
 	int64 id = 0;
@@ -116,6 +119,7 @@ struct PreparedFile {
 	Type type = Type::File;
 	crl::time ttlSeconds = 0;
 	bool spoiler = false;
+	bool selected = false;
 	bool sendLargePhotos = false;
 	std::shared_ptr<Media::Encode::Job> animationJob;
 	std::shared_ptr<PreparedFileArchive> archive;
@@ -141,11 +145,6 @@ struct PreparedList {
 	PreparedList(PreparedList &&other) = default;
 	PreparedList &operator=(PreparedList &&other) = default;
 
-	[[nodiscard]] static PreparedList Reordered(
-		PreparedList &&list,
-		std::vector<int> order);
-	void mergeToEnd(PreparedList &&other, bool cutToAlbumSize = false);
-
 	[[nodiscard]] bool canAddCaption(bool compress) const;
 	[[nodiscard]] bool canMoveCaption(
 		bool sendingAlbum,
@@ -163,6 +162,7 @@ struct PreparedList {
 	[[nodiscard]] bool hasSticker() const;
 	[[nodiscard]] bool hasSpoilerMenu(bool compress) const;
 	[[nodiscard]] bool hasSendLargePhotosOption(bool compress) const;
+	[[nodiscard]] int64 memoryUsage() const;
 
 	Error error = Error::None;
 	QString errorData;

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "main/main_session_settings.h"
+#include "chat_helpers/spellchecker_locale_ids.h"
 
 #include "chat_helpers/tabbed_selector.h"
 #include "ui/widgets/fields/input_field.h"
@@ -95,6 +96,7 @@ QByteArray SessionSettings::serialize() const {
 	for (const auto &id : _extraFavoriteReactions) {
 		size += sizeof(quint64) + Serialize::stringSize(id.emoji());
 	}
+	size += sizeof(qint32); // _stashHintShowsCount
 
 	auto result = QByteArray();
 	result.reserve(size);
@@ -187,18 +189,22 @@ QByteArray SessionSettings::serialize() const {
 		for (const auto &id : _extraFavoriteReactions) {
 			stream << quint64(id.custom()) << id.emoji();
 		}
+		stream << qint32(_stashHintShowsCount);
 	}
 
 	Ensures(result.size() == size);
 	return result;
 }
 
-void SessionSettings::addFromSerialized(const QByteArray &serialized) {
+void SessionSettings::addFromSerialized(
+		const QByteArray &serialized,
+		int writerVersion) {
 	if (serialized.isEmpty()) {
 		return;
 	}
 
 	auto &app = Core::App().settings();
+	const auto appColumns = app.windowColumns();
 
 	QDataStream stream(serialized);
 	stream.setVersion(QDataStream::Qt_5_1);
@@ -215,9 +221,9 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 	base::flat_set<PeerId> groupEmojiSectionHidden;
 	qint32 appThirdSectionInfoEnabled = 0;
 	qint32 legacySmallDialogsList = 0;
-	float64 appDialogsWidthRatio = app.dialogsWidthRatio(false);
-	int appThirdColumnWidth = app.thirdColumnWidth();
-	int appThirdSectionExtendedBy = app.thirdSectionExtendedBy();
+	float64 appDialogsWidthRatio = appColumns.dialogsWithChatWidthRatio;
+	int appThirdColumnWidth = appColumns.thirdColumnWidth;
+	int appThirdSectionExtendedBy = appColumns.thirdSectionExtendedBy;
 	qint32 appSendFilesWay = app.sendFilesWay().serialize();
 	qint32 legacyCallsPeerToPeer = qint32(0);
 	qint32 appSendSubmitWay = static_cast<qint32>(app.sendSubmitWay());
@@ -263,6 +269,7 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 	qint32 disableSharingBoxShowsCount = 0;
 	qint32 phoneNumberHidden = 0;
 	std::vector<Data::ReactionId> extraFavoriteReactions;
+	qint32 stashHintShowsCount = 0;
 
 	stream >> versionTag;
 	if (versionTag == kVersionTag) {
@@ -745,6 +752,9 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 			}
 		}
 	}
+	if (!stream.atEnd()) {
+		stream >> stashHintShowsCount;
+	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: "
 			"Bad data for SessionSettings::addFromSerialized()"));
@@ -811,6 +821,7 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 	_disableSharingBoxShowsCount = disableSharingBoxShowsCount;
 	_phoneNumberHidden = (phoneNumberHidden == 1);
 	_extraFavoriteReactions = std::move(extraFavoriteReactions);
+	_stashHintShowsCount = stashHintShowsCount;
 
 	if (version < 2) {
 		app.setLastSeenWarningSeen(appLastSeenWarningSeen == 1);
@@ -837,6 +848,23 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 		app.setSpellcheckerEnabled(appSpellcheckerEnabled == 1);
 		app.setVideoPlaybackSpeedSerialized(appVideoPlaybackSpeed);
 		app.setVideoPipGeometry(appVideoPipGeometry);
+		const auto local = Spellchecker::LocalIdScheme();
+		const auto scheme = Spellchecker::LangIdSchemeForAppVersion(
+			writerVersion);
+		if (scheme != local) {
+			auto converted = std::vector<int>();
+			for (const auto id : appDictionariesEnabled) {
+				const auto value = Spellchecker::ConvertLangId(
+					id,
+					scheme,
+					local);
+				if (!value || ranges::contains(converted, value)) {
+					continue;
+				}
+				converted.push_back(value);
+			}
+			appDictionariesEnabled = std::move(converted);
+		}
 		app.setDictionariesEnabled(std::move(appDictionariesEnabled));
 		app.setAutoDownloadDictionaries(appAutoDownloadDictionaries == 1);
 		app.setTabbedSelectorSectionEnabled(appTabbedSelectorSectionEnabled == 1);
@@ -854,7 +882,7 @@ void SessionSettings::addFromSerialized(const QByteArray &serialized) {
 		case RectPart::BottomRight: app.setFloatPlayerCorner(uncheckedCorner); break;
 		}
 		app.setThirdSectionInfoEnabled(appThirdSectionInfoEnabled);
-		app.updateDialogsWidthRatio(appDialogsWidthRatio, false);
+		app.updateDialogsWidthRatio(appDialogsWidthRatio);
 		app.setThirdColumnWidth(appThirdColumnWidth);
 		app.setThirdSectionExtendedBy(appThirdSectionExtendedBy);
 	}
@@ -970,6 +998,20 @@ void SessionSettings::incrementDisableSharingBoxShown() {
 
 void SessionSettings::resetDisableSharingBoxShown() {
 	_disableSharingBoxShowsCount = 0;
+}
+
+bool SessionSettings::shouldShowStashHint() const {
+	return _stashHintShowsCount < kStashHintMaxShowsCount;
+}
+
+void SessionSettings::incrementStashHintShown() {
+	if (shouldShowStashHint()) {
+		_stashHintShowsCount++;
+	}
+}
+
+void SessionSettings::markStashHintUsed() {
+	_stashHintShowsCount = kStashHintMaxShowsCount;
 }
 
 std::vector<TimeId> SessionSettings::mutePeriods() const {

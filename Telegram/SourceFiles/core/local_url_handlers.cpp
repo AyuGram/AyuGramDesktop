@@ -61,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_privacy_controllers.h"
 #include "settings/sections/settings_premium.h"
 #include "storage/storage_account.h"
+#include "storage/storage_shared_media.h"
 #include "mainwidget.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
@@ -74,6 +75,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "iv/iv_instance.h"
+#include "wallet/wallet_panel.h"
+#include "wallet/wallet_ton_connect_link.h"
 #include "apiwrap.h"
 
 #include "styles/style_chat_helpers.h"
@@ -88,6 +91,9 @@ namespace Core {
 namespace {
 
 using Match = qthelp::RegularExpressionMatch;
+
+constexpr auto kGetPremiumLocal = "internal:tme_getpremium"_cs;
+constexpr auto kGetPremiumRefMaxLength = 32;
 
 class PersonalChannelController final : public PeerListController {
 public:
@@ -371,7 +377,11 @@ bool ShareUrl(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
 	const auto url = params.value(u"url"_q);
-	if (url.isEmpty() || url.trimmed().startsWith('@')) {
+	const auto start = ranges::find_if(url, [](QChar ch) {
+		return !ch.isSpace()
+			&& (ch != QChar::ObjectReplacementCharacter);
+	});
+	if (url.isEmpty() || (start != url.cend() && *start == '@')) {
 		// Don't allow to insert an inline bot query by share url link.
 		return false;
 	}
@@ -567,6 +577,77 @@ bool ShowWallPaper(
 	return result;
 }
 
+std::optional<Storage::SharedMediaType> ParseSharedMediaType(
+		const QString &value) {
+	using Type = Storage::SharedMediaType;
+	const auto lowered = value.toLower();
+	if (lowered == u"media"_q) {
+		return Type::PhotoVideo;
+	} else if (lowered == u"photos"_q) {
+		return Type::Photo;
+	} else if (lowered == u"videos"_q) {
+		return Type::Video;
+	} else if (lowered == u"gifs"_q) {
+		return Type::GIF;
+	} else if (lowered == u"files"_q) {
+		return Type::File;
+	} else if (lowered == u"music"_q) {
+		return Type::MusicFile;
+	} else if (lowered == u"links"_q) {
+		return Type::Link;
+	} else if (lowered == u"voice"_q) {
+		return Type::RoundVoiceFile;
+	} else if (lowered == u"polls"_q) {
+		return Type::Poll;
+	}
+	return std::nullopt;
+}
+
+bool SidebarRequested(const QMap<QString, QString> &params) {
+	const auto value = params.value(u"sidebar"_q);
+	if (value.isEmpty()) {
+		return params.contains(u"sidebar"_q);
+	}
+	return value.compare(u"false"_q, Qt::CaseInsensitive) != 0
+		&& value != u"0"_q;
+}
+
+bool OpenTonConnectQuery(
+		not_null<Window::SessionController*> controller,
+		const QString &query) {
+	if (const auto link = Wallet::ParseTonConnectLink(query)) {
+		Wallet::OpenTonConnectLink(controller, *link);
+	} else {
+		controller->showToast(tr::lng_wallet_send_link_invalid(tr::now));
+	}
+	return true;
+}
+
+bool ResolveContactToken(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto token = params.value(u"token"_q);
+	if (token.isEmpty()) {
+		controller->showToast(tr::lng_contact_link_invalid(tr::now));
+		return true;
+	}
+	const auto myContext = context.value<ClickHandlerContext>();
+	controller->window().activate();
+	controller->showPeerByLink(Window::PeerByLinkInfo{
+		.contactToken = token,
+		.noPaidToken = params.value(u"free"_q),
+		.clickFromMessageId = myContext.itemId,
+	});
+	return true;
+}
+
 bool ResolveUsernameOrPhone(
 		Window::SessionController *controller,
 		const Match &match,
@@ -577,6 +658,25 @@ bool ResolveUsernameOrPhone(
 	const auto params = url_parse_params(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
+
+	// A dApp link must not choose the account, so this precedes "acc".
+	if (!params.value(u"domain"_q).compare(
+			u"sendgrams"_q,
+			Qt::CaseInsensitive)) {
+		const auto query = Wallet::TonConnectStartParamQuery(
+			params.value(u"startapp"_q));
+		if (query) {
+			return OpenTonConnectQuery(controller, *query);
+		}
+	}
+
+	// Any parameter, like start or startapp, still goes to the bot.
+	if (params.size() == 1
+		&& Wallet::OpenWalletInsteadOfOldBot(
+			controller,
+			params.value(u"domain"_q))) {
+		return true;
+	}
 
 	if (params.contains(u"acc"_q)) {
 		const auto switched = ApplyAccountIndex(
@@ -636,12 +736,14 @@ bool ResolveUsernameOrPhone(
 	const auto validPhone = [](const QString &phone) {
 		return qthelp::regex_match(u"^[0-9]+$"_q, phone, {}).valid();
 	};
-	if (domain == u"telegrampassport"_q) {
+	if (domainParam == u"telegrampassport"_q) {
 		return ShowPassportForm(controller, params);
 	} else if (!validDomain(domain) && !validPhone(phone)) {
 		return false;
 	}
 	using ResolveType = Window::ResolveType;
+	const auto sharedMediaTab = ParseSharedMediaType(
+		params.value(u"tab"_q));
 	auto resolveType = params.contains(u"profile"_q)
 		? ResolveType::Profile
 		: ResolveType::Default;
@@ -715,6 +817,8 @@ bool ResolveUsernameOrPhone(
 		.storyParam = storyParam,
 		.storyAlbumId = storyAlbumId,
 		.giftCollectionId = giftCollectionId,
+		.sharedMediaTab = sharedMediaTab,
+		.sidebar = SidebarRequested(params),
 		.videoTimestamp = (!videot.isEmpty()
 			? ParseVideoTimestamp(videot)
 			: std::optional<TimeId>()),
@@ -730,6 +834,7 @@ bool ResolveUsernameOrPhone(
 			: Window::RepliesByLinkInfo{ v::null },
 		.resolveType = resolveType,
 		.referral = referral,
+		.noPaidToken = params.value(u"free"_q),
 		.startToken = startToken,
 		.startAdminRights = adminRights,
 		.startAutoSubmit = myContext.botStartAutoSubmit,
@@ -793,6 +898,8 @@ bool ResolvePrivatePost(
 		.usernameOrId = channelId,
 		.messageId = msgId,
 		.pollOption = pollOption,
+		.sharedMediaTab = ParseSharedMediaType(params.value(u"tab"_q)),
+		.sidebar = SidebarRequested(params),
 		.repliesInfo = commentId
 			? Window::RepliesByLinkInfo{
 				Window::CommentId{ commentId }
@@ -897,15 +1004,6 @@ bool ShowInviteLink(
 		.iconLottieSize = st::toastLottieIconSize,
 	});
 	return true;
-}
-
-bool OpenExternalLink(
-		Window::SessionController *controller,
-		const Match &match,
-		const QVariant &context) {
-	return Ui::Integration::Instance().handleUrlClick(
-		match->captured(1),
-		context);
 }
 
 bool CopyPeerId(
@@ -1507,6 +1605,50 @@ bool ResolvePremiumOffer(
 	return true;
 }
 
+[[nodiscard]] QString GetPremiumSource(const QString &ref) {
+	const auto lower = ref.toLower();
+	const auto allowed = [](QChar ch) {
+		return (ch >= 'a' && ch <= 'z')
+			|| (ch >= '0' && ch <= '9')
+			|| (ch == '_');
+	};
+	const auto valid = !lower.isEmpty()
+		&& (lower.size() <= kGetPremiumRefMaxLength)
+		&& ranges::all_of(lower, allowed);
+	return valid ? (u"tme_getpremium_"_q + lower) : u"tme_getpremium"_q;
+}
+
+bool ResolveGetPremium(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1).mid(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	::Settings::ShowPremium(
+		controller,
+		GetPremiumSource(params.value(u"ref"_q)));
+	controller->window().activate();
+	return true;
+}
+
+[[nodiscard]] QString GetPremiumLocalUrl(QStringView query) {
+	const auto hash = query.indexOf('#');
+	const auto path = (hash >= 0) ? query.left(hash) : query;
+	const auto question = path.indexOf('?');
+	const auto ref = (question >= 0)
+		? url_parse_params(
+			path.mid(question + 1).toString(),
+			qthelp::UrlParamNameTransform::ToLower).value(u"ref"_q)
+		: QString();
+	// internal:, so no external tg:// link can report this source.
+	return kGetPremiumLocal.utf16()
+		+ (ref.isEmpty() ? QString() : (u"?ref="_q + qthelp::url_encode(ref)));
+}
+
 bool ResolvePremiumMultigift(
 		Window::SessionController *controller,
 		const Match &match,
@@ -1701,6 +1843,28 @@ bool ResolveTonSettings(
 	return true;
 }
 
+bool ResolveSendGrams(
+		Window::SessionController *controller,
+		const Match &match,
+		const QVariant &context) {
+	if (!controller) {
+		return false;
+	}
+	const auto params = url_parse_params(
+		match->captured(1).mid(1),
+		qthelp::UrlParamNameTransform::ToLower);
+	const auto query = Wallet::TonConnectStartParamQuery(
+		params.value(u"startapp"_q));
+	if (query) {
+		return OpenTonConnectQuery(controller, *query);
+	}
+	Wallet::OpenSendGramsLink(
+		controller,
+		params.value(u"to"_q),
+		params.value(u"amount"_q));
+	return true;
+}
+
 bool ResolveOAuth(
 		Window::SessionController *controller,
 		const Match &match,
@@ -1790,6 +1954,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveUsernameOrPhone
 		},
 		{
+			u"^contact/?(?:\\?([^#]*))?(?:#.*)?$"_q,
+			ResolveContactToken
+		},
+		{
 			u"^privatepost/?\\?(.+)(#|$)"_q,
 			ResolvePrivatePost
 		},
@@ -1846,6 +2014,10 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 			ResolveTonSettings
 		},
 		{
+			u"^sendgrams/?(\\?.+)?(#|$)"_q,
+			ResolveSendGrams
+		},
+		{
 			u"^oauth/?\\?(.+)(#|$)"_q,
 			ResolveOAuth
 		},
@@ -1890,10 +2062,6 @@ const std::vector<LocalUrlHandler> &InternalUrlHandlers() {
 		{
 			u"^show_invite_link/?\\?link=([a-zA-Z0-9_\\+\\/\\=\\-]+)(&|$)"_q,
 			ShowInviteLink
-		},
-		{
-			u"^url:(.+)$"_q,
-			OpenExternalLink
 		},
 		{
 			u"^copy:(.+)$"_q,
@@ -1951,6 +2119,10 @@ const std::vector<LocalUrlHandler> &InternalUrlHandlers() {
 			u"^about_popular_apps$"_q,
 			ShowPopularAppsAbout,
 		},
+		{
+			u"^tme_getpremium(\\?.*)?$"_q,
+			ResolveGetPremium,
+		},
 	};
 	return Result;
 }
@@ -1958,6 +2130,12 @@ const std::vector<LocalUrlHandler> &InternalUrlHandlers() {
 QString TryConvertUrlToLocal(QString url) {
 	if (url.size() > 8192) {
 		url = url.mid(0, 8192);
+	}
+	if (url.startsWith(u"tc://"_q, Qt::CaseInsensitive)) {
+		const auto query = url.indexOf('?');
+		return u"tg://sendgrams?startapp="_q
+			+ Wallet::TonConnectStartParam(
+				(query < 0) ? QString() : url.mid(query + 1));
 	}
 
 	using namespace qthelp;
@@ -1969,17 +2147,26 @@ QString TryConvertUrlToLocal(QString url) {
 		const auto protocol = tonsiteMatch->captured(1);
 		return u"tonsite://"_q + url.mid(protocol.size());
 	}
-	auto subdomainMatch = regex_match(u"^(https?://)?([a-zA-Z0-9\\_]+)\\.t\\.me(/\\d+)?/?(\\?.+)?"_q, url, matchOptions);
+	auto subdomainMatch = regex_match(u"^(https?://)?([a-zA-Z0-9\\_]+)\\.t\\.me"_q, url, matchOptions);
 	if (subdomainMatch) {
 		const auto name = subdomainMatch->captured(2);
 		if (name.size() > 1 && name != "www") {
+			const auto protocol = subdomainMatch->captured(1);
+			auto tail = url.mid(
+				protocol.size() + name.size() + u".t.me"_q.size());
+			const auto fragment = tail.indexOf('#');
+			if (fragment >= 0) {
+				tail.truncate(fragment);
+			}
+			if (!tail.isEmpty()
+				&& !tail.startsWith('/')
+				&& !tail.startsWith('?')) {
+				return url;
+			}
 			const auto result = TryConvertUrlToLocal(
-				subdomainMatch->captured(1)
-				+ "t.me/"
-				+ name
-				+ subdomainMatch->captured(3)
-				+ subdomainMatch->captured(4));
-			return result.startsWith("tg://resolve?domain=")
+				protocol + "t.me/" + name + tail);
+			return (result.startsWith("tg://resolve?domain=")
+					|| IsGetPremiumLocalUrl(result))
 				? result
 				: url;
 		}
@@ -1987,7 +2174,18 @@ QString TryConvertUrlToLocal(QString url) {
 	auto telegramMeMatch = regex_match(u"^(https?://)?(www\\.)?(telegram\\.(me|dog)|t\\.me)/(.+)$"_q, url, matchOptions);
 	if (telegramMeMatch) {
 		const auto query = telegramMeMatch->capturedView(5);
-		if (const auto phoneMatch = regex_match(u"^\\+([0-9]+)(\\?|$)"_q, query, matchOptions)) {
+		if (const auto contactMatch = regex_match(
+				u"^contact/([^?#]*)(?:\\?([^#]*))?(?:#.*)?$"_q,
+				query,
+				matchOptions)) {
+			const auto token = QUrl::fromPercentEncoding(
+				contactMatch->captured(1).toUtf8());
+			const auto encoded = QString::fromLatin1(
+				QUrl::toPercentEncoding(token, ":"));
+			const auto params = contactMatch->captured(2);
+			return u"tg://contact?token="_q + encoded
+				+ (params.isEmpty() ? QString() : '&' + params);
+		} else if (const auto phoneMatch = regex_match(u"^\\+([0-9]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto params = query.mid(phoneMatch->captured(0).size()).toString();
 			return u"tg://resolve?phone="_q + phoneMatch->captured(1) + (params.isEmpty() ? QString() : '&' + params);
 		} else if (const auto joinChatMatch = regex_match(u"^(joinchat/|\\+|\\%20)([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
@@ -2050,6 +2248,10 @@ QString TryConvertUrlToLocal(QString url) {
 		} else if (const auto callMatch = regex_match(u"^call/([a-zA-Z0-9\\.\\_\\-]+)(\\?|$)"_q, query, matchOptions)) {
 			const auto slug = callMatch->captured(1);
 			return u"tg://call?slug="_q + slug;
+		} else if (const auto sendGramsMatch = regex_match(u"^sendgrams/?(\\?(.*))?$"_q, query, matchOptions)) {
+			const auto params = sendGramsMatch->captured(2);
+			return u"tg://sendgrams"_q
+				+ (params.isEmpty() ? QString() : '?' + params);
 		} else if (const auto newbotMatch = regex_match(u"^newbot/([a-zA-Z0-9\\.\\_]+)(/([a-zA-Z0-9\\.\\_]*))?(/?\\?(.+))?$"_q, query, matchOptions)) {
 			const auto manager = newbotMatch->captured(1);
 			const auto username = newbotMatch->captured(3);
@@ -2087,6 +2289,8 @@ QString TryConvertUrlToLocal(QString url) {
 		} else if (const auto ayuSettingsMatch = regex_match(
 			u"^(?:ayuSettings|exteraSettings)/?\\?(.+)$"_q, query, matchOptions)) {
 			return u"tg://ayusettings?"_q + ayuSettingsMatch->captured(1);
+		} else if (regex_match(u"^getpremium(/|\\?|#|$)"_q, query, matchOptions)) {
+			return GetPremiumLocalUrl(query);
 		} else if (const auto usernameMatch = regex_match(u"^"
 			"([a-zA-Z0-9\\.\\_]+)"
 			"("
@@ -2132,6 +2336,12 @@ QString TryConvertUrlToLocal(QString url) {
 	return url;
 }
 
+bool IsGetPremiumLocalUrl(const QString &url) {
+	const auto prefix = kGetPremiumLocal.utf16();
+	return url.startsWith(prefix, Qt::CaseInsensitive)
+		&& ((url.size() == prefix.size()) || (url[prefix.size()] == '?'));
+}
+
 bool IsMiniAppUrl(const QString &url) {
 	const auto local = TryConvertUrlToLocal(url);
 	const auto prefix = u"tg://resolve?"_q;
@@ -2156,7 +2366,10 @@ struct InternalLinkCheckResult {
 	if (!urlTrimmed.startsWith(u"tg://"_q, Qt::CaseInsensitive)) {
 		return {};
 	}
-	const auto command = base::StringViewMid(urlTrimmed, u"tg://"_q.size());
+	const auto command = base::StringViewMid(
+		urlTrimmed,
+		u"tg://"_q.size(),
+		8192);
 
 	using namespace qthelp;
 	const auto matchOptions = RegExOption::CaseInsensitive;
@@ -2246,7 +2459,8 @@ void ResolveAndShowUniqueGift(
 				show,
 				*gift,
 				StarGiftResaleInfo(),
-				st));
+				st,
+				nullptr));
 			show->activate();
 		}
 	}).fail([=](const MTP::Error &error) {

@@ -7,9 +7,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_chat_participant_status.h"
+
 namespace InlineBots {
 struct WebViewContext;
 } // namespace InlineBots
+
+namespace Storage {
+enum class SharedMediaType : signed char;
+} // namespace Storage
 
 namespace Window {
 
@@ -39,16 +45,20 @@ struct PeerByLinkInfo {
 	std::variant<QString, ChannelId> usernameOrId;
 	QString phone;
 	QString chatLinkSlug;
+	QString contactToken;
 	MsgId messageId = ShowAtUnreadMsgId;
 	QByteArray pollOption;
 	QString storyParam;
 	int storyAlbumId = 0;
 	int giftCollectionId = 0;
+	std::optional<Storage::SharedMediaType> sharedMediaTab;
+	bool sidebar = false;
 	std::optional<TimeId> videoTimestamp;
 	QString text;
 	RepliesByLinkInfo repliesInfo;
 	ResolveType resolveType = ResolveType::Default;
 	QString referral;
+	QString noPaidToken;
 	QString startToken;
 	ChatAdminRights startAdminRights;
 	bool startAutoSubmit = false;

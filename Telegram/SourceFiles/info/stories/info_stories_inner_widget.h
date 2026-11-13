@@ -10,8 +10,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unique_qptr.h"
 #include "data/data_stories.h"
 #include "info/stories/info_stories_common.h"
-#include "ui/rp_widget.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/rp_widget.h"
 
 namespace Data {
 struct StoryAlbum;
@@ -21,7 +22,6 @@ namespace Ui {
 class SubTabs;
 class PopupMenu;
 class VerticalLayout;
-class MultiSlideTracker;
 struct SubTabsReorderUpdate;
 } // namespace Ui
 
@@ -54,10 +54,14 @@ public:
 		QWidget *parent,
 		not_null<Controller*> controller,
 		rpl::producer<int> albumId,
-		int addingToAlbumId = 0);
+		int addingToAlbumId = 0,
+		bool myProfile = false);
 	~InnerWidget();
 
 	[[nodiscard]] rpl::producer<> backRequest() const;
+	[[nodiscard]] bool myProfile() const {
+		return _myProfile;
+	}
 
 	bool showInternal(not_null<Memento*> memento);
 	void setIsStackBottom(bool isStackBottom) {
@@ -118,10 +122,10 @@ private:
 	void createAboutArchive();
 
 	void startTop();
-	void addArchiveButton(Ui::MultiSlideTracker &tracker);
-	void addRecentButton(Ui::MultiSlideTracker &tracker);
-	void addGiftsButton(Ui::MultiSlideTracker &tracker);
-	void finalizeTop();
+	[[nodiscard]] object_ptr<Ui::SlideWrap<>> makeArchiveButton();
+	[[nodiscard]] object_ptr<Ui::SlideWrap<>> makeRecentButton();
+	[[nodiscard]] object_ptr<Ui::SlideWrap<>> makeGiftsButton();
+	void finalizeTop(bool addAlbumsSkip = true);
 
 	void refreshAlbumsTabs();
 	void showMenuForAlbum(int id);
@@ -135,6 +139,7 @@ private:
 	const not_null<Controller*> _controller;
 	const not_null<PeerData*> _peer;
 	const int _addingToAlbumId = 0;
+	const bool _myProfile = false;
 
 	std::vector<Data::StoryAlbum> _albums;
 	rpl::variable<int> _albumId;

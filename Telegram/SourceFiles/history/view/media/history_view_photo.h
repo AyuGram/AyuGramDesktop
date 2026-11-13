@@ -47,6 +47,9 @@ public:
 
 	void draw(Painter &p, const PaintContext &context) const override;
 	TextState textState(QPoint point, StateRequest request) const override;
+	void clickHandlerPressedChanged(
+		const ClickHandlerPtr &p,
+		bool pressed) override;
 
 	PhotoData *getPhoto() const override {
 		return _data;
@@ -106,6 +109,7 @@ protected:
 
 private:
 	struct Streamed;
+	struct Enlarge;
 
 	void create(FullMsgId contextId, PeerData *chat = nullptr);
 
@@ -154,7 +158,6 @@ private:
 		QPoint photoPosition) const;
 
 	[[nodiscard]] QSize photoSize() const;
-	[[nodiscard]] QRect enlargeRect() const;
 
 	void togglePollingStory(bool enabled) const;
 
@@ -173,7 +176,7 @@ private:
 	mutable uint32 _imageCacheForum : 1 = 0;
 	mutable uint32 _imageCacheBlurred : 1 = 0;
 	mutable uint32 _pollingStory : 1 = 0;
-	mutable uint32 _showEnlarge : 1 = 0;
+	mutable std::unique_ptr<Enlarge> _enlarge;
 
 };
 

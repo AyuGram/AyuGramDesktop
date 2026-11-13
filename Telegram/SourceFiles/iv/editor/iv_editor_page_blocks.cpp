@@ -34,16 +34,22 @@ bool StripWrapperEntityInEditMode(EntityType type) {
 	case EntityType::BotCommand:
 	case EntityType::Phone:
 	case EntityType::BankCard:
+	case EntityType::TonAddress:
 		return true;
 	default:
 		return false;
 	}
 }
 
-bool ButtonTypeIsUserSendable(HistoryMessageMarkupButton::Type type) {
+bool ButtonIsUserSendable(
+		HistoryMessageMarkupButton::Type type,
+		const QByteArray &data) {
 	using Type = HistoryMessageMarkupButton::Type;
 	switch (type) {
 	case Type::Url:
+		return !QString::fromUtf8(data).trimmed().startsWith(
+			u"internal:"_q,
+			Qt::CaseInsensitive);
 	case Type::UserProfile:
 	case Type::CopyText:
 		return true;
@@ -54,7 +60,7 @@ bool ButtonTypeIsUserSendable(HistoryMessageMarkupButton::Type type) {
 bool DegradeEditModeButton(HistoryMessageMarkupButton &button) {
 	using Type = HistoryMessageMarkupButton::Type;
 	if ((button.type == Type::Disabled)
-		|| ButtonTypeIsUserSendable(button.type)) {
+		|| ButtonIsUserSendable(button.type, button.data)) {
 		return false;
 	}
 	button = HistoryMessageMarkupButton(
@@ -487,9 +493,12 @@ bool DegradeEditModeInlineButtons(TextWithEntities &text) {
 		}
 		const auto button = std::get_if<
 			Markdown::InlineTextObjectButtonData>(&parsed->data);
-		if (!button
-			|| (button->type == Type::Disabled)
-			|| ButtonTypeIsUserSendable(button->type)) {
+		if (!button) {
+			continue;
+		}
+		if (!button->link
+			&& ((button->type == Type::Disabled)
+				|| ButtonIsUserSendable(button->type, button->data))) {
 			continue;
 		}
 		*button = Markdown::InlineTextObjectButtonData{

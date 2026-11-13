@@ -114,8 +114,6 @@ using FilterId = int32;
 using MessageIdsList = std::vector<FullMsgId>;
 
 [[nodiscard]] PeerId PeerFromMessage(const MTPmessage &message);
-[[nodiscard]] MTPDmessage::Flags FlagsFromMessage(
-	const MTPmessage &message);
 [[nodiscard]] MsgId IdFromMessage(const MTPmessage &message);
 [[nodiscard]] TimeId DateFromMessage(const MTPmessage &message);
 [[nodiscard]] BusinessShortcutId BusinessShortcutIdFromMessage(
@@ -303,8 +301,7 @@ enum class MessageFlag : uint64 {
 	// Outgoing message and failed to be sent.
 	SendingFailed         = (1ULL << 27),
 
-	// No media and only a several emoji or an only custom emoji text.
-	SpecialOnlyEmoji      = (1ULL << 28),
+	EmojiInteractionWatched = (1ULL << 28),
 
 	// Message existing in the message history.
 	HistoryEntry          = (1ULL << 29),

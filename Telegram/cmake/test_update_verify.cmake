@@ -4,10 +4,10 @@
 # For license and copyright information please follow this link:
 # https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
-# The focused v2 update verification test is built alongside the Packer
-# for special targets as well as with the development test apps: it runs
-# the exact translation unit that verifies updates in the client and it
-# checks the committed trust files against the pinned root.
+# The focused v2 update verification test runs the exact translation unit
+# that verifies updates in the client and checks the committed trust files
+# against the pinned root. Enable it with the development test apps or with
+# TDESKTOP_BUILD_UPDATE_TESTS for pipelines that need only this check.
 
 add_executable(test_update_verify)
 init_target(test_update_verify "(tests)")
@@ -32,6 +32,9 @@ PRIVATE
     desktop-app::external_openssl
 )
 
-set_target_properties(test_update_verify PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+if (WIN32 AND DESKTOP_APP_WIN7_BASELINE)
+    # WindowsApp.lib is off the link line, WinRT stubs come from lib_base.
+    target_link_libraries(test_update_verify PRIVATE desktop-app::lib_base)
+endif()
 
-add_dependencies(Telegram test_update_verify)
+set_target_properties(test_update_verify PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

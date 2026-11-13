@@ -91,8 +91,6 @@ public:
 	[[nodiscard]] int paidMessageChannelStarsDefault() const;
 
 	[[nodiscard]] int pinnedGiftsLimit() const;
-	[[nodiscard]] int giftCollectionsLimit() const;
-	[[nodiscard]] int giftCollectionGiftsLimit() const;
 
 	[[nodiscard]] bool callsDisabledForSession() const;
 	[[nodiscard]] int confcallSizeLimit() const;
@@ -128,7 +126,9 @@ public:
 	[[nodiscard]] int ageVerifyMinAge() const;
 	[[nodiscard]] QString ageVerifyBotUsername() const;
 
-	[[nodiscard]] int storiesAlbumsLimit() const;
+	[[nodiscard]] QString oldWalletBotUsername() const;
+	[[nodiscard]] bool walletAvailable() const;
+
 	[[nodiscard]] int storiesAlbumLimit() const;
 
 	[[nodiscard]] int groupCallMessageLengthLimit() const;

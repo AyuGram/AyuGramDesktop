@@ -55,7 +55,6 @@ struct TopControlsDescriptor {
 	MsgId repliesRootId = 0;
 	Data::ForumTopic *topic = nullptr;
 	Data::SavedSublist *sublist = nullptr;
-	PeerId monoforumPeerId = 0;
 	Ui::ElasticScroll *scroll = nullptr;
 	ListWidget *list = nullptr;
 	Fn<int()> keyboardReservedHeight;
@@ -85,7 +84,7 @@ public:
 	void setRepliesRootId(MsgId repliesRootId);
 	void setTopic(Data::ForumTopic *topic);
 	void setRepliesRootVisible(bool shown);
-	[[nodiscard]] rpl::producer<bool> repliesRootVisibleValue() const;
+	void repliesRootDestroyed();
 	void updatePinnedViewer();
 	void checkLastPinnedClickedIdReset(int wasScrollTop, int nowScrollTop);
 	void addTranslatedItems(not_null<TranslateTracker*> tracker);
@@ -98,6 +97,7 @@ private:
 	[[nodiscard]] PeerData *migratedPeer() const;
 	[[nodiscard]] bool showInForum() const;
 	void setupRootView();
+	void resetRepliesRootView();
 	void setupTopicReopenBar();
 	void setupTranslateBar();
 	void setupGroupCallBar();
@@ -116,7 +116,6 @@ private:
 	void resetPinnedState();
 	void updateLayout();
 	void updateZOrder();
-	void applyHeightChange(int was, int now, bool preserveTop);
 	void applyHeightChangeWithTopMoved(int was, int now);
 	void applyHeightChangeWithRelayout(int was, int now);
 
@@ -172,6 +171,7 @@ private:
 	rpl::lifetime _pinnedLifetime;
 	bool _repliesRootViewInited = false;
 	bool _repliesRootViewInitScheduled = false;
+	bool _repliesRootDestroyed = false;
 	bool _modeSensitiveBarsInited = false;
 	bool _modeSensitiveShowInForum = false;
 	bool _modeSensitiveFullChat = false;

@@ -17,6 +17,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_iv.h"
 #include "styles/style_basic.h"
 
+#include <memory>
 #include <vector>
 
 enum class ImageRoundRadius;
@@ -24,6 +25,10 @@ enum class ImageRoundRadius;
 namespace HistoryView {
 struct MessageSelection;
 } // namespace HistoryView
+
+namespace Iv {
+struct RichPage;
+} // namespace Iv
 
 namespace style {
 struct TwoIconButton;
@@ -33,6 +38,10 @@ struct ScrollArea;
 namespace Ui::Text {
 class CustomEmoji;
 } // namespace Ui::Text
+
+namespace Wallet {
+class CardAngle;
+} // namespace Wallet
 
 namespace Ui {
 
@@ -190,17 +199,30 @@ struct BackgroundEmojiData {
 		uint8 colorIndexPlusOne);
 };
 
+struct ChatPaintRichQuote {
+	std::shared_ptr<const Iv::RichPage> page;
+	int from = 0;
+	int till = 0;
+
+	explicit operator bool() const {
+		return page && (from < till);
+	}
+};
+
 struct ChatPaintHighlight {
 	float64 opacity = 0.;
 	float64 collapsion = 0.;
 	TextSelection range;
 	int todoItemId = 0;
 	QByteArray pollOption;
+	ChatPaintRichQuote richQuote;
 };
 
 struct ChatPaintContext {
 	not_null<const ChatStyle*> st;
 	const BubblePattern *bubblesPattern = nullptr;
+	std::optional<QColor> bubblesPatternAverage;
+	std::optional<QColor> backgroundAverage;
 	ReactionPaintInfo *reactionInfo = nullptr;
 	QRect viewport;
 	QRect area;
@@ -417,7 +439,8 @@ public:
 		bool selected,
 		uint8 colorIndex) const;
 	[[nodiscard]] QColor collectibleNameColor(
-		const std::shared_ptr<ColorCollectible> &collectible) const;
+		const std::shared_ptr<ColorCollectible> &collectible,
+		bool selected) const;
 	[[nodiscard]] not_null<Text::QuotePaintCache*> coloredQuoteCache(
 		bool selected,
 		uint8 colorIndex) const;
@@ -441,6 +464,7 @@ public:
 	[[nodiscard]] not_null<BackgroundEmojiData*> backgroundEmojiData(
 		uint64 emojiId,
 		const std::shared_ptr<ColorCollectible> &collectible) const;
+	[[nodiscard]] not_null<Wallet::CardAngle*> gramCardAngle() const;
 
 	[[nodiscard]] const CornersPixmaps &msgBotKbOverBgAddCornersSmall() const;
 	[[nodiscard]] const CornersPixmaps &msgBotKbOverBgAddCornersLarge() const;
@@ -568,6 +592,7 @@ private:
 		std::unique_ptr<Text::QuotePaintCache> replySelected;
 		ColoredPalette palette;
 		ColoredPalette paletteSelected;
+		QColor nameSelected;
 	};
 
 	void assignPalette(not_null<const style::palette*> palette);
@@ -580,7 +605,8 @@ private:
 		uint8 colorIndex) const;
 	[[nodiscard]] not_null<Text::QuotePaintCache*> collectibleCache(
 		std::unique_ptr<Text::QuotePaintCache> &cache,
-		const std::shared_ptr<ColorCollectible> &collectible) const;
+		const std::shared_ptr<ColorCollectible> &collectible,
+		bool selected) const;
 	[[nodiscard]] CollectibleColors &resolveCollectibleCaches(
 		const std::shared_ptr<ColorCollectible> &collectible) const;
 
@@ -715,6 +741,7 @@ private:
 		CollectibleColors,
 		ColorCollectiblePtrCompare> _collectibleCaches;
 	mutable base::flat_map<uint64, BackgroundEmojiData> _backgroundEmojis;
+	mutable std::unique_ptr<Wallet::CardAngle> _gramCardAngle;
 
 	style::TextPalette _historyPsaForwardPalette;
 	style::TextPalette _imgReplyTextPalette;

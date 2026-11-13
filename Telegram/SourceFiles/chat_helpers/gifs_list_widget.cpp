@@ -323,6 +323,14 @@ void GifsListWidget::inlineResultsDone(const MTPmessages_BotResults &result) {
 		}
 		auto added = 0;
 		for (const auto &res : v) {
+			const auto widget = res.match([](const auto &data) {
+				return (data.vsend_message().type()
+					== mtpc_botInlineMessageWidget);
+			});
+			if (widget) {
+				// GIF selection needs a media rect that widget rows lack.
+				continue;
+			}
 			auto result = InlineBots::Result::Create(
 				&session(),
 				queryId,
@@ -865,7 +873,7 @@ void GifsListWidget::beforeHiding() {
 
 bool GifsListWidget::refreshInlineRows(int32 *added) {
 	auto it = _inlineCache.find(_inlineQuery);
-	const InlineCacheEntry *entry = nullptr;
+	auto entry = (const InlineCacheEntry*)nullptr;
 	if (it != _inlineCache.cend()) {
 		entry = it->second.get();
 		_inlineNextOffset = it->second->nextOffset;

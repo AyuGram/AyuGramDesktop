@@ -109,6 +109,7 @@ public:
 	void ui_hideSettingsAndLayer(anim::type animated);
 	void ui_removeLayerBlackout();
 	[[nodiscard]] bool ui_isLayerShown() const;
+	[[nodiscard]] rpl::producer<bool> ui_layerShownValue() const;
 	[[nodiscard]] rpl::producer<bool> ui_boxShownValue() const;
 	bool closeLayerByBackButton();
 	bool showMediaPreview(
@@ -132,6 +133,7 @@ private:
 	void applyInitialWorkMode();
 	void ensureLayerCreated();
 	void destroyLayer();
+	void raiseMediaPreview();
 
 	void themeUpdated(const Window::Theme::BackgroundUpdate &data);
 
@@ -143,6 +145,7 @@ private:
 	object_ptr<MainWidget> _main = { nullptr };
 	base::unique_qptr<Ui::LayerStackWidget> _layer;
 	rpl::variable<bool> _boxShown = false;
+	rpl::variable<bool> _layerShown = false;
 	object_ptr<Window::MediaPreviewWidget> _mediaPreview = { nullptr };
 
 	object_ptr<Window::Theme::WarningWidget> _testingThemeWarning = { nullptr };

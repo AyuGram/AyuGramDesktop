@@ -104,6 +104,13 @@ using SendFilesConfirmed = Fn<void(
 	Api::SendOptions,
 	FullReplyTo)>;
 
+struct SendFilesStashed {
+	Ui::PreparedList list;
+	TextWithTags caption;
+	FullReplyTo replyTo;
+};
+using SendFilesStash = Fn<void(SendFilesStashed &&)>;
+
 struct SendFilesBoxDescriptor {
 	std::shared_ptr<ChatHelpers::Show> show;
 	Ui::PreparedList list;
@@ -143,7 +150,12 @@ public:
 	void setCancelledCallback(Fn<void()> callback) {
 		_cancelledCallback = std::move(callback);
 	}
+	void setStashCallbacks(Fn<bool()> check, SendFilesStash stash) {
+		_stashCheck = std::move(check);
+		_stashCallback = std::move(stash);
+	}
 	void setReplyTo(FullReplyTo replyTo);
+	void sendWithOptions(Api::SendOptions options);
 
 	[[nodiscard]] rpl::producer<TextWithTags> takeTextWithTagsRequests() const;
 
@@ -186,10 +198,13 @@ private:
 		[[nodiscard]] rpl::producer<int> itemReplaceRequest() const;
 		[[nodiscard]] rpl::producer<int> itemModifyRequest() const;
 		[[nodiscard]] rpl::producer<int> itemRenameRequest() const;
+		[[nodiscard]] rpl::producer<int> itemSelectRequest() const;
 		[[nodiscard]] rpl::producer<> orderUpdated() const;
 
 		void setSendWay(Ui::SendFilesWay way);
 		void toggleSpoilers(bool enabled);
+		void setSelectionMode(bool enabled);
+		void setSelected(int index, bool selected);
 		void applyChanges();
 
 		[[nodiscard]] QImage generatePriceTagBackground() const;
@@ -249,6 +264,7 @@ private:
 	void generatePreviewFrom(int fromBlock);
 
 	void send(Api::SendOptions options, bool ctrlShiftEnter = false);
+	void stash();
 	[[nodiscard]] Fn<void(Api::SendOptions)> sendCallback();
 	void captionResized();
 	void saveSendWaySettings(bool rememberAll);
@@ -269,6 +285,16 @@ private:
 
 	void openDialogToAddFileToAlbum();
 	void refreshAllAfterChanges(int fromItem, Fn<void()> perform = nullptr);
+	void unpackArchive(int index);
+	[[nodiscard]] std::vector<int> archivableIndices(bool selectedOnly) const;
+	[[nodiscard]] bool hasSelection() const;
+	void toggleSelection(int index);
+	void updateSelectionMode();
+	[[nodiscard]] bool clearSelection();
+	void archiveFiles(const std::vector<int> &indices);
+	[[nodiscard]] bool canArchiveAll() const;
+	[[nodiscard]] bool hasArchives() const;
+	void unpackArchives();
 	[[nodiscard]] bool setDisplayNameInSingleFilePreview(
 		int fileIndex,
 		const QString &displayName);
@@ -311,11 +337,14 @@ private:
 	SendFilesCheck _check;
 	SendFilesConfirmed _confirmedCallback;
 	Fn<void()> _cancelledCallback;
+	Fn<bool()> _stashCheck;
+	SendFilesStash _stashCallback;
 	Fn<void(const TextWithTags &text)> _cancelled2Callback;
 	rpl::variable<uint64> _price = 0;
 	std::unique_ptr<Ui::RpWidget> _priceTag;
 	QImage _priceTagBg;
 	bool _confirmed = false;
+	bool _stashed = false;
 	bool _textTaken = false;
 	bool _invertCaption = false;
 

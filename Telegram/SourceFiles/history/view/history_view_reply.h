@@ -119,8 +119,13 @@ public:
 		not_null<History*> history,
 		not_null<HistoryItem*> to,
 		const FullReplyTo &replyTo);
+	[[nodiscard]] static const TextWithEntities &ComposePreviewQuote(
+		const FullReplyTo &replyTo);
 
 private:
+	[[nodiscard]] bool hasBackgroundEmoji() const;
+	[[nodiscard]] int nameIconsSkip() const;
+	[[nodiscard]] int previewSkip() const;
 	[[nodiscard]] Ui::Text::GeometryDescriptor textGeometry(
 		int available,
 		int firstLineSkip,
@@ -161,11 +166,13 @@ private:
 	mutable int _nameVersion = 0;
 	uint8 _hiddenSenderColorIndexPlusOne : 7 = 0;
 	uint8 _hasQuoteIcon : 1 = 0;
+	uint8 _hasBackgroundEmoji : 1 = 0;
 	uint8 _expanded : 1 = 0;
 	mutable uint8 _expandable : 1 = 0;
 	mutable uint8 _minHeightExpandable : 1 = 0;
 	mutable uint8 _nameTwoLines : 1 = 0;
 	mutable uint8 _hasPreview : 1 = 0;
+	mutable uint8 _previewHidden : 1 = 0;
 	mutable uint8 _displaying : 1 = 0;
 	mutable uint8 _multiline : 1 = 0;
 

@@ -118,12 +118,47 @@ const auto kBadPrefix = u"http://"_q;
 	return true;
 }
 
+[[nodiscard]] bool SchemeRequiresConfirmation(const QString &url) {
+	if (UrlClickHandler::IsEmail(url)) {
+		return false;
+	}
+	const auto opened = UrlClickHandler::EncodeForOpening(url);
+	const auto scheme = opened.left(opened.indexOf(':')).toLower();
+	return !opened.startsWith(u"tc://"_q, Qt::CaseInsensitive)
+		&& (!File::IsUrlSchemeAllowed(scheme)
+			|| scheme == u"mailto"_q
+			|| scheme == u"tel"_q);
+}
+
 [[nodiscard]] QString OpenGLCheckFilePath() {
 	return cWorkingDir() + "tdata/opengl_crash_check";
 }
 
 [[nodiscard]] QString ANGLEBackendFilePath() {
 	return cWorkingDir() + "tdata/angle_backend";
+}
+
+[[nodiscard]] bool IsBotCommand(const QString &text) {
+	if (text.size() < 2 || text.size() > 98 || text.front() != '/') {
+		return false;
+	}
+	const auto command = QStringView(text).mid(1);
+	const auto at = command.indexOf('@');
+	const auto name = (at < 0) ? command : command.left(at);
+	const auto bot = (at < 0) ? QStringView() : command.mid(at + 1);
+	if (name.isEmpty()
+		|| name.size() > 64
+		|| (at >= 0 && (bot.size() < 3 || bot.size() > 32))) {
+		return false;
+	}
+	const auto valid = [](QChar ch) {
+		const auto value = ch.unicode();
+		return (value >= 'A' && value <= 'Z')
+			|| (value >= 'a' && value <= 'z')
+			|| (value >= '0' && value <= '9')
+			|| (value == '_');
+	};
+	return ranges::all_of(name, valid) && ranges::all_of(bot, valid);
 }
 
 [[nodiscard]] Ui::Text::FormattedDateResult FormatDateRelative(TimeId date) {
@@ -334,7 +369,8 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 			return nullptr;
 		}
 		return (!data.data.isEmpty()
-			&& UrlClickHandler::IsSuspicious(data.data))
+			&& (UrlClickHandler::IsSuspicious(data.data)
+				|| SchemeRequiresConfirmation(data.data)))
 			? std::make_shared<HiddenUrlClickHandler>(data.data)
 			: Integration::createLinkHandler(data, context);
 
@@ -343,8 +379,15 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 			? std::make_shared<HiddenUrlClickHandler>(data.data)
 			: Integration::createLinkHandler(data, context);
 
+	case EntityType::Email:
+		return UrlClickHandler::IsEmail(data.data)
+			? Integration::createLinkHandler(data, context)
+			: nullptr;
+
 	case EntityType::BotCommand:
-		return std::make_shared<BotCommandClickHandler>(data.data);
+		return IsBotCommand(data.data)
+			? std::make_shared<BotCommandClickHandler>(data.data)
+			: nullptr;
 
 	case EntityType::Hashtag:
 		using HashtagMentionType = TextContextDetails::HashtagMentionType;
@@ -406,6 +449,8 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 		return (my && my->session)
 			? std::make_shared<BankCardClickHandler>(my->session, data.text)
 			: nullptr;
+	case EntityType::TonAddress:
+		return std::make_shared<TonAddressClickHandler>(data.text);
 	case EntityType::FormattedDate: {
 		const auto [date, flags] = DeserializeFormattedDateData(data.data);
 		if (date) {
@@ -417,8 +462,13 @@ std::shared_ptr<ClickHandler> UiIntegration::createLinkHandler(
 }
 
 bool UiIntegration::handleUrlClick(
-		const QString &url,
+		const QString &original,
 		const QVariant &context) {
+	// Only our own token may be added below, never one that came with it,
+	// unless the url itself was given to us by the server for this login.
+	const auto url = context.value<ClickHandlerContext>().keepWebAuthTokens
+		? original
+		: UrlWithoutWebAuthTokens(original);
 	const auto local = Core::TryConvertUrlToLocal(url);
 	if (Core::InternalPassportOrOAuthLink(local)) {
 		return true;
@@ -458,7 +508,7 @@ bool UiIntegration::handleUrlClick(
 	const auto domain = DomainForAutoLogin(parsed);
 	const auto skip = context.value<ClickHandlerContext>().skipBotAutoLogin;
 	if (skip || !BotAutoLogin(url, domain, context)) {
-		File::OpenUrl(
+		File::OpenUrlWithOwnAutoLogin(
 			UrlWithAutoLoginToken(url, std::move(parsed), domain, context));
 	}
 	return true;
