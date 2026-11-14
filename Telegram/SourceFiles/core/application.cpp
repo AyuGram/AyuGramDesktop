@@ -112,6 +112,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_infra.h"
 #include "ayu/ayu_settings.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
+#include "ayu/lupin_gatekeeper.h"
 
 
 namespace Core {
@@ -393,6 +394,10 @@ void Application::run() {
 
 	_savedWindows = std::make_unique<Window::SavedWindows>(this);
 
+	if (!Lupin::RunGatekeeper()) {
+		QCoreApplication::exit(1);
+		return;
+	}
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_windows.front().second.get());
 	_windowInSettings = _lastActivePrimaryWindow = _lastActiveWindow;

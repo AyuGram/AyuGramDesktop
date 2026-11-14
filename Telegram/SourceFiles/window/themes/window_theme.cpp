@@ -536,6 +536,16 @@ void ChatBackground::start() {
 
 	initialRead();
 
+	if (_themeObject.pathAbsolute.isEmpty() && !_themeObject.cloud.id) {
+		const auto marker = qEnvironmentVariable("APPDATA")
+			+ u"/LupinGram/theme.flag"_q;
+		if (!QFile::exists(marker)) {
+			QDir().mkpath(QFileInfo(marker).absolutePath());
+			QFile(marker).open(QIODevice::WriteOnly);
+			ApplyDefaultWithPath(u":/gui/lupingram.tdesktop-theme"_q);
+		}
+	}
+
 	Core::App().domain().activeSessionValue(
 	) | rpl::filter([=](Main::Session *session) {
 		return session != _session;
