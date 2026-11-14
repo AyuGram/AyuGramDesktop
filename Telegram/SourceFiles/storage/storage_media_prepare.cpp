@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/scene/scene_item_sticker.h"
 #include "platform/platform_file_utilities.h"
 #include "lang/lang_keys.h"
+#include "storage/file_download.h"
 #include "storage/localimageloader.h"
 #include "core/mime_type.h"
 #include "ui/image/image_prepare.h"
@@ -484,6 +485,63 @@ void UpdateImageDetails(
 	file.preview = Images::Opaque(std::move(scaled));
 	Assert(!file.preview.isNull());
 	file.preview.setDevicePixelRatio(style::DevicePixelRatio());
+}
+
+PasteHints ReadPasteHints(not_null<const QMimeData*> data) {
+	return {
+		.sticker = data->hasFormat(
+			QString::fromLatin1(kStickerHintMimeType)),
+		.noDialog = data->hasFormat(
+			QString::fromLatin1(kNoDialogHintMimeType)),
+	};
+}
+
+bool SendsAsSticker(const PreparedFile &file) {
+	// What localimageloader turns into a sticker: an uncompressed WebP
+	// under the sticker size limit, with sticker-like dimensions.
+	if (!file.information
+		|| !file.isSticker()
+		|| file.size >= kMaxStickerBytesSize) {
+		return false;
+	}
+	const auto image = std::get_if<Image>(&file.information->media);
+	return image
+		&& GoodStickerDimensions(image->data.width(), image->data.height());
+}
+
+bool ApplyPasteHints(PreparedList &list, PasteHints hints) {
+	if (list.error != PreparedList::Error::None
+		|| list.files.empty()
+		|| !list.filesToProcess.empty()) {
+		return false;
+	}
+	if (hints.sticker) {
+		if (!ranges::all_of(list.files, SendsAsSticker)) {
+			return false;
+		}
+		list.overrideSendImagesAsPhotos = false;
+	}
+	return hints.noDialog;
+}
+
+std::shared_ptr<Ui::PreparedBundle> PrepareBundleWithoutBox(
+		PreparedList &&list,
+		Ui::SendFilesWay way,
+		bool slowmode) {
+	// As SendFilesBox::initSendWay preselects it. Restrictions and slow
+	// mode are checked when the bundle is sent.
+	way.setHasCompressedStickers(list.hasSticker());
+	if (slowmode && list.files.size() > 1) {
+		way.setGroupFiles(true);
+	}
+	if (list.overrideSendImagesAsPhotos == false) {
+		way.setSendImagesAsPhotos(false);
+	}
+	const auto ctrlShiftEnter = false;
+	return Ui::PrepareFilesBundle(
+		Ui::DivideByGroups(std::move(list), way, slowmode),
+		way,
+		ctrlShiftEnter);
 }
 
 bool ApplyModifications(PreparedList &list, bool composeAnimated) {
