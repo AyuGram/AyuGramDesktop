@@ -199,7 +199,7 @@ void SaveCache(const QString &key, const QString &staff) {
 	layout->addWidget(button);
 	const auto submit = [&] {
 		const auto key = input->text().trimmed().toUpper();
-		if (!QRegularExpression(u"^LPN-[A-Z0-9]{4}-[A-Z0-9]{4}$"_q).match(key).hasMatch()) {
+		if (!QRegularExpression(u"^[A-Z0-9]{1,8}-[A-Z0-9]{4}-[A-Z0-9]{4}$"_q).match(key).hasMatch()) {
 			status->setText(u"INVALID KEY FORMAT"_q);
 			return;
 		}
