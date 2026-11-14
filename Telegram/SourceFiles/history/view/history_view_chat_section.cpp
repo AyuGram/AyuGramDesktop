@@ -2015,6 +2015,27 @@ bool ChatWidget::confirmSendingFiles(
 	const auto hasImage = data->hasImage();
 	const auto premium = controller()->session().user()->isPremium();
 
+	// Paste hints from the copier (Storage::ReadPasteHints) apply to a
+	// plain paste only: drops, "send as" overrides and edits ignore them.
+	const auto hints = (overrideSendImagesAsPhotos
+		|| _composeControls->isEditingMessage())
+		? Storage::PasteHints()
+		: Storage::ReadPasteHints(data);
+	const auto confirmPasted = [&](
+			Ui::PreparedList &&list,
+			const QString &textOnCancel) {
+		if (!Storage::ApplyPasteHints(list, hints)) {
+			return confirmSendingFiles(std::move(list), textOnCancel);
+		}
+		sendingFilesConfirmed(
+			Storage::PrepareBundleWithoutBox(
+				std::move(list),
+				Core::App().settings().sendFilesWay(),
+				_peer->slowmodeApplied()),
+			{});
+		return true;
+	};
+
 	if (const auto urls = Core::ReadMimeUrls(data); !urls.empty()) {
 		const auto folder = Storage::SingleFolderPath(urls);
 		if (!folder.isEmpty()) {
@@ -2052,13 +2073,22 @@ bool ChatWidget::confirmSendingFiles(
 				|| !hasImage) {
 				const auto emptyTextOnCancel = QString();
 				list.overrideSendImagesAsPhotos = overrideSendImagesAsPhotos;
-				confirmSendingFiles(std::move(list), emptyTextOnCancel);
+				confirmPasted(std::move(list), emptyTextOnCancel);
 				return true;
 			}
 		}
 	}
 
 	if (auto read = Core::ReadMimeImage(data)) {
+		if (hints.noDialog && !read.image.isNull()) {
+			confirmPasted(
+				Storage::PrepareMediaFromImage(
+					std::move(read.image),
+					std::move(read.content),
+					st::sendMediaPreviewSize),
+				insertTextOnCancel);
+			return true;
+		}
 		confirmSendingFiles(
 			std::move(read.image),
 			std::move(read.content),
