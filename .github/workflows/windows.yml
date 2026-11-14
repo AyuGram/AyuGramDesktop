@@ -19,6 +19,13 @@ jobs:
         with:
           arch: x64
 
+      - name: Patch MSYS2 diffutils package name
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path "Telegram/build" -Recurse -Include *.py,*.bat | ForEach-Object {
+            (Get-Content $_.FullName) -replace 'mingw-w64-x86_64-diffutils', 'diffutils' | Set-Content $_.FullName
+          }
+
       - name: Prepare dependencies
         run: |
           cd Telegram/build/prepare
