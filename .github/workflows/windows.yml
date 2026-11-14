@@ -1,0 +1,37 @@
+name: Build LupinGram Windows
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Prepare dependencies
+        run: |
+          cd Telegram/build/prepare
+          ./win.bat
+
+      - name: Configure & Build
+        run: |
+          cd Telegram
+          ./configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+          cmake --build ../out --config Release --target Telegram --parallel
+
+      - name: Upload LupinGram.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: LupinGram-Windows-x64
+          path: out/Release/Telegram.exe
