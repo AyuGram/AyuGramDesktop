@@ -19,11 +19,24 @@ jobs:
         with:
           arch: x64
 
-      - name: Patch MSYS2 diffutils package name
+      - name: Cache ThirdParty and Libraries
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ThirdParty
+            Libraries
+          key: win-x64-deps-v1-${{ hashFiles('Telegram/build/prepare/win.bat') }}
+
+      - name: Patch MSYS2 diffutils & skip breakpad
         shell: pwsh
         run: |
           Get-ChildItem -Path "Telegram/build" -Recurse -Include *.py,*.bat | ForEach-Object {
             (Get-Content $_.FullName) -replace 'mingw-w64-x86_64-diffutils', 'diffutils' | Set-Content $_.FullName
+          }
+          $preparePy = "Telegram/build/prepare/prepare.py"
+          if (Test-Path $preparePy) {
+            (Get-Content $preparePy) -replace "'breakpad',", "# 'breakpad'," -replace '"breakpad",', '# "breakpad",' | Set-Content $preparePy
           }
 
       - name: Prepare dependencies
@@ -34,7 +47,7 @@ jobs:
       - name: Configure & Build
         run: |
           cd Telegram
-          ./configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+          ./configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
           cmake --build ../out --config Release --target Telegram --parallel
 
       - name: Upload LupinGram.exe
