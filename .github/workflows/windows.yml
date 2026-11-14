@@ -2,38 +2,53 @@ name: Build LupinGram Windows
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "claude/gifted-rubin-nzkrec" ]
   workflow_dispatch:
+
+env:
+  TBUILD_REAL: C:\TBuild
 
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 360
     steps:
+      - name: Prepare directories (Libraries and ThirdParty on C:)
+        shell: cmd
+        run: |
+          mkdir "%TBUILD_REAL%\Libraries"
+          mkdir "%TBUILD_REAL%\ThirdParty"
+          mklink /d "%GITHUB_WORKSPACE%\Libraries" "%TBUILD_REAL%\Libraries"
+          mklink /d "%GITHUB_WORKSPACE%\ThirdParty" "%TBUILD_REAL%\ThirdParty"
+
       - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
+          path: tdesktop
           submodules: recursive
 
-      - name: Setup MSVC
+      - name: Setup MSVC (x64)
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: Cache ThirdParty and Libraries
-        id: cache-deps
         uses: actions/cache@v4
         with:
           path: |
-            ThirdParty
-            Libraries
-          key: win-x64-deps-v1-${{ hashFiles('Telegram/build/prepare/win.bat') }}
+            C:\TBuild\ThirdParty
+            C:\TBuild\Libraries
+          key: win-x64-deps-v2-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+          restore-keys: |
+            win-x64-deps-v2-
+          save-always: true
 
       - name: Patch MSYS2 diffutils & skip breakpad
         shell: python
         run: |
           import glob, re
 
-          for path in glob.glob("Telegram/build/**/*.*", recursive=True):
+          for path in glob.glob("tdesktop/Telegram/build/**/*.*", recursive=True):
               if path.endswith((".py", ".bat")):
                   with open(path, "r", encoding="utf-8", errors="ignore") as f:
                       txt = f.read()
@@ -41,7 +56,7 @@ jobs:
                       with open(path, "w", encoding="utf-8") as f:
                           f.write(txt.replace("mingw-w64-x86_64-diffutils", "diffutils"))
 
-          prep = "Telegram/build/prepare/prepare.py"
+          prep = "tdesktop/Telegram/build/prepare/prepare.py"
           with open(prep, "r", encoding="utf-8") as f:
               code = f.read()
           code = re.sub(r"stage\(['\"]breakpad['\"],\s*\"\"\".*?\"\"\"\)", "pass", code, flags=re.S)
@@ -49,18 +64,29 @@ jobs:
               f.write(code)
 
       - name: Prepare dependencies
+        shell: cmd
         run: |
-          cd Telegram/build/prepare
-          ./win.bat
+          echo Platform=%Platform% VSCMD_ARG_TGT_ARCH=%VSCMD_ARG_TGT_ARCH%
+          cd tdesktop\Telegram\build\prepare
+          call win.bat silent
+          if errorlevel 1 exit /b 1
+          dir "%GITHUB_WORKSPACE%\Libraries\win64\local"
 
-      - name: Configure & Build
+      - name: Configure
+        shell: cmd
         run: |
-          cd Telegram
-          ./configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
-          cmake --build ../out --config Release --target Telegram --parallel
+          cd tdesktop\Telegram
+          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          if errorlevel 1 exit /b 1
+
+      - name: Build
+        shell: cmd
+        run: |
+          cd tdesktop\Telegram
+          cmake --build ..\out --config Release --target Telegram --parallel
 
       - name: Upload LupinGram.exe
         uses: actions/upload-artifact@v4
         with:
           name: LupinGram-Windows-x64
-          path: out/Release/Telegram.exe
+          path: tdesktop/out/Release/Telegram.exe
