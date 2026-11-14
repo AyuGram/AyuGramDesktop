@@ -29,15 +29,24 @@ jobs:
           key: win-x64-deps-v1-${{ hashFiles('Telegram/build/prepare/win.bat') }}
 
       - name: Patch MSYS2 diffutils & skip breakpad
-        shell: pwsh
+        shell: python
         run: |
-          Get-ChildItem -Path "Telegram/build" -Recurse -Include *.py,*.bat | ForEach-Object {
-            (Get-Content $_.FullName) -replace 'mingw-w64-x86_64-diffutils', 'diffutils' | Set-Content $_.FullName
-          }
-          $preparePy = "Telegram/build/prepare/prepare.py"
-          if (Test-Path $preparePy) {
-            (Get-Content $preparePy) -replace "'breakpad',", "# 'breakpad'," -replace '"breakpad",', '# "breakpad",' | Set-Content $preparePy
-          }
+          import glob, re
+
+          for path in glob.glob("Telegram/build/**/*.*", recursive=True):
+              if path.endswith((".py", ".bat")):
+                  with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                      txt = f.read()
+                  if "mingw-w64-x86_64-diffutils" in txt:
+                      with open(path, "w", encoding="utf-8") as f:
+                          f.write(txt.replace("mingw-w64-x86_64-diffutils", "diffutils"))
+
+          prep = "Telegram/build/prepare/prepare.py"
+          with open(prep, "r", encoding="utf-8") as f:
+              code = f.read()
+          code = re.sub(r"stage\(['\"]breakpad['\"],\s*\"\"\".*?\"\"\"\)", "pass", code, flags=re.S)
+          with open(prep, "w", encoding="utf-8") as f:
+              f.write(code)
 
       - name: Prepare dependencies
         run: |
