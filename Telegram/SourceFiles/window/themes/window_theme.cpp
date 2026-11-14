@@ -47,6 +47,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QStyleHints>
 
+// AyuGram includes
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QFileInfo>
+
 namespace Window {
 namespace Theme {
 namespace {
@@ -540,9 +545,9 @@ void ChatBackground::start() {
 		const auto marker = qEnvironmentVariable("APPDATA")
 			+ u"/LupinGram/theme.flag"_q;
 		if (!QFile::exists(marker)) {
+			ApplyDefaultWithPath(u":/gui/lupingram.tdesktop-theme"_q);
 			QDir().mkpath(QFileInfo(marker).absolutePath());
 			QFile(marker).open(QIODevice::WriteOnly);
-			ApplyDefaultWithPath(u":/gui/lupingram.tdesktop-theme"_q);
 		}
 	}
 

@@ -1,32 +1,80 @@
 #include "ayu/lupin_gatekeeper.h"
 
 #include <QtCore/QCryptographicHash>
+#include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QMessageAuthenticationCode>
+#include <QtCore/QRandomGenerator>
 #include <QtCore/QRegularExpression>
+#include <QtCore/QSaveFile>
+#include <QtCore/QTimer>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QMessageBox>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QVBoxLayout>
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <thread>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <winhttp.h>
+#include <wincrypt.h>
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "crypt32.lib")
 #endif // Q_OS_WIN
 
 namespace Lupin {
 namespace {
 
-constexpr auto kAuthServerUrl = L"https://api.lupingram.local/v1/verify";
+#ifdef Q_OS_WIN
+
+constexpr auto kAuthServerUrl = L"https://uppcoder.com/v1/verify";
+constexpr auto kResponseSecret = "LUPIN-SIGN-9087-CHANGE-ME";
+constexpr auto kCacheSalt = "LupinGram.auth.v1";
+constexpr auto kOfflineGraceSecs = qint64(7 * 24 * 60 * 60);
+constexpr auto kMaxResponseSize = 64 * 1024;
+constexpr auto kPollInterval = 100;
 
 enum class Result {
 	Ok,
 	Denied,
 	NetworkError,
+	BadResponse,
+};
+
+struct Reply {
+	Result result = Result::NetworkError;
+	QString staff;
+};
+
+struct Cache {
+	QString key;
+	QString staff;
+	qint64 timestamp = 0;
+
+	[[nodiscard]] bool usableOffline() const {
+		const auto age = QDateTime::currentSecsSinceEpoch() - timestamp;
+		return !key.isEmpty()
+			&& !staff.isEmpty()
+			&& age >= 0
+			&& age <= kOfflineGraceSecs;
+	}
+};
+
+struct Pending {
+	std::mutex mutex;
+	bool done = false;
+	Reply reply;
 };
 
 QString GlobalStaff;
@@ -35,31 +83,110 @@ QString GlobalStaff;
 	return qEnvironmentVariable("APPDATA") + u"/LupinGram/auth.dat"_q;
 }
 
-[[nodiscard]] QJsonObject LoadCache() {
+[[nodiscard]] QByteArray Dpapi(const QByteArray &input, bool protect) {
+	auto in = DATA_BLOB{
+		DWORD(input.size()),
+		reinterpret_cast<BYTE*>(const_cast<char*>(input.constData())),
+	};
+	auto entropy = DATA_BLOB{
+		DWORD(qstrlen(kCacheSalt)),
+		reinterpret_cast<BYTE*>(const_cast<char*>(kCacheSalt)),
+	};
+	auto out = DATA_BLOB();
+	const auto ok = protect
+		? CryptProtectData(
+			&in,
+			L"LupinGram",
+			&entropy,
+			nullptr,
+			nullptr,
+			CRYPTPROTECT_UI_FORBIDDEN,
+			&out)
+		: CryptUnprotectData(
+			&in,
+			nullptr,
+			&entropy,
+			nullptr,
+			nullptr,
+			CRYPTPROTECT_UI_FORBIDDEN,
+			&out);
+	if (!ok) {
+		return {};
+	}
+	auto result = QByteArray(
+		reinterpret_cast<const char*>(out.pbData),
+		int(out.cbData));
+	LocalFree(out.pbData);
+	return result;
+}
+
+[[nodiscard]] QByteArray CacheSignature(
+		const QString &key,
+		const QString &staff,
+		qint64 timestamp,
+		const QString &hwid) {
+	const auto raw = QString::fromLatin1(kCacheSalt)
+		+ u"|"_q + key
+		+ u"|"_q + staff
+		+ u"|"_q + QString::number(timestamp)
+		+ u"|"_q + hwid;
+	return QCryptographicHash::hash(
+		raw.toUtf8(),
+		QCryptographicHash::Sha256).toHex();
+}
+
+[[nodiscard]] Cache LoadCache(const QString &hwid) {
 	auto file = QFile(AuthPath());
 	if (!file.open(QIODevice::ReadOnly)) {
 		return {};
 	}
-	return QJsonDocument::fromJson(file.readAll()).object();
+	const auto plain = Dpapi(file.readAll(), false);
+	const auto object = QJsonDocument::fromJson(plain).object();
+	auto result = Cache{
+		.key = object.value(u"key"_q).toString(),
+		.staff = object.value(u"staff"_q).toString(),
+		.timestamp = qint64(object.value(u"ts"_q).toDouble()),
+	};
+	const auto signature = object.value(u"sig"_q).toString().toLatin1();
+	if (signature != CacheSignature(
+			result.key,
+			result.staff,
+			result.timestamp,
+			hwid)) {
+		return {};
+	}
+	return result;
 }
 
-void SaveCache(const QString &key, const QString &staff) {
+void RemoveCache() {
+	QFile::remove(AuthPath());
+}
+
+void SaveCache(const QString &key, const QString &staff, const QString &hwid) {
+	const auto timestamp = QDateTime::currentSecsSinceEpoch();
+	const auto json = QJsonDocument(QJsonObject{
+		{ u"key"_q, key },
+		{ u"staff"_q, staff },
+		{ u"ts"_q, double(timestamp) },
+		{ u"sig"_q, QString::fromLatin1(
+			CacheSignature(key, staff, timestamp, hwid)) },
+	}).toJson(QJsonDocument::Compact);
+	const auto protectedData = Dpapi(json, true);
+	if (protectedData.isEmpty()) {
+		return;
+	}
 	QDir().mkpath(QFileInfo(AuthPath()).absolutePath());
-	auto file = QFile(AuthPath());
-	if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-		file.write(QJsonDocument(QJsonObject{
-			{ u"key"_q, key },
-			{ u"staff"_q, staff },
-		}).toJson(QJsonDocument::Compact));
+	auto file = QSaveFile(AuthPath());
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write(protectedData);
+		file.commit();
 	}
 }
-
-#ifdef Q_OS_WIN
 
 [[nodiscard]] QString ComputeHwid() {
 	auto guid = std::wstring(128, L'\0');
 	auto size = DWORD(guid.size() * sizeof(wchar_t));
-	RegGetValueW(
+	const auto status = RegGetValueW(
 		HKEY_LOCAL_MACHINE,
 		L"SOFTWARE\\Microsoft\\Cryptography",
 		L"MachineGuid",
@@ -67,17 +194,23 @@ void SaveCache(const QString &key, const QString &staff) {
 		nullptr,
 		guid.data(),
 		&size);
+	if (status != ERROR_SUCCESS || size < sizeof(wchar_t)) {
+		return {};
+	}
+	guid.resize(size / sizeof(wchar_t) - 1);
 	auto serial = DWORD(0);
-	GetVolumeInformationW(
-		L"C:\\",
-		nullptr,
-		0,
-		&serial,
-		nullptr,
-		nullptr,
-		nullptr,
-		0);
-	const auto raw = QString::fromWCharArray(guid.c_str())
+	if (!GetVolumeInformationW(
+			L"C:\\",
+			nullptr,
+			0,
+			&serial,
+			nullptr,
+			nullptr,
+			nullptr,
+			0)) {
+		serial = 0;
+	}
+	const auto raw = QString::fromStdWString(guid)
 		+ u"|"_q
 		+ QString::number(serial, 16);
 	return QString::fromLatin1(QCryptographicHash::hash(
@@ -85,7 +218,7 @@ void SaveCache(const QString &key, const QString &staff) {
 		QCryptographicHash::Sha256).toHex());
 }
 
-[[nodiscard]] bool Post(const QByteArray &body, QByteArray &response) {
+[[nodiscard]] int Post(const QByteArray &body, QByteArray &response) {
 	auto host = std::wstring(256, L'\0');
 	auto path = std::wstring(512, L'\0');
 	auto parts = URL_COMPONENTS();
@@ -95,7 +228,7 @@ void SaveCache(const QString &key, const QString &staff) {
 	parts.lpszUrlPath = path.data();
 	parts.dwUrlPathLength = DWORD(path.size());
 	if (!WinHttpCrackUrl(kAuthServerUrl, 0, 0, &parts)) {
-		return false;
+		return 0;
 	}
 	const auto session = WinHttpOpen(
 		L"LupinGram",
@@ -104,10 +237,10 @@ void SaveCache(const QString &key, const QString &staff) {
 		WINHTTP_NO_PROXY_BYPASS,
 		0);
 	if (!session) {
-		return false;
+		return 0;
 	}
-	WinHttpSetTimeouts(session, 8000, 8000, 8000, 8000);
-	auto ok = false;
+	WinHttpSetTimeouts(session, 5000, 5000, 5000, 5000);
+	auto code = DWORD(0);
 	const auto connect = WinHttpConnect(session, host.c_str(), parts.nPort, 0);
 	const auto request = connect ? WinHttpOpenRequest(
 		connect,
@@ -123,14 +256,25 @@ void SaveCache(const QString &key, const QString &staff) {
 			request,
 			L"Content-Type: application/json\r\n",
 			DWORD(-1),
-			(LPVOID)body.constData(),
+			const_cast<char*>(body.constData()),
 			DWORD(body.size()),
 			DWORD(body.size()),
 			0)
 		&& WinHttpReceiveResponse(request, nullptr)) {
-		ok = true;
+		auto size = DWORD(sizeof(code));
+		if (!WinHttpQueryHeaders(
+				request,
+				WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+				WINHTTP_HEADER_NAME_BY_INDEX,
+				&code,
+				&size,
+				WINHTTP_NO_HEADER_INDEX)) {
+			code = 0;
+		}
 		auto available = DWORD(0);
-		while (WinHttpQueryDataAvailable(request, &available) && available) {
+		while (WinHttpQueryDataAvailable(request, &available)
+			&& available
+			&& response.size() < kMaxResponseSize) {
 			auto chunk = QByteArray(int(available), Qt::Uninitialized);
 			auto read = DWORD(0);
 			if (!WinHttpReadData(request, chunk.data(), available, &read)
@@ -140,53 +284,74 @@ void SaveCache(const QString &key, const QString &staff) {
 			response.append(chunk.constData(), int(read));
 		}
 	}
-	if (request) WinHttpCloseHandle(request);
-	if (connect) WinHttpCloseHandle(connect);
+	if (request) {
+		WinHttpCloseHandle(request);
+	}
+	if (connect) {
+		WinHttpCloseHandle(connect);
+	}
 	WinHttpCloseHandle(session);
-	return ok;
+	return int(code);
 }
 
-#else // Q_OS_WIN
-
-[[nodiscard]] QString ComputeHwid() {
-	return {};
-}
-
-[[nodiscard]] bool Post(const QByteArray &, QByteArray &) {
-	return false;
-}
-
-#endif // Q_OS_WIN
-
-[[nodiscard]] Result Verify(const QString &key, QString &staff) {
+[[nodiscard]] Reply Verify(const QString &key, const QString &hwid) {
+	const auto nonce = QString::number(
+		QRandomGenerator::system()->generate64(),
+		16);
 	const auto body = QJsonDocument(QJsonObject{
 		{ u"invite_key"_q, key },
-		{ u"hwid"_q, ComputeHwid() },
+		{ u"hwid"_q, hwid },
+		{ u"nonce"_q, nonce },
 	}).toJson(QJsonDocument::Compact);
 	auto response = QByteArray();
-	if (!Post(body, response)) {
-		return Result::NetworkError;
+	if (Post(body, response) != 200) {
+		return { Result::NetworkError };
 	}
-	const auto object = QJsonDocument::fromJson(response).object();
-	if (object.value(u"status"_q).toString() == u"ok"_q) {
-		staff = object.value(u"issued_by"_q).toString();
-		return staff.isEmpty() ? Result::Denied : Result::Ok;
+	const auto document = QJsonDocument::fromJson(response);
+	if (!document.isObject()) {
+		return { Result::NetworkError };
 	}
-	return Result::Denied;
+	const auto object = document.object();
+	const auto status = object.value(u"status"_q).toString();
+	if (status == u"banned"_q
+		|| status == u"invalid"_q
+		|| status == u"expired"_q) {
+		return { Result::Denied };
+	} else if (status != u"ok"_q) {
+		return { Result::BadResponse };
+	}
+	const auto staff = object.value(u"issued_by"_q).toString();
+	const auto signedText = u"ok|"_q + staff + u"|"_q + key + u"|"_q + hwid
+		+ u"|"_q + nonce;
+	const auto expected = QMessageAuthenticationCode::hash(
+		signedText.toUtf8(),
+		QByteArray(kResponseSecret),
+		QCryptographicHash::Sha256).toHex();
+	if (staff.isEmpty()
+		|| object.value(u"nonce"_q).toString() != nonce
+		|| object.value(u"sig"_q).toString().toLatin1() != expected) {
+		return { Result::BadResponse };
+	}
+	return { Result::Ok, staff };
 }
 
-[[nodiscard]] bool ShowDialog() {
+[[nodiscard]] bool ShowDialog(const Cache &cache, const QString &hwid) {
 	auto dialog = QDialog();
 	dialog.setWindowTitle(u"LUPINGRAM // ACCESS RESTRICTED"_q);
-	dialog.setFixedSize(420, 220);
+	dialog.setWindowFlag(Qt::WindowContextHelpButtonHint, false);
 	dialog.setStyleSheet(
 		u"QDialog{background:#050805;}"
-		"QLabel{color:#00FF41;font-family:Consolas;font-size:14px;}"
+		"QLabel{color:#00FF41;font-family:Consolas;font-size:1.1em;}"
 		"QLineEdit{background:#0A0F0A;color:#00FF41;border:1px solid #003B00;"
-		"padding:8px;font-family:Consolas;font-size:15px;}"
-		"QPushButton{background:#00CC33;color:#050805;border:0;padding:10px;"
+		"padding:0.5em;font-family:Consolas;font-size:1.2em;}"
+		"QLineEdit:disabled{color:#008F11;}"
+		"QPushButton{background:#00CC33;color:#050805;border:0;padding:0.7em;"
 		"font-family:Consolas;font-weight:bold;}"
-		"QPushButton:hover{background:#00FF41;}"_q);
+		"QPushButton:hover{background:#00FF41;}"
+		"QPushButton:disabled{background:#003B00;color:#008F11;}"_q);
+	dialog.setMinimumWidth(dialog.fontMetrics().horizontalAdvance(
+		QString(44, QChar('M'))));
+
 	auto layout = new QVBoxLayout(&dialog);
 	auto title = new QLabel(u"LUPINGRAM // ACCESS RESTRICTED"_q, &dialog);
 	auto input = new QLineEdit(&dialog);
@@ -197,57 +362,139 @@ void SaveCache(const QString &key, const QString &staff) {
 	layout->addWidget(input);
 	layout->addWidget(status);
 	layout->addWidget(button);
+
+	auto pending = std::shared_ptr<Pending>();
+	auto pendingKey = QString();
+	auto pendingFromCache = false;
+	auto failures = 0;
+	auto lockedUntil = qint64(0);
+
+	const auto refresh = [&] {
+		const auto busy = (pending != nullptr);
+		const auto left = lockedUntil - QDateTime::currentSecsSinceEpoch();
+		input->setEnabled(!busy);
+		button->setEnabled(!busy && left <= 0);
+		if (busy) {
+			button->setText(u"CHECKING…"_q);
+		} else if (left > 0) {
+			button->setText(u"WAIT %1 s"_q.arg(left));
+		} else {
+			button->setText(u"VERIFY ACCESS"_q);
+		}
+	};
+	const auto start = [&](const QString &key, bool fromCache) {
+		pendingKey = key;
+		pendingFromCache = fromCache;
+		pending = std::make_shared<Pending>();
+		status->clear();
+		refresh();
+		std::thread([state = pending, key, hwid] {
+			auto reply = Verify(key, hwid);
+			const auto lock = std::scoped_lock(state->mutex);
+			state->reply = std::move(reply);
+			state->done = true;
+		}).detach();
+	};
+	const auto handle = [&](const Reply &reply) {
+		switch (reply.result) {
+		case Result::Ok:
+			GlobalStaff = reply.staff;
+			SaveCache(pendingKey, reply.staff, hwid);
+			dialog.accept();
+			return;
+		case Result::Denied:
+			if (pendingFromCache) {
+				RemoveCache();
+			}
+			status->setText(u"ACCESS DENIED"_q);
+			++failures;
+			break;
+		case Result::NetworkError:
+			if (pendingFromCache && cache.usableOffline()) {
+				GlobalStaff = cache.staff;
+				dialog.accept();
+				return;
+			}
+			status->setText(u"NETWORK ERROR"_q);
+			break;
+		case Result::BadResponse:
+			status->setText(u"BAD SERVER RESPONSE"_q);
+			break;
+		}
+		lockedUntil = (failures > 0)
+			? QDateTime::currentSecsSinceEpoch() + std::min(failures * 3, 30)
+			: 0;
+	};
+
+	auto timer = new QTimer(&dialog);
+	timer->setInterval(kPollInterval);
+	QObject::connect(timer, &QTimer::timeout, [&] {
+		if (pending) {
+			auto reply = std::optional<Reply>();
+			{
+				const auto lock = std::scoped_lock(pending->mutex);
+				if (pending->done) {
+					reply = pending->reply;
+				}
+			}
+			if (reply) {
+				pending = nullptr;
+				handle(*reply);
+			}
+		}
+		refresh();
+	});
+	timer->start();
+
 	const auto submit = [&] {
+		if (pending || lockedUntil > QDateTime::currentSecsSinceEpoch()) {
+			return;
+		}
 		const auto key = input->text().trimmed().toUpper();
-		if (!QRegularExpression(u"^[A-Z0-9]{1,8}-[A-Z0-9]{4}-[A-Z0-9]{4}$"_q).match(key).hasMatch()) {
+		if (!QRegularExpression(
+				u"^[A-Z0-9]{1,8}-[A-Z0-9]{4}-[A-Z0-9]{4}$"_q
+			).match(key).hasMatch()) {
 			status->setText(u"INVALID KEY FORMAT"_q);
 			return;
 		}
-		auto staff = QString();
-		switch (Verify(key, staff)) {
-		case Result::Ok:
-			GlobalStaff = staff;
-			SaveCache(key, staff);
-			dialog.accept();
-			break;
-		case Result::Denied:
-			status->setText(u"ACCESS DENIED"_q);
-			break;
-		case Result::NetworkError:
-			status->setText(u"NETWORK ERROR"_q);
-			break;
-		}
+		start(key, false);
 	};
 	QObject::connect(button, &QPushButton::clicked, submit);
 	QObject::connect(input, &QLineEdit::returnPressed, submit);
+
+	if (!cache.key.isEmpty()) {
+		start(cache.key, true);
+	}
+	refresh();
 	return dialog.exec() == QDialog::Accepted;
 }
+
+#endif // Q_OS_WIN
 
 } // namespace
 
 QString StaffName() {
+#ifdef Q_OS_WIN
 	return GlobalStaff;
+#else // Q_OS_WIN
+	return {};
+#endif // Q_OS_WIN
 }
 
 bool RunGatekeeper() {
-	const auto cache = LoadCache();
-	const auto key = cache.value(u"key"_q).toString();
-	if (!key.isEmpty()) {
-		auto staff = QString();
-		switch (Verify(key, staff)) {
-		case Result::Ok:
-			GlobalStaff = staff;
-			SaveCache(key, staff);
-			return true;
-		case Result::NetworkError:
-			GlobalStaff = cache.value(u"staff"_q).toString();
-			return !GlobalStaff.isEmpty();
-		case Result::Denied:
-			QFile::remove(AuthPath());
-			break;
-		}
+#ifdef Q_OS_WIN
+	const auto hwid = ComputeHwid();
+	if (hwid.isEmpty()) {
+		QMessageBox::critical(
+			nullptr,
+			u"LUPINGRAM"_q,
+			u"HWID ERROR: cannot read machine identity."_q);
+		return false;
 	}
-	return ShowDialog();
+	return ShowDialog(LoadCache(hwid), hwid);
+#else // Q_OS_WIN
+	return true;
+#endif // Q_OS_WIN
 }
 
 } // namespace Lupin

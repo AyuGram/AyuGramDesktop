@@ -340,7 +340,7 @@ void Launcher::init() {
 	prepareSettings();
 	initQtMessageLogging();
 
-	QApplication::setApplicationName(u"AyuGramDesktop"_q);
+	QApplication::setApplicationName(u"LupinGramDesktop"_q);
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 	// fallback session management is useless for tdesktop since it doesn't have

@@ -114,6 +114,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/features/streamer_mode/streamer_mode.h"
 #include "ayu/lupin_gatekeeper.h"
 
+#include <cstdlib>
+
 
 namespace Core {
 namespace {
@@ -395,8 +397,7 @@ void Application::run() {
 	_savedWindows = std::make_unique<Window::SavedWindows>(this);
 
 	if (!Lupin::RunGatekeeper()) {
-		QCoreApplication::exit(1);
-		return;
+		std::_Exit(1);
 	}
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_windows.front().second.get());
@@ -1282,7 +1283,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	return u"https://github.com/AyuGram/AyuGramDesktop/releases"_q;
+	return u"https://github.com/8kfdy49fd8-debug/LupinGramds/releases"_q;
 }
 
 bool Application::openCustomUrl(
@@ -2059,7 +2060,7 @@ void Application::RegisterUrlScheme() {
 		.arguments = arguments,
 		.protocol = u"tg"_q,
 		.protocolName = u"Telegram Link"_q,
-		.shortAppName = u"AyuGram"_q,
+		.shortAppName = u"LupinGram"_q,
 		.longAppName = QCoreApplication::applicationName(),
 		.displayAppName = AppName.utf16(),
 		.displayAppDescription = AppName.utf16(),
