@@ -1,0 +1,66 @@
+name: Build LupinGram Windows
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache ThirdParty and Libraries
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ThirdParty
+            Libraries
+          key: win-x64-deps-v1-${{ hashFiles('Telegram/build/prepare/win.bat') }}
+
+      - name: Patch MSYS2 diffutils & skip breakpad
+        shell: python
+        run: |
+          import glob, re
+
+          for path in glob.glob("Telegram/build/**/*.*", recursive=True):
+              if path.endswith((".py", ".bat")):
+                  with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                      txt = f.read()
+                  if "mingw-w64-x86_64-diffutils" in txt:
+                      with open(path, "w", encoding="utf-8") as f:
+                          f.write(txt.replace("mingw-w64-x86_64-diffutils", "diffutils"))
+
+          prep = "Telegram/build/prepare/prepare.py"
+          with open(prep, "r", encoding="utf-8") as f:
+              code = f.read()
+          code = re.sub(r"stage\(['\"]breakpad['\"],\s*\"\"\".*?\"\"\"\)", "pass", code, flags=re.S)
+          with open(prep, "w", encoding="utf-8") as f:
+              f.write(code)
+
+      - name: Prepare dependencies
+        run: |
+          cd Telegram/build/prepare
+          ./win.bat
+
+      - name: Configure & Build
+        run: |
+          cd Telegram
+          ./configure.bat -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          cmake --build ../out --config Release --target Telegram --parallel
+
+      - name: Upload LupinGram.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: LupinGram-Windows-x64
+          path: out/Release/Telegram.exe
