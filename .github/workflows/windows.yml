@@ -30,10 +30,24 @@ jobs:
           cd tdesktop
           git submodule update --init --recursive --depth 1 --jobs 8
 
-      - name: Setup MSVC (x64)
+      - name: Ensure MSVC toolset 14.44 is installed
+        shell: pwsh
+        run: |
+          $vs = "C:\Program Files\Microsoft Visual Studio\18\Enterprise"
+          $has = Get-ChildItem "$vs\VC\Tools\MSVC" -Filter "14.44*" -ErrorAction SilentlyContinue
+          Write-Host "Installed toolsets:"
+          Get-ChildItem "$vs\VC\Tools\MSVC" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.Name }
+          if (-not $has) {
+            Write-Host "Installing VC 14.44 component"
+            Start-Process -Wait -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList @("modify","--installPath",$vs,"--add","Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64","--quiet","--norestart","--nocache")
+            Get-ChildItem "$vs\VC\Tools\MSVC" | ForEach-Object { Write-Host $_.Name }
+          }
+
+      - name: Setup MSVC (x64, toolset 14.44 as in docs/building-win.md)
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+          toolset: 14.44
 
       - name: Restore ThirdParty and Libraries cache
         id: cache-deps
@@ -42,9 +56,9 @@ jobs:
           path: |
             C:\TBuild\ThirdParty
             C:\TBuild\Libraries
-          key: win-x64-deps-v2-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+          key: win-x64-tc1444-deps-v3-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
           restore-keys: |
-            win-x64-deps-v2-
+            win-x64-tc1444-deps-v3-
 
       - name: Patch MSYS2 diffutils & skip breakpad
         shell: python
@@ -82,7 +96,7 @@ jobs:
           path: |
             C:\TBuild\ThirdParty
             C:\TBuild\Libraries
-          key: win-x64-deps-v2-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+          key: win-x64-tc1444-deps-v3-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
 
       - name: Configure
         shell: cmd
