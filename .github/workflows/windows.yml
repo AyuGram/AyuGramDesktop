@@ -9,6 +9,7 @@ on:
 
 env:
   TBUILD_REAL: C:\TBuild
+  PreferredToolArchitecture: x64
 
 jobs:
   build:
@@ -118,7 +119,7 @@ jobs:
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=1 > ..\build.log 2>&1
+          cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=2 > ..\build.log 2>&1
           if errorlevel 1 exit /b 1
 
       - name: Show build errors
