@@ -111,7 +111,7 @@ jobs:
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON
           if errorlevel 1 exit /b 1
 
       - name: Build
