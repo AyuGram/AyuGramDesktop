@@ -126,7 +126,7 @@ jobs:
       - name: Build
         shell: cmd
         run: |
-          set _CL_=/MP2
+          set _CL_=/MP1
           cd tdesktop\Telegram
           cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=2 > ..\build.log 2>&1
           if errorlevel 1 exit /b 1
