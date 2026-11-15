@@ -14,6 +14,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 
 #include <crl/crl_object_on_thread.h>
+#include <openssl/core_names.h>
+#include <openssl/kdf.h>
+#include <openssl/opensslv.h>
+#include <openssl/params.h>
 #include <QtCore/QtEndian>
 #include <QtCore/QSaveFile>
 
@@ -26,6 +30,43 @@ constexpr auto TdfMagicLen = int(sizeof(TdfMagic));
 
 constexpr auto kStrongIterationsCount = 100'000;
 
+// The memory-hard passcode wrap targets at most roughly twice the full
+// legacy 100,000-iteration PBKDF2-HMAC-SHA512 derivation in CreateLocalKey,
+// including its prehash and 256-byte output. Paired measurements use the same
+// machine and time window. Optimized OpenSSL calibration leaves conservative
+// headroom with low-end devices in mind; timings still vary by device and
+// library configuration. Windows x86 is calibrated separately with lower
+// time and scrypt N costs. Keeping Argon2 at 64 MiB instead of 128 MiB leaves
+// more contiguous-allocation headroom in a fragmented 32-bit address space.
+// Parallelism stays at a single lane and a single thread, which lets OpenSSL
+// run its single-threaded fill without a thread pool enabled in the library
+// context. Every wrap records its family and these three numbers beside its
+// own salt, so changing defaults only affects wraps written afterwards.
+// Existing wraps use their recorded parameters. Independent read ceilings
+// leave a compatibility margin above the shipped costs so later builds can
+// raise the write parameters without making their files unreadable here.
+constexpr auto kPasscodeArgon2MemoryKiB = quint32(65'536);
+constexpr auto kPasscodeArgon2Lanes = quint32(1);
+#if defined Q_OS_WIN && defined Q_PROCESSOR_X86_32
+constexpr auto kPasscodeArgon2Time = quint32(4);
+constexpr auto kPasscodeScryptN = quint32(65'536);
+#else // Q_OS_WIN && Q_PROCESSOR_X86_32
+constexpr auto kPasscodeArgon2Time = quint32(8);
+constexpr auto kPasscodeScryptN = quint32(131'072);
+#endif // Q_OS_WIN && Q_PROCESSOR_X86_32
+constexpr auto kPasscodeArgon2MaxMemoryKiB = quint32(262'144);
+constexpr auto kPasscodeArgon2MaxTime = quint32(64);
+constexpr auto kPasscodeArgon2MaxLanes = quint32(16);
+static_assert(kPasscodeArgon2MemoryKiB <= kPasscodeArgon2MaxMemoryKiB);
+static_assert(kPasscodeArgon2Time <= kPasscodeArgon2MaxTime);
+static_assert(kPasscodeArgon2Lanes <= kPasscodeArgon2MaxLanes);
+constexpr auto kPasscodeScryptR = quint32(8);
+constexpr auto kPasscodeScryptP = quint32(1);
+constexpr auto kPasscodeScryptMaxMem = quint64(192) * 1024 * 1024;
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+constexpr auto kPasscodeArgon2Name = "ARGON2ID";
+#endif // OPENSSL_VERSION_NUMBER >= 0x30200000L
+
 struct WriteEntry {
 	QString basePath;
 	QString base;
@@ -33,19 +74,32 @@ struct WriteEntry {
 	QByteArray md5;
 };
 
+struct RemoveEntry {
+	std::vector<QString> files;
+	QString folder;
+};
+
+using WriteOperation = std::variant<WriteEntry, RemoveEntry>;
+using WriteQueue = std::deque<WriteOperation>;
+
 class WriteManager final {
 public:
 	explicit WriteManager(crl::weak_on_thread<WriteManager> weak);
 
 	void write(WriteEntry &&entry);
-	void writeSync(WriteEntry &&entry);
+	[[nodiscard]] bool writeSync(WriteEntry &&entry);
+	void remove(RemoveEntry &&entry);
 	void writeSyncAll();
 
 private:
 	void scheduleWrite();
 	void writeScheduled();
 	bool writeOneScheduledNow();
-	void writeNow(WriteEntry &&entry);
+	bool writeNow(WriteEntry &&entry);
+	void removeNow(const RemoveEntry &entry);
+
+	[[nodiscard]] WriteQueue::iterator segment();
+	[[nodiscard]] WriteQueue::iterator scheduled(const QString &base);
 
 	template <typename File>
 	[[nodiscard]] bool open(File &file, const WriteEntry &entry, char postfix);
@@ -56,14 +110,15 @@ private:
 		QFileDevice &file);
 
 	crl::weak_on_thread<WriteManager> _weak;
-	std::deque<WriteEntry> _scheduled;
+	WriteQueue _scheduled;
 
 };
 
 class AsyncWriteManager final {
 public:
 	void write(WriteEntry &&entry);
-	void writeSync(WriteEntry &&entry);
+	[[nodiscard]] bool writeSync(WriteEntry &&entry);
+	void remove(RemoveEntry &&entry);
 	void sync();
 	void stop();
 
@@ -77,8 +132,29 @@ WriteManager::WriteManager(crl::weak_on_thread<WriteManager> weak)
 : _weak(std::move(weak)) {
 }
 
+WriteQueue::iterator WriteManager::segment() {
+	const auto removal = ranges::find_if(
+		rbegin(_scheduled),
+		rend(_scheduled),
+		[](const WriteOperation &operation) {
+			return v::is<RemoveEntry>(operation);
+		});
+	return removal.base();
+}
+
+WriteQueue::iterator WriteManager::scheduled(const QString &base) {
+	// WHY: writes coalesce only after the last removal, so a removal
+	// never erases a later write and no earlier write outlives it.
+	return ranges::find_if(
+		segment(),
+		end(_scheduled),
+		[&](const WriteOperation &operation) {
+			return (v::get<WriteEntry>(operation).base == base);
+		});
+}
+
 void WriteManager::write(WriteEntry &&entry) {
-	const auto i = ranges::find(_scheduled, entry.base, &WriteEntry::base);
+	const auto i = scheduled(entry.base);
 	if (i == end(_scheduled)) {
 		_scheduled.push_back(std::move(entry));
 	} else {
@@ -87,53 +163,87 @@ void WriteManager::write(WriteEntry &&entry) {
 	scheduleWrite();
 }
 
-void WriteManager::writeSync(WriteEntry &&entry) {
-	const auto i = ranges::find(_scheduled, entry.base, &WriteEntry::base);
+bool WriteManager::writeSync(WriteEntry &&entry) {
+	for (auto left = segment() - begin(_scheduled); left > 0; --left) {
+		writeOneScheduledNow();
+	}
+	const auto i = scheduled(entry.base);
 	if (i != end(_scheduled)) {
 		_scheduled.erase(i);
 	}
-	writeNow(std::move(entry));
+	return writeNow(std::move(entry));
 }
 
-void WriteManager::writeNow(WriteEntry &&entry) {
+void WriteManager::remove(RemoveEntry &&entry) {
+	_scheduled.push_back(std::move(entry));
+	scheduleWrite();
+}
+
+bool WriteManager::writeNow(WriteEntry &&entry) {
 	const auto path = [&](char postfix) {
 		return this->path(entry, postfix);
 	};
 	const auto open = [&](auto &file, char postfix) {
 		return this->open(file, entry, postfix);
 	};
+	auto writeError = QString();
 	const auto write = [&](auto &file) {
-		file.write(entry.data);
-		file.write(entry.md5);
+		writeError = QString();
+		if (file.write(entry.data) == entry.data.size()
+			&& file.write(entry.md5) == entry.md5.size()) {
+			return true;
+		}
+		// close() and commit() drop the reason of a failed unbuffered write.
+		writeError = file.errorString();
+		return false;
+	};
+	const auto reason = [&](const QFileDevice &file) {
+		return writeError.isEmpty() ? file.errorString() : writeError;
 	};
 	const auto safe = path('s');
 	const auto simple = path('0');
 	const auto backup = path('1');
 	QSaveFile save;
 	if (open(save, 's')) {
-		write(save);
+		const auto written = write(save);
 		if (save.commit()) {
 			QFile::remove(simple);
 			QFile::remove(backup);
-			return;
+			const auto ok = written
+				&& (save.error() == QFileDevice::NoError);
+			if (!ok) {
+				LOG(("Storage Error: Could not write '%1': %2."
+					).arg(safe, reason(save)));
+			}
+			return ok;
 		}
-		LOG(("Storage Error: Could not commit '%1'.").arg(safe));
+		LOG(("Storage Error: Could not commit '%1': %2."
+			).arg(safe, reason(save)));
 	}
 	QFile plain;
 	if (open(plain, '0')) {
-		write(plain);
+		const auto written = write(plain);
 		base::Platform::FlushFileData(plain);
 		plain.close();
 
+		const auto ok = written
+			&& (plain.error() == QFileDevice::NoError);
+		if (!ok) {
+			LOG(("Storage Error: Could not write '%1': %2."
+				).arg(simple, reason(plain)));
+			QFile::remove(simple);
+			return false;
+		}
 		QFile::remove(backup);
 		if (base::Platform::RenameWithOverwrite(simple, safe)) {
-			return;
+			return true;
 		}
+		const auto renameError = qt_error_string();
 		QFile::remove(safe);
-		LOG(("Storage Error: Could not rename '%1' to '%2', removing.").arg(
-			simple,
-			safe));
+		LOG(("Storage Error: Could not rename '%1' to '%2' (%3), removing."
+			).arg(simple, safe, renameError));
 	}
+	return false;
 }
 
 void WriteManager::writeSyncAll() {
@@ -146,11 +256,30 @@ bool WriteManager::writeOneScheduledNow() {
 		return false;
 	}
 
-	auto entry = std::move(_scheduled.front());
+	auto operation = std::move(_scheduled.front());
 	_scheduled.pop_front();
 
-	writeNow(std::move(entry));
+	v::match(operation, [&](WriteEntry &entry) {
+		writeNow(std::move(entry));
+	}, [&](const RemoveEntry &entry) {
+		removeNow(entry);
+	});
 	return true;
+}
+
+void WriteManager::removeNow(const RemoveEntry &entry) {
+	auto failed = 0;
+	for (const auto &file : entry.files) {
+		if (!QFile::remove(file) && QFileInfo::exists(file)) {
+			++failed;
+		}
+	}
+	if (failed) {
+		LOG(("Storage Error: Could not remove %1 files.").arg(failed));
+	}
+	if (!entry.folder.isEmpty() && !QDir(entry.folder).removeRecursively()) {
+		LOG(("Storage Error: Could not remove a folder."));
+	}
 }
 
 bool WriteManager::writeHeader(const QString &basePath, QFileDevice &file) {
@@ -179,7 +308,8 @@ bool WriteManager::open(File &file, const WriteEntry &entry, char postfix) {
 	const auto name = path(entry, postfix);
 	file.setFileName(name);
 	if (!writeHeader(entry.basePath, file)) {
-		LOG(("Storage Error: Could not open '%1' for writing.").arg(name));
+		LOG(("Storage Error: Could not open '%1' for writing: %2."
+			).arg(name, file.errorString()));
 		return false;
 	}
 	return true;
@@ -208,14 +338,27 @@ void AsyncWriteManager::write(WriteEntry &&entry) {
 	});
 }
 
-void AsyncWriteManager::writeSync(WriteEntry &&entry) {
+bool AsyncWriteManager::writeSync(WriteEntry &&entry) {
 	Expects(!_finished);
 
 	if (!_manager) {
 		_manager.emplace();
 	}
+	auto result = false;
 	_manager->with_sync([&](WriteManager &manager) {
-		manager.writeSync(std::move(entry));
+		result = manager.writeSync(std::move(entry));
+	});
+	return result;
+}
+
+void AsyncWriteManager::remove(RemoveEntry &&entry) {
+	Expects(!_finished);
+
+	if (!_manager) {
+		_manager.emplace();
+	}
+	_manager->with([entry = std::move(entry)](WriteManager &manager) mutable {
+		manager.remove(std::move(entry));
 	});
 }
 
@@ -341,6 +484,140 @@ MTP::AuthKeyPtr CreateLegacyLocalKey(
 	return std::make_shared<MTP::AuthKey>(key);
 }
 
+bool PasscodeKdf::valid() const {
+	if (!time || !parallel) {
+		return false;
+	} else if (kind == kPasscodeKdfArgon2id) {
+		return (memory >= 8 * parallel);
+	} else if (kind == kPasscodeKdfScrypt) {
+		return (memory >= 2) && !(memory & (memory - 1));
+	}
+	return false;
+}
+
+bool PasscodeKdf::costWithinLimits() const {
+	return (kind != kPasscodeKdfArgon2id)
+		|| (memory <= kPasscodeArgon2MaxMemoryKiB
+			&& time <= kPasscodeArgon2MaxTime
+			&& parallel <= kPasscodeArgon2MaxLanes);
+}
+
+PasscodeKdf DefaultPasscodeKdf() {
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+	static const auto argon2 = [] {
+		const auto algorithm = EVP_KDF_fetch(
+			nullptr,
+			kPasscodeArgon2Name,
+			nullptr);
+		if (!algorithm) {
+			return false;
+		}
+		EVP_KDF_free(algorithm);
+		return true;
+	}();
+#else // OPENSSL_VERSION_NUMBER >= 0x30200000L
+	constexpr auto argon2 = false;
+#endif // OPENSSL_VERSION_NUMBER < 0x30200000L
+	return argon2
+		? PasscodeKdf{
+			.kind = kPasscodeKdfArgon2id,
+			.memory = kPasscodeArgon2MemoryKiB,
+			.time = kPasscodeArgon2Time,
+			.parallel = kPasscodeArgon2Lanes,
+		} : PasscodeKdf{
+			.kind = kPasscodeKdfScrypt,
+			.memory = kPasscodeScryptN,
+			.time = kPasscodeScryptR,
+			.parallel = kPasscodeScryptP,
+		};
+}
+
+MTP::AuthKeyPtr CreatePasscodeKey(
+		const QByteArray &passcode,
+		const QByteArray &salt,
+		const PasscodeKdf &kdf) {
+	if (passcode.isEmpty()
+		|| salt.size() < kPasscodeSaltMinSize
+		|| !kdf.costWithinLimits()
+		|| !kdf.valid()) {
+		return nullptr;
+	}
+	auto key = MTP::AuthKey::Data{ { gsl::byte{} } };
+	const auto to = reinterpret_cast<unsigned char*>(key.data());
+	if (kdf.kind == kPasscodeKdfArgon2id) {
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+		const auto algorithm = EVP_KDF_fetch(
+			nullptr,
+			kPasscodeArgon2Name,
+			nullptr);
+		if (!algorithm) {
+			LOG(("App Error: Argon2id is not available."));
+			return nullptr;
+		}
+		const auto algorithmGuard = gsl::finally([&] {
+			EVP_KDF_free(algorithm);
+		});
+		const auto context = EVP_KDF_CTX_new(algorithm);
+		if (!context) {
+			LOG(("App Error: Could not create the Argon2id context."));
+			return nullptr;
+		}
+		const auto contextGuard = gsl::finally([&] {
+			EVP_KDF_CTX_free(context);
+		});
+		auto memory = uint32_t(kdf.memory);
+		auto time = uint32_t(kdf.time);
+		auto lanes = uint32_t(kdf.parallel);
+		auto threads = uint32_t(1);
+		const auto params = std::array{
+			OSSL_PARAM_construct_octet_string(
+				OSSL_KDF_PARAM_PASSWORD,
+				const_cast<char*>(passcode.constData()),
+				size_t(passcode.size())),
+			OSSL_PARAM_construct_octet_string(
+				OSSL_KDF_PARAM_SALT,
+				const_cast<char*>(salt.constData()),
+				size_t(salt.size())),
+			OSSL_PARAM_construct_uint32(
+				OSSL_KDF_PARAM_ARGON2_MEMCOST,
+				&memory),
+			OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_ITER, &time),
+			OSSL_PARAM_construct_uint32(
+				OSSL_KDF_PARAM_ARGON2_LANES,
+				&lanes),
+			OSSL_PARAM_construct_uint32(OSSL_KDF_PARAM_THREADS, &threads),
+			OSSL_PARAM_construct_end(),
+		};
+		if (EVP_KDF_derive(context, to, key.size(), params.data()) != 1) {
+			LOG(("App Error: Argon2id derivation failed."));
+			return nullptr;
+		}
+#else // OPENSSL_VERSION_NUMBER >= 0x30200000L
+		LOG(("App Error: Argon2id is not available."));
+		return nullptr;
+#endif // OPENSSL_VERSION_NUMBER < 0x30200000L
+	} else if (kdf.kind == kPasscodeKdfScrypt) {
+		if (!EVP_PBE_scrypt(
+			passcode.constData(),
+			size_t(passcode.size()),
+			reinterpret_cast<const unsigned char*>(salt.constData()),
+			size_t(salt.size()),
+			uint64_t(kdf.memory),
+			uint64_t(kdf.time),
+			uint64_t(kdf.parallel),
+			kPasscodeScryptMaxMem,
+			to,
+			key.size())) {
+			LOG(("App Error: Scrypt derivation failed."));
+			return nullptr;
+		}
+	} else {
+		LOG(("App Error: Unknown passcode KDF family."));
+		return nullptr;
+	}
+	return std::make_shared<MTP::AuthKey>(key);
+}
+
 FileReadDescriptor::~FileReadDescriptor() {
 	if (version) {
 		stream.setDevice(nullptr);
@@ -425,9 +702,9 @@ void FileWriteDescriptor::writeEncrypted(
 	writeData(PrepareEncrypted(data, key));
 }
 
-void FileWriteDescriptor::finish() {
+bool FileWriteDescriptor::finish() {
 	if (!_stream.device()) {
-		return;
+		return _result;
 	}
 
 	_stream.setDevice(nullptr);
@@ -445,10 +722,11 @@ void FileWriteDescriptor::finish() {
 		.md5 = QByteArray((const char*)_md5.result(), 0x10)
 	};
 	if (_sync) {
-		Manager.writeSync(std::move(entry));
+		_result = Manager.writeSync(std::move(entry));
 	} else {
 		Manager.write(std::move(entry));
 	}
+	return _result;
 }
 
 [[nodiscard]] QByteArray PrepareEncrypted(
@@ -664,6 +942,18 @@ bool ReadEncryptedFile(
 		const QString &basePath,
 		const MTP::AuthKeyPtr &key) {
 	return ReadEncryptedFile(result, ToFilePart(fkey), basePath, key);
+}
+
+void ScheduleRemoveFiles(std::vector<QString> paths) {
+	if (!paths.empty()) {
+		Manager.remove({ .files = std::move(paths) });
+	}
+}
+
+void ScheduleRemoveFolder(const QString &path) {
+	Expects(!path.isEmpty());
+
+	Manager.remove({ .folder = path });
 }
 
 void Sync() {

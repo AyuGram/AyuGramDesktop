@@ -1611,6 +1611,8 @@ void Members::Controller::addMuteActionsToContextMenu(
 			Group::kMaxVolume,
 			muted,
 			st::groupCallMenuVolumePadding);
+		volumeItem->setCanMute(!isMe(participantPeer)
+			&& !(participantIsCallAdmin && _call->canManage()));
 
 		mutesFromVolume = volumeItem->toggleMuteRequests();
 
@@ -1671,6 +1673,10 @@ void Members::Controller::addMuteActionsToContextMenu(
 			return nullptr;
 		}
 		auto callback = [=] {
+			const auto row = findRow(participantPeer);
+			if (!row) {
+				return;
+			}
 			const auto state = row->state();
 			const auto muted = (state == Row::State::Muted)
 				|| (state == Row::State::RaisedHand);
@@ -1686,6 +1692,10 @@ void Members::Controller::addMuteActionsToContextMenu(
 		std::move(
 			mutesFromVolume
 		) | rpl::on_next([=](bool mutedFromVolume) {
+			const auto row = findRow(participantPeer);
+			if (!row) {
+				return;
+			}
 			const auto state = _call->canManage()
 				? (mutedFromVolume
 					? (row->raisedHandRating()

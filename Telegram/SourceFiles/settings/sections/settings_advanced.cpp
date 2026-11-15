@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/launcher.h"
+#include "core/update_channel.h"
 #include "core/update_checker.h"
 #include "data/data_auto_download.h"
 #include "data/data_session.h"
@@ -671,6 +672,7 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 
 	if (Platform::AutostartSupported()) {
 		const auto minimizedToggled = [=] {
+			// Starting hidden must not conceal a verified launch lock.
 			return cStartMinimized()
 				&& controller
 				&& !controller->session().domain().local().hasLocalPasscode();
@@ -729,6 +731,7 @@ void BuildSystemIntegrationSection(SectionBuilder &builder) {
 			) | rpl::filter([=](bool checked) {
 				return (checked != minimizedToggled());
 			}) | rpl::on_next([=](bool checked) {
+				// Refuse a verified launch lock, as the checkbox does.
 				if (controller->session().domain().local().hasLocalPasscode()) {
 					minimized->setChecked(false);
 					controller->show(Ui::MakeInformBox(
@@ -1017,6 +1020,102 @@ void BuildSpellcheckerSection(SectionBuilder &builder) {
 #endif // !TDESKTOP_DISABLE_SPELLCHECK
 }
 
+void ShowDownloadProgress(
+		not_null<rpl::event_stream<QString>*> texts,
+		not_null<rpl::event_stream<bool>*> downloading,
+		int64 ready,
+		int64 total,
+		bool preferPercent) {
+	const auto formatted = [&] {
+		if (!preferPercent) {
+			return Ui::FormatDownloadText(ready, total);
+		}
+		const auto percent = (total > 0)
+			? std::clamp((ready * 100) / float64(total), 0., 100.)
+			: 0.;
+		auto result = QString::number(percent, 'f', 2);
+		if (result.contains('.')) {
+			while (result.endsWith('0')) {
+				result.chop(1);
+			}
+			if (result.endsWith('.')) {
+				result.chop(1);
+			}
+		}
+		return result + '%';
+	}();
+	texts->fire(tr::lng_settings_downloading_update(
+		tr::now,
+		lt_progress,
+		formatted));
+	downloading->fire(true);
+}
+
+void SetDefaultStatus(
+		const Core::UpdateChecker &checker,
+		not_null<rpl::event_stream<QString>*> texts,
+		not_null<rpl::event_stream<bool>*> downloading,
+		not_null<Ui::SettingsButton*> update,
+		const QString &version) {
+	using State = Core::UpdateChecker::State;
+	const auto state = checker.state();
+	switch (state) {
+	case State::Download:
+		ShowDownloadProgress(
+			texts,
+			downloading,
+			checker.already(),
+			checker.size(),
+			checker.percent());
+		break;
+	case State::Ready:
+		texts->fire(tr::lng_settings_update_ready(tr::now));
+		update->show();
+		break;
+	default:
+		texts->fire_copy(version);
+		break;
+	}
+}
+
+void SubscribeToUpdateChecker(
+		const Core::UpdateChecker &checker,
+		not_null<Ui::SlideWrap<Ui::VerticalLayout>*> options,
+		not_null<rpl::event_stream<QString>*> texts,
+		not_null<rpl::event_stream<bool>*> downloading,
+		not_null<Ui::SettingsButton*> update) {
+	checker.checking() | rpl::on_next([=] {
+		options->setAttribute(Qt::WA_TransparentForMouseEvents);
+		texts->fire(tr::lng_settings_update_checking(tr::now));
+		downloading->fire(false);
+	}, options->lifetime());
+	checker.isLatest() | rpl::on_next([=] {
+		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+		texts->fire(tr::lng_settings_latest_installed(tr::now));
+		downloading->fire(false);
+	}, options->lifetime());
+	checker.progress(
+	) | rpl::on_next([=](Core::UpdateChecker::Progress progress) {
+		ShowDownloadProgress(
+			texts,
+			downloading,
+			progress.already,
+			progress.size,
+			progress.percent);
+	}, options->lifetime());
+	checker.failed() | rpl::on_next([=] {
+		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+		texts->fire(tr::lng_settings_update_fail(tr::now));
+		downloading->fire(false);
+	}, options->lifetime());
+	checker.ready() | rpl::on_next([=] {
+		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+		texts->fire(tr::lng_settings_update_ready(tr::now));
+		update->show();
+		downloading->fire(false);
+	}, options->lifetime());
+}
+
 void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 	if (!HasUpdate()) {
 		return;
@@ -1085,7 +1184,9 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 	auto install = (Ui::SettingsButton*)nullptr;
 	auto check = (Ui::SettingsButton*)nullptr;
 	builder.scope([&] {
-		install = (cAlphaVersion() || KSandbox::isInside())
+		install = (cAlphaVersion()
+			|| Core::BuildIsCanary
+			|| KSandbox::isInside())
 			? nullptr
 			: builder.addButton({
 				.id = u"advanced/install_beta"_q,
@@ -1121,55 +1222,6 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 			update->moveToLeft(0, 0);
 		}, update->lifetime());
 
-		const auto showDownloadProgress = [=](
-				int64 ready,
-				int64 total,
-				bool preferPercent) {
-			const auto formatted = [&] {
-				if (!preferPercent) {
-					return Ui::FormatDownloadText(ready, total);
-				}
-				const auto percent = (total > 0)
-					? std::clamp((ready * 100) / float64(total), 0., 100.)
-					: 0.;
-				auto result = QString::number(percent, 'f', 2);
-				if (result.contains('.')) {
-					while (result.endsWith('0')) {
-						result.chop(1);
-					}
-					if (result.endsWith('.')) {
-						result.chop(1);
-					}
-				}
-				return result + '%';
-			}();
-			texts->fire(tr::lng_settings_downloading_update(
-				tr::now,
-				lt_progress,
-				formatted));
-			downloading->fire(true);
-		};
-		const auto setDefaultStatus = [=](
-				const Core::UpdateChecker &checker) {
-			using State = Core::UpdateChecker::State;
-			const auto state = checker.state();
-			switch (state) {
-			case State::Download:
-				showDownloadProgress(
-					checker.already(),
-					checker.size(),
-					checker.percent());
-				break;
-			case State::Ready:
-				texts->fire(tr::lng_settings_update_ready(tr::now));
-				update->show();
-				break;
-			default:
-				texts->fire_copy(version);
-				break;
-			}
-		};
-
 		toggle->toggledValue(
 		) | rpl::filter([](bool toggled) {
 			return (toggled != cAutoUpdate());
@@ -1181,7 +1233,7 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 				checker.start();
 			} else {
 				checker.stop();
-				setDefaultStatus(checker);
+				SetDefaultStatus(checker, texts, downloading, update, version);
 			}
 		}, toggle->lifetime());
 
@@ -1202,37 +1254,8 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 		}
 
 		Core::UpdateChecker checker;
-
-		checker.checking() | rpl::on_next([=] {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents);
-			texts->fire(tr::lng_settings_update_checking(tr::now));
-			downloading->fire(false);
-		}, options->lifetime());
-		checker.isLatest() | rpl::on_next([=] {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-			texts->fire(tr::lng_settings_latest_installed(tr::now));
-			downloading->fire(false);
-		}, options->lifetime());
-		checker.progress(
-		) | rpl::on_next([=](Core::UpdateChecker::Progress progress) {
-			showDownloadProgress(
-				progress.already,
-				progress.size,
-				progress.percent);
-		}, options->lifetime());
-		checker.failed() | rpl::on_next([=] {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-			texts->fire(tr::lng_settings_update_fail(tr::now));
-			downloading->fire(false);
-		}, options->lifetime());
-		checker.ready() | rpl::on_next([=] {
-			options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-			texts->fire(tr::lng_settings_update_ready(tr::now));
-			update->show();
-			downloading->fire(false);
-		}, options->lifetime());
-
-		setDefaultStatus(checker);
+		SubscribeToUpdateChecker(checker, options, texts, downloading, update);
+		SetDefaultStatus(checker, texts, downloading, update, version);
 
 		update->setClickedCallback([] {
 			if (!Core::UpdaterDisabled()) {
@@ -1442,7 +1465,9 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 			container,
 			object_ptr<Ui::VerticalLayout>(container)));
 	const auto inner = options->entity();
-	const auto install = (cAlphaVersion() || KSandbox::isInside())
+	const auto install = (cAlphaVersion()
+		|| Core::BuildIsCanary
+		|| KSandbox::isInside())
 		? nullptr
 		: inner->add(object_ptr<Button>(
 			inner,
@@ -1473,54 +1498,6 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 	}, label->lifetime());
 	label->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-	const auto showDownloadProgress = [=](
-			int64 ready,
-			int64 total,
-			bool preferPercent) {
-		const auto formatted = [&] {
-			if (!preferPercent) {
-				return Ui::FormatDownloadText(ready, total);
-			}
-			const auto percent = (total > 0)
-				? std::clamp((ready * 100) / float64(total), 0., 100.)
-				: 0.;
-			auto result = QString::number(percent, 'f', 2);
-			if (result.contains('.')) {
-				while (result.endsWith('0')) {
-					result.chop(1);
-				}
-				if (result.endsWith('.')) {
-					result.chop(1);
-				}
-			}
-			return result + '%';
-		}();
-		texts->fire(tr::lng_settings_downloading_update(
-			tr::now,
-			lt_progress,
-			formatted));
-		downloading->fire(true);
-	};
-	const auto setDefaultStatus = [=](const Core::UpdateChecker &checker) {
-		using State = Core::UpdateChecker::State;
-		const auto state = checker.state();
-		switch (state) {
-		case State::Download:
-			showDownloadProgress(
-				checker.already(),
-				checker.size(),
-				checker.percent());
-			break;
-		case State::Ready:
-			texts->fire(tr::lng_settings_update_ready(tr::now));
-			update->show();
-			break;
-		default:
-			texts->fire_copy(version);
-			break;
-		}
-	};
-
 	toggle->toggleOn(rpl::single(cAutoUpdate()));
 	toggle->toggledValue(
 	) | rpl::filter([](bool toggled) {
@@ -1534,7 +1511,7 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 			checker.start();
 		} else {
 			checker.stop();
-			setDefaultStatus(checker);
+			SetDefaultStatus(checker, texts, downloading, update, version);
 		}
 	}, toggle->lifetime());
 
@@ -1565,36 +1542,8 @@ void SetupUpdate(not_null<Ui::VerticalLayout*> container) {
 		return check && !downloading;
 	}));
 
-	checker.checking() | rpl::on_next([=] {
-		options->setAttribute(Qt::WA_TransparentForMouseEvents);
-		texts->fire(tr::lng_settings_update_checking(tr::now));
-		downloading->fire(false);
-	}, options->lifetime());
-	checker.isLatest() | rpl::on_next([=] {
-		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-		texts->fire(tr::lng_settings_latest_installed(tr::now));
-		downloading->fire(false);
-	}, options->lifetime());
-	checker.progress(
-	) | rpl::on_next([=](Core::UpdateChecker::Progress progress) {
-		showDownloadProgress(
-			progress.already,
-			progress.size,
-			progress.percent);
-	}, options->lifetime());
-	checker.failed() | rpl::on_next([=] {
-		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-		texts->fire(tr::lng_settings_update_fail(tr::now));
-		downloading->fire(false);
-	}, options->lifetime());
-	checker.ready() | rpl::on_next([=] {
-		options->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-		texts->fire(tr::lng_settings_update_ready(tr::now));
-		update->show();
-		downloading->fire(false);
-	}, options->lifetime());
-
-	setDefaultStatus(checker);
+	SubscribeToUpdateChecker(checker, options, texts, downloading, update);
+	SetDefaultStatus(checker, texts, downloading, update, version);
 
 	check->addClickHandler([] {
 		Core::UpdateChecker checker;
@@ -1867,6 +1816,7 @@ void SetupSystemIntegrationContent(
 
 	if (Platform::AutostartSupported() && controller) {
 		const auto minimizedToggled = [=] {
+			// This path also avoids hiding a verified launch prompt.
 			return cStartMinimized()
 				&& !controller->session().domain().local().hasLocalPasscode();
 		};
@@ -1910,6 +1860,7 @@ void SetupSystemIntegrationContent(
 		) | rpl::filter([=](bool checked) {
 			return (checked != minimizedToggled());
 		}) | rpl::on_next([=](bool checked) {
+			// Keep the verified prompt refusal in this path too.
 			if (controller->session().domain().local().hasLocalPasscode()) {
 				minimized->entity()->setChecked(false);
 				controller->show(Ui::MakeInformBox(

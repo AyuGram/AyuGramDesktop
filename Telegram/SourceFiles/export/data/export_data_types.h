@@ -27,6 +27,8 @@ namespace Data {
 
 using Utf8String = QByteArray;
 
+inline constexpr auto kNanosInGram = int64(1'000'000'000);
+
 uint8 PeerColorIndex(BareId bareId);
 BareId PeerToBareId(PeerId peerId);
 uint8 PeerColorIndex(PeerId peerId);
@@ -70,6 +72,7 @@ struct TextPart {
 		Strike,
 		Blockquote,
 		BankCard,
+		TonAddress,
 		Spoiler,
 		CustomEmoji,
 	};
@@ -177,6 +180,7 @@ struct RichText {
 		AutoEmail,
 		AutoPhone,
 		BankCard,
+		TonAddress,
 		MentionName,
 		FormattedDate,
 		InlineImage,
@@ -447,6 +451,9 @@ struct Image {
 	int height = 0;
 	File file;
 };
+
+// td_export does not link lib_ui, so the svg/svgz reader guard lives here.
+[[nodiscard]] bool IsSvgFormat(const QByteArray &format);
 
 std::pair<QString, QSize> WriteImageThumb(
 	const QString &basePath,
@@ -1105,6 +1112,26 @@ struct ActionManagedBotCreated {
 	UserId botId = 0;
 };
 
+struct ActionGramTransfer {
+	int64 amount = 0;
+	Utf8String peerAddress;
+	Utf8String transactionId;
+	Utf8String comment;
+	bool commentEncrypted = false;
+};
+
+struct ActionWalletTonConnectRequest {
+	uint64 sessionId = 0;
+	TimeId expires = 0;
+	Utf8String topic;
+	Utf8String traceId;
+	bool accepted = false;
+	bool declined = false;
+};
+
+struct ActionNoPaidMessagesTokenUsed {
+};
+
 struct ServiceAction {
 	std::variant<
 		v::null_t,
@@ -1166,7 +1193,10 @@ struct ServiceAction {
 		ActionNoForwardsRequest,
 		ActionNewCreatorPending,
 		ActionChangeCreator,
-		ActionManagedBotCreated> content;
+		ActionManagedBotCreated,
+		ActionGramTransfer,
+		ActionWalletTonConnectRequest,
+		ActionNoPaidMessagesTokenUsed> content;
 };
 
 ServiceAction ParseServiceAction(
@@ -1428,6 +1458,7 @@ Utf8String FormatDateTime(
 	QChar timeSeparator = QChar(':'),
 	QChar separator = QChar(' '));
 Utf8String FormatMoneyAmount(int64 amount, const Utf8String &currency);
+Utf8String FormatGramsAmount(int64 nanos);
 Utf8String FormatFileSize(int64 size);
 Utf8String FormatDuration(int64 seconds);
 

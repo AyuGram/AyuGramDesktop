@@ -83,6 +83,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_schedule_box.h"
 #include "iv/editor/iv_editor_session.h"
+#include "wallet/wallet_panel.h"
+#include "window/window_columns.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
 #include "window/window_controller.h"
@@ -135,6 +137,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h" // st::windowMinWidth
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
+#include "styles/style_wallet.h"
 
 #include <QAction>
 #include <QtWidgets/QApplication>
@@ -345,6 +348,7 @@ private:
 	void addDeleteContact();
 	void addTTLSubmenu(bool addSeparator);
 	void addSendGift();
+	void addSendMoney();
 	void addCreateTopic();
 	void addViewAsMessages();
 	void addViewAsTopics();
@@ -628,8 +632,8 @@ void Filler::addInfo() {
 	} else if (_controller->adaptive().isThreeColumn()) {
 		const auto thread = _controller->activeChatCurrent().thread();
 		if (thread && !thread->asSublist() && thread == _thread) {
-			if (Core::App().settings().thirdSectionInfoEnabled()
-				|| Core::App().settings().tabbedReplacedWithInfo()) {
+			if (_controller->columns().thirdSectionInfoEnabled()
+				|| _controller->columns().tabbedReplacedWithInfo()) {
 				return;
 			}
 		}
@@ -1702,6 +1706,12 @@ void Filler::addSendGift() {
 	}, &st::menuIconGiftPremium);
 }
 
+void Filler::addSendMoney() {
+	if (const auto user = _peer->asUser()) {
+		AddSendMoneyAction(_controller, user, _addAction);
+	}
+}
+
 void Filler::fill() {
 	if (_folder) {
 		fillArchiveActions();
@@ -1902,6 +1912,12 @@ void Filler::addVideoChat() {
 }
 
 void Filler::fillContextMenuActions() {
+	const auto history = _request.key.history();
+	const auto channel = history ? history->peer->asChannel() : nullptr;
+	if (channel && !channel->amIn() && !history->inChatList()) {
+		addNewWindow(false);
+		return;
+	}
 	addNewWindow();
 	addUngroup();
 	addHidePromotion();
@@ -1963,6 +1979,7 @@ void Filler::fillProfileActions() {
 	addBotToGroup();
 	addNewMembers();
 	addSendGift();
+	addSendMoney();
 	addViewStatistics();
 	addStoryArchive();
 	addManageChat();
@@ -2261,6 +2278,11 @@ void PeerMenuDeleteTopicWithConfirmation(
 	};
 	const auto controller = navigation->parentController();
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		topic->destroyed(
+		) | rpl::on_next([=] {
+			box->closeBox();
+		}, box->lifetime());
+
 		Ui::AddSkip(box->verticalLayout());
 		Ui::IconWithTitle(
 			box->verticalLayout(),
@@ -2672,7 +2694,11 @@ void PeerMenuEditTodoList(
 			result.options,
 			crl::guard(weak, [=] { weak->closeBox(); }),
 			crl::guard(weak, [=](const QString &error) {
-				weak->submitFailed(error);
+				if (error == u"MESSAGE_NOT_MODIFIED"_q) {
+					weak->closeBox();
+				} else {
+					weak->submitFailed(error);
+				}
 			}));
 	}, box->lifetime());
 	controller->show(std::move(box), Ui::LayerOption::CloseOther);
@@ -3545,7 +3571,9 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 				return true;
 			}
 			const auto id = SeparateId(
-				((peer->isForum() && !peer->useSubsectionTabs())
+				((!thread->asTopic()
+					&& peer->isForum()
+					&& !peer->useSubsectionTabs())
 					? SeparateType::Forum
 					: SeparateType::Chat),
 				thread);
@@ -4331,8 +4359,9 @@ Fn<void()> DeleteAndLeaveHandler(
 	}();
 	if (isCreator) {
 		const auto requestId = std::make_shared<mtpRequestId>(0);
-		return [=] {
-			if (controller->showFrozenError() || (*requestId > 0)) {
+		const auto show = controller->uiShow();
+		const auto leaveAsCreator = [=](Fn<void()> leave) {
+			if (*requestId > 0) {
 				return;
 			}
 			*requestId = peer->session().api().request(
@@ -4340,17 +4369,27 @@ Fn<void()> DeleteAndLeaveHandler(
 					peer->input()
 			)).done([=](const MTPUser &result) {
 				*requestId = 0;
-				const auto user = peer->owner().processUser(result);
-				controller->show(Box(SelectFutureOwnerbox, peer, user));
+				if (result.type() == mtpc_userEmpty) {
+					leave();
+				} else {
+					const auto user = peer->owner().processUser(result);
+					show->show(Box(SelectFutureOwnerbox, peer, user, leave));
+				}
 			}).fail([=](const MTP::Error &error) {
 				*requestId = 0;
-				controller->show(Box(DeleteChatBox, peer));
+				leave();
 			}).send();
+		};
+		return [=] {
+			if (controller->showFrozenError() || (*requestId > 0)) {
+				return;
+			}
+			controller->show(Box(DeleteChatBox, peer, leaveAsCreator));
 		};
 	}
 	return [=] {
 		if (!controller->showFrozenError()) {
-			controller->show(Box(DeleteChatBox, peer));
+			controller->show(Box(DeleteChatBox, peer, nullptr));
 		}
 	};
 }
@@ -4575,6 +4614,44 @@ void AddSenderUserpicModerateAction(
 			.isAttention = true,
 		});
 	}
+}
+
+void AddSendMoneyAction(
+		not_null<SessionController*> controller,
+		not_null<UserData*> user,
+		const PeerMenuCallback &addAction) {
+	const auto session = &controller->session();
+	const auto userId = peerToUser(user->id);
+	const auto weakController = base::make_weak(controller);
+	const auto weakSession = base::make_weak(session);
+	const auto canOffer = [=] {
+		return weakController
+			&& weakSession
+			&& &controller->session() == session
+			&& &user->session() == session
+			&& session->data().userLoaded(userId) == user
+			&& Wallet::CanOfferSendMoney(user);
+	};
+	if (!canOffer()) {
+		return;
+	}
+	const auto activated = std::make_shared<bool>(false);
+	const auto sent = [=] {
+		if (weakController
+			&& weakSession
+			&& &controller->session() == session
+			&& session->data().userLoaded(userId) == user) {
+			controller->showPeerHistory(
+				user,
+				SectionShow::Way::ClearStack,
+				ShowAtTheEndMsgId);
+		}
+	};
+	addAction(tr::lng_wallet_profile_send_money(tr::now), [=] {
+		if (canOffer() && !std::exchange(*activated, true)) {
+			Wallet::OpenSendMoney(controller, user, sent);
+		}
+	}, &st::walletMenuIcon);
 }
 
 void AddSeparatorAndShiftUp(const PeerMenuCallback &addAction) {

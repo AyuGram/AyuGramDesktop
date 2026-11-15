@@ -516,7 +516,9 @@ SendError FileRestrictionError(
 	}
 	switch (file.type) {
 	case Type::Photo:
-		if (compress == true && photos) {
+		if (compress == true && videos && file.hasAudioEditScene()) {
+			return videos;
+		} else if (compress == true && photos) {
 			return photos;
 		} else if (const auto other = file.isSticker() ? stickers : files) {
 			if ((compress == false || photos) && other) {
@@ -525,7 +527,9 @@ SendError FileRestrictionError(
 		}
 		break;
 	case Type::Video:
-		if (const auto error = file.isGifv() ? gifs : videos) {
+		if (const auto error = (file.isGifv() || file.sendsVideoAsGif())
+				? gifs
+				: videos) {
 			return error;
 		}
 		break;

@@ -217,7 +217,7 @@ constexpr auto kBlurRadius = 24;
 
 	const auto innerRect = QRect(QPoint(), partRect.size())
 		- st::dialogsTTLBadgeInnerMargins;
-	const auto ttlText = Ui::FormatTTLTiny(ttl);
+	const auto ttlText = Ui::FormatTTLBadge(ttl);
 
 	Ui::PaintTimerIcon(q, innerRect, ttlText, st::premiumButtonFg->c);
 
@@ -835,6 +835,7 @@ void Row::paintUserpic(
 		&& !(badgeUser && Data::IsUserOnline(badgeUser))
 		&& !subscribed
 		&& !insideCommunity;
+	_cornerBadgeUserpic->communityMember = communityMember ? 1 : 0;
 	if (keyChanged
 		|| !_cornerBadgeUserpic->layersManager.isFinished()
 		|| activeChanged
@@ -905,6 +906,26 @@ void Row::paintUserpic(
 bool Row::lookupIsInTopicJump(int x, int y) const {
 	const auto history = this->history();
 	return history && history->lastItemDialogsView().isInTopicJump(x, y);
+}
+
+bool Row::lookupIsInCommunityBadge(
+		int x,
+		int y,
+		const style::DialogRow &st) const {
+	if (!_cornerBadgeUserpic
+		|| !_cornerBadgeUserpic->communityMember
+		|| !_cornerBadgeUserpic->layersManager.isSameLayer(kTopLayer)) {
+		return false;
+	}
+	const auto size = st::dialogsCommunityBadgeSize;
+	const auto &skip = st::dialogsCommunityBadgeSkip;
+	const auto stroke = st::dialogsCommunityBadgeStroke;
+	return QRect(
+		st.padding.left() + st.photoSize - skip.x() - size,
+		st.padding.top() + st.photoSize - skip.y() - size,
+		size,
+		size
+	).marginsAdded({ stroke, stroke, stroke, stroke }).contains(x, y);
 }
 
 void Row::stopLastRipple() {

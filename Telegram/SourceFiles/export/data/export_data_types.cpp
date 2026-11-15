@@ -7,12 +7,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "export/data/export_data_types.h"
 
+struct GeoPointLocation;
+
 #include "export/export_settings.h"
 #include "export/output/export_output_file.h"
 #include "base/base_file_utilities.h"
 #include "ui/text/format_values.h"
 #include "core/mime_type.h"
 #include "core/utils.h"
+#include "data/data_location.h"
 #include <QtCore/QDateTime>
 #include <QtCore/QTimeZone>
 #include <QtCore/QRegularExpression>
@@ -326,6 +329,8 @@ std::vector<TextPart> ParseText(
 			[](const MTPDmessageEntityBlockquote&) {
 				return Type::Blockquote; },
 			[](const MTPDmessageEntityBankCard&) { return Type::BankCard; },
+			[](const MTPDmessageEntityTonAddress&) {
+				return Type::TonAddress; },
 			[](const MTPDmessageEntitySpoiler&) { return Type::Spoiler; },
 			[](const MTPDmessageEntityCustomEmoji&) { return Type::CustomEmoji; },
 			[](const MTPDmessageEntityFormattedDate&) { return Type::Unknown; },
@@ -613,6 +618,8 @@ RichText ParseRichText(const MTPRichText &text) {
 		return ParseRichTextWrapper(Type::AutoPhone, data.vtext());
 	}, [](const MTPDtextBankCard &data) {
 		return ParseRichTextWrapper(Type::BankCard, data.vtext());
+	}, [](const MTPDtextTonAddress &data) {
+		return ParseRichTextWrapper(Type::TonAddress, data.vtext());
 	}, [](const MTPDtextMentionName &data) {
 		auto result = ParseRichTextWrapper(Type::MentionName, data.vtext());
 		result.id = uint64(data.vuser_id().v);
@@ -1597,9 +1604,13 @@ SharedContact ParseSharedContact(
 GeoPoint ParseGeoPoint(const MTPGeoPoint &data) {
 	auto result = GeoPoint();
 	data.match([&](const MTPDgeoPoint &data) {
-		result.latitude = data.vlat().v;
-		result.longitude = data.vlong().v;
-		result.valid = true;
+		const auto latitude = data.vlat().v;
+		const auto longitude = data.vlong().v;
+		if (::Data::ValidGeoCoordinates(latitude, longitude)) {
+			result.latitude = latitude;
+			result.longitude = longitude;
+			result.valid = true;
+		}
 	}, [](const MTPDgeoPointEmpty &data) {});
 	return result;
 }
@@ -1898,6 +1909,11 @@ StoriesSlice ParseStoriesSlice(
 	return result;
 }
 
+bool IsSvgFormat(const QByteArray &format) {
+	const auto lower = format.toLower();
+	return (lower == "svg") || (lower == "svgz");
+}
+
 std::pair<QString, QSize> WriteImageThumb(
 		const QString &basePath,
 		const QString &largePath,
@@ -1910,7 +1926,7 @@ std::pair<QString, QSize> WriteImageThumb(
 	}
 	const auto path = basePath + largePath;
 	QImageReader reader(path);
-	if (!reader.canRead()) {
+	if (!reader.canRead() || IsSvgFormat(reader.format())) {
 		return {};
 	}
 	const auto size = reader.size();
@@ -2350,6 +2366,8 @@ Media ParseMedia(
 		result.content = ParsePaidMedia(context, data, folder, date);
 	}, [](const MTPDmessageMediaVideoStream &data) {
 		// Live stories.
+	}, [](const MTPDmessageMediaWidget &data) {
+		// #TODO widgets
 	}, [](const MTPDmessageMediaEmpty &data) {});
 	return result;
 }
@@ -2792,6 +2810,25 @@ ServiceAction ParseServiceAction(
 		auto content = ActionChatJoinedViaCommunity();
 		content.communityId = ChannelId(data.vcommunity_id().v);
 		result.content = content;
+	}, [&](const MTPDmessageActionGramTransfer &data) {
+		result.content = ActionGramTransfer{
+			.amount = int64(data.vamount().v),
+			.peerAddress = data.vpeer_address().v,
+			.transactionId = data.vtransaction_id().v,
+			.comment = data.vcomment().value_or_empty(),
+			.commentEncrypted = data.is_comment_encrypted(),
+		};
+	}, [&](const MTPDmessageActionWalletTonConnectRequest &data) {
+		result.content = ActionWalletTonConnectRequest{
+			.sessionId = data.vsession_id().v,
+			.expires = data.vexpires().v,
+			.topic = data.vtopic().value_or_empty(),
+			.traceId = data.vtrace_id().value_or_empty(),
+			.accepted = data.is_accepted(),
+			.declined = data.is_declined(),
+		};
+	}, [&](const MTPDmessageActionNoPaidMessagesTokenUsed &data) {
+		result.content = ActionNoPaidMessagesTokenUsed();
 	}, [](const MTPDmessageActionEmpty &data) {});
 	return result;
 }
@@ -3563,8 +3600,35 @@ Utf8String FormatMoneyAmount(int64 amount, const Utf8String &currency) {
 		QString::fromUtf8(currency)).toUtf8();
 }
 
+Utf8String FormatGramsAmount(int64 nanos) {
+	constexpr auto kNanos = uint64(kNanosInGram);
+
+	const auto negative = (nanos < 0);
+	const auto absolute = negative ? (0 - uint64(nanos)) : uint64(nanos);
+	const auto whole = absolute / kNanos;
+	auto fraction = NumberToString(absolute % kNanos, 9);
+	while (fraction.endsWith('0')) {
+		fraction.chop(1);
+	}
+	return (negative ? Utf8String("-") : Utf8String())
+		+ NumberToString(whole)
+		+ (fraction.isEmpty() ? Utf8String() : ('.' + fraction))
+		+ ((absolute == kNanos) ? " Gram" : " Grams");
+}
+
 Utf8String FormatFileSize(int64 size) {
-	return Ui::FormatSizeText(size).toUtf8();
+	// Exports are written in English and off the main thread.
+	const auto tenths = [](int64 value) {
+		return QByteArray::number(value / 10)
+			+ '.'
+			+ QByteArray::number(value % 10);
+	};
+	if (size >= 1024 * 1024) {
+		return tenths(size * 10 / (1024 * 1024)) + " MB";
+	} else if (size >= 1024) {
+		return tenths(size * 10 / 1024) + " KB";
+	}
+	return QByteArray::number(size) + " B";
 }
 
 Utf8String FormatDuration(int64 seconds) {

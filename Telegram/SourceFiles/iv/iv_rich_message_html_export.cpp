@@ -18,6 +18,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_media.h"
 #include "data/data_download_manager.h"
 #include "data/data_file_origin.h"
+#include "data/data_location.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
@@ -1087,19 +1088,22 @@ void SerializeBlock(
 	case Kind::Map: {
 		*out += u"<figure class=\"map\"%1>"_q.arg(
 			IdAttribute(block.anchorId));
-		const auto zoom = (block.zoom > 0) ? block.zoom : 15;
-		const auto latitude = QString::number(block.latitude);
-		const auto longitude = QString::number(block.longitude);
-		const auto url = u"https://www.openstreetmap.org/"
-			u"?mlat=%1&mlon=%2#map=%3/%1/%2"_q
-			.arg(latitude, longitude, QString::number(zoom));
-		*out += u"<tg-map lat=\"%1\" long=\"%2\" zoom=\"%3\"></tg-map>"_q
-			.arg(latitude, longitude, QString::number(zoom));
-		*out += u"<a%1>%2, %3</a>"_q
-			.arg(
-				AnchorHref(url),
-				EscapeHtml(latitude),
-				EscapeHtml(longitude));
+		if (block.zoom > 0
+			&& ::Data::ValidGeoCoordinates(block.latitude, block.longitude)) {
+			const auto zoom = QString::number(block.zoom);
+			const auto latitude = QString::number(block.latitude);
+			const auto longitude = QString::number(block.longitude);
+			const auto url = u"https://www.openstreetmap.org/"
+				u"?mlat=%1&mlon=%2#map=%3/%1/%2"_q
+				.arg(latitude, longitude, zoom);
+			*out += u"<tg-map lat=\"%1\" long=\"%2\" zoom=\"%3\"></tg-map>"_q
+				.arg(latitude, longitude, zoom);
+			*out += u"<a%1>%2, %3</a>"_q
+				.arg(
+					AnchorHref(url),
+					EscapeHtml(latitude),
+					EscapeHtml(longitude));
+		}
 		SerializeCaption(out, block.caption, context);
 		*out += u"</figure>\n"_q;
 	} break;
@@ -1396,40 +1400,6 @@ void CollectClipboardMediaFromText(
 	}
 }
 
-[[nodiscard]] Main::Session *SessionFromBlocks(
-		const std::vector<RichPage::Block> &blocks) {
-	for (const auto &block : blocks) {
-		if (block.photo) {
-			return &block.photo->session();
-		} else if (block.document) {
-			return &block.document->session();
-		} else if (block.peer) {
-			return &block.peer->session();
-		}
-		for (const auto &item : block.mediaItems) {
-			if (item.photo) {
-				return &item.photo->session();
-			} else if (item.document) {
-				return &item.document->session();
-			}
-		}
-		for (const auto &article : block.relatedArticles) {
-			if (article.photo) {
-				return &article.photo->session();
-			}
-		}
-		for (const auto &item : block.listItems) {
-			if (const auto session = SessionFromBlocks(item.blocks)) {
-				return session;
-			}
-		}
-		if (const auto session = SessionFromBlocks(block.blocks)) {
-			return session;
-		}
-	}
-	return nullptr;
-}
-
 void CollectClipboardMedia(
 		ClipboardMedia &media,
 		Main::Session *session,
@@ -1491,7 +1461,7 @@ QByteArray RichBlocksClipboardHtml(
 	auto media = ClipboardMedia();
 	CollectClipboardMedia(
 		media,
-		session ? session : SessionFromBlocks(slice.blocks),
+		session ? session : RichBlocksMediaSession(slice.blocks),
 		slice.blocks);
 
 	auto page = RichPage();

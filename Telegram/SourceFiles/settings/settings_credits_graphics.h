@@ -57,6 +57,7 @@ class GenericBox;
 class RpWidget;
 class VerticalLayout;
 class PopupMenu;
+struct UniqueGiftCoverAction;
 } // namespace Ui
 
 namespace Settings {
@@ -118,6 +119,7 @@ struct CreditsEntryBoxStyleOverrides {
 	const style::PopupMenu *menu = nullptr;
 	const style::Table *table = nullptr;
 	const style::FlatLabel *tableValueMultiline = nullptr;
+	const style::FlatLabel *tableValueAddress = nullptr;
 	const style::FlatLabel *tableValueMessage = nullptr;
 	const style::icon *link = nullptr;
 	const style::icon *share = nullptr;
@@ -138,6 +140,13 @@ struct CreditsEntryBoxStyleOverrides {
 };
 [[nodiscard]] CreditsEntryBoxStyleOverrides DarkCreditsEntryBoxStyle();
 
+struct UniqueGiftCoverActions {
+	Fn<void()> transfer;
+	Fn<std::vector<Ui::UniqueGiftCoverAction>(
+		not_null<Ui::GenericBox*>)> extra;
+	Fn<void(not_null<Ui::GenericBox*>)> aboveButtons;
+};
+
 [[nodiscard]] rpl::producer<CreditsAmount> UniqueGiftResalePrice(
 	std::shared_ptr<Data::UniqueGift> unique,
 	bool forceTon = false);
@@ -152,7 +161,8 @@ void GenericCreditsEntryBox(
 	std::shared_ptr<ChatHelpers::Show> show,
 	const Data::CreditsHistoryEntry &e,
 	const Data::SubscriptionEntry &s,
-	CreditsEntryBoxStyleOverrides st = {});
+	CreditsEntryBoxStyleOverrides st = {},
+	std::shared_ptr<const UniqueGiftCoverActions> actions = nullptr);
 void GenericCreditsEntryBody(
 	not_null<Ui::GenericBox*> box,
 	std::shared_ptr<ChatHelpers::Show> show,
@@ -200,7 +210,8 @@ void GlobalStarGiftBox(
 	std::shared_ptr<ChatHelpers::Show> show,
 	const Data::StarGift &data,
 	StarGiftResaleInfo resale,
-	CreditsEntryBoxStyleOverrides st = {});
+	CreditsEntryBoxStyleOverrides st = {},
+	std::shared_ptr<const UniqueGiftCoverActions> actions = nullptr);
 
 [[nodiscard]] Data::CreditsHistoryEntry SavedStarGiftEntry(
 	not_null<PeerData*> owner,
@@ -327,6 +338,8 @@ void AddUniqueCloseMoreButton(
 	not_null<Ui::GenericBox*> box,
 	Settings::CreditsEntryBoxStyleOverrides st,
 	Fn<void(not_null<Ui::PopupMenu*>)> fillMenu = nullptr,
-	Fn<void()> launchCraft = nullptr);
+	Fn<void()> launchCraft = nullptr,
+	const style::IconButton *closeSt = nullptr,
+	const style::IconButton *menuSt = nullptr);
 
 } // namespace Settings

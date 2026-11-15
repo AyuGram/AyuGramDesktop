@@ -152,6 +152,14 @@ void PaintMediaBadge(
 		: AlbumType::None;
 }
 
+[[nodiscard]] bool SendsAnimationAsGif(const PreparedFile &file) {
+	const auto job = file.animationJob.get();
+	const auto still = job
+		? std::get_if<Media::Encode::StillSource>(&job->source)
+		: nullptr;
+	return job && (!still || still->music.empty());
+}
+
 [[nodiscard]] std::vector<GroupRange> GroupRanges(
 		const std::vector<PreparedFile> &files,
 		SendFilesWay way,
@@ -166,7 +174,7 @@ void PaintMediaBadge(
 	auto from = 0;
 	auto groupType = AlbumType::None;
 	for (auto i = 0; i != int(files.size()); ++i) {
-		const auto fileGroupType = (files[i].animationJob
+		const auto fileGroupType = (SendsAnimationAsGif(files[i])
 			|| files[i].sendsVideoAsGif())
 			? AlbumType::None
 			: GroupTypeForFile(
@@ -275,13 +283,44 @@ bool PreparedFile::sendsVideoAsGif() const {
 	return video && video->hasAudio && video->modifications.gif;
 }
 
+int64 PreparedFile::memoryUsage() const {
+	using Image = PreparedFileInformation::Image;
+	using Song = PreparedFileInformation::Song;
+	using Video = PreparedFileInformation::Video;
+	auto result = int64(content.size()) + int64(preview.sizeInBytes());
+	if (information) {
+		v::match(information->media, [&](const Image &data) {
+			result += int64(data.data.sizeInBytes())
+				+ int64(data.bytes.size());
+		}, [&](const Song &data) {
+			result += int64(data.cover.sizeInBytes());
+		}, [&](const Video &data) {
+			result += int64(data.thumbnail.sizeInBytes());
+		}, [](v::null_t) {
+		});
+	}
+	if (videoCover) {
+		result += videoCover->memoryUsage();
+	}
+	return result;
+}
+
 bool PreparedFile::hasAnimatedEditScene() const {
 	const auto image = information
 		? std::get_if<PreparedFileInformation::Image>(&information->media)
 		: nullptr;
 	return image
 		&& image->modifications.paint
-		&& image->modifications.paint->hasAnimatedItems();
+		&& image->modifications.paint->hasAnimatedResult();
+}
+
+bool PreparedFile::hasAudioEditScene() const {
+	const auto image = information
+		? std::get_if<PreparedFileInformation::Image>(&information->media)
+		: nullptr;
+	return image
+		&& image->modifications.paint
+		&& image->modifications.paint->hasSoundResult();
 }
 
 AlbumType PreparedFile::albumType(bool sendImagesAsPhotos) const {
@@ -321,38 +360,15 @@ bool InsertTextOnImageCancel(const QString &text) {
 	return !text.isEmpty() && !text.startsWith(u"data:image"_q);
 }
 
-PreparedList PreparedList::Reordered(
-		PreparedList &&list,
-		std::vector<int> order) {
-	Expects(list.error == PreparedList::Error::None);
-	Expects(list.files.size() == order.size());
-
-	auto result = PreparedList(list.error, list.errorData);
-	result.files.reserve(list.files.size());
-	for (auto index : order) {
-		result.files.push_back(std::move(list.files[index]));
+int64 PreparedList::memoryUsage() const {
+	auto result = int64();
+	for (const auto &file : files) {
+		result += file.memoryUsage();
+	}
+	for (const auto &file : filesToProcess) {
+		result += file.memoryUsage();
 	}
 	return result;
-}
-
-void PreparedList::mergeToEnd(PreparedList &&other, bool cutToAlbumSize) {
-	if (error != Error::None) {
-		return;
-	}
-	if (other.error != Error::None) {
-		error = other.error;
-		errorData = other.errorData;
-		return;
-	}
-	files.reserve(std::min(
-		size_t(cutToAlbumSize ? kMaxAlbumCount : INT_MAX),
-		files.size() + other.files.size()));
-	for (auto &file : other.files) {
-		if (cutToAlbumSize && files.size() == kMaxAlbumCount) {
-			break;
-		}
-		files.push_back(std::move(file));
-	}
 }
 
 bool PreparedList::canBeSentInSlowmode() const {

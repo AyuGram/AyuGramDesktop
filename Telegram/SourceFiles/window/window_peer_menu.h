@@ -92,6 +92,11 @@ void AddSenderUserpicModerateAction(
 	HistoryItem *moderateItem,
 	const PeerMenuCallback &addAction);
 
+void AddSendMoneyAction(
+	not_null<SessionController*> controller,
+	not_null<UserData*> user,
+	const PeerMenuCallback &addAction);
+
 void PeerMenuExportChat(
 	not_null<Window::SessionController*> controller,
 	not_null<PeerData*> peer);
@@ -208,11 +213,6 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
 	Fn<void()> &&successCallback = nullptr);
-base::weak_qptr<Ui::BoxContent> ShowShareUrlBox(
-	not_null<Window::SessionNavigation*> navigation,
-	const QString &url,
-	const QString &text,
-	FnMut<void()> &&successCallback = nullptr);
 base::weak_qptr<Ui::BoxContent> ShowShareGameBox(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<UserData*> bot,

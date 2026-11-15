@@ -38,7 +38,7 @@ constexpr auto kDefaultProxyPort = 80;
 
 } // namespace
 
-PreLaunchWindow *PreLaunchWindowInstance = nullptr;
+auto PreLaunchWindowInstance = (PreLaunchWindow*)nullptr;
 
 PreLaunchWindow::PreLaunchWindow(QString title) {
 	setWindowIcon(Window::CreateIcon());

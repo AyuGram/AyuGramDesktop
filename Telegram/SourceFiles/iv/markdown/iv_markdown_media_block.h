@@ -9,8 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "iv/markdown/iv_markdown_common.h"
 
+#include "ui/chat/message_bubble.h"
 #include "ui/click_handler.h"
-#include "ui/painter.h"
 #include "ui/text/text_entity.h"
 
 #include <memory>
@@ -18,6 +18,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QPoint>
 #include <QtCore/QRect>
+
+class Painter;
 
 namespace style {
 struct Markdown;
@@ -54,6 +56,8 @@ public:
 	void setHost(MediaBlockHost *host);
 	[[nodiscard]] MediaBlockHost *host() const;
 	void setMediaPixelScale(double scale);
+	void setBubbleRounding(Ui::BubbleRounding rounding);
+	[[nodiscard]] Ui::BubbleRounding bubbleRounding() const;
 
 	[[nodiscard]] virtual uint64 stableId() const = 0;
 	[[nodiscard]] virtual bool alive() const;
@@ -105,6 +109,7 @@ private:
 	MediaBlockHost *_host = nullptr;
 	const style::Markdown *_st = nullptr;
 	double _mediaPixelScale = 1.;
+	Ui::BubbleRounding _bubbleRounding;
 
 };
 

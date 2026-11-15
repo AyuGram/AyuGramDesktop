@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/editor/iv_editor_state.h"
 #include "iv/editor/iv_editor_page_media.h"
 #include "iv/editor/iv_editor_page_table_grid.h"
+#include "iv/editor/iv_editor_page_table_remove.h"
 #include "iv/editor/iv_editor_text_entities.h"
 #include "iv/markdown/iv_markdown_prepare_serialize.h"
 #include "lang/lang_keys.h"
@@ -484,6 +485,47 @@ bool SetMediaBlockSpoiler(Block *block, bool enabled) {
 		path.container,
 		list,
 		removedItemIndex);
+}
+
+[[nodiscard]] LeafPath ShiftLeafPathAfterRemovedBlocks(
+		LeafPath leaf,
+		const BlockContainerPath &container,
+		int from,
+		int till) {
+	auto shifted = leaf.block;
+	for (auto i = till; i != from;) {
+		--i;
+		if (!ShiftBlockPathAfterRemovedBlock(shifted, BlockPath{
+				.container = container,
+				.index = i,
+			})) {
+			return leaf;
+		}
+	}
+	leaf.block = shifted;
+	return leaf;
+}
+
+[[nodiscard]] LeafPath ShiftLeafPathAfterRemovedListItems(
+		LeafPath leaf,
+		const BlockPath &list,
+		int from,
+		int till) {
+	if (leaf.block == list && leaf.kind == LeafKind::ListItemText) {
+		if (leaf.listItemIndex >= till) {
+			leaf.listItemIndex -= (till - from);
+		}
+		return leaf;
+	}
+	auto shifted = leaf.block;
+	for (auto i = till; i != from;) {
+		--i;
+		if (!ShiftBlockPathAfterRemovedListItem(shifted, list, i)) {
+			return leaf;
+		}
+	}
+	leaf.block = shifted;
+	return leaf;
 }
 
 [[nodiscard]] std::optional<int> BlockIndexInContainer(
@@ -2025,6 +2067,14 @@ State::ListSelectionInfo State::listSelectionInfo(
 			return EffectiveOrderedListType(*owner, item)
 				== result.listOrderedType;
 		});
+	result.listRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		0,
+		int(owner->listItems.size()));
+	result.selectedRomanSupported = OrderedItemsSupportRoman(
+		*owner,
+		validated->from,
+		validated->till);
 	result.allOrderedDecimal = true;
 	result.allOrderedLowerAlpha = true;
 	result.allOrderedUpperAlpha = true;
@@ -3246,28 +3296,6 @@ State::BoundaryTarget State::boundaryTargetForLeaf(
 			}
 		}
 	}
-	const auto prioritizeStructuralStep = [&](const BoundaryTarget &target) {
-		if (target.action != BoundaryAction::StructuralSelection) {
-			return false;
-		}
-		switch (target.structuralSelection.kind) {
-		case PreparedEditSelectionKind::Blocks:
-			if (const auto range = validateBlockRange(
-					target.structuralSelection.blocks)) {
-				return leafWillBeRemoved(leaf, *range);
-			}
-			break;
-		case PreparedEditSelectionKind::ListItems:
-			if (const auto range = validateListItemRange(
-					target.structuralSelection.listItems)) {
-				return leafWillBeRemoved(leaf, *range);
-			}
-			break;
-		default:
-			break;
-		}
-		return false;
-	};
 	const auto removeDirectly = allowRemoveDirectly
 		&& descriptor
 		&& removalTargetIsEmpty(descriptor->removalTarget)
@@ -3285,10 +3313,8 @@ State::BoundaryTarget State::boundaryTargetForLeaf(
 			const auto next = (i + 1 < count)
 				? steps[i + 1]
 				: BoundaryTarget();
-			if (prioritizeStructuralStep(next)) {
-				return next;
-			}
-			if (removeDirectly) {
+			if (removeDirectly
+				&& next.action != BoundaryAction::StructuralSelection) {
 				return {
 					.action = BoundaryAction::RemoveActiveOwner,
 				};
@@ -3322,6 +3348,41 @@ bool State::isActiveTopLevelParagraphOrHeading() const {
 		&& ((owner->kind == BlockKind::Paragraph)
 			|| (owner->kind == BlockKind::Heading)
 			|| (owner->kind == BlockKind::Footer));
+}
+
+bool State::isActiveInsertableParagraph() const {
+	const auto descriptor = textNode(_activeTextOrdinal);
+	if (!descriptor) {
+		return false;
+	}
+	const auto &leaf = descriptor->leaf;
+	const auto owner = block(leaf.block);
+	if (!owner) {
+		return false;
+	} else if (leaf.kind == LeafKind::ListItemText) {
+		if (owner->kind != BlockKind::List) {
+			return false;
+		}
+	} else if (leaf.kind != LeafKind::BlockText
+		|| owner->kind != BlockKind::Paragraph) {
+		return false;
+	}
+	auto container = leaf.block.container;
+	while (!container.steps.empty()) {
+		const auto step = container.steps.back();
+		container.steps.pop_back();
+		const auto parent = block({
+			.container = container,
+			.index = step.blockIndex,
+		});
+		const auto expected = (step.kind == BlockContainerKind::BlockChildren)
+			? BlockKind::Details
+			: BlockKind::List;
+		if (!parent || parent->kind != expected) {
+			return false;
+		}
+	}
+	return true;
 }
 
 bool State::hasActiveListItemSurface() const {
@@ -3987,7 +4048,10 @@ bool State::canLiftActiveLineOutOfContainer() const {
 		return false;
 	}
 	const auto owner = block(descriptor->leaf.block);
+	const auto parent = block(*container);
 	return owner
+		&& parent
+		&& (parent->kind == BlockKind::Quote)
 		&& JoinableTextBlockKind(owner->kind)
 		&& (descriptor->leaf.block.index == 0);
 }
@@ -4487,6 +4551,23 @@ State::ParagraphBoundaryJoinResult State::joinActiveParagraphBoundary(
 	});
 }
 
+State::LeafPath State::shiftLeafAfterRemovedSelection(
+		const Markdown::PreparedEditSelection &selection,
+		LeafPath leaf) const {
+	if (selection.kind != PreparedEditSelectionKind::Blocks) {
+		return leaf;
+	}
+	const auto range = validateBlockRange(selection.blocks);
+	if (!range || leafWillBeRemoved(leaf, *range)) {
+		return leaf;
+	}
+	return ShiftLeafPathAfterRemovedBlocks(
+		std::move(leaf),
+		range->container,
+		range->from,
+		range->till);
+}
+
 std::optional<int> State::removeStructuralSelection(
 		const Markdown::PreparedEditSelection &selection,
 		bool forward) {
@@ -4686,7 +4767,7 @@ std::optional<int> State::removeStructuralSelection(
 		if (!range) {
 			return std::nullopt;
 		}
-		const auto plannedFocus = plannedFocusForRange(*range, forward);
+		auto plannedFocus = plannedFocusForRange(*range, forward);
 		const auto blocks = blockContainer(range->container);
 		if (!blocks) {
 			return std::nullopt;
@@ -4694,6 +4775,13 @@ std::optional<int> State::removeStructuralSelection(
 		blocks->erase(
 			blocks->begin() + range->from,
 			blocks->begin() + range->till);
+		if (plannedFocus) {
+			plannedFocus = ShiftLeafPathAfterRemovedBlocks(
+				*plannedFocus,
+				range->container,
+				range->from,
+				range->till);
+		}
 		return finish([&] {
 			return leafNearBlockRange(*range, forward);
 		}, plannedFocus);
@@ -4703,7 +4791,7 @@ std::optional<int> State::removeStructuralSelection(
 		if (!range) {
 			return std::nullopt;
 		}
-		const auto plannedFocus = plannedFocusForRange(*range, forward);
+		auto plannedFocus = plannedFocusForRange(*range, forward);
 		const auto owner = block(range->block);
 		if (!owner || owner->kind != BlockKind::List) {
 			return std::nullopt;
@@ -4719,9 +4807,23 @@ std::optional<int> State::removeStructuralSelection(
 				})) {
 				return std::nullopt;
 			}
+			if (plannedFocus) {
+				plannedFocus = ShiftLeafPathAfterRemovedBlocks(
+					*plannedFocus,
+					removed.container,
+					removed.index,
+					removed.index + 1);
+			}
 			return finish([&] {
 				return focusForRemovedBlock(removed, forward);
 			}, plannedFocus);
+		}
+		if (plannedFocus) {
+			plannedFocus = ShiftLeafPathAfterRemovedListItems(
+				*plannedFocus,
+				range->block,
+				range->from,
+				range->till);
 		}
 		return finish([&] {
 			return leafNearListItemRange(*range, forward);
@@ -4737,9 +4839,11 @@ std::optional<int> State::removeStructuralSelection(
 		if (!owner || owner->kind != BlockKind::Table) {
 			return std::nullopt;
 		}
-		owner->tableRows.erase(
-			owner->tableRows.begin() + range->from,
-			owner->tableRows.begin() + range->till);
+		EraseTableRowsKeepingSpans(
+			owner,
+			tableRenderLimits(),
+			range->from,
+			range->till);
 		if (owner->tableRows.empty() && RichTextIsEmpty(owner->text)) {
 			const auto removed = range->block;
 			if (!removeTarget({
@@ -8852,19 +8956,6 @@ State::TextSelectionDropResult State::moveTextSelectionToDropTarget(
 		target);
 }
 
-void State::insertHeading1AfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Heading,
-		.headingLevel = 1,
-	});
-}
-
-void State::insertBlockquoteAfterActive() {
-	insertBlockAfterActive({
-		.type = InsertBlockType::Blockquote,
-	});
-}
-
 bool State::insertBlocksAfterActiveWithContextUnchecked(
 		std::vector<Block> &blocks,
 		const ActiveTextInsertContext &context) {
@@ -9133,12 +9224,6 @@ bool State::insertBlockAfterActive(
 			.result = applied,
 		};
 	});
-}
-
-bool State::insertPreparedBlockAfterActive(Block block) {
-	auto blocks = std::vector<Block>();
-	blocks.push_back(std::move(block));
-	return insertPreparedBlocksAfterActive(std::move(blocks));
 }
 
 bool State::insertPreparedBlocksAfterActive(

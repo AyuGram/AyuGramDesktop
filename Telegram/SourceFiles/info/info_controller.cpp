@@ -244,6 +244,18 @@ rpl::producer<SparseIdsMergedSlice> AbstractController::mediaSource(
 		SparseIdsMergedSlice::UniversalMsgId aroundId,
 		int limitBefore,
 		int limitAfter) const {
+	return sharedMediaSource(
+		section().mediaType(),
+		aroundId,
+		limitBefore,
+		limitAfter);
+}
+
+rpl::producer<SparseIdsMergedSlice> AbstractController::sharedMediaSource(
+		Storage::SharedMediaType type,
+		SparseIdsMergedSlice::UniversalMsgId aroundId,
+		int limitBefore,
+		int limitAfter) const {
 	Expects(peer() != nullptr);
 
 	const auto isScheduled = [&] {
@@ -272,7 +284,7 @@ rpl::producer<SparseIdsMergedSlice> AbstractController::mediaSource(
 				sublist() ? sublist()->sublistPeer()->id : PeerId(),
 				migratedPeerId(),
 				aroundId),
-			section().mediaType()),
+			type),
 		limitBefore,
 		limitAfter);
 }
@@ -436,6 +448,8 @@ not_null<Ui::RpWidget*> Controller::wrapWidget() const {
 bool Controller::validateMementoPeer(
 		not_null<ContentMemento*> memento) const {
 	return memento->peer() == peer()
+		&& memento->topic() == topic()
+		&& memento->sublist() == sublist()
 		&& memento->migratedPeerId() == migratedPeerId()
 		&& memento->settingsSelf() == settingsSelf()
 		&& memento->storiesPeer() == storiesPeer()
@@ -464,7 +478,9 @@ void Controller::updateSearchControllers(
 		? _section.mediaType()
 		: Section::MediaType::kCount;
 	const auto hasMediaSearch = isMedia
-		&& SharedMediaAllowSearch(mediaType);
+		&& (SharedMediaAllowSearch(mediaType)
+			|| (type == Type::GlobalMedia
+				&& mediaType == Section::MediaType::RoundVoiceFile));
 	const auto hasRequestsListSearch = (type == Type::RequestsList);
 	const auto hasCommonGroupsSearch = (type == Type::CommonGroups);
 	const auto hasDownloadsSearch = (type == Type::Downloads);
@@ -540,16 +556,20 @@ void Controller::removeFromStack(const std::vector<Section> &sections) const {
 	_widget->removeFromStack(sections);
 }
 
-auto Controller::produceSearchQuery(
-		const QString &query) const -> SearchQuery {
-	Expects(_key.peer() != nullptr);
+auto AbstractController::produceSearchQuery(
+		const QString &query) const
+-> SearchQuery {
+	Expects(peer() != nullptr);
 
 	auto result = SearchQuery();
-	result.type = _section.mediaType();
-	result.peerId = _key.peer()->id;
-	result.topicRootId = _key.topic() ? _key.topic()->rootId() : 0;
+	result.type = section().mediaType();
+	result.peerId = peer()->id;
+	result.topicRootId = topic() ? topic()->rootId() : 0;
+	result.monoforumPeerId = sublist()
+		? sublist()->sublistPeer()->id
+		: PeerId();
 	result.query = query;
-	result.migratedPeerId = _migrated ? _migrated->id : PeerId(0);
+	result.migratedPeerId = migratedPeerId();
 	return result;
 }
 
@@ -559,6 +579,18 @@ rpl::producer<bool> Controller::searchEnabledByContent() const {
 
 rpl::producer<QString> Controller::mediaSourceQueryValue() const {
 	return _searchController->currentQueryValue();
+}
+
+Storage::SharedMediaType Controller::mediaSourceType() const {
+	return _searchController->currentQuery().type;
+}
+
+void Controller::setMediaSourceType(Storage::SharedMediaType type) {
+	auto query = _searchController->currentQuery();
+	if (query.type != type) {
+		query.type = type;
+		_searchController->setQueryFast(query);
+	}
 }
 
 rpl::producer<QString> Controller::searchQueryValue() const {

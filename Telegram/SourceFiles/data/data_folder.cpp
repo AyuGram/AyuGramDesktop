@@ -147,6 +147,13 @@ Folder::Folder(not_null<Session*> owner, FolderId id)
 	) | rpl::on_next([=] {
 		updateChatListEntryPostponed();
 	}, _lifetime);
+
+	Lang::Updated(
+	) | rpl::on_next([=] {
+		_name = tr::lng_archived_name(tr::now);
+		++_nameVersion;
+		updateChatListEntry();
+	}, _lifetime);
 }
 
 FolderId Folder::id() const {
@@ -177,7 +184,7 @@ void Folder::unregisterOne(not_null<History*> history) {
 }
 
 int Folder::chatListNameVersion() const {
-	return 1;
+	return _nameVersion;
 }
 
 void Folder::oneListMessageChanged(HistoryItem *from, HistoryItem *to) {

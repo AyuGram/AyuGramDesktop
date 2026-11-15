@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_group_call.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
+#include "data/data_location.h"
 #include "data/data_message_reactions.h"
 #include "data/data_messages.h"
 #include "data/data_poll.h"
@@ -33,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "iv/iv_rich_page.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
@@ -164,6 +166,9 @@ Data::SendError GetErrorForSending(
 			return tr::lng_slowmode_no_many(tr::now);
 		} else if (count > 1) {
 			const auto albumForward = [&] {
+				if (!request.forward || request.forward->empty()) {
+					return false;
+				}
 				const auto first = request.forward->front();
 				if (const auto groupId = first->groupId()) {
 					for (const auto &item : *request.forward) {
@@ -831,6 +836,14 @@ HistoryItem *MessageByGlobalId(GlobalMsgId globalId) {
 	return nullptr;
 }
 
+std::vector<not_null<DocumentData*>> ItemRichPageAudio(
+		not_null<const HistoryItem*> item) {
+	const auto page = item->richPage();
+	return page
+		? Iv::CollectRichPageAudio(*page)
+		: std::vector<not_null<DocumentData*>>();
+}
+
 QDateTime ItemDateTime(not_null<const HistoryItem*> item) {
 	return base::unixtime::parse(item->date());
 }
@@ -1030,16 +1043,25 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 		const auto replyToTop = LookupReplyToTop(action.history, replyTo);
 		const auto topicPost = replyTo.topicRootId
 			&& (replyTo.topicRootId != Data::ForumTopic::kGeneralId);
+		const auto rich = replyTo.messageId
+			? replyTo.richQuote.get()
+			: nullptr;
 		const auto quoteNormalized = reverseLocalPremiumEmoji(replyTo.quote, action.history, true);
-		auto quoteEntities = Api::EntitiesToMTP(
-			&action.history->session(),
-			quoteNormalized.entities,
-			Api::ConvertOption::SkipLocal);
+		auto quoteEntities = rich
+			? MTPVector<MTPMessageEntity>()
+			: Api::EntitiesToMTP(
+				&action.history->session(),
+				quoteNormalized.entities,
+				Api::ConvertOption::SkipLocal);
 		return MTP_messageReplyHeader(
 			MTP_flags(Flag::f_reply_to_msg_id
 				| (replyToTop ? Flag::f_reply_to_top_id : Flag())
 				| (externalPeerId ? Flag::f_reply_to_peer_id : Flag())
-				| (quoteNormalized.empty()
+				| (rich
+					? (Flag::f_quote
+						| Flag::f_quote_rich
+						| (rich->offset ? Flag::f_quote_offset : Flag()))
+					: quoteNormalized.empty()
 					? Flag()
 					: (Flag::f_quote
 						| Flag::f_quote_text
@@ -1059,9 +1081,10 @@ MTPMessageReplyHeader NewMessageReplyHeader(const Api::SendAction &action) {
 			MTP_int(replyToTop),
 			MTP_string(replyTo.quote.text),
 			quoteEntities,
-			MTP_int(replyTo.quoteOffset),
+			MTP_int(rich ? rich->offset.value_or(0) : replyTo.quoteOffset),
 			MTP_int(replyTo.todoItemId),
-			MTP_bytes(replyTo.pollOption));
+			MTP_bytes(replyTo.pollOption),
+			(rich ? rich->fragments : MTPVector<MTPRichText>())); // quote_rich
 	}
 	return MTPMessageReplyHeader();
 }
@@ -1073,23 +1096,17 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 	}, [](const MTPDmessageMediaContact &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaGeo &data) {
-		return data.vgeo().match([](const MTPDgeoPoint &) {
-			return Result::Good;
-		}, [](const MTPDgeoPointEmpty &) {
-			return Result::Empty;
-		});
+		return Data::LocationPoint::FromMTP(data.vgeo())
+			? Result::Good
+			: Result::Empty;
 	}, [](const MTPDmessageMediaVenue &data) {
-		return data.vgeo().match([](const MTPDgeoPoint &) {
-			return Result::Good;
-		}, [](const MTPDgeoPointEmpty &) {
-			return Result::Empty;
-		});
+		return Data::LocationPoint::FromMTP(data.vgeo())
+			? Result::Good
+			: Result::Empty;
 	}, [](const MTPDmessageMediaGeoLive &data) {
-		return data.vgeo().match([](const MTPDgeoPoint &) {
-			return Result::Good;
-		}, [](const MTPDgeoPointEmpty &) {
-			return Result::Empty;
-		});
+		return Data::LocationPoint::FromMTP(data.vgeo())
+			? Result::Good
+			: Result::Empty;
 	}, [](const MTPDmessageMediaPhoto &data) {
 		const auto photo = data.vphoto();
 		if (!photo) {
@@ -1151,6 +1168,8 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 	}, [](const MTPDmessageMediaPaidMedia &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaVideoStream &) {
+		return Result::Good;
+	}, [](const MTPDmessageMediaWidget &) {
 		return Result::Good;
 	}, [](const MTPDmessageMediaUnsupported &) {
 		return Result::Unsupported;

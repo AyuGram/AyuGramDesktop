@@ -11,19 +11,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/replace_boost_box.h" // CreateUserpicsTransfer.
 #include "boxes/send_credits_box.h" // Ui::CreditsEmoji.
 #include "chat_helpers/stickers_lottie.h"
+#include "core/click_handler_types.h"
 #include "core/ui_integration.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
+#include "data/data_peer_values.h"
 #include "data/data_session.h"
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_sticker_player.h"
+#include "info/profile/info_profile_icon.h"
+#include "info/info_controller.h"
+#include "info/info_wrap_widget.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/controls/who_reacted_context_action.h"
+#include "ui/effects/premium_top_bar.h"
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/layers/generic_box.h"
@@ -191,14 +197,15 @@ void ChooseRecipient(
 		const auto index = int(actions->size());
 		actions->push_back({ action.get(), Ui::MakeUserpicThumbnail(peer) });
 
+		const auto user = peer->asUser();
 		const auto updateUserpic = [=] {
 			const auto size = st::defaultWhoRead.photoSize;
 			actions->at(index).action->setData({
 				.text = peer->name(),
 				.date = (peer->isSelf()
 					? tr::lng_group_call_join_as_personal(tr::now)
-					: peer->isUser()
-					? tr::lng_status_bot(tr::now)
+					: user
+					? Data::BotStatusText(user)
 					: peer->isBroadcast()
 					? tr::lng_channel_status(tr::now)
 					: tr::lng_group_status(tr::now)),
@@ -1036,6 +1043,86 @@ object_ptr<Ui::RpWidget> CreateLinkHeaderIcon(
 		not_null<Main::Session*> session,
 		int usersCount) {
 	return CreateLinkIcon(parent, session, usersCount);
+}
+
+object_ptr<Ui::RpWidget> MakeInfoRow(
+		not_null<QWidget*> parent,
+		rpl::producer<QString> title,
+		rpl::producer<QString> text,
+		not_null<const style::icon*> icon) {
+	auto result = object_ptr<Ui::VerticalLayout>(parent);
+	const auto raw = result.data();
+
+	raw->add(
+		object_ptr<Ui::FlatLabel>(
+			raw,
+			std::move(title) | rpl::map(tr::bold),
+			st::defaultFlatLabel),
+		st::settingsPremiumRowTitlePadding);
+	raw->add(
+		object_ptr<Ui::FlatLabel>(
+			raw,
+			std::move(text),
+			st::boxDividerLabel),
+		st::settingsPremiumRowAboutPadding);
+	object_ptr<Info::Profile::FloatingIcon>(
+		raw,
+		*icon,
+		st::starrefInfoIconPosition);
+
+	return result;
+}
+
+std::unique_ptr<Ui::Premium::TopBar> MakeTopBar(
+		not_null<QWidget*> parent,
+		not_null<Controller*> controller,
+		rpl::producer<QString> title,
+		rpl::producer<TextWithEntities> about,
+		Fn<void(int)> updateTopSkip) {
+	const auto weak = base::make_weak(controller->parentController());
+	const auto clickContextOther = [=] {
+		return QVariant::fromValue(ClickHandlerContext{
+			.sessionWindow = weak,
+			.botStartAutoSubmit = true,
+		});
+	};
+	auto result = std::make_unique<Ui::Premium::TopBar>(
+		parent,
+		st::starrefCover,
+		Ui::Premium::TopBarDescriptor{
+			.clickContextOther = clickContextOther,
+			.logo = u"affiliate"_q,
+			.title = std::move(title),
+			.about = std::move(about),
+			.light = true,
+		});
+	const auto raw = result.get();
+
+	controller->wrapValue(
+	) | rpl::on_next([=](Info::Wrap wrap) {
+		raw->setRoundEdges(wrap == Info::Wrap::Layer);
+	}, raw->lifetime());
+
+	const auto baseHeight = st::starrefCoverHeight;
+	raw->resize(parent->width(), baseHeight);
+	const auto setTopHeight = [=](int height) {
+		if (height > raw->maximumHeight()) {
+			raw->setMaximumHeight(height);
+			raw->setMinimumHeight(height);
+		} else {
+			raw->setMinimumHeight(height);
+			raw->setMaximumHeight(height);
+		}
+		raw->resize(raw->width(), height);
+		updateTopSkip(raw->height());
+	};
+
+	raw->additionalHeight(
+	) | rpl::on_next([=](int additionalHeight) {
+		setTopHeight(baseHeight + additionalHeight);
+	}, raw->lifetime());
+
+	return result;
 }
 
 } // namespace Info::BotStarRef

@@ -68,6 +68,10 @@ Panel::Progress::Progress(QWidget *parent, Fn<QRect()> rect)
 	st::paymentsLoading) {
 }
 
+not_null<QWidget*> Panel::widget() const {
+	return _widget.get();
+}
+
 Panel::Panel(not_null<PanelDelegate*> delegate)
 : _delegate(delegate)
 , _widget(std::make_unique<SeparatePanel>()) {
@@ -610,14 +614,14 @@ bool Panel::createWebview(const Webview::ThemeParams &params) {
 		_delegate->panelWebviewMessage(message, save);
 	});
 
-	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
 		if (!_delegate->panelWebviewNavigationAttempt(uri)) {
 			return false;
-		} else if (newWindow) {
-			return false;
 		}
+		return !newWindow;
+	});
+	raw->setNavigationStartHandler([=] {
 		showWebviewProgress();
-		return true;
 	});
 	raw->setNavigationDoneHandler([=](bool success) {
 		hideWebviewProgress();

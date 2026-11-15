@@ -7,9 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/tabs/adapters/info_profile_tab_sub_controller.h"
 
-#include "data/data_forum_topic.h"
-#include "data/data_peer.h"
-#include "data/data_saved_sublist.h"
 #include "main/main_session.h"
 
 namespace Info::Profile {
@@ -23,7 +20,8 @@ MediaSubController::MediaSubController(
 , _parent(parent)
 , _key(parent->key())
 , _section(mediaType)
-, _migrated(migrated) {
+, _migrated(migrated)
+, _sourceType(mediaType) {
 	if (withSearch) {
 		_search = std::make_unique<Api::DelayedSearchController>(
 			&session());
@@ -56,36 +54,36 @@ rpl::producer<SparseIdsMergedSlice> MediaSubController::mediaSource(
 	if (_search && !_search->currentQuery().query.isEmpty()) {
 		return _search->idsSlice(aroundId, limitBefore, limitAfter);
 	}
-	return AbstractController::mediaSource(
+	return sharedMediaSource(
+		_sourceType.current(),
 		aroundId,
 		limitBefore,
 		limitAfter);
 }
 
 rpl::producer<QString> MediaSubController::mediaSourceQueryValue() const {
-	return _search
-		? _search->currentQueryValue()
-		: AbstractController::mediaSourceQueryValue();
+	return rpl::combine(
+		(_search
+			? _search->currentQueryValue()
+			: AbstractController::mediaSourceQueryValue()),
+		_sourceType.value()
+	) | rpl::map([](const QString &query, auto) {
+		return query;
+	});
+}
+
+Storage::SharedMediaType MediaSubController::mediaSourceType() const {
+	return _sourceType.current();
+}
+
+void MediaSubController::setMediaSourceType(Storage::SharedMediaType type) {
+	_sourceType = type;
 }
 
 void MediaSubController::applySearchQuery(const QString &query) {
 	if (_search) {
 		_search->setQuery(produceSearchQuery(query));
 	}
-}
-
-auto MediaSubController::produceSearchQuery(
-	const QString &query) const -> SearchQuery {
-	auto result = SearchQuery();
-	result.type = _section.mediaType();
-	result.peerId = _key.peer()->id;
-	result.topicRootId = _key.topic() ? _key.topic()->rootId() : 0;
-	result.monoforumPeerId = _key.sublist()
-		? _key.sublist()->sublistPeer()->id
-		: PeerId();
-	result.query = query;
-	result.migratedPeerId = _migrated ? _migrated->id : PeerId(0);
-	return result;
 }
 
 } // namespace Info::Profile

@@ -87,6 +87,9 @@ void TopBar::setTitle(TitleDescriptor descriptor) {
 	if (_subtitle) {
 		delete _subtitle;
 	}
+	if (_badge) {
+		delete _badge;
+	}
 	const auto withSubtitle = !!descriptor.subtitle;
 	if (withSubtitle) {
 		_subtitle = Ui::CreateChild<Ui::FadeWrap<Ui::FlatLabel>>(
@@ -118,6 +121,27 @@ void TopBar::setTitle(TitleDescriptor descriptor) {
 	registerToggleControlCallback(_title.data(), [=] {
 		return !selectionMode() && !storiesTitle() && !searchMode();
 	});
+	if (descriptor.badge) {
+		_badge = Ui::CreateChild<Ui::FadeWrap<Ui::FlatLabel>>(
+			this,
+			object_ptr<Ui::FlatLabel>(
+				this,
+				std::move(descriptor.badge),
+				_st.badge),
+			st::infoTopBarScale);
+		_badge->setDuration(st::infoTopBarDuration);
+		_badge->toggle(
+			!selectionMode() && !storiesTitle(),
+			anim::type::instant);
+		registerToggleControlCallback(_badge.data(), [=] {
+			return !selectionMode() && !storiesTitle() && !searchMode();
+		});
+		_badge->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_badge->widthValue(
+		) | rpl::on_next([=] {
+			updateControlsGeometry(width());
+		}, _badge->lifetime());
+	}
 
 	if (_back) {
 		_title->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -381,6 +405,14 @@ void TopBar::updateDefaultControlsGeometry(int newWidth) {
 		button->moveToRight(right, 0, newWidth);
 		right += button->width();
 	}
+	if (_badge) {
+		right += _st.badgeSkip;
+		_badge->moveToRight(
+			right,
+			(_st.height - _badge->height()) / 2,
+			newWidth);
+		right += _badge->width() + _st.badgeSkip;
+	}
 	if (_back) {
 		_back->setGeometryToLeft(
 			0,
@@ -477,40 +509,14 @@ void TopBar::updateStoriesGeometry(int newWidth) {
 void TopBar::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
-	auto highlight = _a_highlight.value(_highlight ? 1. : 0.);
-	if (_highlight && !_a_highlight.animating()) {
-		_highlight = false;
-		startHighlightAnimation();
-	}
 	if (!_roundRect) {
-		const auto brush = anim::brush(_st.bg, _st.highlightBg, highlight);
-		p.fillRect(e->rect(), brush);
-	} else if (highlight > 0.) {
-		p.setPen(Qt::NoPen);
-		p.setBrush(anim::brush(_st.bg, _st.highlightBg, highlight));
-		p.drawRoundedRect(
-			rect() + style::margins(0, 0, 0, _st.radius * 2),
-			_st.radius,
-			_st.radius);
+		p.fillRect(e->rect(), _st.bg);
 	} else {
 		_roundRect->paintSomeRounded(
 			p,
 			rect(),
 			RectPart::TopLeft | RectPart::TopRight);
 	}
-}
-
-void TopBar::highlight() {
-	_highlight = true;
-	startHighlightAnimation();
-}
-
-void TopBar::startHighlightAnimation() {
-	_a_highlight.start(
-		[this] { update(); },
-		_highlight ? 0. : 1.,
-		_highlight ? 1. : 0.,
-		_st.highlightDuration);
 }
 
 void TopBar::updateControlsVisibility(anim::type animated) {
@@ -852,14 +858,6 @@ bool TopBar::storiesTitle() const {
 
 bool TopBar::searchMode() const {
 	return _searchModeAvailable && _searchModeEnabled;
-}
-
-void TopBar::performForward() {
-	_selectionActionRequests.fire(SelectionAction::Forward);
-}
-
-void TopBar::performDelete() {
-	_selectionActionRequests.fire(SelectionAction::Delete);
 }
 
 } // namespace Info
