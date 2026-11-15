@@ -41,7 +41,7 @@ jobs:
               --json databaseId,status,conclusion,displayTitle,url,createdAt --jq '.[0]')
             if [ -z "$RUN" ] || [ "$RUN" = "null" ]; then
               send "LupinGram: нет ранов workflow '$TARGET' на ветке $BRANCH"
-              sleep 1800
+              sleep 900
               continue
             fi
             ID=$(echo "$RUN" | jq -r .databaseId)
@@ -55,7 +55,7 @@ jobs:
               STEP=$(gh run view "$ID" --repo "$REPO" --json jobs \
                 --jq '[.jobs[].steps[] | select(.status=="in_progress")][0].name // "ожидание"')
               send "$(printf '%s\n' "⏳ $REPO — $TARGET" "Идёт: $TITLE" "Сейчас шаг: $STEP" "Запущен: $SINCE" "$URL")"
-              sleep 1800
+              sleep 900
               continue
             fi
 
