@@ -3,6 +3,8 @@ name: Build LupinGram Windows
 on:
   push:
     branches: [ "main", "dev", "claude/gifted-rubin-nzkrec" ]
+    paths-ignore:
+      - ".github/workflows/tg-watch.yml"
   workflow_dispatch:
 
 env:
