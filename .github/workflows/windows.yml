@@ -21,14 +21,12 @@ jobs:
           mklink /d "%GITHUB_WORKSPACE%\Libraries" "%TBUILD_REAL%\Libraries"
           mklink /d "%GITHUB_WORKSPACE%\ThirdParty" "%TBUILD_REAL%\ThirdParty"
 
-      - name: Checkout repository with submodules
-        uses: actions/checkout@v4
-        with:
-          path: tdesktop
-
-      - name: Init submodules
+      - name: Checkout (manual, keeps job log tail small)
         shell: cmd
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          git clone --depth 1 --branch %GITHUB_REF_NAME% https://x-access-token:%GH_TOKEN%@github.com/%GITHUB_REPOSITORY%.git tdesktop
           cd tdesktop
           git submodule update --init --recursive --depth 1 --jobs 8
 
