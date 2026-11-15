@@ -111,14 +111,14 @@ jobs:
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
           if errorlevel 1 exit /b 1
 
       - name: Build
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=2 > ..\build.log 2>&1
+          cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=1 > ..\build.log 2>&1
           if errorlevel 1 exit /b 1
 
       - name: Show build errors
