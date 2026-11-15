@@ -33,9 +33,9 @@ jobs:
       - name: Configure pagefile (MSVC PCH needs a lot of virtual memory)
         uses: al-cheb/configure-pagefile-action@v1.4
         with:
-          minimum-size: 16GB
-          maximum-size: 32GB
-          disk-root: "C:"
+          minimum-size: 8GB
+          maximum-size: 16GB
+          disk-root: "D:"
 
       - name: Ensure MSVC toolset 14.44 is installed
         shell: pwsh
