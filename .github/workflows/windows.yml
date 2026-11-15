@@ -33,11 +33,19 @@ jobs:
           cd tdesktop
           git submodule update --init --recursive --depth 1 --jobs 8
 
+      - name: Free disk space on C (the deps cache is ~20 GB unpacked)
+        shell: pwsh
+        run: |
+          foreach ($d in @("C:\Android","C:\Program Files (x86)\Android","C:\Program Files\Android","C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk","C:\hostedtoolcache\windows\go","C:\hostedtoolcache\windows\Ruby","C:\hostedtoolcache\windows\PyPy","C:\Julia","C:\Strawberry")) {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue }
+          }
+          Get-PSDrive C,D | ForEach-Object { Write-Host ("{0}: free {1:N1} GB" -f $_.Name, ($_.Free/1GB)) }
+
       - name: Configure pagefile (MSVC PCH needs a lot of virtual memory)
         uses: al-cheb/configure-pagefile-action@v1.4
         with:
-          minimum-size: 12GB
-          maximum-size: 12GB
+          minimum-size: 8GB
+          maximum-size: 8GB
           disk-root: "C:"
 
       - name: Ensure MSVC toolset 14.44 is installed
