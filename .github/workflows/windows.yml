@@ -30,6 +30,13 @@ jobs:
           cd tdesktop
           git submodule update --init --recursive --depth 1 --jobs 8
 
+      - name: Configure pagefile (MSVC PCH needs a lot of virtual memory)
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 32GB
+          disk-root: "C:"
+
       - name: Ensure MSVC toolset 14.44 is installed
         shell: pwsh
         run: |
@@ -109,7 +116,7 @@ jobs:
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          cmake --build ..\out --config Release --target Telegram --parallel > ..\build.log 2>&1
+          cmake --build ..\out --config Release --target Telegram --parallel 2 -- /p:CL_MPCount=2 > ..\build.log 2>&1
           if errorlevel 1 exit /b 1
 
       - name: Show build errors
