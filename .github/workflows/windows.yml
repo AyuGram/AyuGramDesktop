@@ -25,15 +25,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: tdesktop
-          submodules: recursive
+
+      - name: Init submodules
+        shell: cmd
+        run: |
+          cd tdesktop
+          git submodule update --init --recursive --depth 1 --jobs 8
 
       - name: Setup MSVC (x64)
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      - name: Cache ThirdParty and Libraries
-        uses: actions/cache@v4
+      - name: Restore ThirdParty and Libraries cache
+        id: cache-deps
+        uses: actions/cache/restore@v4
         with:
           path: |
             C:\TBuild\ThirdParty
@@ -41,7 +47,6 @@ jobs:
           key: win-x64-deps-v2-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
           restore-keys: |
             win-x64-deps-v2-
-          save-always: true
 
       - name: Patch MSYS2 diffutils & skip breakpad
         shell: python
@@ -72,6 +77,15 @@ jobs:
           if errorlevel 1 exit /b 1
           dir "%GITHUB_WORKSPACE%\Libraries\win64\local"
 
+      - name: Save ThirdParty and Libraries cache
+        if: success() && steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:\TBuild\ThirdParty
+            C:\TBuild\Libraries
+          key: win-x64-deps-v2-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+
       - name: Configure
         shell: cmd
         run: |
@@ -83,7 +97,19 @@ jobs:
         shell: cmd
         run: |
           cd tdesktop\Telegram
-          cmake --build ..\out --config Release --target Telegram --parallel
+          cmake --build ..\out --config Release --target Telegram --parallel > ..\build.log 2>&1
+          if errorlevel 1 exit /b 1
+
+      - name: Show build errors
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "===== BUILD ERRORS ====="
+          Select-String -Path tdesktop/build.log -Pattern 'error C|error:|FAILED:|fatal error|LNK[0-9]+' |
+            Select-Object -First 30 |
+            ForEach-Object { $l = $_.Line; $l.Substring(0, [Math]::Min(300, $l.Length)) }
+          Write-Host "===== LAST LINES ====="
+          Get-Content tdesktop/build.log -Tail 15
 
       - name: Upload LupinGram.exe
         uses: actions/upload-artifact@v4

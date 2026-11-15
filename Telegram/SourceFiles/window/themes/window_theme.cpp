@@ -547,7 +547,8 @@ void ChatBackground::start() {
 		if (!QFile::exists(marker)) {
 			ApplyDefaultWithPath(u":/gui/lupingram.tdesktop-theme"_q);
 			QDir().mkpath(QFileInfo(marker).absolutePath());
-			QFile(marker).open(QIODevice::WriteOnly);
+			if (QFile(marker).open(QIODevice::WriteOnly)) {
+			}
 		}
 	}
 
