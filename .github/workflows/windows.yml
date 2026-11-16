@@ -5,6 +5,8 @@ on:
     branches: [ "main", "dev", "claude/gifted-rubin-nzkrec" ]
     paths-ignore:
       - ".github/workflows/tg-watch.yml"
+      - ".github/workflows/windows-smoke.yml"
+      - ".github/workflows/probe-auth.yml"
   workflow_dispatch:
 
 env:
