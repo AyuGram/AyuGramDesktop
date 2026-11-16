@@ -11,13 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe the verification endpoint
+      - name: Read the landing page
         run: |
           B="https://imni1m4o-python-lupingram.apps-2.websson.cloud"
-          for p in /health /openapi.json; do
-            echo "=== GET $p"; curl -sS -m 20 -i "$B$p" | head -c 1200; echo
+          echo "=== GET /"; curl -sS -m 20 "$B/" | sed -e 's/<style>.*<\/style>//' | grep -v -E '^\s*(\*|body|\.|h1|\}|<style|</style)' | head -80
+          for p in /docs /v1/health /api/health /status; do
+            printf "%s -> " "$p"; curl -s -m 15 -o /dev/null -w "%{http_code} %{content_type}\n" "$B$p"
           done
-          echo "=== POST /v1/verify (fake key, same body as the client sends)"
-          curl -sS -m 20 -i -X POST "$B/v1/verify" -H "Content-Type: application/json" \
-            -d '{"invite_key":"LPN-0000-0000","hwid":"probe-hwid","nonce":"abc123"}' | head -c 1200; echo
-          echo "=== TLS"; curl -sS -m 20 -v -o /dev/null "$B/health" 2>&1 | grep -i -E "subject:|issuer:|expire|SSL connection|HTTP/" | head
