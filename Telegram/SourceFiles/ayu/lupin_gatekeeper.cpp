@@ -38,7 +38,7 @@ namespace {
 
 #ifdef Q_OS_WIN
 
-constexpr auto kAuthServerUrl = L"https://imni1m4o-python-lupingram.apps-2.websson.cloud/v1/verify";
+constexpr auto kAuthServerUrl = L"https://imni1m4o-python-lupingram.apps-2.websson.cloud/app/v1/verify";
 constexpr auto kResponseSecret = "LUPIN-SIGN-9087-CHANGE-ME";
 constexpr auto kCacheSalt = "LupinGram.auth.v1";
 constexpr auto kOfflineGraceSecs = qint64(7 * 24 * 60 * 60);
