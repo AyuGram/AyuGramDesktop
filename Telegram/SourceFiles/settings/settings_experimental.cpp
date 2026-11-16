@@ -65,8 +65,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonDocument>
 #include <QtGui/QGuiApplication>
 
-// AyuGram includes
-#include "ayu/ui/settings/settings_main.h"
+// LupinGram includes
+#include "lupin/ui/settings/settings_main.h"
 #include "settings/settings_builder.h"
 
 
@@ -82,7 +82,7 @@ struct DecodeOptionsResult {
 
 struct ResolvedReferrer {
 	QString controlId;
-	Type section = AyuMain::Id();
+	Type section = LupinMain::Id();
 };
 
 [[nodiscard]] QString EncodeOptionsToText(const QString &json) {
@@ -151,17 +151,17 @@ struct ResolvedReferrer {
 [[nodiscard]] QString OptionReferrer(const base::options::option<bool> &option) {
 	const auto &id = option.id();
 	if (id == u"tabbed-panel-show-on-click"_q) {
-		return u"ayu/showEmojiPopup"_q;
+		return u"lupin/showEmojiPopup"_q;
 	} else if (id == u"show-peer-id-below-about"_q) {
-		return u"ayu/showPeerId"_q;
+		return u"lupin/showPeerId"_q;
 	} else if (id == u"use-small-msg-bubble-radius"_q) {
-		return u"ayu/messageBubbleRadius"_q;
+		return u"lupin/messageBubbleRadius"_q;
 	} else if (id == u"unlimited-recent-stickers"_q) {
-		return u"ayu/unlimitedRecentStickers"_q;
+		return u"lupin/unlimitedRecentStickers"_q;
 	} else if (id == u"hide-ai-button"_q) {
-		return u"ayu/showAiEditorButtonInMessageField"_q;
+		return u"lupin/showAiEditorButtonInMessageField"_q;
 	} else if (id == u"unlimited-message-width"_q) {
-		return u"ayu/wideMultiplier"_q;
+		return u"lupin/wideMultiplier"_q;
 	}
 	return QString();
 }

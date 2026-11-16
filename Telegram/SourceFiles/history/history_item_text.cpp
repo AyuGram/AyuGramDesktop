@@ -27,7 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 
-// AyuGram includes
+// LupinGram includes
 #include "api/api_transcribes.h"
 
 

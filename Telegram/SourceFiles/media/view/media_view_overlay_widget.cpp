@@ -134,10 +134,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <kurlmimedata.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_state.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_state.h"
+#include "lupin/features/streamer_mode/streamer_mode.h"
 
 
 namespace Media {
@@ -1331,10 +1331,10 @@ void OverlayWidget::refreshTtlBadge(TimeId destroyAt) {
 						_message->history()->peer->shortName()
 					) | rpl::map(tr::rich),
 					tr::rich)
-			: AyuSettings::getInstance().saveDeletedMessages()
+			: LupinSettings::getInstance().saveDeletedMessages()
 			? (isVideo
-				? tr::ayu_OnceVideoMessageNote
-				: tr::ayu_OncePhotoMessageNote)(tr::rich)
+				? tr::lupin_OnceVideoMessageNote
+				: tr::lupin_OncePhotoMessageNote)(tr::rich)
 			: (isVideo
 				? tr::lng_ttl_video_tooltip_in
 				: tr::lng_ttl_photo_tooltip_in)(tr::rich);
@@ -1455,7 +1455,7 @@ bool OverlayWidget::hasCopyMediaRestriction(bool skipPremiumCheck) const {
 			return true;
 		}
 	}
-	// AyuGram: removed; allow downloading any stories
+	// LupinGram: removed; allow downloading any stories
 	return false;
 }
 
@@ -1492,7 +1492,7 @@ QSize OverlayWidget::videoSize() const {
 bool OverlayWidget::streamingRequiresControls() const {
 	return !_stories
 		&& _document;
-	// AyuGram: allow vieo messages seeking
+	// LupinGram: allow vieo messages seeking
 	//  && (!_document->isAnimation() || _document->isVideoMessage());
 }
 
@@ -4527,10 +4527,10 @@ void OverlayWidget::activate() {
 	QApplication::setActiveWindow(_window);
 	setFocus();
 
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(_window);
+	if (LupinSettings::getInstance().streamerMode()) {
+		LupinFeatures::StreamerMode::hideWidgetWindow(_window);
 	} else {
-		AyuFeatures::StreamerMode::showWidgetWindow(_window);
+		LupinFeatures::StreamerMode::showWidgetWindow(_window);
 	}
 }
 
@@ -8852,7 +8852,7 @@ Window::SessionController *OverlayWidget::findWindow(bool switchTo) const {
 
 // #TODO unite and check
 void OverlayWidget::clearBeforeHide() {
-	AyuState::disableGhostModeOnStoryClose(_storiesSession);
+	LupinState::disableGhostModeOnStoryClose(_storiesSession);
 	checkSingleViewMediaBurn();
 	_message = nullptr;
 	_sharedMedia = nullptr;

@@ -1,0 +1,29 @@
+<RCC>
+    <qresource prefix="/gui">
+        <file alias="art/lupin/alt/app.svg">../../art/lupin/alt/app.svg</file>
+        <file alias="art/lupin/alt/app_icon.ico">../../art/lupin/alt/app_icon.ico</file>
+        <file alias="art/lupin/bard/app.svg">../../art/lupin/bard/app.svg</file>
+        <file alias="art/lupin/bard/app_icon.ico">../../art/lupin/bard/app_icon.ico</file>
+        <file alias="art/lupin/chibi/app.png">../../art/lupin/chibi/app.png</file>
+        <file alias="art/lupin/chibi/app_icon.ico">../../art/lupin/chibi/app_icon.ico</file>
+        <file alias="art/lupin/chibi2/app.png">../../art/lupin/chibi2/app.png</file>
+        <file alias="art/lupin/chibi2/app_icon.ico">../../art/lupin/chibi2/app_icon.ico</file>
+        <file alias="art/lupin/default/app.svg">../../art/lupin/default/app.svg</file>
+        <file alias="art/lupin/default/app_icon.ico">../../art/lupin/default/app_icon.ico</file>
+        <file alias="art/lupin/discord/app.svg">../../art/lupin/discord/app.svg</file>
+        <file alias="art/lupin/discord/app_icon.ico">../../art/lupin/discord/app_icon.ico</file>
+        <file alias="art/lupin/extera/app.svg">../../art/lupin/extera/app.svg</file>
+        <file alias="art/lupin/extera/app_icon.ico">../../art/lupin/extera/app_icon.ico</file>
+        <file alias="art/lupin/extera2/app.svg">../../art/lupin/extera2/app.svg</file>
+        <file alias="art/lupin/extera2/app_icon.ico">../../art/lupin/extera2/app_icon.ico</file>
+        <file alias="art/lupin/nothing/app.svg">../../art/lupin/nothing/app.svg</file>
+        <file alias="art/lupin/nothing/app_icon.ico">../../art/lupin/nothing/app_icon.ico</file>
+        <file alias="art/lupin/spotify/app.svg">../../art/lupin/spotify/app.svg</file>
+        <file alias="art/lupin/spotify/app_icon.ico">../../art/lupin/spotify/app_icon.ico</file>
+        <file alias="art/lupin/win95/app.png">../../art/lupin/win95/app.png</file>
+        <file alias="art/lupin/win95/app_icon.ico">../../art/lupin/win95/app_icon.ico</file>
+        <file alias="art/lupin/yaplus/app.svg">../../art/lupin/yaplus/app.svg</file>
+        <file alias="art/lupin/yaplus/app_icon.ico">../../art/lupin/yaplus/app_icon.ico</file>
+        <file alias="icons/lupin/nocover.svg">../../icons/lupin/nocover.svg</file>
+    </qresource>
+</RCC>

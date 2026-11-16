@@ -1,6 +1,6 @@
-# Agent Guide for AyuGram Desktop
+# Agent Guide for LupinGram Desktop
 
-This guide defines repository-wide instructions for coding agents working with the AyuGram Desktop (Telegram Desktop fork) codebase.
+This guide defines repository-wide instructions for coding agents working with the LupinGram Desktop (Telegram Desktop fork) codebase.
 
 Avoid building the project.
 
@@ -219,22 +219,22 @@ _limit = kDefaultLimit; // the server rejects anything larger
 // on every reconnect.
 ```
 
-**AyuGram includes in upstream files:**
+**LupinGram includes in upstream files:**
 
-When an upstream (Telegram Desktop) file needs an extra include for AyuGram
+When an upstream (Telegram Desktop) file needs an extra include for LupinGram
 code, never mix it into the upstream include list. Put all such includes in a
-separate block after the last upstream include, headed by `// AyuGram includes`,
+separate block after the last upstream include, headed by `// LupinGram includes`,
 with one empty line before the marker and two empty lines after the block.
 If the file already has this block, append to it instead of creating another.
-Files under `Telegram/SourceFiles/ayu/` don't need the marker.
+Files under `Telegram/SourceFiles/lupin/` don't need the marker.
 
 ```cpp
 #include "storage/file_upload.h"
 #include "storage/storage_account.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "window/window_controller.h"
 
 

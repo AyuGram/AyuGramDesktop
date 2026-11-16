@@ -26,8 +26,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "spellcheck/platform/platform_language.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace HistoryView {
@@ -84,7 +84,7 @@ void TranslateTracker::setup() {
 		}
 	}, _lifetime);
 
-	AyuSettings::getInstance().translationProviderChanges(
+	LupinSettings::getInstance().translationProviderChanges(
 	) | rpl::on_next([=](TranslationProvider) {
 		resetProvider();
 	}, _lifetime);

@@ -11,7 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_photo.h"
 
-// AyuGram includes
+// LupinGram includes
 #include "ui/effects/animations.h"
 
 

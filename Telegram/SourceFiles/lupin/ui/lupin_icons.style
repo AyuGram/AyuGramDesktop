@@ -1,0 +1,82 @@
+/*
+ * This is the source code of LupinGram for Desktop.
+ *
+ * We do not and cannot prevent the use of our code,
+ * but be respectful and credit the original author.
+ *
+ * Copyright @Radolyn, 2025
+ */
+
+using "ui/colors.palette";
+using "ui/chat/chat.style";
+using "ui/widgets/widgets.style";
+using "dialogs/dialogs.style";
+
+lupinGhostIcon: icon {{ "lupin/ghost", menuIconColor }};
+lupinGhostModeGlobalIcon: icon {{ "lupin/ghost_mode_global", historyPeerUserpicFg }};
+lupinEditsHistoryIcon: icon {{ "lupin/edits_history", menuIconColor }};
+lupinLReadMenuIcon: icon {{ "lupin/lread", menuIconColor }};
+lupinSReadMenuIcon: icon {{ "lupin/sread", menuIconColor }};
+lupinStreamerModeMenuIcon: icon {{ "lupin/streamer", menuIconColor }};
+lupinToBeginningMenuIcon: icon {{ "lupin/to_beginning", menuIconColor }};
+lupinRepeatMenuIcon: icon {{ "lupin/repeat", menuIconColor }};
+lupinContactsMutualIcon: icon {{ "lupin/contacts_mutual", contactsStatusFg }};
+lupinContactsMutualIconOver: icon {{ "lupin/contacts_mutual", contactsStatusFgOver }};
+
+messageFieldAttachIcon: icon {{ "lupin/message_field/attach", menuIconColor }};
+messageFieldCommandsIcon: icon {{ "lupin/message_field/commands", menuIconColor }};
+messageFieldEmojiIcon: icon {{ "lupin/message_field/emoji", menuIconColor }};
+messageFieldVoiceIcon: icon {{ "lupin/message_field/voice", menuIconColor }};
+messageFieldTTLIcon: icon {{ "lupin/message_field/ttl", menuIconColor }};
+messageFieldCocoonAiIcon: icon{
+	{ size(24px, 24px), transparent },
+	{ "chat/ai_letters-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star1-20x20", menuIconColor, point(2px, 2px) },
+	{ "chat/ai_star2-20x20", menuIconColor, point(2px, 2px) },
+};
+
+inChannelBadgeIcon: icon {{ "lupin/channel", msgInDateFg }};
+inChannelBadgeSelectedIcon: icon {{ "lupin/channel", msgInDateFgSelected }};
+outChannelBadgeIcon: icon {{ "lupin/channel", msgOutDateFg }};
+outChannelBadgeSelectedIcon: icon {{ "lupin/channel", msgOutDateFgSelected }};
+
+infoExteraOfficialBadge: icon {{ "lupin/extera_official", profileVerifiedCheckBg }};
+infoExteraSupporterBadge: icon {{ "lupin/extera_badge", profileVerifiedCheckBg }};
+
+winEnterWithGuestIcon: icon {{ "lupin/ghost_tray", windowFg }};
+
+editedIcon: IconEmoji{
+    icon: icon{{ "lupin/edited", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+deletedIcon: IconEmoji{
+    icon: icon{{ "lupin/trash_bin", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+burntIcon: IconEmoji{
+    icon: icon{{ "lupin/burnt", windowFg }};
+    padding: margins(0px, 0px, 0px, 0px);
+    useIconColor: false;
+}
+
+dialogsExteraOfficialIcon: ThreeStateIcon {
+	icon: icon {{ "lupin/dialogs_extera_official", dialogsVerifiedIconBg }};
+	over: icon {{ "lupin/dialogs_extera_official", dialogsVerifiedIconBgOver }};
+	active: icon {{ "lupin/dialogs_extera_official", dialogsVerifiedIconBgActive }};
+}
+dialogsExteraSupporterIcon: ThreeStateIcon {
+	icon: icon {{ "lupin/dialogs_extera_supporter", dialogsVerifiedIconBg }};
+	over: icon {{ "lupin/dialogs_extera_supporter", dialogsVerifiedIconBgOver }};
+	active: icon {{ "lupin/dialogs_extera_supporter", dialogsVerifiedIconBgActive }};
+}
+
+lupinHistoryFileInPlugin: icon {{ "lupin/history_file_plugin", historyFileInIconFg }};
+lupinHistoryFileInPluginSelected: icon {{ "lupin/history_file_plugin", historyFileInIconFgSelected }};
+lupinHistoryFileOutPlugin: icon {{ "lupin/history_file_plugin", historyFileOutIconFg }};
+lupinHistoryFileOutPluginSelected: icon {{ "lupin/history_file_plugin", historyFileOutIconFgSelected }};
+
+menuIconClearAttention: icon {{ "menu/clear", menuIconAttentionColor }};

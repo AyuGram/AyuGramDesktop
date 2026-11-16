@@ -60,8 +60,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <kurlmimedata.h>
 
-// AyuGram includes
-#include "ayu/ui/ayu_logo.h"
+// LupinGram includes
+#include "lupin/ui/lupin_logo.h"
 
 
 namespace Window {
@@ -141,11 +141,11 @@ const char kOptionNewWindowsSizeAsFirst[] = "new-windows-size-as-first";
 const char kOptionDisableTouchbar[] = "touchbar-disabled";
 
 QImage Logo() {
-	return AyuAssets::currentAppLogo();
+	return LupinAssets::currentAppLogo();
 }
 
 QImage LogoNoMargin() {
-	return AyuAssets::currentAppLogo();
+	return LupinAssets::currentAppLogo();
 }
 
 const QImage &LogoTelegramDefault() {
@@ -921,7 +921,7 @@ void MainWindow::updateTitle() {
 		: Dialogs::Key();
 	const auto thread = key ? key.thread() : nullptr;
 	if (!thread) {
-		setTitle((user.isEmpty() ? u"AyuGram"_q : user) + added + suffix);
+		setTitle((user.isEmpty() ? u"LupinGram"_q : user) + added + suffix);
 		return;
 	}
 	const auto history = thread->owningHistory();

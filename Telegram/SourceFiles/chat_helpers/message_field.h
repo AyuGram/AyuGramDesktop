@@ -220,7 +220,7 @@ enum class FrozenWriteRestrictionType {
 	std::shared_ptr<ChatHelpers::Show> show,
 	FrozenWriteRestrictionType type,
 	FreezeInfoStyleOverride st = {});
-std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
+std::unique_ptr<Ui::AbstractButton> LupinForwardWriteRestriction(
 	not_null<QWidget *> parent,
 	const PeerId &peer,
 	const Main::Session &session);

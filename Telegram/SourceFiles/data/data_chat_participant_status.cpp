@@ -26,8 +26,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/toast/toast.h"
 #include "window/window_session_controller.h"
 
-// AyuGram includes
-#include "ayu/features/forward/ayu_forward.h"
+// LupinGram includes
+#include "lupin/features/forward/lupin_forward.h"
 
 
 namespace {
@@ -239,7 +239,7 @@ bool CanSendAnyOf(
 		not_null<const PeerData*> peer,
 		ChatRestrictions rights,
 		bool forbidInForums) {
-	if (AyuForward::isForwarding(peer->id)) {
+	if (LupinForward::isForwarding(peer->id)) {
 		return false;
 	}
 	if (peer->session().frozen()
@@ -303,9 +303,9 @@ bool CanSendAnyOf(
 SendError RestrictionError(
 		not_null<PeerData*> peer,
 		ChatRestriction restriction) {
-	if (AyuForward::isForwarding(peer->id)) {
+	if (LupinForward::isForwarding(peer->id)) {
 		return SendError({
-			.text = AyuForward::stateName(peer->id).first + "\n" + AyuForward::stateName(peer->id).second,
+			.text = LupinForward::stateName(peer->id).first + "\n" + LupinForward::stateName(peer->id).second,
 		});
 	}
 	using Flag = ChatRestriction;

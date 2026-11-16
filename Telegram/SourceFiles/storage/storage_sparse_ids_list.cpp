@@ -72,7 +72,7 @@ SparseIdsList::AddResult SparseIdsList::addRangeItemsAndCountNew(
 		MsgRange noSkipRange) {
 	// Expects(noSkipRange.from <= noSkipRange.till);
 	if (!(noSkipRange.from <= noSkipRange.till)) {
-		return { 0 }; // AyuGram: fix crash when using `saveDeletedMessages`
+		return { 0 }; // LupinGram: fix crash when using `saveDeletedMessages`
 	}
 
 	if (noSkipRange.from == noSkipRange.till

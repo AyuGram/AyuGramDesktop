@@ -18,8 +18,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "apiwrap.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Api {
@@ -46,7 +46,7 @@ bool UnreadThings::trackReactions(Data::Thread *thread) const {
 	if (!peer) {
 		return false;
 	}
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions()) {
 		return false;
 	}

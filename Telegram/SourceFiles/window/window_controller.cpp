@@ -37,9 +37,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_state.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_state.h"
 #include "data/data_story.h"
 
 
@@ -602,7 +602,7 @@ Window::Adaptive &Controller::adaptive() const {
 void Controller::openInMediaView(Media::View::OpenRequest &&request) {
 	if (request.story()) {
 		const auto story = not_null{ request.story() };
-		auto &ghost = AyuSettings::ghost(&story->session());
+		auto &ghost = LupinSettings::ghost(&story->session());
 		const auto suggestGhostMode = ghost.suggestGhostModeBeforeViewingStory()
 			&& ghost.sendReadStories()
 			&& !ghost.sendReadStoriesLocked()
@@ -611,11 +611,11 @@ void Controller::openInMediaView(Media::View::OpenRequest &&request) {
 			const auto controller = request.controller();
 			const auto context = request.storiesContext();
 			show(Ui::MakeConfirmBox({
-				.text = tr::ayu_SuggestGhostModeStoryText(tr::now, tr::rich),
+				.text = tr::lupin_SuggestGhostModeStoryText(tr::now, tr::rich),
 				.confirmed = [=](Fn<void()> close) {
 					close();
-					AyuSettings::ghost(&story->session()).setGhostModeEnabled(true);
-					AyuState::setDisableGhostModeOnStoryClose(&story->session());
+					LupinSettings::ghost(&story->session()).setGhostModeEnabled(true);
+					LupinState::setDisableGhostModeOnStoryClose(&story->session());
 					_openInMediaViewRequests.fire(
 						Media::View::OpenRequest(controller, story, context));
 				},
@@ -624,9 +624,9 @@ void Controller::openInMediaView(Media::View::OpenRequest &&request) {
 					_openInMediaViewRequests.fire(
 						Media::View::OpenRequest(controller, story, context));
 				},
-				.confirmText = tr::ayu_SuggestGhostModeStoryActionTextYes(),
-				.cancelText = tr::ayu_SuggestGhostModeStoryActionTextNo(),
-				.title = tr::ayu_SuggestGhostModeTitle(),
+				.confirmText = tr::lupin_SuggestGhostModeStoryActionTextYes(),
+				.cancelText = tr::lupin_SuggestGhostModeStoryActionTextNo(),
+				.title = tr::lupin_SuggestGhostModeTitle(),
 				.strictCancel = true,
 			}));
 			return;

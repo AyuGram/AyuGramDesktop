@@ -36,7 +36,7 @@ jobs:
           $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
           $ascii = [System.Text.Encoding]::Latin1.GetString($bytes)
           $wide = [System.Text.Encoding]::Unicode.GetString($bytes)
-          foreach ($p in @("LupinGram","AyuGram","imni1m4o-python-lupingram","v1/verify","Invited by","LUPIN-SIGN-9087-CHANGE-ME","auth.dat")) {
+          foreach ($p in @("LupinGram",("Ay"+"uGram"),("ay"+"u"),"imni1m4o-python-lupingram","v1/verify","Invited by","LUPIN-SIGN-9087-CHANGE-ME","auth.dat")) {
             $a = [regex]::Matches($ascii, [regex]::Escape($p)).Count
             $w = [regex]::Matches($wide, [regex]::Escape($p)).Count
             Write-Host ("STRING '{0}': ascii={1} utf16={2}" -f $p, $a, $w)

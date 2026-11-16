@@ -73,12 +73,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_dialogs.h"
 #include "styles/style_iv.h"
 
-// AyuGram includes
+// LupinGram includes
 #include "data/data_groups.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/features/message_shot/message_shot.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "styles/style_ayu_styles.h"
+#include "lupin/lupin_settings.h"
+#include "lupin/features/message_shot/message_shot.h"
+#include "lupin/utils/telegram_helpers.h"
+#include "styles/style_lupin_styles.h"
 
 
 namespace HistoryView {
@@ -784,7 +784,7 @@ void UnreadBar::paint(
 		int y,
 		int w,
 		ElementChatMode mode) const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
+	if (LupinFeatures::MessageShot::isTakingShot()) {
 		return;
 	}
 	const auto previousTranslation = p.transform().dx();
@@ -1302,7 +1302,7 @@ Element::Element(
 		}
 	}
 	const auto deletedOpacityEnabled
-		= AyuSettings::getInstance().semiTransparentDeletedMessages();
+		= LupinSettings::getInstance().semiTransparentDeletedMessages();
 	if (deletedOpacityEnabled
 		&& replacing
 		&& replacing->_deletedOpacityAnimation.animating()) {
@@ -1488,7 +1488,7 @@ void Element::refreshDeletedAnimationTarget() {
 }
 
 float64 Element::deletedOpacity() const {
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (!settings.semiTransparentDeletedMessages()) {
 		_deletedOpacityAnimation.stop();
 		_deletedOpacityAnimationTarget = nullptr;
@@ -1515,7 +1515,7 @@ float64 Element::deletedOpacity() const {
 }
 
 void Element::startDeletedAnimation() {
-	if (!AyuSettings::getInstance().semiTransparentDeletedMessages()) {
+	if (!LupinSettings::getInstance().semiTransparentDeletedMessages()) {
 		_deletedOpacityAnimation.stop();
 		_deletedOpacityAnimationTarget = nullptr;
 		return;
@@ -1523,7 +1523,7 @@ void Element::startDeletedAnimation() {
 	refreshDeletedAnimationTarget();
 	_deletedOpacityAnimation.start(
 		[target = _deletedOpacityAnimationTarget] {
-			if (!AyuSettings::getInstance().semiTransparentDeletedMessages()) {
+			if (!LupinSettings::getInstance().semiTransparentDeletedMessages()) {
 				return false;
 			}
 			if (const auto view = target->get()) {
@@ -1634,7 +1634,7 @@ int Element::skipBlockWidth() const {
 	if (hidesBottomInfo()) {
 		return 0;
 	}
-	if (AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 		return st::msgDateDelta.x();
 	}
 
@@ -2543,7 +2543,7 @@ void Element::destroyUnreadBar() {
 }
 
 int Element::displayedDateHeight() const {
-	if (AyuFeatures::MessageShot::isTakingShot() || isMessageHidden(data())) {
+	if (LupinFeatures::MessageShot::isTakingShot() || isMessageHidden(data())) {
 		return 0;
 	}
 

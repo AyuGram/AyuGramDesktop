@@ -346,7 +346,7 @@ bool checkInstalled(QString path = {}) {
 	}
 
 	const auto installed = u"LupinGram/LupinGram.lnk"_q;
-	const auto old = u"AyuGram for Windows/AyuGram.lnk"_q;
+	const auto old = u"LupinGram for Windows/LupinGram.lnk"_q;
 	return validateShortcutAt(path + installed)
 		|| validateShortcutAt(path + old);
 }

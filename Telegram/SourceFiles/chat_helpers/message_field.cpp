@@ -66,8 +66,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/features/forward/ayu_forward.h"
+// LupinGram includes
+#include "lupin/features/forward/lupin_forward.h"
 
 
 namespace {
@@ -1419,14 +1419,14 @@ std::unique_ptr<Ui::AbstractButton> BoostsToLiftWriteRestriction(
 	return result;
 }
 
-std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
+std::unique_ptr<Ui::AbstractButton> LupinForwardWriteRestriction(
 	not_null<QWidget *> parent,
 	const PeerId &peer,
 	const Main::Session &session) {
 	using namespace Ui;
 
 	// status and part
-	const auto pair = AyuForward::stateName(peer);
+	const auto pair = LupinForward::stateName(peer);
 
 	auto result = std::make_unique<FlatButton>(
 		parent,
@@ -1476,7 +1476,7 @@ std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
 	}, title->lifetime());
 
 	raw->setClickedCallback([&] {
-		AyuForward::cancelForward(peer, session);
+		LupinForward::cancelForward(peer, session);
 	});
 
 	return result;

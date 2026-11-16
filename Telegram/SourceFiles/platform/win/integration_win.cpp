@@ -130,7 +130,7 @@ void WindowsIntegration::refreshCustomJumpList() {
 	}
 
 	// add "Enter with Ghost" item
-	AddJumpListItem(collection.get(), tr::ayu_GhostModeShortcut(tr::now), "-ghost", Tray::GhostJumpListIconPath());
+	AddJumpListItem(collection.get(), tr::lupin_GhostModeShortcut(tr::now), "-ghost", Tray::GhostJumpListIconPath());
 
 	// add "Quit" item
 	AddJumpListItem(collection.get(), tr::lng_quit_from_tray(tr::now), "-quit", Tray::QuitJumpListIconPath());

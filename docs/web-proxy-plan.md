@@ -60,7 +60,7 @@ The initial draft left several architectural choices open. They are now fixed:
    than Unicode 3.2 can normalise to different strings — and therefore different
    capabilities — per platform.
 5. WEB entries are entered manually or imported from `tg://webproxy` /
-   `https://t.me/webproxy` links (see §11); there is no `tg://proxy?…` form.
+   `https://github.com/8kfdy49fd8-debug/LupinGramds links (see §11); there is no `tg://proxy?…` form.
 6. Inactive WEB entries are not checked and are removed from proxy rotation's
    candidate order in v1. Checking would require activating a WebView carrier and
    must not create background carriers for every saved proxy.
@@ -546,7 +546,7 @@ WEB links use `webproxy`, a canonical address, and the MTProxy secret. Port 443 
 implicit and is neither accepted from the link nor displayed in its confirmation:
 
 ```text
-https://t.me/webproxy?server=<address>&secret=<secret>
+https://github.com/8kfdy49fd8-debug/LupinGramds<address>&secret=<secret>
 tg://webproxy?server=<address>&secret=<secret>
 ```
 

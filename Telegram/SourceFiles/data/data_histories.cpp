@@ -34,11 +34,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "apiwrap.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_worker.h"
-#include "ayu/data/messages_storage.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_worker.h"
+#include "lupin/data/messages_storage.h"
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace Data {
@@ -697,10 +697,10 @@ void Histories::reportPendingDeliveries() {
 void Histories::sendReadRequests() {
 	DEBUG_LOG(("Reading: send requests with count %1.").arg(_states.size()));
 
-	// AyuGram sendReadMessages
-	const auto &ghost = AyuSettings::ghost(&_owner->session());
+	// LupinGram sendReadMessages
+	const auto &ghost = LupinSettings::ghost(&_owner->session());
 	if (!ghost.sendReadMessages()) {
-		DEBUG_LOG(("[AyuGram] Don't read messages"));
+		DEBUG_LOG(("[LupinGram] Don't read messages"));
 		_readRequestsTimer.cancel();
 		auto histories = std::vector<not_null<History*>>();
 		histories.reserve(_states.size());
@@ -1015,7 +1015,7 @@ void Histories::deleteMessages(const MessageIdsList &ids, bool revoke) {
 			}
 			remove.push_back(item);
 			if (item->isDeleted()) {
-				AyuMessages::removeDeletedMessage(item);
+				LupinMessages::removeDeletedMessage(item);
 			} else if (item->isRegular()) {
 				idsByPeer[history].push_back(MTP_int(itemId.msg));
 			}
@@ -1189,7 +1189,7 @@ int Histories::sendPreparedMessage(
 					const MTPUpdates &result,
 					const MTP::Response &response) {
 				api->applyUpdates(result, randomId);
-				AyuWorker::markAsOnline(&history->owner().session());
+				LupinWorker::markAsOnline(&history->owner().session());
 				done(result, response);
 				finish();
 			}).fail([=](

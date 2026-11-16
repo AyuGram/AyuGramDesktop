@@ -108,11 +108,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <ksandbox.h>
 
-// AyuGram includes
-#include "ayu/ayu_infra.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
-#include "ayu/lupin_gatekeeper.h"
+// LupinGram includes
+#include "lupin/lupin_infra.h"
+#include "lupin/lupin_settings.h"
+#include "lupin/features/streamer_mode/streamer_mode.h"
+#include "lupin/lupin_gatekeeper.h"
 
 #include <cstdlib>
 
@@ -346,7 +346,7 @@ void Application::run() {
 	_translator = std::make_unique<Lang::Translator>();
 	QCoreApplication::instance()->installTranslator(_translator.get());
 
-	AyuInfra::init();
+	LupinInfra::init();
 	style::StartManager(cScale());
 	Ui::Accessible::Init();
 	Ui::InitTextOptions();
@@ -396,7 +396,7 @@ void Application::run() {
 
 	_savedWindows = std::make_unique<Window::SavedWindows>(this);
 
-	if (!Lupin::RunGatekeeper()) {
+	if (!LupinGate::RunGatekeeper()) {
 		std::_Exit(1);
 	}
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
@@ -611,8 +611,8 @@ void Application::processCreatedWindow(
 	window->openInMediaViewRequests(
 	) | rpl::start_to_stream(_openInMediaViewRequests, window->lifetime());
 
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(window->widget());
+	if (LupinSettings::getInstance().streamerMode()) {
+		LupinFeatures::StreamerMode::hideWidgetWindow(window->widget());
 	}
 }
 

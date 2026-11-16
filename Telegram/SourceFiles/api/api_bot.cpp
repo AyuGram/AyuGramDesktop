@@ -48,8 +48,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
 
-// AyuGram includes
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace Api {

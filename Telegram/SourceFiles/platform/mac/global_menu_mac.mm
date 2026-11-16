@@ -33,8 +33,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <Cocoa/Cocoa.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Platform {
@@ -190,7 +190,7 @@ GhostModeAccountSettings *Manager::resolveGhostSettings() const {
 		return nullptr;
 	}
 	const auto session = window->maybeSession();
-	return session ? &AyuSettings::ghost(session) : nullptr;
+	return session ? &LupinSettings::ghost(session) : nullptr;
 }
 
 bool Manager::clipboardHasText() {
@@ -254,22 +254,22 @@ void Manager::retranslate() {
 		_clearFormat->setText(tr::lng_menu_formatting_clear(tr::now));
 	}
 	if (_ghostModeMenu) {
-		_ghostModeMenu->setTitle(tr::ayu_CategoryGhostMode(tr::now));
+		_ghostModeMenu->setTitle(tr::lupin_CategoryGhostMode(tr::now));
 	}
 	if (_ghostMode) {
 		if (const auto ghost = resolveGhostSettings()) {
 			_ghostMode->setText(ghost->isGhostModeActive()
-				? tr::ayu_DisableGhostMode(tr::now)
-				: tr::ayu_EnableGhostMode(tr::now));
+				? tr::lupin_DisableGhostMode(tr::now)
+				: tr::lupin_EnableGhostMode(tr::now));
 		} else {
-			_ghostMode->setText(tr::ayu_EnableGhostMode(tr::now));
+			_ghostMode->setText(tr::lupin_EnableGhostMode(tr::now));
 		}
 	}
 	if (_readOnInteract) {
-		_readOnInteract->setText(tr::ayu_MarkReadAfterAction(tr::now));
+		_readOnInteract->setText(tr::lupin_MarkReadAfterAction(tr::now));
 	}
 	if (_scheduleMessages) {
-		_scheduleMessages->setText(tr::ayu_UseScheduledMessages(tr::now));
+		_scheduleMessages->setText(tr::lupin_UseScheduledMessages(tr::now));
 	}
 }
 
@@ -407,8 +407,8 @@ void Manager::recomputeState() {
 		action->blockSignals(wasBlocked);
 	};
 	_ghostMode->setText(next.ghostModeActive
-		? tr::ayu_DisableGhostMode(tr::now)
-		: tr::ayu_EnableGhostMode(tr::now));
+		? tr::lupin_DisableGhostMode(tr::now)
+		: tr::lupin_EnableGhostMode(tr::now));
 	setChecked(_readOnInteract, next.readOnInteract);
 	setChecked(_scheduleMessages, next.scheduleMessages);
 }
@@ -421,7 +421,7 @@ void Manager::buildAppleMenu(QMenu *main) {
 			});
 		};
 		const auto about = main->addAction(
-			u"About AyuGram"_q,
+			u"About LupinGram"_q,
 			std::move(callback));
 		about->setMenuRole(QAction::AboutQtRole);
 	}
@@ -723,7 +723,7 @@ void Manager::buildWindowMenu(QMenu *window) {
 }
 
 void Manager::buildMenu() {
-	buildAppleMenu(_menuBar->addMenu(u"AyuGram"_q));
+	buildAppleMenu(_menuBar->addMenu(u"LupinGram"_q));
 	buildFileMenu(_menuBar->addMenu(u"File"_q));
 	buildEditMenu(_menuBar->addMenu(u"Edit"_q));
 

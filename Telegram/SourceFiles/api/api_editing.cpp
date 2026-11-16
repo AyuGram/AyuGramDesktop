@@ -33,8 +33,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mtproto/mtproto_response.h"
 #include "boxes/abstract_box.h" // Ui::show().
 
-// AyuGram includes
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace Api {

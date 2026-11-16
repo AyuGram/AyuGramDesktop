@@ -103,8 +103,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMimeData>
 
-// AyuGram includes
-#include "ayu/features/forward/ayu_forward.h"
+// LupinGram includes
+#include "lupin/features/forward/lupin_forward.h"
 
 
 namespace {
@@ -610,7 +610,7 @@ bool MainWidget::setForwardDraft(
 		});
 	// allow opening chat that
 	// already have some forward task
-	if (error && !AyuForward::isForwarding(history->peer->id)) {
+	if (error && !LupinForward::isForwarding(history->peer->id)) {
 		Data::ShowSendErrorToast(_controller, history->peer, error);
 		return false;
 	}

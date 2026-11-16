@@ -135,7 +135,7 @@ Pass conditions:
 Verify both canonical link forms with the same hostname and secret:
 
 ```text
-https://t.me/webproxy?server=proxy.example.com&secret=000102030405060708090a0b0c0d0e0f
+https://github.com/8kfdy49fd8-debug/LupinGramds
 tg://webproxy?server=proxy.example.com&secret=000102030405060708090a0b0c0d0e0f
 ```
 

@@ -55,8 +55,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace {
@@ -1715,13 +1715,13 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 	}
 }
 
-bool PeerData::isAyuNoForwards() const {
+bool PeerData::isLupinNoForwards() const {
 	if (const auto user = asUser()) {
-		return user->isAyuNoForwards();
+		return user->isLupinNoForwards();
 	} else if (const auto channel = asChannel()) {
-		return channel->isAyuNoForwards();
+		return channel->isLupinNoForwards();
 	} else if (const auto chat = asChat()) {
-		return chat->isAyuNoForwards();
+		return chat->isLupinNoForwards();
 	}
 	return true;
 }

@@ -46,8 +46,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QBuffer>
 #include <QtGui/QImageWriter>
 
-// AyuGram includes
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace {

@@ -1099,7 +1099,7 @@ void Controller::fillPrivacyTypeButton() {
 		.usernamesOrder = (_peer->isChannel()
 			? _peer->asChannel()->usernames()
 			: std::vector<QString>()),
-		.noForwards = _peer->isAyuNoForwards(),
+		.noForwards = _peer->isLupinNoForwards(),
 		.joinToWrite = (_peer->isMegagroup()
 			&& _peer->asChannel()->joinToWrite()),
 		.requestToJoin = (_peer->isChannel()
@@ -2967,7 +2967,7 @@ void Controller::saveSignatures() {
 
 void Controller::saveForwards() {
 	if (!_savingData.noForwards
-		|| *_savingData.noForwards == _peer->isAyuNoForwards()) {
+		|| *_savingData.noForwards == _peer->isLupinNoForwards()) {
 		return continueSave();
 	}
 	using Flag = MTPmessages_ToggleNoForwards::Flag;

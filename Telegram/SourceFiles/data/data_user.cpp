@@ -39,9 +39,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "window/notifications_manager.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace {
@@ -376,7 +376,7 @@ void UserData::setName(
 	auto filteredFirstName = newFirstName;
 	auto filteredLastName = newLastName;
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.filterZalgo()) {
 		filteredFirstName = filterZalgo(filteredFirstName);
 		filteredLastName = filterZalgo(filteredLastName);
@@ -624,7 +624,7 @@ bool UserData::isFake() const {
 
 bool UserData::isPremium() const {
 	if (id) {
-		const auto &settings = AyuSettings::getInstance();
+		const auto &settings = LupinSettings::getInstance();
 		if (settings.localPremium()) {
 			if (getSession(id.value)) {
 				return true;
@@ -691,7 +691,7 @@ bool UserData::allowsForwarding() const {
 	return true;
 }
 
-bool UserData::isAyuNoForwards() const {
+bool UserData::isLupinNoForwards() const {
 	return (flags() & Flag::NoForwardsMyEnabled)
 		|| (flags() & Flag::NoForwardsPeerEnabled);
 }

@@ -40,8 +40,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace ChatHelpers {
@@ -198,7 +198,7 @@ PreviewWrap::PreviewWrap(
 		}
 	}, lifetime());
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 
 	{
 		const auto close = Ui::CreateChild<Ui::RoundButton>(
@@ -236,8 +236,8 @@ PreviewWrap::PreviewWrap(
 					) | rpl::map(tr::rich),
 					tr::rich)
 			: (isRound
-				? settings.saveDeletedMessages() ? tr::ayu_ExpiringVideoMessageNote : tr::lng_ttl_round_tooltip_in
-				: settings.saveDeletedMessages() ? tr::ayu_ExpiringVoiceMessageNote : tr::lng_ttl_voice_tooltip_in)(tr::rich);
+				? settings.saveDeletedMessages() ? tr::lupin_ExpiringVideoMessageNote : tr::lng_ttl_round_tooltip_in
+				: settings.saveDeletedMessages() ? tr::lupin_ExpiringVoiceMessageNote : tr::lng_ttl_voice_tooltip_in)(tr::rich);
 		const auto tooltip = Ui::CreateChild<Ui::ImportantTooltip>(
 			this,
 			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
