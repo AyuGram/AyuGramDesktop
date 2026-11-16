@@ -1,0 +1,23 @@
+name: Probe auth server
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-auth.yml"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe the verification endpoint
+        run: |
+          B="https://imni1m4o-python-lupingram.apps-2.websson.cloud"
+          for p in /health /openapi.json; do
+            echo "=== GET $p"; curl -sS -m 20 -i "$B$p" | head -c 1200; echo
+          done
+          echo "=== POST /v1/verify (fake key, same body as the client sends)"
+          curl -sS -m 20 -i -X POST "$B/v1/verify" -H "Content-Type: application/json" \
+            -d '{"invite_key":"LPN-0000-0000","hwid":"probe-hwid","nonce":"abc123"}' | head -c 1200; echo
+          echo "=== TLS"; curl -sS -m 20 -v -o /dev/null "$B/health" 2>&1 | grep -i -E "subject:|issuer:|expire|SSL connection|HTTP/" | head
