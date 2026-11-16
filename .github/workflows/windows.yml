@@ -142,8 +142,19 @@ jobs:
           Write-Host "===== LAST LINES ====="
           Get-Content tdesktop/build.log -Tail 15
 
+      - name: Collect the built executable
+        if: success()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Get-ChildItem tdesktop/out -Recurse -Include *.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Length -gt 30MB -and $_.FullName -notmatch 'CMakeFiles' } |
+            ForEach-Object { Write-Host ("{0} {1:N1} MB" -f $_.FullName, ($_.Length/1MB)); Copy-Item $_.FullName artifact }
+          Get-ChildItem artifact
+
       - name: Upload LupinGram.exe
         uses: actions/upload-artifact@v4
         with:
           name: LupinGram-Windows-x64
-          path: tdesktop/out/Release/Telegram.exe
+          path: artifact/*.exe
+          if-no-files-found: error
