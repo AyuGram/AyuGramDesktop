@@ -201,6 +201,8 @@ set(lupingram_files
         lupin/ui/components/image_view.h
         lupin/ui/components/icon_picker.cpp
         lupin/ui/components/icon_picker.h
+        lupin/ui/components/snow_overlay.cpp
+        lupin/ui/components/snow_overlay.h
         lupin/ui/components/avatar_corners_preview.cpp
         lupin/ui/components/avatar_corners_preview.h
         lupin/ui/components/message_preview.cpp

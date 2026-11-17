@@ -8790,6 +8790,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lupin_ThemeAmber" = "Amber (yellow)";
 "lupin_ThemeIce" = "Ice (blue)";
 "lupin_ThemeCrimson" = "Crimson (red)";
+"lupin_ThemeWinter" = "Winter (white, snow)";
+"lupin_ThemeDeco" = "Art Deco (cartoon cream & teal)";
 "lupin_PanicKey" = "Panic Hide";
 "lupin_PanicKeyDescription" = "Press Ctrl+Shift+L to instantly hide the window to the tray.";
 "lupin_CategoryChats" = "Chats";

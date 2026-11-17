@@ -128,10 +128,17 @@ jobs:
       - name: Build
         shell: cmd
         run: |
-          set _CL_=/MP1
+          set _CL_=/MP1 /GL-
           cd tdesktop\Telegram
-          cmake --build ..\out --config Release --target Telegram --parallel 1 -- /p:CL_MPCount=2 > ..\build.log 2>&1
-          if errorlevel 1 exit /b 1
+          set attempt=0
+          :retry
+          set /a attempt+=1
+          cmake --build ..\out --config Release --target Telegram --parallel 1 >> ..\build.log 2>&1
+          if not errorlevel 1 goto built
+          if %attempt% GEQ 3 exit /b 1
+          echo build attempt %attempt% failed, resuming incrementally
+          goto retry
+          :built
 
       - name: Show build errors
         if: failure()

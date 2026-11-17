@@ -63,6 +63,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // LupinGram includes
 #include "lupin/ui/lupin_logo.h"
+#include "lupin/ui/components/snow_overlay.h"
 
 
 namespace Window {
@@ -585,7 +586,10 @@ void MainWindow::init() {
 	updateTitle();
 	updateWindowIcon();
 
-	// LupinGram includes
+	LupinUi::AttachSnow(body());
+	LupinUi::SetSnowEnabled(
+		Core::App().settings().readPref<int>("lupin/themeIndex", 0) == 4);
+
 	const auto panic = new QShortcut(
 		QKeySequence(u"Ctrl+Shift+L"_q),
 		this);

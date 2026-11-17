@@ -25,13 +25,11 @@ namespace LupinInfra {
 
 void initLang() {
 	QString id = Lang::GetInstance().id();
-	QString baseId = Lang::GetInstance().baseId();
 	if (id.isEmpty()) {
 		LOG(("Language is not loaded"));
 		return;
 	}
 	LupinLanguage::init();
-	LupinLanguage::currentInstance()->fetchLanguage(id, baseId);
 }
 
 void initUiSettings() {

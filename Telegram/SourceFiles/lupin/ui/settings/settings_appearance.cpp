@@ -15,6 +15,7 @@
 #include "lupin/ui/settings/lupin_builder.h"
 #include "lupin/ui/settings/settings_lupin_utils.h"
 #include "lupin/ui/settings/settings_main.h"
+#include "lupin/ui/components/snow_overlay.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "inline_bots/bot_attach_web_view.h"
@@ -48,6 +49,8 @@ const char *LupinThemePaths[] = {
 	":/gui/lupingram-amber.tdesktop-theme",
 	":/gui/lupingram-ice.tdesktop-theme",
 	":/gui/lupingram-crimson.tdesktop-theme",
+	":/gui/lupingram-winter.tdesktop-theme",
+	":/gui/lupingram-deco.tdesktop-theme",
 };
 
 void ApplyLupinTheme(int index) {
@@ -58,6 +61,7 @@ void ApplyLupinTheme(int index) {
 		QString::fromLatin1(LupinThemePaths[index]));
 	Window::Theme::KeepApplied();
 	Core::App().settings().writePref<int>(kLupinThemePrefKey, index);
+	LupinUi::SetSnowEnabled(index == 4);
 	Core::App().saveSettingsDelayed();
 }
 
@@ -225,6 +229,8 @@ void BuildAppearance(SectionBuilder &builder, LupinSectionBuilder &lupin) {
 			tr::lupin_ThemeAmber(tr::now),
 			tr::lupin_ThemeIce(tr::now),
 			tr::lupin_ThemeCrimson(tr::now),
+			tr::lupin_ThemeWinter(tr::now),
+			tr::lupin_ThemeDeco(tr::now),
 		},
 		.setter = [](int index) { ApplyLupinTheme(index); },
 	});

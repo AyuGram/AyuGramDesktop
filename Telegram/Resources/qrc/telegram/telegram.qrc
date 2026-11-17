@@ -20,6 +20,8 @@
     <file alias="lupingram-amber.tdesktop-theme">../../lupingram-amber.tdesktop-theme</file>
     <file alias="lupingram-ice.tdesktop-theme">../../lupingram-ice.tdesktop-theme</file>
     <file alias="lupingram-crimson.tdesktop-theme">../../lupingram-crimson.tdesktop-theme</file>
+    <file alias="lupingram-winter.tdesktop-theme">../../lupingram-winter.tdesktop-theme</file>
+    <file alias="lupingram-deco.tdesktop-theme">../../lupingram-deco.tdesktop-theme</file>
     <file alias="day-custom-base.tdesktop-theme">../../day-custom-base.tdesktop-theme</file>
     <file alias="night-custom-base.tdesktop-theme">../../night-custom-base.tdesktop-theme</file>
     <file alias="icons/calls/hands.lottie">../../icons/calls/hands.lottie</file>
