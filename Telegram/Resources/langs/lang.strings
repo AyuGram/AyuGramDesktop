@@ -8784,6 +8784,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lupin_DocsText" = "Documentation";
 "lupin_CategoryGeneral" = "General";
 "lupin_CategoryAppearance" = "Look & Feel";
+"lupin_ThemePickerTitle" = "Theme";
+"lupin_ThemePickerBoxTitle" = "Choose a LupinGram theme";
+"lupin_ThemeMatrix" = "Matrix (green)";
+"lupin_ThemeAmber" = "Amber (yellow)";
+"lupin_ThemeIce" = "Ice (blue)";
+"lupin_ThemeCrimson" = "Crimson (red)";
+"lupin_PanicKey" = "Panic Hide";
+"lupin_PanicKeyDescription" = "Press Ctrl+Shift+L to instantly hide the window to the tray.";
 "lupin_CategoryChats" = "Chats";
 "lupin_CategoryOther" = "Misc";
 "lupin_CategoryGhostMode" = "Phantom Mode";

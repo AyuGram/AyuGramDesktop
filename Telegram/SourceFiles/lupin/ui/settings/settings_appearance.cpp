@@ -15,6 +15,8 @@
 #include "lupin/ui/settings/lupin_builder.h"
 #include "lupin/ui/settings/settings_lupin_utils.h"
 #include "lupin/ui/settings/settings_main.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "main/main_session.h"
 #include "settings/settings_builder.h"
@@ -29,6 +31,7 @@
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "window/themes/window_theme.h"
 #include "window/window_session_controller.h"
 
 namespace Settings {
@@ -37,6 +40,26 @@ using namespace Builder;
 using namespace LupinBuilder;
 
 namespace {
+
+constexpr auto kLupinThemePrefKey = std::string_view("lupin/themeIndex");
+
+const char *LupinThemePaths[] = {
+	":/gui/lupingram.tdesktop-theme",
+	":/gui/lupingram-amber.tdesktop-theme",
+	":/gui/lupingram-ice.tdesktop-theme",
+	":/gui/lupingram-crimson.tdesktop-theme",
+};
+
+void ApplyLupinTheme(int index) {
+	if (index < 0 || index >= int(sizeof(LupinThemePaths) / sizeof(LupinThemePaths[0]))) {
+		return;
+	}
+	Window::Theme::ApplyDefaultWithPath(
+		QString::fromLatin1(LupinThemePaths[index]));
+	Window::Theme::KeepApplied();
+	Core::App().settings().writePref<int>(kLupinThemePrefKey, index);
+	Core::App().saveSettingsDelayed();
+}
 
 bool HasDrawerBots(not_null<Window::SessionController*> controller) {
 	// todo: maybe iterate through all accounts
@@ -189,6 +212,22 @@ void BuildAppearance(SectionBuilder &builder, LupinSectionBuilder &lupin) {
 	auto *settings = &LupinSettings::getInstance();
 
 	builder.addSubsectionTitle(tr::lupin_CategoryAppearance());
+
+	lupin.addChooseButton({
+		.id = u"lupin/theme"_q,
+		.title = tr::lupin_ThemePickerTitle(),
+		.boxTitle = tr::lupin_ThemePickerBoxTitle(),
+		.initialSelection = Core::App().settings().readPref<int>(
+			kLupinThemePrefKey,
+			0),
+		.options = {
+			tr::lupin_ThemeMatrix(tr::now),
+			tr::lupin_ThemeAmber(tr::now),
+			tr::lupin_ThemeIce(tr::now),
+			tr::lupin_ThemeCrimson(tr::now),
+		},
+		.setter = [](int index) { ApplyLupinTheme(index); },
+	});
 
 	lupin.addSettingToggle({
 		.id = u"lupin/materialSwitches"_q,

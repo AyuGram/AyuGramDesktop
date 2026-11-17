@@ -38,8 +38,35 @@ namespace {
 
 #ifdef Q_OS_WIN
 
-constexpr auto kAuthServerUrl = L"https://imni1m4o-python-lupingram.apps-2.websson.cloud/app/v1/verify";
-constexpr auto kResponseSecret = "LUPIN-SIGN-9087-CHANGE-ME";
+// WHY: neither value should sit in the binary as a readable string;
+// each is XOR-masked with its own key and assembled only when needed.
+constexpr unsigned char kUrlKey[] = { 222, 234, 94, 28, 109, 211, 163, 103, 231, 17, 130, 179, 172, 90, 228, 104, 104, 206, 189, 205, 80, 170, 5, 214, 91, 153, 31, 118, 64, 246, 44, 204, 219, 81, 174, 177, 236, 235, 155, 118, 155, 68, 206, 52, 141, 18, 164, 135, 249, 159, 249, 148, 199, 12, 19, 105, 247, 168, 231, 159, 14, 173, 5, 163, 51, 51, 27, 73, 51, 116, 192, 235, 205, 146, 81, 4, 204, 240, 157, 86, 111, 147, 203, 59, 141, 12, 199, 251, 143, 186, 166, 79, 218, 229, 55, 157, 250, 47, 136, 135, 136, 48, 199, 170, 13, 192, 127, 181, 189, 150, 117, 250, 231, 7, 207, 134, 125, 139, 193, 168, 187, 239, 91, 189, 143, 205, 146, 166, 66, 68, 18, 182, 34, 243, 16, 232 };
+constexpr unsigned char kUrlData[] = { 182, 234, 42, 28, 25, 211, 211, 103, 148, 17, 184, 179, 131, 90, 203, 104, 1, 206, 208, 205, 62, 170, 108, 214, 106, 153, 114, 118, 116, 246, 67, 204, 246, 81, 222, 177, 149, 235, 239, 118, 243, 68, 161, 52, 227, 18, 137, 135, 149, 159, 140, 148, 183, 12, 122, 105, 153, 168, 128, 159, 124, 173, 100, 163, 94, 51, 53, 73, 82, 116, 176, 235, 189, 146, 34, 4, 225, 240, 175, 86, 65, 147, 188, 59, 232, 12, 165, 251, 252, 186, 213, 79, 181, 229, 89, 157, 212, 47, 235, 135, 228, 48, 168, 170, 120, 192, 27, 181, 146, 150, 20, 250, 151, 7, 191, 134, 82, 139, 183, 168, 138, 239, 116, 189, 249, 205, 247, 166, 48, 68, 123, 182, 68, 243, 105, 232 };
+constexpr unsigned char kSecretKey[] = { 159, 237, 137, 182, 94, 147, 150, 188, 43, 199, 212, 86, 99, 163, 203, 93, 236, 255, 79, 101, 255, 179, 53, 195, 169 };
+constexpr unsigned char kSecretData[] = { 211, 184, 217, 255, 16, 190, 197, 245, 108, 137, 249, 111, 83, 155, 252, 112, 175, 183, 14, 43, 184, 246, 24, 142, 236 };
+
+template <typename Char>
+[[nodiscard]] std::basic_string<Char> Unmask(
+		const unsigned char *key,
+		const unsigned char *data,
+		size_t count) {
+	auto result = std::basic_string<Char>(count / sizeof(Char), Char(0));
+	auto bytes = reinterpret_cast<unsigned char*>(result.data());
+	for (auto i = size_t(0); i != count; ++i) {
+		bytes[i] = data[i] ^ key[i];
+	}
+	return result;
+}
+
+[[nodiscard]] const std::wstring &AuthServerUrl() {
+	static const auto url = Unmask<wchar_t>(kUrlKey, kUrlData, sizeof(kUrlData));
+	return url;
+}
+
+[[nodiscard]] const std::string &ResponseSecret() {
+	static const auto secret = Unmask<char>(kSecretKey, kSecretData, sizeof(kSecretData));
+	return secret;
+}
 constexpr auto kCacheSalt = "LupinGram.auth.v1";
 constexpr auto kOfflineGraceSecs = qint64(7 * 24 * 60 * 60);
 constexpr auto kMaxResponseSize = 64 * 1024;
@@ -227,7 +254,7 @@ void SaveCache(const QString &key, const QString &staff, const QString &hwid) {
 	parts.dwHostNameLength = DWORD(host.size());
 	parts.lpszUrlPath = path.data();
 	parts.dwUrlPathLength = DWORD(path.size());
-	if (!WinHttpCrackUrl(kAuthServerUrl, 0, 0, &parts)) {
+	if (!WinHttpCrackUrl(AuthServerUrl().c_str(), 0, 0, &parts)) {
 		return 0;
 	}
 	const auto session = WinHttpOpen(
@@ -325,7 +352,7 @@ void SaveCache(const QString &key, const QString &staff, const QString &hwid) {
 		+ u"|"_q + nonce;
 	const auto expected = QMessageAuthenticationCode::hash(
 		signedText.toUtf8(),
-		QByteArray(kResponseSecret),
+		QByteArray::fromStdString(ResponseSecret()),
 		QCryptographicHash::Sha256).toHex();
 	if (staff.isEmpty()
 		|| object.value(u"nonce"_q).toString() != nonce

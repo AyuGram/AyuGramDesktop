@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
+#include <QtGui/QShortcut>
 #include <QtGui/QDrag>
 
 #include <kurlmimedata.h>
@@ -583,6 +584,15 @@ void MainWindow::init() {
 
 	updateTitle();
 	updateWindowIcon();
+
+	// LupinGram includes
+	const auto panic = new QShortcut(
+		QKeySequence(u"Ctrl+Shift+L"_q),
+		this);
+	panic->setContext(Qt::ApplicationShortcut);
+	QObject::connect(panic, &QShortcut::activated, this, [=] {
+		minimizeToTray();
+	});
 }
 
 void MainWindow::handleStateChanged(Qt::WindowState state) {
