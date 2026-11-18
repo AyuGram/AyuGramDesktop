@@ -22,6 +22,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session_settings.h"
 #include "spellcheck/spellcheck_types.h"
 
+// AyuGram includes
+#include "core/application.h"
+#include "core/core_settings.h"
+
+
 namespace Api {
 
 Transcribes::Transcribes(not_null<ApiWrap*> api)
@@ -243,9 +248,10 @@ void Transcribes::summarize(not_null<HistoryItem*> item) {
 
 	const auto id = item->fullId();
 	const auto translatedTo = item->history()->translatedTo();
-	const auto langCode = translatedTo
-		? translatedTo.twoLetterCode()
-		: QString();
+	// AyuGram: without to_lang the server may summarize in a wrong language.
+	const auto langCode = (translatedTo
+		? translatedTo
+		: Core::App().settings().translateTo()).twoLetterCode();
 	const auto requestId = _api.request(MTPmessages_SummarizeText(
 		langCode.isEmpty()
 			? MTP_flags(0)
