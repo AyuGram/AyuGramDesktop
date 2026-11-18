@@ -143,26 +143,6 @@ void BuildCategories(SectionBuilder &builder) {
 	});
 }
 
-void BuildLinks(SectionBuilder &builder) {
-	builder.addSkip();
-	builder.addDivider();
-	builder.addSkip();
-
-	builder.addSubsectionTitle(tr::lupin_LinksHeader());
-
-	builder.addButton({
-		.id = u"lupin/channel"_q,
-		.title = tr::lupin_LinksChannel(),
-		.icon = { &st::menuIconChannel },
-		.label = rpl::single(QString("GitHub")),
-		.onClick = [=] {
-			QDesktopServices::openUrl(QString("https://github.com/8kfdy49fd8-debug/LupinGramds"));
-		},
-	});
-
-	builder.addSkip();
-}
-
 const auto kMeta = BuildHelper({
 	.id = LupinMain::Id(),
 	.parentId = MainId(),
@@ -173,7 +153,6 @@ const auto kMeta = BuildHelper({
 	builder.addSkip();
 	BuildVersionInfo(builder);
 	BuildCategories(builder);
-	BuildLinks(builder);
 });
 
 } // namespace

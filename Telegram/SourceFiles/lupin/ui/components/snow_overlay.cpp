@@ -6,6 +6,7 @@
 #include <QtCore/QRandomGenerator>
 #include <QtCore/QTimer>
 #include <QtGui/QPainter>
+#include <QtGui/QPen>
 #include <QtWidgets/QWidget>
 
 #include <algorithm>
@@ -15,7 +16,7 @@
 namespace LupinUi {
 namespace {
 
-constexpr auto kFlakes = 90;
+constexpr auto kFlakes = 220;
 constexpr auto kStepMs = 33;
 
 struct Flake {
@@ -25,6 +26,8 @@ struct Flake {
 	float speed = 1.f;
 	float drift = 0.f;
 	float phase = 0.f;
+	float spin = 0.f;
+	int alpha = 200;
 };
 
 class SnowWidget final : public QWidget {
@@ -66,16 +69,37 @@ protected:
 	void paintEvent(QPaintEvent *) override {
 		auto p = QPainter(this);
 		p.setRenderHint(QPainter::Antialiasing);
-		p.setPen(Qt::NoPen);
 		for (const auto &flake : _flakes) {
-			const auto glow = QColor(150, 185, 225, 90);
-			const auto core = QColor(250, 252, 255, 235);
-			p.setBrush(glow);
-			p.drawEllipse(
-				QPointF(flake.x, flake.y),
-				flake.radius + 1.6,
-				flake.radius + 1.6);
-			p.setBrush(core);
+			if (flake.radius > 3.6f) {
+				// Near flakes are drawn as six-armed snowflakes.
+				auto pen = QPen(QColor(235, 246, 255, flake.alpha));
+				pen.setWidthF(1.3);
+				pen.setCapStyle(Qt::RoundCap);
+				p.setPen(pen);
+				const auto angle = flake.phase + _tick * flake.spin;
+				const auto r = double(flake.radius) * 1.5;
+				for (auto arm = 0; arm != 3; ++arm) {
+					const auto a = angle + arm * 1.0471975511965976;
+					const auto dx = std::cos(a) * r;
+					const auto dy = std::sin(a) * r;
+					p.drawLine(
+						QPointF(flake.x - dx, flake.y - dy),
+						QPointF(flake.x + dx, flake.y + dy));
+				}
+				p.setPen(Qt::NoPen);
+				p.setBrush(QColor(255, 255, 255, flake.alpha));
+				p.drawEllipse(QPointF(flake.x, flake.y), 1.6, 1.6);
+				continue;
+			}
+			p.setPen(Qt::NoPen);
+			if (flake.radius > 2.4f) {
+				p.setBrush(QColor(150, 185, 225, 70));
+				p.drawEllipse(
+					QPointF(flake.x, flake.y),
+					flake.radius + 1.6,
+					flake.radius + 1.6);
+			}
+			p.setBrush(QColor(250, 252, 255, flake.alpha));
 			p.drawEllipse(QPointF(flake.x, flake.y), flake.radius, flake.radius);
 		}
 	}
@@ -97,22 +121,39 @@ private:
 
 	void reset(Flake &flake, float w, float h, bool anywhere) {
 		auto *rng = QRandomGenerator::global();
-		flake.x = float(rng->bounded(int(w)));
-		flake.y = anywhere ? float(rng->bounded(int(h))) : -6.f;
-		flake.radius = 1.4f + float(rng->bounded(24)) / 10.f;
-		flake.speed = 0.7f + flake.radius * 0.45f;
-		flake.drift = 0.25f + float(rng->bounded(10)) / 20.f;
-		flake.phase = float(rng->bounded(628)) / 100.f;
+		const auto layer = rng->bounded(100);
+		const auto unit = [&] { return float(rng->bounded(1000)) / 1000.f; };
+		if (layer < 60) { // Far: small, slow, faint.
+			flake.radius = 1.0f + unit() * 1.0f;
+			flake.speed = 0.5f + unit() * 0.4f;
+			flake.alpha = 120 + rng->bounded(50);
+		} else if (layer < 90) { // Middle.
+			flake.radius = 2.0f + unit() * 1.4f;
+			flake.speed = 1.0f + unit() * 0.6f;
+			flake.alpha = 190 + rng->bounded(35);
+		} else { // Near: large six-armed snowflakes.
+			flake.radius = 3.8f + unit() * 2.2f;
+			flake.speed = 1.6f + unit() * 0.8f;
+			flake.alpha = 235;
+		}
+		flake.x = float(rng->bounded(std::max(int(w), 1)));
+		flake.y = anywhere ? float(rng->bounded(std::max(int(h), 1))) : -8.f;
+		flake.drift = 0.25f + unit() * 0.5f;
+		flake.phase = unit() * 6.28f;
+		flake.spin = (unit() - 0.5f) * 0.05f;
 	}
 
 	void step() {
 		const auto w = float(std::max(width(), 1));
 		const auto h = float(std::max(height(), 1));
 		_tick += 1.f;
+		// Gentle gusts of wind that come and go.
+		const auto wind = std::sin(_tick * 0.0045f) * 0.55f;
 		for (auto &flake : _flakes) {
 			flake.y += flake.speed;
-			flake.x += std::sin(_tick * 0.03f + flake.phase) * flake.drift;
-			if (flake.y > h + 6.f || flake.x < -8.f || flake.x > w + 8.f) {
+			flake.x += std::sin(_tick * 0.03f + flake.phase) * flake.drift
+				+ wind * (0.4f + flake.radius * 0.2f);
+			if (flake.y > h + 8.f || flake.x < -8.f || flake.x > w + 8.f) {
 				reset(flake, w, h, false);
 			}
 		}

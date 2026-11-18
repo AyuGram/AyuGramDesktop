@@ -1283,7 +1283,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	return u"https://github.com/8kfdy49fd8-debug/LupinGramds/releases"_q;
+	return QString();
 }
 
 bool Application::openCustomUrl(

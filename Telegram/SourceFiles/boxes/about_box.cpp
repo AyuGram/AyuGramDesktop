@@ -45,11 +45,7 @@ rpl::producer<TextWithEntities> Text() {
 		lt_gpl_link,
 		rpl::single(Ui::Text::Link(
 			"GNU GPL",
-			"https://github.com/8kfdy49fd8-debug/LupinGramds/blob/claude/gifted-rubin-nzkrec/LICENSE")),
-		lt_github_link,
-		rpl::single(Ui::Text::Link(
-			"GitHub",
-			"https://github.com/8kfdy49fd8-debug/LupinGramds")),
+			"https://www.gnu.org/licenses/gpl-3.0.html")),
 		tr::marked);
 }
 

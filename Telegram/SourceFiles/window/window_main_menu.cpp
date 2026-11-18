@@ -391,9 +391,7 @@ MainMenu::MainMenu(
 
 	parentResized();
 
-	_telegram->setMarkedText(tr::link(
-		u"LupinGram Desktop"_q,
-		u"https://github.com/8kfdy49fd8-debug/LupinGramds"_q));
+	_telegram->setMarkedText(TextWithEntities{ u"LupinGram Desktop"_q });
 	_telegram->setLinksTrusted();
 	// The canary version is too long for the "Version {version}" form.
 	_version->setMarkedText(
