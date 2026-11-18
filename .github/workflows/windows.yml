@@ -118,6 +118,36 @@ jobs:
             C:\TBuild\Libraries
           key: win-x64-tc1444-deps-v3-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
 
+      - name: Restore compiled objects cache
+        id: cache-out
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            tdesktop/out/Telegram/Telegram.dir
+            tdesktop/out/Telegram/Telegram_autogen
+          key: win-out-v1-${{ github.run_id }}
+          restore-keys: |
+            win-out-v1-
+
+      - name: Make sources older than restored objects, touch only changed files
+        if: steps.cache-out.outputs.cache-restore-key != '' || steps.cache-out.outputs.cache-matched-key != ''
+        shell: pwsh
+        run: |
+          $shaFile = "tdesktop/out/Telegram/Telegram.dir/built_sha.txt"
+          if (-not (Test-Path $shaFile)) { Write-Host "no sha marker, full rebuild"; exit 0 }
+          $old = (Get-Content $shaFile -Raw).Trim()
+          Push-Location tdesktop
+          git fetch --depth 1 origin $old 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) { Write-Host "cannot fetch $old, full rebuild"; Pop-Location; exit 0 }
+          $changed = git diff --name-only $old HEAD
+          Write-Host "changed since cached build: $(@($changed).Count) files"
+          $past = [datetime]"2020-01-01"
+          Get-ChildItem -Recurse -File -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\\.git(\\|$)' -and $_.FullName -notmatch '\\out\\' } |
+            ForEach-Object { $_.LastWriteTime = $past }
+          foreach ($f in $changed) { if (Test-Path $f) { (Get-Item $f).LastWriteTime = Get-Date } }
+          Pop-Location
+
       - name: Configure
         shell: cmd
         run: |
@@ -139,6 +169,23 @@ jobs:
           echo build attempt %attempt% failed, resuming incrementally
           goto retry
           :built
+
+      - name: Save compiled objects cache
+        if: always() && (success() || failure())
+        shell: pwsh
+        run: |
+          if (Test-Path tdesktop/out/Telegram/Telegram.dir) {
+            (git -C tdesktop rev-parse HEAD) | Set-Content tdesktop/out/Telegram/Telegram.dir/built_sha.txt
+          }
+
+      - name: Upload compiled objects cache
+        if: always() && (success() || failure())
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            tdesktop/out/Telegram/Telegram.dir
+            tdesktop/out/Telegram/Telegram_autogen
+          key: win-out-v1-${{ github.run_id }}
 
       - name: Show build errors
         if: failure()
