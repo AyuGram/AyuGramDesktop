@@ -333,7 +333,7 @@ private:
 
 	Ui::PeerUserpicView _userpicView;
 	InMemoryKey _userpicUniqueKey;
-	uint8 _userpicAyuState = 0xFF;
+	uint8 _userpicLupinState = 0xFF;
 	QImage _cachedUserpic;
 	Ui::CommunityUserpicEffect _communityUserpicEffect;
 	bool _communityEffect = false;

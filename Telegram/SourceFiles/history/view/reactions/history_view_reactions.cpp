@@ -32,11 +32,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/message_shot/message_shot.h"
-#include "ayu/ui/ayu_userpic.h"
-#include "ayu/features/filters/filters_controller.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/features/message_shot/message_shot.h"
+#include "lupin/ui/lupin_userpic.h"
+#include "lupin/features/filters/filters_controller.h"
 
 
 namespace HistoryView::Reactions {
@@ -638,7 +638,7 @@ void InlineList::paint(
 		}
 	}
 	if (!animations.empty() && context.reactionInfo
-		&& !AyuFeatures::MessageShot::isTakingShot()) {
+		&& !LupinFeatures::MessageShot::isTakingShot()) {
 		const auto now = context.now;
 		context.reactionInfo->effectPaint = [
 			now,
@@ -924,7 +924,7 @@ void InlineList::continueAnimations(base::flat_map<
 InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 	using Flag = InlineListData::Flag;
 	const auto item = view->data();
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (!settings.showChannelReactions()
 		&& item->history()->peer->isChannel()
 		&& !item->history()->peer->isMegagroup()) {
@@ -1010,7 +1010,7 @@ InlineListData InlineListDataFromMessage(not_null<Element*> view) {
 			}
 		}
 	}
-	if (AyuSettings::getInstance().filtersEnabled()) {
+	if (LupinSettings::getInstance().filtersEnabled()) {
 		for (auto &[id, peers] : result.recent) {
 			peers.erase(ranges::remove_if(peers, [](not_null<PeerData*> peer) {
 				return FiltersController::isBlocked(peer);

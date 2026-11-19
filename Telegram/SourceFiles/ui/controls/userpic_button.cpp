@@ -60,8 +60,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace Ui {
@@ -739,8 +739,8 @@ void UserpicButton::paintUserpicFrame(Painter &p, QPoint photoPosition) {
 		auto size = QSize{ _st.photoSize, _st.photoSize };
 		const auto ratio = style::DevicePixelRatio();
 		request.outer = request.resize = size * ratio;
-		const auto ayuOverride = AyuUserpic::ShouldOverrideShape(_shape);
-		if (ayuOverride) {
+		const auto lupinOverride = AyuUserpic::ShouldOverrideShape(_shape);
+		if (lupinOverride) {
 			AyuUserpic::ApplyFrameRounding(
 				request,
 				_roundingCorners,
@@ -1149,9 +1149,9 @@ void UserpicButton::showCustom(QImage &&image) {
 			size * style::DevicePixelRatio(),
 			Qt::IgnoreAspectRatio,
 			Qt::SmoothTransformation);
-		const auto ayuOverride = AyuUserpic::ShouldOverrideShape(_shape);
+		const auto lupinOverride = AyuUserpic::ShouldOverrideShape(_shape);
 		_userpic = Ui::PixmapFromImage(
-			ayuOverride
+			lupinOverride
 			? Images::Round(std::move(small), ImageRoundRadius::AyuUserpic)
 			: useForumShape()
 			? Images::Round(
@@ -1244,8 +1244,8 @@ void UserpicButton::fillShape(QPainter &p, QBrush brush) const {
 	p.setPen(Qt::NoPen);
 	p.setBrush(brush);
 	const auto size = _st.photoSize;
-	const auto ayuOverride = AyuUserpic::ShouldOverrideShape(_shape);
-	if (ayuOverride) {
+	const auto lupinOverride = AyuUserpic::ShouldOverrideShape(_shape);
+	if (lupinOverride) {
 		AyuUserpic::PaintShape(p, 0, 0, size);
 	} else if (useForumShape()) {
 		const auto radius = size * Ui::ForumUserpicRadiusMultiplier();
@@ -1283,8 +1283,8 @@ void UserpicButton::prepareUserpicPixmap() {
 						QSize(size, size) * ratio,
 						Qt::IgnoreAspectRatio,
 						Qt::SmoothTransformation);
-					const auto ayuNP = AyuUserpic::ShouldOverrideShape(_shape);
-					if (ayuNP) {
+					const auto lupinNP = AyuUserpic::ShouldOverrideShape(_shape);
+					if (lupinNP) {
 						image = Images::Round(
 							std::move(image),
 							ImageRoundRadius::AyuUserpic);

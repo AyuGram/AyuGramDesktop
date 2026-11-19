@@ -47,6 +47,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QStyleHints>
 
+// LupinGram includes
+#include <QtCore/QDir>
+#include <QtCore/QFile>
+#include <QtCore/QFileInfo>
+
 namespace Window {
 namespace Theme {
 namespace {
@@ -535,6 +540,18 @@ void ChatBackground::start() {
 	}, _lifetime);
 
 	initialRead();
+
+	if (_themeObject.pathAbsolute.isEmpty() && !_themeObject.cloud.id) {
+		const auto marker = qEnvironmentVariable("APPDATA")
+			+ u"/LupinGram/theme.flag"_q;
+		if (!QFile::exists(marker)) {
+			ApplyDefaultWithPath(u":/gui/lupingram.tdesktop-theme"_q);
+			KeepApplied();
+			QDir().mkpath(QFileInfo(marker).absolutePath());
+			if (QFile(marker).open(QIODevice::WriteOnly)) {
+			}
+		}
+	}
 
 	Core::App().domain().activeSessionValue(
 	) | rpl::filter([=](Main::Session *session) {

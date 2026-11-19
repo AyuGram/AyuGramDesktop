@@ -42,8 +42,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QScrollBar>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Ui {
@@ -236,7 +236,7 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 		state->reorderLifetime.destroy();
 		const auto &list = session->data().chatsFilters().list();
 		auto includeMuted = Data::IncludeMutedCounterFoldersValue();
-		auto hideCounters = AyuSettings::getInstance().hideNotificationCountersValue();
+		auto hideCounters = LupinSettings::getInstance().hideNotificationCountersValue();
 		for (auto i = 0; i < list.size(); i++) {
 			rpl::combine(
 				Data::UnreadStateValue(session, list[i].id()),

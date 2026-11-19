@@ -19,8 +19,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace Ui {
@@ -70,9 +70,9 @@ QImage VideoUserpicPlayer::frame(
 		: peer->isForum()
 		? Ui::PeerUserpicShape::Forum
 		: Ui::PeerUserpicShape::Circle;
-	const auto ayuOverride = AyuUserpic::ShouldOverrideShape(peerShape);
+	const auto lupinOverride = AyuUserpic::ShouldOverrideShape(peerShape);
 
-	if (ayuOverride) {
+	if (lupinOverride) {
 		AyuUserpic::ApplyFrameRounding(
 			request,
 			_roundingCorners,
@@ -97,7 +97,7 @@ QImage VideoUserpicPlayer::frame(
 	}
 
 	auto result = _streamed->frame(request);
-	if (!ayuOverride && broadcast) {
+	if (!lupinOverride && broadcast) {
 		constexpr auto kFormat = QImage::Format_ARGB32_Premultiplied;
 		if (result.format() != kFormat) {
 			result = std::move(result).convertToFormat(kFormat);

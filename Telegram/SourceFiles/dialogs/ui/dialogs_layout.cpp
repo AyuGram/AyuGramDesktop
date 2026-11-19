@@ -51,9 +51,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
-// AyuGram includes
-#include "ayu/features/filters/filters_controller.h"
-#include "styles/style_ayu_icons.h"
+// LupinGram includes
+#include "lupin/features/filters/filters_controller.h"
+#include "styles/style_lupin_icons.h"
 
 
 namespace Dialogs::Ui {

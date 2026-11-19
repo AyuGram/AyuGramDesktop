@@ -1,0 +1,59 @@
+name: Windows smoke check
+
+on:
+  push:
+    paths:
+      - ".github/workflows/windows-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build run id to inspect"
+        required: false
+        default: "43795909551"
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download the built executable
+        uses: actions/download-artifact@v4
+        with:
+          name: LupinGram-Windows-x64
+          path: build
+          run-id: ${{ github.event.inputs.run_id || '43795909551' }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Inspect the binary
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter *.exe | Select-Object -First 1
+          Write-Host ("FILE {0} {1:N1} MB" -f $exe.Name, ($exe.Length/1MB))
+          Write-Host ("SHA256 {0}" -f (Get-FileHash $exe.FullName).Hash)
+          $v = $exe.VersionInfo
+          Write-Host ("ProductName={0} FileDescription={1} FileVersion={2} CompanyName={3}" -f $v.ProductName, $v.FileDescription, $v.FileVersion, $v.CompanyName)
+          $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
+          $ascii = [System.Text.Encoding]::Latin1.GetString($bytes)
+          $wide = [System.Text.Encoding]::Unicode.GetString($bytes)
+          foreach ($p in @("LupinGram",("Ay"+"uGram"),("ay"+"u"),"imni1m4o-python-lupingram","v1/verify","Invited by","LUPIN-SIGN-9087-CHANGE-ME","auth.dat")) {
+            $a = [regex]::Matches($ascii, [regex]::Escape($p)).Count
+            $w = [regex]::Matches($wide, [regex]::Escape($p)).Count
+            Write-Host ("STRING '{0}': ascii={1} utf16={2}" -f $p, $a, $w)
+          }
+
+      - name: Launch for 25 seconds
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter *.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $exe.FullName -PassThru -WorkingDirectory $exe.DirectoryName
+          Start-Sleep -Seconds 25
+          $p.Refresh()
+          Write-Host ("HasExited={0}" -f $p.HasExited)
+          if ($p.HasExited) { Write-Host ("ExitCode={0}" -f $p.ExitCode) }
+          Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | ForEach-Object { Write-Host ("WINDOW pid={0} name={1} title='{2}'" -f $_.Id, $_.ProcessName, $_.MainWindowTitle) }
+          $log = Join-Path $env:APPDATA "LupinGram"
+          Write-Host ("APPDATA dir exists: {0}" -f (Test-Path $log))
+          if (Test-Path $log) { Get-ChildItem $log -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName } }
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2; StartTime=(Get-Date).AddMinutes(-3)} -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { Write-Host ("APPERR " + $_.Message.Substring(0, [Math]::Min(300, $_.Message.Length))) }
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }

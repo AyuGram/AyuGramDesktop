@@ -85,7 +85,7 @@ constexpr auto kFlatpakUpdated = "/app/.updated"_cs;
 #ifdef TDESKTOP_DISABLE_AUTOUPDATE
 bool UpdaterIsDisabled = true;
 #else // TDESKTOP_DISABLE_AUTOUPDATE
-bool UpdaterIsDisabled = false;
+bool UpdaterIsDisabled = true;
 #endif // TDESKTOP_DISABLE_AUTOUPDATE
 
 std::weak_ptr<Updater> UpdaterInstance;
@@ -2369,7 +2369,7 @@ void UpdateApplication() {
 			} else if (KSandbox::isSnap()) {
 				return "https://snapcraft.io/telegram-desktop";
 			}
-			return "https://t.me/AyuGramReleases";
+			return "";
 #endif // OS_WIN_STORE || OS_MAC_STORE
 		}();
 		UrlClickHandler::Open(url);

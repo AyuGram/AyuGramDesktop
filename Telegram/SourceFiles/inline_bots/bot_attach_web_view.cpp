@@ -97,8 +97,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QSvgRenderer>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace InlineBots {
@@ -827,7 +827,7 @@ void BotAction::handleKeyPress(not_null<QKeyEvent*> e) {
 }
 
 QString WebviewPlatform() {
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	return settings.spoofWebviewAsAndroid() ? "android" : "tdesktop";
 }
 

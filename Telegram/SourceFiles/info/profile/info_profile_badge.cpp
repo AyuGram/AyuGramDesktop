@@ -23,8 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "styles/style_info.h"
 
-// AyuGram includes
-#include "styles/style_ayu_icons.h"
+// LupinGram includes
+#include "styles/style_lupin_icons.h"
 
 
 namespace Info::Profile {

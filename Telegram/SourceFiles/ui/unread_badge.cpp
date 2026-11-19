@@ -21,9 +21,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/unread_badge_paint.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "styles/style_info.h"
 
 
@@ -244,7 +244,7 @@ PeerBadge::~PeerBadge() = default;
 int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	Expects(descriptor.customEmojiRepaint != nullptr);
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	const auto hidePremiumStatuses = settings.hidePremiumStatuses();
 
 	const auto peer = descriptor.peer;

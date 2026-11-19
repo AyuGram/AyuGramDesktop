@@ -57,8 +57,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 
-// AyuGram includes
-#include "styles/style_ayu_icons.h"
+// LupinGram includes
+#include "styles/style_lupin_icons.h"
 
 
 namespace {
@@ -73,7 +73,7 @@ public:
 protected:
 	QSize rightActionSize() const override {
 		return isMutualContact()
-			? QSize(st::ayuContactsMutualIcon.width(), st::ayuContactsMutualIcon.height())
+			? QSize(st::lupinContactsMutualIcon.width(), st::lupinContactsMutualIcon.height())
 			: QSize();
 	}
 
@@ -105,8 +105,8 @@ protected:
 			return;
 		}
 		(selected || actionSelected
-			? st::ayuContactsMutualIconOver
-			: st::ayuContactsMutualIcon).paint(p, x, y, outerWidth);
+			? st::lupinContactsMutualIconOver
+			: st::lupinContactsMutualIcon).paint(p, x, y, outerWidth);
 	}
 
 private:
@@ -156,7 +156,7 @@ object_ptr<Ui::BoxContent> PrepareContactsBox(
 			if (const auto user = row->peer()->asUser();
 				user && (user->flags() & UserDataFlag::MutualContact)) {
 				delegate()->peerListUiShow()->showToast(
-					tr::ayu_MutualContactInfo(tr::now));
+					tr::lupin_MutualContactInfo(tr::now));
 			}
 		}
 

@@ -29,8 +29,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwidget.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace Data {

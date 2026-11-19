@@ -108,10 +108,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <ksandbox.h>
 
-// AyuGram includes
-#include "ayu/ayu_infra.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/features/streamer_mode/streamer_mode.h"
+// LupinGram includes
+#include "lupin/lupin_infra.h"
+#include "lupin/lupin_settings.h"
+#include "lupin/features/streamer_mode/streamer_mode.h"
+#include "lupin/lupin_gatekeeper.h"
+
+#include <cstdlib>
 
 
 namespace Core {
@@ -343,7 +346,7 @@ void Application::run() {
 	_translator = std::make_unique<Lang::Translator>();
 	QCoreApplication::instance()->installTranslator(_translator.get());
 
-	AyuInfra::init();
+	LupinInfra::init();
 	style::StartManager(cScale());
 	Ui::Accessible::Init();
 	Ui::InitTextOptions();
@@ -393,6 +396,9 @@ void Application::run() {
 
 	_savedWindows = std::make_unique<Window::SavedWindows>(this);
 
+	if (!LupinGate::RunGatekeeper()) {
+		std::_Exit(1);
+	}
 	_windows.emplace(nullptr, std::make_unique<Window::Controller>());
 	setLastActiveWindow(_windows.front().second.get());
 	_windowInSettings = _lastActivePrimaryWindow = _lastActiveWindow;
@@ -605,8 +611,8 @@ void Application::processCreatedWindow(
 	window->openInMediaViewRequests(
 	) | rpl::start_to_stream(_openInMediaViewRequests, window->lifetime());
 
-	if (AyuSettings::getInstance().streamerMode()) {
-		AyuFeatures::StreamerMode::hideWidgetWindow(window->widget());
+	if (LupinSettings::getInstance().streamerMode()) {
+		LupinFeatures::StreamerMode::hideWidgetWindow(window->widget());
 	}
 }
 
@@ -1277,7 +1283,7 @@ bool Application::openInternalUrl(const QString &url, QVariant context) {
 }
 
 QString Application::changelogLink() const {
-	return u"https://github.com/AyuGram/AyuGramDesktop/releases"_q;
+	return QString();
 }
 
 bool Application::openCustomUrl(
@@ -2054,7 +2060,7 @@ void Application::RegisterUrlScheme() {
 		.arguments = arguments,
 		.protocol = u"tg"_q,
 		.protocolName = u"Telegram Link"_q,
-		.shortAppName = u"AyuGram"_q,
+		.shortAppName = u"LupinGram"_q,
 		.longAppName = QCoreApplication::applicationName(),
 		.displayAppName = AppName.utf16(),
 		.displayAppDescription = AppName.utf16(),

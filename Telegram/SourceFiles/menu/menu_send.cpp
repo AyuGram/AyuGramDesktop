@@ -62,8 +62,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace SendMenu {
@@ -750,11 +750,11 @@ FillMenuResult FillSendMenu(
 
 	if (sending && type != Type::Reminder) {
 		const auto &ghost = maybeShow
-			? AyuSettings::ghost(&maybeShow->session())
-			: AyuSettings::ghost();
+			? LupinSettings::ghost(&maybeShow->session())
+			: LupinSettings::ghost();
 		const auto sendWithoutSound = ghost.shouldSendWithoutSound();
 		menu->addAction(
-			sendWithoutSound ? tr::ayu_SendWithSound(tr::now) : tr::lng_send_silent_message(tr::now),
+			sendWithoutSound ? tr::lupin_SendWithSound(tr::now) : tr::lng_send_silent_message(tr::now),
 			[=] { action({ Api::SendOptions{ .silent = true } }, details); },
 			sendWithoutSound ? &icons.menuUnmute : &icons.menuMute);
 	}

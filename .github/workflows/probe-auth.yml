@@ -1,0 +1,20 @@
+name: Probe auth server
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-auth.yml"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the landing page
+        run: |
+          B="https://imni1m4o-python-lupingram.apps-2.websson.cloud"
+          echo "=== GET /"; curl -sS -m 20 "$B/" | sed -e 's/<style>.*<\/style>//' | grep -v -E '^\s*(\*|body|\.|h1|\}|<style|</style)' | head -80
+          for p in /docs /v1/health /api/health /status; do
+            printf "%s -> " "$p"; curl -s -m 15 -o /dev/null -w "%{http_code} %{content_type}\n" "$B$p"
+          done

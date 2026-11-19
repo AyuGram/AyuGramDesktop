@@ -25,8 +25,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_app_config.h"
 #include "apiwrap.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Data {
@@ -397,7 +397,7 @@ ChatFilters::ChatFilters(not_null<Session*> owner)
 	_list.emplace_back();
 	crl::on_main(&owner->session(), [=] { load(); });
 
-	AyuSettings::getInstance().hideAllChatsFolderChanges()
+	LupinSettings::getInstance().hideAllChatsFolderChanges()
 	| rpl::on_next([=](bool hide) {
 		if (!_loaded) {
 			return;
@@ -515,8 +515,8 @@ void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {
 }
 
 void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
-	// AyuGram hideAllChatsFolder
-	const auto &settings = AyuSettings::getInstance();
+	// LupinGram hideAllChatsFolder
+	const auto &settings = LupinSettings::getInstance();
 
 	auto position = 0;
 	auto changed = false;
@@ -557,8 +557,8 @@ void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
 }
 
 void ChatFilters::apply(const MTPUpdate &update) {
-	// AyuGram hideAllChatsFolder
-	const auto &settings = AyuSettings::getInstance();
+	// LupinGram hideAllChatsFolder
+	const auto &settings = LupinSettings::getInstance();
 
 	update.match([&](const MTPDupdateDialogFilter &data) {
 		if (const auto filter = data.vfilter()) {
@@ -947,10 +947,10 @@ FilterId ChatFilters::defaultId() const {
 FilterId ChatFilters::lookupId(int index) const {
 	// Expects(index >= 0 && index < _list.size());
 	if (!(index >= 0 && index < _list.size())) {
-		return FilterId(); // AyuGram: fix crash when using `hideAllChatsFolder`
+		return FilterId(); // LupinGram: fix crash when using `hideAllChatsFolder`
 	}
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 
 	if (_owner->session().user()->isPremium() || !_list.front().id() || settings.hideAllChatsFolder()) {
 		return _list[index].id();

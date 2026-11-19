@@ -54,8 +54,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <tgcalls/VideoCaptureInterface.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 #include "boxes/abstract_box.h"
 
 
@@ -3026,11 +3026,11 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 								close();
 							});
 
-						const auto &settings = AyuSettings::getInstance();
+						const auto &settings = LupinSettings::getInstance();
 						if (settings.roundConfirmation()) {
 							_show->showBox(Ui::MakeConfirmBox(
 								{
-									.text = tr::ayu_ConfirmationRound(),
+									.text = tr::lupin_ConfirmationRound(),
 									.confirmed = std::move(sendRoundCallback),
 									.confirmText = tr::lng_send_button()
 								}));
@@ -3076,11 +3076,11 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 					close();
 				});
 
-			const auto &settings = AyuSettings::getInstance();
+			const auto &settings = LupinSettings::getInstance();
 			if (settings.voiceConfirmation()) {
 				_show->showBox(Ui::MakeConfirmBox(
 					{
-						.text = tr::ayu_ConfirmationVoice(),
+						.text = tr::lupin_ConfirmationVoice(),
 						.confirmed = std::move(sendVoiceCallback),
 						.confirmText = tr::lng_send_button()
 					}));
@@ -3156,7 +3156,7 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 		}
 
 		const auto video = !_data.minithumbs.isNull();
-		const auto &settings = AyuSettings::getInstance();
+		const auto &settings = LupinSettings::getInstance();
 		auto sendVoiceCallback = crl::guard(
 			this,
 			[=, this](Fn<void()> &&close)
@@ -3175,8 +3175,8 @@ void VoiceRecordBar::requestToSendWithOptions(Api::SendOptions options) {
 			_show->showBox(Ui::MakeConfirmBox(
 				{
 					.text = (video
-						? tr::ayu_ConfirmationRound()
-						: tr::ayu_ConfirmationVoice()),
+						? tr::lupin_ConfirmationRound()
+						: tr::lupin_ConfirmationVoice()),
 					.confirmed = std::move(sendVoiceCallback),
 					.confirmText = tr::lng_send_button()
 				}));

@@ -23,8 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Data {
@@ -1009,7 +1009,7 @@ void RepliesList::sendReadTillRequest() {
 	const auto api = &_history->session().api();
 	api->request(base::take(_readRequestId)).cancel();
 
-	const auto &ghost = AyuSettings::ghost(&_history->session());
+	const auto &ghost = LupinSettings::ghost(&_history->session());
 	if (!ghost.sendReadMessages()) {
 		return;
 	}

@@ -51,11 +51,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Radolyn Labs"
-            VALUE "FileDescription", "AyuGram Desktop Updater"
+            VALUE "CompanyName", "LupinGram"
+            VALUE "FileDescription", "LupinGram Updater"
             VALUE "FileVersion", "7.2.9.0"
             VALUE "LegalCopyright", "Copyright (C) 2014-2026"
-            VALUE "ProductName", "AyuGram Desktop"
+            VALUE "ProductName", "LupinGram"
             VALUE "ProductVersion", "7.2.9.0"
         END
     END

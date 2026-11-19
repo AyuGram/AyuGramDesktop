@@ -108,11 +108,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/file_upload.h"
 #include "storage/storage_account.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_worker.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "ayu/features/forward/ayu_forward.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_worker.h"
+#include "lupin/utils/telegram_helpers.h"
+#include "lupin/features/forward/lupin_forward.h"
 
 
 namespace {
@@ -505,7 +505,7 @@ void ApiWrap::toggleHistoryArchived(
 		if (archived) {
 			history->setFolder(_session->data().folder(archiveId));
 		} else {
-			const auto &settings = AyuSettings::getInstance();
+			const auto &settings = LupinSettings::getInstance();
 			if (settings.hideAllChatsFolder()) {
 				if (const auto window = Core::App().activeWindow()) {
 					if (const auto controller = window->sessionController()) {
@@ -1454,8 +1454,8 @@ void ApiWrap::migrateFail(not_null<PeerData*> peer, const QString &error) {
 
 void ApiWrap::markContentsRead(
 		const base::flat_set<not_null<HistoryItem*>> &items) {
-	const auto &settings = AyuSettings::getInstance();
-	const auto &ghost = AyuSettings::ghost(&session());
+	const auto &settings = LupinSettings::getInstance();
+	const auto &ghost = LupinSettings::ghost(&session());
 
 	auto markedIds = QVector<MTPint>();
 	auto channelMarkedIds = base::flat_map<
@@ -1500,7 +1500,7 @@ void ApiWrap::markContentsRead(
 
 void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 	const auto passthrough = (item->isUnreadMention() || item->hasUnreadReaction()) && !item->isUnreadMedia();
-	const auto keepUnread = AyuSettings::getInstance().saveDeletedMessages()
+	const auto keepUnread = LupinSettings::getInstance().saveDeletedMessages()
 		&& item->isIncomingUnreadMedia()
 		&& item->media()->ttlSeconds();
 
@@ -1509,7 +1509,7 @@ void ApiWrap::markContentsRead(not_null<HistoryItem*> item) {
 		return;
 	}
 
-	const auto &ghost = AyuSettings::ghost(&session());
+	const auto &ghost = LupinSettings::ghost(&session());
 	if (!ghost.sendReadMessages() && !passthrough) {
 		return;
 	}
@@ -1989,7 +1989,7 @@ void ApiWrap::joinChannel(not_null<ChannelData*> channel) {
 		using Flag = ChannelDataFlag;
 		chatParticipants().loadSimilarPeers(channel);
 
-		const auto &settings = AyuSettings::getInstance();
+		const auto &settings = LupinSettings::getInstance();
 		if (!settings.collapseSimilarChannels()) {
 			channel->setFlags(channel->flags() | Flag::SimilarExpanded);
 		}
@@ -3875,18 +3875,18 @@ void ApiWrap::forwardMessages(
 		FnMut<void()> &&successCallback) {
 	Expects(!draft.items.empty());
 
-	const auto fullAyuForward = AyuForward::isFullAyuForwardNeeded(draft.items.front());
-	if (fullAyuForward) {
+	const auto fullLupinForward = LupinForward::isFullLupinForwardNeeded(draft.items.front());
+	if (fullLupinForward) {
 		crl::async([=] {
-			AyuForward::forwardMessages(_session, action, false, draft);
+			LupinForward::forwardMessages(_session, action, false, draft);
 		});
 		return;
 	}
 
-	const auto ayuIntelligentForwardNeeded = AyuForward::isAyuForwardNeeded(draft.items);
-	if (ayuIntelligentForwardNeeded) {
+	const auto lupinIntelligentForwardNeeded = LupinForward::isLupinForwardNeeded(draft.items);
+	if (lupinIntelligentForwardNeeded) {
 		crl::async([=] {
-			AyuForward::intelligentForward(_session, action, draft);
+			LupinForward::intelligentForward(_session, action, draft);
 		});
 		return;
 	}
@@ -4798,7 +4798,7 @@ void ApiWrap::sendMessage(
 	const auto ephemeral = _session->ephemeralMessages().wouldSend(message);
 	if (!ephemeral
 		&& !canSendTexts
-		&& !AyuForward::isForwarding(peer->id)) {
+		&& !LupinForward::isForwarding(peer->id)) {
 		return;
 	} else if (_session->ephemeralMessages().trySend(message)) {
 		if (clearCloudDraft) {
@@ -5123,7 +5123,7 @@ void ApiWrap::sendBotStart(
 	)).done([=](const MTPUpdates &result) {
 		applyUpdates(result);
 
-		AyuWorker::markAsOnline(_session);
+		LupinWorker::markAsOnline(_session);
 	}).fail([=](const MTP::Error &error) {
 		if (chat) {
 			const auto type = error.type();

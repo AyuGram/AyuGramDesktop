@@ -59,8 +59,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_history_view_about_view.h"
 #include "styles/style_menu_icons.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace HistoryView {
@@ -273,7 +273,7 @@ auto GenerateChatIntro(
 				st::defaultTextStyle,
 				links));
 		};
-		const auto disableGreeting = AyuSettings::getInstance().disableGreetingSticker();
+		const auto disableGreeting = LupinSettings::getInstance().disableGreetingSticker();
 		const auto title = data.customPhrases()
 			? data.title
 			: tr::lng_chat_intro_default_title(tr::now);
@@ -773,7 +773,7 @@ bool AboutView::refresh() {
 				makeIntro(user);
 			} else if (const auto stars = user->starsPerMessageChecked()) {
 				setItem(makeStarsPerMessage(stars), nullptr);
-			} else if (!AyuSettings::getInstance().disableGreetingSticker()) {
+			} else if (!LupinSettings::getInstance().disableGreetingSticker()) {
 				makeIntro(user);
 			}
 			return true;

@@ -17,7 +17,7 @@ Go to ***BuildPath*** and run
 
     sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-    git clone --recursive https://github.com/AyuGram/AyuGramDesktop.git tdesktop
+    git clone --recursive https://github.com/8kfdy49fd8-debug/LupinGramds.git tdesktop
     ./tdesktop/Telegram/build/prepare/mac.sh
 
 ### Building the project

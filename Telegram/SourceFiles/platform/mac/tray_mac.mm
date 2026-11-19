@@ -23,8 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #import <AppKit/NSMenu.h>
 #import <AppKit/NSStatusItem.h>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 @interface CommonDelegate : NSObject<NSMenuDelegate> {
@@ -200,7 +200,7 @@ void UpdateIcon(const NSStatusItem *status) {
 	auto resultActive = result;
 	resultActive.detach();
 
-    const auto &settings = AyuSettings::getInstance();
+    const auto &settings = LupinSettings::getInstance();
 
 	const auto counter = settings.hideNotificationBadge() ? 0 : Core::App().unreadBadge();
 	const auto muted = settings.hideNotificationBadge() ? 0 : Core::App().unreadBadgeMuted();

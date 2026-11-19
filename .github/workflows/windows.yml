@@ -1,0 +1,236 @@
+name: Build LupinGram Windows
+
+on:
+  push:
+    branches: [ "main", "dev", "claude/gifted-rubin-nzkrec" ]
+    paths-ignore:
+      - ".github/workflows/tg-watch.yml"
+      - ".github/workflows/windows-smoke.yml"
+      - ".github/workflows/probe-auth.yml"
+  workflow_dispatch:
+
+env:
+  TBUILD_REAL: C:\TBuild
+  PreferredToolArchitecture: x64
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 360
+    steps:
+      - name: Prepare directories (Libraries and ThirdParty on C:)
+        shell: cmd
+        run: |
+          mkdir "%TBUILD_REAL%\Libraries"
+          mkdir "%TBUILD_REAL%\ThirdParty"
+          mklink /d "%GITHUB_WORKSPACE%\Libraries" "%TBUILD_REAL%\Libraries"
+          mklink /d "%GITHUB_WORKSPACE%\ThirdParty" "%TBUILD_REAL%\ThirdParty"
+
+      - name: Checkout (manual, keeps job log tail small)
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --depth 1 --branch %GITHUB_REF_NAME% https://x-access-token:%GH_TOKEN%@github.com/%GITHUB_REPOSITORY%.git tdesktop
+          cd tdesktop
+          git submodule update --init --recursive --depth 1 --jobs 8
+
+      - name: Free disk space on C (the deps cache is ~20 GB unpacked)
+        shell: pwsh
+        run: |
+          foreach ($d in @("C:\Android","C:\Program Files (x86)\Android","C:\Program Files\Android","C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk","C:\hostedtoolcache\windows\go","C:\hostedtoolcache\windows\Ruby","C:\hostedtoolcache\windows\PyPy","C:\Julia","C:\Strawberry")) {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue }
+          }
+          Get-PSDrive C,D | ForEach-Object { Write-Host ("{0}: free {1:N1} GB" -f $_.Name, ($_.Free/1GB)) }
+
+      - name: Configure pagefile (MSVC PCH needs a lot of virtual memory)
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 8GB
+          maximum-size: 8GB
+          disk-root: "C:"
+
+      - name: Ensure MSVC toolset 14.44 is installed
+        shell: pwsh
+        run: |
+          $vs = "C:\Program Files\Microsoft Visual Studio\18\Enterprise"
+          $has = Get-ChildItem "$vs\VC\Tools\MSVC" -Filter "14.44*" -ErrorAction SilentlyContinue
+          Write-Host "Installed toolsets:"
+          Get-ChildItem "$vs\VC\Tools\MSVC" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.Name }
+          if (-not $has) {
+            Write-Host "Installing VC 14.44 component"
+            Start-Process -Wait -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList @("modify","--installPath",$vs,"--add","Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64","--quiet","--norestart","--nocache")
+            Get-ChildItem "$vs\VC\Tools\MSVC" | ForEach-Object { Write-Host $_.Name }
+          }
+
+      - name: Setup MSVC (x64, toolset 14.44 as in docs/building-win.md)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: 14.44
+
+      - name: Restore ThirdParty and Libraries cache
+        id: cache-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            C:\TBuild\ThirdParty
+            C:\TBuild\Libraries
+          key: win-x64-tc1444-deps-v3-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+          restore-keys: |
+            win-x64-tc1444-deps-v3-
+
+      - name: Patch MSYS2 diffutils & skip breakpad
+        shell: python
+        run: |
+          import glob, re
+
+          for path in glob.glob("tdesktop/Telegram/build/**/*.*", recursive=True):
+              if path.endswith((".py", ".bat")):
+                  with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                      txt = f.read()
+                  if "mingw-w64-x86_64-diffutils" in txt:
+                      with open(path, "w", encoding="utf-8") as f:
+                          f.write(txt.replace("mingw-w64-x86_64-diffutils", "diffutils"))
+
+          prep = "tdesktop/Telegram/build/prepare/prepare.py"
+          with open(prep, "r", encoding="utf-8") as f:
+              code = f.read()
+          code = re.sub(r"stage\(['\"]breakpad['\"],\s*\"\"\".*?\"\"\"\)", "pass", code, flags=re.S)
+          with open(prep, "w", encoding="utf-8") as f:
+              f.write(code)
+
+      - name: Prepare dependencies
+        shell: cmd
+        run: |
+          echo Platform=%Platform% VSCMD_ARG_TGT_ARCH=%VSCMD_ARG_TGT_ARCH%
+          cd tdesktop\Telegram\build\prepare
+          call win.bat silent
+          if errorlevel 1 exit /b 1
+          dir "%GITHUB_WORKSPACE%\Libraries\win64\local"
+
+      - name: Save ThirdParty and Libraries cache
+        if: success() && steps.cache-deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:\TBuild\ThirdParty
+            C:\TBuild\Libraries
+          key: win-x64-tc1444-deps-v3-${{ hashFiles('tdesktop/Telegram/build/prepare/prepare.py', 'tdesktop/Telegram/build/qt_version.py') }}
+
+      - name: Restore compiled objects cache
+        id: cache-out
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            tdesktop/out/Telegram/Telegram.dir
+            tdesktop/out/Telegram/Telegram_autogen
+          key: win-out-v1-${{ github.run_id }}
+          restore-keys: |
+            win-out-v1-
+
+      - name: Make sources older than restored objects, touch only changed files
+        if: steps.cache-out.outputs.cache-restore-key != '' || steps.cache-out.outputs.cache-matched-key != ''
+        shell: pwsh
+        run: |
+          $shaFile = "tdesktop/out/Telegram/Telegram.dir/built_sha.txt"
+          if (-not (Test-Path $shaFile)) { Write-Host "no sha marker, full rebuild"; exit 0 }
+          $old = (Get-Content $shaFile -Raw).Trim()
+          Push-Location tdesktop
+          git fetch --depth 1 origin $old 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) { Write-Host "cannot fetch $old, full rebuild"; Pop-Location; exit 0 }
+          $changed = git diff --name-only $old HEAD
+          Write-Host "changed since cached build: $(@($changed).Count) files"
+          $past = [datetime]"2020-01-01"
+          Get-ChildItem -Recurse -File -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\\.git(\\|$)' -and $_.FullName -notmatch '\\out\\' } |
+            ForEach-Object { $_.LastWriteTime = $past }
+          foreach ($f in $changed) { if (Test-Path $f) { (Get-Item $f).LastWriteTime = Get-Date } }
+          Pop-Location
+
+      - name: Delete stale compiled-objects caches (the repository cache limit is 10 GB)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $keep = "${{ steps.cache-out.outputs.cache-matched-key }}"
+          $list = gh cache list --repo $env:GITHUB_REPOSITORY --key win-out-v1- --limit 100 --json id,key,sizeInBytes | ConvertFrom-Json
+          foreach ($c in $list) {
+            if ($c.key -ne $keep) {
+              Write-Host ("deleting {0} ({1:N1} GB)" -f $c.key, ($c.sizeInBytes/1GB))
+              gh cache delete $c.id --repo $env:GITHUB_REPOSITORY
+            }
+          }
+          gh cache list --repo $env:GITHUB_REPOSITORY --limit 100 | Out-Host
+        continue-on-error: true
+
+      - name: Configure
+        shell: cmd
+        run: |
+          cd tdesktop\Telegram
+          call configure.bat x64 -D TDESKTOP_API_ID=2040 -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          if errorlevel 1 exit /b 1
+
+      - name: Build
+        shell: cmd
+        run: |
+          set _CL_=/MP1 /GL-
+          set _LINK_=/DEBUG:NONE /OPT:NOICF
+          cd tdesktop\Telegram
+          set attempt=0
+          :retry
+          set /a attempt+=1
+          cmake --build ..\out --config Release --target Telegram --parallel 1 >> ..\build.log 2>&1
+          if not errorlevel 1 goto built
+          if %attempt% GEQ 3 exit /b 1
+          echo build attempt %attempt% failed, resuming incrementally
+          goto retry
+          :built
+
+      - name: Save compiled objects cache
+        if: always() && (success() || failure())
+        shell: pwsh
+        run: |
+          if (Test-Path tdesktop/out/Telegram/Telegram.dir) {
+            (git -C tdesktop rev-parse HEAD) | Set-Content tdesktop/out/Telegram/Telegram.dir/built_sha.txt
+          }
+
+      - name: Upload compiled objects cache
+        if: always() && (success() || failure())
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            tdesktop/out/Telegram/Telegram.dir
+            tdesktop/out/Telegram/Telegram_autogen
+          key: win-out-v1-${{ github.run_id }}
+
+      - name: Show build errors
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "===== BUILD ERRORS ====="
+          Select-String -Path tdesktop/build.log -Pattern 'error C|error:|FAILED:|fatal error|LNK[0-9]+' |
+            Select-Object -First 30 |
+            ForEach-Object { $l = $_.Line; $l.Substring(0, [Math]::Min(300, $l.Length)) }
+          Write-Host "===== LAST LINES ====="
+          Get-Content tdesktop/build.log -Tail 15
+
+      - name: Collect the built executable
+        if: success()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Get-ChildItem tdesktop/out -Recurse -Include *.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Length -gt 30MB -and $_.FullName -notmatch 'CMakeFiles' } |
+            ForEach-Object { Write-Host ("{0} {1:N1} MB" -f $_.FullName, ($_.Length/1MB)); Copy-Item $_.FullName artifact }
+          Get-ChildItem artifact
+
+      - name: Upload LupinGram.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: LupinGram-Windows-x64
+          path: artifact/*.exe
+          if-no-files-found: error

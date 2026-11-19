@@ -82,11 +82,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "spellcheck/spellcheck_highlight_syntax.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/filters/filters_controller.h"
-#include "ayu/features/message_shot/message_shot.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/features/filters/filters_controller.h"
+#include "lupin/features/message_shot/message_shot.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "ui/emoji_config.h"
 
 
@@ -106,7 +106,7 @@ template <typename T>
 [[nodiscard]] bool ShowTtlMediaAsExpired(
 		not_null<HistoryItem*> item,
 		const MTPMessageMedia &media) {
-	if (AyuSettings::getInstance().saveDeletedMessages()) {
+	if (LupinSettings::getInstance().saveDeletedMessages()) {
 		return false;
 	}
 	if (item->out() || item->hasUnreadMediaFlag()) {
@@ -1840,7 +1840,7 @@ bool HistoryItem::isTtlCoveredMedia() const {
 		return false;
 	} else if (isBurnt()
 		&& !Has<HistoryServiceSelfDestruct>()
-		&& AyuSettings::getInstance().saveDeletedMessages()) {
+		&& LupinSettings::getInstance().saveDeletedMessages()) {
 		return false;
 	} else if (media->photo()) {
 		return true;
@@ -2258,8 +2258,8 @@ bool HistoryItem::isSponsored() const {
 	return _flags & MessageFlag::Sponsored;
 }
 
-bool HistoryItem::isAyuNoForwards() const {
-	return _flags & MessageFlag::AyuNoForwards;
+bool HistoryItem::isLupinNoForwards() const {
+	return _flags & MessageFlag::LupinNoForwards;
 }
 
 bool HistoryItem::canLookupMessageAuthor() const {
@@ -2891,7 +2891,7 @@ void HistoryItem::clearMediaAsExpired() {
 	}
 
 	unarmMediaDestroy();
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.saveDeletedMessages()) {
 		RemoveComponents(HistoryServiceSelfDestruct::Bit());
 		_history->owner().requestItemViewRefresh(this);
@@ -3734,11 +3734,11 @@ void HistoryItem::updateReactionsUnknown() {
 
 const std::vector<Data::MessageReaction> &HistoryItem::reactions() const {
 	static const auto kEmpty = std::vector<Data::MessageReaction>();
-	return _reactions && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Reactions) ? _reactions->list() : kEmpty;
+	return _reactions && !LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Reactions) ? _reactions->list() : kEmpty;
 }
 
 std::vector<Data::MessageReaction> HistoryItem::reactionsWithLocal() const {
-	if (!_reactions || AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Reactions)) {
+	if (!_reactions || LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Reactions)) {
 		return {};
 	}
 	auto result = _reactions->list();
@@ -4153,8 +4153,8 @@ void HistoryItem::setDeleted() {
 	}
 
 	if (isService()) {
-		const auto &settings = AyuSettings::getInstance();
-		setAyuHint(settings.deletedMark());
+		const auto &settings = LupinSettings::getInstance();
+		setLupinHint(settings.deletedMark());
 	} else {
 		history()->owner().requestItemViewRefresh(this);
 		history()->owner().requestItemResize(this);
@@ -4177,7 +4177,7 @@ void HistoryItem::markDeletedAnimated() {
 	_deletedAnimated = false;
 }
 
-void HistoryItem::setAyuHint(const QString &hint) {
+void HistoryItem::setLupinHint(const QString &hint) {
 	try {
 		auto msgsigned = Get<HistoryMessageSigned>();
 		if (hint.isEmpty()) {
@@ -4222,7 +4222,7 @@ void HistoryItem::setAyuHint(const QString &hint) {
 		history()->owner().requestItemViewRefresh(this);
 		history()->owner().requestItemResize(this);
 	} catch (...) {
-		DEBUG_LOG(("AyuGram: crash in setting hint"));
+		DEBUG_LOG(("LupinGram: crash in setting hint"));
 	}
 }
 
@@ -4655,7 +4655,7 @@ void HistoryItem::detectTextLinks(
 
 void HistoryItem::setText(TextWithEntities textWithEntities) {
 	auto text = textWithEntities;
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.filterZalgo()) {
 		text.text = filterZalgo(text.text);
 	}

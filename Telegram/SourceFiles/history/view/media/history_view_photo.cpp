@@ -45,9 +45,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/ui_integration.h"
 #include "styles/style_chat.h"
 
-// AyuGram includes
-#include "ayu/features/message_shot/message_shot.h"
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/features/message_shot/message_shot.h"
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace HistoryView {
@@ -431,7 +431,7 @@ void Photo::draw(Painter &p, const PaintContext &context) const {
 			p.setBrush(over ? st->msgDateImgBgOver() : st->msgDateImgBg());
 		}
 	}
-	if (paintInCenter && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (paintInCenter && !LupinFeatures::MessageShot::isTakingShot()) {
 		const auto radialOpacity = (radial && loaded && !_data->uploading())
 			? _animation->radial.opacity() :
 			1.;
@@ -899,7 +899,7 @@ void Photo::drawGrouped(
 			|| (!loaded && !_data->loading())
 			|| _data->waitingForAlbum()
 			|| ttlCovered);
-	if (paintInCenter && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (paintInCenter && !LupinFeatures::MessageShot::isTakingShot()) {
 		const auto radialOpacity = radial
 			? _animation->radial.opacity()
 			: 1.;
@@ -1014,11 +1014,11 @@ bool Photo::dataLoaded() const {
 }
 
 bool Photo::needInfoDisplay() const {
-	if (AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 		return false;
 	}
 
-	if (AyuFeatures::MessageShot::isTakingShot()) {
+	if (LupinFeatures::MessageShot::isTakingShot()) {
 		return true;
 	}
 

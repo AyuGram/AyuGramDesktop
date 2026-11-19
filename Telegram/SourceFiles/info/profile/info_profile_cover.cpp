@@ -21,10 +21,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ui/components/saved_music.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/ui/components/saved_music.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "ui/toast/toast.h"
 #include "ui/wrap/slide_wrap.h"
 

@@ -139,11 +139,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QAction>
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/utils/telegram_helpers.h"
-#include "styles/style_ayu_icons.h"
-#include "ayu/ui/context_menu/context_menu.h"
-#include "ayu/features/forward/ayu_forward.h"
+// LupinGram includes
+#include "lupin/utils/telegram_helpers.h"
+#include "styles/style_lupin_icons.h"
+#include "lupin/ui/context_menu/context_menu.h"
+#include "lupin/features/forward/lupin_forward.h"
 
 
 namespace Window {
@@ -1606,7 +1606,7 @@ void Filler::addToggleNoForwards() {
 			}
 		}).send();
 	};
-	const auto disabledNow = user->isAyuNoForwards();
+	const auto disabledNow = user->isLupinNoForwards();
 	_addAction(disabledNow
 		? tr::lng_enable_sharing(tr::now)
 		: tr::lng_disable_sharing(tr::now), [=] {
@@ -1921,7 +1921,7 @@ void Filler::fillContextMenuActions() {
 	}
 	addBanFromChannel();
 	addClearHistory();
-	AyuUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
+	LupinUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
 	addDeleteChat();
 	addLeaveChat();
 	addDeleteTopic();
@@ -1929,11 +1929,11 @@ void Filler::fillContextMenuActions() {
 
 void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
-	AyuUi::AddAyuGramActions(_peer, _thread, _controller, _addAction);
+	LupinUi::AddLupinGramActions(_peer, _thread, _controller, _addAction);
 	addCreateTopic();
 	addInfo();
-	AyuUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
-	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
+	LupinUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
+	LupinUi::AddOpenChannelAction(_peer, _controller, _addAction);
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();
@@ -1949,7 +1949,7 @@ void Filler::fillHistoryActions() {
 	addTranslate();
 	addReport();
 	addClearHistory();
-	AyuUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
+	LupinUi::AddDeleteOwnMessagesAction(_peer, _topic, _controller, _addAction);
 	addDeleteChat();
 	addLeaveChat();
 }
@@ -1970,8 +1970,8 @@ void Filler::fillProfileActions() {
 	addTopicLink();
 	addManageTopic();
 	addToggleTopicClosed();
-	AyuUi::AddOpenChannelAction(_peer, _controller, _addAction);
-	AyuUi::AddShadowBanAction(_peer, _addAction);
+	LupinUi::AddOpenChannelAction(_peer, _controller, _addAction);
+	LupinUi::AddShadowBanAction(_peer, _addAction);
 	addViewDiscussion();
 	addDirectMessages();
 	addExportChat();
@@ -1986,10 +1986,10 @@ void Filler::fillProfileActions() {
 }
 
 void Filler::fillRepliesActions() {
-	AyuUi::AddAyuGramActions(_peer, _thread, _controller, _addAction);
+	LupinUi::AddLupinGramActions(_peer, _thread, _controller, _addAction);
 	if (_topic) {
 		addInfo();
-		AyuUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
+		LupinUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);
 		addManageTopic();
 	}
 	addBoostChat();
@@ -3674,13 +3674,13 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 			options,
 			forwardOptions);
 		const auto items = history->owner().idsToItems(msgIds);
-		const auto ayuForwarding = AyuForward::isAyuForwardNeeded(items)
-			|| AyuForward::isFullAyuForwardNeeded(items.front());
+		const auto lupinForwarding = LupinForward::isLupinForwardNeeded(items)
+			|| LupinForward::isFullLupinForwardNeeded(items.front());
 
-		if ((!state->submit || ayuForwarding) && successCallback) {
+		if ((!state->submit || lupinForwarding) && successCallback) {
 			successCallback();
 		}
-		// AyuGram-changed
+		// LupinGram-changed
 	};
 
 	const auto sendMenuType = [=] {

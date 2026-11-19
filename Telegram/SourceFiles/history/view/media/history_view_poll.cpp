@@ -84,8 +84,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_polls.h"
 #include "styles/style_widgets.h"
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace HistoryView {

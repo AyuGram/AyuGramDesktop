@@ -20,8 +20,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "webrtc/webrtc_device_common.h"
 #include "window/section_widget.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
 
 
 namespace Core {
@@ -540,7 +540,7 @@ void Settings::addFromSerialized(const QByteArray &serialized) {
 		return;
 	}
 
-    AyuSettings::load();
+    LupinSettings::load();
 
 	QDataStream stream(serialized);
 	stream.setVersion(QDataStream::Qt_5_1);
@@ -1354,6 +1354,23 @@ std::optional<bool> Settings::readPrefImpl<bool>(std::string_view key) {
 template <>
 void Settings::writePrefImpl<bool>(std::string_view key, bool value) {
 	writePrefGeneric(key, value ? "\x1"_q : QByteArray());
+}
+
+template <>
+std::optional<int> Settings::readPrefImpl<int>(std::string_view key) {
+	if (const auto data = readPrefGeneric(key)) {
+		auto ok = false;
+		const auto value = data->toInt(&ok);
+		if (ok) {
+			return value;
+		}
+	}
+	return {};
+}
+
+template <>
+void Settings::writePrefImpl<int>(std::string_view key, int value) {
+	writePrefGeneric(key, QByteArray::number(value));
 }
 
 template <>

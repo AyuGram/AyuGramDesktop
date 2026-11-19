@@ -56,12 +56,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 #include <QtGui/QWindow>
 #include <QtGui/QScreen>
+#include <QShortcut>
 #include <QtGui/QDrag>
 
 #include <kurlmimedata.h>
 
-// AyuGram includes
-#include "ayu/ui/ayu_logo.h"
+// LupinGram includes
+#include "lupin/ui/lupin_logo.h"
+#include "lupin/ui/components/snow_overlay.h"
 
 
 namespace Window {
@@ -141,11 +143,11 @@ const char kOptionNewWindowsSizeAsFirst[] = "new-windows-size-as-first";
 const char kOptionDisableTouchbar[] = "touchbar-disabled";
 
 QImage Logo() {
-	return AyuAssets::currentAppLogo();
+	return LupinAssets::currentAppLogo();
 }
 
 QImage LogoNoMargin() {
-	return AyuAssets::currentAppLogo();
+	return LupinAssets::currentAppLogo();
 }
 
 const QImage &LogoTelegramDefault() {
@@ -583,6 +585,18 @@ void MainWindow::init() {
 
 	updateTitle();
 	updateWindowIcon();
+
+	LupinUi::AttachSnow(body());
+	LupinUi::SetSnowEnabled(
+		Core::App().settings().readPref<int>("lupin/themeIndex", 0) == 4);
+
+	const auto panic = new QShortcut(
+		QKeySequence(u"Ctrl+Shift+L"_q),
+		this);
+	panic->setContext(Qt::ApplicationShortcut);
+	QObject::connect(panic, &QShortcut::activated, this, [=] {
+		minimizeToTray();
+	});
 }
 
 void MainWindow::handleStateChanged(Qt::WindowState state) {
@@ -921,7 +935,7 @@ void MainWindow::updateTitle() {
 		: Dialogs::Key();
 	const auto thread = key ? key.thread() : nullptr;
 	if (!thread) {
-		setTitle((user.isEmpty() ? u"AyuGram"_q : user) + added + suffix);
+		setTitle((user.isEmpty() ? u"LupinGram"_q : user) + added + suffix);
 		return;
 	}
 	const auto history = thread->owningHistory();

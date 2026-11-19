@@ -22,8 +22,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "styles/style_settings.h"
 
-// AyuGram includes
-#include "ayu/ui/settings/settings_ayu_utils.h"
+// LupinGram includes
+#include "lupin/ui/settings/settings_lupin_utils.h"
 
 
 namespace Settings::Builder {

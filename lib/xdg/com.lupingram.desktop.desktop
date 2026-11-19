@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=LupinGram Desktop
+Comment=Desktop version of LupinGram - ToS breaking Telegram client
+TryExec=LupinGram
+Exec=env DESKTOPINTEGRATION=1 LupinGram -- %U
+Icon=com.lupingram.desktop
+Terminal=false
+StartupWMClass=LupinGram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;sms;telegram;tdesktop;
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=LupinGram -quit
+Name=Quit LupinGram
+Icon=application-exit

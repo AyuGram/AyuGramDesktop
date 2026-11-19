@@ -18,9 +18,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/translate_url_provider.h"
 #include "platform/platform_translate_provider.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/features/translator/ayu_translate_provider.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/features/translator/lupin_translate_provider.h"
 
 
 namespace {
@@ -33,7 +33,7 @@ base::options::option<QString> OptionTranslateUrlTemplate({
 });
 
 [[nodiscard]] TranslationProvider ResolveTranslateProvider() {
-	const auto provider = AyuSettings::getInstance().translationProvider();
+	const auto provider = LupinSettings::getInstance().translationProvider();
 	if ((provider == TranslationProvider::Native)
 		&& !Platform::IsTranslateProviderAvailable()) {
 		return TranslationProvider::Telegram;
@@ -56,7 +56,7 @@ std::unique_ptr<TranslateProvider> CreateTranslateProvider(
 	switch (provider) {
 	case TranslationProvider::Google:
 	case TranslationProvider::Yandex:
-		return CreateAyuTranslateProvider(session, provider);
+		return CreateLupinTranslateProvider(session, provider);
 	case TranslationProvider::Native:
 		if (auto native = Platform::CreateTranslateProvider()) {
 			return native;

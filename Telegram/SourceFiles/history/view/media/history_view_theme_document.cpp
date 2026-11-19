@@ -44,8 +44,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
 
-// AyuGram includes
-#include "ayu/features/message_shot/message_shot.h"
+// LupinGram includes
+#include "lupin/features/message_shot/message_shot.h"
 
 
 namespace HistoryView {
@@ -272,7 +272,7 @@ void ThemeDocument::draw(Painter &p, const PaintContext &context) const {
 			p.setPen(st->msgDateImgFg());
 			p.drawTextLeft(statusX, statusY, width(), _statusText, statusW - 2 * st::msgDateImgPadding.x());
 		}
-		if ((radial || (!loaded && !_data->loading())) && !AyuFeatures::MessageShot::isTakingShot()) {
+		if ((radial || (!loaded && !_data->loading())) && !LupinFeatures::MessageShot::isTakingShot()) {
 			const auto radialOpacity = (radial && loaded && !_data->uploading())
 				? _animation->radial.opacity() :
 				1.;

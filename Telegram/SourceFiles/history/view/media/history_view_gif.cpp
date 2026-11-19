@@ -69,8 +69,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QSvgRenderer>
 #include <QtWidgets/QApplication>
 
-// AyuGram includes
-#include "ayu/features/message_shot/message_shot.h"
+// LupinGram includes
+#include "lupin/features/message_shot/message_shot.h"
 
 
 namespace HistoryView {
@@ -834,7 +834,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			|| (!streamingMode
 				&& ((!loaded && !_data->loading()) || !autoplay))
 			|| ttlCovered);
-	if (paintInCenter && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (paintInCenter && !LupinFeatures::MessageShot::isTakingShot()) {
 		const auto radialRevealed = 1.;
 		const auto opacity = (item->isSending() || _data->uploading())
 			? 1.
@@ -913,7 +913,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			return spoilerTagBackground();
 		});
 	}
-	if (displayMute && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (displayMute && !LupinFeatures::MessageShot::isTakingShot()) {
 		auto muteRect = style::rtlrect(rthumb.x() + (rthumb.width() - st::historyVideoMessageMuteSize) / 2, rthumb.y() + st::msgDateImgDelta, st::historyVideoMessageMuteSize, st::historyVideoMessageMuteSize, width());
 		p.setPen(Qt::NoPen);
 		p.setBrush(sti->msgDateImgBg);
@@ -929,7 +929,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 		drawPurchasedTag(p, rthumb, context);
 	}
 
-	if (!unwrapped && !skipDrawingSurrounding && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (!unwrapped && !skipDrawingSurrounding && !LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 		const auto sponsoredSkip = !_data->isVideoFile()
 			&& _realParent->isSponsored();
 		if ((!isRound || !inWebPage) && !sponsoredSkip) {
@@ -940,7 +940,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			}
 		}
 	} else if (!skipDrawingSurrounding) {
-		if (isRound && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+		if (isRound && !LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 			const auto mediaUnread = item->hasUnreadMediaFlag();
 			const auto statusText = _seeking
 				? Ui::FormatDurationText(1 + int64(base::SafeRound(
@@ -1059,7 +1059,7 @@ void Gif::draw(Painter &p, const PaintContext &context) const {
 			}
 		}
 	}
-	if (!inWebPage && !skipDrawingSurrounding && !AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (!inWebPage && !skipDrawingSurrounding && !LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 		auto fullRight = paintx + usex + usew;
 		auto fullBottom = painty + painth;
 		auto maxRight = _parent->width() - st::msgMargin.left();
@@ -1364,10 +1364,10 @@ void Gif::drawCornerStatus(
 		.radial = ((_animation && _animation->radial.animating())
 			? &_animation->radial
 			: nullptr),
-		.download = download && !AyuFeatures::MessageShot::isTakingShot(),
+		.download = download && !LupinFeatures::MessageShot::isTakingShot(),
 		.loading = _data->loading(),
 		.mute = (_streamed && _data->isVideoFile() && !download
-			&& !AyuFeatures::MessageShot::isTakingShot()),
+			&& !LupinFeatures::MessageShot::isTakingShot()),
 	});
 }
 
@@ -1903,7 +1903,7 @@ void Gif::drawGrouped(
 		&& (radial
 			|| (!streamingMode
 				&& ((!loaded && !_data->loading()) || !autoplay)));
-	if (paintInCenter && !AyuFeatures::MessageShot::isTakingShot()) {
+	if (paintInCenter && !LupinFeatures::MessageShot::isTakingShot()) {
 		const auto radialRevealed = 1.;
 		const auto opacity = (item->isSending() || _data->uploading())
 			? 1.
@@ -2724,7 +2724,7 @@ bool Gif::needInfoDisplay() const {
 }
 
 bool Gif::needCornerStatusDisplay() const {
-	if (AyuFeatures::MessageShot::ignoreRender(AyuFeatures::MessageShot::RenderPart::Date)) {
+	if (LupinFeatures::MessageShot::ignoreRender(LupinFeatures::MessageShot::RenderPart::Date)) {
 		return false;
 	}
 
@@ -2733,7 +2733,7 @@ bool Gif::needCornerStatusDisplay() const {
 }
 
 void Gif::ensureTranscribeButton() const {
-	if (AyuFeatures::MessageShot::isTakingShot()) {
+	if (LupinFeatures::MessageShot::isTakingShot()) {
 		_transcribe = nullptr;
 		return;
 	}

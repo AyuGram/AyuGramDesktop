@@ -108,9 +108,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTextEdit>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "base/platform/base_platform_haptic.h"
 
 
@@ -1120,7 +1120,7 @@ void Widget::chosenRow(const ChosenRow &row) {
 		&& (row.message.fullId.msg == ShowAtUnreadMsgId)
 		&& history->peer->hasActiveStories()
 		&& !history->peer->isSelf()
-		&& !AyuSettings::getInstance().disableStories()) {
+		&& !LupinSettings::getInstance().disableStories()) {
 		controller()->openPeerStories(history->peer->id);
 		return;
 	} else if (userpicCommunity) {
@@ -1763,7 +1763,7 @@ void Widget::setupMainMenuToggle() {
 			? &st::dialogsMenuToggleUnread
 			: &st::dialogsMenuToggleUnreadMuted;
 
-		const auto &settings = AyuSettings::getInstance();
+		const auto &settings = LupinSettings::getInstance();
 		if (settings.hideNotificationCounters()) {
 			icon = nullptr;
 		}
@@ -1773,8 +1773,8 @@ void Widget::setupMainMenuToggle() {
 }
 
 void Widget::setupStories() {
-	// AyuGram disableStories
-	const auto &settings = AyuSettings::getInstance();
+	// LupinGram disableStories
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.disableStories()) {
 		return;
 	}
@@ -2693,7 +2693,7 @@ void Widget::checkUpdateStatus() {
 		}
 		_updateTelegram.create(
 			this,
-			tr::ayu_UpdateAyuGram(tr::now),
+			tr::lupin_UpdateLupinGram(tr::now),
 			st::dialogsUpdateButton,
 			st::dialogsInstallUpdate,
 			st::dialogsInstallUpdateOver,
@@ -2903,7 +2903,7 @@ void Widget::updateStoriesVisibility() {
 		return;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.disableStories()) {
 		_stories->setVisible(false);
 		return;

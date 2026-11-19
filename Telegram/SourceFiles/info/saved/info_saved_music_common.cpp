@@ -21,11 +21,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "ui/vertical_list.h"
 
-// AyuGram includes
+// LupinGram includes
 #include "lang_auto.h"
-#include "ayu/ayu_settings.h"
-#include "ayu/ui/components/saved_music.h"
-#include "ayu/utils/telegram_helpers.h"
+#include "lupin/lupin_settings.h"
+#include "lupin/ui/components/saved_music.h"
+#include "lupin/utils/telegram_helpers.h"
 #include "data/data_document.h"
 #include "styles/style_menu_icons.h"
 #include "ui/widgets/popup_menu.h"
@@ -86,9 +86,9 @@ rpl::producer<bool> SetupSavedMusic(
 			if (const auto document = item->media()
 					? item->media()->document()
 					: nullptr) {
-				auto musicButton = divider->entity()->add(object_ptr<Ui::SlideWrap<Profile::AyuMusicButton>>(
+				auto musicButton = divider->entity()->add(object_ptr<Ui::SlideWrap<Profile::LupinMusicButton>>(
 					divider->entity(),
-					object_ptr<Profile::AyuMusicButton>(
+					object_ptr<Profile::LupinMusicButton>(
 						divider->entity(),
 						DocumentMusicButtonData(document, item),
 						color,
@@ -106,7 +106,7 @@ rpl::producer<bool> SetupSavedMusic(
 					return mouseButton == Qt::RightButton;
 				}) | rpl::on_next([=]
 										  {
-											  const auto &settings = AyuSettings::getInstance();
+											  const auto &settings = LupinSettings::getInstance();
 
 											  const auto contextMenu = new Ui::PopupMenu(
 												  nullptr,
@@ -115,11 +115,11 @@ rpl::producer<bool> SetupSavedMusic(
 
 											  contextMenu->addAction(
 												  settings.adaptiveCoverColor()
-													  ? tr::ayu_DisableColorfulCover(tr::now)
-													  : tr::ayu_EnableColorfulCover(tr::now),
+													  ? tr::lupin_DisableColorfulCover(tr::now)
+													  : tr::lupin_EnableColorfulCover(tr::now),
 												  [=]
 												  {
-													  AyuSettings::getInstance().setAdaptiveCoverColor(!AyuSettings::getInstance().adaptiveCoverColor());
+													  LupinSettings::getInstance().setAdaptiveCoverColor(!LupinSettings::getInstance().adaptiveCoverColor());
 
 													  const auto mediaRefreshed = item ? item->media() : nullptr;
 													  const auto documentRefreshed = mediaRefreshed

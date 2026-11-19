@@ -102,10 +102,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMimeData>
 #include <unordered_map>
 
-// AyuGram includes
-#include "ayu/ui/ayu_userpic.h"
-#include "ayu/utils/telegram_helpers.h"
-#include "styles/style_ayu_icons.h"
+// LupinGram includes
+#include "lupin/ui/lupin_userpic.h"
+#include "lupin/utils/telegram_helpers.h"
+#include "styles/style_lupin_icons.h"
 
 
 namespace Dialogs {
@@ -1486,7 +1486,7 @@ void InnerWidget::paintEvent(QPaintEvent *e) {
 			p.fillRect(0, 0, fullWidth, st::searchedBarHeight, st::searchedBarBg);
 			p.setFont(st::searchedBarFont);
 			p.setPen(st::searchedBarFg);
-			p.drawTextLeft(st::searchedBarPosition.x(), st::searchedBarPosition.y(), width(), tr::ayu_SearchByIDResults(tr::now));
+			p.drawTextLeft(st::searchedBarPosition.x(), st::searchedBarPosition.y(), width(), tr::lupin_SearchByIDResults(tr::now));
 			p.translate(0, st::searchedBarHeight);
 
 			auto skip = idSearchOffset();

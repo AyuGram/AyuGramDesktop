@@ -1,8 +1,8 @@
-#define MyAppShortName "AyuGram"
-#define MyAppName "AyuGram Desktop"
+#define MyAppShortName "LupinGram"
+#define MyAppName "LupinGram Desktop"
 #define MyAppPublisher "Radolyn Labs"
-#define MyAppURL "https://github.com/AyuGram"
-#define MyAppExeName "AyuGram.exe"
+#define MyAppURL "https://github.com/8kfdy49fd8-debug"
+#define MyAppExeName "LupinGram.exe"
 #define MyAppId "53F49750-6209-4FBF-9CA8-7A333C87D666"
 #define CurrentYear GetDateTimeString('yyyy','','')
 
@@ -38,11 +38,11 @@ SignTool=sha256
 
 #ifndef MyOutputBaseFilename
   #if MyBuildTarget == "winarm"
-    #define MyOutputBaseFilename "ayusetup-arm64." + MyAppVersionFull
+    #define MyOutputBaseFilename "lupinsetup-arm64." + MyAppVersionFull
   #elif MyBuildTarget == "win64"
-    #define MyOutputBaseFilename "ayusetup-x64." + MyAppVersionFull
+    #define MyOutputBaseFilename "lupinsetup-x64." + MyAppVersionFull
   #else
-    #define MyOutputBaseFilename "ayusetup." + MyAppVersionFull
+    #define MyOutputBaseFilename "lupinsetup." + MyAppVersionFull
   #endif
 #endif
 OutputBaseFilename={#MyOutputBaseFilename}

@@ -2154,11 +2154,11 @@ void RegisterSettingsHandlers(Router &router) {
 QString SettingsDeepLink(
 		::Settings::Type section,
 		const QString &controlId) {
-	const auto ayuPrefix = u"ayu/"_q;
-	if (controlId.size() > ayuPrefix.size()
-		&& controlId.startsWith(ayuPrefix)) {
-		return u"https://t.me/ayuSettings?s="_q
-			+ controlId.mid(ayuPrefix.size());
+	const auto lupinPrefix = u"lupin/"_q;
+	if (controlId.size() > lupinPrefix.size()
+		&& controlId.startsWith(lupinPrefix)) {
+		return u"https://lupingram.invalid/settings?s="_q
+			+ controlId.mid(lupinPrefix.size());
 	}
 	const auto &router = Router::Instance();
 	const auto sectionPath = [&] {

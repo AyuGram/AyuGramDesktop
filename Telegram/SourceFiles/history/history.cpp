@@ -83,9 +83,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qt/qt_common_adapters.h"
 #include "styles/style_dialogs.h"
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_state.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_state.h"
 
 
 namespace {
@@ -685,7 +685,7 @@ not_null<HistoryItem*> History::insertItem(
 void History::destroyMessage(not_null<HistoryItem*> item) {
 	// Expects(item->isHistoryEntry() || !item->mainView());
 	if (!(item->isHistoryEntry() || !item->mainView())) {
-		return; // AyuGram: fix crash when using `saveDeletedMessages`
+		return; // LupinGram: fix crash when using `saveDeletedMessages`
 	}
 
 	if (item->isHistoryEntry()) {
@@ -2833,7 +2833,7 @@ Dialogs::UnreadState History::computeUnreadState() const {
 	result.marks = mark ? 1 : 0;
 	result.mentions = unreadMentions().has() ? 1 : 0;
 	const auto peer = this->peer.get();
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	const auto hideReactions = (peer->isChannel() && !peer->isMegagroup() && !settings.showChannelReactions())
 		|| (peer->isMegagroup() && !settings.showGroupReactions())
 		|| (peer->isUser() && !settings.showPrivateChatReactions());

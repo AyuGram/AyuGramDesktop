@@ -45,9 +45,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDateTime>
 #include <QtCore/QLocale>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ayu_url_handlers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/lupin_url_handlers.h"
 
 
 namespace {
@@ -317,8 +317,8 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 			|| (HiddenUrlRequiresConfirmation(parsedUrl)
 				&& !skipConfirmation);
 		const auto skipWarning
-			= AyuSettings::getInstance().disableOpenLinkWarning()
-			&& AyuUrlHandlers::IsWebUrl(parsedUrl);
+			= LupinSettings::getInstance().disableOpenLinkWarning()
+			&& LupinUrlHandlers::IsWebUrl(parsedUrl);
 		if (!skipWarning && requiresConfirmation) {
 			if (!my.show) {
 				Core::App().hideMediaView();

@@ -80,8 +80,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtGui/QGuiApplication>
 
-// AyuGram includes
-#include "ayu/ayu_url_handlers.h"
+// LupinGram includes
+#include "lupin/lupin_url_handlers.h"
 
 
 namespace Core {
@@ -1851,27 +1851,27 @@ const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 		},
 		{
 			u"^user\\?(.+)(#|$)"_q,
-			AyuUrlHandlers::ResolveUser
+			LupinUrlHandlers::ResolveUser
 		},
 		{
 			u"^chat\\?(.+)(#|$)"_q,
-			AyuUrlHandlers::ResolveChat
+			LupinUrlHandlers::ResolveChat
 		},
 		{
-			u"^ayusettings/?\\?(.+)(#|$)"_q,
-			AyuUrlHandlers::HandleAyuSettings
+			u"^lupinsettings/?\\?(.+)(#|$)"_q,
+			LupinUrlHandlers::HandleLupinSettings
 		},
 		{
-			u"^ayusettings/?$"_q,
-			AyuUrlHandlers::HandleAyuSettings
+			u"^lupinsettings/?$"_q,
+			LupinUrlHandlers::HandleLupinSettings
 		},
 		{
-			u"^ayu(/?.+)?(#|$)"_q,
-			AyuUrlHandlers::HandleAyu
+			u"^lupin(/?.+)?(#|$)"_q,
+			LupinUrlHandlers::HandleLupin
 		},
 		{
 			u"^(support)|(donate)$"_q,
-			AyuUrlHandlers::HandleSupport
+			LupinUrlHandlers::HandleSupport
 		},
 		{
 			u"^([^\\?]+)(\\?|#|$)"_q,
@@ -2084,9 +2084,9 @@ QString TryConvertUrlToLocal(QString url) {
 				added = u"&post="_q + postMatch->captured(1);
 			}
 			return base + added + (params.isEmpty() ? QString() : '&' + params);
-		} else if (const auto ayuSettingsMatch = regex_match(
-			u"^(?:ayuSettings|exteraSettings)/?\\?(.+)$"_q, query, matchOptions)) {
-			return u"tg://ayusettings?"_q + ayuSettingsMatch->captured(1);
+		} else if (const auto lupinSettingsMatch = regex_match(
+			u"^(?:lupinSettings|exteraSettings)/?\\?(.+)$"_q, query, matchOptions)) {
+			return u"tg://lupinsettings?"_q + lupinSettingsMatch->captured(1);
 		} else if (const auto usernameMatch = regex_match(u"^"
 			"([a-zA-Z0-9\\.\\_]+)"
 			"("

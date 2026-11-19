@@ -21,9 +21,9 @@ add_subdirectory(lib_webrtc)
 add_subdirectory(lib_webview)
 add_subdirectory(codegen)
 
-# AyuGram filters
+# LupinGram filters
 add_subdirectory(lib_icu)
-# AyuGram filters
+# LupinGram filters
 
 get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
@@ -103,155 +103,159 @@ PRIVATE
     desktop-app::external_openal
     desktop-app::external_xxhash
 
-    # AyuGram filters
+    # LupinGram filters
     ayugram::lib_icu
 )
 
-set(ayugram_files
-        ayu/ayu_worker.cpp
-        ayu/ayu_worker.h
-        ayu/ayu_url_handlers.cpp
-        ayu/ayu_url_handlers.h
-        ayu/ayu_state.cpp
-        ayu/ayu_state.h
-        ayu/ayu_settings.cpp
-        ayu/ayu_settings.h
-        ayu/ayu_lang.cpp
-        ayu/ayu_lang.h
-        ayu/ayu_infra.cpp
-        ayu/ayu_infra.h
-        ayu/utils/ayu_mapper.cpp
-        ayu/utils/ayu_mapper.h
-        ayu/utils/qt_key_modifiers_extended.h
-        ayu/utils/telegram_helpers.cpp
-        ayu/utils/telegram_helpers.h
-        ayu/utils/windows_utils.cpp
-        ayu/utils/windows_utils.h
-        ayu/utils/rc_manager.cpp
-        ayu/utils/rc_manager.h
-        ayu/ui/ayu_logo.cpp
-        ayu/ui/ayu_logo.h
-        ayu/ui/toasts.cpp
-        ayu/ui/toasts.h
-        ayu/ui/ayu_userpic.cpp
-        ayu/ui/ayu_userpic.h
-        ayu/ui/utils/ayu_profile_values.cpp
-        ayu/ui/utils/ayu_profile_values.h
-        ayu/ui/utils/color_cut_quantizer.cpp
-        ayu/ui/utils/color_cut_quantizer.h
-        ayu/ui/utils/color_utils.cpp
-        ayu/ui/utils/color_utils.h
-        ayu/ui/utils/palette.cpp
-        ayu/ui/utils/palette.h
-        ayu/ui/utils/itunes_search.cpp
-        ayu/ui/utils/itunes_search.h
-        ayu/ui/settings/ayu_builder.cpp
-        ayu/ui/settings/ayu_builder.h
-        ayu/ui/settings/settings_appearance.cpp
-        ayu/ui/settings/settings_appearance.h
-        ayu/ui/settings/settings_ayu_utils.cpp
-        ayu/ui/settings/settings_ayu_utils.h
-        ayu/ui/settings/settings_chats.cpp
-        ayu/ui/settings/settings_chats.h
-        ayu/ui/settings/settings_general.cpp
-        ayu/ui/settings/settings_general.h
-        ayu/ui/settings/settings_ayu.cpp
-        ayu/ui/settings/settings_ayu.h
-        ayu/ui/settings/settings_filters.cpp
-        ayu/ui/settings/settings_filters.h
-        ayu/ui/settings/settings_main.cpp
-        ayu/ui/settings/settings_main.h
-        ayu/ui/settings/settings_other.cpp
-        ayu/ui/settings/settings_other.h
-        ayu/ui/settings/filters/settings_filters_list.cpp
-        ayu/ui/settings/filters/settings_filters_list.h
-        ayu/ui/settings/filters/per_dialog_filter.cpp
-        ayu/ui/settings/filters/per_dialog_filter.h
-        ayu/ui/settings/filters/edit_filter.cpp
-        ayu/ui/settings/filters/edit_filter.h
-        ayu/ui/context_menu/context_menu.cpp
-        ayu/ui/context_menu/context_menu.h
-        ayu/ui/context_menu/menu_item_subtext.cpp
-        ayu/ui/context_menu/menu_item_subtext.h
-        ayu/ui/message_history/history_inner.cpp
-        ayu/ui/message_history/history_inner.h
-        ayu/ui/message_history/history_item.cpp
-        ayu/ui/message_history/history_item.h
-        ayu/ui/message_history/history_section.cpp
-        ayu/ui/message_history/history_section.h
-        ayu/ui/boxes/edit_mark_box.cpp
-        ayu/ui/boxes/edit_mark_box.h
-        ayu/ui/boxes/font_selector.cpp
-        ayu/ui/boxes/font_selector.h
-        ayu/ui/boxes/import_filters_box.cpp
-        ayu/ui/boxes/import_filters_box.h
-        ayu/ui/boxes/theme_selector_box.cpp
-        ayu/ui/boxes/theme_selector_box.h
-        ayu/ui/boxes/message_shot_box.cpp
-        ayu/ui/boxes/message_shot_box.h
-        ayu/ui/boxes/donate_qr_box.cpp
-        ayu/ui/boxes/donate_qr_box.h
-        ayu/ui/boxes/donate_info_box.cpp
-        ayu/ui/boxes/donate_info_box.h
-        ayu/ui/boxes/plugin_info_box.cpp
-        ayu/ui/boxes/plugin_info_box.h
-        ayu/ui/components/image_view.cpp
-        ayu/ui/components/image_view.h
-        ayu/ui/components/icon_picker.cpp
-        ayu/ui/components/icon_picker.h
-        ayu/ui/components/avatar_corners_preview.cpp
-        ayu/ui/components/avatar_corners_preview.h
-        ayu/ui/components/message_preview.cpp
-        ayu/ui/components/message_preview.h
-        ayu/ui/components/saved_music.cpp
-        ayu/ui/components/saved_music.h
-        ayu/libs/json.hpp
-        ayu/libs/json_ext.hpp
-        ayu/libs/sqlite/sqlite3.c
-        ayu/libs/sqlite/sqlite3.h
-        ayu/libs/sqlite/sqlite_orm.h
-        ayu/features/streamer_mode/platform/linux/streamer_mode_linux.cpp
-        ayu/features/streamer_mode/platform/linux/streamer_mode_linux.h
-        ayu/features/streamer_mode/platform/mac/streamer_mode_mac.mm
-        ayu/features/streamer_mode/platform/mac/streamer_mode_mac.h
-        ayu/features/streamer_mode/platform/win/streamer_mode_win.cpp
-        ayu/features/streamer_mode/platform/win/streamer_mode_win.h
-        ayu/features/streamer_mode/platform/platform_streamer_mode.h
-        ayu/features/streamer_mode/streamer_mode.cpp
-        ayu/features/streamer_mode/streamer_mode.h
-        ayu/features/message_shot/message_shot.cpp
-        ayu/features/message_shot/message_shot.h
-        ayu/features/message_shot/message_shot_theme_state.cpp
-        ayu/features/message_shot/message_shot_theme_state.h
-        ayu/features/forward/ayu_forward.cpp
-        ayu/features/forward/ayu_forward.h
-        ayu/features/forward/ayu_forward_rich.cpp
-        ayu/features/forward/ayu_forward_rich.h
-        ayu/features/forward/ayu_sync.cpp
-        ayu/features/forward/ayu_sync.h
-        ayu/features/translator/ayu_translator.cpp
-        ayu/features/translator/ayu_translator.h
-        ayu/features/translator/ayu_translate_provider.cpp
-        ayu/features/translator/ayu_translate_provider.h
-        ayu/features/translator/html_parser.cpp
-        ayu/features/translator/html_parser.h
-        ayu/features/translator/implementations/google.cpp
-        ayu/features/translator/implementations/google.h
-        ayu/features/translator/implementations/yandex.cpp
-        ayu/features/translator/implementations/yandex.h
-        ayu/features/translator/implementations/base.cpp
-        ayu/features/translator/implementations/base.h
-        ayu/features/filters/filters_controller.cpp
-        ayu/features/filters/filters_controller.h
-        ayu/features/filters/filters_cache_controller.cpp
-        ayu/features/filters/filters_cache_controller.h
-        ayu/features/filters/filters_utils.cpp
-        ayu/features/filters/filters_utils.h
-        ayu/data/messages_storage.cpp
-        ayu/data/messages_storage.h
-        ayu/data/entities.h
-        ayu/data/ayu_database.cpp
-        ayu/data/ayu_database.h
+set(lupingram_files
+        lupin/lupin_worker.cpp
+        lupin/lupin_worker.h
+        lupin/lupin_url_handlers.cpp
+        lupin/lupin_url_handlers.h
+        lupin/lupin_state.cpp
+        lupin/lupin_state.h
+        lupin/lupin_settings.cpp
+        lupin/lupin_settings.h
+        lupin/lupin_gatekeeper.cpp
+        lupin/lupin_gatekeeper.h
+        lupin/lupin_lang.cpp
+        lupin/lupin_lang.h
+        lupin/lupin_infra.cpp
+        lupin/lupin_infra.h
+        lupin/utils/lupin_mapper.cpp
+        lupin/utils/lupin_mapper.h
+        lupin/utils/qt_key_modifiers_extended.h
+        lupin/utils/telegram_helpers.cpp
+        lupin/utils/telegram_helpers.h
+        lupin/utils/windows_utils.cpp
+        lupin/utils/windows_utils.h
+        lupin/utils/rc_manager.cpp
+        lupin/utils/rc_manager.h
+        lupin/ui/lupin_logo.cpp
+        lupin/ui/lupin_logo.h
+        lupin/ui/toasts.cpp
+        lupin/ui/toasts.h
+        lupin/ui/lupin_userpic.cpp
+        lupin/ui/lupin_userpic.h
+        lupin/ui/utils/lupin_profile_values.cpp
+        lupin/ui/utils/lupin_profile_values.h
+        lupin/ui/utils/color_cut_quantizer.cpp
+        lupin/ui/utils/color_cut_quantizer.h
+        lupin/ui/utils/color_utils.cpp
+        lupin/ui/utils/color_utils.h
+        lupin/ui/utils/palette.cpp
+        lupin/ui/utils/palette.h
+        lupin/ui/utils/itunes_search.cpp
+        lupin/ui/utils/itunes_search.h
+        lupin/ui/settings/lupin_builder.cpp
+        lupin/ui/settings/lupin_builder.h
+        lupin/ui/settings/settings_appearance.cpp
+        lupin/ui/settings/settings_appearance.h
+        lupin/ui/settings/settings_lupin_utils.cpp
+        lupin/ui/settings/settings_lupin_utils.h
+        lupin/ui/settings/settings_chats.cpp
+        lupin/ui/settings/settings_chats.h
+        lupin/ui/settings/settings_general.cpp
+        lupin/ui/settings/settings_general.h
+        lupin/ui/settings/settings_lupin.cpp
+        lupin/ui/settings/settings_lupin.h
+        lupin/ui/settings/settings_filters.cpp
+        lupin/ui/settings/settings_filters.h
+        lupin/ui/settings/settings_main.cpp
+        lupin/ui/settings/settings_main.h
+        lupin/ui/settings/settings_other.cpp
+        lupin/ui/settings/settings_other.h
+        lupin/ui/settings/filters/settings_filters_list.cpp
+        lupin/ui/settings/filters/settings_filters_list.h
+        lupin/ui/settings/filters/per_dialog_filter.cpp
+        lupin/ui/settings/filters/per_dialog_filter.h
+        lupin/ui/settings/filters/edit_filter.cpp
+        lupin/ui/settings/filters/edit_filter.h
+        lupin/ui/context_menu/context_menu.cpp
+        lupin/ui/context_menu/context_menu.h
+        lupin/ui/context_menu/menu_item_subtext.cpp
+        lupin/ui/context_menu/menu_item_subtext.h
+        lupin/ui/message_history/history_inner.cpp
+        lupin/ui/message_history/history_inner.h
+        lupin/ui/message_history/history_item.cpp
+        lupin/ui/message_history/history_item.h
+        lupin/ui/message_history/history_section.cpp
+        lupin/ui/message_history/history_section.h
+        lupin/ui/boxes/edit_mark_box.cpp
+        lupin/ui/boxes/edit_mark_box.h
+        lupin/ui/boxes/font_selector.cpp
+        lupin/ui/boxes/font_selector.h
+        lupin/ui/boxes/import_filters_box.cpp
+        lupin/ui/boxes/import_filters_box.h
+        lupin/ui/boxes/theme_selector_box.cpp
+        lupin/ui/boxes/theme_selector_box.h
+        lupin/ui/boxes/message_shot_box.cpp
+        lupin/ui/boxes/message_shot_box.h
+        lupin/ui/boxes/donate_qr_box.cpp
+        lupin/ui/boxes/donate_qr_box.h
+        lupin/ui/boxes/donate_info_box.cpp
+        lupin/ui/boxes/donate_info_box.h
+        lupin/ui/boxes/plugin_info_box.cpp
+        lupin/ui/boxes/plugin_info_box.h
+        lupin/ui/components/image_view.cpp
+        lupin/ui/components/image_view.h
+        lupin/ui/components/icon_picker.cpp
+        lupin/ui/components/icon_picker.h
+        lupin/ui/components/snow_overlay.cpp
+        lupin/ui/components/snow_overlay.h
+        lupin/ui/components/avatar_corners_preview.cpp
+        lupin/ui/components/avatar_corners_preview.h
+        lupin/ui/components/message_preview.cpp
+        lupin/ui/components/message_preview.h
+        lupin/ui/components/saved_music.cpp
+        lupin/ui/components/saved_music.h
+        lupin/libs/json.hpp
+        lupin/libs/json_ext.hpp
+        lupin/libs/sqlite/sqlite3.c
+        lupin/libs/sqlite/sqlite3.h
+        lupin/libs/sqlite/sqlite_orm.h
+        lupin/features/streamer_mode/platform/linux/streamer_mode_linux.cpp
+        lupin/features/streamer_mode/platform/linux/streamer_mode_linux.h
+        lupin/features/streamer_mode/platform/mac/streamer_mode_mac.mm
+        lupin/features/streamer_mode/platform/mac/streamer_mode_mac.h
+        lupin/features/streamer_mode/platform/win/streamer_mode_win.cpp
+        lupin/features/streamer_mode/platform/win/streamer_mode_win.h
+        lupin/features/streamer_mode/platform/platform_streamer_mode.h
+        lupin/features/streamer_mode/streamer_mode.cpp
+        lupin/features/streamer_mode/streamer_mode.h
+        lupin/features/message_shot/message_shot.cpp
+        lupin/features/message_shot/message_shot.h
+        lupin/features/message_shot/message_shot_theme_state.cpp
+        lupin/features/message_shot/message_shot_theme_state.h
+        lupin/features/forward/lupin_forward.cpp
+        lupin/features/forward/lupin_forward.h
+        lupin/features/forward/lupin_forward_rich.cpp
+        lupin/features/forward/lupin_forward_rich.h
+        lupin/features/forward/lupin_sync.cpp
+        lupin/features/forward/lupin_sync.h
+        lupin/features/translator/lupin_translator.cpp
+        lupin/features/translator/lupin_translator.h
+        lupin/features/translator/lupin_translate_provider.cpp
+        lupin/features/translator/lupin_translate_provider.h
+        lupin/features/translator/html_parser.cpp
+        lupin/features/translator/html_parser.h
+        lupin/features/translator/implementations/google.cpp
+        lupin/features/translator/implementations/google.h
+        lupin/features/translator/implementations/yandex.cpp
+        lupin/features/translator/implementations/yandex.h
+        lupin/features/translator/implementations/base.cpp
+        lupin/features/translator/implementations/base.h
+        lupin/features/filters/filters_controller.cpp
+        lupin/features/filters/filters_controller.h
+        lupin/features/filters/filters_cache_controller.cpp
+        lupin/features/filters/filters_cache_controller.h
+        lupin/features/filters/filters_utils.cpp
+        lupin/features/filters/filters_utils.h
+        lupin/data/messages_storage.cpp
+        lupin/data/messages_storage.h
+        lupin/data/entities.h
+        lupin/data/lupin_database.cpp
+        lupin/data/lupin_database.h
 
         info/profile/info_profile_music_button.cpp
         info/profile/info_profile_music_button.h
@@ -265,7 +269,7 @@ target_precompile_headers(Telegram PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${sr
 nice_target_sources(Telegram ${src_loc}
 PRIVATE
     ${style_files}
-    ${ayugram_files}
+    ${lupingram_files}
 
     api/api_attached_stickers.cpp
     api/api_attached_stickers.h
@@ -2379,7 +2383,7 @@ endif()
 
 nice_target_sources(Telegram ${res_loc}
 PRIVATE
-    qrc/ayu/ayu.qrc
+    qrc/lupin/lupin.qrc
 
     qrc/emoji_1.qrc
     qrc/emoji_2.qrc
@@ -2442,7 +2446,7 @@ elseif (APPLE)
 
     set(icons_path ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets)
     if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(ayugram_icons
+        set(lupingram_icons
             Default
             Alt
             Discord
@@ -2457,7 +2461,7 @@ elseif (APPLE)
             Extera2
         )
 
-        foreach (icon ${ayugram_icons})
+        foreach (icon ${lupingram_icons})
             target_add_resource(Telegram "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/AppIcon-${icon}.icon")
             set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Telegram/AppIcon-${icon}.icon" PROPERTIES
                     XCODE_EXPLICIT_FILE_TYPE "folder.iconcomposer.icon"
@@ -2566,12 +2570,12 @@ if (build_macstore)
     )
 else()
     if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(bundle_identifier "one.ayugram.AyuGramDesktop$<$<CONFIG:Debug>:Debug>")
+        set(bundle_identifier "one.lupingram.LupinGramDesktop$<$<CONFIG:Debug>:Debug>")
     else()
-        set(bundle_identifier "one.ayugram.AyuGramDesktop")
+        set(bundle_identifier "one.lupingram.LupinGramDesktop")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "AyuGram")
+    set(output_name "LupinGram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -2613,14 +2617,14 @@ PRIVATE
     TDESKTOP_API_ID=${TDESKTOP_API_ID}
     TDESKTOP_API_HASH=${TDESKTOP_API_HASH}
     G_LOG_DOMAIN="Telegram"
-    U_STATIC_IMPLEMENTATION=1 # AyuGram: do not use __declspec(dllimport) when including icu headers
+    U_STATIC_IMPLEMENTATION=1 # LupinGram: do not use __declspec(dllimport) when including icu headers
 )
 
 get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (APPLE
     OR is_multi_config
     OR NOT CMAKE_EXECUTABLE_SUFFIX STREQUAL ""
-    OR NOT "${output_name}" STREQUAL "AyuGram")
+    OR NOT "${output_name}" STREQUAL "LupinGram")
     set(output_folder ${CMAKE_BINARY_DIR})
 else()
     set(output_folder ${CMAKE_BINARY_DIR}/bin)
@@ -2800,28 +2804,28 @@ endif()
 
 if (LINUX AND DESKTOP_APP_USE_PACKAGED)
     include(GNUInstallDirs)
-    configure_file("../lib/xdg/com.ayugram.desktop.service" "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.service" @ONLY)
-    configure_file("../lib/xdg/com.ayugram.desktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.metainfo.xml" @ONLY)
-    generate_appstream_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.metainfo.xml")
+    configure_file("../lib/xdg/com.lupingram.desktop.service" "${CMAKE_CURRENT_BINARY_DIR}/com.lupingram.desktop.service" @ONLY)
+    configure_file("../lib/xdg/com.lupingram.desktop.metainfo.xml" "${CMAKE_CURRENT_BINARY_DIR}/com.lupingram.desktop.metainfo.xml" @ONLY)
+    generate_appstream_changelog(Telegram "${CMAKE_SOURCE_DIR}/changelog.txt" "${CMAKE_CURRENT_BINARY_DIR}/com.lupingram.desktop.metainfo.xml")
     install(TARGETS Telegram RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    install(FILES "Resources/art/icon16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon16@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon32@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon48@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon64@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon128@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon256@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/art/icon512@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512@2/apps" RENAME "com.ayugram.desktop.png")
-    install(FILES "Resources/icons/tray_monochrome.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.ayugram.desktop-symbolic.svg")
-    install(FILES "Resources/icons/tray_monochrome_attention.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.ayugram.desktop-attention-symbolic.svg")
-    install(FILES "Resources/icons/tray_monochrome_mute.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.ayugram.desktop-mute-symbolic.svg")
-    install(FILES "../lib/xdg/com.ayugram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.service" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/dbus-1/services")
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.ayugram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
+    install(FILES "Resources/art/icon16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon16@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon32@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon48@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon64@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon128@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon256@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/art/icon512@2x.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512@2/apps" RENAME "com.lupingram.desktop.png")
+    install(FILES "Resources/icons/tray_monochrome.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.lupingram.desktop-symbolic.svg")
+    install(FILES "Resources/icons/tray_monochrome_attention.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.lupingram.desktop-attention-symbolic.svg")
+    install(FILES "Resources/icons/tray_monochrome_mute.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/symbolic/apps" RENAME "com.lupingram.desktop-mute-symbolic.svg")
+    install(FILES "../lib/xdg/com.lupingram.desktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.lupingram.desktop.service" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/dbus-1/services")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/com.lupingram.desktop.metainfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
 endif()

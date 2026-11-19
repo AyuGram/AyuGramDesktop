@@ -54,9 +54,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <gio/gio.hpp>
 #endif // __has_include(<gio/gio.hpp>)
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace Window {
@@ -411,7 +411,7 @@ System::Timing System::countTiming(
 		delay = config.notifyDefaultDelay;
 	}
 
-	const auto &settings = AyuSettings::getInstance();
+	const auto &settings = LupinSettings::getInstance();
 	if (settings.disableNotificationsDelay()) {
 		delay = minimalDelay;
 	}

@@ -21,9 +21,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QMutex>
 #include <QtSvg/QSvgRenderer>
 
-// AyuGram includes
-#include "ayu/ayu_settings.h"
-#include "ayu/ui/ayu_userpic.h"
+// LupinGram includes
+#include "lupin/lupin_settings.h"
+#include "lupin/ui/lupin_userpic.h"
 
 
 namespace Ui {
@@ -357,7 +357,7 @@ void EmptyUserpic::paintRounded(
 		int size,
 		int radius) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		if (AyuSettings::getInstance().singleCornerRadius()) {
+		if (LupinSettings::getInstance().singleCornerRadius()) {
 			AyuUserpic::PaintShape(p, x, y, size);
 		} else {
 			p.drawRoundedRect(x, y, size, size, radius, radius);
@@ -383,7 +383,7 @@ void EmptyUserpic::paintMonoforum(
 		int outerWidth,
 		int size) const {
 	paint(p, x, y, outerWidth, size, [&] {
-		if (AyuSettings::getInstance().singleCornerRadius()) {
+		if (LupinSettings::getInstance().singleCornerRadius()) {
 			AyuUserpic::PaintShape(p, x, y, size);
 		} else {
 			PaintMonoforumShape(p, QRect(x, y, size, size));

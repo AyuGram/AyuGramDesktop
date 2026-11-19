@@ -1,0 +1,75 @@
+name: Telegram build watcher
+
+on:
+  push:
+    branches: [ "claude/gifted-rubin-nzkrec" ]
+    paths:
+      - ".github/workflows/tg-watch.yml"
+  workflow_dispatch:
+    inputs:
+      target_workflow:
+        description: "Name of the workflow to watch"
+        required: true
+
+jobs:
+  watch:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Report status to Telegram every 30 minutes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TARGET: ${{ inputs.target_workflow }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
+            echo "::error::Add repository secrets TG_BOT_TOKEN and TG_CHAT_ID."
+            exit 1
+          fi
+
+          send() {
+            curl -s -m 30 -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+              -d chat_id="$TG_CHAT_ID" \
+              -d disable_web_page_preview=true \
+              --data-urlencode text="$1" > /dev/null || true
+          }
+
+          REPO="$GITHUB_REPOSITORY"
+          while true; do
+            RUN=$(gh run list --repo "$REPO" --workflow "$TARGET" --branch "$BRANCH" --limit 1 \
+              --json databaseId,status,conclusion,displayTitle,url,createdAt --jq '.[0]')
+            if [ -z "$RUN" ] || [ "$RUN" = "null" ]; then
+              send "LupinGram: нет ранов workflow '$TARGET' на ветке $BRANCH"
+              sleep 900
+              continue
+            fi
+            ID=$(echo "$RUN" | jq -r .databaseId)
+            STATUS=$(echo "$RUN" | jq -r .status)
+            CONC=$(echo "$RUN" | jq -r .conclusion)
+            TITLE=$(echo "$RUN" | jq -r .displayTitle)
+            URL=$(echo "$RUN" | jq -r .url)
+            SINCE=$(echo "$RUN" | jq -r .createdAt)
+
+            if [ "$STATUS" != "completed" ]; then
+              STEP=$(gh run view "$ID" --repo "$REPO" --json jobs \
+                --jq '[.jobs[].steps[] | select(.status=="in_progress")][0].name // "ожидание"')
+              send "$(printf '%s\n' "⏳ $REPO — $TARGET" "Идёт: $TITLE" "Сейчас шаг: $STEP" "Запущен: $SINCE" "$URL")"
+              sleep 900
+              continue
+            fi
+
+            FAILED=$(gh run view "$ID" --repo "$REPO" --json jobs \
+              --jq '[.jobs[].steps[] | select(.conclusion=="failure")][0].name // ""')
+            if [ "$CONC" = "success" ]; then
+              send "$(printf '%s\n' "✅ $REPO — $TARGET: СОБРАНО" "$TITLE" "Артефакты: $URL")"
+            else
+              send "$(printf '%s\n' "❌ $REPO — $TARGET: $CONC" "$TITLE" "Упал шаг: ${FAILED:-—}" "$URL")"
+            fi
+            break
+          done

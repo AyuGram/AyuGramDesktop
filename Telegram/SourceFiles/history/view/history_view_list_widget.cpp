@@ -106,9 +106,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
 
-// AyuGram includes
-#include "ayu/features/filters/filters_cache_controller.h"
-#include "ayu/utils/telegram_helpers.h"
+// LupinGram includes
+#include "lupin/features/filters/filters_cache_controller.h"
+#include "lupin/utils/telegram_helpers.h"
 
 
 namespace HistoryView {
