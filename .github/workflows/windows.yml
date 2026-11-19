@@ -16,6 +16,9 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 360
     steps:
       - name: Prepare directories (Libraries and ThirdParty on C:)
@@ -148,6 +151,22 @@ jobs:
           foreach ($f in $changed) { if (Test-Path $f) { (Get-Item $f).LastWriteTime = Get-Date } }
           Pop-Location
 
+      - name: Delete stale compiled-objects caches (the repository cache limit is 10 GB)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $keep = "${{ steps.cache-out.outputs.cache-matched-key }}"
+          $list = gh cache list --repo $env:GITHUB_REPOSITORY --key win-out-v1- --limit 100 --json id,key,sizeInBytes | ConvertFrom-Json
+          foreach ($c in $list) {
+            if ($c.key -ne $keep) {
+              Write-Host ("deleting {0} ({1:N1} GB)" -f $c.key, ($c.sizeInBytes/1GB))
+              gh cache delete $c.id --repo $env:GITHUB_REPOSITORY
+            }
+          }
+          gh cache list --repo $env:GITHUB_REPOSITORY --limit 100 | Out-Host
+        continue-on-error: true
+
       - name: Configure
         shell: cmd
         run: |
@@ -159,6 +178,7 @@ jobs:
         shell: cmd
         run: |
           set _CL_=/MP1 /GL-
+          set _LINK_=/DEBUG:NONE /OPT:NOICF
           cd tdesktop\Telegram
           set attempt=0
           :retry
