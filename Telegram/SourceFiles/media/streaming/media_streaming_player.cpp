@@ -159,7 +159,11 @@ void Player::trackReceivedTill(
 	} else if (state.duration != kTimeUnknown) {
 		if (state.receivedTill < position) {
 			state.receivedTill = position;
+			const auto guard = base::make_weak(&_sessionGuard);
 			trackSendReceivedTill(track, state);
+			if (!guard) {
+				return;
+			}
 		}
 	} else {
 		state.receivedTill = position;
@@ -185,7 +189,8 @@ void Player::trackPlayedTill(
 			: position;
 		_updates.fire({ PlaybackUpdate<Track>{ value } });
 	}
-	if (_pauseReading
+	if (guard
+		&& _pauseReading
 		&& (!bothReceivedEnough(loadInAdvanceFor()) || receivedTillEnd())) {
 		_pauseReading = false;
 		_file->wake();
@@ -214,8 +219,11 @@ void Player::trackSendReceivedTill(
 void Player::audioReceivedTill(crl::time position) {
 	Expects(_audio != nullptr);
 
+	const auto guard = base::make_weak(&_sessionGuard);
 	trackReceivedTill(*_audio, _information.audio.state, position);
-	checkResumeFromWaitingForData();
+	if (guard) {
+		checkResumeFromWaitingForData();
+	}
 }
 
 void Player::audioPlayedTill(crl::time position) {
@@ -227,8 +235,11 @@ void Player::audioPlayedTill(crl::time position) {
 void Player::videoReceivedTill(crl::time position) {
 	Expects(_video != nullptr);
 
+	const auto guard = base::make_weak(&_sessionGuard);
 	trackReceivedTill(*_video, _information.video.state, position);
-	checkResumeFromWaitingForData();
+	if (guard) {
+		checkResumeFromWaitingForData();
+	}
 }
 
 void Player::videoPlayedTill(crl::time position) {
@@ -513,9 +524,10 @@ void Player::provideStartInformation() {
 		auto copy = _information;
 		_information.video.cover = QImage();
 
+		const auto guard = base::make_weak(&_sessionGuard);
 		_updates.fire(Update{ std::move(copy) });
 
-		if (_stage == Stage::Ready && !_paused) {
+		if (guard && _stage == Stage::Ready && !_paused) {
 			_paused = true;
 			updatePausedState();
 		}
