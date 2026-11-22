@@ -951,6 +951,12 @@ void AyuSettings::setHideAllChatsFolder(bool val) {
 	save();
 }
 
+void AyuSettings::setDefaultChatsFolder(int val) {
+	if (_defaultChatsFolder.current() == val) return;
+	_defaultChatsFolder = val;
+	save();
+}
+
 void AyuSettings::setChannelBottomButton(ChannelBottomButton val) {
 	if (_channelBottomButton.current() == val) return;
 	_channelBottomButton = val;
@@ -1147,6 +1153,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"hideNotificationCounters", s._hideNotificationCounters.current()},
 		{"hideNotificationBadge", s._hideNotificationBadge.current()},
 		{"hideAllChatsFolder", s._hideAllChatsFolder.current()},
+		{"defaultChatsFolder", s._defaultChatsFolder.current()},
 		{"channelBottomButton", s._channelBottomButton.current()},
 		{"quickAdminShortcuts", s._quickAdminShortcuts.current()},
 		{"disableGreetingSticker", s._disableGreetingSticker.current()},
@@ -1251,6 +1258,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._hideNotificationCounters = j.value("hideNotificationCounters", defaults._hideNotificationCounters.current());
 	s._hideNotificationBadge = j.value("hideNotificationBadge", defaults._hideNotificationBadge.current());
 	s._hideAllChatsFolder = j.value("hideAllChatsFolder", defaults._hideAllChatsFolder.current());
+	s._defaultChatsFolder = j.value("defaultChatsFolder", defaults._defaultChatsFolder.current());
 	s._channelBottomButton = j.value("channelBottomButton", defaults._channelBottomButton.current());
 	s._quickAdminShortcuts = j.value("quickAdminShortcuts", defaults._quickAdminShortcuts.current());
 	s._disableGreetingSticker = j.value("disableGreetingSticker", defaults._disableGreetingSticker.current());

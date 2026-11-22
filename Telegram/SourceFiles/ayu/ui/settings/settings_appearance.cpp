@@ -15,16 +15,20 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "data/data_chat_filters.h"
+#include "data/data_session.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "main/main_session.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
+#include "window/window_session_controller.h"
 #include "styles/style_ayu_icons.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "ui/boxes/single_choice_box.h"
 #include "ui/painter.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
@@ -248,6 +252,73 @@ void BuildChatFolders(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.title = tr::ayu_HideAllChats(),
 		.getter = &AyuSettings::hideAllChatsFolder,
 		.setter = &AyuSettings::setHideAllChatsFolder,
+	});
+
+	// AyuGram defaultChatsFolder
+	// Registered even without a controller, so settings search and
+	// tg://ayusettings links can find it; the session is only needed
+	// for the label and the picker.
+	const auto controller = builder.controller();
+	const auto settings = &AyuSettings::getInstance();
+	using FolderEntry = std::pair<FilterId, QString>;
+	const auto folders = [=] {
+		auto result = std::vector<FolderEntry>();
+		result.emplace_back(FilterId(), tr::lng_filters_all(tr::now));
+		if (controller) {
+			const auto &filters = controller->session().data().chatsFilters();
+			for (const auto &filter : filters.list()) {
+				if (filter.id()) {
+					result.emplace_back(filter.id(), filter.title().text.text);
+				}
+			}
+		}
+		return result;
+	};
+	const auto indexOf = [](const std::vector<FolderEntry> &list, int id) {
+		const auto i = ranges::find(list, FilterId(id), &FolderEntry::first);
+		return (i == end(list)) ? 0 : int(i - begin(list));
+	};
+	auto label = rpl::producer<QString>();
+	if (controller) {
+		const auto filters = &controller->session().data().chatsFilters();
+		label = rpl::combine(
+			settings->defaultChatsFolderValue(),
+			rpl::single(0) | rpl::then(filters->changed() | rpl::map_to(0))
+		) | rpl::map([=](int id, int) {
+			const auto list = folders();
+			return list[indexOf(list, id)].second;
+		});
+	}
+	builder.addButton({
+		.id = u"ayu/defaultChatsFolder"_q,
+		.title = tr::ayu_DefaultChatsFolder(),
+		.st = &st::settingsButtonNoIcon,
+		.label = std::move(label),
+		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
+			const auto list = folders();
+			auto options = std::vector<QString>();
+			for (const auto &[id, title] : list) {
+				options.push_back(title);
+			}
+			controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+				SingleChoiceBox(box, {
+					.title = tr::ayu_DefaultChatsFolder(),
+					.options = options,
+					.initialSelection = indexOf(
+						list,
+						settings->defaultChatsFolder()),
+					.callback = [=](int index) {
+						if (index >= 0 && index < int(list.size())) {
+							settings->setDefaultChatsFolder(
+								int(list[index].first));
+						}
+					},
+				});
+			}));
+		},
 	});
 
 	ayu.addSectionDivider();

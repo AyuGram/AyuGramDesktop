@@ -2063,6 +2063,16 @@ void SessionController::activateFirstChatsFilter() {
 	_filtersActivated = true;
 
 	const auto &settings = AyuSettings::getInstance();
+
+	// AyuGram defaultChatsFolder
+	if (const auto preferred = FilterId(settings.defaultChatsFolder())) {
+		const auto &list = session().data().chatsFilters().list();
+		if (ranges::contains(list, preferred, &Data::ChatFilter::id)) {
+			setActiveChatsFilter(preferred);
+			return;
+		}
+	}
+
 	if (!settings.hideAllChatsFolder()) {
 		setActiveChatsFilter(session().data().chatsFilters().defaultId());
 	}
