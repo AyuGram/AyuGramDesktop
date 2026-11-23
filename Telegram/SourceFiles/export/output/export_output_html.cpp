@@ -3342,7 +3342,8 @@ public:
 
 	[[nodiscard]] QByteArray pushHeader(
 		const QByteArray &header,
-		const QString &path = QString());
+		const QString &path = QString(),
+		const QByteArray &details = QByteArray());
 	[[nodiscard]] QByteArray pushSection(
 		const QByteArray &label,
 		const QByteArray &type,
@@ -3816,7 +3817,8 @@ Result HtmlWriter::Wrap::writeBlock(const QByteArray &block) {
 
 QByteArray HtmlWriter::Wrap::pushHeader(
 		const QByteArray &header,
-		const QString &path) {
+		const QString &path,
+		const QByteArray &details) {
 	auto result = pushDiv("page_header");
 	result.append(path.isEmpty()
 		? pushDiv("content")
@@ -3827,6 +3829,12 @@ QByteArray HtmlWriter::Wrap::pushHeader(
 		}));
 	result.append(pushDiv("text bold"));
 	result.append(SerializeString(header));
+	if (!details.isEmpty()) {
+		result.append(
+			" <span class=\"details\" style=\"font-size: 14px; font-weight: normal;\">"
+			+ SerializeString(details)
+			+ "</span>");
+	}
 	result.append(popTag());
 	result.append(popTag());
 	result.append(popTag());
@@ -4410,6 +4418,14 @@ auto HtmlWriter::Wrap::pushMessage(
 	const auto fromPeerId = message.fromId;
 	const auto showForwardedInfo = message.forwarded
 		&& !message.showForwardedAsOriginal;
+	const auto checkUserpic = [&](PeerId id) -> QString {
+		if (!id) {
+			return QString();
+		}
+		const auto path = "images/userpic_" + QString::number(id.value) + ".png";
+		return QFile::exists(basePath + path) ? path : QString();
+	};
+
 	auto forwardedUserpic = UserpicData();
 	if (message.forwarded) {
 		forwardedUserpic.colorIndex = message.forwardedFromId
@@ -4420,6 +4436,8 @@ auto HtmlWriter::Wrap::pushMessage(
 			FillUserpicNames(
 				forwardedUserpic,
 				peers.peer(message.forwardedFromId));
+			forwardedUserpic.imageLink = checkUserpic(message.forwardedFromId);
+			forwardedUserpic.largeLink = forwardedUserpic.imageLink;
 		} else {
 			FillUserpicNames(forwardedUserpic, message.forwardedFromName);
 		}
@@ -4431,6 +4449,8 @@ auto HtmlWriter::Wrap::pushMessage(
 		userpic.colorIndex = PeerColorIndex(fromPeerId);
 		userpic.pixelSize = kHistoryUserpicSize;
 		FillUserpicNames(userpic, peers.peer(fromPeerId));
+		userpic.imageLink = checkUserpic(fromPeerId);
+		userpic.largeLink = userpic.imageLink;
 	}
 
 	const auto via = [&] {
@@ -5689,6 +5709,22 @@ Result HtmlWriter::start(
 		}
 	}
 
+	for (const auto &[peerId, bytes] : _environment.userpics) {
+		if (bytes.isEmpty()) {
+			continue;
+		}
+		const auto filename = "images/userpic_"
+			+ QString::number(peerId.value)
+			+ ".png";
+		const auto fullPath = _settings.path + filename;
+		QDir().mkpath(QFileInfo(fullPath).absolutePath());
+		auto f = QFile(fullPath);
+		if (f.open(QIODevice::WriteOnly)) {
+			f.write(bytes);
+			f.close();
+		}
+	}
+
 	if (_settings.onlySinglePeer()) {
 		return Result::Success();
 	}
@@ -6584,10 +6620,26 @@ Result HtmlWriter::writeDialogOpening(int index) {
 	const auto name = (_dialog.name.isEmpty()
 		&& _dialog.lastName.isEmpty())
 		? QByteArray("Deleted Account")
-		: (_dialog.name + ' ' + _dialog.lastName);
+		: (_dialog.name + ' ' + _dialog.lastName).trimmed();
+	const auto bareId = _dialog.peerId.value & PeerId::kChatTypeMask;
+	auto username = _dialog.username;
+	if (username.isEmpty() && _environment.singlePeerId == bareId) {
+		username = _environment.singlePeerUsername;
+	}
+	auto details = QByteArray();
+	if (bareId != 0 || !username.isEmpty()) {
+		if (!username.isEmpty() && bareId != 0) {
+			details = "(@" + username + ", ID: " + QByteArray::number(bareId) + ")";
+		} else if (!username.isEmpty()) {
+			details = "(@" + username + ")";
+		} else if (bareId != 0) {
+			details = "(ID: " + QByteArray::number(bareId) + ")";
+		}
+	}
 	auto block = _chat->pushHeader(
 		name,
-		_settings.onlySinglePeer() ? QString() : _dialogsRelativePath);
+		_settings.onlySinglePeer() ? QString() : _dialogsRelativePath,
+		details);
 	block.append(_chat->pushDiv("page_body chat_page"));
 	block.append(_chat->pushDiv("history"));
 	if (index > 0) {

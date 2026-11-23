@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/flags.h"
 #include "base/flat_map.h"
+#include "data/data_peer_id.h"
 
 namespace Export {
 namespace Output {
@@ -128,6 +129,9 @@ struct Environment {
 	QByteArray aboutWebSessions;
 	QByteArray aboutChats;
 	QByteArray aboutLeftChats;
+	BareId singlePeerId = 0;
+	QByteArray singlePeerUsername;
+	base::flat_map<PeerId, QByteArray> userpics;
 };
 
 } // namespace Export

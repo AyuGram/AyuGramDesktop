@@ -769,7 +769,7 @@ bool PeerData::canEditMessagesIndefinitely() const {
 }
 
 bool PeerData::canExportChatHistory() const {
-	if (isRepliesChat() || isVerifyCodes() || !allowsForwarding()) {
+	if (isRepliesChat() || isVerifyCodes()) {
 		return false;
 	} else if (const auto channel = asChannel()) {
 		if (!channel->amIn() && channel->invitePeekExpires()) {
