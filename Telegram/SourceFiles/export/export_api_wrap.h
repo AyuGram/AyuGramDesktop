@@ -322,9 +322,10 @@ private:
 	template <typename Request>
 	[[nodiscard]] auto splitRequest(int index, Request &&request);
 
-	[[nodiscard]] auto fileRequest(
+	[[nodiscard]] mtpRequestId fileRequest(
 		const Data::FileLocation &location,
-		int64 offset);
+		int64 offset,
+		FnMut<void(const MTPupload_File &)> done);
 
 	void error(const MTP::Error &error);
 	void error(const QString &text);

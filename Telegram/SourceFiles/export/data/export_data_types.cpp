@@ -3254,6 +3254,11 @@ DialogsInfo ParseDialogsInfo(const MTPmessages_Dialogs &data) {
 				info.lastName = peer.user()
 					? peer.user()->info.lastName
 					: Utf8String();
+				info.username = peer.user()
+					? peer.user()->username
+					: peer.chat()
+					? peer.chat()->username
+					: Utf8String();
 				info.colorIndex = peer.colorIndex();
 				info.input = peer.input();
 				info.migratedToChannelId = peer.chat()
@@ -3285,6 +3290,7 @@ DialogInfo DialogInfoFromUser(const User &data) {
 	result.input = (Peer{ data }).input();
 	result.name = data.info.firstName;
 	result.lastName = data.info.lastName;
+	result.username = data.username;
 	result.peerId = data.id();
 	result.topMessageDate = 0;
 	result.topMessageId = 0;
@@ -3297,6 +3303,7 @@ DialogInfo DialogInfoFromChat(const Chat &data) {
 	auto result = DialogInfo();
 	result.input = data.input;
 	result.name = data.title;
+	result.username = data.username;
 	result.peerId = data.id();
 	result.topMessageDate = 0;
 	result.topMessageId = 0;

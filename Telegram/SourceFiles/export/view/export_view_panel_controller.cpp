@@ -21,6 +21,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "main/main_session.h"
 #include "data/data_session.h"
+#include "data/data_peer.h"
+#include "data/data_user.h"
+#include <QtCore/QBuffer>
 #include "base/platform/base_platform_info.h"
 #include "base/unixtime.h"
 #include "base/qt/qt_common_adapters.h"
@@ -83,7 +86,9 @@ void SuggestBox::prepare() {
 
 } // namespace
 
-Environment PrepareEnvironment(not_null<Main::Session*> session) {
+Environment PrepareEnvironment(
+		not_null<Main::Session*> session,
+		const Settings &settings) {
 	auto result = Environment();
 	result.internalLinksDomain = session->serverConfig().internalLinksDomain;
 	result.aboutTelegram = tr::lng_export_about_telegram(tr::now).toUtf8();
@@ -93,6 +98,36 @@ Environment PrepareEnvironment(not_null<Main::Session*> session) {
 	result.aboutWebSessions = tr::lng_export_about_web_sessions(tr::now).toUtf8();
 	result.aboutChats = tr::lng_export_about_chats(tr::now).toUtf8();
 	result.aboutLeftChats = tr::lng_export_about_left_chats(tr::now).toUtf8();
+
+	if (settings.onlySinglePeer()) {
+		const auto savePeerUserpic = [&](not_null<PeerData*> peer) {
+			if (!peer->hasUserpic()) {
+				return;
+			}
+			auto view = peer->activeUserpicView();
+			auto img = peer->userpicCloudImage(view);
+			if (!img || img->isNull()) {
+				view = peer->createUserpicView();
+				img = peer->userpicCloudImage(view);
+			}
+			if (!img || img->isNull()) {
+				return;
+			}
+			auto bytes = QByteArray();
+			auto buffer = QBuffer(&bytes);
+			if (buffer.open(QIODevice::WriteOnly) && img->save(&buffer, "PNG")) {
+				result.userpics.emplace(peer->id, std::move(bytes));
+			}
+		};
+
+		savePeerUserpic(session->user());
+
+		if (const auto peer = Data::PeerFromInputMTP(&session->data(), settings.singlePeer)) {
+			savePeerUserpic(peer);
+			result.singlePeerId = peer->id.value & PeerId::kChatTypeMask;
+			result.singlePeerUsername = peer->username().toUtf8();
+		}
+	}
 	return result;
 }
 
@@ -205,7 +240,7 @@ void PanelController::showSettings() {
 	settings->startClicks(
 	) | rpl::on_next([=]() {
 		showProgress();
-		_process->startExport(*_settings, PrepareEnvironment(_session));
+		_process->startExport(*_settings, PrepareEnvironment(_session, *_settings));
 	}, settings->lifetime());
 
 	settings->cancelClicks(
