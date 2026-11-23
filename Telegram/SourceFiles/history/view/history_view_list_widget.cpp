@@ -5976,7 +5976,7 @@ void ListWidget::replyNextMessage(FullMsgId fullId, bool next) {
 		}
 	};
 	const auto replyFirst = [&] {
-		reply(next ? nullptr : _items.back().get());
+		reply((next || _items.empty()) ? nullptr : _items.back().get());
 	};
 	if (!fullId) {
 		replyFirst();
@@ -5991,15 +5991,18 @@ void ListWidget::replyNextMessage(FullMsgId fullId, bool next) {
 	if (it == end(list)) {
 		replyFirst();
 		return;
-	} else {
-		const auto nextIt = it + (next ? -1 : 1);
-		if (nextIt == end(list)) {
-			return;
-		} else if (next && (it == begin(list))) {
+	} else if (next) {
+		if (it == begin(list)) {
 			reply(nullptr);
 		} else {
-			reply(nextIt->get());
+			reply((it - 1)->get());
 		}
+	} else {
+		const auto nextIt = it + 1;
+		if (nextIt == end(list)) {
+			return;
+		}
+		reply(nextIt->get());
 	}
 }
 
