@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "tgw/tgw_backend.h"
 #include "tgw/tgw_emoji.h"
 #include "tgw/tgw_emoji_images.h"
+#include "tgw/tgw_painter_clips.h"
 #include "tgw/tgw_painter_filters.h"
 #include "ui/image/image_prepare.h"
 
@@ -86,6 +87,14 @@ constexpr auto kOutlineSubpixels = 64.;
 constexpr auto kGradientPixel = 8.;
 constexpr auto kMaxColorGlyphBytes = int64(64 * 1024 * 1024);
 constexpr auto kColorGlyphBytes = 48.;
+constexpr auto kMaxCommandText = int64(192 * 1024);
+constexpr auto kMaxStops = int64(16384);
+constexpr auto kMaxDashes = int64(32768);
+constexpr auto kMaxNesting = std::size_t(8192);
+// Qt keeps 2049 legal clip levels of up to 272 bytes per device row.
+constexpr auto kClipLevelRowBytes = int64(576 * 1024);
+constexpr auto kFoldedLevelBytes = int64(2 * 1024 * 1024);
+constexpr auto kMaxUnfoldedClipLevels = 256;
 
 struct CornerRadius {
 	float64 x = 0.;
@@ -286,7 +295,11 @@ private:
 
 class Executor final {
 public:
-	Executor(QPainter &root, const QtBackend &backend, float64 scale);
+	Executor(
+		QPainter &root,
+		const QtBackend &backend,
+		float64 scale,
+		crl::time started);
 
 	[[nodiscard]] bool run(const twlite::DisplayList &list);
 	[[nodiscard]] const QString &exceeded() const;
@@ -303,6 +316,7 @@ private:
 		EntryKind kind = EntryKind::Clip;
 		bool saved = false;
 		bool filter = false;
+		int64 clipBytes = 0;
 	};
 	struct Layer {
 		QImage image;
@@ -311,8 +325,19 @@ private:
 		float64 opacity = 1.;
 		std::shared_ptr<const twlite::Filters> filters;
 		float64 filterScale = 0.;
+		int clips = 0;
 	};
 
+	[[nodiscard]] bool paint(const twlite::DisplayList &list);
+	[[nodiscard]] bool admitCommand(
+		const twlite::Command &command,
+		int &groups);
+	[[nodiscard]] bool late() const;
+	[[nodiscard]] bool exceedTime();
+	[[nodiscard]] bool inTime();
+	void pushEntry(Entry entry);
+	[[nodiscard]] int &clipLevels();
+	[[nodiscard]] bool chargeClip(int64 known);
 	[[nodiscard]] bool execute(const twlite::Command &command);
 	void fillShape(const twlite::Command &command, const QBrush &brush);
 	void strokeRect(const twlite::Command &command);
@@ -335,7 +360,8 @@ private:
 	[[nodiscard]] bool pushLayer(
 		const QTransform &world,
 		float64 opacity,
-		const QRect &area);
+		const QRect &area,
+		bool filter = false);
 	[[nodiscard]] bool admitFilter(const FilterCost &cost, int64 bytes);
 	[[nodiscard]] bool chargeShadow(
 		const QRectF &area,
@@ -348,7 +374,7 @@ private:
 		const QString &text,
 		const std::vector<EmojiCell> &cells,
 		float64 side);
-	void pushHidden();
+	void pushHidden(bool filter = false);
 	void popGroup();
 	void popFilter();
 	void popEntry(bool composite);
@@ -368,7 +394,9 @@ private:
 
 	QPainter &_root;
 	const QtBackend &_backend;
+	const crl::time _started = 0;
 	std::vector<Entry> _stack;
+	std::vector<std::size_t> _nonClip;
 	std::vector<std::unique_ptr<Layer>> _layers;
 	std::vector<QRectF> _inks;
 	PaintAllowance _allowance;
@@ -379,6 +407,10 @@ private:
 	int64 _filterWork = 0;
 	int64 _shadowWork = kMaxShadowWork;
 	int64 _colorGlyphBytes = kMaxColorGlyphBytes;
+	int64 _clipBytes = 0;
+	int64 _maxClipBytes = 0;
+	int _rootClips = 0;
+	int _groups = 0;
 	int _hidden = 0;
 	bool _pathClips = false;
 	bool _refused = false;
@@ -390,10 +422,26 @@ private:
 	return !size.isEmpty() && std::isfinite(scale) && (scale > 0.);
 }
 
-[[nodiscard]] QString PaintLimit(const QString &what, int64 max) {
-	return u"Paint limit exceeded: %1 (max %2)"_q.arg(
-		what,
-		QString::number(max));
+[[nodiscard]] QString OutOfMemoryLimit() {
+	return u"Out of memory painting a widget frame"_q;
+}
+
+[[nodiscard]] QString RasterTimeLimit(crl::time started) {
+	return PaintLimit(
+		u"a frame raster of %1 ms"_q.arg(crl::now() - started),
+		kMaxRasterTime);
+}
+
+[[nodiscard]] QString FrameLimit(QSize size, crl::time started) {
+	const auto pixels = int64(size.width()) * size.height();
+	if (pixels > kMaxFrameBytes / kPixelBytes) {
+		return PaintLimit(
+			u"a frame of %1 pixels"_q.arg(pixels),
+			kMaxFrameBytes / kPixelBytes);
+	} else if (crl::now() - started > kMaxRasterTime) {
+		return RasterTimeLimit(started);
+	}
+	return QString();
 }
 
 [[nodiscard]] int64 LayerBytes(QSize size) {
@@ -569,13 +617,42 @@ private:
 		box.adjusted(-margin, -margin, margin, margin));
 }
 
-[[nodiscard]] QPen StrokePen(twlite::Color color, float width) {
+[[nodiscard]] QPen StrokePen(twlite::Color color, float64 width) {
 	return QPen(
 		ToColor(color),
 		width,
 		Qt::SolidLine,
 		Qt::FlatCap,
 		Qt::MiterJoin);
+}
+
+[[nodiscard]] float64 ReachableStrokeWidth(
+		const QRectF &rect,
+		float64 width,
+		const QRectF &reach) {
+	if (rect.isEmpty() || reach.isEmpty() || !std::isfinite(width)) {
+		return width;
+	}
+	const auto distance = [&](QPointF corner) {
+		return std::hypot(
+			std::max({
+				rect.left() - corner.x(),
+				corner.x() - rect.right(),
+				0.,
+			}),
+			std::max({
+				rect.top() - corner.y(),
+				corner.y() - rect.bottom(),
+				0.,
+			}));
+	};
+	const auto farthest = std::max({
+		distance(reach.topLeft()),
+		distance(reach.topRight()),
+		distance(reach.bottomRight()),
+		distance(reach.bottomLeft()),
+	}) + std::hypot(rect.width(), rect.height());
+	return std::min(width, 2. * farthest);
 }
 
 [[nodiscard]] float64 OverlapFactor(float64 length, float64 sum) {
@@ -1412,7 +1489,8 @@ void DrawTextWithEmoji(
 		const QtFont &font,
 		const QString &text,
 		const std::vector<EmojiCell> &cells,
-		int alpha) {
+		int alpha,
+		const EmojiAccount &account) {
 	const auto fontSize = float64(font.font.pixelSize());
 	const auto side = EmojiAdvance(fontSize)
 		* MaxStretch(p.combinedTransform());
@@ -1423,7 +1501,7 @@ void DrawTextWithEmoji(
 			return;
 		}
 		p.setOpacity(opacity * alpha / 255.);
-		PaintEmoji(p, emoji, EmojiBox(x, fontSize), side);
+		PaintEmoji(p, emoji, EmojiBox(x, fontSize), side, account);
 		p.setOpacity(opacity);
 	};
 	WalkTextWithEmoji(font.metrics, text, cells, fontSize, draw);
@@ -1618,11 +1696,12 @@ void DrawTextWithEmoji(
 	return DeviceInk(world, ToRect(command.rect), frame, reach);
 }
 
-[[nodiscard]] std::vector<QRectF> GroupInks(
+[[nodiscard]] std::optional<std::vector<QRectF>> GroupInks(
 		const twlite::DisplayList &list,
 		const QtBackend &backend,
 		const QTransform &root,
-		const QRectF &frame) {
+		const QRectF &frame,
+		crl::time deadline) {
 	struct Open {
 		size_t slot = 0;
 		QTransform world;
@@ -1643,7 +1722,9 @@ void DrawTextWithEmoji(
 		}
 	};
 	for (const auto &command : list) {
-		if (command.kind == twlite::Cmd::GroupPush) {
+		if (crl::now() > deadline) {
+			return std::nullopt;
+		} else if (command.kind == twlite::Cmd::GroupPush) {
 			const auto parent = stack.back();
 			const auto world = (parent.hidden || !Shown(command))
 				? std::nullopt
@@ -1743,8 +1824,9 @@ QImage ShadowCache::find(const ShadowKey &key) {
 }
 
 void ShadowCache::insert(const ShadowKey &key, QImage image) {
-	_bytes += LayerBytes(image.size());
+	const auto bytes = LayerBytes(image.size());
 	_entries.push_back({ .key = key, .image = std::move(image) });
+	_bytes += bytes;
 	auto evicted = begin(_entries);
 	while (_bytes > kMaxShadowBytes
 		|| end(_entries) - evicted > kMaxShadows) {
@@ -2317,20 +2399,39 @@ float64 Outline::quarter() {
 Executor::Executor(
 		QPainter &root,
 		const QtBackend &backend,
-		float64 scale)
+		float64 scale,
+		crl::time started)
 : _root(root)
 , _backend(backend)
+, _started(started)
 , _maxFilterWork(FilterWorkBound(scale))
-, _filterWork(_maxFilterWork) {
+, _filterWork(_maxFilterWork)
+, _maxClipBytes(
+	kClipLevelRowBytes * root.device()->height() + kFoldedLevelBytes) {
 	PrepareHints(_root);
 	_root.scale(scale, scale);
 }
 
 bool Executor::run(const twlite::DisplayList &list) {
+	try {
+		return paint(list);
+	} catch (const std::bad_alloc &) {
+		return exceed(OutOfMemoryLimit());
+	}
+}
+
+bool Executor::paint(const twlite::DisplayList &list) {
 	using Cmd = twlite::Cmd;
 	auto passes = int64();
 	auto layers = int64();
+	auto scanned = std::size_t();
+	auto groups = 0;
 	for (const auto &command : list) {
+		if (!(++scanned % kDeadlineStride) && late()) {
+			return exceedTime();
+		} else if (!admitCommand(command, groups)) {
+			return false;
+		}
 		const auto vector = (command.kind == Cmd::Path)
 			|| (command.kind == Cmd::ClipPush);
 		const auto filter = (command.kind == Cmd::FilterPush)
@@ -2360,29 +2461,137 @@ bool Executor::run(const twlite::DisplayList &list) {
 			kMaxShadowLayers));
 	}
 	const auto device = _root.device();
-	_inks = GroupInks(
+	auto inks = GroupInks(
 		list,
 		_backend,
 		_root.worldTransform(),
-		QRectF(0., 0., device->width(), device->height()));
+		QRectF(0., 0., device->width(), device->height()),
+		_started + kMaxRasterTime);
+	if (!inks) {
+		return exceedTime();
+	}
+	_inks = std::move(*inks);
 	for (const auto &command : list) {
-		if (!execute(command) || _refused) {
+		if (late()) {
+			unwind(false);
+			return exceedTime();
+		} else if (!execute(command) || _refused) {
 			unwind(false);
 			return false;
 		}
 	}
+	if (late()) {
+		unwind(false);
+		return exceedTime();
+	}
 	unwind(true);
-	return !_refused;
+	return !_refused && inTime();
 }
 
 const QString &Executor::exceeded() const {
 	return _exceeded.isEmpty() ? _allowance.exceeded() : _exceeded;
 }
 
+bool Executor::admitCommand(const twlite::Command &command, int &groups) {
+	using Cmd = twlite::Cmd;
+	auto stops = std::size_t();
+	auto dashes = std::size_t();
+	switch (command.kind) {
+	case Cmd::Text:
+		if (int64(command.text.size()) > kMaxCommandText) {
+			return exceed(PaintLimit(
+				u"%1 bytes of text in one command"_q.arg(
+					command.text.size()),
+				kMaxCommandText));
+		}
+		break;
+	case Cmd::Linear:
+	case Cmd::Radial:
+	case Cmd::Conic: stops = command.stops.size(); break;
+	case Cmd::Path:
+	case Cmd::ClipPush:
+		if (const auto path = command.path.get()) {
+			stops = std::max(path->stops.size(), path->stroke_stops.size());
+			dashes = path->dashes.size();
+		}
+		break;
+	case Cmd::GroupPush:
+		if (std::size_t(++groups) > kMaxNesting) {
+			return exceed(PaintLimit(
+				u"%1 nested groups"_q.arg(groups),
+				int64(kMaxNesting)));
+		}
+		break;
+	case Cmd::GroupPop:
+		if (groups > 0) {
+			--groups;
+		}
+		break;
+	default: break;
+	}
+	if (int64(stops) > kMaxStops) {
+		return exceed(PaintLimit(
+			u"%1 gradient stops in one command"_q.arg(stops),
+			kMaxStops));
+	} else if (int64(dashes) > kMaxDashes) {
+		return exceed(PaintLimit(
+			u"%1 dashes in one path"_q.arg(dashes),
+			kMaxDashes));
+	}
+	return true;
+}
+
+bool Executor::late() const {
+	return crl::now() - _started > kMaxRasterTime;
+}
+
+bool Executor::exceedTime() {
+	_refused = true;
+	return exceed(RasterTimeLimit(_started));
+}
+
+bool Executor::inTime() {
+	return !late() || exceedTime();
+}
+
+void Executor::pushEntry(Entry entry) {
+	if (entry.kind != EntryKind::Clip) {
+		_nonClip.push_back(_stack.size());
+		if (!entry.filter) {
+			++_groups;
+		}
+	}
+	_stack.push_back(entry);
+}
+
+int &Executor::clipLevels() {
+	return _layers.empty() ? _rootClips : _layers.back()->clips;
+}
+
+bool Executor::chargeClip(int64 known) {
+	const auto bytes = known + ClipDataBytes(painter());
+	if (bytes > _maxClipBytes - _clipBytes) {
+		return exceed(PaintLimit(
+			u"%1 clip bytes at once"_q.arg(_clipBytes + bytes),
+			_maxClipBytes));
+	}
+	_clipBytes += bytes;
+	_stack.back().clipBytes = bytes;
+	return true;
+}
+
 bool Executor::execute(const twlite::Command &command) {
 	using Cmd = twlite::Cmd;
 	if (_hidden > 0 && !Structural(command.kind)) {
 		return true;
+	}
+	const auto push = (command.kind == Cmd::ClipPush)
+		|| (command.kind == Cmd::GroupPush)
+		|| (command.kind == Cmd::FilterPush);
+	if (push && (_stack.size() >= kMaxNesting)) {
+		return exceed(PaintLimit(
+			u"%1 nested clips, groups and filters"_q.arg(_stack.size() + 1),
+			int64(kMaxNesting)));
 	}
 	switch (command.kind) {
 	case Cmd::FillRect: fillShape(command, SolidBrush(command.color)); break;
@@ -2420,7 +2629,7 @@ void Executor::fillShape(
 	if (!corners) {
 		return;
 	} else if (!Rounded(*corners)) {
-		p.fillRect(rect.intersected(clip), brush);
+		p.fillRect(bounded(rect.intersected(clip)), brush);
 	} else if (clip.contains(rect)) {
 		p.fillPath(RoundedPath(rect, *corners), brush);
 	} else {
@@ -2439,7 +2648,9 @@ void Executor::strokeRect(const twlite::Command &command) {
 	if (const auto corners = NormalizedCorners(rect, command.radii)) {
 		painter().strokePath(
 			RoundedPath(rect, *corners),
-			StrokePen(command.color, command.width));
+			StrokePen(
+				command.color,
+				ReachableStrokeWidth(rect, command.width, limit())));
 	}
 }
 
@@ -2465,7 +2676,11 @@ void Executor::strokeEllipse(const twlite::Command &command) {
 	}
 	auto path = QPainterPath();
 	path.addEllipse(inset);
-	painter().strokePath(path, StrokePen(command.color, command.width));
+	painter().strokePath(
+		path,
+		StrokePen(
+			command.color,
+			ReachableStrokeWidth(rect, command.width, limit())));
 }
 
 void Executor::drawText(const twlite::Command &command) {
@@ -2503,7 +2718,13 @@ void Executor::drawText(const twlite::Command &command) {
 	if (cells.empty()) {
 		p.drawText(QPointF(), text);
 	} else {
-		DrawTextWithEmoji(p, *font, text, cells, command.color.a);
+		DrawTextWithEmoji(
+			p,
+			*font,
+			text,
+			cells,
+			command.color.a,
+			_backend.emoji());
 	}
 	p.restore();
 }
@@ -2524,8 +2745,21 @@ void Executor::drawImage(const twlite::Command &command) {
 	}
 	auto &p = painter();
 	const auto rounded = Rounded(*corners);
+	const auto whole = WithinContourReach(
+		DeviceSize(p),
+		p.combinedTransform().mapRect(target));
+	const auto draw = [&] {
+		if (whole) {
+			p.drawImage(target, *image);
+		} else {
+			p.drawImage(
+				visible,
+				*image,
+				SourceRect(image->size(), target, visible));
+		}
+	};
 	if (!rounded && base.contains(target)) {
-		p.drawImage(target, *image);
+		draw();
 		return;
 	}
 	p.save();
@@ -2534,7 +2768,7 @@ void Executor::drawImage(const twlite::Command &command) {
 	} else {
 		clipToRect(base);
 	}
-	p.drawImage(target, *image);
+	draw();
 	p.restore();
 }
 
@@ -2811,14 +3045,31 @@ bool Executor::drawBackdrop(const twlite::Command &command) {
 
 bool Executor::pushClip(const twlite::Command &command) {
 	if (_hidden > 0) {
-		_stack.push_back({ .kind = EntryKind::Clip });
+		pushEntry({ .kind = EntryKind::Clip });
 		return true;
 	}
+	const auto folded = ShortensClipHistory();
+	if (!folded && (clipLevels() >= kMaxUnfoldedClipLevels)) {
+		return exceed(PaintLimit(
+			u"%1 clip levels on one painter"_q.arg(clipLevels() + 1),
+			kMaxUnfoldedClipLevels));
+	}
 	auto &p = painter();
+	const auto history = 2 * kClipHistoryEntryBytes;
+	const auto base = clipLevels() ? int64() : ClipBaseBytes(p);
+	const auto known = history + base + ClipBaseBytes(p);
+	if (folded && (known > _maxClipBytes - _clipBytes)) {
+		return exceed(PaintLimit(
+			u"%1 clip bytes at once"_q.arg(_clipBytes + known),
+			_maxClipBytes));
+	}
 	p.save();
-	_stack.push_back({ .kind = EntryKind::Clip, .saved = true });
+	ShortenClipHistory(p);
+	pushEntry({ .kind = EntryKind::Clip, .saved = true });
+	++clipLevels();
 	if (command.path) {
-		return clipToPath(*command.path);
+		return clipToPath(*command.path)
+			&& (!folded || chargeClip(history + base));
 	}
 	const auto rect = ToRect(command.rect);
 	const auto corners = rect.isEmpty()
@@ -2831,7 +3082,7 @@ bool Executor::pushClip(const twlite::Command &command) {
 	} else {
 		clipToRect(rect);
 	}
-	return true;
+	return !folded || chargeClip(history + base);
 }
 
 void Executor::popClip() {
@@ -2855,14 +3106,14 @@ bool Executor::pushGroup(const twlite::Command &command) {
 	}
 	p.save();
 	p.setWorldTransform(*world);
-	_stack.push_back({ .kind = EntryKind::Group, .saved = true });
+	pushEntry({ .kind = EntryKind::Group, .saved = true });
 	return true;
 }
 
 bool Executor::pushFilter(const twlite::Command &command) {
 	const auto &chain = command.filter;
 	if (_hidden > 0 || !chain || chain->empty()) {
-		_stack.push_back({ .kind = EntryKind::Filter, .filter = true });
+		pushEntry({ .kind = EntryKind::Filter, .filter = true });
 		return true;
 	} else if (!UsableFilters(*chain) || !FiniteRect(command.rect)) {
 		return false;
@@ -2891,29 +3142,28 @@ bool Executor::pushFilter(const twlite::Command &command) {
 				reach),
 			DeviceSpread(Spread(reach), frame));
 	if (area.isEmpty()) {
-		pushHidden();
-		_stack.back().filter = true;
+		pushHidden(true);
 		return true;
 	}
 	const auto cost = MeasureFilters(*chain, area.size(), scale);
 	if (!cost
 		|| !admitFilter(*cost, LayerBytes(area.size()))
-		|| !pushLayer(p.worldTransform(), 1., area)) {
+		|| !pushLayer(p.worldTransform(), 1., area, true)) {
 		return false;
 	}
 	auto &layer = *_layers.back();
 	layer.filters = chain;
 	layer.filterScale = scale;
-	_stack.back().filter = true;
 	return true;
 }
 
 bool Executor::pushLayer(
 		const QTransform &world,
 		float64 opacity,
-		const QRect &area) {
+		const QRect &area,
+		bool filter) {
 	if (area.isEmpty()) {
-		pushHidden();
+		pushHidden(filter);
 		return true;
 	}
 	const auto offset = origin();
@@ -2947,7 +3197,7 @@ bool Executor::pushLayer(
 	_layerBytes += bytes;
 	_layerWork += bytes;
 	_layers.push_back(std::move(layer));
-	_stack.push_back({ .kind = EntryKind::Layer });
+	pushEntry({ .kind = EntryKind::Layer, .filter = filter });
 	return true;
 }
 
@@ -3041,16 +3291,16 @@ bool Executor::admitColorGlyphs(
 	return true;
 }
 
-void Executor::pushHidden() {
+void Executor::pushHidden(bool filter) {
 	++_hidden;
-	_stack.push_back({ .kind = EntryKind::Hidden });
+	pushEntry({ .kind = EntryKind::Hidden, .filter = filter });
 }
 
 void Executor::popGroup() {
 	const auto group = [](const Entry &entry) {
 		return (entry.kind != EntryKind::Clip) && !entry.filter;
 	};
-	if (!ranges::any_of(_stack, group)) {
+	if (!_groups) {
 		return;
 	}
 	while (!group(_stack.back())) {
@@ -3060,22 +3310,31 @@ void Executor::popGroup() {
 }
 
 void Executor::popFilter() {
-	for (auto i = _stack.size(); i != 0; --i) {
-		const auto entry = _stack[i - 1];
-		if (entry.filter) {
-			while (_stack.size() >= i) {
-				popEntry(true);
-			}
-			return;
-		} else if (entry.kind != EntryKind::Clip) {
-			return;
-		}
+	if (_nonClip.empty()) {
+		return;
+	}
+	const auto i = _nonClip.back();
+	if (!_stack[i].filter) {
+		return;
+	}
+	while (_stack.size() > i) {
+		popEntry(true);
 	}
 }
 
 void Executor::popEntry(bool composite) {
 	const auto entry = _stack.back();
 	_stack.pop_back();
+	if (!_nonClip.empty() && _nonClip.back() == _stack.size()) {
+		_nonClip.pop_back();
+	}
+	if (entry.kind != EntryKind::Clip && !entry.filter) {
+		--_groups;
+	}
+	if (entry.kind == EntryKind::Clip && entry.saved) {
+		--clipLevels();
+		_clipBytes -= entry.clipBytes;
+	}
 	if (entry.saved) {
 		painter().restore();
 	}
@@ -3091,11 +3350,13 @@ void Executor::popLayer(bool composite) {
 	_layers.pop_back();
 	layer->painter.end();
 	_layerBytes -= LayerBytes(layer->image.size());
-	if (!composite || _refused) {
+	if (!composite || _refused || !inTime()) {
 		return;
 	} else if (layer->filters
 		&& !ApplyFilters(layer->image, *layer->filters, layer->filterScale)) {
 		_refused = true;
+		return;
+	} else if (!inTime()) {
 		return;
 	}
 	auto &parent = painter();
@@ -3104,6 +3365,7 @@ void Executor::popLayer(bool composite) {
 	parent.setOpacity(layer->opacity);
 	parent.drawImage(layer->origin - origin(), layer->image);
 	parent.restore();
+	_refused = !inTime();
 }
 
 void Executor::unwind(bool composite) {
@@ -3405,6 +3667,12 @@ void PrepareHints(QPainter &painter) {
 		| QPainter::TextAntialiasing);
 }
 
+QString PaintLimit(const QString &what, int64 max) {
+	return u"Paint limit exceeded: %1 (max %2)"_q.arg(
+		what,
+		QString::number(max));
+}
+
 bool Finite(QPointF point) {
 	return std::isfinite(point.x()) && std::isfinite(point.y());
 }
@@ -3575,21 +3843,25 @@ QImage ShadowFromCoverage(QImage mask, int radius, QRgb color) {
 
 PaintedFrame PaintFrame(
 		const twlite::DisplayList &list,
-		const QtBackend &backend,
+		QtBackend &backend,
 		QSize deviceSize,
-		float64 cssToDevice) {
-	if (!ValidFrame(deviceSize, cssToDevice)) {
+		float64 cssToDevice,
+		crl::time started,
+		Fn<QImage(const Fn<QImage()> &make)> acquire) {
+	const auto work = backend.work();
+	if (!work.admitted() || backend.refused()) {
+		return { .limit = backend.refusal() };
+	} else if (!ValidFrame(deviceSize, cssToDevice)) {
 		return {};
 	}
-	const auto pixels = int64(deviceSize.width()) * deviceSize.height();
-	if (pixels > kMaxFrameBytes / kPixelBytes) {
-		return {
-			.limit = PaintLimit(
-				u"a frame of %1 pixels"_q.arg(pixels),
-				kMaxFrameBytes / kPixelBytes),
-		};
+	auto limit = FrameLimit(deviceSize, started);
+	if (!limit.isEmpty()) {
+		return { .limit = std::move(limit) };
 	}
-	auto result = QImage(deviceSize, QImage::Format_ARGB32_Premultiplied);
+	const auto make = [&] {
+		return QImage(deviceSize, QImage::Format_ARGB32_Premultiplied);
+	};
+	auto result = acquire ? acquire(make) : make();
 	if (result.isNull()) {
 		return {};
 	}
@@ -3598,45 +3870,13 @@ PaintedFrame PaintFrame(
 	if (!painter.begin(&result)) {
 		return {};
 	}
-	auto executor = Executor(painter, backend, cssToDevice);
+	auto executor = Executor(painter, backend, cssToDevice, started);
 	const auto painted = executor.run(list);
 	painter.end();
 	if (!painted) {
 		return { .limit = executor.exceeded() };
 	}
 	return { .image = std::move(result) };
-}
-
-std::optional<QString> RepaintFrame(
-		const twlite::DisplayList &list,
-		const QtBackend &backend,
-		QImage &frame,
-		QRect area,
-		float64 cssToDevice) {
-	area &= QRect(QPoint(), frame.size());
-	if (!ValidFrame(frame.size(), cssToDevice)
-		|| (frame.format() != QImage::Format_ARGB32_Premultiplied)) {
-		return std::nullopt;
-	} else if (area.isEmpty()) {
-		return QString();
-	}
-	auto painter = QPainter();
-	if (!painter.begin(&frame)) {
-		return std::nullopt;
-	}
-	painter.setClipRect(area);
-	painter.setCompositionMode(QPainter::CompositionMode_Source);
-	painter.fillRect(area, Qt::transparent);
-	painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-	auto executor = Executor(painter, backend, cssToDevice);
-	const auto painted = executor.run(list);
-	painter.end();
-	if (painted) {
-		return QString();
-	} else if (executor.exceeded().isEmpty()) {
-		return std::nullopt;
-	}
-	return executor.exceeded();
 }
 
 } // namespace Tgw

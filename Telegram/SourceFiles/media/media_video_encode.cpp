@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/media_video_encode.h"
 
+#include "core/mime_type.h"
 #include "core/private_temp_directory.h"
 #include "ffmpeg/ffmpeg_bytes_io_wrap.h"
 #include "ffmpeg/ffmpeg_frame_generator.h"
@@ -14,9 +15,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_frame_generator.h"
 #include "ui/rect.h"
 
+#include <crl/crl_async.h>
 #include <QtCore/QFileInfo>
 #include <QtCore/QTemporaryFile>
 #include <QtGui/QPainter>
+#include <QtGui/QPainterPath>
 
 extern "C" {
 #include <libavutil/audio_fifo.h>
@@ -1317,12 +1320,16 @@ public:
 	, _from(std::max(entity.from, crl::time(0)))
 	, _trimmed(entity.till > _from)
 	, _till(_trimmed ? entity.till : std::numeric_limits<crl::time>::max()) {
-		if (_size.isEmpty() || entity.bytes.isEmpty()) {
+		if (_size.isEmpty()
+			|| (entity.bytes.isEmpty() && entity.path.isEmpty())) {
 			return;
 		}
 		if (entity.kind == AnimatedEntity::Kind::Lottie) {
 			_generator = std::make_unique<Lottie::FrameGenerator>(
 				entity.bytes);
+		} else if (!entity.path.isEmpty()) {
+			_generator = std::make_unique<FFmpeg::FrameGenerator>(
+				entity.path);
 		} else {
 			_generator = std::make_unique<FFmpeg::FrameGenerator>(
 				entity.bytes);
@@ -1511,6 +1518,11 @@ private:
 						p.scale(-1., 1.);
 					}
 					p.translate(-center);
+					if (entity.round) {
+						auto clip = QPainterPath();
+						clip.addEllipse(entity.geometry);
+						p.setClipPath(clip);
+					}
 					if (cutout && frame.isNull()) {
 						p.drawImage(entity.geometry, cutout->picture);
 					} else if (cutout) {
@@ -1610,6 +1622,8 @@ private:
 struct GeometryPlan {
 	QSize target;
 	QRect crop;
+	std::optional<CanvasBackground> canvas;
+	QRect canvasMediaRect;
 	int fileRotation = 0;
 	int userRotation = 0;
 	bool flipped = false;
@@ -1628,11 +1642,14 @@ struct GeometryPlan {
 	if (plan.crop.isEmpty()) {
 		plan.crop = full;
 	}
+	plan.canvas = source.canvas;
+	plan.canvasMediaRect = source.canvasMediaRect;
 	plan.bake = (plan.crop != full)
 		|| plan.userRotation
 		|| plan.flipped
 		|| !source.exactSize.isEmpty()
-		|| (source.coverPosition >= 0);
+		|| (source.coverPosition >= 0)
+		|| plan.canvas.has_value();
 
 	auto oriented = plan.bake ? plan.crop.size() : display;
 	if (plan.bake && RotationSwapWidthHeight(plan.userRotation)) {
@@ -1742,8 +1759,15 @@ struct GeometryPlan {
 	const auto oriented = TransposeSizeByRotation(
 		crop.size(),
 		plan.userRotation);
+	const auto placement = !plan.canvas
+		? QRect()
+		: !plan.canvasMediaRect.isEmpty()
+		? plan.canvasMediaRect
+		: CanvasPlacement(oriented, plan.target);
 	auto scaled = oriented;
-	if (scaled != plan.target) {
+	if (plan.canvas) {
+		scaled = placement.size();
+	} else if (scaled != plan.target) {
 		scaled = oriented.scaled(plan.target, Qt::KeepAspectRatioByExpanding);
 		scaled = QSize(
 			std::max(scaled.width(), 1),
@@ -1781,6 +1805,15 @@ struct GeometryPlan {
 				Qt::IgnoreAspectRatio,
 				Qt::SmoothTransformation);
 		}
+	}
+	if (plan.canvas) {
+		auto result = QImage(
+			plan.target,
+			QImage::Format_ARGB32_Premultiplied);
+		auto p = QPainter(&result);
+		PaintCanvasBackground(p, result.rect(), *plan.canvas);
+		p.drawImage(placement.topLeft(), image);
+		return result;
 	}
 	if (image.size() != plan.target) {
 		const auto x = (image.width() - plan.target.width()) / 2;
@@ -1866,7 +1899,11 @@ SourceInfo ProbeSource(const QString &path) {
 	result.videoBitrate = (videoParameters->bit_rate > 0)
 		? videoParameters->bit_rate
 		: input->bit_rate;
-	result.videoRemuxable = (videoParameters->codec_id == AV_CODEC_ID_H264)
+	result.videoH264 = (videoParameters->codec_id == AV_CODEC_ID_H264);
+	const auto format = AVPixelFormat(videoParameters->format);
+	result.videoYuv420 = (format == AV_PIX_FMT_YUV420P)
+		|| (format == AV_PIX_FMT_YUVJ420P);
+	result.videoRemuxable = result.videoH264
 		|| (videoParameters->codec_id == AV_CODEC_ID_HEVC);
 
 	const auto audioId = av_find_best_stream(
@@ -1887,6 +1924,101 @@ SourceInfo ProbeSource(const QString &path) {
 				&& (audioParameters->sample_rate >= kMp3InMp4MinFrequency));
 	}
 	return result;
+}
+
+bool IsFaststartMp4(const QString &path) {
+	auto file = QFile(path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	const auto be32 = [&](const char *data) {
+		return (uint32(uchar(data[0])) << 24)
+			| (uint32(uchar(data[1])) << 16)
+			| (uint32(uchar(data[2])) << 8)
+			| uint32(uchar(data[3]));
+	};
+	auto skip = qint64(0);
+	auto seenData = false;
+	for (auto i = 0; i != 64; ++i) {
+		if (skip > 0) {
+			if (!file.seek(file.pos() + skip)) {
+				return false;
+			}
+			skip = 0;
+		}
+		const auto header = file.read(8);
+		if (header.size() != 8) {
+			return false;
+		}
+		const auto type = header.mid(4, 4);
+		if (type == "moov") {
+			return !seenData;
+		} else if (type == "mdat") {
+			seenData = true;
+		}
+		const auto size = be32(header.constData());
+		if (size == 1) {
+			const auto large = file.read(8);
+			if (large.size() != 8) {
+				return false;
+			}
+			skip = ((int64(be32(large.constData())) << 32)
+				| be32(large.constData() + 4)) - 16;
+			if (skip < 0) {
+				return false;
+			}
+		} else if (size == 0) {
+			return !seenData;
+		} else {
+			skip = size - 8;
+		}
+	}
+	return false;
+}
+
+bool CanSkipTranscode(const VideoSource &source) {
+	if (source.path.isEmpty()
+		|| !source.bytes.isEmpty()
+		|| (source.mode != VideoSource::Mode::Mp4)
+		|| NormalizeAngle(source.rotation)
+		|| source.flipped
+		|| (source.from > 0)
+		|| source.canvas
+		|| !source.canvasMediaRect.isEmpty()
+		|| !source.music.empty()
+		|| (Core::MimeTypeForFile(QFileInfo(source.path)).name()
+			!= u"video/mp4"_q)) {
+		return false;
+	}
+	const auto info = ProbeSource(source.path);
+	if (info.empty()
+		|| !info.videoH264
+		|| !info.videoYuv420
+		|| info.rotation
+		|| (info.display != EvenSize(info.display))
+		|| (info.duration <= 0)
+		|| (info.videoBitrate <= 0)) {
+		return false;
+	}
+	const auto halfFrame = crl::time(500. / SanitizedFps(info.fps));
+	const auto full = QRect(QPoint(), info.display);
+	const auto shorter = std::min(
+		info.display.width(),
+		info.display.height());
+	const auto audioChanged = info.hasAudio
+		? (source.removeAudio || !info.audioRemuxable)
+		: source.silentAudio;
+	if ((source.crop.isValid() && (source.crop != full))
+		|| ((source.till > 0) && (source.till + halfFrame < info.duration))
+		|| audioChanged
+		|| ((source.fpsLimit > 0.) && (info.fps > source.fpsLimit * 1.05))
+		|| (!source.exactSize.isEmpty() && (info.display != source.exactSize))
+		|| ((source.targetShorterSide > 0)
+			&& (shorter > source.targetShorterSide))
+		|| (info.videoBitrate > TargetBitrate(info.display, info.fps))) {
+		return false;
+	}
+	return IsFaststartMp4(source.path);
 }
 
 int64 EstimateTranscodedSize(
@@ -1986,7 +2118,11 @@ struct TranscodeAttempt {
 	const auto sourceSize = !source.bytes.isEmpty()
 		? int64(source.bytes.size())
 		: QFileInfo(source.path).size();
-	if (sourceSize <= 0 || sourceSize >= kMaxSourceSize) {
+	const auto oversized = (sourceSize >= kMaxSourceSize);
+	const auto canTrimLargeFile = source.bytes.isEmpty()
+		&& (source.mode == VideoSource::Mode::Mp4)
+		&& (source.from > 0 || source.till > 0);
+	if (sourceSize <= 0 || (oversized && !canTrimLargeFile)) {
 		return {};
 	}
 
@@ -2086,6 +2222,9 @@ struct TranscodeAttempt {
 	const auto till = (source.till > from) ? source.till : crl::time(0);
 	const auto trimmed = (from > 0)
 		|| (till > 0 && (!shownDuration || till < shownDuration));
+	if (oversized && !trimmed) {
+		return {};
+	}
 	const auto span = till
 		? (till - from)
 		: ((totalDuration > from) ? (totalDuration - from) : crl::time(0));

@@ -17,6 +17,7 @@ namespace Ui {
 
 class GenericBox;
 
+[[nodiscard]] std::vector<LanguageId> TranslationLanguages();
 [[nodiscard]] QString LanguageNameTranslated(const QString &twoLetterCode);
 [[nodiscard]] QString LanguageNameLocal(LanguageId id);
 [[nodiscard]] QString LanguageName(LanguageId id);
@@ -32,5 +33,10 @@ void ChooseLanguageBox(
 	std::vector<LanguageId> selected,
 	bool multiselect,
 	Fn<bool(LanguageId)> toggleCheck);
+void ChooseLanguagesBox(
+	not_null<GenericBox*> box,
+	rpl::producer<QString> title,
+	rpl::producer<QString> confirm,
+	Fn<void(std::vector<LanguageId>)> callback);
 
 } // namespace Ui

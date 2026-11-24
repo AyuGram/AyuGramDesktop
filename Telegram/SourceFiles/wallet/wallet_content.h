@@ -29,6 +29,7 @@ class SessionShow;
 
 namespace Ui {
 class FlatLabel;
+class GenericBox;
 class RpWidget;
 class SeparatePanel;
 class Show;
@@ -40,11 +41,16 @@ namespace Ui::Menu {
 struct MenuCallback;
 } // namespace Ui::Menu
 
+namespace Ui::Text {
+class CustomEmojiHelper;
+} // namespace Ui::Text
+
 namespace Wallet {
 
 struct CardLook;
 class CommentScope;
 class CollectibleMedia;
+struct FiatRate;
 class WindowPalette;
 struct KeyAuthorization;
 struct TransferItem;
@@ -163,6 +169,16 @@ void AddAddressPlate(
 	object_ptr<Ui::RpWidget> content,
 	const style::color &bg);
 
+[[nodiscard]] TextWithEntities GramMark(
+	Ui::Text::CustomEmojiHelper &helper,
+	const style::font &font);
+
+[[nodiscard]] TextWithEntities GramValueText(
+	const TextWithEntities &mark,
+	int64 amountNano,
+	const FiatRate &rate,
+	int fiatDecimals);
+
 [[nodiscard]] not_null<Ui::TableLayout*> AddDetailsTableFrame(
 	not_null<Ui::VerticalLayout*> container);
 
@@ -229,6 +245,10 @@ void ShowWalletConflict(
 [[nodiscard]] QString SendErrorText(SendError error, int64 minTransferNano);
 void ShowWalletKeyChanged(std::shared_ptr<Main::SessionShow> show);
 void ShowWalletHowItWorks(std::shared_ptr<Main::SessionShow> show);
+void ShowWalletReceiveBox(
+	not_null<Main::Session*> session,
+	std::shared_ptr<Ui::Show> show);
+void CloseByOutsideClick(not_null<Ui::GenericBox*> box);
 
 // The message, then the error type a real user's report should carry.
 [[nodiscard]] QString ErrorWithType(

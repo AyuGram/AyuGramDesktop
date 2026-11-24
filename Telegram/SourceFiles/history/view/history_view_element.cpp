@@ -164,7 +164,7 @@ private:
 	};
 	using BubbleRoundingKey = uchar;
 	struct CacheKey {
-		BubbleRoundingKey rounding;
+		BubbleRoundingKey rounding = 0;
 		HistoryMessageMarkupButton::Color color;
 
 		friend inline constexpr auto operator<=>(

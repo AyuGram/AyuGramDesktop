@@ -229,6 +229,7 @@ struct MarkdownArticlePaintContext final : Ui::ChatPaintContext {
 	int hiddenSegmentIndex = -1;
 	bool debugBlockGeometry = false;
 	bool bubbleGradient = false;
+	bool suppressInteractiveControls = false;
 	RichButtonLoading buttonLoading;
 	RichButtonLoadingCoverage buttonLoadingCoverage;
 	double mediaPixelScale = 1.;
@@ -439,6 +440,7 @@ public:
 		int current);
 	[[nodiscard]] auto searchSources() const
 	-> std::vector<MarkdownArticleSearchSource>;
+	[[nodiscard]] rpl::producer<> searchSourcesChanges() const;
 	void updatePreparedLeaf(
 		const PreparedEditLeafSource &source,
 		const MarkdownArticleContent &prepared);

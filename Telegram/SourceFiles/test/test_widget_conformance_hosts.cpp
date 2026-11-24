@@ -205,13 +205,14 @@ WidgetOpsSelfCheckRow CheckHostReadings() {
 			entry.refusal);
 	}
 	for (const auto &entry : stopCases) {
+		auto run = ConformanceRun();
+		run.deathLine = QString::fromLatin1(entry.deathLine);
+		run.died = entry.died;
+		run.deathMeasured = !run.deathLine.isEmpty();
+		run.summaryOwn = true;
 		judge(
 			entry.name,
-			StopRefusal(
-				QString::fromLatin1(entry.stops),
-				entry.died,
-				QString::fromLatin1(entry.deathLine),
-				false),
+			StopRefusal(QString::fromLatin1(entry.stops), run),
 			entry.refusal);
 	}
 

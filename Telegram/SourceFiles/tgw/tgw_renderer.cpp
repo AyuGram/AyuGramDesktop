@@ -8,12 +8,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "tgw/tgw_renderer.h"
 
 #include "base/platform/base_platform_info.h"
-#include "core/src/renderer.h"
-#include "tgw/tgw_backend.h"
-#include "tgw/tgw_cursor.h"
-#include "tgw/tgw_painter.h"
+#include "test/test_widget_ops.h"
+#include "tgw/tgw_hosted_wire.h"
+#include "tgw/tgw_render_thread.h"
+#include "tgw/tgw_renderer_input.h"
+#include "tgw/tgw_renderer_platform.h"
+#include "tgw/tgw_renderer_work.h"
 #include "tgw/tgw_touch.h"
-#include "twidget/json.h"
+#include "twidget/remote_hosted.h"
+#include "twidget/sandbox_engine.h"
 #include "twidget/sdk_policy.h"
 #include "twidget/widget_host.h"
 #include "ui/style/style_core_scale.h"
@@ -23,100 +26,172 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_basic.h"
 
 namespace Tgw {
+namespace {
+
+class KeptSlot final {
+public:
+	KeptSlot(const KeptSlot &other) = delete;
+	KeptSlot &operator=(const KeptSlot &other) = delete;
+	~KeptSlot();
+
+	[[nodiscard]] static std::unique_ptr<KeptSlot> Reserve();
+
+private:
+	KeptSlot() = default;
+
+};
+
+} // namespace
 
 class HostLink final : public std::enable_shared_from_this<HostLink> {
 public:
-	explicit HostLink(not_null<RendererCore*> core);
+	HostLink(
+		not_null<RendererCore*> core,
+		uint64 work,
+		double ratio);
+	HostLink(const HostLink &other) = delete;
+	HostLink &operator=(const HostLink &other) = delete;
+	~HostLink();
 
-	[[nodiscard]] bool attach(not_null<twidget::Renderer*> proxy);
-	void detach(not_null<twidget::Renderer*> proxy);
 	void close();
-	void bindHost(not_null<twidget::WidgetHost*> host);
-	void toHost(const std::string &json);
+	void forget();
+	[[nodiscard]] bool gone() const;
+	[[nodiscard]] uint64 workId() const;
+	[[nodiscard]] bool installChannel(
+		std::shared_ptr<twidget::SandboxHostedChannel> channel);
+	[[nodiscard]] bool bindHost(
+		std::weak_ptr<twidget::WidgetHost> host,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel);
 	void diag(const std::string &kind, const std::string &detail);
 	[[nodiscard]] std::optional<bool> hostBottom() const;
+	void work(Fn<void(RendererWork&)> task, bool host);
 
-	void postLoaded();
-	void postMessage(twidget::Json message);
-	void postTheme(bool dark);
+	void toPlatform(std::string message);
+	[[nodiscard]] bool pressPlatform(std::string message);
+	void released();
+	[[nodiscard]] bool localStop(QString reason);
+	[[nodiscard]] bool reserveKeep();
+	void keep(twidget::WidgetHost &host);
+	void keepDropped();
+	void releaseRoute(Fn<void()> done);
+	void setHooks(HostedRunHooks hooks);
+	[[nodiscard]] HostedWithdrawal withdrawRoute(bool keepOwnDeath);
+	[[nodiscard]] bool holdRoute(std::shared_ptr<twidget::WidgetHost> host);
+	[[nodiscard]] bool deciding() const;
+	[[nodiscard]] bool observedDeciding() const;
+
+	void postFrozen(QString reason, bool fatal);
+	void postDeath(const std::string &reason, QString label);
+	void postTraffic(HostedTraffic traffic);
 	void postLinkRequest(RendererCore::LinkRequest request);
 	void postBotRequest(RendererCore::BotRequest request);
 	void postCopyText(std::string text);
 	void postWatch(bool on);
 
+	static void PostTraffic(
+		const std::weak_ptr<HostLink> &weak,
+		const std::string &message,
+		Fn<void(std::string)> respond);
+
 private:
+	enum class Route : uchar {
+		Pending,
+		Live,
+		Keeping,
+		Kept,
+		Closed,
+	};
+	enum class Observed : uchar {
+		Channel,
+		Deciding,
+		Withdrawn,
+	};
+	using DecidedView = twidget::SandboxHostedDecidedView;
+
 	[[nodiscard]] RendererCore *current() const;
+	bool platformSend(std::string &&message, bool press);
+	[[nodiscard]] twidget::HostedKeptRenderer::Observers keptObservers();
+	[[nodiscard]] bool bufferLocked(std::string &&message);
+	void closeLocked();
+	[[nodiscard]] std::vector<Fn<void()>> takeReleasedLocked();
+	void completeRelease(
+		std::unique_ptr<twidget::HostedKeptRenderer> kept,
+		std::unique_ptr<KeptSlot> slot);
+	void markGone();
+	[[nodiscard]] bool recordLocked(HostedDecision decision);
+	[[nodiscard]] Fn<void()> takeDecisionLocked();
+	[[nodiscard]] auto withdrawLocked(bool keepOwnDeath)
+	-> std::shared_ptr<twidget::SandboxHostedChannel>;
+	[[nodiscard]] bool keepSettled(HostedOutcome transport);
+	[[nodiscard]] HostedWithdrawal withdrawalLocked() const;
+	[[nodiscard]] Observed observedLocked() const;
+	void observeLocked();
+	void postDecision();
+	void applyDecision();
+	void postHostFrozen();
+	void reached(HostedDecision decision);
 
 	const base::weak_ptr<RendererCore> _core;
+	const uint64 _work;
 	mutable std::mutex _mutex;
-	twidget::Renderer *_proxy = nullptr;
-	twidget::WidgetHost *_host = nullptr;
-	bool _closed = false;
+	std::weak_ptr<twidget::WidgetHost> _host;
+	std::weak_ptr<twidget::WidgetHost> _live;
+	std::weak_ptr<twidget::SandboxHostedChannel> _channel;
+	std::shared_ptr<const DecidedView> _decidedView;
+	std::shared_ptr<twidget::WidgetHost> _held;
+	std::unique_ptr<twidget::HostedKeptRenderer> _kept;
+	std::unique_ptr<KeptSlot> _slot;
+	std::vector<std::string> _buffered;
+	std::vector<Fn<void()>> _released;
+	HostedRunHooks _hooks;
+	std::optional<HostedDecision> _decision;
+	std::size_t _bufferedBytes = 0;
+	int _releases = 0;
+	Route _route = Route::Pending;
+	HostedOutcome _settled = HostedOutcome::None;
+	bool _releaseWanted = false;
+	bool _decided = false;
+	bool _admitted = false;
+	bool _reached = false;
+	bool _withdrawCalled = false;
+	bool _withdrawn = false;
+	bool _ended = false;
+	bool _claimed = false;
+	std::atomic<const DecidedView*> _decidedRead = nullptr;
+	std::atomic<Observed> _observed = Observed::Channel;
+	std::atomic<bool> _closed = false;
+	std::atomic<bool> _gone = false;
+	std::atomic<bool> _routeClosed = false;
+	std::atomic<bool> _documentGone = false;
 
 };
 
 namespace {
 
 constexpr auto kFallbackWidth = 1.;
-constexpr auto kReadyMessage = "{\"type\":\"ready\"}";
-constexpr auto kPaintBoundsKind = "paint-bounds";
-constexpr auto kMinWakeDelay = crl::time(1);
-constexpr auto kMaxWakeDelay = crl::time(std::numeric_limits<int>::max());
-// Mirrors lib_ui's private kAnimationTick, the cadence every clock runs at.
-constexpr auto kHeldTick = crl::time(1000) / st::universalDuration;
-// A request this soon after a reply may continue a frame loop.
-constexpr auto kRecentReply = crl::time(1000);
-constexpr auto kTouchDown = 0;
-constexpr auto kTouchMove = 1;
-constexpr auto kTouchUp = 2;
-constexpr auto kTouchCancel = 3;
-constexpr auto kHoverMove = 0;
-constexpr auto kHoverLeave = 1;
-constexpr auto kMousePointer = 0;
-constexpr auto kFingerPointer = 1;
-constexpr auto kPrimaryButton = 0;
-constexpr auto kSecondaryButton = 2;
-constexpr auto kLocalQueryId = 0;
-// Mirrors the private twidget::WidgetHost::kRenderAckQid, its post-load query.
-constexpr auto kLoadAckQueryId = -1;
 constexpr auto kDomAlt = 1;
 constexpr auto kDomCtrl = 2;
 constexpr auto kDomMeta = 4;
 constexpr auto kDomShift = 8;
+constexpr auto kMaxKeptRoutes = 8;
+constexpr auto kMaxBufferedSends = std::size_t(256);
+constexpr auto kMaxBufferedBytes = std::size_t(1) << 20;
 
-class HostRenderer final : public twidget::Renderer {
+auto WorkSerial = uint64(0);
+std::atomic<int> KeptRoutes = 0;
+
+class KeepTicket final {
 public:
-	explicit HostRenderer(std::shared_ptr<HostLink> link);
-	~HostRenderer();
+	explicit KeepTicket(std::shared_ptr<HostLink> link);
+	KeepTicket(const KeepTicket &other) = delete;
+	KeepTicket &operator=(const KeepTicket &other) = delete;
+	~KeepTicket();
 
-	void load() override;
-	void send(const std::string &json) override;
-	void setTheme(const std::string &theme) override;
-	void setWidth(double width) override;
-	void destroy() override;
+	void run(twidget::WidgetHost &host);
 
 private:
 	const std::shared_ptr<HostLink> _link;
-
-};
-
-// WHY: one ops message draws canvas text and lays out the document through
-// the same create_font(), so only the core's canvas_font() hook can tell
-// canvas fonts apart for their allowance.
-class CanvasFontRenderer final : public twlite::Renderer {
-public:
-	CanvasFontRenderer(
-		double width,
-		double dpr,
-		bool dark,
-		not_null<QtBackend*> backend);
-
-private:
-	int canvas_font(
-		const std::string &css,
-		twlite::FontMetrics &metrics) override;
-
-	const not_null<QtBackend*> _backend;
+	std::atomic<bool> _used = false;
 
 };
 
@@ -124,289 +199,100 @@ private:
 	return std::isfinite(width) && (width > 0.);
 }
 
-[[nodiscard]] int DeviceSide(uint32 side) {
-	return int(std::min(side, uint32(std::numeric_limits<int>::max())));
-}
-
-[[nodiscard]] QSize DeviceSize(const twlite::Renderer &renderer) {
-	return QSize(
-		DeviceSide(renderer.px_width()),
-		DeviceSide(renderer.px_height()));
-}
-
-[[nodiscard]] bool FitsCard(
-		QSize frame,
-		QSize card,
-		int ratio,
-		bool autoHeight) {
-	return (std::abs(frame.width() - card.width()) <= ratio)
-		&& (!autoHeight
-			|| (std::abs(frame.height() - card.height()) <= ratio));
-}
-
-[[nodiscard]] QRect CornerPatch(
-		Images::CornersMaskRef corners,
-		int index,
-		QSize card) {
-	const auto mask = corners.p[index];
-	if (!mask
-		|| (mask->width() > card.width())
-		|| (mask->height() > card.height())) {
-		return QRect();
-	}
-	const auto right = (index == Images::kTopRight)
-		|| (index == Images::kBottomRight);
-	const auto bottom = (index == Images::kBottomLeft)
-		|| (index == Images::kBottomRight);
-	return QRect(
-		QPoint(
-			right ? (card.width() - mask->width()) : 0,
-			bottom ? (card.height() - mask->height()) : 0),
-		mask->size());
-}
-
-[[nodiscard]] QImage RoundFrame(
-		QImage &&frame,
-		Images::CornersMaskRef corners,
-		QSize card,
-		std::optional<QRect> repainted = std::nullopt) {
-	const auto bounds = QRect(QPoint(), frame.size());
-	for (auto i = 0; i != 4; ++i) {
-		const auto patch = CornerPatch(corners, i, card);
-		const auto target = patch.intersected(bounds);
-		if (target.isEmpty()
-			|| (repainted && !repainted->contains(target))) {
-			continue;
-		}
-		const auto mask = corners.p[i];
-		const auto part = (target == patch)
-			? *mask
-			: mask->copy(target.translated(-patch.topLeft()));
-		auto single = Images::CornersMaskRef();
-		single.p[Images::kTopLeft] = &part;
-		frame = Images::Round(std::move(frame), single, target);
-	}
-	return std::move(frame);
-}
-
-// WHY: a widget may report damage of any size, so it is bounded before it
-// meets an int, and one rectangle grown over the corner patches it touches
-// keeps antialiased edges and masked corners as a whole paint makes them.
-[[nodiscard]] std::optional<QRect> RepaintArea(
-		const std::vector<twlite::Rect> &damage,
-		float64 cssToDevice,
-		Images::CornersMaskRef corners,
-		QSize card,
-		QSize frame) {
-	const auto bounds = QRect(QPoint(), frame);
-	const auto reach = QRectF(bounds).adjusted(-1., -1., 1., 1.);
-	auto result = QRect();
-	for (const auto &rect : damage) {
-		const auto mapped = QRectF(
-			rect.x * cssToDevice,
-			rect.y * cssToDevice,
-			rect.w * cssToDevice,
-			rect.h * cssToDevice);
-		if (!std::isfinite(mapped.x())
-			|| !std::isfinite(mapped.y())
-			|| !std::isfinite(mapped.width())
-			|| !std::isfinite(mapped.height())) {
-			return std::nullopt;
-		}
-		const auto shown = mapped.intersected(reach);
-		if (!shown.isEmpty()) {
-			result |= shown.toAlignedRect().adjusted(-1, -1, 1, 1);
-		}
-	}
-	result &= bounds;
-	for (auto grown = !result.isEmpty(); grown;) {
-		grown = false;
-		for (auto i = 0; i != 4; ++i) {
-			const auto patch = CornerPatch(corners, i, card).intersected(
-				bounds);
-			if (!patch.isEmpty()
-				&& result.intersects(patch)
-				&& !result.contains(patch)) {
-				result |= patch;
-				grown = true;
-			}
-		}
-	}
-	return result;
-}
-
-// Backdrops read the pixels under them; nested filters damage too little.
-[[nodiscard]] bool RepaintsInPlace(const twlite::DisplayList &list) {
-	auto filters = 0;
-	for (const auto &command : list) {
-		switch (command.kind) {
-		case twlite::Cmd::Backdrop: return false;
-		case twlite::Cmd::FilterPush:
-			if (++filters > 1) {
-				return false;
-			}
-			break;
-		case twlite::Cmd::FilterPop: filters = std::max(filters - 1, 0); break;
-		default: break;
-		}
-	}
-	return true;
-}
-
-[[nodiscard]] crl::time WakeDelay(double seconds) {
-	return crl::time(std::clamp(
-		std::ceil(seconds * 1000.),
-		double(kMinWakeDelay),
-		double(kMaxWakeDelay)));
-}
-
-[[nodiscard]] twidget::Json FrameMessage() {
-	auto result = twidget::Json::object();
-	result.set("type", "frame");
-	result.set("time", twlite::Renderer::clock() * 1000.);
-	return result;
-}
-
-[[nodiscard]] twidget::Json LocalQuery(twidget::Json query) {
-	auto result = twidget::Json::object();
-	result.set("type", "query");
-	result.set("qid", kLocalQueryId);
-	result.set("query", std::move(query));
-	return result;
-}
-
-[[nodiscard]] twidget::Json ElementAtQuery(QPointF point) {
-	auto query = twidget::Json::object();
-	query.set("q", "elementFromPoint");
-	query.set("x", point.x());
-	query.set("y", point.y());
-	return LocalQuery(std::move(query));
-}
-
-[[nodiscard]] twidget::Json ViewportQuery() {
-	auto query = twidget::Json::object();
-	query.set("q", "viewport");
-	return LocalQuery(std::move(query));
-}
-
-[[nodiscard]] auto OfType(std::string_view type) {
-	return [=](const twidget::Json &message) {
-		return (message["type"].asString() == type);
+[[nodiscard]] std::optional<twlite::remote::Kind> SettingKind(
+		std::string_view message) {
+	using Kind = twlite::remote::Kind;
+	constexpr auto kSettings = std::array{
+		Kind::SetWidth,
+		Kind::SetMaxHeight,
+		Kind::ClearSelection,
 	};
-}
-
-[[nodiscard]] twidget::Json TakeMessage(
-		std::vector<twidget::Json> &out,
-		std::string_view type) {
-	const auto i = ranges::find_if(out, OfType(type));
-	if (i == end(out)) {
-		return twidget::Json();
-	}
-	auto result = std::move(*i);
-	out.erase(i);
-	return result;
-}
-
-[[nodiscard]] twidget::WidgetGestureClaim GestureClaim(
-		const std::vector<twidget::Json> &out) {
-	const auto i = ranges::find_if(out, OfType("gesture"));
-	if (i == end(out)) {
-		return {};
-	}
-	return {
-		.x = (*i)["x"].asBool(),
-		.hold = (*i)["hold"].asBool(),
-	};
-}
-
-void Append(
-		std::vector<twidget::Json> &to,
-		std::vector<twidget::Json> &&from) {
-	to.insert(
-		end(to),
-		std::make_move_iterator(begin(from)),
-		std::make_move_iterator(end(from)));
-}
-
-[[nodiscard]] std::vector<twidget::Json> Touch(
-		twlite::Renderer &renderer,
-		int action,
-		QPointF point,
-		int modifiers,
-		int pointer = kMousePointer,
-		int button = kPrimaryButton) {
-	return renderer.touch(
-		action,
-		point.x(),
-		point.y(),
-		pointer,
-		true,
-		(pointer == kMousePointer),
-		modifiers,
-		button);
-}
-
-[[nodiscard]] bool OutsideSlop(QPointF point, QPointF origin) {
-	const auto delta = point - origin;
-	return std::hypot(delta.x(), delta.y())
-		> twidget::gesture::TOUCH_SLOP_PX;
-}
-
-[[nodiscard]] int ParsedDocuments(const twlite::Renderer &renderer) {
-	const auto &stats = renderer.stats();
-	return stats.builds - stats.patched;
+	const auto kind = twlite::remote::kind_of(message);
+	return (kind && ranges::contains(kSettings, *kind))
+		? kind
+		: std::nullopt;
 }
 
 void RespondFailed(const RendererCore::Respond &respond) {
 	respond({ .failure = twidget::WidgetRequestFailure::Failed });
 }
 
-HostRenderer::HostRenderer(std::shared_ptr<HostLink> link)
+void PostReleased(std::vector<Fn<void()>> released) {
+	if (released.empty()) {
+		return;
+	}
+	crl::on_main([released = std::move(released)] {
+		for (const auto &done : released) {
+			done();
+		}
+	});
+}
+
+[[nodiscard]] HostedOutcome TransportOutcome(
+		twidget::SandboxHostedChannel::Death death) {
+	using Death = twidget::SandboxHostedChannel::Death;
+	switch (death) {
+	case Death::Ordinary: return HostedOutcome::Ordinary;
+	case Death::Stalled: return HostedOutcome::Stalled;
+	case Death::Spared: return HostedOutcome::Spared;
+	}
+	Unexpected("Death in Tgw::TransportOutcome.");
+}
+
+[[nodiscard]] RendererWork::Host HostOf(std::shared_ptr<HostLink> link) {
+	return {
+		.diag = [=](const std::string &kind, const std::string &detail) {
+			link->diag(kind, detail);
+		},
+		.bottom = [=] {
+			return link->hostBottom();
+		},
+		.gone = [=] {
+			return link->gone();
+		},
+		.platform = [=](std::string message) {
+			link->toPlatform(std::move(message));
+		},
+		.press = [=](std::string message) {
+			return link->pressPlatform(std::move(message));
+		},
+		.released = [=] {
+			link->released();
+		},
+		.localStop = [=](QString reason) {
+			return link->localStop(std::move(reason));
+		},
+	};
+}
+
+KeptSlot::~KeptSlot() {
+	--KeptRoutes;
+}
+
+std::unique_ptr<KeptSlot> KeptSlot::Reserve() {
+	auto held = KeptRoutes.load();
+	do {
+		if (held >= kMaxKeptRoutes) {
+			return nullptr;
+		}
+	} while (!KeptRoutes.compare_exchange_weak(held, held + 1));
+	return std::unique_ptr<KeptSlot>(new KeptSlot());
+}
+
+KeepTicket::KeepTicket(std::shared_ptr<HostLink> link)
 : _link(std::move(link)) {
 }
 
-HostRenderer::~HostRenderer() {
-	_link->detach(this);
-}
-
-void HostRenderer::load() {
-	if (_link->attach(this)) {
-		_link->postLoaded();
+KeepTicket::~KeepTicket() {
+	if (!_used) {
+		_link->keepDropped();
 	}
 }
 
-void HostRenderer::send(const std::string &json) {
-	if (auto message = twidget::Json::parse(json)) {
-		_link->postMessage(std::move(*message));
-	} else if (onDiag) {
-		onDiag("renderer-message", "unparsed host message");
+void KeepTicket::run(twidget::WidgetHost &host) {
+	if (!_used.exchange(true)) {
+		_link->keep(host);
 	}
-}
-
-void HostRenderer::setTheme(const std::string &theme) {
-	_link->postTheme(theme == "dark");
-}
-
-void HostRenderer::setWidth(double) {
-}
-
-void HostRenderer::destroy() {
-	_link->detach(this);
-}
-
-CanvasFontRenderer::CanvasFontRenderer(
-	double width,
-	double dpr,
-	bool dark,
-	not_null<QtBackend*> backend)
-: twlite::Renderer(width, dpr, dark, *backend)
-, _backend(backend) {
-}
-
-int CanvasFontRenderer::canvas_font(
-		const std::string &css,
-		twlite::FontMetrics &metrics) {
-	return _backend->canvasFont(css, metrics);
 }
 
 } // namespace
@@ -428,52 +314,133 @@ int DomModifiers(Qt::KeyboardModifiers modifiers) {
 	return result;
 }
 
-HostLink::HostLink(not_null<RendererCore*> core)
-: _core(core) {
+int LogicalHeight(double css, int scale) {
+	return int(std::ceil(css * scale / 100.));
 }
 
-bool HostLink::attach(not_null<twidget::Renderer*> proxy) {
-	auto lock = std::lock_guard(_mutex);
-	if (_closed) {
-		return false;
+void DropChannel(std::shared_ptr<twidget::SandboxHostedChannel> channel) {
+	if (channel) {
+		crl::async([channel = std::move(channel)]() mutable {
+			channel = nullptr;
+		});
 	}
-	_proxy = proxy.get();
-	return true;
 }
 
-void HostLink::detach(not_null<twidget::Renderer*> proxy) {
-	auto lock = std::lock_guard(_mutex);
-	if (_proxy == proxy.get()) {
-		_proxy = nullptr;
-		_host = nullptr;
+bool ChargesCrash(HostedOutcome outcome) {
+	switch (outcome) {
+	case HostedOutcome::None:
+	case HostedOutcome::Spared: return false;
+	case HostedOutcome::Ordinary:
+	case HostedOutcome::Stalled:
+	case HostedOutcome::Refused: return true;
 	}
+	Unexpected("Outcome in Tgw::ChargesCrash.");
+}
+
+HostLink::HostLink(
+	not_null<RendererCore*> core,
+	uint64 work,
+	double ratio)
+: _core(core)
+, _work(work) {
+	_buffered.push_back(HostedWire::EncodeOpen(ratio));
+	_bufferedBytes = _buffered.back().size();
+}
+
+HostLink::~HostLink() {
+	if (_kept || _slot) {
+		crl::async([
+			kept = std::move(_kept),
+			slot = std::move(_slot)
+		]() mutable {
+			kept = nullptr;
+			slot = nullptr;
+		});
+	}
+	PostReleased(base::take(_released));
 }
 
 void HostLink::close() {
 	auto lock = std::lock_guard(_mutex);
 	_closed = true;
-	_proxy = nullptr;
-	_host = nullptr;
+	_host.reset();
 }
 
-void HostLink::bindHost(not_null<twidget::WidgetHost*> host) {
-	auto lock = std::lock_guard(_mutex);
-	if (!_closed) {
-		_host = host.get();
+void HostLink::forget() {
+	auto strong = std::shared_ptr<twidget::SandboxHostedChannel>();
+	auto held = std::shared_ptr<twidget::WidgetHost>();
+	auto hooks = HostedRunHooks();
+	auto decided = Fn<void()>();
+	auto withdrawal = HostedWithdrawal();
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (_gone) {
+			return;
+		}
+		_gone = true;
+		strong = withdrawLocked(false);
+		observeLocked();
+		withdrawal = withdrawalLocked();
+		decided = takeDecisionLocked();
+		hooks = base::take(_hooks);
+		held = base::take(_held);
+	}
+	DropChannel(std::move(strong));
+	if (decided) {
+		decided();
+	}
+	if (hooks.gone) {
+		hooks.gone(withdrawal);
 	}
 }
 
-void HostLink::toHost(const std::string &json) {
+bool HostLink::gone() const {
+	return _gone;
+}
+
+uint64 HostLink::workId() const {
+	return _work;
+}
+
+bool HostLink::installChannel(
+		std::shared_ptr<twidget::SandboxHostedChannel> channel) {
 	auto lock = std::lock_guard(_mutex);
-	if (_proxy && _proxy->onMessage) {
-		_proxy->onMessage(json);
+	if (_gone || _withdrawCalled || _decided) {
+		return false;
 	}
+	_channel = channel;
+	_decidedView = channel ? channel->decidedView() : nullptr;
+	_decidedRead = _decidedView.get();
+	return true;
+}
+
+bool HostLink::bindHost(
+		std::weak_ptr<twidget::WidgetHost> host,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel) {
+	auto lock = std::lock_guard(_mutex);
+	_channel = std::move(channel);
+	if (_route != Route::Pending) {
+		return false;
+	}
+	const auto strong = host.lock();
+	if (!strong) {
+		return false;
+	} else if (!_closed) {
+		_host = host;
+	}
+	_live = std::move(host);
+	_route = Route::Live;
+	for (auto &message : base::take(_buffered)) {
+		strong->sendPlatform(std::move(message));
+	}
+	_bufferedBytes = 0;
+	return true;
 }
 
 void HostLink::diag(const std::string &kind, const std::string &detail) {
 	auto lock = std::lock_guard(_mutex);
-	if (_proxy && _proxy->onDiag) {
-		_proxy->onDiag(kind, detail);
+	if (const auto host = _live.lock()) {
+		host->platformDiag(kind, detail);
 	}
 }
 
@@ -485,7 +452,7 @@ RendererCore *HostLink::current() const {
 std::optional<bool> HostLink::hostBottom() const {
 	const auto host = [&] {
 		auto lock = std::lock_guard(_mutex);
-		return _host;
+		return _host.lock();
 	}();
 	if (!host) {
 		return std::nullopt;
@@ -501,28 +468,572 @@ std::optional<bool> HostLink::hostBottom() const {
 	return result;
 }
 
-void HostLink::postLoaded() {
+void HostLink::work(Fn<void(RendererWork&)> task, bool host) {
+	PostToRenderThread([
+		link = shared_from_this(),
+		task = std::move(task),
+		host
+	] {
+		if (link->_gone || (host && link->_closed)) {
+			return;
+		} else if (const auto work = RendererWork::Find(link->_work)) {
+			const auto operation = work->operation();
+			task(*work);
+		}
+	});
+}
+
+void HostLink::toPlatform(std::string message) {
+	platformSend(std::move(message), false);
+}
+
+bool HostLink::pressPlatform(std::string message) {
+	return platformSend(std::move(message), true);
+}
+
+bool HostLink::platformSend(std::string &&message, bool press) {
+	auto lost = false;
+	auto live = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (_routeClosed) {
+			return false;
+		}
+		switch (_route) {
+		case Route::Pending:
+		case Route::Keeping:
+			lost = !bufferLocked(std::move(message));
+			break;
+		case Route::Live:
+			if (const auto host = _live.lock()) {
+				if (press) {
+					host->sendPlatformPress(std::move(message));
+					live = true;
+				} else {
+					host->sendPlatform(std::move(message));
+				}
+			} else {
+				lost = true;
+			}
+			break;
+		case Route::Kept:
+			_kept->sendPlatform(std::move(message));
+			break;
+		case Route::Closed:
+			break;
+		}
+	}
+	if (lost) {
+		releaseRoute(nullptr);
+	}
+	return live;
+}
+
+void HostLink::released() {
+	auto lock = std::lock_guard(_mutex);
+	if (_route != Route::Live) {
+		return;
+	} else if (const auto host = _live.lock()) {
+		host->releaseDelivered();
+	}
+}
+
+bool HostLink::localStop(QString reason) {
+	using Death = twidget::SandboxHostedChannel::Death;
+	auto strong = std::shared_ptr<twidget::SandboxHostedChannel>();
+	auto stalled = false;
+	auto recorded = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (_gone) {
+			return false;
+		}
+		strong = _channel.lock();
+		const auto death = strong ? strong->localStop() : std::nullopt;
+		stalled = (death == Death::Stalled);
+		recorded = recordLocked({
+			.reason = stalled ? StalledReason() : std::move(reason),
+			.outcome = (stalled
+				? HostedOutcome::Stalled
+				: HostedOutcome::Refused),
+			.transport = (death
+				? TransportOutcome(*death)
+				: HostedOutcome::None),
+		});
+	}
+	DropChannel(std::move(strong));
+	if (recorded) {
+		postDecision();
+	}
+	return stalled;
+}
+
+bool HostLink::reserveKeep() {
+	auto lock = std::lock_guard(_mutex);
+	if (_route != Route::Live || _slot || _live.expired()) {
+		return false;
+	}
+	_slot = KeptSlot::Reserve();
+	return (_slot != nullptr);
+}
+
+void HostLink::keep(twidget::WidgetHost &host) {
+	auto slot = std::unique_ptr<KeptSlot>();
+	auto released = std::vector<Fn<void()>>();
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (!_slot) {
+			return;
+		} else if (_route == Route::Live && _live.lock().get() == &host) {
+			_route = Route::Keeping;
+		} else {
+			slot = base::take(_slot);
+			closeLocked();
+			released = takeReleasedLocked();
+		}
+	}
+	if (slot) {
+		slot = nullptr;
+		PostReleased(std::move(released));
+		markGone();
+		return;
+	}
+	auto kept = host.keepRenderer(keptObservers());
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (kept && !_releaseWanted) {
+			_kept = std::move(kept);
+			_route = Route::Kept;
+			_live.reset();
+			for (auto &message : base::take(_buffered)) {
+				_kept->sendPlatform(std::move(message));
+			}
+			_bufferedBytes = 0;
+			return;
+		}
+		_releaseWanted = false;
+		slot = base::take(_slot);
+		closeLocked();
+		++_releases;
+	}
+	markGone();
+	completeRelease(std::move(kept), std::move(slot));
+}
+
+void HostLink::keepDropped() {
+	auto slot = std::unique_ptr<KeptSlot>();
+	auto released = std::vector<Fn<void()>>();
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (!_slot || _route == Route::Keeping || _route == Route::Kept) {
+			return;
+		}
+		slot = base::take(_slot);
+		closeLocked();
+		released = takeReleasedLocked();
+	}
+	slot = nullptr;
+	PostReleased(std::move(released));
+	markGone();
+}
+
+void HostLink::releaseRoute(Fn<void()> done) {
+	auto held = std::shared_ptr<twidget::WidgetHost>();
+	auto kept = std::unique_ptr<twidget::HostedKeptRenderer>();
+	auto slot = std::unique_ptr<KeptSlot>();
+	auto released = std::vector<Fn<void()>>();
+	{
+		auto lock = std::lock_guard(_mutex);
+		held = base::take(_held);
+		if (done) {
+			_released.push_back(std::move(done));
+		}
+		if (_route == Route::Keeping) {
+			_releaseWanted = true;
+			_routeClosed = true;
+			observeLocked();
+			_buffered.clear();
+			_bufferedBytes = 0;
+		} else {
+			if (_route == Route::Kept) {
+				kept = base::take(_kept);
+				slot = base::take(_slot);
+				++_releases;
+			}
+			closeLocked();
+		}
+		released = takeReleasedLocked();
+	}
+	if (kept) {
+		crl::async([
+			link = shared_from_this(),
+			kept = std::move(kept),
+			slot = std::move(slot)
+		]() mutable {
+			link->completeRelease(std::move(kept), std::move(slot));
+		});
+	}
+	PostReleased(std::move(released));
+	markGone();
+}
+
+void HostLink::setHooks(HostedRunHooks hooks) {
+	auto pending = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		_hooks = std::move(hooks);
+		pending = _decision.has_value();
+	}
+	if (pending) {
+		postDecision();
+	}
+}
+
+HostedWithdrawal HostLink::withdrawRoute(bool keepOwnDeath) {
+	auto strong = std::shared_ptr<twidget::SandboxHostedChannel>();
+	auto decided = Fn<void()>();
+	auto result = HostedWithdrawal();
+	{
+		auto lock = std::lock_guard(_mutex);
+		strong = withdrawLocked(keepOwnDeath);
+		observeLocked();
+		result = withdrawalLocked();
+		decided = takeDecisionLocked();
+	}
+	DropChannel(std::move(strong));
+	if (decided) {
+		decided();
+	}
+	return result;
+}
+
+bool HostLink::holdRoute(std::shared_ptr<twidget::WidgetHost> host) {
+	auto lock = std::lock_guard(_mutex);
+	if (!host || !withdrawalLocked().awaits) {
+		return false;
+	}
+	_held = std::move(host);
+	return true;
+}
+
+bool HostLink::deciding() const {
+	auto strong = std::shared_ptr<twidget::SandboxHostedChannel>();
+	auto result = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		switch (observedLocked()) {
+		case Observed::Deciding: return true;
+		case Observed::Withdrawn: return false;
+		case Observed::Channel: break;
+		}
+		strong = _channel.lock();
+		result = strong && strong->decided();
+	}
+	DropChannel(std::move(strong));
+	return result;
+}
+
+bool HostLink::observedDeciding() const {
+	switch (_observed.load()) {
+	case Observed::Deciding: return true;
+	case Observed::Withdrawn: return false;
+	case Observed::Channel: break;
+	}
+	const auto view = _decidedRead.load();
+	return view && view->decided();
+}
+
+twidget::HostedKeptRenderer::Observers HostLink::keptObservers() {
+	const auto weak = weak_from_this();
+	return {
+		.onPlatformMessage = [=](const std::string &message) {
+			PostTraffic(weak, message, nullptr);
+		},
+		.onPlatformRequest = [=](
+				const std::string &message,
+				Fn<void(std::string answer)> respond) {
+			PostTraffic(weak, message, std::move(respond));
+		},
+		.onEnded = [=](const std::string &) {
+			crl::async([=] {
+				if (const auto link = weak.lock()) {
+					link->releaseRoute(nullptr);
+				}
+			});
+		},
+	};
+}
+
+bool HostLink::bufferLocked(std::string &&message) {
+	if (const auto kind = SettingKind(message)) {
+		for (auto i = _buffered.rbegin(); i != _buffered.rend(); ++i) {
+			const auto was = SettingKind(*i);
+			if (!was) {
+				break;
+			} else if (*was == *kind) {
+				_bufferedBytes -= i->size();
+				_buffered.erase(std::next(i).base());
+				break;
+			}
+		}
+	}
+	if ((_buffered.size() >= kMaxBufferedSends)
+		|| (message.size() > kMaxBufferedBytes - _bufferedBytes)) {
+		return false;
+	}
+	_bufferedBytes += message.size();
+	_buffered.push_back(std::move(message));
+	return true;
+}
+
+void HostLink::closeLocked() {
+	_route = Route::Closed;
+	_routeClosed = true;
+	observeLocked();
+	_buffered.clear();
+	_bufferedBytes = 0;
+	_live.reset();
+}
+
+std::vector<Fn<void()>> HostLink::takeReleasedLocked() {
+	return (_slot || _releases > 0)
+		? std::vector<Fn<void()>>()
+		: base::take(_released);
+}
+
+void HostLink::completeRelease(
+		std::unique_ptr<twidget::HostedKeptRenderer> kept,
+		std::unique_ptr<KeptSlot> slot) {
+	kept = nullptr;
+	slot = nullptr;
+	auto released = std::vector<Fn<void()>>();
+	{
+		auto lock = std::lock_guard(_mutex);
+		--_releases;
+		released = takeReleasedLocked();
+	}
+	PostReleased(std::move(released));
+}
+
+void HostLink::markGone() {
+	if (_documentGone.exchange(true)) {
+		return;
+	}
+	work([](RendererWork &work) {
+		work.routeEnded();
+	}, false);
+	crl::on_main([link = shared_from_this()] {
+		if (const auto core = link->_core.get()) {
+			core->routeLost();
+		}
+	});
+}
+
+bool HostLink::recordLocked(HostedDecision decision) {
+	if (_gone || _decided) {
+		return false;
+	}
+	_decided = true;
+	_decision = std::move(decision);
+	observeLocked();
+	return true;
+}
+
+Fn<void()> HostLink::takeDecisionLocked() {
+	if (!_decision || !_hooks.decided) {
+		return nullptr;
+	}
+	return [decided = _hooks.decided, decision = *base::take(_decision)] {
+		decided(decision);
+	};
+}
+
+auto HostLink::withdrawLocked(bool keepOwnDeath)
+-> std::shared_ptr<twidget::SandboxHostedChannel> {
+	using Death = twidget::SandboxHostedChannel::Death;
+	if (std::exchange(_withdrawCalled, true)) {
+		return nullptr;
+	}
+	auto strong = _channel.lock();
+	auto settled = Fn<void(Death death)>();
+	if (strong && _hooks.settled) {
+		settled = [weak = weak_from_this(), hook = _hooks.settled](
+				Death death) {
+			crl::on_main([=] {
+				const auto transport = TransportOutcome(death);
+				const auto link = weak.lock();
+				if (!link || !link->keepSettled(transport)) {
+					hook(transport);
+				}
+			});
+		};
+	}
+	const auto withdrawal = strong
+		? strong->withdraw(std::move(settled))
+		: twidget::SandboxHostedChannel::Withdrawal();
+	_ended = withdrawal.ended;
+	_withdrawn = !withdrawal.ended;
+	_claimed = keepOwnDeath
+		&& withdrawal.own
+		&& !_decided
+		&& (_route == Route::Pending);
+	if (withdrawal.death) {
+		_settled = TransportOutcome(*withdrawal.death);
+	}
+	return strong;
+}
+
+bool HostLink::keepSettled(HostedOutcome transport) {
+	auto lock = std::lock_guard(_mutex);
+	if (_gone) {
+		return false;
+	}
+	_settled = transport;
+	return true;
+}
+
+HostedWithdrawal HostLink::withdrawalLocked() const {
+	return {
+		.settled = _settled,
+		.ended = _ended,
+		.awaits = _ended && !_reached && !_gone && !_routeClosed,
+		.decided = _decided,
+		.claimed = _claimed,
+	};
+}
+
+HostLink::Observed HostLink::observedLocked() const {
+	return (_gone || _decided || _claimed || withdrawalLocked().awaits)
+		? Observed::Deciding
+		: _withdrawCalled
+		? Observed::Withdrawn
+		: Observed::Channel;
+}
+
+void HostLink::observeLocked() {
+	_observed = observedLocked();
+}
+
+void HostLink::postDecision() {
+	crl::on_main([link = shared_from_this()] {
+		link->applyDecision();
+	});
+}
+
+void HostLink::applyDecision() {
+	auto decided = Fn<void()>();
+	{
+		auto lock = std::lock_guard(_mutex);
+		decided = takeDecisionLocked();
+	}
+	if (decided) {
+		decided();
+	}
+}
+
+void HostLink::postHostFrozen() {
 	crl::on_main([link = shared_from_this()] {
 		if (const auto core = link->current()) {
-			core->hostLoaded();
+			core->hostFrozen();
 		}
 	});
 }
 
-void HostLink::postMessage(twidget::Json message) {
-	crl::on_main([link = shared_from_this(), message = std::move(message)] {
-		if (const auto core = link->current()) {
-			core->hostMessage(message);
+void HostLink::reached(HostedDecision decision) {
+	auto held = std::shared_ptr<twidget::WidgetHost>();
+	auto recorded = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (_gone || std::exchange(_reached, true)) {
+			return;
+		} else if (decision.outcome == HostedOutcome::Spared) {
+			recorded = recordLocked(std::move(decision));
+		}
+		observeLocked();
+		held = base::take(_held);
+	}
+	if (recorded) {
+		postDecision();
+	}
+	if (held) {
+		releaseRoute(nullptr);
+	}
+}
+
+void HostLink::postFrozen(QString reason, bool fatal) {
+	postHostFrozen();
+	work([=](RendererWork &work) {
+		work.freeze(reason, fatal);
+	}, true);
+}
+
+void HostLink::postDeath(const std::string &, QString label) {
+	using Death = twidget::SandboxHostedChannel::Death;
+	auto strong = std::shared_ptr<twidget::SandboxHostedChannel>();
+	auto decision = HostedDecision();
+	auto recorded = false;
+	{
+		auto lock = std::lock_guard(_mutex);
+		if (_gone || _withdrawn || std::exchange(_admitted, true)) {
+			return;
+		}
+		strong = _channel.lock();
+		decision.transport = TransportOutcome(strong
+			? strong->death()
+			: Death::Ordinary);
+		decision.outcome = decision.transport;
+		decision.reason = (decision.outcome == HostedOutcome::Stalled)
+			? StalledReason()
+			: std::move(label);
+		if (decision.outcome != HostedOutcome::Spared) {
+			recorded = recordLocked(decision);
+		}
+	}
+	DropChannel(std::move(strong));
+	if (recorded) {
+		postDecision();
+	}
+	if (decision.outcome == HostedOutcome::Spared) {
+		postHostFrozen();
+	} else {
+		postFrozen(decision.reason, true);
+	}
+	work([=, link = shared_from_this()](RendererWork &work) {
+		work.hostDied([=] {
+			link->reached(decision);
+		});
+	}, false);
+}
+
+void HostLink::postTraffic(HostedTraffic traffic) {
+	if (_gone || _routeClosed) {
+		return;
+	}
+	PostToRenderThread([
+		link = shared_from_this(),
+		shared = std::make_shared<HostedTraffic>(std::move(traffic))
+	] {
+		if (link->_gone || link->_routeClosed) {
+			return;
+		} else if (const auto work = RendererWork::Find(link->_work)) {
+			work->platformTraffic(std::move(*shared));
 		}
 	});
 }
 
-void HostLink::postTheme(bool dark) {
-	crl::on_main([link = shared_from_this(), dark] {
-		if (const auto core = link->current()) {
-			core->hostTheme(dark);
-		}
-	});
+void HostLink::PostTraffic(
+		const std::weak_ptr<HostLink> &weak,
+		const std::string &message,
+		Fn<void(std::string)> respond) {
+	const auto delivery = twidget::WidgetHost::platformDelivery();
+	auto traffic = HostedTraffic(
+		message,
+		delivery.hold,
+		delivery.request,
+		std::move(respond));
+	if (const auto link = weak.lock()) {
+		link->postTraffic(std::move(traffic));
+	}
 }
 
 void HostLink::postLinkRequest(RendererCore::LinkRequest request) {
@@ -560,37 +1071,138 @@ void HostLink::postWatch(bool on) {
 }
 
 RendererCore::RendererCore(double width, double dpr)
-: _link(std::make_shared<HostLink>(this))
-, _backend(std::make_unique<QtBackend>(
-	[link = _link](const std::string &kind, const std::string &detail) {
-		link->diag(kind, detail);
-	}))
-, _renderer(std::make_unique<CanvasFontRenderer>(
-	ValidWidth(width) ? width : kFallbackWidth,
-	dpr,
-	false,
-	_backend.get()))
-, _clock([=](crl::time now) { return step(now); })
-, _wake([=] { wake(); })
-, _heldTimer([=] { releaseHeld(); refreshClock(); }) {
+: _link(std::make_shared<HostLink>(
+	this,
+	++WorkSerial,
+	RendererWork::DeviceRatio(dpr)))
+, _wait(std::make_shared<twidget::SandboxHostedWait>())
+, _reports(std::make_shared<ReportPost>())
+, _pictures(std::make_shared<PicturePost>())
+, _size{ .width = ValidWidth(width) ? width : kFallbackWidth }
+, _menuDeadline([=] { menuDeadline(); })
+, _claimDeadline([=] { claimDeadline(); }) {
+	auto values = RendererValues{
+		.regularFamily = st::normalFont->f.family(),
+		.monospaceFamily = st::normalFont->monospace()->f.family(),
+		.positions = CurrentFontPositions(),
+		.emoji = CurrentEmojiSides(),
+	};
+	PostToRenderThread([
+		link = _link,
+		chat = base::make_weak(this),
+		dpr,
+		values = std::move(values),
+		wait = _wait,
+		reports = _reports,
+		pictures = _pictures
+	] {
+		if (!link->gone()) {
+			RendererWork::Create(
+				link->workId(),
+				chat,
+				dpr,
+				values,
+				HostOf(link),
+				RendererHosted{
+					.wait = wait,
+					.reports = reports,
+					.pictures = pictures,
+				});
+		}
+	});
 }
 
 RendererCore::~RendererCore() {
-	_clock.stop();
-	_wake.cancel();
-	releaseInput();
+	_pictures->close();
 	_link->close();
+	_link->forget();
+	_link->releaseRoute(nullptr);
+	PostToRenderThread([id = _link->workId()] {
+		RendererWork::Destroy(id);
+	});
 }
 
-twidget::RendererFactory RendererCore::hostFactory() const {
-	return [link = _link](
-			std::shared_ptr<twidget::SandboxResources>,
-			const std::string &theme,
-			double) {
-		link->postTheme(theme == "dark");
-		return std::unique_ptr<twidget::Renderer>(
-			std::make_unique<HostRenderer>(link));
+uint64 RendererCore::workId() const {
+	return _link->workId();
+}
+
+std::shared_ptr<twidget::SandboxHostedWait> RendererCore::hostedWait() const {
+	return _wait;
+}
+
+RendererCore::HostedHandlers RendererCore::hostedHandlers(
+		QString stoppedLabel) const {
+	const auto weak = std::weak_ptr<HostLink>(_link);
+	return {
+		.message = [=](const std::string &message) {
+			HostLink::PostTraffic(weak, message, nullptr);
+		},
+		.request = [=](
+				const std::string &message,
+				Fn<void(std::string answer)> respond) {
+			HostLink::PostTraffic(weak, message, std::move(respond));
+		},
+		.death = [=](const std::string &reason) {
+			if (const auto link = weak.lock()) {
+				link->postDeath(reason, stoppedLabel);
+			}
+		},
+		.channel = [=](
+				std::shared_ptr<twidget::SandboxHostedChannel> channel) {
+			const auto link = weak.lock();
+			return link && link->installChannel(std::move(channel));
+		},
 	};
+}
+
+Fn<void(twidget::WidgetHost &host)> RendererCore::keepRoute() {
+	if (_routeChecked || _documentGone || !_link->reserveKeep()) {
+		return nullptr;
+	}
+	const auto ticket = std::make_shared<KeepTicket>(_link);
+	return [=](twidget::WidgetHost &host) {
+		ticket->run(host);
+	};
+}
+
+void RendererCore::releaseRoute(Fn<void()> done) {
+	_link->releaseRoute(std::move(done));
+}
+
+void RendererCore::setHostedRun(HostedRunHooks hooks) {
+	_link->setHooks(std::move(hooks));
+}
+
+HostedWithdrawal RendererCore::withdrawRoute(bool keepOwnDeath) {
+	return _link->withdrawRoute(keepOwnDeath);
+}
+
+bool RendererCore::holdRoute(std::shared_ptr<twidget::WidgetHost> host) {
+	return _link->holdRoute(std::move(host));
+}
+
+bool RendererCore::deciding() const {
+	return _link->deciding();
+}
+
+bool RendererCore::observedDeciding() const {
+	return _link->observedDeciding();
+}
+
+void RendererCore::forget() {
+	_link->forget();
+}
+
+bool RendererCore::routeChecked() const {
+	return _routeChecked;
+}
+
+bool RendererCore::documentGone() const {
+	return _documentGone;
+}
+
+rpl::producer<> RendererCore::keptUpdates() const {
+	return _keptUpdates.events();
 }
 
 auto RendererCore::hostActionHandler() const
@@ -640,21 +1252,22 @@ RendererCore::WatchHandler RendererCore::hostWatchHandler() const {
 	};
 }
 
-void RendererCore::bindHost(not_null<twidget::WidgetHost*> host) {
-	_link->bindHost(host);
+bool RendererCore::bindHost(
+		std::weak_ptr<twidget::WidgetHost> host,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel) {
+	return _link->bindHost(std::move(host), std::move(channel));
 }
 
 void RendererCore::detach() {
-	resetInput();
-	_renderer->clear_selection();
 	_detached = true;
-	_pendingSize = std::string();
-	if (_loaded) {
-		notifyPosted(forwardAll(takeSettled()));
-	}
-	refreshClock();
+	Test::WidgetCoreDetached(workId());
+	endInput();
+	forgetSelection();
+	_reports->close();
 	_link->close();
-	_backend->releaseCanvasFonts();
+	work([](RendererWork &work) {
+		work.detach();
+	});
 }
 
 bool RendererCore::attached() const {
@@ -662,273 +1275,206 @@ bool RendererCore::attached() const {
 }
 
 void RendererCore::setOnScreen(bool onScreen) {
-	if (_onScreen == onScreen) {
-		return;
+	if (_onScreen != onScreen) {
+		_onScreen = onScreen;
+		if (!onScreen) {
+			endInput();
+		}
+		work([=, visibility = ++_visibility](RendererWork &work) {
+			work.setOnScreen(onScreen, visibility);
+		});
 	}
-	_onScreen = onScreen;
-	_stepBusy = false;
-	if (!onScreen) {
-		resetInput();
-	}
-	refreshClock();
 }
 
 bool RendererCore::acceptsInput() const {
-	return canTick() && _hasContent;
+	return _onScreen
+		&& !_detached
+		&& !_frozen
+		&& !_stopped
+		&& _hasContent;
 }
 
 void RendererCore::pointerEnter() {
 	if (acceptsInput() && !TouchBridge::Active()) {
-		_pointer.over = true;
+		work([serial = ++_pointerSerial](RendererWork &work) {
+			work.pointerEnter(serial);
+		});
 	}
 }
 
 void RendererCore::pointerMove(QPointF point, int modifiers) {
-	if (!acceptsInput() || TouchBridge::Active()) {
-		return;
+	if (acceptsInput() && !TouchBridge::Active()) {
+		work([=, serial = ++_pointerSerial](RendererWork &work) {
+			work.pointerMove(point, modifiers, serial);
+		});
 	}
-	_pointer.position = point;
-	_pointer.hit = elementAt(point);
-	const auto wasDirty = _renderer->dirty();
-	if (_pointer.pressed) {
-		auto out = Touch(*_renderer, kTouchMove, point, modifiers);
-		_pointer.moved = _pointer.moved
-			|| OutsideSlop(point, _pointer.origin);
-		if (_pointer.moved) {
-			trackHover();
-		}
-		inputDone(out, wasDirty);
-		return;
-	}
-	_pointer.over = _pointer.hovering = true;
-	auto out = _renderer->hover(kHoverMove, point.x(), point.y(), modifiers);
-	trackHover();
-	inputDone(out, wasDirty);
 }
 
 void RendererCore::pointerLeave() {
-	_cursor = nullptr;
-	if (!acceptsInput()) {
-		return;
-	}
-	_pointer.over = false;
-	if (_pointer.pressed || !_pointer.hovering) {
-		return;
-	}
-	const auto wasDirty = _renderer->dirty();
-	inputDone(leaveHover(), wasDirty);
+	_input.hand = false;
+	work([serial = ++_pointerSerial](RendererWork &work) {
+		work.pointerLeave(serial);
+	});
 }
 
 void RendererCore::pointerPress(QPointF point, int modifiers) {
 	if (!acceptsInput() || TouchBridge::Active()) {
 		return;
 	}
-	menuRelease(modifiers);
-	const auto hit = elementAt(point);
-	const auto wasDirty = _renderer->dirty();
-	auto out = Touch(*_renderer, kTouchDown, point, modifiers);
-	holdPointer(point, hit, false);
-	inputDone(out, wasDirty);
+	endMenu();
+	_input.pressed = true;
+	_input.menuPressed = false;
+	forgetSelection();
+	const auto serial = ++_pointerSerial;
+	const auto selection = _selectionSerial;
+	Test::WidgetPressDispatched(workId(), serial);
+	work([=](RendererWork &work) {
+		work.pointerPress(point, modifiers, serial, selection);
+	});
 }
 
 void RendererCore::pointerRelease(QPointF point, int modifiers) {
-	if (!acceptsInput() || !_pointer.pressed) {
-		return;
-	}
-	const auto wasDirty = _renderer->dirty();
-	// A finger's press elsewhere took this one: it ends with no click.
-	auto out = TouchBridge::Active()
-		? Touch(*_renderer, kTouchCancel, _pointer.position, 0)
-		: Touch(*_renderer, kTouchUp, point, modifiers);
-	_pointer.position = point;
-	_pointer.press = 0;
-	_pointer.pressed = _pointer.secondary = false;
-	_pointer.moved = _pointer.active = false;
-	if (!_pointer.over) {
-		Append(out, leaveHover());
-	}
-	inputDone(out, wasDirty);
+	_input.pressed = _input.menuPressed = false;
+	const auto cancel = TouchBridge::Active();
+	const auto serial = ++_pointerSerial;
+	work([=](RendererWork &work) {
+		work.pointerRelease(point, modifiers, cancel, serial);
+	});
 }
 
-bool RendererCore::menuPress(QPointF point, int modifiers) {
+bool RendererCore::menuPress(
+		QPointF point,
+		int modifiers,
+		MenuDecided decided) {
+	endMenu();
 	if (!acceptsInput()
 		|| TouchBridge::Active()
-		|| _pointer.pressed
-		|| _finger.pressed) {
+		|| pressed()
+		|| _input.fingerPressed) {
 		return false;
 	}
-	const auto hit = elementAt(point);
-	if (hasSelection()) {
-		const auto synced = (_pointer.parsed == ParsedDocuments(*_renderer));
-		const auto hover = synced ? _pointer.hover : 0;
-		// A core press drops the selection: keep it unless the hold is claimed.
-		if (!cursorStyles().hold(*_renderer, hit, hover).value_or(false)) {
-			return false;
-		}
-	}
-	const auto wasDirty = _renderer->dirty();
-	auto out = Touch(
-		*_renderer,
-		kTouchDown,
-		point,
-		modifiers,
-		kMousePointer,
-		kSecondaryButton);
-	const auto claim = GestureClaim(out);
-	const auto verdict = twidget::GestureArbiter().down(
-		double(crl::now()),
-		point.x(),
-		point.y(),
-		claim,
-		twidget::PointerKind::Mouse,
-		kSecondaryButton);
-	const auto taken = (verdict.owner == twidget::GestureOwner::Widget);
-	if (taken) {
-		holdPointer(point, hit, true);
-	} else {
-		Append(out, Touch(*_renderer, kTouchCancel, point, 0));
-	}
-	inputDone(out, wasDirty);
-	return taken;
+	const auto serial = ++_pressSerial;
+	_menu = PendingMenu{ .decided = std::move(decided), .serial = serial };
+	_menuDeadline.callOnce(kAnswerDeadline);
+	work([=](RendererWork &work) {
+		work.menuPress(point, modifiers, serial);
+	});
+	return true;
 }
 
 void RendererCore::menuRelease(int modifiers) {
-	if (_pointer.secondary) {
-		pointerRelease(_pointer.position, modifiers);
-	}
+	endMenu();
+	_input.menuPressed = false;
+	work([=, cancel = TouchBridge::Active()](RendererWork &work) {
+		work.menuRelease(modifiers, cancel);
+	});
 }
 
-std::optional<twidget::WidgetGestureClaim> RendererCore::fingerPress(
+bool RendererCore::fingerPress(
 		QPointF point,
-		int modifiers) {
-	if (!acceptsInput() || _finger.pressed) {
-		return std::nullopt;
+		int modifiers,
+		ClaimArrived claimed) {
+	if (!acceptsInput() || _input.fingerPressed) {
+		return false;
 	}
-	const auto wasDirty = _renderer->dirty();
-	auto out = Touch(*_renderer, kTouchDown, point, modifiers, kFingerPointer);
-	const auto claim = GestureClaim(out);
-	_finger = { .position = point, .pressed = true };
-	inputDone(out, wasDirty);
-	return claim;
+	endClaim();
+	const auto serial = ++_pressSerial;
+	_input.fingerPressed = true;
+	_claim = PendingClaim{ .claimed = std::move(claimed), .serial = serial };
+	_claimDeadline.callOnce(kAnswerDeadline);
+	work([=](RendererWork &work) {
+		work.fingerPress(point, modifiers, serial);
+	});
+	return true;
 }
 
 void RendererCore::fingerMove(QPointF point, int modifiers) {
-	if (!_finger.pressed || !acceptsInput() || point == _finger.position) {
-		return;
+	if (_input.fingerPressed) {
+		work([=](RendererWork &work) {
+			work.fingerMove(point, modifiers);
+		});
 	}
-	_finger.position = point;
-	const auto wasDirty = _renderer->dirty();
-	inputDone(
-		Touch(*_renderer, kTouchMove, point, modifiers, kFingerPointer),
-		wasDirty);
 }
 
 void RendererCore::fingerHold() {
-	if (!_finger.pressed || !acceptsInput()) {
-		return;
+	if (_input.fingerPressed) {
+		work([](RendererWork &work) {
+			work.fingerHold();
+		});
 	}
-	const auto wasDirty = _renderer->dirty();
-	inputDone(_renderer->tick(), wasDirty);
 }
 
 void RendererCore::fingerRelease(QPointF point, int modifiers) {
-	if (!_finger.pressed || !acceptsInput()) {
-		return;
-	}
-	const auto wasDirty = _renderer->dirty();
-	auto out = (point != _finger.position)
-		? Touch(*_renderer, kTouchMove, point, modifiers, kFingerPointer)
-		: std::vector<twidget::Json>();
-	_finger = Finger();
-	Append(out, Touch(*_renderer, kTouchUp, point, modifiers, kFingerPointer));
-	inputDone(out, wasDirty);
+	endClaim();
+	_input.fingerPressed = false;
+	work([=](RendererWork &work) {
+		work.fingerRelease(point, modifiers);
+	});
 }
 
 void RendererCore::fingerCancel() {
-	if (!_finger.pressed || !acceptsInput()) {
-		return;
-	}
-	const auto position = base::take(_finger).position;
-	const auto wasDirty = _renderer->dirty();
-	inputDone(
-		Touch(*_renderer, kTouchCancel, position, 0, kFingerPointer),
-		wasDirty);
+	endClaim();
+	_input.fingerPressed = false;
+	work([](RendererWork &work) {
+		work.fingerCancel();
+	});
 }
 
-bool RendererCore::hovered() const {
-	return _pointer.over;
+void RendererCore::resetInput() {
+	endInput();
+	work([](RendererWork &work) {
+		work.resetInput();
+	});
 }
 
 bool RendererCore::pressed() const {
-	return _pointer.pressed;
+	return _input.pressed || _input.menuPressed;
 }
 
 bool RendererCore::fingerPressed() const {
-	return _finger.pressed;
+	return _input.fingerPressed;
 }
 
-bool RendererCore::handCursorAt(QPointF point) {
-	if (!acceptsInput()) {
-		return false;
-	}
-	const auto hit = elementAt(point);
-	const auto synced = (_pointer.parsed == ParsedDocuments(*_renderer));
-	const auto held = _pointer.pressed
-		&& !_pointer.moved
-		&& !OutsideSlop(point, _pointer.origin);
-	const auto hover = held ? (synced ? _pointer.hover : 0) : hit;
-	const auto active = (synced && _pointer.active && hover == _pointer.hover)
-		? hover
-		: 0;
-	return cursorStyles().pointer(*_renderer, hit, hover, active);
+bool RendererCore::handCursor() const {
+	return _input.hand;
 }
 
 bool RendererCore::hasSelection() const {
-	return !_detached && !_stopped && _renderer->has_selection();
+	return _hasSelection;
 }
 
 QString RendererCore::selectedText() const {
-	return (_detached || _stopped)
-		? QString()
-		: QString::fromStdString(_renderer->selected_text());
+	return _selectedText;
 }
 
 void RendererCore::clearSelection() {
-	const auto wasDirty = _renderer->dirty();
-	if (_renderer->clear_selection()) {
-		inputDone({}, wasDirty);
-	}
+	forgetSelection();
+	work([serial = _selectionSerial](RendererWork &work) {
+		work.clearSelection(serial);
+	});
 }
 
-void RendererCore::setWidth(double width) {
-	if (!ValidWidth(width)) {
+void RendererCore::setSize(RendererSize size) {
+	if (!ValidWidth(size.width)) {
+		size.width = _size.width;
+	}
+	if (_sizeSerial && (_size == size)) {
 		return;
 	}
-	const auto was = _renderer->width();
-	auto out = std::vector<twidget::Json>();
-	_renderer->set_width(width, out);
-	auto changes = Changes();
-	if (_renderer->width() != was) {
-		changes |= Change::Repaint;
-	}
-	finish(out, changes);
+	_size = size;
+	work([size, serial = ++_sizeSerial](RendererWork &work) {
+		work.setSize(size, serial);
+	});
 }
 
-void RendererCore::setMaxHeight(double height) {
-	const auto wasDirty = _renderer->dirty();
-	const auto was = DeviceSize(*_renderer);
-	auto out = std::vector<twidget::Json>();
-	_renderer->set_max_height(height, out);
-	auto changes = Changes();
-	if ((DeviceSize(*_renderer) != was)
-		|| (!wasDirty && _renderer->dirty())) {
-		changes |= Change::Repaint;
-	}
-	finish(out, changes);
+void RendererCore::setCut(const RendererCut &cut) {
+	work([cut](RendererWork &work) {
+		work.setCut(cut);
+	});
 }
 
 double RendererCore::width() const {
-	return _renderer->width();
+	return _size.width;
 }
 
 std::optional<double> RendererCore::height() const {
@@ -959,114 +1505,25 @@ bool RendererCore::stopFatal() const {
 	return _stopFatal;
 }
 
-not_null<twlite::Renderer*> RendererCore::renderer() const {
-	return _renderer.get();
-}
-
-const QImage &RendererCore::frame(
-		Images::CornersMaskRef corners,
-		QSize cardArea,
-		bool autoHeight) {
-	const auto ratio = style::DevicePixelRatio();
-	const auto card = cardArea * ratio;
-	const auto fits = [&] {
-		return !_frame.isNull()
-			&& (_frameArea == cardArea)
-			&& (_frameCorners == corners)
-			&& (_frame.devicePixelRatio() == ratio)
-			&& FitsCard(_frame.size(), card, ratio, autoHeight);
-	};
-	// A released core shows its last picture, whatever build it holds.
-	if ((_detached || !_renderer->dirty())
-		&& (_frameSize == DeviceSize(*_renderer))
-		&& (_frameCorners == corners)
+QImage RendererCore::frame(QSize cardArea) {
+	const auto held = !_frame.isNull()
+		&& (_frameSerial == _sizeSerial)
 		&& (_frameArea == cardArea)
-		&& (_frame.isNull() || fits())) {
-		return _frame;
+		&& (_frame.devicePixelRatio() == style::DevicePixelRatio());
+	const auto outdated = _pictures->takeOutdated();
+	if (base::take(_refresh) || outdated || !held) {
+		work([](RendererWork &work) {
+			work.demand();
+		});
 	}
-	const auto builds = _renderer->stats().builds;
-	// WHY: the display list names backend font handles that a later build
-	// may delete with an idle face, so it is rasterized at once and only
-	// the pixels are kept.
-	const auto list = _renderer->paint();
-	const auto size = DeviceSize(*_renderer);
-	const auto settled = (_renderer->stats().builds != builds);
-	if (!FitsCard(size, card, ratio, autoHeight)) {
-		// A size the list has not laid out yet keeps this card's picture.
-		_frameRepaintable = false;
-		if (settled) {
-			flushQueued();
-		}
-		if (!fits()) {
-			dropFrame();
-		}
-		return _frame;
-	}
-	const auto inPlace = RepaintsInPlace(list);
-	auto damage = std::vector<twlite::Rect>();
-	const auto area = (inPlace
-		&& _frameRepaintable
-		&& fits()
-		&& (_frameSize == size)
-		&& (_frame.size() == size)
-		&& _renderer->damage(damage))
-		? RepaintArea(damage, _renderer->dpr(), corners, card, size)
-		: std::nullopt;
-	auto limit = area ? repaintFrame(list, *area, corners, card) : std::nullopt;
-	if (!limit) {
-		auto painted = PaintFrame(list, *_backend, size, _renderer->dpr());
-		limit = std::move(painted.limit);
-		if (limit->isEmpty() || !fits()) {
-			_frame = std::move(painted.image);
-			if (!_frame.isNull()) {
-				_frame = RoundFrame(std::move(_frame), corners, card);
-				_frame.setDevicePixelRatio(ratio);
-			}
-		}
-	}
-	const auto refused = !limit->isEmpty();
-	_frameRepaintable = inPlace && !refused && !_frame.isNull();
-	_frameSize = size;
-	_frameCorners = corners;
-	_frameArea = cardArea;
-	if (refused && !_detached && !_stopped) {
-		_link->diag(kPaintBoundsKind, limit->toStdString());
-		stop(std::move(*limit), true);
-		refreshClock();
-		notifyPosted(Change::Stopped | Change::Repaint);
-	}
-	if (settled) {
-		flushQueued(); // paint() holds its build's output for the next call
+	if (!held) {
+		return QImage();
+	} else if (base::take(_undrawn)) {
+		work([](RendererWork &work) {
+			work.drawn();
+		});
 	}
 	return _frame;
-}
-
-std::optional<QString> RendererCore::repaintFrame(
-		const std::vector<twlite::Command> &list,
-		QRect area,
-		Images::CornersMaskRef corners,
-		QSize card) {
-	if (area.isEmpty()) {
-		return QString();
-	}
-	const auto ratio = _frame.devicePixelRatio();
-	_frame.setDevicePixelRatio(1.);
-	const auto backup = _frame.copy(area);
-	auto result = RepaintFrame(
-		list,
-		*_backend,
-		_frame,
-		area,
-		_renderer->dpr());
-	if (result && result->isEmpty()) {
-		_frame = RoundFrame(std::move(_frame), corners, card, area);
-	} else {
-		auto p = QPainter(&_frame);
-		p.setCompositionMode(QPainter::CompositionMode_Source);
-		p.drawImage(area.topLeft(), backup);
-	}
-	_frame.setDevicePixelRatio(ratio);
-	return result;
 }
 
 int64 RendererCore::frameBytes() const {
@@ -1075,25 +1532,19 @@ int64 RendererCore::frameBytes() const {
 
 void RendererCore::dropFrame() {
 	_frame = QImage();
-	_frameSize = QSize();
+	_pixels = nullptr;
 	_frameArea = QSize();
-	_frameCorners = Images::CornersMaskRef();
-	_frameRepaintable = false;
+	_refresh = false;
+	work([epoch = ++_epoch](RendererWork &work) {
+		work.dropFrame(epoch);
+	});
 }
 
 void RendererCore::refreshFrame() {
-	// A paint-stopped core's replay is refused, so its last picture stays.
-	_frameSize = QSize();
-	_frameRepaintable = false;
-}
-
-void RendererCore::takeFrameFrom(RendererCore &other) {
-	_frame = base::take(other._frame);
-	_frameSize = base::take(other._frameSize);
-	_frameArea = base::take(other._frameArea);
-	_frameCorners = base::take(other._frameCorners);
-	_frameRepaintable = false;
-	other._frameRepaintable = false;
+	_refresh = true;
+	work([](RendererWork &work) {
+		work.refreshFrame();
+	});
 }
 
 rpl::producer<RendererCore::Changes> RendererCore::updates() const {
@@ -1116,115 +1567,30 @@ rpl::producer<bool> RendererCore::watchChanges() const {
 	return _watchChanges.events();
 }
 
-void RendererCore::hostLoaded() {
-	if (_ready || _stopped) {
+void RendererCore::hostFrozen() {
+	if (_frozen) {
 		return;
 	}
-	_ready = true;
-	_link->toHost(kReadyMessage);
-	if (!_pendingSize.empty()) {
-		_link->toHost(base::take(_pendingSize));
-	}
-	refreshClock();
+	_frozen = true;
+	endInput();
+	forgetSelection();
+	_reports->close();
 }
 
-void RendererCore::hostMessage(const twidget::Json &message) {
-	const auto &type = message["type"].asString();
-	if (_stopped) {
-		return;
-	} else if (type == "requestFrame") {
-		if (!_frameRequested) {
-			_idleRequest = canTick()
-				&& !_clock.animating()
-				&& (crl::now() >= _recentReplyUntil);
-			if (_held) {
-				dropHeld();
-				_clock.stop();
-			}
-		}
-		_frameRequested = true;
-		refreshClock();
-		return;
-	} else if (type == "frozen") {
-		// WHY: HtmlWidget::drawStopped() paints the themed stop pill; the
-		// core's own freeze would rebuild its badge and fatal dimming into
-		// the last frame, so the core never sees this message.
-		stop(
-			QString::fromStdString(message["reason"].asString()),
-			message["fatal"].asBool());
-		finish({}, Change::Stopped | Change::Repaint);
-		return;
+void RendererCore::routeLost() {
+	if (!std::exchange(_documentGone, true)) {
+		_keptUpdates.fire({});
 	}
-	const auto wasDirty = _renderer->dirty();
-	const auto quiet = (type == "ops")
-		&& canTick()
-		&& !_held
-		&& (_frameRequested ? _idleRequest : !_clock.animating())
-		&& !_renderer->wants_tick();
-	const auto builds = _renderer->stats().builds;
-	_backend->beginCanvasBatch();
-	auto out = _renderer->receive(message);
-	auto changes = Changes();
-	if (type == "ops" && !message["ops"].arr().empty()) {
-		changes |= Change::Repaint;
-		if (!_hasContent) {
-			_hasContent = true;
-			changes |= Change::Content;
-		}
-	} else if (type == "anim") {
-		changes |= Change::Repaint;
-	} else if (type == "query"
-		&& message["qid"].isNumber()
-		&& (message["qid"].asInt() == kLoadAckQueryId)) {
-		_acked = true;
-	}
-	if (_acked && _hasContent && !_loaded) {
-		_loaded = true;
-		changes |= Change::Loaded;
-		// a first height equal to the empty document's applies no change
-		bindHeightAnchor();
-		if (type == "ops") {
-			Append(out, takeSettled());
-		}
-	}
-	if (!wasDirty && _renderer->dirty()) {
-		changes |= Change::Repaint;
-	}
-	// WHY: a clock started for the held part of a flush, or by a request
-	// pending at it, first ticks next turn and builds it before the later
-	// parts arrive, laying out twice, so held work waits one cadence tick.
-	if (quiet
-		&& (_renderer->stats().builds == builds)
-		&& _renderer->wants_tick()) {
-		_held = Held{ .since = crl::now(), .builds = builds };
-		_heldTimer.callOnce(kHeldTick);
-	}
-	// A paint before the release would only redraw the cached picture.
-	if (_held
-		&& (_held->builds == _renderer->stats().builds)
-		&& !_renderer->dirty()) {
-		changes &= ~Change::Repaint;
-	}
-	finish(out, changes);
-}
-
-void RendererCore::hostTheme(bool dark) {
-	if (_stopped) {
-		return;
-	}
-	auto out = std::vector<twidget::Json>();
-	_renderer->set_theme(dark, out);
-	finish(out, Change::Repaint);
 }
 
 void RendererCore::hostLinkRequest(const LinkRequest &request) {
-	if (!_stopped) {
+	if (!refusesHost()) {
 		_linkRequests.fire_copy(request);
 	}
 }
 
 void RendererCore::hostBotRequest(const BotRequest &request) {
-	if (_stopped || !_botRequests.has_consumers()) {
+	if (refusesHost() || !_botRequests.has_consumers()) {
 		RespondFailed(request.respond);
 	} else {
 		_botRequests.fire_copy(request);
@@ -1232,299 +1598,209 @@ void RendererCore::hostBotRequest(const BotRequest &request) {
 }
 
 void RendererCore::hostCopyText(const std::string &text) {
-	if (!_stopped) {
+	if (!refusesHost()) {
 		_copyRequests.fire_copy(text);
 	}
 }
 
 void RendererCore::hostWatch(bool on) {
-	if (!_stopped) {
+	if (!refusesHost()) {
 		_watchChanges.fire_copy(on);
 	}
 }
 
-int64 RendererCore::elementAt(QPointF point) {
-	const auto wasDirty = _renderer->dirty();
-	auto out = _renderer->receive(ElementAtQuery(point));
-	const auto result = TakeMessage(out, "result")["result"].asNumber();
-	auto changes = forwardAll(out);
-	if (!wasDirty && _renderer->dirty()) {
-		changes |= Change::Repaint;
+bool RendererCore::refusesHost() const {
+	return _frozen || _stopped;
+}
+
+void RendererCore::work(Fn<void(RendererWork&)> task) const {
+	_link->work(std::move(task), false);
+}
+
+void RendererCore::apply(RendererAnswer &&answer) {
+	if (answer.closed && !std::exchange(_routeChecked, true)) {
+		_link->releaseRoute(nullptr);
 	}
-	notifyPosted(changes);
-	return int64(result);
-}
-
-CursorStyles &RendererCore::cursorStyles() {
-	if (!_cursor) {
-		_cursor = std::make_unique<CursorStyles>(_renderer->dpr());
+	auto changes = Changes();
+	if (answer.state.hasContent && !_hasContent) {
+		_hasContent = true;
+		changes |= Change::Content;
 	}
-	return *_cursor;
-}
-
-void RendererCore::holdPointer(QPointF point, int64 hit, bool secondary) {
-	_pointer.position = _pointer.origin = point;
-	_pointer.hit = _pointer.hover = _pointer.press = hit;
-	_pointer.parsed = ParsedDocuments(*_renderer);
-	_pointer.over = _pointer.hovering = _pointer.pressed = true;
-	_pointer.moved = false;
-	_pointer.active = !secondary;
-	_pointer.secondary = secondary;
-}
-
-void RendererCore::trackHover() {
-	const auto parsed = ParsedDocuments(*_renderer);
-	if (_pointer.parsed != parsed) {
-		_pointer.parsed = parsed;
-		_pointer.hover = 0;
-		_pointer.active = false;
+	if (answer.state.loaded && !_loaded) {
+		_loaded = true;
+		changes |= Change::Loaded;
 	}
-	if (_pointer.hover == _pointer.hit) {
-		return;
+	const auto post = answer.post;
+	if (auto layout = _pictures->take(post, _sizeSerial, _epoch)) {
+		changes |= applyLayout(std::move(*layout));
 	}
-	_pointer.hover = _pointer.hit;
-	_pointer.active = false;
-}
-
-std::vector<twidget::Json> RendererCore::leaveHover() {
-	_cursor = nullptr;
-	_pointer.hit = _pointer.hover = 0;
-	_pointer.hovering = false;
-	return _renderer->hover(kHoverLeave, 0., 0., 0);
-}
-
-void RendererCore::inputDone(
-		const std::vector<twidget::Json> &out,
-		bool wasDirty) {
-	auto changes = forwardAll(out);
-	if (!wasDirty && _renderer->dirty()) {
-		changes |= Change::Repaint;
-	}
-	notifyPosted(changes);
-	refreshClock();
-}
-
-void RendererCore::resetInput() {
-	if (!_detached
-		&& !_stopped
-		&& (_pointer.pressed || _pointer.hovering || _finger.pressed)) {
-		const auto wasDirty = _renderer->dirty();
-		auto out = _pointer.pressed
-			? Touch(*_renderer, kTouchCancel, _pointer.position, 0)
-			: std::vector<twidget::Json>();
-		if (_finger.pressed) {
-			Append(out, Touch(
-				*_renderer,
-				kTouchCancel,
-				_finger.position,
-				0,
-				kFingerPointer));
+	if (answer.stop && !_stopped) {
+		_stopped = true;
+		_stopReason = std::move(answer.stop->reason);
+		_stopFatal = answer.stop->fatal;
+		changes |= Change::Stopped | Change::Repaint;
+		if (_input.hand || _frozen) {
+			changes |= Change::Cursor;
 		}
-		if (_pointer.hovering) {
-			Append(out, leaveHover());
+		endInput();
+		forgetSelection();
+		_reports->close();
+	}
+	const auto decided = answer.menu
+		? takeMenu(*answer.menu)
+		: Fn<void()>();
+	const auto claimed = answer.claim
+		? takeClaim(*answer.claim)
+		: Fn<void()>();
+	const auto weak = base::make_weak(this);
+	if (changes) {
+		_updates.fire_copy(changes);
+	}
+	if (decided && weak) {
+		decided();
+	}
+	if (claimed && weak) {
+		claimed();
+	}
+}
+
+RendererCore::Changes RendererCore::applyLayout(RendererLayout &&layout) {
+	if ((layout.serial != _sizeSerial) || (layout.epoch != _epoch)) {
+		return {};
+	}
+	auto result = Changes(Change::Repaint);
+	if (_height != layout.height) {
+		_height = layout.height;
+		result |= Change::Height;
+	}
+	if (layout.client || (layout.visibility != _visibility)) {
+		result |= Change::Client;
+	}
+	_heightBottom = layout.bottom;
+	_frame = std::move(layout.picture);
+	_pixels = std::move(layout.pixels);
+	if (_pixels) {
+		_pixels->dequeue();
+	}
+	_frameArea = layout.area;
+	_frameSerial = layout.serial;
+	_undrawn = true;
+	return result;
+}
+
+RendererCore::Changes RendererCore::applyInput(
+		std::optional<RendererSelection> &selection,
+		const std::optional<RendererCursor> &cursor) {
+	auto result = Changes();
+	if (selection && applySelection(*selection)) {
+		result |= Change::Selection;
+	}
+	if (cursor) {
+		const auto current = (cursor->serial == _pointerSerial);
+		if ((current || !cursor->hand) && (_input.hand != cursor->hand)) {
+			_input.hand = cursor->hand;
+			result |= Change::Cursor;
 		}
-		_pointer = Pointer();
-		_finger = Finger();
-		inputDone(out, wasDirty);
 	}
-	releaseInput();
+	return result;
 }
 
-void RendererCore::releaseInput() {
-	_cursor = nullptr;
-	_pointer = Pointer();
-	_finger = Finger();
-}
-
-void RendererCore::stop(QString reason, bool fatal) {
-	_stopped = true;
-	_frameRequested = false;
-	_stopReason = std::move(reason);
-	_stopFatal = fatal;
-	releaseInput();
-}
-
-std::vector<twidget::Json> RendererCore::takeSettled() {
-	auto out = _renderer->receive(ViewportQuery());
-	out.erase(ranges::remove_if(out, OfType("result")), end(out));
-	return out;
-}
-
-void RendererCore::flushQueued() {
-	if (_detached || _stopped) {
-		return;
-	}
-	notifyPosted(forwardAll(takeSettled()));
-	refreshClock();
-}
-
-bool RendererCore::canTick() const {
-	return _onScreen && _ready && !_detached && !_stopped;
-}
-
-bool RendererCore::clockWanted() const {
-	return canTick()
-		&& (_stepBusy || _frameRequested || _renderer->wants_tick());
-}
-
-void RendererCore::refreshClock() {
-	if (clockWanted()) {
-		_wake.cancel();
-		if (!_clock.animating()) {
-			_clock.start();
-		}
-	} else {
-		dropHeld();
-		_clock.stop();
-		scheduleWake();
-	}
-}
-
-void RendererCore::scheduleWake() {
-	const auto seconds = canTick()
-		? _renderer->next_tick_in()
-		: std::numeric_limits<double>::infinity();
-	if (std::isfinite(seconds)) {
-		_wake.callOnce(WakeDelay(seconds));
-	} else {
-		_wake.cancel();
-	}
-}
-
-void RendererCore::dropHeld() {
-	// A reader's build may still need a repaint when this hold ends.
-	if (_held
-		&& canTick()
-		&& (_held->builds != _renderer->stats().builds)
-		&& _renderer->dirty()) {
-		crl::on_main(this, [=] {
-			if (canTick() && _renderer->dirty()) {
-				_updates.fire(Change::Repaint);
-			}
-		});
-	}
-	_held = std::nullopt;
-	_heldTimer.cancel();
-	_idleRequest = false;
-}
-
-void RendererCore::releaseHeld() {
-	dropHeld();
-	_stepBusy = _frameRequested;
-	if (clockWanted()) {
-		tick();
-	}
-}
-
-bool RendererCore::step(crl::time now) {
-	_stepBusy = canTick()
-		&& (_frameRequested || _renderer->wants_tick());
-	if (!_stepBusy) {
-		dropHeld();
-		scheduleWake();
+bool RendererCore::applySelection(RendererSelection &selection) {
+	if ((selection.serial != _selectionSerial)
+		|| ((_hasSelection == selection.has)
+			&& (_selectedText == selection.text))) {
 		return false;
-	} else if (!_held) {
-		tick();
-		return true;
-	} else if ((_held->builds == _renderer->stats().builds)
-		&& (now < _held->since + kHeldTick)) {
-		return true;
 	}
-	releaseHeld();
-	if (clockWanted()) {
-		return true;
-	}
-	scheduleWake();
-	return false;
+	_hasSelection = selection.has;
+	_selectedText = std::move(selection.text);
+	return true;
 }
 
-void RendererCore::wake() {
-	if (canTick()) {
-		tick();
+void RendererCore::takeReports() {
+	auto latest = _reports->take();
+	if (_detached || refusesHost()) {
+		return;
 	}
-	refreshClock();
-}
-
-void RendererCore::tick() {
-	const auto wasDirty = _renderer->dirty();
-	auto changes = forwardAll(_renderer->tick());
-	if (base::take(_frameRequested)) {
-		forward(FrameMessage());
-		_recentReplyUntil = crl::now() + kRecentReply;
-	}
-	if (!wasDirty && _renderer->dirty()) {
-		changes |= Change::Repaint;
-	}
-	notifyPosted(changes);
-}
-
-void RendererCore::finish(
-		const std::vector<twidget::Json> &out,
-		Changes changes) {
-	changes |= forwardAll(out);
-	refreshClock();
+	const auto changes = applyInput(latest.selection, latest.cursor);
 	if (changes) {
 		_updates.fire_copy(changes);
 	}
 }
 
-RendererCore::Changes RendererCore::forwardAll(
-		const std::vector<twidget::Json> &out) {
-	auto changes = Changes();
-	for (const auto &message : out) {
-		if (message["type"].asString() == "size") {
-			changes |= applySize(message);
-		}
-		forward(message);
+Fn<void()> RendererCore::takeMenu(const RendererMenu &menu) {
+	if (!_menu || (_menu->serial != menu.serial)) {
+		return nullptr;
 	}
-	return changes;
+	auto decided = std::move(base::take(_menu)->decided);
+	_menuDeadline.cancel();
+	work([serial = menu.serial, taken = menu.taken](RendererWork &work) {
+		work.menuDecided(serial, taken);
+	});
+	if (menu.taken) {
+		_input.menuPressed = true;
+	}
+	return [decided = std::move(decided), taken = menu.taken] {
+		decided(taken);
+	};
 }
 
-RendererCore::Changes RendererCore::applySize(
-		const twidget::Json &message) {
-	const auto &height = message["height"];
-	if (!height.isNumber() || !std::isfinite(height.asNumber())) {
-		return {};
+Fn<void()> RendererCore::takeClaim(const RendererClaim &claim) {
+	if (!_claim || (_claim->serial != claim.serial)) {
+		return nullptr;
 	}
-	const auto clamped = std::clamp(
-		height.asNumber(),
-		kMinHeight,
-		kMaxHeight);
-	if (_height == clamped) {
-		return {};
-	}
-	bindHeightAnchor();
-	_height = clamped;
-	return Change::Height;
+	auto claimed = std::move(base::take(_claim)->claimed);
+	_claimDeadline.cancel();
+	return [claimed = std::move(claimed), claim = claim.claim] {
+		claimed(claim);
+	};
 }
 
-void RendererCore::bindHeightAnchor() {
-	if (const auto bottom = _link->hostBottom()) {
-		_heightBottom = *bottom;
-	}
+void RendererCore::endInput() {
+	endMenu();
+	endClaim();
+	_input = Input();
+	++_pointerSerial;
 }
 
-void RendererCore::forward(const twidget::Json &message) {
-	if (_detached || _stopped) {
-		return;
-	} else if (_ready) {
-		_link->toHost(message.dump());
-	} else if (message["type"].asString() == "size") {
-		_pendingSize = message.dump();
-	}
-}
-
-void RendererCore::notifyPosted(Changes changes) {
-	if (!changes) {
+void RendererCore::endMenu() {
+	if (!_menu) {
 		return;
 	}
-	const auto queued = bool(_postedChanges);
-	_postedChanges |= changes;
-	if (!queued) {
-		crl::on_main(this, [=] {
-			_updates.fire(base::take(_postedChanges));
-		});
+	const auto serial = base::take(_menu)->serial;
+	_menuDeadline.cancel();
+	work([=](RendererWork &work) {
+		work.menuDecided(serial, false);
+	});
+}
+
+void RendererCore::endClaim() {
+	_claim = std::nullopt;
+	_claimDeadline.cancel();
+}
+
+void RendererCore::forgetSelection() {
+	_hasSelection = false;
+	_selectedText = QString();
+	++_selectionSerial;
+}
+
+void RendererCore::menuDeadline() {
+	if (!_menu) {
+		return;
 	}
+	auto pending = *base::take(_menu);
+	work([serial = pending.serial](RendererWork &work) {
+		work.menuDecided(serial, false);
+	});
+	pending.decided(false);
+}
+
+void RendererCore::claimDeadline() {
+	if (!_claim) {
+		return;
+	}
+	auto pending = *base::take(_claim);
+	pending.claimed(twidget::gesture::NO_CLAIM);
 }
 
 } // namespace Tgw

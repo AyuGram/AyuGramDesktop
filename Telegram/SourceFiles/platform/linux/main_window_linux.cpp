@@ -217,7 +217,7 @@ void MainWindow::createGlobalMenu() {
 		this,
 		[=] {
 			ensureWindowShown();
-			controller().showLogoutConfirmation();
+			controller().showLogoutOptions();
 		});
 
 	auto quit = file->addAction(
@@ -564,10 +564,6 @@ QString ScreenDisplayLabel(const QScreen *screen) {
 	}
 
 	return screen->name();
-}
-
-QRect ScreenAvailableGeometry(const QScreen *screen) {
-	return screen ? screen->availableGeometry() : QRect();
 }
 
 } // namespace Platform

@@ -64,6 +64,8 @@ struct GifsListDescriptor {
 	bool requireConfirmation = false;
 	Fn<bool()> paused;
 	const style::EmojiPan *st = nullptr;
+	PeerData *inlineQueryPeer = nullptr;
+	bool chooseBeforeLoad = false;
 };
 
 class GifsListWidget final
@@ -179,6 +181,7 @@ private:
 
 	const std::shared_ptr<Show> _show;
 	const bool _requireConfirmation = false;
+	const bool _chooseBeforeLoad;
 	std::unique_ptr<Ui::TabbedSearch> _search;
 
 	MTP::Sender _api;

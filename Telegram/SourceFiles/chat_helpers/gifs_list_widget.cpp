@@ -114,11 +114,13 @@ GifsListWidget::GifsListWidget(
 	descriptor.paused)
 , _show(std::move(descriptor.show))
 , _requireConfirmation(descriptor.requireConfirmation)
+, _chooseBeforeLoad(descriptor.chooseBeforeLoad)
 , _api(&session().mtp())
 , _section(Section::Gifs)
 , _updateInlineItems([=] { updateInlineItems(); })
 , _mosaic(st::emojiPanWidth - st::inlineResultsLeft)
 , _previewTimer([=] { showPreview(); }) {
+	setInlineQueryPeer(descriptor.inlineQueryPeer);
 	setMouseTracking(true);
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
@@ -518,7 +520,7 @@ void GifsListWidget::selectInlineResult(
 		};
 	};
 
-	forceSend |= base::IsCtrlPressed();
+	forceSend |= _chooseBeforeLoad || base::IsCtrlPressed();
 	if (const auto photo = item->getPhoto()) {
 		using Data::PhotoSize;
 		const auto media = photo->activeMediaView();
@@ -568,7 +570,7 @@ void GifsListWidget::selectInlineResult(
 			}
 		}
 	} else if (const auto inlineResult = item->getResult()) {
-		if (inlineResult->onChoose(item)) {
+		if (_chooseBeforeLoad || inlineResult->onChoose(item)) {
 			options.hideViaBot = true;
 			_inlineResultChosen.fire({
 				.result = inlineResult,

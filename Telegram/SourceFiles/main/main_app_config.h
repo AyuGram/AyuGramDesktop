@@ -23,6 +23,12 @@ namespace Main {
 
 class Account;
 
+enum class GiftResaleFilterMode : uchar {
+	Default,
+	Visible,
+	Hidden,
+};
+
 class AppConfig final {
 public:
 	explicit AppConfig(not_null<Account*> account);
@@ -102,6 +108,10 @@ public:
 	[[nodiscard]] int64 giftResaleNanoTonMin() const;
 	[[nodiscard]] int64 giftResaleNanoTonMax() const;
 	[[nodiscard]] int giftResaleNanoTonThousandths() const;
+	[[nodiscard]] bool giftResaleFragmentEnabled() const;
+	[[nodiscard]] GiftResaleFilterMode giftResaleTonFilter() const;
+	[[nodiscard]] GiftResaleFilterMode giftResaleStarsFilter() const;
+	[[nodiscard]] bool giftOnchainOffersEnabled() const;
 
 	[[nodiscard]] int pollOptionsLimit() const;
 	[[nodiscard]] int pollAnswerDeletePeriod() const;
@@ -130,6 +140,10 @@ public:
 	[[nodiscard]] bool walletAvailable() const;
 
 	[[nodiscard]] int storiesAlbumLimit() const;
+	[[nodiscard]] bool storiesPostingAvailable() const;
+	[[nodiscard]] bool storiesPostingPremiumOnly() const;
+	[[nodiscard]] bool storiesEntitiesPremiumOnly() const;
+	[[nodiscard]] bool storiesEntitiesAvailable() const;
 
 	[[nodiscard]] int groupCallMessageLengthLimit() const;
 	[[nodiscard]] TimeId groupCallMessageTTL() const;

@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "styles/style_editor.h"
 
+#include <QApplication>
 #include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
@@ -42,6 +43,7 @@ public:
 
 	Fn<void()> onFinish;
 	Fn<void()> onCancel;
+	QPointer<QWidget> emojiPanel;
 
 	void setStyleInfo(
 			TextStyle style,
@@ -94,10 +96,7 @@ protected:
 		QGraphicsTextItem::keyPressEvent(event);
 	}
 
-	void focusOutEvent(QFocusEvent *event) override {
-		QGraphicsTextItem::focusOutEvent(event);
-		fire(onFinish);
-	}
+	void focusOutEvent(QFocusEvent *event) override;
 
 	void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override {
 		event->accept();
@@ -205,6 +204,29 @@ private:
 	float64 _fontSize = 0.;
 };
 
+void TextEditProxy::focusOutEvent(QFocusEvent *event) {
+	QGraphicsTextItem::focusOutEvent(event);
+	if (!emojiPanel) {
+		fire(onFinish);
+		return;
+	}
+	crl::on_main(
+		this,
+		[=] {
+			const auto focused
+				= QApplication::focusWidget();
+			const auto inPanel = focused
+				&& emojiPanel
+				&& emojiPanel->isAncestorOf(focused);
+			if (!hasFocus()
+				&& onFinish
+				&& !inPanel) {
+				const auto finish = onFinish;
+				finish();
+			}
+		});
+}
+
 } // namespace
 
 TextEditController::TextEditController(not_null<Scene*> scene)
@@ -270,6 +292,24 @@ void TextEditController::setColor(const QColor &color) {
 	} else {
 		_defaultColor = color;
 	}
+}
+
+void TextEditController::setEmojiPanel(QWidget *panel) {
+	_emojiPanel = panel;
+}
+
+void TextEditController::insertText(const QString &text) {
+	const auto proxy = _edit.proxy.get();
+	if (!proxy) {
+		return;
+	}
+	auto cursor = proxy->textCursor();
+	cursor.insertText(text);
+	proxy->setTextCursor(cursor);
+	if (!_scene->views().isEmpty()) {
+		_scene->views().first()->setFocus();
+	}
+	proxy->setFocus();
 }
 
 bool TextEditController::editing() const {
@@ -400,6 +440,7 @@ void TextEditController::setupProxy(
 		const QColor &color,
 		const TextLayoutSpec &spec,
 		TextAlignment alignment) {
+	static_cast<TextEditProxy*>(proxy)->emojiPanel = _emojiPanel;
 	proxy->setTextInteractionFlags(Qt::TextEditorInteraction);
 	proxy->setDefaultTextColor(color);
 

@@ -9,8 +9,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/platform/win/base_windows_safe_library.h"
 
+#include <exdisp.h>
+#include <servprov.h>
+#include <shldisp.h>
+
 #include <limits>
 #include <memory>
+
+#ifdef ShellExecute
+#undef ShellExecute // shellapi.h would rename the IShellDispatch2 method
+#endif // ShellExecute
 
 bool _debug = false;
 
@@ -207,6 +215,29 @@ DWORD FinishUpdateProcess(DWORD processId, ULONGLONG creationTime) {
 		: GetLastError();
 }
 
+// WHY: the parent keeps running while a privileged install copies, and
+// Windows cannot overwrite a mapped image or library, only rename it, so a
+// shared target moves aside and the leftover goes with the next reboot.
+bool ReplaceSharedFile(const wstring &from, const wstring &to) {
+	const auto fresh = to + L".new";
+	const auto aside = to + L".old";
+	DeleteFile(fresh.c_str());
+	if (!CopyFile(from.c_str(), fresh.c_str(), FALSE)) {
+		return false;
+	}
+	DeleteFile(aside.c_str());
+	if (!MoveFileEx(to.c_str(), aside.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+		DeleteFile(fresh.c_str());
+		return false;
+	} else if (!MoveFileEx(fresh.c_str(), to.c_str(), 0)) {
+		MoveFileEx(aside.c_str(), to.c_str(), 0);
+		DeleteFile(fresh.c_str());
+		return false;
+	}
+	MoveFileEx(aside.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+	return true;
+}
+
 void fullClearPath(const wstring &dir) {
 	WCHAR path[4096];
 	memcpy(path, dir.c_str(), (dir.size() + 1) * sizeof(WCHAR));
@@ -359,19 +390,27 @@ bool update() {
 	for (size_t i = 0; i < from.size(); ++i) {
 		wstring fname = from[i], tofname = to[i];
 		BOOL copyResult;
+		auto movedAside = false;
 		do {
 			writeLog(L"Copying file '" + fname + L"' to '" + tofname + L"'..");
 			int copyTries = 0;
 			auto errorCode = DWORD(0);
 			do {
 				copyResult = CopyFile(fname.c_str(), tofname.c_str(), FALSE);
-				if (!copyResult) {
-					errorCode = GetLastError();
-					++copyTries;
-					Sleep(100);
-				} else {
+				if (copyResult) {
 					break;
 				}
+				errorCode = GetLastError();
+				if (errorCode == ERROR_SHARING_VIOLATION
+					&& !movedAside
+					&& ReplaceSharedFile(fname, tofname)) {
+					movedAside = true;
+					copyResult = TRUE;
+					writeLog(L"Replaced the shared target aside: " + tofname);
+					break;
+				}
+				++copyTries;
+				Sleep(100);
 			} while (copyTries < 100);
 			if (!copyResult) {
 				const auto error = FormatUpdateError(
@@ -451,6 +490,177 @@ void updateRegistry() {
 	}
 }
 
+namespace {
+
+struct ComReleaser {
+	void operator()(IUnknown *object) const;
+};
+
+struct BstrDeleter {
+	void operator()(OLECHAR *string) const;
+};
+
+template <typename Interface>
+using ComPtr = std::unique_ptr<Interface, ComReleaser>;
+
+using Bstr = std::unique_ptr<OLECHAR, BstrDeleter>;
+
+void ComReleaser::operator()(IUnknown *object) const {
+	object->Release();
+}
+
+void BstrDeleter::operator()(OLECHAR *string) const {
+	SysFreeString(string);
+}
+
+template <typename Interface>
+[[nodiscard]] ComPtr<Interface> ComQuery(IUnknown *object, REFIID iid) {
+	auto result = (void*)nullptr;
+	if (!object
+		|| FAILED(object->QueryInterface(iid, &result))
+		|| !result) {
+		return nullptr;
+	}
+	return ComPtr<Interface>(static_cast<Interface*>(result));
+}
+
+[[nodiscard]] VARIANT BstrVariant(const Bstr &string) {
+	auto result = VARIANT();
+	result.vt = VT_BSTR;
+	result.bstrVal = string.get();
+	return result;
+}
+
+// WHY: the elevated updater must start the new version with the user's
+// token without trusting the user-writable working directory; the desktop
+// view's automation object lives in the user's own unelevated explorer.exe.
+[[nodiscard]] ComPtr<IShellDispatch2> DesktopShellDispatch() {
+	auto windowsRaw = (void*)nullptr;
+	if (FAILED(CoCreateInstance(
+			CLSID_ShellWindows,
+			nullptr,
+			CLSCTX_LOCAL_SERVER,
+			IID_IShellWindows,
+			&windowsRaw))
+		|| !windowsRaw) {
+		writeLog(L"Error: could not reach the shell windows.");
+		return nullptr;
+	}
+	const auto windows = ComPtr<IShellWindows>(
+		static_cast<IShellWindows*>(windowsRaw));
+
+	auto location = VARIANT();
+	location.vt = VT_I4;
+	location.lVal = CSIDL_DESKTOP;
+	auto root = VARIANT();
+	root.vt = VT_EMPTY;
+	auto hwnd = long(0);
+	auto desktopRaw = (IDispatch*)nullptr;
+	if (FAILED(windows->FindWindowSW(
+			&location,
+			&root,
+			SWC_DESKTOP,
+			&hwnd,
+			SWFO_NEEDDISPATCH,
+			&desktopRaw))
+		|| !desktopRaw) {
+		writeLog(L"Error: could not find the desktop window.");
+		return nullptr;
+	}
+	const auto desktop = ComPtr<IDispatch>(desktopRaw);
+
+	const auto provider = ComQuery<IServiceProvider>(
+		desktop.get(),
+		IID_IServiceProvider);
+	auto browserRaw = (void*)nullptr;
+	if (!provider
+		|| FAILED(provider->QueryService(
+			SID_STopLevelBrowser,
+			IID_IShellBrowser,
+			&browserRaw))
+		|| !browserRaw) {
+		writeLog(L"Error: could not reach the desktop browser.");
+		return nullptr;
+	}
+	const auto browser = ComPtr<IShellBrowser>(
+		static_cast<IShellBrowser*>(browserRaw));
+
+	auto viewRaw = (IShellView*)nullptr;
+	if (FAILED(browser->QueryActiveShellView(&viewRaw)) || !viewRaw) {
+		writeLog(L"Error: could not reach the desktop view.");
+		return nullptr;
+	}
+	const auto view = ComPtr<IShellView>(viewRaw);
+
+	auto backgroundRaw = (void*)nullptr;
+	if (FAILED(view->GetItemObject(
+			SVGIO_BACKGROUND,
+			IID_IDispatch,
+			&backgroundRaw))
+		|| !backgroundRaw) {
+		writeLog(L"Error: could not reach the desktop automation object.");
+		return nullptr;
+	}
+	const auto background = ComPtr<IDispatch>(
+		static_cast<IDispatch*>(backgroundRaw));
+
+	const auto folderView = ComQuery<IShellFolderViewDual>(
+		background.get(),
+		IID_IShellFolderViewDual);
+	auto applicationRaw = (IDispatch*)nullptr;
+	if (!folderView
+		|| FAILED(folderView->get_Application(&applicationRaw))
+		|| !applicationRaw) {
+		writeLog(L"Error: could not reach the desktop shell application.");
+		return nullptr;
+	}
+	const auto application = ComPtr<IDispatch>(applicationRaw);
+
+	auto result = ComQuery<IShellDispatch2>(
+		application.get(),
+		IID_IShellDispatch2);
+	if (!result) {
+		writeLog(L"Error: the desktop shell application is not scriptable.");
+	}
+	return result;
+}
+
+[[nodiscard]] bool LaunchUnelevated(
+		const wstring &executable,
+		const wstring &arguments,
+		const wstring &directory) {
+	const auto shell = DesktopShellDispatch();
+	if (!shell) {
+		return false;
+	}
+	const auto file = Bstr(SysAllocString(executable.c_str()));
+	const auto parameters = Bstr(SysAllocString(arguments.c_str()));
+	const auto folder = Bstr(SysAllocString(directory.c_str()));
+	const auto operation = Bstr(SysAllocString(L"open"));
+	if (!file || !parameters || !folder || !operation) {
+		writeLog(L"Error: could not allocate the launch strings.");
+		return false;
+	}
+	auto show = VARIANT();
+	show.vt = VT_I4;
+	show.lVal = SW_SHOWNORMAL;
+	const auto result = shell->ShellExecute(
+		file.get(),
+		BstrVariant(parameters),
+		BstrVariant(folder),
+		BstrVariant(operation),
+		show);
+	if (result != S_OK) {
+		writeLog(FormatUpdateError(
+			L"The desktop shell did not execute the new version.",
+			DWORD(result)));
+		return false;
+	}
+	return true;
+}
+
+} // namespace
+
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdParamarg, int cmdShow) {
 	base::Platform::InitDynamicLibraries();
 
@@ -467,6 +677,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 	auto processArgumentsValid = true;
 
 	bool needupdate = false, autostart = false, debug = false, writeprotected = false, startintray = false;
+	bool justupdate = false, updated = false;
 	const auto args = CommandLineToArgvW(GetCommandLine(), &argsCount);
 	const auto argsGuard = std::unique_ptr<void, decltype(&LocalFree)>(
 		args,
@@ -491,6 +702,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 				}
 			} else if (equal(args[i], L"-autostart")) {
 				autostart = true;
+			} else if (equal(args[i], L"-justupdate")) {
+				justupdate = true;
 			} else if (equal(args[i], L"-debug")) {
 				debug = _debug = true;
 				openLog();
@@ -555,6 +768,7 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 					}
 				}
 				if (needupdate && update()) {
+					updated = true;
 					updateRegistry();
 				}
 				if (writeprotected) { // if we can't clear all tupdates\ready (Updater.exe is there) - clear only version
@@ -586,47 +800,20 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 	}
 	writeLog(L"Result arguments: " + targs);
 
-	bool executed = false;
-	if (writeprotected) { // run un-elevated
-		writeLog(L"Trying to run un-elevated by temp.lnk");
+	bool executed = justupdate;
+	if (justupdate) {
+		writeLog(L"Just updating, the parent relaunches..");
+	} else if (writeprotected) { // run un-elevated
+		writeLog(L"Trying to run un-elevated through the desktop shell..");
 
 		HRESULT hres = CoInitialize(0);
 		if (SUCCEEDED(hres)) {
-			IShellLink* psl;
-			HRESULT hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
-			if (SUCCEEDED(hres)) {
-				IPersistFile* ppf;
-
-				wstring exe = updateTo + exeName, dir = updateTo;
-				psl->SetArguments((targs.size() ? targs.substr(1) : targs).c_str());
-				psl->SetPath(exe.c_str());
-				psl->SetWorkingDirectory(dir.c_str());
-				psl->SetDescription(L"");
-
-				hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
-
-				if (SUCCEEDED(hres)) {
-					wstring lnk = L"tupdates\\temp\\temp.lnk";
-					hres = ppf->Save(lnk.c_str(), TRUE);
-					if (!SUCCEEDED(hres)) {
-						lnk = L"tupdates\\ready\\temp.lnk"; // old
-						hres = ppf->Save(lnk.c_str(), TRUE);
-					}
-					ppf->Release();
-
-					if (SUCCEEDED(hres)) {
-						writeLog(L"Executing un-elevated through link..");
-						ShellExecute(0, 0, L"explorer.exe", lnk.c_str(), 0, SW_SHOWNORMAL);
-						executed = true;
-					} else {
-						writeLog(L"Error: ppf->Save failed");
-					}
-				} else {
-					writeLog(L"Error: Could not create interface IID_IPersistFile");
-				}
-				psl->Release();
-			} else {
-				writeLog(L"Error: could not create instance of IID_IShellLink");
+			executed = LaunchUnelevated(
+				updateTo + exeName,
+				targs.size() ? targs.substr(1) : targs,
+				updateTo);
+			if (executed) {
+				writeLog(L"Executed un-elevated through the desktop shell.");
 			}
 			CoUninitialize();
 		} else {
@@ -634,13 +821,19 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		}
 	}
 	if (!executed) {
-		ShellExecute(0, 0, (updateTo + exeName).c_str(), (L"-noupdate" + targs).c_str(), 0, SW_SHOWNORMAL);
+		ShellExecuteW(
+			0,
+			0,
+			(updateTo + exeName).c_str(),
+			(L"-noupdate" + targs).c_str(),
+			updateTo.empty() ? nullptr : updateTo.c_str(),
+			SW_SHOWNORMAL);
 	}
 
-	writeLog(L"Executed '" + exeName + L"', closing log and quitting..");
+	writeLog(L"Closing log and quitting..");
 	closeLog();
 
-	return 0;
+	return (needupdate && !updated) ? 1 : 0;
 }
 
 static const WCHAR *_programName = L"Telegram Desktop"; // folder in APPDATA, if current path is unavailable for writing

@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/base_platform_info.h"
 #include "core/launcher.h"
 
+#include <iterator>
 #include <signal.h>
 #include <new>
 #include <mutex>
@@ -31,7 +32,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <execinfo.h>
 #include <sys/syscall.h>
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 
 #include <dlfcn.h>
 #include <unistd.h>
@@ -42,11 +43,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <client/crashpad_client.h>
 #endif // else for MAC_USE_BREAKPAD
 
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 
 #include <client/linux/handler/exception_handler.h>
 
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 
 #endif // Q_OS_WIN
 #endif // !TDESKTOP_DISABLE_CRASH_REPORTS
@@ -65,6 +66,19 @@ AnnotationRefs ProcessAnnotationRefs;
 QString ReportPath;
 auto ReportFile = (FILE*)nullptr;
 int ReportFileNo = 0;
+
+#ifdef Q_OS_WIN
+[[nodiscard]] std::wstring ReportPathNative() {
+	auto result = ReportPath.toStdWString();
+	if (result.size() < MAX_PATH) {
+		return result;
+	}
+	result = QDir::toNativeSeparators(ReportPath).toStdWString();
+	return result.starts_with(L"\\\\")
+		? (L"\\\\?\\UNC" + result.substr(1))
+		: (L"\\\\?\\" + result);
+}
+#endif // Q_OS_WIN
 
 void SafeWriteChar(char ch) {
 	if (!ReportFile) return;
@@ -263,16 +277,16 @@ void SignalHandler(int signum, siginfo_t *info, void *ucontext) {
 
 bool SetSignalHandlers = true;
 bool CrashLogged = false;
-#if !defined Q_OS_MAC || defined MAC_USE_BREAKPAD
+#if !defined Q_OS_MACOS || defined MAC_USE_BREAKPAD
 google_breakpad::ExceptionHandler* BreakpadExceptionHandler = 0;
 
 #ifdef Q_OS_WIN
 bool DumpCallback(const wchar_t* _dump_dir, const wchar_t* _minidump_id, void* context, EXCEPTION_POINTERS* exinfo, MDRawAssertionInfo* assertion, bool success)
-#elif defined Q_OS_MAC // Q_OS_WIN
+#elif defined Q_OS_MACOS // Q_OS_WIN
 bool DumpCallback(const char* _dump_dir, const char* _minidump_id, void *context, bool success)
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 bool DumpCallback(const google_breakpad::MinidumpDescriptor &md, void *context, bool success)
-#endif // else for Q_OS_WIN || Q_OS_MAC
+#endif // else for Q_OS_WIN || Q_OS_MACOS
 {
 	if (CrashLogged) return success;
 	CrashLogged = true;
@@ -282,16 +296,16 @@ bool DumpCallback(const google_breakpad::MinidumpDescriptor &md, void *context, 
 	SignalHandler(-1);
 #else // Q_OS_WIN
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	BreakpadDumpPath = _minidump_id;
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 	BreakpadDumpPath = md.path();
-#endif // else for Q_OS_MAC
+#endif // else for Q_OS_MACOS
 	SignalHandler(-1, 0, 0);
 #endif // else for Q_OS_WIN
 	return success;
 }
-#endif // !Q_OS_MAC || MAC_USE_BREAKPAD
+#endif // !Q_OS_MACOS || MAC_USE_BREAKPAD
 
 #endif // !TDESKTOP_DISABLE_CRASH_REPORTS
 
@@ -320,7 +334,7 @@ QString PlatformString() {
 	Unexpected("Platform in CrashReports::PlatformString.");
 }
 
-void StartCatching() {
+QString StartCatching() {
 #ifndef TDESKTOP_DISABLE_CRASH_REPORTS
 	ProcessAnnotations["Binary"] = cExeName().toUtf8().constData();
 	ProcessAnnotations["ApiId"] = QString::number(ApiId).toUtf8().constData();
@@ -337,8 +351,16 @@ void StartCatching() {
 	QDir().mkpath(dumpspath);
 
 #ifdef Q_OS_WIN
+	// Breakpad formats each minidump path into a fixed MAX_PATH buffer.
+	constexpr auto kMinidumpNameSize = std::size(
+		L"\\00000000-0000-0000-0000-000000000000.dmp");
+	const auto path = dumpspath.toStdWString();
+	if (path.size() + kMinidumpNameSize > MAX_PATH) {
+		return u"WARNING: Crash catching is disabled, "
+			"dumps path is too long: %1"_q.arg(dumpspath);
+	}
 	BreakpadExceptionHandler = new google_breakpad::ExceptionHandler(
-		dumpspath.toStdWString(),
+		path,
 		google_breakpad::ExceptionHandler::FilterCallback(nullptr),
 		DumpCallback,
 		(void*)nullptr, // callback_context
@@ -348,7 +370,7 @@ void StartCatching() {
 		(const wchar_t*)nullptr, // pipe_name
 		(const google_breakpad::CustomClientInfo*)nullptr
 	);
-#elif defined Q_OS_MAC // Q_OS_WIN
+#elif defined Q_OS_MACOS // Q_OS_WIN
 
 #ifdef MAC_USE_BREAKPAD
 #ifndef _DEBUG
@@ -386,17 +408,18 @@ void StartCatching() {
 		true,
 		-1
 	);
-#endif // else for Q_OS_WIN || Q_OS_MAC
+#endif // else for Q_OS_WIN || Q_OS_MACOS
 #endif // !TDESKTOP_DISABLE_CRASH_REPORTS
+	return QString();
 }
 
 void FinishCatching() {
 #ifndef TDESKTOP_DISABLE_CRASH_REPORTS
-#if !defined Q_OS_MAC || defined MAC_USE_BREAKPAD
+#if !defined Q_OS_MACOS || defined MAC_USE_BREAKPAD
 
 	delete base::take(BreakpadExceptionHandler);
 
-#endif // !Q_OS_MAC || MAC_USE_BREAKPAD
+#endif // !Q_OS_MACOS || MAC_USE_BREAKPAD
 #endif // !TDESKTOP_DISABLE_CRASH_REPORTS
 }
 
@@ -406,7 +429,7 @@ StartResult Start() {
 
 #ifdef Q_OS_WIN
 	auto f = (FILE*)nullptr;
-	if (_wfopen_s(&f, ReportPath.toStdWString().c_str(), L"rb") != 0) {
+	if (_wfopen_s(&f, ReportPathNative().c_str(), L"rb") != 0) {
 		f = nullptr;
 	} else {
 #else // !Q_OS_WIN
@@ -438,7 +461,7 @@ Status Restart() {
 	}
 
 #ifdef Q_OS_WIN
-	if (_wfopen_s(&ReportFile, ReportPath.toStdWString().c_str(), L"wb") != 0) {
+	if (_wfopen_s(&ReportFile, ReportPathNative().c_str(), L"wb") != 0) {
 		ReportFile = nullptr;
 	}
 #else // Q_OS_WIN
@@ -491,7 +514,7 @@ void Finish() {
 		ReportFile = nullptr;
 
 #ifdef Q_OS_WIN
-		_wunlink(ReportPath.toStdWString().c_str());
+		_wunlink(ReportPathNative().c_str());
 #else // Q_OS_WIN
 		unlink(ReportPath.toUtf8().constData());
 #endif // else for Q_OS_WIN

@@ -544,36 +544,123 @@ private:
 
 };
 
-class TextToolButton final : public Ui::AbstractButton {
+class SaveButton final
+	: public Ui::IconButton
+	, public Ui::AbstractTooltipShower {
 public:
-	TextToolButton(not_null<QWidget*> parent)
-	: AbstractButton(parent) {
-		resize(
-			st::photoEditorTextButtonSize.width(),
-			st::photoEditorTextButtonSize.height());
+	explicit SaveButton(QWidget *parent)
+	: IconButton(parent, st::photoEditorSaveButton) {
 		events(
 		) | rpl::on_next([=](not_null<QEvent*> event) {
-			if (event->type() == QEvent::Enter
-				|| event->type() == QEvent::Leave) {
-				update();
+			if (event->type() == QEvent::Enter) {
+				Ui::Tooltip::Show(1000, this);
+			} else if (event->type() == QEvent::Leave) {
+				Ui::Tooltip::Hide();
 			}
 		}, lifetime());
 	}
+	void setSaveEnabled(bool enabled) {
+		setEnabled(enabled);
+		if (enabled) {
+			setIconColorOverride(std::nullopt);
+		} else {
+			auto color = st::photoEditorButtonIconFg->c;
+			color.setAlphaF(
+				color.alphaF() * st::photoEditorButtonDisabledOpacity);
+			setIconColorOverride(color);
+		}
+	}
+
+	QString tooltipText() const override {
+		return isEnabled()
+			? tr::lng_story_save_file(tr::now)
+			: tr::lng_story_preparing_video(tr::now);
+	}
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+	bool tooltipWindowActive() const override {
+		return Ui::AppInFocus() && Ui::InFocusChain(window());
+	}
+
+};
+
+class TextToolButton final : public Ui::AbstractButton {
+public:
+	TextToolButton(not_null<QWidget*> parent, bool supportsEmoji);
+
+	void setEditing(bool editing);
+
+	[[nodiscard]] bool emojiMode() const;
 
 private:
-	void paintEvent(QPaintEvent *) override {
-		auto p = QPainter(this);
-		auto hq = PainterHighQualityEnabler(p);
-		auto font = st::semiboldFont->f;
-		font.setPixelSize(QWidget::rect().height() / 2);
-		p.setFont(font);
-		p.setPen(isOver()
-			? st::photoEditorButtonIconFgOver
-			: st::photoEditorButtonIconFg);
-		p.translate(0, st::photoEditorTextButtonGlyphSkip);
-		p.drawText(QWidget::rect(), style::al_center, u"A"_q);
-	}
+	void updateAccessibleName();
+
+	void paintEvent(QPaintEvent *) override;
+
+	const bool _supportsEmoji;
+	bool _emoji = false;
+
 };
+
+TextToolButton::TextToolButton(not_null<QWidget*> parent, bool supportsEmoji)
+: AbstractButton(parent)
+, _supportsEmoji(supportsEmoji) {
+	resize(
+		st::photoEditorTextButtonSize.width(),
+		st::photoEditorTextButtonSize.height());
+	updateAccessibleName();
+	events(
+	) | rpl::on_next([=](not_null<QEvent*> event) {
+		if (event->type() == QEvent::Enter
+			|| event->type() == QEvent::Leave) {
+			update();
+		}
+	}, lifetime());
+}
+
+void TextToolButton::setEditing(bool editing) {
+	const auto emoji = _supportsEmoji && editing;
+	if (_emoji == emoji) {
+		return;
+	}
+	_emoji = emoji;
+	updateAccessibleName();
+	update();
+}
+
+bool TextToolButton::emojiMode() const {
+	return _emoji;
+}
+
+void TextToolButton::updateAccessibleName() {
+	setAccessibleName(_emoji
+		? tr::lng_photo_editor_insert_emoji(tr::now)
+		: tr::lng_photo_editor_text_placeholder(tr::now));
+}
+
+void TextToolButton::paintEvent(QPaintEvent *) {
+	auto p = QPainter(this);
+	auto hq = PainterHighQualityEnabler(p);
+	const auto content = rect().translated(
+		0,
+		st::photoEditorTextButtonGlyphSkip);
+	if (_emoji) {
+		const auto &button = st::photoEditorTextEmojiButton;
+		const auto &icon = isOver()
+			? button.iconOver
+			: button.icon;
+		icon.paintInCenter(p, content);
+		return;
+	}
+	auto font = st::semiboldFont->f;
+	font.setPixelSize(QWidget::rect().height() / 2);
+	p.setFont(font);
+	p.setPen(isOver()
+		? st::photoEditorButtonIconFgOver
+		: st::photoEditorButtonIconFg);
+	p.drawText(content, style::al_center, u"A"_q);
+}
 
 PhotoEditorControls::PhotoEditorControls(
 	not_null<Ui::RpWidget*> parent,
@@ -586,6 +673,8 @@ PhotoEditorControls::PhotoEditorControls(
 , _imageSize(imageSize)
 , _originalRatio(data.originalRatio)
 , _fixedCrop(data.fixedCrop)
+, _canvasMode(data.story && !data.story->canvasMedia.isNull())
+, _storyPhoto(data.story && data.story->videoObject.empty())
 , _bg(st::roundedBg)
 , _buttonHeight(st::photoEditorButtonBarHeight)
 , _transformButtons(base::make_unique_q<ButtonBar>(this, _bg))
@@ -626,6 +715,9 @@ PhotoEditorControls::PhotoEditorControls(
 		_transformButtons,
 		st::photoEditorCornersButton)
 	: nullptr)
+, _saveButton((data.hasSaveButton || data.story.has_value())
+	? base::make_unique_q<SaveButton>(_transformButtons)
+	: nullptr)
 , _transformDone(base::make_unique_q<EdgeButton>(
 	_transformButtons,
 	(data.confirm.isEmpty() ? tr::lng_box_done(tr::now) : data.confirm),
@@ -654,7 +746,9 @@ PhotoEditorControls::PhotoEditorControls(
 			_paintBottomButtons,
 			st::photoEditorStickersButton)
 		: nullptr)
-, _textButton(base::make_unique_q<TextToolButton>(_paintBottomButtons))
+, _textButton(base::make_unique_q<TextToolButton>(
+	_paintBottomButtons,
+	data.story && controllers->stickersPanelController))
 , _shapesButton(base::make_unique_q<Ui::IconButton>(
 	_paintBottomButtons,
 	st::photoEditorShapesButton))
@@ -679,10 +773,22 @@ PhotoEditorControls::PhotoEditorControls(
 		.mode = _mode.current().mode,
 		.fixedCrop = _fixedCrop,
 		.timeline = _videoTimelineShown || _audioTimelineShown,
+		.canvasMode = _canvasMode,
+		.storyPhoto = _storyPhoto,
 	};
 })) {
 
 	_shapesFilled = shapesFilled;
+	const auto panel = controllers->stickersPanelController.get();
+	_textButton->setClickedCallback([=] {
+		if (_textButton->emojiMode()) {
+			panel->toggleTextEmojiPanel(
+				_textButton->mapToGlobal(
+					QPoint(_textButton->width() / 2, 0)));
+		} else {
+			_textRequests.fire({});
+		}
+	});
 	_videoTimeline->hide(anim::type::instant);
 	_videoTimeline->setDuration(st::photoEditorBarAnimationDuration);
 	_audioTimeline->hide(anim::type::instant);
@@ -1011,11 +1117,15 @@ rpl::producer<> PhotoEditorControls::paintModeRequests() const {
 }
 
 rpl::producer<> PhotoEditorControls::textRequests() const {
-	return _textButton->clicks() | rpl::to_empty;
+	return _textRequests.events();
 }
 
 rpl::producer<ShapeRequest> PhotoEditorControls::shapeRequests() const {
 	return _shapeRequests.events();
+}
+
+void PhotoEditorControls::setTextEditing(bool editing) {
+	_textButton->setEditing(editing);
 }
 
 void PhotoEditorControls::setShapeToolActive(bool active) {
@@ -1135,6 +1245,18 @@ rpl::producer<> PhotoEditorControls::cancelRequests() const {
 		return (key == Qt::Key_Escape)
 			&& !_toggledBarAnimation.animating();
 	}) | rpl::to_empty);
+}
+
+rpl::producer<> PhotoEditorControls::saveRequests() const {
+	return _saveButton
+		? (_saveButton->clicks() | rpl::to_empty)
+		: (rpl::never<>() | rpl::type_erased);
+}
+
+void PhotoEditorControls::setSaveEnabled(bool enabled) {
+	if (const auto button = static_cast<SaveButton*>(_saveButton.get())) {
+		button->setSaveEnabled(enabled);
+	}
 }
 
 rpl::producer<float64> PhotoEditorControls::aspectRatioChanges() const {

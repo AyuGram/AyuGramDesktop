@@ -21,11 +21,14 @@ should call.
 | [test_l10n_seams](test_l10n_seams.md) | Internal dependency | Phrase-read observer, app-config overrides and the request holder for the localization capture |
 | [test_probe](test_probe.md) | API | Windowed observations and correlated requests |
 | [test_expiry_window](test_expiry_window.md) | API | Served-expiry observations bound to a live owner, generation and link; frozen cutoff windows and boundary polls with named refusals |
-| [test_widgets](test_widgets.md) | API | Typed discovery, a button's own disabled state, live publications and input events |
+| [test_widgets](test_widgets.md) | API | Typed discovery, a button's own disabled state, live publications and input events; key presses leave Qt's cached keyboard modifiers released |
 | [test_wheel](test_wheel.md) | Self-test | Self-test for wheel delivery |
+| [test_keyboard_modifiers](test_keyboard_modifiers.md) | Self-test | Self-test for released keyboard modifiers after `PressKey` and a QPA sequence's `end()`, beside modifier delivery during the press and a widget shortcut |
+| [test_field_submit](test_field_submit.md) | API | Submit a `Ui::InputField` with the Return chord its submit setting requires - the app's `sendSubmitWay()` by default - and report whether `submits()` fired, refusing `None` by name; with its self-test |
 | [test_queued_drag](test_queued_drag.md) | API | Deliver queued drag starts before the synthetic release |
-| [test_qpa_mouse](test_qpa_mouse.md) | API | Mouse press, move and release through Qt's platform layer and window routing, for widgets that grab the mouse; a drag stage that waits for queued work before its release and leaves no button, grab or hover |
-| [test_qpa_mouse_self_test](test_qpa_mouse_self_test.md) | Self-test | Self-test for QPA grab routing, the drag stage's wait and refusals, coordinates, double clicks and clean end state |
+| [test_qpa_mouse](test_qpa_mouse.md) | API | Mouse press, move and release through Qt's platform layer and window routing, for widgets that grab the mouse; a held press keeps the pressed widget at the sequence's point through lib_ui's moves built from the OS pointer; a drag stage that waits for queued work before its release and leaves no button, grab, hover or keyboard modifier |
+| [test_qpa_mouse_self_test](test_qpa_mouse_self_test.md) | Self-test | Self-test for QPA grab routing, the drag stage's wait and refusals, coordinates, double clicks, clean end state and a paced gesture passing its own armed console shield, with the OS cursor covered on Windows |
+| [test_qpa_mouse_held_self_test](test_qpa_mouse_held_self_test.md) | Self-test | Self-test for a held QPA press clicking once through a scroll that sends lib_ui's move from the OS pointer, beside a deliberate move outside that does not |
 | [test_touch](test_touch.md) | API | Registered touchscreen and touchpad input through Qt's platform layer |
 | [test_text_drop](test_text_drop.md) | Self-test | Self-test for text-drop routing |
 | [test_clipboard](test_clipboard.md) | API | Clipboard round-trip and classified read-back |
@@ -51,19 +54,21 @@ should call.
 | [test_style](test_style.md) | API | Settled palette samples and baseline checks |
 | [test_palette](test_palette.md) | API | Switch and restore palettes while respecting system following |
 | [test_panel](test_panel.md) | API | Separate-panel discovery, show-cache readiness and typed fixture sizing |
-| [test_menu](test_menu.md) | API | Same-turn menu readings, actions, keyboard activation of accessible custom rows, and captures |
+| [test_menu](test_menu.md) | API | Same-turn menu readings and their later-turn retake, actions, keyboard activation of accessible custom rows, and captures |
 | [test_chat_menu](test_chat_menu.md) | API | Attribute chat-list context menus to the exact message |
 | [test_chat_show](test_chat_show.md) | API | Show a chat-list message wholly in view, painted, ready and hovered before input |
 | [test_chat_show_self_test](test_chat_show_self_test.md) | Self-test | Self-test for chat-list show acceptance, re-correction and named refusals |
 | [test_chat_show_place](test_chat_show_place.md) | API | Place several chat-list messages wholly in or out of view together, gated by geometry and a fresh visibility reading, and prove they stayed for a window |
-| [test_widget_ops](test_widget_ops.md) | API | Tap a widget message's validated ops: the `--attacks` leak scan, its renderer's `limit` reports, the latest conformance result, every `data-stress` value with its receipt, the newest host's batch counts, scheme and theme message |
-| [test_widget_paint_policy](test_widget_paint_policy.md) | API | Run widget-sandbox's `paint-policy.json` against the heavy-box rule and limit glue Telegram compiles, one row per entry, without the app's state |
+| [test_widget_ops](test_widget_ops.md) | API | Tap a widget message's hosted hosts for their validated ops, results, themes and press steps, and read each hosted work's final charge and death |
 | [test_widget_host](test_widget_host.md) | API | Override a widget message's host measurement options and record what its host got and reported: applied options, stats, nodes, load, verbatim death with its time, diag counts and error logs, one record per host; and its renderer core's work, timed by a disposable overlay's scopes |
-| [test_widget_attacks](test_widget_attacks.md) | API | Run widget-sandbox's attack corpus through the chat list with tapped ops, one click each and loopback network controls |
+| [test_widget_attacks](test_widget_attacks.md) | API | Audit widget-sandbox's attack corpus in the chat list: each file's leak scan and death verdict, one click per eligible card, and optional loopback controls around all files |
 | [test_widget_bot](test_widget_bot.md) | API | Answer an armed widget message's bot requests from a table at the runtime's request seam, with a record per message |
-| [test_widget_conformance](test_widget_conformance.md) | API | Run widget-sandbox's conformance sets through the chat list in a one-column window on its own screen, with real input, 2x stage crops and requested whole-card pictures, into the run file `report.mjs` reads |
-| [test_widget_stress](test_widget_stress.md) | API | Run widget-sandbox's stress kit through the chat list, one widget alive at a time in a one-column window on the fastest screen, with frame, renderer, host and widget readings per level, into the run file of one pass that `report.mjs` reads |
-| [test_widget_fixture](test_widget_fixture.md) | Internal dependency | Shared live-chat fixture of the widget stage packs: gates, local widget messages with their media fields, cards, a watched core's stop the desktop decided itself, runtime log, controls, the primary window's one-column placement and release |
+| [test_widget_conformance](test_widget_conformance.md) | API | Run widget-sandbox's conformance sets through the chat list with real input and 2x crops into the run file `report.mjs` reads, deaths read from final charges |
+| [test_widget_stress](test_widget_stress.md) | API | Run widget-sandbox's stress kit through the chat list, one widget alive at a time in a one-column window on the fastest screen, with frame, renderer, host and widget readings per level (of a hosted widget its own theme reading and, in Debug, the helper's renderer work), into the run file of one pass that `report.mjs` reads |
+| [test_widget_fixture](test_widget_fixture.md) | Internal dependency | Shared live-chat fixture and removal barrier of the widget packs; the reference for where widget engines run and how a helper's end is charged |
+| [test_widget_helper_probe](test_widget_helper_probe.md) | Internal dependency | Debug probe of the widget helper's lockdown, inside `TelegramWidgetHelper`'s Debug build on macOS, Linux and Windows: its argv tail; on macOS the full descriptor and Mach listing after the real lockdown, the denied attempts with their unsandboxed control, and a refusal summary instead of serving, or, with `rendering:<ms>`, the same listing taken later while the helper serves widgets; on Linux the probe lines on stderr from forked copies and the locked helper, then serving hosted widgets; on Windows, in `modules\<arch>\TelegramWidgetHelper.exe`, the native probe report on stderr before the helper serves hosted widgets |
+| [test_widget_helper_tap](test_widget_helper_tap.md) | Internal dependency | The helper's half of the validated-ops tap, twidget's Rust tap in `TelegramWidgetHelper`'s Debug build (macOS, Linux and Windows): the hosted renderer's wrapper that, armed by the client's `Mirror` or `MirrorWork` control, mirrors the served host's and renderer's messages and the scheme to the client's tap and, when asked, times the helper's renderer work |
+| [test_widget_renderer_forward](test_widget_renderer_forward.md) | Internal dependency | The format and decode bounds of the helper work record that the helper's Rust tap writes and Telegram's tap reads |
 | [test_messages](test_messages.md) | API | Observe matching sent server messages |
 | [test_history_fixtures](test_history_fixtures.md) | API | Lifetime-owned history service-message fixtures |
 | [test_notify_override](test_notify_override.md) | API | Local notify-setting override and restoration |

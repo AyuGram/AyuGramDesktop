@@ -243,8 +243,17 @@ void PlaybackControls::updateSpeedToggleQuality() {
 
 void PlaybackControls::updatePlaybackSpeed(float64 speed) {
 	DEBUG_LOG(("Media playback speed: update to %1.").arg(speed));
-	_delegate->playbackControlsSpeedChanged(speed);
+	saveSpeed(speed);
+	if (_speedController) {
+		_speedController->reloadFromLookup();
+	}
 	resizeEvent(nullptr);
+}
+
+void PlaybackControls::updatePlaybackVolume(float64 volume) {
+	_delegate->playbackControlsVolumeChanged(volume);
+	_volumeController->setValue(volume);
+	updateVolumeToggleIcon();
 }
 
 void PlaybackControls::updatePlayback(const Player::TrackState &state) {

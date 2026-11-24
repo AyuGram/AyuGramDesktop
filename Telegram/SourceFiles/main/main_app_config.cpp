@@ -22,6 +22,16 @@ namespace {
 
 constexpr auto kRefreshTimeout = 3600 * crl::time(1000);
 
+[[nodiscard]] GiftResaleFilterMode ParseGiftResaleFilterMode(
+		const QString &value) {
+	if (value == u"visible"_q) {
+		return GiftResaleFilterMode::Visible;
+	} else if (value == u"hidden"_q) {
+		return GiftResaleFilterMode::Hidden;
+	}
+	return GiftResaleFilterMode::Default;
+}
+
 } // namespace
 
 AppConfig::AppConfig(not_null<Account*> account) : _account(account) {
@@ -187,6 +197,24 @@ int AppConfig::giftResaleNanoTonThousandths() const {
 	return get<int>(u"ton_stargift_resale_commission_permille"_q, 800);
 }
 
+bool AppConfig::giftResaleFragmentEnabled() const {
+	return get<bool>(u"stargifts_fragment_resale_enabled"_q, false);
+}
+
+GiftResaleFilterMode AppConfig::giftResaleTonFilter() const {
+	return ParseGiftResaleFilterMode(
+		get<QString>(u"stargifts_ton_resale"_q, u"default"_q));
+}
+
+GiftResaleFilterMode AppConfig::giftResaleStarsFilter() const {
+	return ParseGiftResaleFilterMode(
+		get<QString>(u"stargifts_stars_resale"_q, u"default"_q));
+}
+
+bool AppConfig::giftOnchainOffersEnabled() const {
+	return get<bool>(u"onchain_stargift_offers_enabled"_q, true);
+}
+
 int AppConfig::pollOptionsLimit() const {
 	return get<int>(u"poll_answers_max"_q, 12);
 }
@@ -281,6 +309,26 @@ bool AppConfig::walletAvailable() const {
 
 int AppConfig::storiesAlbumLimit() const {
 	return get<int>(u"stories_album_stories_limit"_q, 1000);
+}
+
+bool AppConfig::storiesPostingAvailable() const {
+	const auto value = get<QString>(u"stories_posting"_q, u"enabled"_q);
+	return (value != u"disabled"_q);
+}
+
+bool AppConfig::storiesPostingPremiumOnly() const {
+	const auto value = get<QString>(u"stories_posting"_q, u"enabled"_q);
+	return (value == u"premium"_q);
+}
+
+bool AppConfig::storiesEntitiesPremiumOnly() const {
+	const auto value = get<QString>(u"stories_entities"_q, u"premium"_q);
+	return (value == u"premium"_q);
+}
+
+bool AppConfig::storiesEntitiesAvailable() const {
+	const auto value = get<QString>(u"stories_entities"_q, u"premium"_q);
+	return (value != u"disabled"_q);
 }
 
 int AppConfig::groupCallMessageLengthLimit() const {

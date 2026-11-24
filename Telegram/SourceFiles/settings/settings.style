@@ -66,6 +66,9 @@ settingsFaqKeysLegend: IconButton {
 settingsExperimentalTitle: FlatLabel(defaultFlatLabel) {
 	minWidth: 100px;
 }
+settingsExperimentalTitleDisabled: FlatLabel(settingsExperimentalTitle) {
+	textFg: windowSubTextFg;
+}
 settingsExperimentalAbout: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
 	minWidth: 100px;
@@ -544,6 +547,7 @@ settingsSearchResultNoIcon: SettingsButton(settingsSearchResult) {
 	padding: margins(22px, 4px, 22px, 4px);
 }
 settingsSearchResultDetails: FlatLabel(settingsNotificationTypeDetails) {
+	maxHeight: 20px;
 }
 settingsSearchNoResults: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
@@ -768,5 +772,15 @@ detailedSettingsButtonStyle: DetailedSettingsButtonStyle {
 	descriptionBottomSkip: 8px;
 	descriptionRightSkip: 4px;
 }
+
+logoutOptionsButtonStyle: DetailedSettingsButtonStyle(detailedSettingsButtonStyle) {
+	iconPadding: 3px;
+	iconForegroundPadding: 2px;
+}
+
+logoutIconAddAccount: icon {{ "logout/add_account-24x24", menuIconColor }};
+logoutIconSetPasscode: icon {{ "logout/set_passcode-24x24", menuIconColor }};
+logoutIconClearCache: icon {{ "logout/clear_cache-24x24", menuIconColor }};
+logoutIconContactSupport: icon {{ "logout/contact_support-24x24", menuIconColor }};
 
 settingsToastStarIcon: icon {{ "toast/star", toastFg }};

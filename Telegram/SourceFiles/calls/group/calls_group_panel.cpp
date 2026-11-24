@@ -603,6 +603,12 @@ void Panel::initControls() {
 	createMessageButton();
 	refreshLeftButton();
 	refreshVideoButtons();
+	if (!Platform::IsWayland()) {
+		createPinOnTop();
+	}
+	if (_call->rtmp()) {
+		setupFullScreenBehavior();
+	}
 
 	rpl::combine(
 		_mode.value(),
@@ -1629,12 +1635,6 @@ void Panel::setupFullScreenBehavior() {
 }
 
 void Panel::refreshTopButton() {
-	if (!_pinOnTop) {
-		createPinOnTop();
-		if (_call->rtmp()) {
-			setupFullScreenBehavior();
-		}
-	}
 	if (_mode.current() == PanelMode::Wide) {
 		_menuToggle.destroy();
 		if (!_call->rtmp()) {
@@ -1976,12 +1976,12 @@ QRect Panel::computeTitleRect() const {
 			+ (_menuToggle ? _menuToggle->width() : 0)
 			+ custom));
 	const auto width = widget()->width();
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	const auto left = window()->isFullScreen()
 		? st::groupCallNarrowSkip
 		: st::groupCallTitleLeftMac;
 	return QRect(left, 0, width - remove - left, 28);
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 	const auto controls = _window->controlsGeometry();
 	const auto onTheLeft = (controls.center().x() < width / 2);
 	auto band = controls;
@@ -1992,7 +1992,7 @@ QRect Panel::computeTitleRect() const {
 	return onTheLeft
 		? QRect(right, 0, width - right - remove, band.height())
 		: QRect(remove, 0, band.x() - skip - remove, band.height());
-#endif // !Q_OS_MAC
+#endif // !Q_OS_MACOS
 }
 
 bool Panel::updateMode() {
@@ -2643,6 +2643,7 @@ void Panel::updateButtonsGeometry() {
 		const auto addSkip = st::callMuteButtonSmall.active.outerRadius;
 		const auto muteSize = _mute->innerSize().width() + 2 * addSkip;
 		const auto skip = st::groupCallButtonSkipSmall;
+		_mute->setLabelsMaxWidth(0);
 		const auto fullWidth = (rtmp
 			? (_settings->width() + skip)
 			: (_screenShare->width() + skip
@@ -2799,6 +2800,9 @@ void Panel::updateButtonsGeometry() {
 			? (nextButtonLeft + single + buttonSkip + addSkip)
 			: (nextButtonLeft + addSkip);
 		_mute->moveInner({ muteButtonLeft, muteTop });
+		_mute->setLabelsMaxWidth(muteSize
+			+ 2 * buttonSkip
+			- st::callMuteButton.labelAdditional);
 		toggle(_wideMenu, false);
 		toggle(_callShare, true);
 		if (_callShare) {

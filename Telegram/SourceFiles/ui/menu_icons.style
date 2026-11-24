@@ -116,6 +116,9 @@ menuIconChatBubble: icon {{ "menu/chat_bubble", menuIconColor }};
 menuIconPhone: icon {{ "menu/phone", menuIconColor }};
 menuIconChannel: icon {{ "menu/channel", menuIconColor }};
 menuIconStoriesSavedSection: icon {{ "menu/stories_saved_section", menuIconColor }};
+menuIconStoryPost: icon {{ "menu/add_story", menuIconColor }};
+menuIconStoriesArchived: icon {{ "menu/stories_archived", menuIconColor }};
+menuIconStoriesPosted: icon {{ "menu/stories_posted", menuIconColor }};
 menuIconStoriesArchiveSection: icon {{ "menu/stories_archive_section", menuIconColor }};
 menuIconStoriesSave: icon {{ "menu/stories_save", menuIconColor }};
 menuIconStoriesArchive: icon {{ "menu/archive", menuIconColor }};
@@ -219,6 +222,8 @@ menuIconPendingRequests: icon {{ "menu/pending_requests-24x24", menuIconColor }}
 menuIconRemovedUsers: icon {{ "menu/removed_users-24x24", menuIconColor }};
 menuIconWelcomeMessage: icon {{ "menu/welcome_message-24x24", menuIconColor }};
 menuIconStar: icon {{ "menu/star", menuIconColor }};
+menuIconGrams: icon {{ "payments/ton_emoji-18x18", menuIconColor, point(3px, 2px) }};
+menuIconFragment: icon {{ "fragment", menuIconColor }};
 
 // AyuGram: the context menu still uses the plain auto-delete icon.
 menuIconTTLAny: icon {{ "menu/auto_delete_plain", menuIconColor }};
@@ -264,12 +269,14 @@ mediaMenuIconBlock: icon {{ "menu/block", mediaviewMenuFg }};
 
 mediaMenuIconFlip: icon {{ "menu/flip", mediaviewMenuFg }};
 mediaMenuIconEdit: icon {{ "menu/edit", mediaviewMenuFg }};
+mediaMenuIconPrivacy: icon {{ "menu/lock", mediaviewMenuFg }};
 mediaMenuIconNightMode: icon {{ "menu/night_mode", mediaviewMenuFg }};
 mediaMenuIconFont: icon {{ "menu/fonts", mediaviewMenuFg }};
 mediaMenuIconTextStylePlain: icon {{ "menu/text_style_plain-22x22", mediaviewMenuFg, point(0px, 2px) }};
 mediaMenuIconTextStyleFramed: icon {{ "menu/text_style_framed-22x22", mediaviewMenuFg, point(0px, 2px) }};
 mediaMenuIconTextStyleSemiTransparent: icon {{ "menu/text_style_semi-22x22", mediaviewMenuFg, point(0px, 2px) }};
 mediaMenuIconTextStyleOpaque: icon {{ "menu/text_style_opaque-22x22", mediaviewMenuFg, point(0px, 2px) }};
+mediaMenuIconLocation: icon {{ "menu/rich/location-24x24", mediaviewMenuFg }};
 
 menuIconDeleteAttention: icon {{ "menu/delete", menuIconAttentionColor }};
 menuIconLeaveAttention: icon {{ "menu/leave", menuIconAttentionColor }};

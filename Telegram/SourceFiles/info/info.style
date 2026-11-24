@@ -196,13 +196,6 @@ infoTopBarKeysLegend: IconButton(infoTopBarQr) {
 	icon: icon {{ "menu/faq", boxTitleCloseFg }};
 	iconOver: icon {{ "menu/faq", boxTitleCloseFgOver }};
 }
-infoTopBarEdit: IconButton(infoTopBarMenu) {
-	width: 48px;
-	icon: icon {{ "menu/edit", boxTitleCloseFg }};
-	iconOver: icon {{ "menu/edit", boxTitleCloseFgOver }};
-	iconPosition: point(8px, -1px);
-	rippleAreaPosition: point(0px, 6px);
-}
 infoTopBarForward: IconButton(infoTopBarBack) {
 	width: 46px;
 	icon: icon {{ "info/info_media_forward", boxTitleCloseFg }};
@@ -315,16 +308,6 @@ infoLayerTopBarSearch: IconButton(infoLayerTopBarClose) {
 	iconOver: icon {{ "top_bar_search", boxTitleCloseFgOver }};
 	iconPosition: point(7px, -1px);
 }
-infoLayerTopBarEdit: IconButton(infoLayerTopBarClose) {
-	width: 44px;
-	height: infoLayerTopBarHeight - 2px;
-	icon: icon {{ "menu/edit", boxTitleCloseFg }};
-	iconOver: icon {{ "menu/edit", boxTitleCloseFgOver }};
-	iconPosition: point(10px, -1px);
-
-	rippleAreaSize: 42px;
-	rippleAreaPosition: point(1px, 6px);
-}
 infoLayerTopBarForward: IconButton(infoLayerTopBarBack) {
 	width: 45px;
 	icon: icon {{ "info/info_media_forward", boxTitleCloseFg }};
@@ -390,7 +373,10 @@ infoProfileTopBarActionButtonLottieSize: infoProfileTopBarActionButtonIconSize -
 infoProfileTopBarActionButtonIconTop: 6px;
 infoProfileTopBarActionButtonTextTop: infoProfileTopBarActionButtonIconSize + infoProfileTopBarActionButtonIconTop + 1px;
 infoProfileTopBarActionButtonTextSkip: 4px;
+infoProfileTopBarActionButtonDragBorder: 2px;
 infoProfileTopBarActionButtonFont: font(11px);
+infoProfileTopBarActionButtonMinFontSize: 9px;
+infoProfileTopBarActionButtonTextPadding: 4px;
 
 infoProfileTopBarActionButtonsPadding: margins(18px, 0px, 18px, 16px);
 infoProfileTopBarActionButtonsHeight: infoProfileTopBarActionButtonSize + infoProfileTopBarActionButtonsPadding.topBottom;
@@ -867,12 +853,7 @@ infoStoriesAboutArchive: FlatLabel(defaultFlatLabel) {
 }
 infoStoriesAboutArchivePadding: margins(22px, 12px, 22px, 12px);
 
-editPeerBottomButtonsLayoutMargins: margins(0px, 7px, 0px, 0px);
-
 editPeerTopButtonsLayoutSkip: 5px;
-editPeerTopButtonsLayoutSkipToBottom: 5px;
-
-editPeerTopButtonsLayoutSkipCustomBottom: 5px;
 
 editPeerHistoryVisibilityTopSkip: 8px;
 
@@ -898,7 +879,7 @@ editPeerDescription: InputField(defaultInputField) {
 
 	heightMin: 32px;
 }
-editPeerDescriptionMargins: margins(22px, 3px, 22px, 2px);
+editPeerDescriptionMargins: margins(22px, 3px, 22px, 4px);
 editPeerPrivaciesMargins: margins(15px, 7px, 22px, 0px);
 editPeerPrivacyBottomSkip: 16px;
 editPeerPrivacyLabel: FlatLabel(defaultFlatLabel) {
@@ -1313,6 +1294,24 @@ collectionAddIcon: IconEmoji {
 	icon: icon {{ "settings/plus", windowFgActive }};
 	padding: margins(1px, -2px, 1px, 0px);
 }
+storiesAddPostIcon: IconEmoji {
+	icon: icon {{ "profile/add_story", windowFgActive }};
+	padding: margins(1px, -2px, 6px, 0px);
+}
+storiesBottomButton: RoundButton(defaultActiveButton) {
+	height: 40px;
+	textTop: 10px;
+	width: -40px;
+	style: semiboldTextStyle;
+}
+storiesBottomButtonShadow: BoxShadow {
+	blurRadius: 8px;
+	offset: point(0px, 2px);
+	opacity: 0.18;
+}
+storiesBottomButtonHalo: 4px;
+storiesBottomButtonBottom: 8px;
+storiesBottomButtonRevealAfter: 120px;
 collectionEditBox: Box(defaultBox) {
 	buttonPadding: margins(16px, 12px, 16px, 12px);
 	buttonHeight: 42px;
@@ -1378,6 +1377,7 @@ peerQrEmojiPan: EmojiPan(statusEmojiPan) {
 	photoButtonIcon: icon {{ "photo_editor/camera-24x24", windowFg }};
 	audioButtonIcon: icon {{ "photo_editor/widget_music", windowFg }};
 	linkButtonIcon: icon {{ "limits/links", windowFg }};
+	locationButtonIcon: icon {{ "chat/filled_location", windowFg }};
 }
 peerQrEmojiBadgeSize: 14px;
 peerQrEmojiBadgeInset: 6px;

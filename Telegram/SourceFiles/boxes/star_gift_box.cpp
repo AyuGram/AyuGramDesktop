@@ -24,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peer_list_controllers.h"
 #include "boxes/send_credits_box.h"
 #include "boxes/star_gift_auction_box.h"
+#include "boxes/star_gift_onchain_sale_box.h"
 #include "boxes/star_gift_preview_box.h"
 #include "boxes/star_gift_resale_box.h"
 #include "boxes/transfer_gift_box.h"
@@ -583,6 +584,32 @@ auto GenerateGiftMedia(
 			lt_cost,
 			cost,
 			tr::marked);
+}
+
+[[nodiscard]] TextWithEntities GramSellAmountText(int64 nanos) {
+	const auto shown = Data::GiftDisplayNanos(nanos);
+	auto part = shown % kNanosInOne;
+	if (part % 1000) {
+		while (!(part % 10)) {
+			part /= 10;
+		}
+		if (part > 999'999) {
+			part = 900'000 + part % 100'000;
+		}
+	} else {
+		part /= 1000;
+	}
+	const auto amount = Data::FormatGiftGramAmount(nanos);
+	return tr::lng_gift_sell_amount_ton(
+		tr::now,
+		lt_count,
+		shown / kNanosInOne + part / 1'000'000.,
+		[&](QString text) {
+			return tr::rich(Lang::ReplaceTag<QString>::Call(
+				std::move(text),
+				ushort(lt_count),
+				amount));
+		});
 }
 
 [[nodiscard]] PreviewContent GiftPreviewContent(
@@ -3021,7 +3048,13 @@ void UpdateGiftSellPrice(
 		std::shared_ptr<Data::UniqueGift> unique,
 		Data::SavedStarGiftId savedId,
 		CreditsAmount price) {
-	const auto wasOnResale = (unique->starsForResale > 0);
+	if (unique->onchainSale) {
+		LOG(("Wallet Error: %1 is sold on-chain, not with %2."
+			).arg(unique->slug, u"payments.updateStarGiftPrice"_q));
+		show->showToast(tr::lng_gift_buy_onchain_error(tr::now));
+		return;
+	}
+	const auto wasOnResale = Data::UniqueGiftOnSale(*unique);
 	const auto session = &show->session();
 	session->api().request(MTPpayments_UpdateStarGiftPrice(
 		Api::InputSavedStarGiftId(savedId, unique),
@@ -3062,6 +3095,7 @@ void UpdateGiftSellPrice(
 			.id = savedId,
 			.slug = unique->slug,
 			.action = Data::GiftUpdate::Action::ResaleChange,
+			.listingChanged = (wasOnResale != bool(price)),
 		});
 	}).fail([=](const MTP::Error &error) {
 		const auto earlyPrefix = u"STARGIFT_RESELL_TOO_EARLY_"_q;
@@ -3083,11 +3117,14 @@ void UniqueGiftSellBox(
 		std::shared_ptr<Data::UniqueGift> unique,
 		Data::SavedStarGiftId savedId,
 		int price,
-		Settings::GiftWearBoxStyleOverride st) {
+		Settings::GiftWearBoxStyleOverride st,
+		Fn<void(int64 nanoTon, Fn<void()> invalid)> onchain) {
 	const auto session = &show->session();
 	const auto &appConfig = session->appConfig();
 	const auto starsMin = appConfig.giftResaleStarsMin();
 	const auto nanoTonMin = appConfig.giftResaleNanoTonMin();
+	const auto starsMax = appConfig.giftResaleStarsMax();
+	const auto nanoTonMax = appConfig.giftResaleNanoTonMax();
 	const auto starsThousandths = appConfig.giftResaleStarsThousandths();
 	const auto nanoTonThousandths = appConfig.giftResaleNanoTonThousandths();
 
@@ -3096,11 +3133,18 @@ void UniqueGiftSellBox(
 		rpl::variable<CreditsAmount> price;
 		Fn<std::optional<CreditsAmount>()> computePrice;
 		rpl::event_stream<> errors;
+		bool aboveMaximum = false;
 	};
 	const auto state = box->lifetime().make_state<State>();
-	state->onlyTon = unique->onlyAcceptTon;
-	const auto priceNow = Data::UniqueGiftResaleAsked(*unique);
-	state->price = priceNow
+	const auto onSale = Data::UniqueGiftOnSale(*unique);
+	const auto priceNow = !onchain
+		? Data::UniqueGiftResaleAsked(*unique)
+		: onSale
+		? Data::UniqueGiftResaleTon(*unique)
+		: CreditsAmount();
+	state->onlyTon = onchain
+		|| (onSale ? priceNow.ton() : unique->onlyAcceptTon);
+	state->price = (priceNow || onchain)
 		? priceNow
 		: price
 		? CreditsAmount(price)
@@ -3125,10 +3169,15 @@ void UniqueGiftSellBox(
 		.showTon = state->onlyTon.value(),
 		.price = state->price.current(),
 		.starsMin = starsMin,
-		.starsMax = appConfig.giftResaleStarsMax(),
+		.starsMax = starsMax,
 		.nanoTonMin = nanoTonMin,
-		.nanoTonMax = appConfig.giftResaleNanoTonMax(),
+		.nanoTonMax = nanoTonMax,
 		.allowEmpty = true,
+		.errorHook = [=](CreditsAmount amount) {
+			state->aboveMaximum = amount.ton()
+				? (amount.whole() * Ui::kNanosInOne + amount.nano() > nanoTonMax)
+				: (amount.whole() > starsMax);
+		},
 	});
 	state->price = std::move(priceInput.result);
 	state->computePrice = std::move(priceInput.computeResult);
@@ -3140,7 +3189,36 @@ void UniqueGiftSellBox(
 		state->errors.events() | rpl::map_to(false)
 	) | rpl::start_spawning(box->lifetime());
 	auto text = rpl::duplicate(goods) | rpl::map([=](bool good) {
-		const auto value = state->computePrice();
+		if (!good && state->aboveMaximum) {
+			const auto maximum = state->onlyTon.current()
+				? PrepareGramAmountText(nanoTonMax)
+				: tr::lng_action_gift_for_stars(
+					tr::now,
+					lt_count_decimal,
+				starsMax);
+			return tr::lng_gift_sell_max_price(
+				tr::now,
+				lt_amount,
+				tr::marked(maximum),
+				tr::rich);
+		}
+		if (onchain) {
+			const auto entered = (good && unique->feeBps)
+				? state->computePrice()
+				: std::optional<CreditsAmount>();
+			const auto nanos = entered
+				? (entered->whole() * Ui::kNanosInOne + entered->nano())
+				: int64();
+			const auto receive = (nanos > 0)
+				? Data::PriceAfterSaleFee(nanos, unique->feeBps)
+				: std::optional<int64>();
+			if (receive) {
+				return GramSellAmountText(*receive);
+			}
+		}
+		const auto value = onchain
+			? std::optional<CreditsAmount>()
+			: state->computePrice();
 		const auto amount = value ? value->value() : 0.;
 		const auto tonMin = nanoTonMin / float64(Ui::kNanosInOne);
 		const auto enough = value
@@ -3192,25 +3270,27 @@ void UniqueGiftSellBox(
 
 	Ui::AddSkip(container);
 	Ui::AddSkip(container);
-	box->addRow(object_ptr<Ui::PlainShadow>(box));
-	Ui::AddSkip(container);
-	Ui::AddSkip(container);
+	if (!onchain) {
+		box->addRow(object_ptr<Ui::PlainShadow>(box));
+		Ui::AddSkip(container);
+		Ui::AddSkip(container);
 
-	const auto onlyTon = box->addRow(
-		object_ptr<Ui::Checkbox>(
-			box,
-			tr::lng_gift_sell_only_ton(tr::now),
-			state->onlyTon.current(),
-			st::defaultCheckbox));
-	state->onlyTon = onlyTon->checkedValue();
+		const auto onlyTon = box->addRow(
+			object_ptr<Ui::Checkbox>(
+				box,
+				tr::lng_gift_sell_only_ton(tr::now),
+				state->onlyTon.current(),
+				st::defaultCheckbox));
+		state->onlyTon = onlyTon->checkedValue();
 
-	Ui::AddSkip(container);
-	box->addRow(
-		object_ptr<Ui::FlatLabel>(
-			container,
-			tr::lng_gift_sell_only_ton_about(tr::rich),
-			st::boxDividerLabel));
-	Ui::AddSkip(container);
+		Ui::AddSkip(container);
+		box->addRow(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				tr::lng_gift_sell_only_ton_about(tr::rich),
+				st::boxDividerLabel));
+		Ui::AddSkip(container);
+	}
 
 	rpl::duplicate(goods) | rpl::on_next([=](bool good) {
 		details->setTextColorOverride(
@@ -3218,9 +3298,14 @@ void UniqueGiftSellBox(
 	}, details->lifetime());
 
 	const auto submit = [=] {
+		state->aboveMaximum = false;
 		const auto value = state->computePrice();
-		if (!value) {
+		if (!value || (onchain && !*value)) {
 			state->errors.fire({});
+			return;
+		} else if (onchain) {
+			const auto nanos = value->whole() * Ui::kNanosInOne + value->nano();
+			onchain(nanos, crl::guard(box, [=] { state->errors.fire({}); }));
 			return;
 		}
 		box->closeBox();
@@ -3229,7 +3314,7 @@ void UniqueGiftSellBox(
 	std::move(
 		priceInput.submits
 	) | rpl::on_next(submit, details->lifetime());
-	auto submitText = priceNow
+	auto submitText = onSale
 		? tr::lng_gift_sell_update()
 		: tr::lng_gift_sell_put();
 	box->addButton(std::move(submitText), submit);
@@ -3240,13 +3325,22 @@ void ShowUniqueGiftSellBox(
 		std::shared_ptr<Data::UniqueGift> unique,
 		Data::SavedStarGiftId savedId,
 		Settings::GiftWearBoxStyleOverride st) {
-	if (ShowResaleGiftLater(show, unique)) {
+	if (!show
+		|| !show->valid()
+		|| !unique
+		|| HasPendingGiftSale(&show->session(), *unique)) {
+		return;
+	} else if (unique->onchainSale) {
+		ShowOnchainGiftSellBox(show, unique, st);
+		return;
+	} else if (ShowResaleGiftLater(show, unique)) {
 		return;
 	}
 	const auto session = &show->session();
 	const auto &title = unique->title;
 	InvokeWithUniqueGiftResellPrice(session, title, [=](int price) {
-		show->show(Box(UniqueGiftSellBox, show, unique, savedId, price, st));
+		show->show(
+			Box(UniqueGiftSellBox, show, unique, savedId, price, st, nullptr));
 	});
 }
 
@@ -3435,7 +3529,10 @@ struct UpgradeArgs : StarGiftUpgradeArgs {
 					if (!indices.empty()) {
 						return;
 					}
-					indices = ranges::views::ints(0) | ranges::views::take(
+					indices = ranges::views::ints(
+						0,
+						ranges::unreachable
+					) | ranges::views::take(
 						v.size()
 					) | ranges::to_vector;
 					ranges::shuffle(indices);

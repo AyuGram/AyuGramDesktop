@@ -35,8 +35,8 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - Turning tg:// and t.me links, deep links and clickable text entities into in-app navigation and actions. It must not own the screens those links open. Today it also builds the personal-channel picker in `local_url_handlers.cpp`; that belongs in `settings/sections` beside the account-info page.
 
 ### core/updates — self-update
-- Paths: `SourceFiles/core/update_*`, `SourceFiles/_other/updater*`, `SourceFiles/_other/packer*`, `SourceFiles/platform/linux/update_install_linux*`
-- Checking, downloading, verifying, unpacking and installing new versions per channel, the standalone Updater, the Linux protected install and the release Packer. It must not own changelogs or settings UI.
+- Paths: `SourceFiles/core/update_*`, `SourceFiles/_other/updater*`, `SourceFiles/_other/packer*`, `SourceFiles/platform/linux/update_install_linux*`, `SourceFiles/platform/mac/update_install_mac*`, `SourceFiles/platform/win/update_install_win*`
+- Checking, downloading, verifying, unpacking and installing new versions per channel, the standalone Updater, the Linux and Windows protected installs, the macOS kept-package install and the release Packer. It must not own changelogs or settings UI.
 
 ### accounts — accounts and sessions
 - Paths: `SourceFiles/main/`
@@ -95,8 +95,8 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - DC options and config, auth keys, sessions and resending, TCP, HTTP and TLS connections, proxies and checks, special-config fallback, dedicated loaders, the TL schemes and the tde2e end-to-end binding. It knows nothing about messages, peers or UI.
 
 ### storage/local — encrypted local persistence
-- Paths: `SourceFiles/storage/storage_account*`, `SourceFiles/storage/storage_domain*`, `SourceFiles/storage/localstorage*`, `SourceFiles/storage/details/`, `SourceFiles/storage/serialize_*`, `SourceFiles/storage/storage_file_lock*`
-- The tdata of accounts and the domain, the settings scheme, serializers and file locks. It must not own file transfer.
+- Paths: `SourceFiles/storage/storage_account*`, `SourceFiles/storage/storage_domain*`, `SourceFiles/storage/localstorage*`, `SourceFiles/storage/details/`, `SourceFiles/storage/serialize_*`
+- The tdata of accounts and the domain, the settings scheme and serializers. It must not own file transfer.
 
 ### storage/transfer — downloads and uploads
 - Paths: `SourceFiles/storage/`, `SourceFiles/ui/image/image_location*`
@@ -238,6 +238,10 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - Paths: `SourceFiles/history/view/media/`, `SourceFiles/history/view/history_view_add_poll_option*`, `SourceFiles/history/view/history_view_sponsored_click_handler*`, `SourceFiles/chat_helpers/ttl_media_layer_widget*`
 - Everything inside a bubble beyond text: photos, videos, GIFs, round videos, documents, voice, stickers, albums, web pages, polls, to-do lists, locations, games, invoices, calls, and service boxes for gifts, giveaways, suggestions and TON transfers. It must not own playback, downloads or the media viewer.
 
+### tgw — widget messages
+- Paths: `SourceFiles/tgw/`
+- The sandboxed HTML widgets of messages that `HistoryView::HtmlWidget` shows: `Tgw::Runtime` with its starts, limits, crash counting and kept stills, whether each widget's engine, validator and renderer run in the widget helper, through its manager and hosted client, or nowhere where no helper can render, the render work on the widget render thread with its Qt backend, checked painter, frames, input and kept pictures, scroll, touch and selection, and the bridge to bots, storage, themes and the wallet. The hosted wire and renderer rules (`tgw_hosted_wire.h`, `tgw_renderer_rules.h`), which twidget's Rust serving in the widget helper mirrors (`rust/crates/helper`), must not use Qt or Telegram data; the area must not own the bubble around a widget, the OS sandbox or the helper executable.
+
 ### history/compose — chat compose area
 - Paths: `SourceFiles/history/view/controls/`, `SourceFiles/ui/controls/round_video_recorder*`, `SourceFiles/api/api_suggest_post*`
 - The field with send, attach, emoji and bot-menu buttons, reply, edit and forward panels with draft options, link previews, voice and round recording, suggested-post options, the draft stash, media editing with covers, search in chat and the join, mute and unblock bars. It must not own reusable field helpers.
@@ -255,7 +259,7 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 - The peer and chat-entry menus with their handlers, send options and scheduling, mute, auto-delete, mark as read, sponsored and per-message menu items, and the delete, moderate, report and pin confirmations. It must not own generic menu widgets.
 
 ### sending — preparing outgoing content
-- Paths: `SourceFiles/boxes/send_files_box*`, `SourceFiles/boxes/send_gif_with_caption_box*`, `SourceFiles/boxes/edit_caption_box*`, `SourceFiles/boxes/music_attach_box*`, `SourceFiles/boxes/share_box*`, `SourceFiles/ui/chat/attach/`
+- Paths: `SourceFiles/boxes/send_files_box*`, `SourceFiles/boxes/send_gif_with_caption_box*`, `SourceFiles/boxes/edit_caption_box*`, `SourceFiles/boxes/message_video_edit*`, `SourceFiles/boxes/music_attach_box*`, `SourceFiles/boxes/share_box*`, `SourceFiles/ui/chat/attach/`
 - The send-files box with album, spoiler and caption options and the prepared-file model with its previews, GIF with caption, the music picker, editing a sent caption or media, and the share and forward box. It must not own the send pipeline.
 
 ### polls — composing polls and checklists
@@ -383,12 +387,12 @@ This atlas divides Telegram Desktop's sources into named areas, ordered from fou
 ## Platform
 
 ### platform — OS integration
-- Paths: `SourceFiles/platform/`, `SourceFiles/webauthn/`, `SourceFiles/data/data_passkey_deserialize*`, `SourceFiles/menu/menu_dock*`, `SourceFiles/_other/startup_task_win.cpp`
-- Linux, macOS and Windows implementations behind `platform_*.h`: native window and title, notification backends, tray, launcher and autostart, file dialogs, overlay helpers, OCR, translation providers, wallet key protection, passkeys with caBLE and FIDO2, the Touch Bar and the Dock menu. It must not hold cross-platform feature logic. Today it also holds the shared caBLE passkey protocol, ceremony and QR box in `webauthn/`, which every OS backend calls; that belongs in a passkeys feature area, which does not exist yet.
+- Paths: `SourceFiles/platform/`, `SourceFiles/webauthn/`, `SourceFiles/data/data_passkey_deserialize*`, `SourceFiles/menu/menu_dock*`, `SourceFiles/_other/startup_task_win.cpp`, `SourceFiles/_other/widget_helper*`
+- Linux, macOS and Windows implementations behind `platform_*.h`: native window and title, notification backends, tray, launcher and autostart, file dialogs, overlay helpers, OCR, translation providers, wallet key protection, passkeys with caBLE and FIDO2, the Touch Bar and the Dock menu, and the Qt-free `TelegramWidgetHelper` executable under the OS sandbox: its lockdown, the Mac App Store XPC service, the detached serving thread both macOS packages start, and the thin entry that serves whole widgets through twidget's Rust serving (`_other/widget_helper_rust.cpp`). It must not hold cross-platform feature logic. Today it also holds the shared caBLE passkey protocol, ceremony and QR box in `webauthn/`, which every OS backend calls; that belongs in a passkeys feature area, which does not exist yet.
 
 ## Tooling and tests
 
 ### test — test tooling
 - Paths: `SourceFiles/test/`, `SourceFiles/tests/`
 - Start with the short `test/README.md`; helper contracts and task-specific guides live under `test/docs/`. New or changed helper documentation follows `test/docs/adding-helpers.md`.
-- The `-testagent` harness (scenario runner, evidence log, session and RPC fixtures, widget probes and pixel captures, wallet fixtures and the secrecy scan) and the standalone unit tests for the text engine and the updater. The harness is compiled in Debug and, with the `TDESKTOP_RELEASE_TEST_HARNESS` CMake option, in Release. Product code must not depend on it. Today it also exposes hooks that `core/application.cpp`, `data_document.cpp`, `mtp_instance.cpp`, `platform_file_utilities.cpp` and `tgw_runtime.cpp` call directly; those belong behind seams owned by the calling areas.
+- The `-testagent` harness (scenario runner, evidence log, session and RPC fixtures, widget probes and pixel captures, wallet fixtures and the secrecy scan) and the standalone unit tests for the text engine and the updater. The harness is compiled in Debug and, with the `TDESKTOP_RELEASE_TEST_HARNESS` CMake option, in Release. Product code must not depend on it. Today it also exposes hooks that `core/application.cpp`, `data_document.cpp`, `mtp_instance.cpp`, `platform_file_utilities.cpp`, `tgw_remote.cpp`, `tgw_runtime.cpp`, `tgw_renderer.cpp`, `tgw_renderer_work.cpp`, `_other/widget_helper.cpp` and `_other/widget_helper_renderer.cpp` call directly; those belong behind seams owned by the calling areas.

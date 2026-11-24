@@ -16,11 +16,16 @@ namespace HistoryView {
 class Element;
 } // namespace HistoryView
 
+namespace Images {
+struct CornersMaskRef;
+} // namespace Images
+
 namespace Main {
 class Session;
 } // namespace Main
 
 namespace twidget {
+class SandboxHostedChannel;
 class SandboxResources;
 struct WalletCall;
 struct WidgetData;
@@ -33,7 +38,13 @@ namespace Tgw {
 
 class Bridge;
 class RendererCore;
+struct HostedDecision;
+struct HostedRun;
+struct HostedWithdrawal;
 struct MessageMemory;
+struct RendererCut;
+
+inline constexpr auto kMaxLogLine = 240;
 
 enum class HeightChange : uchar {
 	Own,
@@ -87,6 +98,7 @@ public:
 
 	[[nodiscard]] static bool IsQuitPrevent();
 	[[nodiscard]] static bool IsExitPrevent(Fn<void()> retry);
+	static void Finish();
 	static void StateChanged(
 		const base::flat_set<not_null<HistoryItem*>> &items);
 	[[nodiscard]] static auto WatchingOnScreen()
@@ -111,6 +123,7 @@ public:
 		Fn<void()> repaint,
 		Fn<void()> heavyChanged);
 	void setSize(int width, double maxHeight);
+	void setCut(Images::CornersMaskRef corners, bool autoHeight);
 	void setSafeArea(ContentSafeArea area);
 	void laidOut(int height);
 	void setTheme(std::shared_ptr<const twidget::WidgetTheme> theme);
@@ -123,6 +136,29 @@ public:
 
 private:
 	struct Host;
+
+	enum class Demand : uchar {
+		None,
+		Paint,
+		GatedPaint,
+	};
+
+	enum class Discard : uchar {
+		Storage,
+		Sibling,
+		Own,
+		Stale,
+		Capacity,
+	};
+
+	struct Request {
+		std::shared_ptr<HostedRun> run;
+		Demand paint = Demand::None;
+		bool recovery = false;
+		bool started = false;
+		bool left = false;
+		bool owned = false;
+	};
 
 	[[nodiscard]] static std::shared_ptr<MessageMemory> RememberMessage(
 		not_null<HistoryItem*> item,
@@ -141,39 +177,66 @@ private:
 	static void ThemeDone(const std::shared_ptr<Host> &host);
 	static void WalletAvailabilityChanged(not_null<Main::Session*> session);
 	[[nodiscard]] static Runtime *FindVictim();
-	static void TrimKeptPictures();
+	static void TrimKept();
+	static void FinishRun(
+		std::shared_ptr<HostedRun> run,
+		HostedDecision decision);
+	static void RunGone(
+		const std::shared_ptr<HostedRun> &run,
+		const HostedWithdrawal &withdrawal);
+	[[nodiscard]] static bool ChargeRun(HostedRun &run, MessageMemory &memory);
 
 	[[nodiscard]] bool currentContent() const;
 	[[nodiscard]] bool crashedOut() const;
 	[[nodiscard]] bool startable() const;
-	[[nodiscard]] bool wantsStart() const;
+	[[nodiscard]] bool demanded() const;
+	[[nodiscard]] bool wantsStart();
+	[[nodiscard]] bool runsDeciding(const HostedRun *self = nullptr) const;
 	[[nodiscard]] bool queryVisible() const;
 
-	[[nodiscard]] bool recordStop(not_null<RendererCore*> renderer);
-	void breakCrashRun();
+	void recordStop(not_null<RendererCore*> renderer);
+	int breakCrashRun();
 	void start();
 	void release();
+	void cancelStart();
+	void gatePaint();
+	void releaseAttempt(Discard discard, const QString &note);
+	void applyFinal(const HostedRun &run);
+	void stopForRun(const HostedDecision &decision);
+	[[nodiscard]] bool livesWork(uint64 work) const;
+	void restartSpared(uint64 work);
 	void resourcesReady(
 		int generation,
 		std::shared_ptr<twidget::SandboxResources> resources);
 	void construct(std::shared_ptr<twidget::SandboxResources> resources);
+	[[nodiscard]] std::shared_ptr<HostedRun> createRun();
 	void constructed(
 		int generation,
 		std::shared_ptr<twidget::WidgetHost> host,
 		const twidget::WidgetData &data,
 		const QString &error,
-		uint64 storage);
-	void retire(State state);
+		uint64 storage,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel);
+	void retire(State state, bool keepOwnDeath = false);
+	[[nodiscard]] Fn<void(twidget::WidgetHost &host)> keepStill(bool ended);
 	void stopForCrashes();
 	void fail(const QString &error);
 	void failResources();
 
 	void subscribeLive();
+	void subscribeStill();
 	void coreUpdated(
 		not_null<RendererCore*> renderer,
 		bool repaint,
-		bool finished);
-	void coreStopped(not_null<RendererCore*> renderer);
+		bool client);
+	void cursorChanged(not_null<RendererCore*> renderer);
+	void coreStopped(not_null<RendererCore*> renderer, bool client);
+	void stillUpdated(
+		not_null<RendererCore*> renderer,
+		bool stopped,
+		bool repaint,
+		bool client);
+	void stillKeptChanged(not_null<RendererCore*> renderer);
 	void linkRequested(
 		not_null<RendererCore*> renderer,
 		const std::string &url,
@@ -221,12 +284,14 @@ private:
 	std::shared_ptr<const twidget::WidgetTheme> _hostTheme;
 	std::unique_ptr<RendererCore> _live;
 	std::unique_ptr<RendererCore> _still;
+	std::unique_ptr<RendererCut> _cut;
 	std::vector<QString> _notes;
 	QString _stopReason;
 	QString _summary;
 	Fn<void(const QString &text)> _logDone;
 	QPointer<QWidget> _window;
 	rpl::lifetime _liveLifetime;
+	rpl::lifetime _stillLifetime;
 	rpl::lifetime _windowLifetime;
 	std::optional<int> _shownHeight;
 	const uint64 _contentSerial = 0;
@@ -238,6 +303,7 @@ private:
 	uint64 _summaryRequest = 0;
 	uint64 _logHost = 0;
 	double _maxHeight = 0.;
+	Request _request;
 	int _generation = 0;
 	int _width = 0;
 	HeightLayout _layout;
@@ -246,20 +312,22 @@ private:
 	State _state = State::Idle;
 	bool _visible = false;
 	bool _hostVisible = false;
-	bool _painted = false;
 	bool _windowKnown = false;
 	bool _stopFatal = false;
 	bool _summaryLast = false;
 	bool _displayDeferred = false;
 	bool _displayPosted = false;
-	bool _sizing = false;
 	bool _clientPending = false;
+	bool _stillKept = false;
 
 };
 
 [[nodiscard]] double CssFromLogical(int logical);
 [[nodiscard]] int LogicalHeight(double css);
 [[nodiscard]] int LogicalWidth(double css);
+
+[[nodiscard]] QString ClipLogLine(QString text, int length = kMaxLogLine);
+[[nodiscard]] QString ClipLogLine(const std::string &text);
 
 [[nodiscard]] Runtime *FindRuntime(
 	not_null<const HistoryView::Element*> view);

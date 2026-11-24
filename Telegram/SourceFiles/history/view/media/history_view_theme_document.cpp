@@ -10,7 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "base/unixtime.h"
 #include "boxes/background_preview_box.h"
+#include "boxes/gift_onchain_offer_box.h"
+#include "boxes/star_gift_onchain_withdraw_box.h"
 #include "history/history.h"
+#include "history/history_gift_onchain_offer.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/view/history_view_element.h"
@@ -27,13 +30,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_url.h"
 #include "core/click_handler_types.h"
 #include "core/local_url_handlers.h"
+#include "info/peer_gifts/info_peer_gifts_common.h"
 #include "lang/lang_keys.h"
+#include "lang/lang_tag.h"
 #include "main/main_session.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
+#include "ui/effects/premium_stars.h"
 #include "ui/cached_round_corners.h"
 #include "ui/painter.h"
 #include "ui/top_background_gradient.h"
@@ -43,6 +49,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/themes/window_theme.h"
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
+
+#include <QtCore/QDateTime>
 
 // AyuGram includes
 #include "ayu/features/message_shot/message_shot.h"
@@ -83,6 +91,40 @@ namespace {
 	) | rpl::map([peer, paper = *paper] {
 		return WallPaperRevertable(peer, paper);
 	});
+}
+
+[[nodiscard]] Info::PeerGifts::GiftBadge OnchainOfferRibbon(
+		const Data::UniqueGift &unique,
+		not_null<const HistoryServiceGiftOnchainOffer*> offer) {
+	const auto white = QColor(255, 255, 255);
+	const auto state = ComputeGiftOnchainOfferState(
+		offer,
+		base::unixtime::now());
+	const auto accepted = (state == GiftOnchainOfferState::Accepted);
+	if (accepted && !offer->buyer) {
+		return {
+			.text = tr::lng_gift_sold_tag(tr::now),
+			.bg1 = Info::PeerGifts::BurnedBadgeBg(),
+			.fg = white,
+			.small = true,
+		};
+	}
+	return {
+		.text = (accepted
+			? tr::lng_gift_bought_tag(tr::now)
+			: (QChar('#') + Lang::FormatCountDecimal(unique.number))),
+		.bg1 = unique.backdrop.edgeColor,
+		.bg2 = unique.backdrop.patternColor,
+		.fg = white,
+		.small = true,
+	};
+}
+
+[[nodiscard]] bool OnchainOfferReviewable(
+		not_null<const HistoryItem*> item,
+		TimeId now) {
+	const auto offer = item->Get<HistoryServiceGiftOnchainOffer>();
+	return offer && GiftOnchainOfferReviewable(offer, now);
 }
 
 } // namespace
@@ -621,7 +663,13 @@ GiftServiceBox::GiftServiceBox(
 	not_null<Element*> parent,
 	not_null<Data::MediaGiftBox*> gift)
 : _parent(parent)
-, _data(*gift->gift()) {
+, _data(*gift->gift())
+, _review((_data.type == Data::GiftType::OnchainOffer)
+	&& OnchainOfferReviewable(parent->data(), base::unixtime::now()))
+, _withdraw((_data.type == Data::GiftType::OnchainOffer)
+	&& CanWithdrawGiftOnchainOffer(
+		parent->data(),
+		base::unixtime::now())) {
 }
 
 GiftServiceBox::~GiftServiceBox() = default;
@@ -646,6 +694,17 @@ TextWithEntities GiftServiceBox::title() {
 }
 
 TextWithEntities GiftServiceBox::subtitle() {
+	if (_data.type == Data::GiftType::OnchainOffer) {
+		const auto item = _parent->data();
+		const auto offer = item->Get<HistoryServiceGiftOnchainOffer>();
+		const auto now = base::unixtime::now();
+		_shownLeft = offer ? GiftOnchainOfferTimeLeft(offer, now) : 0;
+		if ((_review && !OnchainOfferReviewable(item, now))
+			|| (_withdraw && !CanWithdrawGiftOnchainOffer(item, now))) {
+			removeButton();
+		}
+		return GiftOnchainOfferCardText(item, now);
+	}
 	const auto giftName = tr::bold(Data::UniqueGiftName(*_data.unique));
 	if (_data.type == Data::GiftType::GiftOffer) {
 		const auto item = _parent->data();
@@ -770,14 +829,20 @@ void GiftServiceBox::clearKeyboard() {
 }
 
 rpl::producer<> GiftServiceBox::changes() {
-	if (_data.type != Data::GiftType::GiftOffer) {
+	if (_data.type != Data::GiftType::GiftOffer
+		&& _data.type != Data::GiftType::OnchainOffer) {
 		return nullptr;
 	}
 	return _changes.events();
 }
 
 rpl::producer<QString> GiftServiceBox::button() {
-	if (_data.type == Data::GiftType::GiftOffer) {
+	if (_review) {
+		return tr::lng_action_gift_onchain_offer_review();
+	} else if (_withdraw) {
+		return tr::lng_gift_onchain_offer_withdraw();
+	} else if (_data.type == Data::GiftType::GiftOffer
+		|| _data.type == Data::GiftType::OnchainOffer) {
 		return nullptr;
 	}
 	return tr::lng_sticker_premium_view();
@@ -788,8 +853,42 @@ ClickHandlerPtr GiftServiceBox::createViewLink() {
 		u"tg://nft?slug="_q + _data.unique->slug);
 }
 
+ClickHandlerPtr GiftServiceBox::createButtonLink() {
+	const auto item = _parent->data();
+	const auto itemId = item->fullId();
+	if (_withdraw) {
+		const auto session = &item->history()->session();
+		return std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+			const auto my = context.other.value<ClickHandlerContext>();
+			const auto controller = my.sessionWindow.get();
+			if (controller && (&controller->session() == session)) {
+				Ui::WithdrawOnchainGiftOffer(controller->uiShow(), itemId);
+			}
+		});
+	} else if (!_review) {
+		const auto offer = item->Get<HistoryServiceGiftOnchainOffer>();
+		if (offer && offer->originalOfferLink) {
+			return offer->originalOfferLink;
+		}
+		return createViewLink();
+	}
+	return std::make_shared<LambdaClickHandler>([=](ClickContext context) {
+		const auto my = context.other.value<ClickHandlerContext>();
+		if (const auto controller = my.sessionWindow.get()) {
+			ShowGiftOnchainOfferReview(controller, itemId);
+		}
+	});
+}
+
 int GiftServiceBox::buttonSkip() {
 	return st::msgServiceGiftBoxButtonMargins.top();
+}
+
+std::optional<Ui::Premium::MiniStarsType> GiftServiceBox::buttonMinistars() {
+	if (!_review) {
+		return std::nullopt;
+	}
+	return Ui::Premium::MiniStarsType::SlowDiamondStars;
 }
 
 void GiftServiceBox::cacheUniqueBackground(int width, int height) {
@@ -853,6 +952,66 @@ void GiftServiceBox::draw(
 	} else {
 		ensureStickerCreated();
 	}
+	if (_data.type == Data::GiftType::OnchainOffer) {
+		paintOnchainOfferRibbon(p, geometry);
+		armOnchainOfferTick();
+	}
+}
+
+void GiftServiceBox::paintOnchainOfferRibbon(
+		QPainter &p,
+		const QRect &geometry) {
+	const auto offer = _parent->data()->Get<HistoryServiceGiftOnchainOffer>();
+	if (!offer) {
+		return;
+	}
+	const auto badge = OnchainOfferRibbon(*_data.unique, offer);
+	if (_ribbonCache.isNull() || _ribbonText != badge.text) {
+		_ribbonText = badge.text;
+		_ribbonCache = Info::PeerGifts::ValidateRotatedBadge(
+			badge,
+			QMargins());
+	}
+	const auto overhang = st::lineWidth;
+	const auto ratio = _ribbonCache.devicePixelRatio();
+	const auto ribbonWidth = _ribbonCache.width() / ratio;
+	p.save();
+	p.setClipRect(
+		geometry.marginsAdded({ overhang, overhang, overhang, overhang }),
+		Qt::IntersectClip);
+	p.drawImage(
+		QPointF(
+			geometry.x() + geometry.width() + overhang - ribbonWidth,
+			geometry.y() - overhang),
+		_ribbonCache);
+	p.restore();
+}
+
+void GiftServiceBox::armOnchainOfferTick() {
+	if (!_shownLeft || _changeTimer.isActive()) {
+		return;
+	}
+	constexpr auto kSecond = crl::time(1000);
+	constexpr auto kNewSecondMargin = crl::time(5);
+	// Sample the phase first, so a second ending in between reads as stale.
+	const auto phase = QDateTime::currentMSecsSinceEpoch() % kSecond;
+	const auto offer = _parent->data()->Get<HistoryServiceGiftOnchainOffer>();
+	const auto left = offer
+		? GiftOnchainOfferTimeLeft(offer, base::unixtime::now())
+		: TimeId();
+	_changeTimer.setCallback([=] { _changes.fire({}); });
+	_changeTimer.callOnce(
+		((left == _shownLeft) ? (kSecond - phase + kNewSecondMargin) : 0),
+		Qt::PreciseTimer);
+}
+
+void GiftServiceBox::removeButton() {
+	_review = false;
+	_withdraw = false;
+	crl::on_main(this, [=] {
+		const auto item = _parent->data();
+		item->history()->owner().requestItemViewRefresh(item);
+	});
 }
 
 bool GiftServiceBox::hideServiceText() {

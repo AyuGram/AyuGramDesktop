@@ -7,10 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "tgw/tgw_backend.h"
 
-#include "core/src/css.h"
 #include "core/src/png.h"
 #include "tgw/tgw_canvas.h"
 #include "tgw/tgw_emoji.h"
+#include "tgw/tgw_emoji_images.h"
+#include "tgw/tgw_painter.h"
+#include "tgw/tgw_renderer_rules.h"
+#include "tgw/tgw_renderer_work.h"
+#include "twidget/sandbox_engine.h"
 
 #include <QtCore/QBuffer>
 #include <QtGui/QImageReader>
@@ -23,22 +27,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Tgw {
 namespace {
 
+using RendererRules::kMaxCanvasFonts;
+using RendererRules::kMaxNewCanvasFonts;
+
 constexpr auto kMaxFontSize = 1e6;
 constexpr auto kMaxFontPixelSize = 1024;
-constexpr auto kMaxNewCanvasFonts = 16;
-constexpr auto kMaxCanvasFonts = 32;
-constexpr auto kMaxCanvasFontParses = 64;
-constexpr auto kMaxCanvasFontSpellings = 64;
-constexpr auto kMaxCanvasFontSpellingSize = std::size_t(512);
-constexpr auto kCanvasFontKind = std::string_view("canvas-font-limit");
+constexpr auto kMaxLiveFonts = 16384;
+constexpr auto kMaxFamiliesBytes = std::size_t(128 * 1024);
+constexpr auto kMaxMeasuredText = std::size_t(320 * 1024);
 constexpr auto kMaxImageUrlSize = std::size_t(5 * 1024 * 1024);
 constexpr auto kMaxImageSide = 4096;
 constexpr auto kMaxImagePixels = 4 * 1024 * 1024;
 constexpr auto kImagePixelBytes = 4;
 constexpr auto kMaxBackendImageBytes = int64(32 * 1024 * 1024);
-constexpr auto kMaxBackendImages = 1024;
+constexpr auto kMaxBackendImages = 4096;
 constexpr auto kMaxTotalImageBytes = int64(128 * 1024 * 1024);
-constexpr auto kMaxTotalImages = 4096;
+constexpr auto kMaxTotalImages = 32768;
+constexpr auto kMaxPublishedSeconds = 1e7;
+constexpr auto kFrameInterval = crl::time(1000) / st::universalDuration;
 constexpr auto kAsciiSpaces = std::string_view(" \t\n\f\r");
 constexpr auto kDataPrefix = std::string_view("data:");
 constexpr auto kBase64 = std::string_view("base64");
@@ -101,10 +107,6 @@ constexpr auto kImageTypes = std::array{
 	ImageType{ "image/jpg", "jpeg" },
 	ImageType{ "image/gif", kGifFormat },
 	ImageType{ "image/webp", "webp" },
-	ImageType{ "image/avif", "avif" },
-	ImageType{ "image/bmp", "bmp" },
-	ImageType{ "image/x-icon", "ico" },
-	ImageType{ "image/vnd.microsoft.icon", "ico" },
 };
 
 struct DataUrl {
@@ -117,6 +119,14 @@ struct DecodedImage {
 	QSizeF size;
 };
 
+struct PngHeader {
+	QByteArray bytes;
+	QSizeF size;
+	uint32 width = 0;
+	uchar depth = 0;
+	uchar type = 0;
+};
+
 struct ImageCharges {
 	int64 bytes = 0;
 	int count = 0;
@@ -125,6 +135,14 @@ struct ImageCharges {
 [[nodiscard]] ImageCharges &TotalCharges() {
 	static auto result = ImageCharges();
 	return result;
+}
+
+[[nodiscard]] std::chrono::steady_clock::time_point PublishedAt(
+		float64 seconds) {
+	const auto in = std::chrono::duration<float64>(
+		std::clamp(seconds, 0., kMaxPublishedSeconds));
+	return std::chrono::steady_clock::now()
+		+ std::chrono::duration_cast<std::chrono::steady_clock::duration>(in);
 }
 
 [[nodiscard]] std::string_view Trimmed(std::string_view value) {
@@ -187,12 +205,6 @@ struct ImageCharges {
 	return FontKind::Regular;
 }
 
-[[nodiscard]] QFont BaseFont(FontKind kind) {
-	return (kind == FontKind::Monospace)
-		? st::normalFont->monospace()->f
-		: st::normalFont->f;
-}
-
 [[nodiscard]] std::pair<uint32, float64> ResolveFont(
 		std::string_view families,
 		float size,
@@ -207,8 +219,11 @@ struct ImageCharges {
 	return { style, requested };
 }
 
-[[nodiscard]] QFont StyledFont(uint32 style, int pixels) {
-	auto result = BaseFont(FontKind(style & 1));
+[[nodiscard]] QFont StyledFont(
+		const QString &family,
+		uint32 style,
+		int pixels) {
+	auto result = QFont(family);
 	result.setPixelSize(pixels);
 	result.setWeight(kFontWeights[style >> 2]);
 	result.setItalic((style & 2) != 0);
@@ -357,20 +372,55 @@ void AppendPngChunk(
 	return false;
 }
 
-// The rows before the damage, of a PNG that png_intact_rows() measured.
-[[nodiscard]] QByteArray IntactPng(const QByteArray &bytes, size_t rows) {
-	const auto header = bytes.mid(kPngHeaderOffset, kPngHeaderSize);
-	const auto width = ReadUInt32(header, 0);
-	const auto depth = uint64(uchar(header[8]));
-	const auto type = uchar(header[9]);
-	const auto channels = (type == 2)
+[[nodiscard]] std::optional<PngHeader> ReadPngHeader(const QByteArray &bytes) {
+	const auto signature = QByteArray::fromRawData(
+		kPngSignature.data(),
+		qsizetype(kPngSignature.size()));
+	if ((bytes.size() < kPngHeaderOffset + kPngHeaderSize + 4)
+		|| !bytes.startsWith(signature)
+		|| (bytes.mid(kPngHeaderOffset - 4, 4) != "IHDR")
+		|| (ReadUInt32(bytes, kPngHeaderOffset - 8) < kPngHeaderSize)) {
+		return std::nullopt;
+	}
+	return PngHeader{
+		.bytes = bytes.mid(kPngHeaderOffset, kPngHeaderSize),
+		.size = QSizeF(
+			ReadUInt32(bytes, kPngHeaderOffset),
+			ReadUInt32(bytes, kPngHeaderOffset + 4)),
+		.width = ReadUInt32(bytes, kPngHeaderOffset),
+		.depth = uchar(bytes[kPngHeaderOffset + 8]),
+		.type = uchar(bytes[kPngHeaderOffset + 9]),
+	};
+}
+
+[[nodiscard]] uint64 PngStride(const PngHeader &header) {
+	const auto channels = (header.type == 2)
 		? 3
-		: (type == 4)
+		: (header.type == 4)
 		? 2
-		: (type == 6)
+		: (header.type == 6)
 		? 4
 		: 1;
-	const auto stride = (uint64(width) * channels * depth + 7) / 8 + 1;
+	return (uint64(header.width) * channels * header.depth + 7) / 8 + 1;
+}
+
+[[nodiscard]] bool PngRecoverable(const PngHeader &header, int64 budget) {
+	if (!ValidImageSize(header.size)
+		|| (ImageBytes(header.size) > budget)
+		|| !ValidPngDepth(header.type, header.depth)) {
+		return false;
+	}
+	const auto rows = uint64(header.size.height());
+	const auto ceiling = 2 * uint64(ImageBytes(header.size)) + rows;
+	return (PngStride(header) <= ceiling / rows);
+}
+
+// The rows before the damage, of a PNG that png_intact_rows() measured.
+[[nodiscard]] QByteArray IntactPng(
+		const QByteArray &bytes,
+		const PngHeader &header,
+		size_t rows) {
+	const auto stride = PngStride(header);
 	auto before = QByteArray();
 	auto compressed = QByteArray();
 	auto at = qsizetype(kPngSignature.size());
@@ -421,9 +471,9 @@ void AppendPngChunk(
 	}
 	packed.truncate(qsizetype(packedSize));
 	auto shortened = QByteArray();
-	AppendUInt32(shortened, width);
+	AppendUInt32(shortened, header.width);
 	AppendUInt32(shortened, uint32(kept));
-	shortened.append(header.mid(8));
+	shortened.append(header.bytes.mid(8));
 	auto result = QByteArray(
 		kPngSignature.data(),
 		qsizetype(kPngSignature.size()));
@@ -469,41 +519,39 @@ void AppendPngChunk(
 // the rest transparent, where Qt's decoder refuses the whole image.
 [[nodiscard]] DecodedImage DecodeDamagedPng(
 		const QByteArray &bytes,
+		const PngHeader &header,
 		size_t intact,
 		int64 budget) {
-	const auto size = QSizeF(
-		ReadUInt32(bytes, kPngHeaderOffset),
-		ReadUInt32(bytes, kPngHeaderOffset + 4));
-	const auto header = bytes.mid(kPngHeaderOffset, kPngHeaderSize);
-	if (!ValidImageSize(size)
-		|| (ImageBytes(size) > budget)
-		|| (header.size() != kPngHeaderSize)
-		|| !ValidPngDepth(uchar(header[9]), uchar(header[8]))) {
-		return {};
-	}
-	auto image = QImage(size.toSize(), QImage::Format_ARGB32_Premultiplied);
+	auto image = QImage(
+		header.size.toSize(),
+		QImage::Format_ARGB32_Premultiplied);
 	image.fill(Qt::transparent);
 	const auto rows = intact
-		? DecodeRaster(IntactPng(bytes, intact), kPngFormat, budget)
+		? DecodeRaster(IntactPng(bytes, header, intact), kPngFormat, budget)
 		: DecodedImage();
 	if (!rows.image.isNull()) {
 		auto p = QPainter(&image);
 		p.setCompositionMode(QPainter::CompositionMode_Source);
 		p.drawImage(0, 0, rows.image);
 	}
-	return { std::move(image), size };
+	return { std::move(image), header.size };
 }
 
 [[nodiscard]] DecodedImage ReadRaster(
 		QByteArray bytes,
 		std::string_view format,
 		int64 budget) {
-	if (format == kPngFormat) {
+	if (format != kPngFormat) {
+		return DecodeRaster(std::move(bytes), format, budget);
+	} else if (const auto header = ReadPngHeader(bytes)) {
+		if (!PngRecoverable(*header, budget)) {
+			return {};
+		}
 		const auto intact = twlite::png_intact_rows(
 			reinterpret_cast<const uint8_t*>(bytes.constData()),
 			size_t(bytes.size()));
 		if (intact != SIZE_MAX) {
-			return DecodeDamagedPng(bytes, intact, budget);
+			return DecodeDamagedPng(bytes, *header, intact, budget);
 		}
 	}
 	return DecodeRaster(std::move(bytes), format, budget);
@@ -511,17 +559,31 @@ void AppendPngChunk(
 
 } // namespace
 
-QtBackend::QtBackend(Diagnostic diagnostic)
+QtBackend::QtBackend(
+	Diagnostic diagnostic,
+	Fn<void()> refused,
+	QString regularFamily,
+	QString monospaceFamily,
+	std::vector<FontPosition> positions)
 : _diagnostic(diagnostic)
+, _refused(std::move(refused))
+, _regularFamily(std::move(regularFamily))
+, _monospaceFamily(std::move(monospaceFamily))
+, _positions(std::move(positions))
 , _canvases(std::make_unique<Canvases>(std::move(diagnostic)))
-, _canvasFontsLeft(kMaxNewCanvasFonts)
-, _canvasParsesLeft(kMaxCanvasFontParses) {
+, _emoji(std::make_unique<EmojiAccount>())
+, _meter([=](QString reason) { refuse(std::move(reason)); })
+, _canvasFontsLeft(kMaxNewCanvasFonts) {
 }
 
 QtBackend::~QtBackend() {
 	auto &total = TotalCharges();
 	total.bytes -= _imageBytes;
 	total.count -= int(_images.size());
+}
+
+bool QtBackend::serves(const WidgetMeter::Work &work) const {
+	return !_released && work.admitted() && !refused();
 }
 
 int QtBackend::create_font(
@@ -531,20 +593,56 @@ int QtBackend::create_font(
 		bool italic,
 		const std::string&,
 		twlite::FontMetrics &out) {
+	const auto work = _meter.work();
+	if (!serves(work) || !admitFamilies(families)) {
+		out = twlite::FontMetrics();
+		return 0;
+	}
 	return makeFont(ResolveFont(families, size, weight, italic), out, false);
+}
+
+int QtBackend::create_canvas_font(
+		const std::string &families,
+		float size,
+		int weight,
+		bool italic,
+		twlite::FontMetrics &out) {
+	const auto work = _meter.work();
+	if (!serves(work) || !admitFamilies(families)) {
+		return refuseCanvasFont(out);
+	}
+	return admitCanvasFont(ResolveFont(families, size, weight, italic), out);
 }
 
 int QtBackend::makeFont(
 		FontKey key,
 		twlite::FontMetrics &out,
 		bool canvas) {
+	const auto fail = [&](QString limit) {
+		refuse(std::move(limit));
+		out = twlite::FontMetrics();
+		return 0;
+	};
+	if (int(_fonts.size()) >= kMaxLiveFonts) {
+		return fail(PaintLimit(
+			u"%1 live fonts"_q.arg(_fonts.size() + 1),
+			kMaxLiveFonts));
+	} else if (_lastFontId == std::numeric_limits<int>::max()) {
+		return fail(PaintLimit(
+			u"%1 font handles"_q.arg(int64(_lastFontId) + 1),
+			std::numeric_limits<int>::max()));
+	}
 	const auto requested = key.second;
 	const auto pixels = int(std::clamp(
 		std::round(requested),
 		1.,
 		float64(kMaxFontPixelSize)));
 	const auto scale = requested / pixels;
-	const auto font = StyledFont(key.first, pixels);
+	const auto &family = (FontKind(key.first & 1) == FontKind::Monospace)
+		? _monospaceFamily
+		: _regularFamily;
+	const auto font = StyledFont(family, key.first, pixels);
+	AdoptFontPositions(font, _positions);
 	const auto metrics = QFontMetricsF(font);
 	out.ascent = float(metrics.ascent() * scale);
 	out.descent = float(metrics.descent() * scale);
@@ -557,10 +655,30 @@ int QtBackend::makeFont(
 }
 
 void QtBackend::delete_font(int font) {
-	_fonts.remove(font);
+	const auto i = _fonts.find(font);
+	if (i == end(_fonts)) {
+		return;
+	} else if (i->second.canvas) {
+		const auto j = ranges::find_if(_canvasFonts, [&](const auto &entry) {
+			return (entry.second.id == font);
+		});
+		if (j != end(_canvasFonts)) {
+			_canvasFonts.erase(j);
+		}
+	}
+	_fonts.erase(i);
 }
 
 float QtBackend::text_width(int font, const std::string &text) {
+	const auto work = _meter.work();
+	if (!serves(work)) {
+		return 0.f;
+	} else if (text.size() > kMaxMeasuredText) {
+		refuse(PaintLimit(
+			u"%1 bytes of measured text"_q.arg(text.size()),
+			kMaxMeasuredText));
+		return 0.f;
+	}
 	const auto i = _fonts.find(font);
 	if (i == end(_fonts)) {
 		return 0.f;
@@ -586,10 +704,17 @@ bool QtBackend::load_image(
 		const std::string &url,
 		float &width,
 		float &height) {
+	const auto work = _meter.work();
+	if (!serves(work) || _images.contains(id)) {
+		return false;
+	} else if (int(_images.size()) >= kMaxBackendImages) {
+		refuse(PaintLimit(
+			u"%1 images"_q.arg(_images.size() + 1),
+			kMaxBackendImages));
+		return false;
+	}
 	auto &total = TotalCharges();
-	if (_images.contains(id)
-		|| (int(_images.size()) >= kMaxBackendImages)
-		|| (total.count >= kMaxTotalImages)) {
+	if (total.count >= kMaxTotalImages) {
 		return false;
 	}
 	auto data = ParseDataUrl(url);
@@ -618,7 +743,14 @@ void QtBackend::canvas_run(
 		int width,
 		int height,
 		const std::vector<twlite::CanvasOp> &ops) {
-	_canvases->run(id, width, height, ops, *this);
+	const auto work = _meter.work();
+	if (!serves(work)) {
+		return;
+	}
+	auto refusal = _canvases->run(id, width, height, ops, *this);
+	if (!refusal.isEmpty()) {
+		refuse(std::move(refusal));
+	}
 }
 
 bool QtBackend::canvas_read(
@@ -628,6 +760,10 @@ bool QtBackend::canvas_read(
 		int width,
 		int height,
 		std::vector<uint8_t> &rgba) {
+	const auto work = _meter.work();
+	if (!serves(work)) {
+		return false;
+	}
 	return _canvases->read(id, x, y, width, height, rgba);
 }
 
@@ -654,47 +790,93 @@ const QImage *QtBackend::canvas(int id) const {
 	return _canvases->bitmap(id);
 }
 
-void QtBackend::beginCanvasBatch() {
+const EmojiAccount &QtBackend::emoji() const {
+	return *_emoji;
+}
+
+bool QtBackend::beginFrame() {
+	const auto now = crl::now();
+	if (_meter.heldFor() || (now - _framed < kFrameInterval)) {
+		return false;
+	}
+	_framed = now;
 	_canvases->refill();
 	_canvasFontsLeft = kMaxNewCanvasFonts;
-	_canvasParsesLeft = kMaxCanvasFontParses;
+	return true;
 }
 
-int QtBackend::canvasFont(
-		const std::string &css,
-		twlite::FontMetrics &metrics) {
-	if (css.size() > kMaxCanvasFontSpellingSize) {
-		return refuseCanvasFont(metrics);
+void QtBackend::noteCanvasFontRefused() {
+	if (!std::exchange(_canvasFontLimitNoted, true) && _diagnostic) {
+		_diagnostic(
+			std::string(RendererRules::kCanvasFontLimitKind),
+			RendererRules::CanvasFontLimitText());
 	}
-	const auto i = _canvasSpellings.find(css);
-	if (i != end(_canvasSpellings)) {
-		return admitCanvasFont(i->second, metrics);
-	} else if (_canvasParsesLeft <= 0) {
-		return refuseCanvasFont(metrics);
-	}
-	--_canvasParsesLeft;
-	const auto parsed = twlite::css::parse_font(css);
-	const auto key = ResolveFont(
-		parsed.family,
-		parsed.size,
-		parsed.weight,
-		parsed.italic);
-	if (int(_canvasSpellings.size()) >= kMaxCanvasFontSpellings) {
-		// Holds no handles, so clearing it mid-message is safe.
-		_canvasSpellings.clear();
-	}
-	_canvasSpellings.emplace(css, key);
-	return admitCanvasFont(key, metrics);
 }
 
-void QtBackend::releaseCanvasFonts() {
-	for (const auto &entry : _canvasFonts) {
-		_fonts.remove(entry.second.id);
+void QtBackend::releaseLive() {
+	if (std::exchange(_released, true)) {
+		return;
 	}
-	_canvasFonts.clear();
-	_canvasSpellings.clear();
+	auto &total = TotalCharges();
+	total.bytes -= base::take(_imageBytes);
+	total.count -= int(_images.size());
+	base::take(_images);
+	base::take(_fonts);
+	base::take(_canvasFonts);
+	_canvases->clear();
 	_canvasFontsLeft = 0;
-	_canvasParsesLeft = 0;
+	_emoji->close();
+}
+
+WidgetMeter::Operation QtBackend::operation() {
+	return _meter.operation();
+}
+
+WidgetMeter::Work QtBackend::work() {
+	return _meter.work();
+}
+
+WidgetMeter::Work QtBackend::workUnlessHeld() {
+	return _meter.workUnlessHeld();
+}
+
+crl::time QtBackend::heldFor() const {
+	return _meter.heldFor();
+}
+
+void QtBackend::input() {
+	_meter.input();
+}
+
+void QtBackend::publishWaits(
+		std::shared_ptr<twidget::SandboxHostedWait> wait) {
+	if (!wait) {
+		_meter.publish(nullptr, nullptr);
+		return;
+	}
+	_meter.publish([=](float64 seconds) {
+		wait->hold(PublishedAt(seconds));
+	}, [=](float64 seconds) {
+		wait->exempt(PublishedAt(seconds));
+	});
+}
+
+bool QtBackend::refused() const {
+	return !_refusal.isEmpty();
+}
+
+const QString &QtBackend::refusal() const {
+	return _refusal;
+}
+
+bool QtBackend::admitFamilies(const std::string &families) {
+	if (families.size() <= kMaxFamiliesBytes) {
+		return true;
+	}
+	refuse(PaintLimit(
+		u"%1 bytes of font families"_q.arg(families.size()),
+		kMaxFamiliesBytes));
+	return false;
 }
 
 int QtBackend::admitCanvasFont(FontKey key, twlite::FontMetrics &out) {
@@ -707,6 +889,9 @@ int QtBackend::admitCanvasFont(FontKey key, twlite::FontMetrics &out) {
 		return refuseCanvasFont(out);
 	}
 	const auto id = makeFont(key, out, true);
+	if (!id) {
+		return refuseCanvasFont(out);
+	}
 	twlite::set_em_box(out, out.ascent, out.descent, float(key.second));
 	_canvasFonts.emplace(key, CachedFont{ id, out });
 	--_canvasFontsLeft;
@@ -715,20 +900,18 @@ int QtBackend::admitCanvasFont(FontKey key, twlite::FontMetrics &out) {
 
 int QtBackend::refuseCanvasFont(twlite::FontMetrics &out) {
 	out = twlite::FontMetrics();
-	if (!std::exchange(_canvasFontLimitNoted, true) && _diagnostic) {
-		_diagnostic(
-			std::string(kCanvasFontKind),
-			"canvas text exceeded the allowance of "
-				+ std::to_string(kMaxNewCanvasFonts)
-				+ " new fonts per message, "
-				+ std::to_string(kMaxCanvasFonts)
-				+ " per widget, "
-				+ std::to_string(kMaxCanvasFontParses)
-				+ " font strings per message of at most "
-				+ std::to_string(kMaxCanvasFontSpellingSize)
-				+ " bytes; text in other fonts is skipped");
-	}
+	noteCanvasFontRefused();
 	return 0;
+}
+
+void QtBackend::refuse(QString reason) {
+	if (!_refusal.isEmpty()) {
+		return;
+	}
+	_refusal = std::move(reason);
+	if (_refused) {
+		_refused();
+	}
 }
 
 } // namespace Tgw

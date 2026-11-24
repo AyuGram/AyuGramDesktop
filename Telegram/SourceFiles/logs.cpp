@@ -386,7 +386,7 @@ void start() {
 	QDir().mkpath(cWorkingDir() + u"tdata"_q);
 
 	launcher.workingFolderReady();
-	CrashReports::StartCatching();
+	const auto crashCatchingWarning = CrashReports::StartCatching();
 
 	if (!LogsData->openMain()) {
 		delete LogsData;
@@ -405,6 +405,9 @@ void start() {
 	LOG(("Initial working dir: %1").arg(launcher.initialWorkingDir()));
 	LOG(("Working dir: %1").arg(cWorkingDir()));
 	LOG(("Command line: %1").arg(launcher.arguments().join(' ')));
+	if (!crashCatchingWarning.isEmpty()) {
+		LOG((crashCatchingWarning));
+	}
 
 	if (!LogsData) {
 		LOG(("FATAL: Could not open '%1' for writing log!"
@@ -416,7 +419,7 @@ void start() {
 	if (cWorkingDir() == psAppDataPath()) { // fix old "Telegram Win (Unofficial)" version
 		MoveOldDataFiles(psAppDataPathOld());
 	}
-#elif !defined Q_OS_MAC && !defined _DEBUG // fix first version
+#elif !defined Q_OS_MACOS && !defined _DEBUG // fix first version
 	MoveOldDataFiles(launcher.initialWorkingDir());
 #endif
 
@@ -514,7 +517,7 @@ void writeDebug(const QString &v) {
 
 #ifdef Q_OS_WIN
 	//OutputDebugString(reinterpret_cast<const wchar_t *>(msg.utf16()));
-#elif defined Q_OS_MAC
+#elif defined Q_OS_MACOS
 	//objc_outputDebugString(msg);
 #elif defined _DEBUG
 	//std::cout << msg.toUtf8().constData();

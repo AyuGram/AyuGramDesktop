@@ -1638,6 +1638,9 @@ void ApplyCommunityUpdate(
 	if (const auto info = channel->communityInfo()) {
 		info->applyLinkedPeers(update.vlinked_peers().v);
 	}
+	if (const auto settings = update.vnotify_settings()) {
+		channel->owner().notifySettings().apply(channel, *settings);
+	}
 	channel->fullUpdated();
 }
 

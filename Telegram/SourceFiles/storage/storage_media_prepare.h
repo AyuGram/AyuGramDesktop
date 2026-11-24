@@ -47,6 +47,7 @@ enum class MimeDataState {
 	int previewWidth,
 	bool premium);
 [[nodiscard]] MimeDataState ComputeMimeDataState(const QMimeData *data);
+[[nodiscard]] bool IsAcceptableStoryDragState(MimeDataState state);
 [[nodiscard]] bool ValidatePhotoEditorMediaDragData(
 	not_null<const QMimeData*> data,
 	bool composeAnimated,
@@ -69,7 +70,8 @@ struct PhotoEditorMedia {
 };
 [[nodiscard]] PhotoEditorMedia ReadPhotoEditorMedia(
 	const QString &path,
-	const QByteArray &content);
+	const QByteArray &content,
+	std::optional<int64> maxSize = std::nullopt);
 void ReadPhotoEditorMediaAsync(
 	const QString &path,
 	const QByteArray &content,

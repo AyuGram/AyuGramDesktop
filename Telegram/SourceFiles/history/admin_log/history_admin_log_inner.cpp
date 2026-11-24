@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_reply.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_selection_modifier.h"
 #include "history/view/history_view_touch_speed.h"
 #include "chat_helpers/message_field.h"
 #include "boxes/sticker_set_box.h"
@@ -2185,10 +2186,10 @@ void InnerWidget::keyPressEvent(QKeyEvent *e) {
 		_cancelSignal.fire({});
 	} else if (e == QKeySequence::Copy && canCopySelected()) {
 		copySelectedText();
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	} else if (e->key() == Qt::Key_E && e->modifiers().testFlag(Qt::ControlModifier)) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	} else {
 		e->ignore();
 	}
@@ -3031,7 +3032,7 @@ void InnerWidget::mouseActionStart(const QPoint &screenPos, Qt::MouseButton butt
 					_selectedTextSelection = _mouseActionItem->selectionFromStates(
 						_mouseTextAnchor,
 						dragState,
-						_mouseSelectType);
+						HistoryView::MouseTextSelectType(_mouseSelectType));
 					_mouseAction = MouseAction::Selecting;
 					repaintItem(_mouseActionItem);
 				}
@@ -3262,7 +3263,7 @@ void InnerWidget::updateSelected() {
 				_selectedTextSelection = _mouseActionItem->selectionFromStates(
 					_mouseTextAnchor,
 					dragState,
-					_mouseSelectType);
+					HistoryView::MouseTextSelectType(_mouseSelectType));
 				repaintItem(_mouseActionItem);
 				if (!_wasSelectedText && !_selectedTextSelection.empty()) {
 					_wasSelectedText = true;

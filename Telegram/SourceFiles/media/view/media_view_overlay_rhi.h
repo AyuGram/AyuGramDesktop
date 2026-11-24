@@ -10,7 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/view/media_view_overlay_renderer.h"
 #include "ui/rhi/rhi_renderer.h"
 #include "ui/rhi/rhi_image.h"
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 #include "media/view/media_view_metal_texture.h"
 #endif
 
@@ -151,6 +151,7 @@ private:
 	QRhiBuffer *_fillVertexBuffer = nullptr;
 	QRhiBuffer *_uniformBuffer = nullptr;
 	QRhiSampler *_sampler = nullptr;
+	QRhiSampler *_mipmapSampler = nullptr;
 	QRhiTexture *_placeholderTexture = nullptr;
 
 	QRhiGraphicsPipeline *_imagePipeline = nullptr;
@@ -212,7 +213,7 @@ private:
 	bool _shadowTopFlip = false;
 	bool _shadowsForStories = false;
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	MetalTextureCache _metalTextureCache;
 #endif
 

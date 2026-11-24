@@ -56,6 +56,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
+#include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -323,7 +325,9 @@ struct LiveState {
 	std::vector<StressEntry> entries;
 	// The placed frame every level must keep.
 	QRect frame;
-	// The first measured level's theme message, every later one's too.
+	// The first measured level's theme, compact (the `theme` of the theme
+	// message its renderer got, or of a hosted widget the theme it read
+	// itself), every later one's too.
 	QString themeMessage;
 	// The current theme wait's last sample.
 	QString sample;
@@ -737,38 +741,104 @@ void JudgePalette(const LiveState &state) {
 		PaletteRestoreText(restore));
 }
 
-// The renderer's scheme and theme message: kTheme, the same for every
-// level of the launch.
+[[nodiscard]] QJsonObject ThemeOf(const std::string &message) {
+	auto parse = QJsonParseError();
+	const auto document = QJsonDocument::fromJson(
+		QByteArray::fromStdString(message),
+		&parse);
+	return document.object().value(u"theme"_q).toObject();
+}
+
+// The theme a hosted widget read itself after it was applied, as the
+// colorScheme and params of a theme message's `theme`.
+[[nodiscard]] QJsonObject EffectiveThemeOf(const WidgetOpsLatest &latest) {
+	const auto params = QJsonDocument::fromJson(
+		QByteArray::fromStdString(latest.effectiveParams)).object();
+	return QJsonObject{
+		{ u"colorScheme"_q, QString::fromStdString(latest.effectiveScheme) },
+		{ u"params"_q, params },
+	};
+}
+
+// Whether every key of |given|, a palette a renderer was given, has the
+// same value in |read|, the palette the widget read (completed from the
+// scheme's defaults beyond the keys given).
+[[nodiscard]] bool PaletteWithin(
+		const QJsonObject &given,
+		const QJsonObject &read) {
+	for (auto i = given.begin(); i != given.end(); ++i) {
+		if (read.value(i.key()) != i.value()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// The scheme and theme the level's widget has: kTheme, the same for every
+// level of the launch. What the widget itself read after the runtime
+// applied its newest theme (the effective reading, the one a Release
+// harness has), which must exist for that theme (else "theme-unobserved"),
+// must have the theme's scheme and palette, and the applied theme must be
+// kTheme, as CheckWidgetTheme() reads it for conformance too; with the
+// Debug helper's tap the scheme and palette its renderer got in the helper
+// must be what the widget read too, and its theme message the applied one.
 void CheckRendererTheme(
 		LiveState &state,
 		LiveLevel &level,
 		const WidgetOpsLatest &latest) {
-	const auto scheme = QString::fromStdString(latest.scheme);
-	const auto message = QString::fromStdString(latest.themeMessage);
-	auto parse = QJsonParseError();
-	const auto document = QJsonDocument::fromJson(message.toUtf8(), &parse);
-	const auto theme = document.object().value(u"theme"_q).toObject();
-	const auto colorScheme = theme.value(u"colorScheme"_q).toString();
+	const auto mirrored = WidgetHelperMirrors();
 	const auto expected = QString::fromLatin1(kTheme);
+	const auto check = CheckWidgetTheme(latest, kTheme);
+	if (check.verdict != WidgetThemeVerdict::Matches) {
+		const auto detail = QString::fromStdString(check.detail);
+		AddError(level, u"theme: "_q + detail);
+	}
+	if (check.verdict == WidgetThemeVerdict::Unobserved) {
+		return;
+	}
+	const auto theme = EffectiveThemeOf(latest);
+	const auto scheme = QString::fromStdString(latest.effectiveScheme);
+	const auto colorScheme = theme.value(u"colorScheme"_q).toString();
 	if ((scheme != expected) || (colorScheme != expected)) {
-		AddError(level, u"theme: the renderer got the scheme [%1] and a "
-			u"theme message of colorScheme [%2], not %3"_q.arg(
+		AddError(level, u"theme: the widget reads the scheme [%1] and a "
+			u"theme of colorScheme [%2], not %3"_q.arg(
 				scheme,
 				colorScheme,
 				expected));
 	}
+	if (mirrored) {
+		const auto helper = ThemeOf(latest.themeMessage);
+		const auto palette = PaletteWithin(
+			helper.value(u"params"_q).toObject(),
+			theme.value(u"params"_q).toObject());
+		if ((latest.scheme != latest.effectiveScheme)
+			|| (helper.value(u"colorScheme"_q).toString() != colorScheme)
+			|| !palette) {
+			AddError(level, u"theme: the renderer in the widget helper got "
+				u"the scheme [%1] and another theme than the widget "
+				u"reads"_q.arg(QString::fromStdString(latest.scheme)));
+		}
+		if (helper != ThemeOf(latest.appliedThemeMessage)) {
+			AddError(level, u"theme: the renderer in the widget helper got "
+				u"another theme message than the runtime applied"_q);
+		}
+	}
+	const auto observed = Compact(theme);
 	if (state.themeMessage.isEmpty()) {
-		state.themeMessage = message;
+		state.themeMessage = observed;
 		if (state.launch.applied) {
 			state.launch.applied->theme = scheme;
 		}
 		state.launch.record.insert(u"rendererTheme"_q, QJsonObject{
 			{ u"colorScheme"_q, colorScheme },
 			{ u"params"_q, theme.value(u"params"_q) },
+			{ u"source"_q, mirrored
+				? u"effective+helper-mirror"_q
+				: u"effective"_q },
 		});
-	} else if (message != state.themeMessage) {
-		AddError(level, u"theme: the renderer got another theme message "
-			u"than the launch's first measured level"_q);
+	} else if (observed != state.themeMessage) {
+		AddError(level, u"theme: the widget reads another theme than for "
+			u"the launch's first measured level"_q);
 	}
 }
 
@@ -868,7 +938,6 @@ void ReleaseOnTop(LiveState &state) {
 	switch (type) {
 	case QSurface::RasterSurface: return u"RasterSurface"_q;
 	case QSurface::OpenGLSurface: return u"OpenGLSurface"_q;
-	case QSurface::RasterGLSurface: return u"RasterGLSurface"_q;
 	case QSurface::OpenVGSurface: return u"OpenVGSurface"_q;
 	case QSurface::VulkanSurface: return u"VulkanSurface"_q;
 	case QSurface::MetalSurface: return u"MetalSurface"_q;
@@ -1596,9 +1665,10 @@ void CheckOneAlive(LiveState &state, LiveLevel &level) {
 	}
 }
 
-// The tap and the host watch are armed in the injection; the work log is
-// reserved before this run returns, so before RendererCore's host is
-// attached on a later main-loop turn.
+// The tap and the host watch are armed in the injection; the work log and
+// the helper's work timing are reserved and asked before this run returns,
+// so before RendererCore's host is constructed and attached on a later
+// main-loop turn.
 void InjectLevel(LiveState &state, LiveLevel &level) {
 	auto &message = *level.message;
 	const auto &widget = state.package.manifest.widgets[level.widget];
@@ -1612,6 +1682,10 @@ void InjectLevel(LiveState &state, LiveLevel &level) {
 		0); // height
 	if (message.host) {
 		ReserveWidgetWork(*message.host, kWorkCapacity);
+	}
+	if (message.tap) {
+		TimeWidgetHelperWork(*message.tap);
+		ReserveWidgetHelperWork(*message.tap, kWorkCapacity);
 	}
 	if (!refusal.isEmpty()) {
 		Refuse(state, level, refusal);
@@ -1970,6 +2044,33 @@ void CheckOneHost(
 	}
 }
 
+// The tap's scan and the helper's work timing are complete, or the level
+// is a runner error: a gap or a dropped record leaves its readings short.
+void CheckObservations(LiveLevel &level) {
+	const auto &tap = level.message->tap;
+	if (!tap) {
+		return;
+	}
+	const auto ops = ReadWidgetOps(*tap);
+	if (ops.scanGaps > 0) {
+		auto examples = QStringList();
+		for (const auto &example : ops.gapExamples) {
+			examples.push_back(QString::fromStdString(example));
+		}
+		AddError(level, u"ops tap: %1 observations were not taken: %2"_q.arg(
+			QString::number(ops.scanGaps),
+			examples.join(u" | "_q)));
+	}
+	const auto work = ReadWidgetHelperWork(*tap, 0);
+	if (work.asked && (work.dropped > 0)) {
+		AddError(level, u"helper work: %1 records dropped (%2 malformed) "
+			u"at %3 events"_q.arg(
+				QString::number(work.dropped),
+				QString::number(work.malformed),
+				QString::number(work.capacity)));
+	}
+}
+
 [[nodiscard]] QJsonObject SetupObject(const LiveLevel &level) {
 	return QJsonObject{
 		{ u"layoutMs"_q, Since(level.injectedAt, level.laidOutAt) },
@@ -1989,11 +2090,119 @@ void CheckOneHost(
 	};
 }
 
+[[nodiscard]] QString HelperWorkKindName(WidgetHelperWorkKind kind) {
+	switch (kind) {
+	case WidgetHelperWorkKind::Message: return u"message"_q;
+	case WidgetHelperWorkKind::Theme: return u"theme"_q;
+	case WidgetHelperWorkKind::Tick: return u"tick"_q;
+	case WidgetHelperWorkKind::Paint: return u"paint"_q;
+	case WidgetHelperWorkKind::Platform: return u"platform"_q;
+	case WidgetHelperWorkKind::Control: return u"control"_q;
+	}
+	return u"unknown"_q;
+}
+
+// What the level's renderer timing observes: Telegram's replay share
+// alone (without the Debug helper's timing, a Release harness), or that
+// share with the helper's own renderer work beside it.
+[[nodiscard]] QString RendererScope(const WidgetHelperWorkReading &work) {
+	return work.events.empty()
+		? u"telegram-replay"_q
+		: u"telegram-replay+helper"_q;
+}
+
+struct HelperWorkSum {
+	int count = 0;
+	crl::profile_time wall = 0;
+	crl::profile_time waited = 0;
+};
+
+// One more event in |sum|, with checked additions: false, |sum| unchanged,
+// when a total would not fit. A kept event's interval is its record's, an
+// hour at most, so its own subtraction is exact.
+[[nodiscard]] bool AddHelperWork(
+		HelperWorkSum &sum,
+		const WidgetHelperWorkEvent &event) {
+	const auto wall = CheckedTimeSum(
+		sum.wall,
+		event.finished - event.started);
+	const auto waited = CheckedTimeSum(sum.waited, event.waited);
+	if (!wall || !waited) {
+		return false;
+	}
+	++sum.count;
+	sum.wall = *wall;
+	sum.waited = *waited;
+	return true;
+}
+
+// The helper's renderer work in the level's window (all of it for a level
+// without one): per kind its count, wall time and the part spent waiting
+// for Telegram's answers, which Telegram's own events overlap. Every sum is
+// checked: one that would overflow leaves its event out and is a level
+// error.
+[[nodiscard]] QJsonObject HelperWorkObject(
+		LiveLevel &level,
+		const WidgetHelperWorkReading &work) {
+	const auto &entry = level.level;
+	const auto from = entry.start ? entry.start->at : crl::profile_time(0);
+	const auto till = (entry.start && entry.end.at)
+		? entry.end.at
+		: std::numeric_limits<crl::profile_time>::max();
+	auto kinds = std::map<WidgetHelperWorkKind, HelperWorkSum>();
+	auto total = HelperWorkSum();
+	auto frames = 0;
+	auto overflows = 0;
+	for (const auto &event : work.events) {
+		if (event.finished < from || event.finished > till) {
+			continue;
+		}
+		if (!AddHelperWork(total, event)
+			|| !AddHelperWork(kinds[event.kind], event)) {
+			++overflows;
+			continue;
+		}
+		frames += (event.frameBytes > 0) ? 1 : 0;
+	}
+	if (overflows > 0) {
+		AddError(level, u"helper work: %1 events would overflow the level's "
+			u"time sums"_q.arg(QString::number(overflows)));
+	}
+	const auto object = [](const HelperWorkSum &sum) {
+		return QJsonObject{
+			{ u"count"_q, sum.count },
+			{ u"ms"_q, sum.wall / 1000. },
+			{ u"waitedMs"_q, sum.waited / 1000. },
+			{ u"ownMs"_q, (sum.wall - sum.waited) / 1000. },
+		};
+	};
+	auto byKind = QJsonObject();
+	for (const auto &[kind, sum] : kinds) {
+		byKind.insert(HelperWorkKindName(kind), object(sum));
+	}
+	return QJsonObject{
+		{ u"asked"_q, work.asked },
+		{ u"windowed"_q, entry.start.has_value() },
+		{ u"capacity"_q, work.capacity },
+		{ u"dropped"_q, qint64(work.dropped) },
+		{ u"malformed"_q, work.malformed },
+		{ u"total"_q, object(total) },
+		{ u"frames"_q, frames },
+		{ u"overflows"_q, overflows },
+		{ u"byKind"_q, byKind },
+	};
+}
+
 [[nodiscard]] QJsonObject LevelDesktop(
-		const LiveLevel &level,
+		LiveLevel &level,
 		const WidgetHostReading &reading,
 		const WidgetOpsLatest &latest) {
+	const auto work = level.message->tap
+		? ReadWidgetHelperWork(*level.message->tap, 0)
+		: WidgetHelperWorkReading();
 	return QJsonObject{
+		{ u"rendererScope"_q, RendererScope(work) },
+		{ u"helperWork"_q, HelperWorkObject(level, work) },
 		{ u"oneAlive"_q, level.oneAlive },
 		{ u"setup"_q, SetupObject(level) },
 		{
@@ -2061,6 +2270,7 @@ void WriteLevel(LiveState &state, LiveLevel &level) {
 	if (level.injectedAt) {
 		CheckOneHost(level, reading, latest);
 		CheckApplied(state, level, reading);
+		CheckObservations(level);
 	}
 	entry.desktop = LevelDesktop(level, reading, latest);
 	const auto computed = ComputeEntry(entry);
@@ -2094,12 +2304,7 @@ void CheckBarrier(LiveState &state, LiveLevel &level) {
 	const auto &tap = level.message->tap;
 	const auto ops = tap ? ReadWidgetOps(*tap) : WidgetOpsReading();
 	const auto finished = tap && WidgetTapFinished(ops);
-	const auto details = u"factories selected=%1 released=%2 wrappers "
-		u"built=%3 destroyed=%4"_q.arg(
-			QString::number(ops.factoriesSelected),
-			QString::number(ops.factoriesReleased),
-			QString::number(ops.wrappersBuilt),
-			QString::number(ops.wrappersDestroyed));
+	const auto details = WidgetTapCounts(ops);
 	Check(
 		finished,
 		LevelName(level, u"the widget's host is gone before another "

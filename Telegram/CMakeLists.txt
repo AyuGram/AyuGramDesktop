@@ -29,14 +29,17 @@ get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
 
 include(cmake/telegram_options.cmake)
+if (APPLE
+    OR WIN32
+    OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(cmake/init_standalone_target.cmake)
+endif()
 include(cmake/lib_ffmpeg.cmake)
 include(cmake/lib_stripe.cmake)
 include(cmake/lib_tgcalls.cmake)
 include(cmake/lib_prisma.cmake)
 include(cmake/lib_fido2.cmake)
 include(cmake/lib_zxcvbn.cmake)
-include(cmake/lib_litehtml.cmake)
-include(cmake/lib_quickjs.cmake)
 include(cmake/lib_widget_renderer.cmake)
 include(cmake/lib_widget_sandbox.cmake)
 include(cmake/td_export.cmake)
@@ -85,10 +88,8 @@ set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 target_link_libraries(Telegram
 PRIVATE
     tdesktop::lib_fido2
-    tdesktop::lib_litehtml
-    tdesktop::lib_quickjs
-    tdesktop::lib_widget_renderer
-    tdesktop::lib_widget_sandbox
+    tdesktop::lib_widget_renderer_platform
+    tdesktop::lib_widget_sandbox_host
     tdesktop::lib_tgcalls
     tdesktop::td_export
     tdesktop::td_gram
@@ -112,7 +113,6 @@ PRIVATE
     desktop-app::lib_webview
     desktop-app::lib_ffmpeg
     desktop-app::lib_stripe
-    desktop-app::external_ada
     desktop-app::external_zlib
     desktop-app::external_minizip
     desktop-app::external_kcoreaddons
@@ -298,6 +298,12 @@ PRIVATE
     api/api_blocked_peers.h
     api/api_bot.cpp
     api/api_bot.h
+    api/api_bot_info.cpp
+    api/api_bot_info.h
+    api/api_bot_media_preview_upload.cpp
+    api/api_bot_media_preview_upload.h
+    api/api_bot_media_previews.cpp
+    api/api_bot_media_previews.h
     api/api_chat_filters.cpp
     api/api_chat_filters.h
     api/api_chat_filters_remove_manager.cpp
@@ -383,6 +389,8 @@ PRIVATE
     api/api_statistics_sender.h
     api/api_stickers_creator.cpp
     api/api_stickers_creator.h
+    api/api_stories.cpp
+    api/api_stories.h
     api/api_suggest_post.cpp
     api/api_suggest_post.h
     api/api_text_entities.cpp
@@ -423,6 +431,10 @@ PRIVATE
     boxes/peers/add_participants_box.h
     boxes/peers/add_to_community_box.cpp
     boxes/peers/add_to_community_box.h
+    boxes/peers/bot_info_emoji_panel.cpp
+    boxes/peers/bot_info_emoji_panel.h
+    boxes/peers/bot_intro_preview.cpp
+    boxes/peers/bot_intro_preview.h
     boxes/peers/channel_ownership_transfer.cpp
     boxes/peers/channel_ownership_transfer.h
     boxes/peers/choose_peer_box.cpp
@@ -433,6 +445,8 @@ PRIVATE
     boxes/peers/community_pending_requests_box.h
     boxes/peers/create_managed_bot_box.cpp
     boxes/peers/create_managed_bot_box.h
+    boxes/peers/edit_bot_info_box.cpp
+    boxes/peers/edit_bot_info_box.h
     boxes/peers/edit_contact_box.cpp
     boxes/peers/edit_contact_box.h
     boxes/peers/edit_forum_topic_box.cpp
@@ -468,6 +482,8 @@ PRIVATE
     boxes/peers/edit_peer_type_box.h
     boxes/peers/edit_peer_usernames_list.cpp
     boxes/peers/edit_peer_usernames_list.h
+    boxes/peers/invite_to_bot_box.cpp
+    boxes/peers/invite_to_bot_box.h
     boxes/peers/peer_short_info_box.cpp
     boxes/peers/peer_short_info_box.h
     boxes/peers/prepare_short_info_box.cpp
@@ -516,6 +532,8 @@ PRIVATE
     boxes/edit_todo_list_box.h
     boxes/gift_credits_box.cpp
     boxes/gift_credits_box.h
+    boxes/gift_onchain_offer_box.cpp
+    boxes/gift_onchain_offer_box.h
     boxes/gift_premium_box.cpp
     boxes/gift_premium_box.h
     boxes/keys_legend.cpp
@@ -524,6 +542,8 @@ PRIVATE
     boxes/language_box.h
     boxes/max_invite_box.cpp
     boxes/max_invite_box.h
+    boxes/message_video_edit.cpp
+    boxes/message_video_edit.h
     boxes/moderate_messages_box.cpp
     boxes/moderate_messages_box.h
     boxes/music_attach_box.cpp
@@ -548,6 +568,8 @@ PRIVATE
     boxes/pin_messages_box.h
     boxes/premium_limits_box.cpp
     boxes/premium_limits_box.h
+    boxes/premium_story_limits_box.cpp
+    boxes/premium_story_limits_box.h
     boxes/premium_preview_box.cpp
     boxes/premium_preview_box.h
     boxes/reactions_settings_box.cpp
@@ -568,8 +590,16 @@ PRIVATE
     boxes/send_files_box.h
     boxes/send_files_box_reply_header.cpp
     boxes/send_files_box_reply_header.h
+    boxes/send_story_box.cpp
+    boxes/send_story_box.h
+    boxes/send_story_row.cpp
+    boxes/send_story_row.h
     boxes/share_box.cpp
     boxes/share_box.h
+    boxes/story_drafts_box.cpp
+    boxes/story_drafts_box.h
+    boxes/story_privacy_box.cpp
+    boxes/story_privacy_box.h
     boxes/star_gift_auction_box.cpp
     boxes/star_gift_auction_box.h
     boxes/star_gift_box.cpp
@@ -580,6 +610,18 @@ PRIVATE
     boxes/star_gift_craft_animation.h
     boxes/star_gift_craft_box.cpp
     boxes/star_gift_craft_box.h
+    boxes/star_gift_onchain_buy_box.cpp
+    boxes/star_gift_onchain_buy_box.h
+    boxes/star_gift_onchain_offer_buy_box.cpp
+    boxes/star_gift_onchain_offer_buy_box.h
+    boxes/star_gift_onchain_offer_confirm_box.cpp
+    boxes/star_gift_onchain_offer_confirm_box.h
+    boxes/star_gift_onchain_sale_box.cpp
+    boxes/star_gift_onchain_sale_box.h
+    boxes/star_gift_onchain_signing.cpp
+    boxes/star_gift_onchain_signing.h
+    boxes/star_gift_onchain_withdraw_box.cpp
+    boxes/star_gift_onchain_withdraw_box.h
     boxes/star_gift_preview_box.cpp
     boxes/star_gift_preview_box.h
     boxes/star_gift_resale_box.cpp
@@ -931,7 +973,6 @@ PRIVATE
     data/data_media_rotation.h
     data/data_media_types.cpp
     data/data_media_types.h
-    # data/data_messages.cpp
     # data/data_messages.h
     data/data_message_reaction_id.cpp
     data/data_message_reaction_id.h
@@ -992,6 +1033,10 @@ PRIVATE
     data/data_stories_ids.h
     data/data_story.cpp
     data/data_story.h
+    data/data_story_drafts.cpp
+    data/data_story_edit_sources.cpp
+    data/data_story_edit_sources.h
+    data/data_story_drafts.h
     data/data_streaming.cpp
     data/data_streaming.h
     data/data_thread.cpp
@@ -1087,8 +1132,10 @@ PRIVATE
     editor/controllers/stickers_panel_controller.h
     editor/editor_audio_timeline.cpp
     editor/editor_audio_timeline.h
-    editor/editor_keys_legend.cpp
-    editor/editor_keys_legend.h
+    editor/editor_caption_bar.cpp
+    editor/editor_caption_bar.h
+    editor/editor_gif.cpp
+    editor/editor_gif.h
     editor/editor_link_box.cpp
     editor/editor_link_box.h
     editor/editor_message_render.cpp
@@ -1099,6 +1146,10 @@ PRIVATE
     editor/editor_message_video.h
     editor/editor_paint.cpp
     editor/editor_paint.h
+    editor/editor_story_areas.cpp
+    editor/editor_story_areas.h
+    editor/editor_weather.cpp
+    editor/editor_weather.h
     editor/photo_editor.cpp
     editor/photo_editor.h
     editor/photo_editor_content.cpp
@@ -1107,18 +1158,16 @@ PRIVATE
     editor/photo_editor_controls.h
     editor/photo_editor_layer_widget.cpp
     editor/photo_editor_layer_widget.h
+    editor/scene/scene_draft.cpp
+    editor/scene/scene_draft.h
     editor/scene/scene_item_message.cpp
     editor/scene/scene_item_message.h
+    editor/scene/scene_item_reaction.cpp
+    editor/scene/scene_item_reaction.h
     editor/scene/scene_item_sticker.cpp
     editor/scene/scene_item_sticker.h
-    editor/scene/scene_item_video.cpp
-    editor/scene/scene_item_video.h
-    editor/video/video_clip.cpp
-    editor/video/video_clip.h
     editor/video/video_editor.cpp
     editor/video/video_editor.h
-    editor/video/video_editor_common.cpp
-    editor/video/video_editor_common.h
     editor/video/video_editor_layer.cpp
     editor/video/video_editor_layer.h
     editor/video/video_editor_quality.cpp
@@ -1137,6 +1186,8 @@ PRIVATE
     export/export_manager.h
     export/view/export_view_content.cpp
     export/view/export_view_content.h
+    export/view/export_view_format_button.cpp
+    export/view/export_view_format_button.h
     export/view/export_view_panel_controller.cpp
     export/view/export_view_panel_controller.h
     export/view/export_view_progress.cpp
@@ -1374,6 +1425,8 @@ PRIVATE
     history/view/history_view_self_forwards_tagger.h
     history/view/history_view_send_action.cpp
     history/view/history_view_send_action.h
+    history/view/history_view_selection_modifier.cpp
+    history/view/history_view_selection_modifier.h
     history/view/history_view_service_message.cpp
     history/view/history_view_service_message.h
     history/view/history_view_sponsored_click_handler.cpp
@@ -1405,8 +1458,12 @@ PRIVATE
     history/history.h
     history/history_drag_area.cpp
     history/history_drag_area.h
+    history/history_gift_onchain_offer.cpp
+    history/history_gift_onchain_offer.h
     history/history_item.cpp
     history/history_item.h
+    history/history_item_bot_invite.cpp
+    history/history_item_bot_invite.h
     history/history_item_components.cpp
     history/history_item_components.h
     history/history_item_edition.cpp
@@ -1425,6 +1482,8 @@ PRIVATE
     history/history_location_manager.h
     history/history_streamed_drafts.cpp
     history/history_streamed_drafts.h
+    history/history_top_message_hint.cpp
+    history/history_top_message_hint.h
     history/history_translation.cpp
     history/history_translation.h
     history/history_unread_things.cpp
@@ -1517,6 +1576,10 @@ PRIVATE
     info/profile/info_profile_actions.h
     info/profile/info_profile_badge.cpp
     info/profile/info_profile_badge.h
+    info/profile/info_profile_bot_media_previews.cpp
+    info/profile/info_profile_bot_media_previews.h
+    info/profile/info_profile_bot_preview_provider.cpp
+    info/profile/info_profile_bot_preview_provider.h
     info/profile/info_profile_balance_pill.cpp
     info/profile/info_profile_balance_pill.h
     info/profile/info_profile_birthday_effect.cpp
@@ -1543,8 +1606,6 @@ PRIVATE
     info/profile/info_profile_qr_gifts.h
     info/profile/info_profile_qr_link.cpp
     info/profile/info_profile_qr_link.h
-    info/profile/info_profile_section_stack.cpp
-    info/profile/info_profile_section_stack.h
     info/profile/info_profile_share_theme.cpp
     info/profile/info_profile_share_theme.h
     info/profile/info_profile_shared_media_classic.cpp
@@ -1553,6 +1614,7 @@ PRIVATE
     info/profile/info_profile_status_label.h
     info/profile/info_profile_top_bar.cpp
     info/profile/info_profile_top_bar.h
+    info/profile/info_profile_top_bar_my_profile.cpp
     info/profile/info_profile_values.cpp
     info/profile/info_profile_values.h
     info/profile/info_profile_widget.cpp
@@ -1775,6 +1837,8 @@ PRIVATE
     media/stories/media_stories_delegate.h
     media/stories/media_stories_header.cpp
     media/stories/media_stories_header.h
+    media/stories/media_stories_post.cpp
+    media/stories/media_stories_post.h
     media/stories/media_stories_reactions.cpp
     media/stories/media_stories_reactions.h
     media/stories/media_stories_recent_views.cpp
@@ -1820,8 +1884,6 @@ PRIVATE
     media/streaming/media_streaming_video_track.cpp
     media/streaming/media_streaming_video_track.h
     media/streaming/media_streaming_native_frame_mac.h
-    media/media_video_encode.cpp
-    media/media_video_encode.h
     media/media_video_frames.cpp
     media/media_video_frames.h
     media/view/media_view_group_thumbs.cpp
@@ -1919,6 +1981,7 @@ PRIVATE
     overview/overview_layout.cpp
     overview/overview_layout.h
     overview/overview_layout_delegate.h
+    overview/overview_voice_search.cpp
     poll/poll_link_box.cpp
     poll/poll_link_box.h
     poll/poll_link_thumbnail.cpp
@@ -1972,6 +2035,11 @@ PRIVATE
     platform/linux/tray_linux.h
     platform/linux/update_install_linux.cpp
     platform/linux/update_install_linux.h
+    platform/linux/widget_descriptors_linux.cpp
+    platform/linux/widget_descriptors_linux.h
+    platform/linux/widget_helper_linux.cpp
+    platform/linux/widget_helper_linux.h
+    platform/linux/widget_lockdown_linux.h
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
     platform/mac/global_menu_mac.h
@@ -1997,6 +2065,8 @@ PRIVATE
     platform/mac/specific_mac.h
     platform/mac/specific_mac_p.mm
     platform/mac/specific_mac_p.h
+    platform/mac/update_install_mac.mm
+    platform/mac/update_install_mac.h
     platform/mac/translate_provider_mac.h
     platform/mac/translate_provider_mac.mm
     platform/mac/tray_mac.h
@@ -2004,6 +2074,9 @@ PRIVATE
     platform/mac/wallet_protection_mac.h
     platform/mac/wallet_protection_mac.mm
     platform/mac/webauthn_mac.mm
+    platform/mac/widget_helper_mac.h
+    platform/mac/widget_helper_mac.mm
+    platform/mac/widget_helper_store_mac.mm
     platform/mac/window_title_mac.mm
     platform/mac/touchbar/items/mac_formatter_item.h
     platform/mac/touchbar/items/mac_formatter_item.mm
@@ -2023,6 +2096,12 @@ PRIVATE
     platform/mac/touchbar/mac_touchbar_manager.mm
     platform/mac/touchbar/mac_touchbar_media_view.h
     platform/mac/touchbar/mac_touchbar_media_view.mm
+    platform/posix/widget_channel_posix.cpp
+    platform/posix/widget_channel_posix.h
+    platform/posix/widget_reaping_posix.cpp
+    platform/posix/widget_reaping_posix.h
+    platform/posix/widget_stderr_posix.cpp
+    platform/posix/widget_stderr_posix.h
     platform/win/file_utilities_win.cpp
     platform/win/file_utilities_win.h
     platform/win/launcher_win.cpp
@@ -2040,9 +2119,18 @@ PRIVATE
     platform/win/translate_provider_win.h
     platform/win/tray_win.cpp
     platform/win/tray_win.h
+    platform/win/update_install_win.cpp
+    platform/win/update_install_win.h
     platform/win/wallet_protection_win.cpp
     platform/win/wallet_protection_win.h
     platform/win/webauthn_win.cpp
+    platform/win/widget_channel_win.cpp
+    platform/win/widget_channel_win.h
+    platform/win/widget_helper_image_win.cpp
+    platform/win/widget_helper_image_win.h
+    platform/win/widget_helper_win.cpp
+    platform/win/widget_sandbox_win.cpp
+    platform/win/widget_sandbox_win.h
     platform/win/windows_app_user_model_id.cpp
     platform/win/windows_app_user_model_id.h
     platform/win/windows_dlls.cpp
@@ -2067,6 +2155,7 @@ PRIVATE
     platform/platform_translate_provider.h
     platform/platform_tray.h
     platform/platform_webauthn.h
+    platform/platform_widget_helper.h
     platform/platform_window_title.h
     profile/profile_block_widget.cpp
     profile/profile_block_widget.h
@@ -2268,6 +2357,8 @@ PRIVATE
     test/test_custom_emoji.h
     test/test_expiry_window.cpp
     test/test_expiry_window.h
+    test/test_field_submit.cpp
+    test/test_field_submit.h
     test/test_fixture_fence.cpp
     test/test_fixture_fence.h
     test/test_fixture_transaction.cpp
@@ -2284,6 +2375,8 @@ PRIVATE
     test/test_hover.h
     test/test_ink.cpp
     test/test_ink.h
+    test/test_keyboard_modifiers.cpp
+    test/test_keyboard_modifiers.h
     test/test_l10n_seams.cpp
     test/test_l10n_seams.h
     test/test_lang_ids_migration.cpp
@@ -2327,6 +2420,7 @@ PRIVATE
     test/test_publication_identity_scan_self_test.cpp
     test/test_qpa_mouse.cpp
     test/test_qpa_mouse.h
+    test/test_qpa_mouse_held_self_test.cpp
     test/test_qpa_mouse_self_test.cpp
     test/test_queued_drag.cpp
     test/test_queued_drag.h
@@ -2375,12 +2469,12 @@ PRIVATE
     test/test_widget_conformance_bridge.h
     test/test_widget_conformance_context.cpp
     test/test_widget_conformance_context.h
+    test/test_widget_conformance_death.cpp
+    test/test_widget_conformance_death.h
     test/test_widget_conformance_hosts.cpp
     test/test_widget_conformance_hosts.h
     test/test_widget_conformance_input.cpp
     test/test_widget_conformance_input.h
-    test/test_widget_conformance_paint_policy.cpp
-    test/test_widget_conformance_paint_policy.h
     test/test_widget_conformance_pictures.cpp
     test/test_widget_conformance_pictures.h
     test/test_widget_conformance_state.h
@@ -2388,12 +2482,19 @@ PRIVATE
     test/test_widget_conformance_stop.h
     test/test_widget_fixture.cpp
     test/test_widget_fixture.h
+    test/test_widget_helper_probe.cpp
+    test/test_widget_helper_probe.h
+    test/test_widget_helper_probe_lockdown.h
     test/test_widget_host.cpp
     test/test_widget_host.h
     test/test_widget_ops.cpp
     test/test_widget_ops.h
-    test/test_widget_paint_policy.cpp
-    test/test_widget_paint_policy.h
+    test/test_widget_ops_check.cpp
+    test/test_widget_ops_deaths.cpp
+    test/test_widget_ops_exchanges.cpp
+    test/test_widget_ops_hosted.cpp
+    test/test_widget_ops_internal.h
+    test/test_widget_renderer_forward.h
     test/test_widget_stress.cpp
     test/test_widget_stress.h
     test/test_widget_stress_internal.h
@@ -2408,24 +2509,38 @@ PRIVATE
     tgw/tgw_bridge.h
     tgw/tgw_canvas.cpp
     tgw/tgw_canvas.h
-    tgw/tgw_cursor.cpp
-    tgw/tgw_cursor.h
     tgw/tgw_emoji.cpp
     tgw/tgw_emoji.h
     tgw/tgw_emoji_images.cpp
     tgw/tgw_emoji_images.h
+    tgw/tgw_hosted_wire.h
     tgw/tgw_intl.cpp
     tgw/tgw_intl.h
+    tgw/tgw_kept_budget.cpp
+    tgw/tgw_kept_budget.h
     tgw/tgw_log_box.cpp
     tgw/tgw_log_box.h
     tgw/tgw_media.cpp
     tgw/tgw_media.h
     tgw/tgw_painter.cpp
     tgw/tgw_painter.h
+    tgw/tgw_painter_clips.cpp
+    tgw/tgw_painter_clips.h
     tgw/tgw_painter_filters.cpp
     tgw/tgw_painter_filters.h
+    tgw/tgw_remote.cpp
+    tgw/tgw_remote.h
+    tgw/tgw_render_thread.cpp
+    tgw/tgw_render_thread.h
     tgw/tgw_renderer.cpp
     tgw/tgw_renderer.h
+    tgw/tgw_renderer_input.cpp
+    tgw/tgw_renderer_input.h
+    tgw/tgw_renderer_platform.cpp
+    tgw/tgw_renderer_platform.h
+    tgw/tgw_renderer_rules.h
+    tgw/tgw_renderer_work.cpp
+    tgw/tgw_renderer_work.h
     tgw/tgw_resources.cpp
     tgw/tgw_resources.h
     tgw/tgw_runtime.cpp
@@ -2449,6 +2564,8 @@ PRIVATE
     tgw/tgw_touch_lists.cpp
     tgw/tgw_wallet.cpp
     tgw/tgw_wallet.h
+    tgw/tgw_widget_meter.cpp
+    tgw/tgw_widget_meter.h
     ui/boxes/edit_invite_link_session.cpp
     ui/boxes/edit_invite_link_session.h
     ui/boxes/emoji_stake_box.cpp
@@ -2550,6 +2667,8 @@ PRIVATE
     ui/filter_icons.h
     ui/filter_icon_panel.cpp
     ui/filter_icon_panel.h
+    ui/filter_title_icon.cpp
+    ui/filter_title_icon.h
     ui/item_text_options.cpp
     ui/item_text_options.h
     ui/resize_area.h
@@ -2625,6 +2744,8 @@ PRIVATE
     wallet/wallet_key_protection.h
     wallet/wallet_move_to_gifts.cpp
     wallet/wallet_move_to_gifts.h
+    wallet/wallet_onchain_gift_presentation.cpp
+    wallet/wallet_onchain_gift_presentation.h
     wallet/wallet_onramp.cpp
     wallet/wallet_onramp.h
     wallet/wallet_own_card.cpp
@@ -2647,6 +2768,10 @@ PRIVATE
     wallet/wallet_session_deposit.h
     wallet/wallet_session_gift_moves.cpp
     wallet/wallet_session_gift_moves.h
+    wallet/wallet_session_onchain_gifts.cpp
+    wallet/wallet_session_onchain_gifts.h
+    wallet/wallet_session_served.cpp
+    wallet/wallet_session_served.h
     wallet/wallet_session_waits.cpp
     wallet/wallet_session_waits.h
     wallet/wallet_stream.cpp
@@ -2718,6 +2843,8 @@ PRIVATE
     window/window_history_hider.h
     window/window_lock_widgets.cpp
     window/window_lock_widgets.h
+    window/window_logout_box.cpp
+    window/window_logout_box.h
     window/window_main_menu.cpp
     window/window_main_menu.h
     window/window_main_menu_helpers.cpp
@@ -2811,6 +2938,12 @@ if (NOT build_winstore)
     )
 endif()
 
+if (NOT build_macstore)
+    remove_target_sources(Telegram ${src_loc}
+        platform/mac/widget_helper_store_mac.mm
+    )
+endif()
+
 if (DESKTOP_APP_USE_PACKAGED)
     remove_target_sources(Telegram ${src_loc}
         platform/mac/mac_iconv_helper.c
@@ -2868,11 +3001,8 @@ if (WIN32)
     #     $<IF:${release},"Appending compatibility manifest.","Finalizing build.">
     # )
 
-    if (QT_VERSION LESS 6 OR DESKTOP_APP_WIN7_BASELINE)
-        target_link_libraries(Telegram PRIVATE desktop-app::win_directx_helper)
-    endif()
-
     if (DESKTOP_APP_WIN7_BASELINE)
+        target_link_libraries(Telegram PRIVATE desktop-app::win_directx_helper)
         # ANGLE loads d3dcompiler_47.dll from modules folder next to exe.
         if (build_win64)
             set(d3d_modules_subdir x64)
@@ -2891,16 +3021,13 @@ if (WIN32)
             "Copying d3dcompiler_47.dll for ANGLE."
         VERBATIM
         )
-    endif()
-
-    target_link_options(Telegram PRIVATE /PDBPAGESIZE:8192)
-
-    if (DESKTOP_APP_WIN7_BASELINE)
         # The loader reads the subsystem version as the minimal Windows.
         target_link_options(Telegram PRIVATE /SUBSYSTEM:WINDOWS,6.01)
         # AyuGram: static Qt Network's DNS lookup imports Dnsapi, absent from the baseline list.
         target_link_libraries(Telegram PRIVATE Dnsapi)
     endif()
+
+    target_link_options(Telegram PRIVATE /PDBPAGESIZE:8192)
 elseif (APPLE)
     if (NOT DESKTOP_APP_USE_PACKAGED)
         target_link_libraries(Telegram PRIVATE desktop-app::external_iconv)
@@ -3066,9 +3193,20 @@ set_target_properties(Telegram PROPERTIES
     XCODE_ATTRIBUTE_COPY_PHASE_STRIP NO
     XCODE_ATTRIBUTE_ALWAYS_SEARCH_USER_PATHS NO
     XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY libc++
-    XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS --deep
     XCODE_ATTRIBUTE_CLANG_DEBUG_INFORMATION_LEVEL $<IF:$<CONFIG:Debug>,default,line-tables-only>
 )
+if (APPLE AND CMAKE_GENERATOR STREQUAL Xcode)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_custom_command(TARGET Telegram POST_BUILD
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/build/sign_mac.py
+            --xcode
+            --runtime
+            --entitlements ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/${bundle_entitlements}
+            $<TARGET_BUNDLE_DIR:Telegram>
+        VERBATIM
+    )
+endif()
+
 set(entitlement_sources
     "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Telegram.entitlements"
     "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Telegram Lite.entitlements"
@@ -3107,42 +3245,24 @@ if (MSVC)
     PRIVATE
         # Keep delay-load protection across Qt variants with different imports.
         /IGNORE:4199
-        /DELAYLOAD:secur32.dll
-        /DELAYLOAD:winmm.dll
-        /DELAYLOAD:ws2_32.dll
-        /DELAYLOAD:user32.dll
-        /DELAYLOAD:gdi32.dll
-        /DELAYLOAD:advapi32.dll
-        /DELAYLOAD:avrt.dll
-        /DELAYLOAD:shell32.dll
-        /DELAYLOAD:ole32.dll
-        /DELAYLOAD:oleaut32.dll
-        /DELAYLOAD:shlwapi.dll
-        /DELAYLOAD:iphlpapi.dll
-        /DELAYLOAD:gdiplus.dll
-        /DELAYLOAD:version.dll
-        /DELAYLOAD:dwmapi.dll
-        /DELAYLOAD:uxtheme.dll
-        /DELAYLOAD:crypt32.dll
-        /DELAYLOAD:bcrypt.dll
-        /DELAYLOAD:ncrypt.dll
-        /DELAYLOAD:netapi32.dll
-        /DELAYLOAD:mpr.dll
-        /DELAYLOAD:imm32.dll
-        /DELAYLOAD:hid.dll
-        /DELAYLOAD:userenv.dll
-        /DELAYLOAD:wtsapi32.dll
-        /DELAYLOAD:propsys.dll
-        /DELAYLOAD:uiautomationcore.dll
-        /DELAYLOAD:icu.dll
     )
-    if (QT_VERSION GREATER 6)
-        if (NOT build_winarm)
-            target_link_options(Telegram PRIVATE
-                /DELAYLOAD:API-MS-Win-EventLog-Legacy-l1-1-0.dll
-            )
-        endif()
-
+    if (DESKTOP_APP_WIN7_PROBE)
+        # Delay-load only Win8+ api-sets; other imports resolve at load time.
+        target_link_options(Telegram
+        PRIVATE
+            /DELAYLOAD:API-MS-Win-Core-Console-l1-1-0.dll
+            /DELAYLOAD:API-MS-Win-Core-Fibers-l2-1-0.dll
+            /DELAYLOAD:API-MS-Win-Core-Fibers-l2-1-1.dll
+            /DELAYLOAD:API-MS-Win-Core-File-l1-1-0.dll
+            # WindowsApp.lib binds LoadLibraryExA here; delay-load self-recurses.
+            /DELAYLOAD:API-MS-Win-Core-Localization-l1-2-0.dll
+            /DELAYLOAD:API-MS-Win-Core-Memory-l1-1-0.dll
+            /DELAYLOAD:API-MS-Win-Core-Memory-l1-1-1.dll
+            /DELAYLOAD:API-MS-Win-Core-WinRT-l1-1-0.dll
+            /DELAYLOAD:API-MS-Win-Core-WinRT-Error-l1-1-0.dll
+            /DELAYLOAD:API-MS-Win-Core-WinRT-String-l1-1-0.dll
+        )
+    else()
         target_link_options(Telegram
         PRIVATE
             /DELAYLOAD:API-MS-Win-Core-Console-l1-1-0.dll
@@ -3163,20 +3283,66 @@ if (MSVC)
             /DELAYLOAD:API-MS-Win-Core-WinRT-String-l1-1-0.dll
             /DELAYLOAD:API-MS-Win-Security-CryptoAPI-l1-1-0.dll
             # /DELAYLOAD:API-MS-Win-Shcore-Scaling-l1-1-1.dll # We shadowed GetDpiForMonitor
-            /DELAYLOAD:authz.dll # Authz.lib
+            /DELAYLOAD:secur32.dll
+            /DELAYLOAD:winmm.dll
+            /DELAYLOAD:ws2_32.dll
+            /DELAYLOAD:user32.dll
+            /DELAYLOAD:gdi32.dll
+            /DELAYLOAD:advapi32.dll
+            /DELAYLOAD:avrt.dll
+            /DELAYLOAD:shell32.dll
+            /DELAYLOAD:ole32.dll
+            /DELAYLOAD:oleaut32.dll
+            /DELAYLOAD:shlwapi.dll
+            /DELAYLOAD:iphlpapi.dll
+            /DELAYLOAD:gdiplus.dll
+            /DELAYLOAD:version.dll
+            /DELAYLOAD:dwmapi.dll
+            /DELAYLOAD:uxtheme.dll
+            /DELAYLOAD:crypt32.dll
+            /DELAYLOAD:bcrypt.dll
+            /DELAYLOAD:ncrypt.dll
+            /DELAYLOAD:netapi32.dll
+            /DELAYLOAD:mpr.dll
+            /DELAYLOAD:imm32.dll
+            /DELAYLOAD:hid.dll
+            /DELAYLOAD:userenv.dll
+            /DELAYLOAD:wtsapi32.dll
+            /DELAYLOAD:propsys.dll
+            /DELAYLOAD:uiautomationcore.dll
+            /DELAYLOAD:authz.dll
             /DELAYLOAD:comdlg32.dll
-            /DELAYLOAD:dwrite.dll # DWrite.lib
-            /DELAYLOAD:dxgi.dll # DXGI.lib
-            /DELAYLOAD:d3d9.dll # D3D9.lib
-            /DELAYLOAD:d3d11.dll # D3D11.lib
-            /DELAYLOAD:d3d12.dll # D3D12.lib
-            /DELAYLOAD:setupapi.dll # SetupAPI.lib
+            /DELAYLOAD:dwrite.dll
+            /DELAYLOAD:dxgi.dll
+            /DELAYLOAD:d3d9.dll
+            /DELAYLOAD:d3d11.dll
+            /DELAYLOAD:d3d12.dll
+            /DELAYLOAD:setupapi.dll
             /DELAYLOAD:winhttp.dll
+            /DELAYLOAD:icu.dll
+        )
+    endif()
+    if (NOT build_winarm)
+        target_link_options(Telegram PRIVATE
+            /DELAYLOAD:API-MS-Win-EventLog-Legacy-l1-1-0.dll
         )
     endif()
 endif()
 
+if (WIN32 AND DESKTOP_APP_WIN7_PROBE)
+    nice_target_sources(Telegram ${src_loc}
+    PRIVATE
+        _other/win7_probe_api_stubs.cpp
+    )
+endif()
+
 target_prepare_qrc(Telegram)
+
+if (APPLE
+    OR WIN32
+    OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(cmake/telegram_widget_helper.cmake)
+endif()
 
 if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_winstore)
     add_executable(Updater WIN32)
@@ -3215,6 +3381,7 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
                 /DELAYLOAD:advapi32.dll
                 /DELAYLOAD:shell32.dll
                 /DELAYLOAD:ole32.dll
+                /DELAYLOAD:oleaut32.dll
                 /DELAYLOAD:shlwapi.dll
             )
         else()

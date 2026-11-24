@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_selection_modifier.h"
 #include "history/view/history_view_reply_button.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/view/history_view_copy_selection.h"
@@ -2411,7 +2412,7 @@ void HistoryInner::mouseActionStart(
 							mouseActionView->selectionFromStates(
 								_mouseTextAnchor,
 								dragState,
-								_mouseSelectType));
+								HistoryView::MouseTextSelectType(_mouseSelectType)));
 						_mouseAction = MouseAction::Selecting;
 					} else if (!hasSelectRestriction()) {
 						_mouseAction = MouseAction::PrepareSelect;
@@ -2571,6 +2572,11 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 }
 
 void HistoryInner::performDrag() {
+	// Fades started below must tick inside the drag's nested event loop.
+	Ui::Animations::Manager::SetScheduleWithInvokeQueued(true);
+	const auto guard = gsl::finally([] {
+		Ui::Animations::Manager::SetScheduleWithInvokeQueued(false);
+	});
 	if (auto mimeData = prepareDrag()) {
 		// This call enters event loop and can destroy any QObject.
 		_reactionsManager->updateButton({});
@@ -4548,12 +4554,12 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 	} else if (HistoryView::IsCopyWithImageTextShortcut(e, &session())
 		&& canCopySelected()) {
 		copySelectedText(true);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	} else if (e->key() == Qt::Key_E
 		&& e->modifiers().testFlag(Qt::ControlModifier)
 		&& !showCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
 		auto selectedState = getSelectionState();
 		if (selectedState.count > 0
@@ -5861,7 +5867,7 @@ void HistoryInner::mouseActionUpdate() {
 					view->selectionFromStates(
 						_mouseTextAnchor,
 						dragState,
-						_mouseSelectType));
+						HistoryView::MouseTextSelectType(_mouseSelectType)));
 				updateDragSelection(nullptr, nullptr, false);
 			} else {
 				auto selectingDown = (itemTop(_mouseActionItem) < itemTop(item)) || (_mouseActionItem == item && _dragStartPosition.y() < m.y());

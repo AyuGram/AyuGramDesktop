@@ -7,38 +7,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/tabbed_selector.h"
 
+#include "apiwrap.h"
+#include "boxes/premium_preview_box.h"
 #include "chat_helpers/emoji_list_widget.h"
-#include "chat_helpers/stickers_list_widget.h"
 #include "chat_helpers/gifs_list_widget.h"
+#include "chat_helpers/stickers_list_widget.h"
+#include "data/stickers/data_custom_emoji.h" // AllowEmojiWithoutPremium.
+#include "data/stickers/data_stickers.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_emoji_statuses.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "mainwindow.h"
 #include "menu/menu_send.h"
+#include "storage/localstorage.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/controls/tabbed_search.h"
+#include "ui/image/image_prepare.h"
+#include "ui/layers/box_content.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/shadow.h"
 #include "ui/widgets/discrete_sliders.h"
+#include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
-#include "ui/layers/box_content.h"
-#include "ui/image/image_prepare.h"
+#include "ui/widgets/shadow.h"
 #include "ui/cached_round_corners.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "storage/localstorage.h"
-#include "data/data_channel.h"
-#include "data/data_emoji_statuses.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/stickers/data_stickers.h"
-#include "data/stickers/data_custom_emoji.h" // AllowEmojiWithoutPremium.
-#include "boxes/premium_preview_box.h"
-#include "lang/lang_keys.h"
-#include "mainwindow.h"
-#include "apiwrap.h"
+
 #include "styles/style_chat_helpers.h"
 
 namespace ChatHelpers {
@@ -395,6 +397,11 @@ TabbedSelector::TabbedSelector(
 		tabs.push_back(createTab(SelectorTab::Emoji, 0));
 		tabs.push_back(createTab(SelectorTab::Stickers, 1));
 		tabs.push_back(createTab(SelectorTab::Gifs, 2));
+	} else if (_mode == Mode::StoriesEditor) {
+		tabs.reserve(3);
+		tabs.push_back(createTab(SelectorTab::Stickers, 0));
+		tabs.push_back(createTab(SelectorTab::Emoji, 1));
+		tabs.push_back(createTab(SelectorTab::Gifs, 2));
 	} else if (mediaEditor()) {
 		tabs.reserve(2);
 		tabs.push_back(createTab(SelectorTab::Stickers, 0));
@@ -419,6 +426,7 @@ TabbedSelector::TabbedSelector(
 , _currentTabType(full()
 	? session().settings().selectorTab()
 	: (mediaEditor()
+		|| _mode == Mode::StoriesEditor
 		|| _mode == Mode::StickersOnly
 		|| _mode == Mode::StickersAndGifs
 		|| _mode == Mode::ChatIntro)
@@ -640,29 +648,34 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 		case SelectorTab::Emoji: {
 			using EmojiMode = EmojiListWidget::Mode;
 			using Descriptor = EmojiListDescriptor;
-			return object_ptr<EmojiListWidget>(this, Descriptor{
-				.show = _show,
-				.mode = (_mode == Mode::EmojiStatus
-					? EmojiMode::EmojiStatus
-					: _mode == Mode::ChannelStatus
-					? EmojiMode::ChannelStatus
-					: _mode == Mode::BackgroundEmoji
-					? EmojiMode::BackgroundEmoji
-					: _mode == Mode::FullReactions
-					? EmojiMode::FullReactions
-					: _mode == Mode::RecentReactions
-					? EmojiMode::RecentReactions
-					: (_mode == Mode::CustomEmojiOnly
-						|| _mode == Mode::CustomEmojiAndGifs)
-					? EmojiMode::CustomOnly
-					: _mode == Mode::PeerTitle
-					? EmojiMode::PeerTitle
-					: EmojiMode::Full),
-				.customTextColor = _customTextColor,
-				.paused = paused,
-				.st = &_st,
-				.features = _features,
-			});
+			const auto mode = (_mode == Mode::EmojiStatus)
+				? EmojiMode::EmojiStatus
+				: (_mode == Mode::ChannelStatus)
+				? EmojiMode::ChannelStatus
+				: (_mode == Mode::BackgroundEmoji)
+				? EmojiMode::BackgroundEmoji
+				: (_mode == Mode::FullReactions)
+				? EmojiMode::FullReactions
+				: (_mode == Mode::RecentReactions)
+				? EmojiMode::RecentReactions
+				: (_mode == Mode::CustomEmojiOnly
+					|| _mode == Mode::CustomEmojiAndGifs)
+				? EmojiMode::CustomOnly
+				: (_mode == Mode::PeerTitle)
+				? EmojiMode::PeerTitle
+				: (_mode == Mode::UnicodeEmojiOnly)
+				? EmojiMode::UnicodeOnly
+				: EmojiMode::Full;
+			return object_ptr<EmojiListWidget>(
+				this,
+				Descriptor{
+					.show = _show,
+					.mode = mode,
+					.customTextColor = _customTextColor,
+					.paused = paused,
+					.st = &_st,
+					.features = _features,
+				});
 		}
 		case SelectorTab::Stickers: {
 			using StickersMode = StickersListWidget::Mode;
@@ -681,12 +694,19 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 		}
 		case SelectorTab::Gifs: {
 			using Descriptor = GifsListDescriptor;
-			return object_ptr<GifsListWidget>(this, Descriptor{
-				.show = _show,
-				.requireConfirmation = (_mode == Mode::Full),
-				.paused = paused,
-				.st = &_st,
-			});
+			const auto story = (_mode == Mode::StoriesEditor);
+			return object_ptr<GifsListWidget>(
+				this,
+				Descriptor{
+					.show = _show,
+					.requireConfirmation = (_mode == Mode::Full),
+					.paused = paused,
+					.st = &_st,
+					.inlineQueryPeer = story
+						? session().user().get()
+						: nullptr,
+					.chooseBeforeLoad = story,
+				});
 		}
 		case SelectorTab::Masks: {
 			using StickersMode = StickersListWidget::Mode;
@@ -763,12 +783,27 @@ rpl::producer<> TabbedSelector::photoRequests() const {
 	return hasStickersTab() ? stickers()->photoRequests() : rpl::never<>();
 }
 
+auto TabbedSelector::reactionRequests() const
+-> rpl::producer<Data::ReactionId> {
+	return hasStickersTab()
+		? stickers()->reactionRequests()
+		: rpl::never<Data::ReactionId>();
+}
+
 rpl::producer<> TabbedSelector::audioRequests() const {
 	return hasStickersTab() ? stickers()->audioRequests() : rpl::never<>();
 }
 
 rpl::producer<> TabbedSelector::linkRequests() const {
 	return hasStickersTab() ? stickers()->linkRequests() : rpl::never<>();
+}
+
+rpl::producer<> TabbedSelector::locationRequests() const {
+	return hasStickersTab() ? stickers()->locationRequests() : rpl::never<>();
+}
+
+rpl::producer<> TabbedSelector::weatherRequests() const {
+	return hasStickersTab() ? stickers()->weatherRequests() : rpl::never<>();
 }
 
 auto TabbedSelector::choosingStickerUpdated() const
@@ -779,7 +814,11 @@ auto TabbedSelector::choosingStickerUpdated() const
 }
 
 rpl::producer<> TabbedSelector::cancelled() const {
-	return hasGifsTab() ? gifs()->cancelRequests() : nullptr;
+	return (_mode == Mode::UnicodeEmojiOnly)
+		? emoji()->escapes()
+		: hasGifsTab()
+		? gifs()->cancelRequests()
+		: nullptr;
 }
 
 rpl::producer<> TabbedSelector::checkForHide() const {

@@ -192,34 +192,6 @@ auto PersonalChannelController::chosen() const
 	return _chosen.events();
 }
 
-Window::SessionController *ApplyAccountIndex(
-		not_null<Window::SessionController*> controller,
-		int accountIndex) {
-	if (accountIndex <= 0) {
-		return nullptr;
-	}
-	const auto list = Core::App().domain().orderedAccounts();
-	if (accountIndex > int(list.size())) {
-		return nullptr;
-	}
-	const auto account = list[accountIndex - 1];
-	if (account == &controller->session().account()) {
-		return controller;
-	} else if (const auto window = Core::App().windowFor({ account })) {
-		if (&window->account() != account) {
-			Core::App().domain().maybeActivate(account);
-			if (&window->account() != account) {
-				return nullptr;
-			}
-		}
-		const auto session = window->sessionController();
-		if (session) {
-			return session;
-		}
-	}
-	return nullptr;
-}
-
 void SavePersonalChannel(
 		not_null<Window::SessionController*> window,
 		ChannelData *channel) {
@@ -659,7 +631,6 @@ bool ResolveUsernameOrPhone(
 		match->captured(1),
 		qthelp::UrlParamNameTransform::ToLower);
 
-	// A dApp link must not choose the account, so this precedes "acc".
 	if (!params.value(u"domain"_q).compare(
 			u"sendgrams"_q,
 			Qt::CaseInsensitive)) {
@@ -676,19 +647,6 @@ bool ResolveUsernameOrPhone(
 			controller,
 			params.value(u"domain"_q))) {
 		return true;
-	}
-
-	if (params.contains(u"acc"_q)) {
-		const auto switched = ApplyAccountIndex(
-			controller,
-			params.value(u"acc"_q).toInt());
-		if (switched) {
-			controller = switched;
-		} else {
-			controller->showToast(u"Could not activate account %1."_q.arg(
-				params.value(u"acc"_q)));
-			return false;
-		}
 	}
 
 	const auto domainParam = params.value(u"domain"_q);
@@ -2264,6 +2222,8 @@ QString TryConvertUrlToLocal(QString url) {
 				result += '&' + params;
 			}
 			return result;
+		} else if (const auto botInviteMatch = regex_match(u"^botinvite/([a-zA-Z0-9\\.\\_]+)/?(\\?|#|$)"_q, query, matchOptions)) {
+			return u"tg://botinvite?username="_q + url_encode(botInviteMatch->captured(1));
 		} else if (const auto privateMatch = regex_match(u"^"
 			"c/(\\-?\\d+)"
 			"("
@@ -2450,6 +2410,7 @@ void ResolveAndShowUniqueGift(
 
 		const auto &data = result.data();
 		session->data().processUsers(data.vusers());
+		session->data().processChats(data.vchats());
 		if (const auto gift = Api::FromTL(session, data.vgift())) {
 			Core::App().hideMediaView();
 

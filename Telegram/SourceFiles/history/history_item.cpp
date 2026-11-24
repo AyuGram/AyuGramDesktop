@@ -16,6 +16,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/media/history_view_media_grouped.h"
+#include "history/history_gift_onchain_offer.h"
+#include "history/history_item_bot_invite.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
 #include "history/history_unread_things.h"
@@ -25,7 +27,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/editor/iv_editor_page_blocks.h"
 #include "iv/iv_rich_page.h"
 #include "mtproto/mtproto_config.h"
-#include "ui/controls/ton_common.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_isolated_emoji.h"
 #include "ui/text/text_utilities.h"
@@ -40,7 +41,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/audio/media_audio.h"
 #include "core/application.h"
 #include "wallet/wallet_address.h"
-#include "wallet/wallet_fiat.h"
 #include "wallet/wallet_panel.h"
 #include "wallet/wallet_session.h"
 #include "wallet/wallet_ton_connect.h"
@@ -5199,10 +5199,11 @@ TextWithEntities HistoryItem::notificationText(
 		}
 		return TextWithEntities();
 	}();
-	// A transfer's amount and comment are never a login code.
+	// Gram transfers and on-chain gift offers never carry a login code.
 	if (options.spoilerLoginCode
 		&& !out()
-		&& !Has<HistoryServiceGramTransfer>()) {
+		&& !Has<HistoryServiceGramTransfer>()
+		&& !Has<HistoryServiceGiftOnchainOffer>()) {
 		const auto peer = history()->peer;
 		if (peer->isNotificationsUser()) {
 			result = SpoilerLoginCode(std::move(result), kMinLoginCode);
@@ -6082,6 +6083,8 @@ void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
 		transfer->peerAddress = qs(data.vpeer_address());
 		transfer->transactionId = qs(data.vtransaction_id());
 		transfer->comment = qs(data.vcomment().value_or_empty());
+		transfer->onrampProvider = qs(
+			data.vonramp_provider_name().value_or_empty()).trimmed();
 		transfer->commentEncrypted = data.is_comment_encrypted();
 	} else if (type == mtpc_messageActionWalletTonConnectRequest) {
 		const auto &data = action.c_messageActionWalletTonConnectRequest();
@@ -6266,6 +6269,11 @@ void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
 			? SuggestRefundType::Expired
 			: SuggestRefundType::User;
 		finish->price = CreditsAmountFromTL(data.vprice());
+	} else if (type == mtpc_messageActionStarGiftOnchainOffer) {
+		UpdateComponents(HistoryServiceGiftOnchainOffer::Bit());
+		FillGiftOnchainOffer(
+			this,
+			action.c_messageActionStarGiftOnchainOffer());
 	} else if (type == mtpc_messageActionNoForwardsToggle) {
 		AddComponents(HistoryServiceNoForwardsToggle::Bit());
 	} else if (type == mtpc_messageActionNoForwardsRequest) {
@@ -6354,18 +6362,24 @@ void HistoryItem::createServiceFromMtp(const MTPDmessageService &message) {
 			const auto peerId = data.vreply_to_peer_id()
 				? peerFromMTP(*data.vreply_to_peer_id())
 				: _history->peer->id;
-			if (const auto dependent = GetServiceDependentData()) {
-				const auto id = data.vreply_to_msg_id().value_or_empty();
-				if (id) {
-					dependent->peerId = (peerId != _history->peer->id)
-						? peerId
-						: 0;
-					dependent->msgId = id;
-					dependent->topId = data.vreply_to_top_id().value_or(id);
-					dependent->topicPost = data.is_forum_topic()
-						|| Has<HistoryServiceTopicInfo>();
-					updateServiceDependent();
-				}
+			const auto id = data.vreply_to_msg_id().value_or_empty();
+			if (!id) {
+				return;
+			}
+			if (const auto offer = Get<HistoryServiceGiftOnchainOffer>()) {
+				offer->originalOfferLink = JumpToMessageClickHandler(
+					_history->owner().peer(peerId),
+					id,
+					fullId());
+			} else if (const auto dependent = GetServiceDependentData()) {
+				dependent->peerId = (peerId != _history->peer->id)
+					? peerId
+					: 0;
+				dependent->msgId = id;
+				dependent->topId = data.vreply_to_top_id().value_or(id);
+				dependent->topicPost = data.is_forum_topic()
+					|| Has<HistoryServiceTopicInfo>();
+				updateServiceDependent();
 			}
 		}, [](const MTPDmessageReplyStoryHeader &data) {
 		});
@@ -6650,6 +6664,10 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 
 	auto prepareTonConnectRequest = [&](const MTPDmessageActionWalletTonConnectRequest &) {
 		return prepareTonConnectRequestText();
+	};
+
+	auto prepareStarGiftOnchainOffer = [&](const MTPDmessageActionStarGiftOnchainOffer &) {
+		return PrepareGiftOnchainOfferText(this);
 	};
 
 	auto prepareNoPaidMessagesTokenUsed = [this](const MTPDmessageActionNoPaidMessagesTokenUsed &) {
@@ -7785,7 +7803,7 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 								lt_user,
 								tr::link(from->shortName(), 1),
 								tr::marked);
-			} else if (action.is_assigned()) {
+			} else if (action.is_assigned() && !resale) {
 				const auto gift = Api::FromTL(
 					&history()->session(),
 					action.vgift());
@@ -8129,6 +8147,15 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		return result;
 	};
 
+	auto prepareBotInvite = [this](const MTPDmessageActionBotInvite &action) {
+		const auto sender = _from->asUser();
+		return PrepareBotInviteText(
+			_history->owner().user(action.vinviter_id().v),
+			sender && sender->isBot(),
+			fromLinkText(),
+			fromLink());
+	};
+
 	auto prepareChangeCommunity = [this](const MTPDmessageActionChangeCommunity &action) {
 		auto result = PreparedServiceText();
 		const auto fromChatItself = (_from == _history->peer);
@@ -8271,6 +8298,8 @@ void HistoryItem::setServiceMessageByAction(const MTPmessageAction &action) {
 		prepareGramTransfer,
 		prepareTonConnectRequest,
 		prepareNoPaidMessagesTokenUsed,
+		prepareStarGiftOnchainOffer,
+		prepareBotInvite,
 		PrepareErrorText<MTPDmessageActionEmpty>));
 
 	processAction(action);
@@ -8607,6 +8636,8 @@ void HistoryItem::processAction(const MTPMessageAction &action) {
 					.type = Data::GiftType::GiftOffer,
 				});
 		}
+	}, [&](const MTPDmessageActionStarGiftOnchainOffer &) {
+		_media = CreateGiftOnchainOfferMedia(this);
 	}, [](const auto &) {
 	});
 }
@@ -8971,27 +9002,10 @@ PreparedServiceText HistoryItem::prepareGramTransferText(
 	if (!transfer) {
 		return result;
 	}
-	auto amount = tr::lng_action_gram_transfer_amount(
-		tr::now,
-		lt_count,
-		transfer->amount / float64(Ui::kNanosInOne),
-		lt_amount,
-		tr::marked(Ui::FormatTonAmount(transfer->amount).full),
-		tr::marked);
-	const auto usdPerGram = history()->session().appConfig().get<float64>(
-		u"ton_usd_rate"_q,
-		0.);
-	if (usdPerGram > 0.) {
-		amount = tr::lng_action_gram_transfer_amount_fiat(
-			tr::now,
-			lt_amount,
-			amount,
-			lt_fiat,
-			tr::marked(Wallet::FormatFiat(
-				transfer->amount,
-				Wallet::FiatRate{ u"USD"_q, usdPerGram })),
-			tr::marked);
-	}
+	auto amount = PrepareGramAmountWithFiat(
+		&history()->session(),
+		transfer->amount,
+		tr::marked(PrepareGramAmountText(transfer->amount)));
 	const auto hidden = history()->peer->isNotificationsUser();
 	auto name = tr::marked();
 	if (!hidden) {

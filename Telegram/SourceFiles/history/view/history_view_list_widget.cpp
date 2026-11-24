@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_message.h"
 #include "history/view/history_view_service_message.h"
 #include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_selection_modifier.h"
 #include "history/view/history_view_translate_tracker.h"
 #include "history/view/history_view_read_metrics_tracker.h"
 #include "history/view/history_view_add_poll_option.h"
@@ -1778,6 +1779,12 @@ void ListWidget::applyUpdatedScrollState() {
 		&& !keepsBottomForSending()
 		&& Ui::ReleaseItemRevealLift(_itemRevealLift)) {
 		revealItemsCallback();
+	}
+	if (_context == Context::History
+		&& _itemsKnownTillEnd
+		&& atNewestEdge()
+		&& isVisible()) {
+		checkActivation();
 	}
 	checkMoveToOtherViewer();
 }
@@ -4324,13 +4331,13 @@ void ListWidget::keyPressEvent(QKeyEvent *e) {
 		&& !showCopyRestriction()
 		&& (_widgetSelection->has() || !hasCopyRestrictionForSelected())) {
 		copySelectedText(true);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	} else if (key == Qt::Key_E
 		&& e->modifiers().testFlag(Qt::ControlModifier)
 		&& !showCopyRestriction()
 		&& !hasCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	} else if (e == QKeySequence::Delete || key == Qt::Key_Backspace) {
 		_delegate->listDeleteRequest();
 	} else if (KeyboardTextSelection::IsExtendKey(key)
@@ -5336,7 +5343,7 @@ void ListWidget::mouseActionStart(
 				pressElement->selectionFromStates(
 					_mouseTextAnchor,
 					dragState,
-					_mouseSelectType));
+					HistoryView::MouseTextSelectType(_mouseSelectType)));
 			_mouseAction = MouseAction::Selecting;
 			mouseActionUpdate();
 			_trippleClickStartTime = crl::now();
@@ -5845,7 +5852,7 @@ void ListWidget::mouseActionUpdate() {
 					view->selectionFromStates(
 						_mouseTextAnchor,
 						dragState,
-						_mouseSelectType));
+						HistoryView::MouseTextSelectType(_mouseSelectType)));
 				clearDragSelection();
 			} else if (_pressState.itemId) {
 				updateDragSelection();
@@ -6002,6 +6009,11 @@ std::unique_ptr<QMimeData> ListWidget::prepareDrag() {
 }
 
 void ListWidget::performDrag() {
+	// Fades started below must tick inside the drag's nested event loop.
+	Ui::Animations::Manager::SetScheduleWithInvokeQueued(true);
+	const auto guard = gsl::finally([] {
+		Ui::Animations::Manager::SetScheduleWithInvokeQueued(false);
+	});
 	if (auto mimeData = prepareDrag()) {
 		// This call enters event loop and can destroy any QObject.
 		if (_reactionsManager) {

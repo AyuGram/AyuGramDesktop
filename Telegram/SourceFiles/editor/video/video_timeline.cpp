@@ -18,6 +18,7 @@ namespace {
 constexpr auto kMaxFrames = 24;
 constexpr auto kMaxCachedFrameSets = 8;
 constexpr auto kDotDuration = crl::time(500);
+constexpr auto kFramesFadeDuration = crl::time(200);
 constexpr auto kReloadDelay = crl::time(150);
 
 constexpr auto kFrameWidthTolerance = 0.25;
@@ -77,6 +78,7 @@ VideoTimeline::VideoTimeline(
 : TrimTimeline(parent, TrimDescriptor(descriptor))
 , _path(descriptor.path)
 , _content(descriptor.content)
+, _preview(std::move(descriptor.preview))
 , _dimensions(descriptor.dimensions)
 , _cache(descriptor.cache)
 , _reloadTimer([=] { reloadFrames(); }) {
@@ -181,46 +183,94 @@ void VideoTimeline::reloadFrames() {
 	const auto content = _content;
 	const auto box = _loading->set.box * style::DevicePixelRatio();
 	crl::async([=, weak = base::make_weak(this)] {
-		Media::Video::ExtractFrames(path, content, {
-			.positions = positions,
-			.box = box,
-			.cover = true,
-		}, [&](int index, QImage &&frame) {
+		auto acceptFrame = [&](int index, QImage &&frame) {
 			if (cancel->load()) {
 				return false;
 			}
 			frame.setDevicePixelRatio(style::DevicePixelRatio());
-			crl::on_main(weak, [=, frame = std::move(frame)]() mutable {
+			auto showFrame = [=, frame = std::move(frame)](
+				) mutable {
 				if (cancel->load()
 					|| !_loading
 					|| index >= int(_loading->set.frames.size())) {
 					return;
 				}
 				_loading->set.frames[index] = std::move(frame);
-				update();
-			});
+				if (!_frames.frames.empty()
+					|| _preview.isNull()) {
+					update();
+				}
+			};
+			crl::on_main(weak, std::move(showFrame));
 			return true;
-		});
-		crl::on_main(weak, [=] {
+		};
+		Media::Video::ExtractFrames(
+			path,
+			content,
+			{
+				.positions = positions,
+				.box = box,
+				.cover = true,
+			},
+			std::move(acceptFrame));
+		auto finishLoading = [=] {
 			if (cancel->load() || !_loading) {
 				return;
 			}
+			const auto fade = _frames.frames.empty()
+				&& !_preview.isNull()
+				&& ranges::any_of(
+					_loading->set.frames,
+					[](const QImage &frame) {
+						return !frame.isNull();
+					});
 			_frames = std::move(_loading->set);
 			_loading = nullptr;
 			if (_cache) {
 				_cache->add(_frames);
 			}
+			if (fade) {
+				_framesShown.start(
+					[=] { update(); },
+					0.,
+					1.,
+					kFramesFadeDuration,
+					anim::linear);
+			}
 			update();
-		});
+		};
+		crl::on_main(weak, std::move(finishLoading));
 	});
 }
 
 void VideoTimeline::paintStrip(QPainter &p, const QRect &strip) {
 	p.fillRect(strip, st::videoTimelinePlaceholderBg);
+	const auto initialPreview = _frames.frames.empty()
+		&& !_preview.isNull();
+	const auto opacity = _framesShown.value(1.);
+	if (initialPreview || opacity < 1.) {
+		const auto width = std::max(
+			_preview.size().scaled(
+				strip.width(),
+				strip.height(),
+				Qt::KeepAspectRatio).width(),
+			(strip.width() + kMaxFrames - 1) / kMaxFrames);
+		p.save();
+		p.setOpacity(p.opacity() * 0.35);
+		for (auto x = strip.x(); x < rect::right(strip); x += width) {
+			p.drawImage(
+				QRect(x, strip.y(), width, strip.height()),
+				_preview);
+		}
+		p.restore();
+	}
+	p.save();
+	p.setOpacity(p.opacity() * opacity);
 	paintFrames(p, strip, _frames);
-	if (_loading) {
+	if (_loading && !initialPreview) {
 		paintFrames(p, strip, _loading->set);
 	}
+	p.restore();
 }
 
 void VideoTimeline::paintFrames(

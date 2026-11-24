@@ -749,7 +749,7 @@ void Main::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 	const auto window = &controller()->window();
 	const auto logout = addAction({
 		.text = tr::lng_settings_logout(tr::now),
-		.handler = [=] { window->showLogoutConfirmation(); },
+		.handler = [=] { window->showLogoutOptions(); },
 		.icon = &st::menuIconLeaveAttention,
 		.isAttention = true,
 	});

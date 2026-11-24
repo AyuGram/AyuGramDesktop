@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "history/history_item_helpers.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_tag.h"
 #include "main/main_session.h"
@@ -26,6 +27,7 @@ namespace {
 constexpr auto kMyGiftsPerPage = 50;
 constexpr auto kResaleGiftsPerPage = 50;
 constexpr auto kCraftGiftsPerPage = 50;
+constexpr auto kBasisPointsInOne = int64(10'000);
 
 [[nodiscard]] MTPStarGiftAttributeId AttributeToTL(GiftAttributeId id) {
 	switch (id.type) {
@@ -67,6 +69,14 @@ QString UniqueGiftName(const UniqueGift &gift) {
 
 QString UniqueGiftName(const QString &title, int number) {
 	return title + u" #"_q + Lang::FormatCountDecimal(number);
+}
+
+bool UniqueGiftOnSale(const UniqueGift &gift) {
+	return (gift.starsForResale > 0) || (gift.nanoTonForResale > 0);
+}
+
+bool UniqueGiftOnchainPurchase(const UniqueGift &gift) {
+	return gift.onchainSale && (gift.nanoTonForResale > 0);
 }
 
 QString UniqueGiftRarityText(UniqueGiftRarity type) {
@@ -126,9 +136,51 @@ CreditsAmount UniqueGiftResaleTon(const UniqueGift &gift) {
 }
 
 CreditsAmount UniqueGiftResaleAsked(const UniqueGift &gift) {
-	return gift.onlyAcceptTon
+	return UniqueGiftResaleBuyTon(gift, gift.onchainSale || gift.fixedSale)
 		? UniqueGiftResaleTon(gift)
 		: UniqueGiftResaleStars(gift);
+}
+
+bool UniqueGiftResaleBuyTon(const UniqueGift &gift, bool preferTon) {
+	return (gift.nanoTonForResale > 0)
+		&& (gift.onlyAcceptTon
+			|| preferTon
+			|| (gift.starsForResale <= 0));
+}
+
+std::optional<int64> PriceAfterSaleFee(
+		int64 price,
+		std::optional<int> feeBps) {
+	if (price < 0
+		|| !feeBps
+		|| *feeBps < 0
+		|| *feeBps > kBasisPointsInOne) {
+		return std::nullopt;
+	}
+	const auto bps = int64(*feeBps);
+	const auto fee = (price / kBasisPointsInOne) * bps
+		+ (price % kBasisPointsInOne) * bps / kBasisPointsInOne;
+	return price - fee;
+}
+
+int64 GiftDisplayNanos(int64 nanos) {
+	// Keep leading fractional zeroes when there is no nonzero prefix.
+	constexpr auto kFourZeroes = 10'000;
+	for (auto place = Ui::kNanosInOne; place > kFourZeroes; place /= 10) {
+		const auto tail = nanos % place;
+		if ((nanos / place != 0) && std::abs(tail) < place / kFourZeroes) {
+			return nanos - tail;
+		}
+	}
+	return nanos;
+}
+
+QString FormatGiftGramAmount(int64 nanos) {
+	return Ui::FormatTonAmount(GiftDisplayNanos(nanos)).full;
+}
+
+QString FormatGiftGramAmountWithUnit(int64 nanos) {
+	return PrepareGramAmountText(GiftDisplayNanos(nanos));
 }
 
 TextWithEntities FormatGiftResaleStars(const UniqueGift &gift) {
@@ -137,14 +189,18 @@ TextWithEntities FormatGiftResaleStars(const UniqueGift &gift) {
 	).append(Lang::FormatCountDecimal(gift.starsForResale));
 }
 
-TextWithEntities FormatGiftResaleTon(const UniqueGift &gift) {
+TextWithEntities FormatGiftResaleTon(int64 nanos) {
 	return Ui::Text::IconEmoji(
 		&st::tonIconEmoji
-	).append(Lang::FormatCreditsAmountDecimal(UniqueGiftResaleTon(gift)));
+	).append(FormatGiftGramAmount(nanos));
+}
+
+TextWithEntities FormatGiftResaleTon(const UniqueGift &gift) {
+	return FormatGiftResaleTon(gift.nanoTonForResale);
 }
 
 TextWithEntities FormatGiftResaleAsked(const UniqueGift &gift) {
-	return gift.onlyAcceptTon
+	return UniqueGiftResaleAsked(gift).ton()
 		? FormatGiftResaleTon(gift)
 		: FormatGiftResaleStars(gift);
 }
@@ -178,13 +234,18 @@ bool SameServedStarGift(const StarGift &a, const StarGift &b) {
 			unique.releasedBy,
 			unique.themeUser,
 			unique.nanoTonForResale,
+			unique.nanoTonMinOffer,
 			unique.starsForResale,
 			unique.starsMinOffer,
+			unique.feeBps,
 			unique.craftChancePermille,
 			unique.onlyAcceptTon,
 			unique.canBeTheme,
 			unique.crafted,
 			unique.burned,
+			unique.onchainSale,
+			unique.fixedSale,
+			unique.mySale,
 			unique.model,
 			unique.pattern,
 			unique.backdrop,
@@ -302,7 +363,11 @@ rpl::producer<ResaleGiftsDescriptor> ResaleGiftsSlice(
 						? Flag()
 						: Flag::f_attributes)
 					| (filter.forCraft ? Flag::f_for_craft : Flag())
-					| (filter.starsOnly ? Flag::f_stars_only : Flag())),
+					| (filter.starsOnly ? Flag::f_stars_only : Flag())
+					| (filter.tonOnly ? Flag::f_ton_only : Flag())
+					| ((filter.fragmentOnly && !filter.forCraft)
+						? Flag::f_fragment_only
+						: Flag())),
 				MTP_long(filter.attributesHash),
 				MTP_long(giftId),
 				MTP_vector_from_range(filter.attributes

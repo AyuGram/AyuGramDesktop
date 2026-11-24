@@ -15,7 +15,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_inner_common.h"
 
 namespace Ui {
-class AbstractButton;
 class IconButton;
 class FlatLabel;
 class PopupMenu;
@@ -30,6 +29,7 @@ class EdgeButton;
 class ButtonBar;
 class VideoClip;
 class KeysLegendButton;
+class TextToolButton;
 class VideoItemTimeline;
 struct AudioTrack;
 struct Controllers;
@@ -53,6 +53,7 @@ public:
 	[[nodiscard]] rpl::producer<bool> shapesFillChanges() const;
 	[[nodiscard]] rpl::producer<> doneRequests() const;
 	[[nodiscard]] rpl::producer<> cancelRequests() const;
+	[[nodiscard]] rpl::producer<> saveRequests() const;
 	[[nodiscard]] rpl::producer<QPoint> colorLinePositionValue() const;
 	[[nodiscard]] rpl::producer<bool> colorLineShownValue() const;
 	[[nodiscard]] rpl::producer<float64> aspectRatioChanges() const;
@@ -62,9 +63,11 @@ public:
 	[[nodiscard]] bool animating() const;
 
 	bool handleKeyPress(not_null<QKeyEvent*> e) const;
+	void setSaveEnabled(bool enabled);
 
 	void applyMode(const PhotoEditorMode &mode);
 	void setShapeToolActive(bool active);
+	void setTextEditing(bool editing);
 	void setVideoClip(std::shared_ptr<VideoClip> clip);
 	void setAudioTrack(std::shared_ptr<AudioTrack> track);
 	void setTrimShortestAvailable(bool available);
@@ -91,6 +94,8 @@ private:
 	const QSize _imageSize;
 	const float64 _originalRatio = 0.;
 	const bool _fixedCrop = false;
+	const bool _canvasMode = false;
+	const bool _storyPhoto = false;
 	const style::color &_bg;
 	const int _buttonHeight;
 	const base::unique_qptr<ButtonBar> _transformButtons;
@@ -105,6 +110,7 @@ private:
 	const base::unique_qptr<Ui::IconButton> _paintModeButton;
 	const base::unique_qptr<Ui::IconButton> _cropRatioButton;
 	const base::unique_qptr<Ui::IconButton> _cornersButton;
+	const base::unique_qptr<Ui::IconButton> _saveButton;
 	const base::unique_qptr<EdgeButton> _transformDone;
 
 	const base::unique_qptr<EdgeButton> _paintCancel;
@@ -112,7 +118,7 @@ private:
 	const base::unique_qptr<Ui::IconButton> _redoButton;
 	const base::unique_qptr<Ui::IconButton> _paintModeButtonActive;
 	const base::unique_qptr<Ui::IconButton> _stickersButton;
-	const base::unique_qptr<Ui::AbstractButton> _textButton;
+	const base::unique_qptr<TextToolButton> _textButton;
 	const base::unique_qptr<Ui::IconButton> _shapesButton;
 	const base::unique_qptr<EdgeButton> _paintDone;
 	const base::unique_qptr<Ui::FadeWrap<VideoItemTimeline>> _videoTimeline;
@@ -138,6 +144,7 @@ private:
 
 	rpl::variable<PhotoEditorMode> _mode;
 	rpl::event_stream<not_null<QKeyEvent*>> _keyPresses;
+	rpl::event_stream<> _textRequests;
 	rpl::event_stream<float64> _aspectRatioChanges;
 	rpl::event_stream<RoundedCornersLevel> _cornersLevelChanges;
 	rpl::event_stream<ShapeRequest> _shapeRequests;

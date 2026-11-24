@@ -10,35 +10,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "test/test_widget_conformance_stop.h"
 
 #include "test/test_widget_conformance_bridge.h"
+#include "test/test_widget_conformance_state.h"
 #include "test/test_widget_fixture.h"
 #include "test/test_widget_host.h"
-
-#include <QtCore/QStringList>
-
-#include <array>
+#include "tgw/tgw_runtime.h"
 
 namespace Test::Conformance {
-namespace {
-
-// kMaxLogLine of tgw_runtime.cpp: Clip() cuts a summary's dead to this many
-// characters, its "..." included.
-constexpr auto kMaxDeathChars = 240;
-
-// Clip() of tgw_runtime.cpp, which cuts the host's dead in the "Died: "
-// line, for a reason that never passes through it.
-[[nodiscard]] QString ClipDeath(QString text) {
-	if (text.size() <= kMaxDeathChars) {
-		return text;
-	}
-	const auto ellipsis = u"..."_q;
-	text.truncate(kMaxDeathChars - ellipsis.size());
-	if (text.at(text.size() - 1).isHighSurrogate()) {
-		text.chop(1);
-	}
-	return text + ellipsis;
-}
-
-} // namespace
 
 QString ReadDesktopStop(
 		const WidgetFixture &fixture,
@@ -50,7 +27,7 @@ QString ReadDesktopStop(
 	if (watch.hosts.size() != 1) {
 		return QString();
 	}
-	return ClipDeath(WidgetDesktopStop(
+	return Tgw::ClipLogLine(WidgetDesktopStop(
 		fixture,
 		message.id,
 		watch.hosts.front().core,
@@ -59,75 +36,30 @@ QString ReadDesktopStop(
 
 ConformanceRefusal StopRefusal(
 		const QString &stops,
-		bool died,
-		const QString &deathLine,
-		bool desktopStop) {
-	const auto reason = deathLine.startsWith(u"Died: "_q)
-		? deathLine.mid(6).trimmed()
-		: QString();
-	if (stops.isEmpty()
-		|| !died
-		|| desktopStop
-		|| (!reason.isEmpty() && (reason != u"terminated"_q))) {
+		const ConformanceRun &run) {
+	if (stops.isEmpty() || !run.died || run.deathMeasured) {
 		return {};
 	}
+	const auto desktop = run.desktopStop.isEmpty()
+		? u"no stop of the desktop's own was observed apart from it"_q
+		: (u"the desktop's own stop ["_q
+			+ run.desktopStop
+			+ u"], read apart, gives a hosted widget no cause"_q);
+	const auto detail = u"the widget of an entry with stops [%1] died of a "
+		u"charge of its selected works, but its sample gave no attributable "
+		u"cause (death line [%2] of a %3 summary sampled from work %4, "
+		u"while a hosted widget's cause comes only from the record of the "
+		u"work a fresh or final summary was sampled from) and %5, so dead "
+		u"is the runner's placeholder"_q.arg(
+			stops,
+			run.deathLine,
+			(run.summaryOwn ? u"fresh or final"_q : u"stale or absent"_q),
+			QString::number(run.summaryWork),
+			desktop);
 	return {
-		.name = u"stop-reason-unmeasured"_q,
-		.detail = u"the widget of an entry with stops [%1] died, but no "
-			u"fresh or final summary of its host gave its \"Died: \" reason "
-			u"(death line [%2]) and the desktop did not stop it itself, so "
-			u"dead is the runner's placeholder"_q.arg(stops, deathLine),
+		.name = QString::fromLatin1(kStopReasonUnmeasured),
+		.detail = detail,
 	};
-}
-
-std::vector<WidgetOpsSelfCheckRow> RunDesktopStopCheck() {
-	struct StopCase {
-		const char *name = nullptr;
-		const char *stops = "";
-		const char *deathLine = "";
-		const char *refusal = "";
-		bool died = false;
-		bool desktopStop = false;
-	};
-	const auto stopCases = std::array{
-		StopCase{
-			.name = "stop died terminated, the desktop's own stop",
-			.stops = "Paint limit exceeded",
-			.deathLine = "Died: terminated",
-			.died = true,
-			.desktopStop = true,
-		},
-		StopCase{
-			.name = "stop died terminated, no desktop stop",
-			.stops = "Paint limit exceeded",
-			.deathLine = "Died: terminated",
-			.refusal = "stop-reason-unmeasured",
-			.died = true,
-		},
-	};
-	auto readings = QStringList();
-	auto passed = true;
-	for (const auto &entry : stopCases) {
-		const auto got = StopRefusal(
-			QString::fromLatin1(entry.stops),
-			entry.died,
-			QString::fromLatin1(entry.deathLine),
-			entry.desktopStop);
-		const auto expected = QString::fromLatin1(entry.refusal);
-		passed = passed
-			&& (got.name == expected)
-			&& (got.detail.isEmpty() == expected.isEmpty());
-		readings.push_back(u"{%1: [%2]}"_q.arg(
-			QString::fromLatin1(entry.name),
-			got.name));
-	}
-	return { WidgetOpsSelfCheckRow{
-		.name = u"desktop stop self-check: a stops entry's death with only "
-			u"\"Died: terminated\" is refused unless the desktop stopped it "
-			u"itself"_q,
-		.details = readings.join(QChar(' ')),
-		.passed = passed,
-	} };
 }
 
 } // namespace Test::Conformance

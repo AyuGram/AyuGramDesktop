@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/send_files_box.h"
 #include "boxes/share_box.h"
 #include "boxes/edit_caption_box.h"
+#include "boxes/message_video_edit.h"
 #include "boxes/moderate_messages_box.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
@@ -325,19 +326,19 @@ HistoryWidget::HistoryWidget(
 	st::historyDiscardRichDraftButton))
 , _unblock(
 	this,
-	tr::lng_unblock_button(tr::now).toUpper(),
+	tr::lng_unblock_button(tr::now, tr::upper),
 	st::historyUnblock)
 , _botStart(
 	this,
-	tr::lng_bot_start(tr::now).toUpper(),
+	tr::lng_bot_start(tr::now, tr::upper),
 	st::historyComposeButton)
 , _joinChannel(
 	this,
-	tr::lng_profile_join_channel(tr::now).toUpper(),
+	tr::lng_profile_join_channel(tr::now, tr::upper),
 	st::historyComposeButton)
 , _muteUnmute(
 	this,
-	tr::lng_channel_mute(tr::now).toUpper(),
+	tr::lng_channel_mute(tr::now, tr::upper),
 	st::historyComposeButton)
 , _discuss(this,
 	tr::ayu_ChannelBottomButtonDiscuss(tr::now).toUpper(),
@@ -556,14 +557,14 @@ HistoryWidget::HistoryWidget(
 		updateExpandButtonVisibility();
 		updateSendButtonType();
 	}, lifetime());
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	// Removed an ability to insert text from the menu bar
 	// when the field is hidden.
 	_field->shownValue(
 	) | rpl::on_next([=](bool shown) {
 		_field->setEnabled(shown);
 	}, _field->lifetime());
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	controller->widget()->shownValue(
 	) | rpl::skip(1) | rpl::on_next([=] {
 		windowIsVisibleChanged();
@@ -1403,11 +1404,11 @@ Dialogs::EntryState HistoryWidget::computeDialogsEntryState() const {
 
 void HistoryWidget::refreshJoinChannelText() {
 	if (const auto channel = _peer ? _peer->asChannel() : nullptr) {
-		_joinChannel->setText((channel->isBroadcast()
+		_joinChannel->setText(Ui::Text::Upper(channel->isBroadcast()
 			? tr::lng_profile_join_channel(tr::now)
 			: (channel->requestToJoin() && !channel->amCreator())
 			? tr::lng_profile_apply_to_join_group(tr::now)
-			: tr::lng_profile_join_group(tr::now)).toUpper());
+			: tr::lng_profile_join_group(tr::now)));
 	}
 }
 
@@ -3645,11 +3646,11 @@ void HistoryWidget::showHistory(
 	initFieldAutocomplete();
 
 	if (_peer) {
-		_unblock->setText(((_peer->isUser()
+		_unblock->setText(Ui::Text::Upper((_peer->isUser()
 			&& _peer->asUser()->isBot()
 			&& !_peer->asUser()->isSupport())
 				? tr::lng_restart_button(tr::now)
-				: tr::lng_unblock_button(tr::now)).toUpper());
+				: tr::lng_unblock_button(tr::now)));
 	}
 
 	_nonEmptySelection = false;
@@ -4173,9 +4174,9 @@ void HistoryWidget::updateNotifyControls() {
 		return;
 	}
 
-	_muteUnmute->setText((_history->muted()
+	_muteUnmute->setText(Ui::Text::Upper(_history->muted()
 		? tr::lng_channel_unmute(tr::now)
-		: tr::lng_channel_mute(tr::now)).toUpper());
+		: tr::lng_channel_mute(tr::now)));
 	if (!session().data().notifySettings().silentPostsUnknown(_peer)) {
 		if (_silent) {
 			_silent->setChecked(
@@ -6068,6 +6069,7 @@ void HistoryWidget::sendVoice(const VoiceToSend &data) {
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		action);
 	_voiceRecordBar->clearListenState();
 }
@@ -6843,8 +6845,9 @@ void HistoryWidget::updateOverStates(QPoint pos) {
 			|| isReadyToForward
 			|| hasWebPage
 			|| _suggestOptions);
-	const auto inPhotoEdit = inDetails
-		&& _photoEditMedia
+	const auto canEditPreview = canEditMediaPreview();
+	const auto inMediaEdit = inDetails
+		&& canEditPreview
 		&& QRect(
 			detailsRect.x() + st::historyReplySkip,
 			(detailsRect.y()
@@ -6852,19 +6855,19 @@ void HistoryWidget::updateOverStates(QPoint pos) {
 			st::historyReplyPreview,
 			st::historyReplyPreview).contains(pos);
 	const auto inClickable = inDetails;
-	if (_inPhotoEdit != inPhotoEdit) {
-		_inPhotoEdit = inPhotoEdit;
-		if (_photoEditMedia) {
-			_inPhotoEditOver.start(
+	if (_inMediaEdit != inMediaEdit) {
+		_inMediaEdit = inMediaEdit;
+		if (canEditPreview) {
+			_inMediaEditOver.start(
 				[=] { updateField(); },
-				_inPhotoEdit ? 0. : 1.,
-				_inPhotoEdit ? 1. : 0.,
+				_inMediaEdit ? 0. : 1.,
+				_inMediaEdit ? 1. : 0.,
 				st::defaultMessageBar.duration);
 		} else {
-			_inPhotoEditOver.stop();
+			_inMediaEditOver.stop();
 		}
 	}
-	_inDetails = inDetails && !inPhotoEdit;
+	_inDetails = inDetails && !inMediaEdit;
 	if (inClickable != _inClickable) {
 		_inClickable = inClickable;
 		setCursor(_inClickable ? style::cur_pointer : style::cur_default);
@@ -6872,16 +6875,16 @@ void HistoryWidget::updateOverStates(QPoint pos) {
 }
 
 void HistoryWidget::clearOverStates() {
-	if (_inPhotoEdit) {
-		_inPhotoEdit = false;
-		if (_photoEditMedia) {
-			_inPhotoEditOver.start(
+	if (_inMediaEdit) {
+		_inMediaEdit = false;
+		if (canEditMediaPreview()) {
+			_inMediaEditOver.start(
 				[=] { updateField(); },
 				1.,
 				0.,
 				st::defaultMessageBar.duration);
 		} else {
-			_inPhotoEditOver.stop();
+			_inMediaEditOver.stop();
 		}
 	}
 	_inDetails = false;
@@ -6889,6 +6892,12 @@ void HistoryWidget::clearOverStates() {
 		_inClickable = false;
 		setCursor(style::cur_default);
 	}
+}
+
+bool HistoryWidget::canEditMediaPreview() const {
+	return _editMsgId
+		&& (_photoEditMedia
+			|| FindEditableMessageVideo(_replyEditMsg));
 }
 
 void HistoryWidget::leaveToChildEvent(QEvent *e, QWidget *child) {
@@ -7066,7 +7075,7 @@ bool HistoryWidget::eventFilter(QObject *obj, QEvent *e) {
 		const auto k = static_cast<QKeyEvent*>(e);
 		if ((k->modifiers() & kCommonModifiers) == Qt::ControlModifier) {
 			if (k->key() == Qt::Key_Up) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 				// Cmd + Up is used instead of Home.
 				if (fieldHasSendText()
 					&& !base::options::value<bool>(
@@ -7076,7 +7085,7 @@ bool HistoryWidget::eventFilter(QObject *obj, QEvent *e) {
 #endif
 				return replyToPreviousMessage();
 			} else if (k->key() == Qt::Key_Down) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 				// Cmd + Down is used instead of End.
 				if (fieldHasSendText()
 					&& !base::options::value<bool>(
@@ -9571,15 +9580,15 @@ void HistoryWidget::mousePressEvent(QMouseEvent *e) {
 	}
 	const auto isReadyToForward = readyToForward();
 	if (_editMsgId
-		&& (_inDetails || _inPhotoEdit)
+		&& (_inDetails || _inMediaEdit)
 		&& (e->button() == Qt::RightButton)) {
 		_mediaEditManager.showMenu(
 			_list,
 			[=] { mouseMoveEvent(nullptr); },
 			fieldHasSendText(),
 			controller()->uiShow());
-	} else if (_inPhotoEdit && _photoEditMedia) {
-		EditCaptionBox::StartPhotoEdit(
+	} else if (_inMediaEdit && canEditMediaPreview()) {
+		EditCaptionBox::StartMediaEdit(
 			controller(),
 			_photoEditMedia,
 			{ _history->peer->id, _editMsgId },
@@ -11012,9 +11021,11 @@ void HistoryWidget::editMessage(
 	}
 
 	const auto editData = PrepareEditText(item);
+	const auto length = uint16(editData.text.size());
+	const auto position = EditFieldSelection(editData, { length, length }).from;
 	const auto cursor = MessageCursor {
-		int(editData.text.size()),
-		int(editData.text.size()),
+		position,
+		position,
 		Ui::kQFixedMax
 	};
 	const auto previewDraft = Data::WebPageDraft::FromItem(item);
@@ -11036,7 +11047,7 @@ void HistoryWidget::editMessage(
 	updateReplyToName();
 	updateControlsGeometry();
 	updateField();
-	SelectTextInFieldWithMargins(_field, selection);
+	SelectTextInFieldWithMargins(_field, EditFieldSelection(editData, selection));
 
 	saveDraftWithTextNow();
 	setInnerFocus();
@@ -11819,8 +11830,10 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 		if (drawMsgText) {
 			if (hasPreview) {
 				if (preview) {
-					const auto overEdit = _photoEditMedia
-						? _inPhotoEditOver.value(_inPhotoEdit ? 1. : 0.)
+					const auto overEdit
+						= canEditMediaPreview()
+						? _inMediaEditOver.value(
+							float64(_inMediaEdit))
 						: 0.;
 					auto to = QRect(
 						replyLeft,
@@ -11844,12 +11857,11 @@ void HistoryWidget::drawField(Painter &p, const QRect &rect) {
 							Ui::DefaultImageSpoiler().frame(
 								_replySpoiler->index(now, pausedSpoiler)));
 					}
-					if (overEdit > 0.) {
-						p.setOpacity(overEdit);
-						p.fillRect(to, st::historyEditMediaBg);
-						st::historyEditMedia.paintInCenter(p, to);
-						p.setOpacity(1.);
-					}
+					using HistoryView::MediaEditManager;
+					MediaEditManager::PaintPreviewHover(
+						p,
+						to,
+						overEdit);
 					_mediaEditManager.paintCoverUpload(p, to);
 				}
 				replyLeft += st::historyReplyPreview + st::msgReplyBarSkip;

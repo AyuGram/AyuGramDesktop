@@ -414,23 +414,22 @@ void HtmlWidget::draw(Painter &p, const PaintContext &context) const {
 		history()->owner().registerHeavyViewPart(_parent);
 	}
 
-	const auto visible = card.intersects(context.clip);
-	if (const auto core = visible ? _runtime->core() : nullptr) {
+	if (card.intersects(context.clip)) {
 		const auto square = infoHeight()
 			? RectParts(RectPart::FullBottom)
 			: RectParts();
-		const auto &frame = core->frame(
+		_runtime->setCut(
 			MediaRoundingMask(adjustedBubbleRounding(square)),
-			card.size(),
 			(_anchors.height <= 0));
-		if (!frame.isNull()) {
-			p.save();
-			p.setClipRect(card, Qt::IntersectClip);
-			p.drawImage(card.topLeft(), frame);
-			p.restore();
+		if (const auto core = _runtime->core()) {
+			const auto frame = core->frame(card.size());
+			if (!frame.isNull()) {
+				p.save();
+				p.setClipRect(card, Qt::IntersectClip);
+				p.drawImage(card.topLeft(), frame);
+				p.restore();
+			}
 		}
-	}
-	if (visible) {
 		_runtime->painted();
 	}
 	const auto state = _runtime->state();
@@ -508,7 +507,7 @@ TextState HtmlWidget::textState(
 		using Flag = Ui::Text::StateRequest::Flag;
 		const auto hand = (request.flags & Flag::LookupLink)
 			&& !OtherLinkPressed(_cardLink)
-			&& core->handCursorAt(cssPoint(point));
+			&& core->handCursor();
 		result.link = _cardLink;
 		result.cursor = hand ? CursorState::None : CursorState::Default;
 	}
@@ -581,14 +580,19 @@ void HtmlWidget::releaseCard() {
 	}
 }
 
-Tgw::RendererCore *HtmlWidget::menuPress(const ClickHandlerPtr &link) {
+Tgw::RendererCore *HtmlWidget::menuPress(
+		const ClickHandlerPtr &link,
+		Fn<void(bool taken)> decided) {
 	if (link != _cardLink || ClickHandler::getPressed()) {
 		return nullptr;
 	}
 	const auto core = pointerCore();
-	const auto taken = core
-		&& core->menuPress(cssPoint(_pointerPoint), CurrentModifiers());
-	return taken ? core : nullptr;
+	const auto pending = core
+		&& core->menuPress(
+			cssPoint(_pointerPoint),
+			CurrentModifiers(),
+			std::move(decided));
+	return pending ? core : nullptr;
 }
 
 bool HtmlWidget::hasHeavyPart() const {

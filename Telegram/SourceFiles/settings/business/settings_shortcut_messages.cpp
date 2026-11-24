@@ -269,6 +269,7 @@ private:
 	QPointer<ListWidget> _inner;
 	std::unique_ptr<Ui::RpWidget> _controlsWrap;
 	std::unique_ptr<ComposeControls> _composeControls;
+	QPointer<SendFilesBox> _sendFilesBox;
 	rpl::event_stream<> _showBackRequests;
 	bool _skipScrollEvent = false;
 
@@ -414,7 +415,16 @@ ShortcutMessages::ShortcutMessages(
 	}, lifetime());
 }
 
-ShortcutMessages::~ShortcutMessages() = default;
+ShortcutMessages::~ShortcutMessages() {
+	// The Info host may already be half deleted, so don't restore the text.
+	if (const auto box = _sendFilesBox.data()) {
+		box->setCancelledCallback(nullptr);
+		box->closeBox();
+	}
+	if (_composeControls) {
+		_composeControls->closeSendAsFileBox(false);
+	}
+}
 
 void ShortcutMessages::refreshEmptyText() {
 	const auto &shortcut = _shortcut.current();
@@ -1204,6 +1214,7 @@ void ShortcutMessages::sendVoice(ComposeControls::VoiceToSend &&data) {
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		std::move(action));
 
 	_composeControls->cancelReplyMessage();
@@ -1361,6 +1372,7 @@ bool ShortcutMessages::confirmSendingFiles(
 		Api::SendType::Normal,
 		SendMenu::Details(),
 		[=](const TextWithTags &text) { _composeControls->setText(text); });
+	_sendFilesBox = box.data();
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,

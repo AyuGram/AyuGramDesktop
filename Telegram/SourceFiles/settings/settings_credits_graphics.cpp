@@ -19,6 +19,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/share_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/star_gift_craft_box.h"
+#include "boxes/star_gift_onchain_buy_box.h"
+#include "boxes/star_gift_onchain_offer_buy_box.h"
+#include "boxes/star_gift_onchain_sale_box.h"
 #include "boxes/star_gift_resale_box.h"
 #include "boxes/transfer_gift_box.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
@@ -930,6 +933,7 @@ not_null<Ui::RpWidget*> AddBalanceWidget(
 			(state->label.style()->font->height
 				+ state->count.style()->font->height));
 	};
+	resize();
 	std::move(
 		balanceValue
 	) | rpl::on_next([=](CreditsAmount value) {
@@ -1157,7 +1161,8 @@ void ProcessReceivedSubscriptions(
 	return owner
 		&& owner->isUser()
 		&& !owner->isSelf()
-		&& (unique->starsMinOffer >= 0);
+		&& (unique->starsMinOffer >= 0)
+		&& !unique->fixedSale;
 	// Currently we're not making offers for channel gifts.
 	// (owner->isChannel() && !owner->asChannel()->canTransferGifts());
 }
@@ -1288,6 +1293,39 @@ void FillUniqueGiftMenu(
 			}
 		}, st.theme ? st.theme : &st::menuIconChangeColors);
 	}
+	const auto own = (unique->ownerId == session->userPeerId())
+		? Ui::OwnOnchainGift::None
+		: Ui::LookupOwnOnchainGift(session, *unique);
+	if (Ui::HasOnchainSaleEntries(own)) {
+		const auto listed = (own == Ui::OwnOnchainGift::Listed);
+		const auto editPrice = (listed
+			? tr::lng_gift_transfer_update
+			: tr::lng_gift_transfer_sell)(tr::now);
+		menu->addAction(editPrice, [=] {
+			const auto style = st.giftWearBox
+				? *st.giftWearBox
+				: GiftWearBoxStyleOverride();
+			Ui::ShowUniqueGiftSellBox(
+				show,
+				unique,
+				Data::SavedStarGiftId(),
+				style);
+		}, st.resell ? st.resell : &st::menuIconTagSell);
+		if (listed) {
+			menu->addAction(tr::lng_gift_transfer_unlist(tr::now), [=] {
+				Ui::ShowOwnGiftUnlistBox(
+					show,
+					unique,
+					Data::SavedStarGiftId());
+			}, st.unlist ? st.unlist : &st::menuIconTagRemove);
+		}
+	} else if (Ui::CanOfferOnchainGift(session, *unique)) {
+		const auto count = e.limitedCount;
+		const auto left = e.limitedLeft;
+		menu->addAction(tr::lng_gift_offer_button(tr::now), [=] {
+			Ui::ShowOnchainGiftOfferBox(show, unique, count, left);
+		}, st.offer ? st.offer : &st::menuIconEarn);
+	}
 	const auto owner = unique->ownerId
 		? show->session().data().peer(unique->ownerId).get()
 		: (PeerData*)nullptr;
@@ -1342,9 +1380,14 @@ void FillUniqueGiftMenu(
 			}, st.wear ? st.wear : &st::menuIconNftWear);
 		}
 	}
-	if (ShowResellButton(&show->session(), e)) {
+	if (owner
+		&& (own == Ui::OwnOnchainGift::None)
+		&& ShowResellButton(&show->session(), e)) {
+		if (Ui::HasPendingGiftSale(session, *unique)) {
+			return;
+		}
 		const auto can = CanResellGift(&show->session(), e);
-		const auto inResale = (unique->starsForResale > 0);
+		const auto inResale = Data::UniqueGiftOnSale(*unique);
 		const auto editPrice = (inResale
 			? tr::lng_gift_transfer_update
 			: tr::lng_gift_transfer_sell)(tr::now);
@@ -1360,19 +1403,7 @@ void FillUniqueGiftMenu(
 		}, st.resell ? st.resell : &st::menuIconTagSell);
 		if (inResale) {
 			menu->addAction(tr::lng_gift_transfer_unlist(tr::now), [=] {
-				const auto name = UniqueGiftName(*unique);
-				const auto confirm = [=](Fn<void()> close) {
-					close();
-					Ui::UpdateGiftSellPrice(show, unique, savedId, {});
-				};
-				show->show(Ui::MakeConfirmBox({
-					.text = tr::lng_gift_sell_unlist_sure(),
-					.confirmed = confirm,
-					.confirmText = tr::lng_gift_transfer_unlist(),
-					.title = tr::lng_gift_sell_unlist_title(
-						lt_name,
-						rpl::single(name)),
-				}));
+				Ui::ShowOwnGiftUnlistBox(show, unique, savedId);
 			}, st.unlist ? st.unlist : &st::menuIconTagRemove);
 		}
 	} else if (ShowOfferBuyButton(&show->session(), e)) {
@@ -1548,13 +1579,6 @@ void GenericCreditsEntryCover(
 			}
 			: Fn<void()>();
 		auto coverActions = std::vector<Ui::UniqueGiftCoverAction>();
-		if (actions && actions->transfer) {
-			coverActions.push_back({
-				.text = tr::lng_gift_transfer_button(),
-				.icon = rpl::single(&st::menuIconReplace),
-				.callback = actions->transfer,
-			});
-		}
 		if (actions && actions->extra) {
 			for (auto &action : actions->extra(box)) {
 				coverActions.push_back(std::move(action));
@@ -1760,8 +1784,25 @@ void GenericCreditsEntryBody(
 		&& !e.converted
 		&& starGiftSender;
 	const auto canConvert = forConvert && !timeExceeded;
-	const auto inResale = uniqueGift && (uniqueGift->starsForResale > 0);
-	const auto canBuyResold = inResale && (e.bareGiftOwnerId != selfPeerId);
+	const auto inResale = uniqueGift
+		&& ((uniqueGift->starsForResale > 0)
+			|| (uniqueGift->nanoTonForResale > 0));
+	const auto ownOnchain = uniqueGift
+		? Ui::LookupOwnOnchainGift(session, *uniqueGift)
+		: Ui::OwnOnchainGift::None;
+	const auto canBuyResold = inResale
+		&& !Data::UniqueGiftOnchainPurchase(*uniqueGift)
+		&& !(uniqueGift->fixedSale && !uniqueGift->onchainSale)
+		&& (e.bareGiftOwnerId != selfPeerId)
+		&& (ownOnchain == Ui::OwnOnchainGift::None);
+	const auto resaleRecipient = e.bareGiftResaleRecipientId
+		? owner->peer(PeerId(e.bareGiftResaleRecipientId))
+		: session->user();
+	const auto canBuyOnchain = uniqueGift
+		&& Ui::CanBuyOnchainGift(resaleRecipient, *uniqueGift);
+	const auto onchainMemory = canBuyOnchain
+		? box->lifetime().make_state<Ui::OnchainBuyMemory>()
+		: nullptr;
 	const auto &stUser = st::boostReplaceUserpic;
 	const auto isPrize = e.bareGiveawayMsgId > 0;
 	const auto starGiftSticker = (isStarGift && e.bareGiftStickerId)
@@ -1779,11 +1820,16 @@ void GenericCreditsEntryBody(
 		? owner->peer(PeerId(e.barePeerId)).get()
 		: nullptr;
 
-	if (auto savedId = EntryToSavedStarGiftId(session, e)) {
-		session->data().giftUpdates(
+	const auto entryId = EntryToSavedStarGiftId(session, e);
+	const auto slug = uniqueGift ? uniqueGift->slug : QString();
+	if (entryId || !slug.isEmpty()) {
+		owner->giftUpdates(
 		) | rpl::on_next([=](const Data::GiftUpdate &update) {
-			if (update.id == savedId
-				&& update.action != Data::GiftUpdate::Action::ResaleChange) {
+			using Action = Data::GiftUpdate::Action;
+			const auto close = (update.action == Action::ResaleChange)
+				? (update.listingChanged && !slug.isEmpty() && update.slug == slug)
+				: (entryId && update.id == entryId);
+			if (close) {
 				box->closeBox();
 			}
 		}, box->lifetime());
@@ -2563,17 +2609,22 @@ void GenericCreditsEntryBody(
 			if (willBusy) {
 				state->confirmButtonBusy = true;
 				send();
-			} else if (canBuyResold) {
-				const auto to = e.bareGiftResaleRecipientId
-					? show->session().data().peer(
-						PeerId(e.bareGiftResaleRecipientId))
-					: show->session().user();
-				ShowBuyResaleGiftBox(
-					show,
-					e.uniqueGift,
-					e.giftResaleForceTon,
-					to,
-					crl::guard(box, [=](bool) { box->closeBox(); }));
+			} else if (canBuyResold || canBuyOnchain) {
+				if (canBuyResold) {
+					ShowBuyResaleGiftBox(
+						show,
+						e.uniqueGift,
+						e.giftResaleForceTon,
+						resaleRecipient,
+						crl::guard(box, [=](bool) { box->closeBox(); }));
+				} else {
+					Ui::ShowBuyOnchainGiftBox(
+						show,
+						e.uniqueGift,
+						resaleRecipient,
+						base::make_weak(onchainMemory),
+						crl::guard(box, [=] { box->closeBox(); }));
+				}
 			} else if (canUpgrade || canGiftUpgrade) {
 				upgrade();
 			} else if (canToggle && !e.savedToProfile) {
@@ -2584,15 +2635,24 @@ void GenericCreditsEntryBody(
 		}, showNextToUpgrade
 			? st::giveawayGiftCodeBoxUpgradeNext
 			: st::giveawayGiftCodeBox.button);
-		if (canBuyResold) {
-			if (uniqueGift->onlyAcceptTon || e.giftResaleForceTon) {
+		if (canBuyResold || canBuyOnchain) {
+			const auto ton = !canBuyResold
+				|| Data::UniqueGiftResaleBuyTon(
+					*uniqueGift,
+					e.giftResaleForceTon);
+			const auto stars = canBuyResold
+				&& (uniqueGift->starsForResale > 0);
+			auto title = tr::lng_gift_buy_resale_button(
+				lt_cost,
+				rpl::single(ton
+					? Data::FormatGiftResaleTon(*uniqueGift)
+					: Data::FormatGiftResaleStars(*uniqueGift)),
+				tr::marked);
+			if (ton && stars) {
 				button->setText(rpl::single(QString()));
 				Ui::SetButtonTwoLabels(
 					button,
-					tr::lng_gift_buy_resale_button(
-						lt_cost,
-						rpl::single(Data::FormatGiftResaleTon(*uniqueGift)),
-						tr::marked),
+					std::move(title),
 					tr::lng_gift_buy_resale_equals(
 						lt_cost,
 						rpl::single(Ui::Text::IconEmoji(
@@ -2603,11 +2663,7 @@ void GenericCreditsEntryBody(
 					st::resaleButtonTitle,
 					st::resaleButtonSubtitle);
 			} else {
-				button->setText(tr::lng_gift_buy_resale_button(
-					lt_cost,
-					rpl::single(Ui::Text::IconEmoji(&st::starIconEmoji).append(
-						Lang::FormatCountDecimal(uniqueGift->starsForResale))),
-					tr::marked));
+				button->setText(std::move(title));
 			}
 		} else if (showNextToUpgrade) {
 			const auto session = &show->session();

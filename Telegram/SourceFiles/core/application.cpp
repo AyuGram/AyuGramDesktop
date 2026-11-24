@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/platform_integration.h"
 #include "history/history.h"
 #include "apiwrap.h"
+#include "api/api_stories.h"
 #include "api/api_updates.h"
 #include "calls/calls_instance.h"
 #include "countries/countries_manager.h"
@@ -300,6 +301,7 @@ Application::~Application() {
 
 	Shortcuts::Finish();
 
+	Tgw::Runtime::Finish();
 	Ui::Emoji::Clear();
 	Media::Clip::Finish();
 
@@ -377,10 +379,12 @@ void Application::run() {
 	}, _lifetime);
 
 	style::ShortAnimationPlaying(
-	) | rpl::on_next([=](bool playing) {
+	) | rpl::combine_previous(
+		false
+	) | rpl::on_next([=](bool was, bool playing) {
 		if (playing) {
 			MTP::details::pause();
-		} else {
+		} else if (was) {
 			MTP::details::unpause();
 		}
 	}, _lifetime);
@@ -619,7 +623,7 @@ void Application::processCreatedWindow(
 }
 
 void Application::startMediaView() {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	// On macOS we create some windows async, otherwise they're
 	// added to the Dock Menu as a visible window and are removed
 	// only after first show and then hide.
@@ -627,7 +631,7 @@ void Application::startMediaView() {
 		_mediaView = std::make_unique<Media::View::OverlayWidget>();
 		_mediaView->setSystemMediaControls(_mediaControlsManager.get());
 	});
-#elif defined Q_OS_WIN // Q_OS_MAC || Q_OS_WIN
+#elif defined Q_OS_WIN // Q_OS_MACOS || Q_OS_WIN
 	// On Windows we needed such hack for the main window, otherwise
 	// somewhere inside the media viewer creating code its geometry
 	// was broken / lost to some invalid values.
@@ -638,20 +642,20 @@ void Application::startMediaView() {
 #else
 	_mediaView = std::make_unique<Media::View::OverlayWidget>();
 	_mediaView->setSystemMediaControls(_mediaControlsManager.get());
-#endif // Q_OS_MAC || Q_OS_WIN
+#endif // Q_OS_MACOS || Q_OS_WIN
 }
 
 void Application::startTray() {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	// On macOS we create some windows async, otherwise they're
 	// added to the Dock Menu as a visible window and are removed
 	// only after first show and then hide, tray icon being "Item-0".
 	InvokeQueued(this, [=] {
 		createTray();
 	});
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 	createTray();
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void Application::createTray() {
@@ -1212,6 +1216,30 @@ bool Application::uploadPreventsQuit() {
 	return false;
 }
 
+bool Application::storyPostPreventsQuit() {
+	if (!_domain->started()) {
+		return false;
+	}
+	for (const auto &[index, account] : _domain->accounts()) {
+		if (!account->sessionExists()) {
+			continue;
+		}
+		auto &session = account->session();
+		if (session.api().stories().posting()) {
+			session.api().stories().stopPostingWithConfirmation([=] {
+				for (const auto &[index, account] : _domain->accounts()) {
+					if (account->sessionExists()) {
+						account->session().api().stories().cancelPosting();
+					}
+				}
+				Quit();
+			});
+			return true;
+		}
+	}
+	return false;
+}
+
 bool Application::downloadPreventsQuit() {
 	if (_downloadManager->loadingInProgress()) {
 		_downloadManager->loadingStopWithConfirmation([=] { Quit(); });
@@ -1222,6 +1250,7 @@ bool Application::downloadPreventsQuit() {
 
 bool Application::preventsQuit(QuitReason reason) {
 	if (exportPreventsQuit()
+		|| storyPostPreventsQuit()
 		|| uploadPreventsQuit()
 		|| downloadPreventsQuit()) {
 		return true;
@@ -1265,9 +1294,6 @@ void Application::checkStartUrls() {
 		return;
 	}
 	if (!Core::App().passcodeLocked()) {
-		// WHY: tg://resolve?acc= switches the account, which shows the
-		// new main widget and re-enters here while we still iterate,
-		// so take the list out and merge whatever was added meanwhile.
 		const auto urls = base::take(cRefStartUrls());
 		auto left = ranges::views::all(
 			urls
@@ -2016,7 +2042,7 @@ bool Application::isSharingScreen() const {
 
 // macOS Qt bug workaround, sometimes no leaveEvent() gets to the nested widgets.
 void Application::registerLeaveSubscription(not_null<QWidget*> widget) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	if (const auto window = widget->window()) {
 		auto i = _leaveFilters.find(window);
 		if (i == end(_leaveFilters)) {
@@ -2044,11 +2070,11 @@ void Application::registerLeaveSubscription(not_null<QWidget*> widget) {
 		}
 		i->second.registered.push_back(widget.get());
 	}
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void Application::unregisterLeaveSubscription(not_null<QWidget*> widget) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	if (const auto topLevel = widget->window()) {
 		const auto i = _leaveFilters.find(topLevel);
 		if (i != end(_leaveFilters)) {
@@ -2060,7 +2086,7 @@ void Application::unregisterLeaveSubscription(not_null<QWidget*> widget) {
 			});
 		}
 	}
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void Application::postponeCall(FnMut<void()> &&callable) {

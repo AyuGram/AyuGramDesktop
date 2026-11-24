@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class History;
 class DocumentData;
+class SendFilesBox;
 struct InlineBotQuery;
 
 namespace style {
@@ -230,6 +231,7 @@ public:
 		Fn<void(
 			std::shared_ptr<Ui::PreparedBundle>,
 			Api::SendOptions)> confirmed);
+	void closeSendAsFileBox(bool restoreText = true);
 	void processChosenSticker(FileChosen &&chosen);
 	void clearFieldAfterStickerSend();
 	[[nodiscard]] rpl::producer<FileChosen> fileChosen() const;
@@ -438,7 +440,9 @@ private:
 	void orderControls();
 	void updateFieldPlaceholder();
 	void updateSilentBroadcast();
-	void editMessage(not_null<HistoryItem*> item);
+	void editMessage(
+		not_null<HistoryItem*> item,
+		const TextWithTags &editData);
 
 	void escape();
 	void fieldChanged();
@@ -643,6 +647,7 @@ private:
 	rpl::event_stream<not_null<QKeyEvent*>> _editLastMessageRequests;
 	rpl::event_stream<std::optional<bool>> _attachRequests;
 	Fn<void(std::shared_ptr<Ui::PreparedBundle>, Api::SendOptions)> _sendAsFileConfirmed;
+	QPointer<SendFilesBox> _sendAsFileBox;
 	rpl::event_stream<> _likeToggled;
 	rpl::event_stream<ReplyNextRequest> _replyNextRequests;
 	rpl::event_stream<> _replyCancelled;

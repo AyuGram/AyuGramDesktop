@@ -67,9 +67,9 @@ constexpr auto kDropLoudAfterQuietCount = 5;
 constexpr auto kMicrophoneTooltipLevelThreshold = 0.2;
 constexpr auto kMicrophoneTooltipCheckInterval = crl::time(500);
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 constexpr auto kCheckAccessibilityInterval = crl::time(500);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 
 void SaveCallJoinMuted(
 		not_null<PeerData*> peer,
@@ -131,7 +131,7 @@ void SaveCallMessagesEnabled(
 		: tr::lng_group_call_ptt_delay_s(
 			tr::now,
 			lt_amount,
-			QString::number(delay / 1000., 'f', 2));
+			QLocale().toString(delay / 1000., 'f', 2));
 }
 
 object_ptr<ShareBox> ShareInviteLinkBox(
@@ -260,8 +260,6 @@ void SettingsBox(
 		std::unique_ptr<Webrtc::DeviceResolver> deviceId;
 		std::unique_ptr<Webrtc::AudioInputTester> micTester;
 		Ui::LevelMeter *micTestLevel = nullptr;
-		float micLevel = 0.;
-		Ui::Animations::Simple micLevelAnimation;
 		base::Timer levelUpdateTimer;
 		bool generatingLink = false;
 	};
@@ -365,12 +363,9 @@ void SettingsBox(
 		state->micTestLevel->resize(QSize(0, st::defaultLevelMeter.height));
 
 		state->levelUpdateTimer.setCallback([=] {
-			const auto was = state->micLevel;
-			state->micLevel = state->micTester->getAndResetLevel();
-			state->micLevelAnimation.start([=] {
-				state->micTestLevel->setValue(
-					state->micLevelAnimation.value(state->micLevel));
-			}, was, state->micLevel, kMicTestAnimationDuration);
+			state->micTestLevel->animateTo(
+				state->micTester->getAndResetLevel(),
+				kMicTestAnimationDuration);
 		});
 
 		Ui::AddSkip(layout);
@@ -449,7 +444,7 @@ void SettingsBox(
 				Core::App().saveSettingsDelayed();
 			};
 			const auto showPrivacyRequest = [=] {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 				if (!Platform::IsMac10_14OrGreater()) {
 					return;
 				}
@@ -494,7 +489,7 @@ void SettingsBox(
 						}, box->lifetime());
 					}
 				}));
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 			};
 			const auto ensureManager = [=] {
 				if (state->manager) {
@@ -706,7 +701,7 @@ void SettingsBox(
 
 		struct State {
 			base::unique_qptr<Ui::PopupMenu> menu;
-			mtpRequestId requestId;
+			mtpRequestId requestId = 0;
 			rpl::event_stream<RtmpInfo> data;
 		};
 		const auto top = box->addTopButton(st::groupCallMenuToggle);

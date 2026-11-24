@@ -60,8 +60,6 @@ thirdPartyDir = os.path.realpath(os.path.join(rootDir, 'ThirdParty'))
 usedPrefix = os.path.realpath(os.path.join(libsDir, 'local'))
 
 optionsList = [
-    'qt5',
-    'qt6',
     'skip-release',
     'build-stackwalk',
     'qt-asserts',
@@ -532,12 +530,12 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout 23d349a3ff09dbc1fa8127ce39ba9223de0edf21
+    git checkout 8a28b8433af70771c3d101c776ad837a94bd47ec
 mac:
     sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
     cd qt6_highsierra
-    git checkout 7387476bb3b7200d3b044015696cb3c28f78593c
+    git checkout df21d71753b075f205e595effb7575b3435012c6
 """)
 
 stage('msys64', """
@@ -843,8 +841,10 @@ win:
 
 # Somehow in x86 Debug build dav1d crashes on AV1 10bpc videos.
 stage('dav1d', """
+depends:patches/dav1d.patch
     git clone -b 1.5.4 https://code.videolan.org/videolan/dav1d.git
     cd dav1d
+    git apply ../patches/dav1d.patch
 win32:
     SET "TARGET=x86"
     SET "DAV1D_ASM_DISABLE=-Denable_asm=false"
@@ -1187,8 +1187,9 @@ stage('regex', """
 """)
 
 stage('ffmpeg', """
-    git clone -b n8.1.3 https://github.com/FFmpeg/FFmpeg.git ffmpeg
+    git clone -b release/8.1 https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
+    git checkout e22a4510c982b048945052bd6a503475014b7ba0
 depends:patches/ffmpeg/*.patch
 win:
     for %%i in (..\\patches\\ffmpeg\\*.patch) do (
@@ -1220,31 +1221,32 @@ mac:
         --enable-cross-compile \
         --target-os=darwin \
         --arch="$arch" \
-        --extra-cflags="$MIN_VER -arch $arch $UNGUARDED -DCONFIG_SAFE_BITSTREAM_READER=1 -I$USED_PREFIX/include" \
-        --extra-cxxflags="$MIN_VER -arch $arch $UNGUARDED -DCONFIG_SAFE_BITSTREAM_READER=1 -I$USED_PREFIX/include" \
+        --extra-cflags="$MIN_VER -arch $arch $UNGUARDED -I$USED_PREFIX/include" \
+        --extra-cxxflags="$MIN_VER -arch $arch $UNGUARDED -I$USED_PREFIX/include" \
         --extra-ldflags="$MIN_VER -arch $arch $USED_PREFIX/lib/libopus.a -lc++" \
         --disable-programs \
         --disable-doc \
         --disable-network \
+        --disable-autodetect \
         --disable-everything \
         --enable-protocol=file \
         --enable-libdav1d \
         --enable-libopenh264 \
         --enable-libopus \
         --enable-libvpx \
+        --enable-videotoolbox \
+        --enable-hwaccel=av1_videotoolbox \
         --enable-hwaccel=h264_videotoolbox \
         --enable-hwaccel=hevc_videotoolbox \
         --enable-hwaccel=mpeg1_videotoolbox \
         --enable-hwaccel=mpeg2_videotoolbox \
         --enable-hwaccel=mpeg4_videotoolbox \
         --enable-decoder=aac \
-        --enable-decoder=aac_at \
         --enable-decoder=aac_fixed \
         --enable-decoder=aac_latm \
         --enable-decoder=aasc \
         --enable-decoder=ac3 \
         --enable-decoder=alac \
-        --enable-decoder=alac_at \
         --enable-decoder=av1 \
         --enable-decoder=eac3 \
         --enable-decoder=flac \
@@ -1259,39 +1261,30 @@ mac:
         --enable-decoder=mp2 \
         --enable-decoder=mp2float \
         --enable-decoder=mp3 \
-        --enable-decoder=mp3adu \
-        --enable-decoder=mp3adufloat \
         --enable-decoder=mp3float \
         --enable-decoder=mp3on4 \
         --enable-decoder=mp3on4float \
+        --enable-decoder=mpeg1video \
+        --enable-decoder=mpeg2video \
         --enable-decoder=mpeg4 \
         --enable-decoder=msmpeg4v2 \
         --enable-decoder=msmpeg4v3 \
         --enable-decoder=opus \
         --enable-decoder=pcm_alaw \
-        --enable-decoder=pcm_alaw_at \
         --enable-decoder=pcm_f32be \
         --enable-decoder=pcm_f32le \
         --enable-decoder=pcm_f64be \
         --enable-decoder=pcm_f64le \
-        --enable-decoder=pcm_lxf \
         --enable-decoder=pcm_mulaw \
-        --enable-decoder=pcm_mulaw_at \
         --enable-decoder=pcm_s16be \
-        --enable-decoder=pcm_s16be_planar \
         --enable-decoder=pcm_s16le \
-        --enable-decoder=pcm_s16le_planar \
         --enable-decoder=pcm_s24be \
-        --enable-decoder=pcm_s24daud \
         --enable-decoder=pcm_s24le \
-        --enable-decoder=pcm_s24le_planar \
         --enable-decoder=pcm_s32be \
         --enable-decoder=pcm_s32le \
-        --enable-decoder=pcm_s32le_planar \
         --enable-decoder=pcm_s64be \
         --enable-decoder=pcm_s64le \
         --enable-decoder=pcm_s8 \
-        --enable-decoder=pcm_s8_planar \
         --enable-decoder=pcm_u16be \
         --enable-decoder=pcm_u16le \
         --enable-decoder=pcm_u24be \
@@ -1315,27 +1308,25 @@ mac:
         --enable-filter=atempo \
         --enable-parser=aac \
         --enable-parser=aac_latm \
+        --enable-parser=ac3 \
         --enable-parser=flac \
         --enable-parser=gif \
         --enable-parser=h264 \
         --enable-parser=hevc \
         --enable-parser=mpeg4video \
         --enable-parser=mpegaudio \
+        --enable-parser=mpegvideo \
         --enable-parser=opus \
         --enable-parser=vorbis \
         --enable-demuxer=aac \
         --enable-demuxer=flac \
         --enable-demuxer=gif \
-        --enable-demuxer=h264 \
-        --enable-demuxer=hevc \
         --enable-demuxer=matroska \
-        --enable-demuxer=m4v \
         --enable-demuxer=mov \
         --enable-demuxer=mp3 \
         --enable-demuxer=ogg \
         --enable-demuxer=wav \
         --enable-muxer=mp4 \
-        --enable-muxer=ogg \
         --enable-muxer=opus \
         --enable-muxer=wav \
         --enable-muxer=webm
@@ -1535,7 +1526,8 @@ release:
     ninja -C out/Release%FolderPostfix% common crash_generation_client exception_handler
     cd tools\\windows\\dump_syms
     gyp dump_syms.gyp --format=msvs
-    msbuild -m dump_syms.vcxproj /property:Configuration=Release /property:Platform="x64" %ToolsetProp%
+    # dump_syms requires ATL; not used by Telegram.
+    if not "%SKIP_DUMPSYMS%"=="1" msbuild -m dump_syms.vcxproj /property:Configuration=Release /property:Platform="x64" %ToolsetProp%
 win:
     deactivate
 mac:
@@ -1605,13 +1597,13 @@ release:
     lipo -create Release.arm64/libcrashpad_client.a Release.x86_64/libcrashpad_client.a -output Release/libcrashpad_client.a
 """)
 
-if win and qt >= '6':
+if win:
     # Windows 7 and 8 support for qtbase, and the ANGLE backend Qt 6 dropped.
     stage('qt6_windows7', """
 win32_win64:
     git clone https://github.com/desktop-app/qt6_windows7_patches.git qt6_windows7
     cd qt6_windows7
-    git checkout 9ce1ffe051161a22f7e78f715b042c773f868e59
+    git checkout fd8d5035b25bce04b849b6f87818ad3a2ba66c7d
 """)
 
 if win:
@@ -1628,84 +1620,12 @@ release:
     cmake --build out --config Release
 """)
 
-if qt < '6':
-    stage('qt_' + qt, """
-    git clone -b v$QT-lts-lgpl https://github.com/qt/qt5.git qt_$QT
-    cd qt_$QT
-    git submodule update --init --recursive --progress qtbase qtimageformats qtsvg
-depends:patches/qtbase_""" + qt + """/*.patch
-depends:patches/qtsvg_""" + qt + """/*.patch
-win:
-    cd qtbase
-    setlocal enabledelayedexpansion
-    for /r %%i in (..\\..\\patches\\qtbase_%QT%\\*) do (
-        git apply %%i -v
-        if errorlevel 1 (
-            echo ERROR: Applying patch %%~nxi failed!
-            exit /b 1
-        )
-    )
-    cd ..\\qtsvg
-    for %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do git apply %%i -v || exit /b 1
-    cd ..
-
-    SET CONFIGURATIONS=-debug
-release:
-    SET CONFIGURATIONS=-debug-and-release
-win:
-    """ + removeDir('"%LIBS_DIR%\\Qt-' + qt + '"') + """
-    SET ANGLE_DIR=%LIBS_DIR%\\tg_angle
-    SET ANGLE_LIBS_DIR=%ANGLE_DIR%\\out
-    SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg
-    SET OPENSSL_DIR=%LIBS_DIR%\\openssl3
-    SET OPENSSL_LIBS_DIR=%OPENSSL_DIR%\\out
-    SET ZLIB_LIBS_DIR=%LIBS_DIR%\\zlib
-    SET WEBP_DIR=%LIBS_DIR%\\libwebp
-    configure -prefix "%LIBS_DIR%\\Qt-%QT%" ^
-        %CONFIGURATIONS% ^
-        -force-debug-info ^
-        -opensource ^
-        -confirm-license ^
-        -static ^
-        -static-runtime ^
-        -opengl es2 -no-angle ^
-        -I "%ANGLE_DIR%\\include" ^
-        -D "KHRONOS_STATIC=" ^
-        -D "DESKTOP_APP_QT_STATIC_ANGLE=" ^
-        QMAKE_LIBS_OPENGL_ES2_DEBUG="%ANGLE_LIBS_DIR%\\Debug\\tg_angle.lib %ZLIB_LIBS_DIR%\\Debug\\libzsd.lib d3d9.lib dxgi.lib dxguid.lib" ^
-        QMAKE_LIBS_OPENGL_ES2_RELEASE="%ANGLE_LIBS_DIR%\\Release\\tg_angle.lib %ZLIB_LIBS_DIR%\\Release\\libzs.lib d3d9.lib dxgi.lib dxguid.lib" ^
-        -egl ^
-        QMAKE_LIBS_EGL_DEBUG="%ANGLE_LIBS_DIR%\\Debug\\tg_angle.lib %ZLIB_LIBS_DIR%\\Debug\\libzsd.lib d3d9.lib dxgi.lib dxguid.lib Gdi32.lib User32.lib" ^
-        QMAKE_LIBS_EGL_RELEASE="%ANGLE_LIBS_DIR%\\Release\\tg_angle.lib %ZLIB_LIBS_DIR%\\Release\\libzs.lib d3d9.lib dxgi.lib dxguid.lib Gdi32.lib User32.lib" ^
-        -openssl-linked ^
-        -I "%OPENSSL_DIR%\\include" ^
-        OPENSSL_LIBS_DEBUG="%OPENSSL_LIBS_DIR%.dbg\\libssl.lib %OPENSSL_LIBS_DIR%.dbg\\libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
-        OPENSSL_LIBS_RELEASE="%OPENSSL_LIBS_DIR%\\libssl.lib %OPENSSL_LIBS_DIR%\\libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
-        -I "%MOZJPEG_DIR%" ^
-        LIBJPEG_LIBS_DEBUG="%MOZJPEG_DIR%\\Debug\\jpeg-static.lib" ^
-        LIBJPEG_LIBS_RELEASE="%MOZJPEG_DIR%\\Release\\jpeg-static.lib" ^
-        -system-webp ^
-        -I "%WEBP_DIR%\\src" ^
-        -L "%WEBP_DIR%\\out\\release-static\\$X8664\\lib" ^
-        -mp ^
-        -no-feature-netlistmgr ^
-        -nomake examples ^
-        -nomake tests ^
-        -platform win32-msvc
-
-    rem jom -jN occasionally fails to create the shared mkspecs\\modules-inst
-    rem directory due to a race in qmake's mkpath under parallel builds; the
-    rem build is incremental, so simply retrying picks up where it stopped.
-    jom -j%NUMBER_OF_PROCESSORS% || jom -j%NUMBER_OF_PROCESSORS%
-    jom -j%NUMBER_OF_PROCESSORS% install
-""")
-else: # qt > '6'
-    qtAngleCmake = os.path.realpath(os.path.join(
-        scriptPath, '../../../cmake/external/angle/qt.cmake')).replace('\\', '/')
-    # checkouts share Libraries, so the cache key gets the content, not the path
-    modifiedEnv['QT_ANGLE_CMAKE'] = qtAngleCmake
-    branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
-    stage('qt_' + qt, """
+qtAngleCmake = os.path.realpath(os.path.join(
+    scriptPath, '../../../cmake/external/angle/qt.cmake')).replace('\\', '/')
+# checkouts share Libraries, so the cache key gets the content, not the path
+modifiedEnv['QT_ANGLE_CMAKE'] = qtAngleCmake
+branch = 'v$QT' + ('-lts-lgpl' if qt.startswith('6.2.') else '')
+stage('qt_' + qt, """
     git clone -b """ + branch + """ https://github.com/qt/qt5.git qt_$QT
     cd qt_$QT
     git submodule update --init --recursive --progress qtbase qtimageformats qtshadertools qtsvg
@@ -1713,6 +1633,8 @@ depends:patches/qtbase_""" + qt + """/*.patch
 depends:patches/qtsvg_""" + qt + """/*.patch
 win32_win64:
 depends:qt6_windows7/*.patch
+mac:
+depends:patches/qt6_highsierra/*.patch
 version:""" + computeFileHash(qtAngleCmake) + """
 mac:
     if [ -d "../patches/qt6_highsierra" ]; then
@@ -1793,8 +1715,6 @@ win_asserts:
 win:
     """ + removeDir('"%LIBS_DIR%\\Qt' + qt + '"') + """
     SET MOZJPEG_DIR=%LIBS_DIR%\\mozjpeg
-    SET OPENSSL_DIR=%LIBS_DIR%\\openssl3
-    SET OPENSSL_LIBS_DIR=%OPENSSL_DIR%\\out
     SET ZLIB_LIBS_DIR=%LIBS_DIR%\\zlib
     SET WEBP_DIR=%LIBS_DIR%\\libwebp
     SET LCMS2_DIR=%LIBS_DIR%\\liblcms2
@@ -1807,7 +1727,7 @@ win:
         -static ^
         -static-runtime ^
         -feature-c++20 ^
-        -openssl linked ^
+        -no-openssl ^
         -system-webp ^
         -system-zlib ^
         -system-libjpeg ^
@@ -1826,12 +1746,6 @@ win32_win64:
         -D CMAKE_PROJECT_QtBase_INCLUDE:FILEPATH="%QT_ANGLE_CMAKE%" ^
         -D DESKTOP_APP_ANGLE_DIR:PATH="%LIBS_DIR%\\tg_angle" ^
 win:
-        -D OPENSSL_FOUND=1 ^
-        -D OPENSSL_INCLUDE_DIR="%OPENSSL_DIR%\\include" ^
-        -D LIB_EAY_DEBUG="%OPENSSL_LIBS_DIR%.dbg\\libcrypto.lib" ^
-        -D SSL_EAY_DEBUG="%OPENSSL_LIBS_DIR%.dbg\\libssl.lib" ^
-        -D LIB_EAY_RELEASE="%OPENSSL_LIBS_DIR%\\libcrypto.lib" ^
-        -D SSL_EAY_RELEASE="%OPENSSL_LIBS_DIR%\\libssl.lib" ^
         -D JPEG_FOUND=1 ^
         -D JPEG_INCLUDE_DIR="%MOZJPEG_DIR%" ^
         -D JPEG_LIBRARY_DEBUG="%MOZJPEG_DIR%\\Debug\\jpeg-static.lib" ^
@@ -1859,7 +1773,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout 020feec5c040fdae2cf752c2c2be62ddde7c236d
+    git checkout a9d098a8f126dff818889d56f4241d7d2aaac9c1
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg
@@ -1954,27 +1868,6 @@ release:
     lipo -create Release.arm64/libtg_owt.a Release.x86_64/libtg_owt.a -output Release/libtg_owt.a
 """)
 
-stage('ada', """
-    git clone -b v3.2.9 https://github.com/ada-url/ada.git
-    cd ada
-win:
-    cmake -B out . ^
-        -D ADA_TESTING=OFF ^
-        -D ADA_TOOLS=OFF ^
-        -D ADA_INCLUDE_URL_PATTERN=OFF ^
-        -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
-    cmake --build out --config Debug
-    cmake --build out --config Release
-mac:
-    CFLAGS="$UNGUARDED" CPPFLAGS="$UNGUARDED" cmake -B build . \\
-        -D ADA_TESTING=OFF \\
-        -D ADA_TOOLS=OFF \\
-        -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \\
-        -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX
-    cmake --build build
-    cmake --install build
-""")
-
 stage('tde2e', """
     git clone https://github.com/tdlib/td.git tde2e
     cd tde2e
@@ -2062,14 +1955,14 @@ release:
 tlottieRevision = '92df98dc20'
 walletEngineRevision = 'e59e0d89d7ee90c388bf36e3334c5b276f396697'
 stage('tlottie', """
-version: 2
+version: 3
     git clone https://github.com/dkaraush/tlottie.git
     cd tlottie
     git checkout """ + tlottieRevision + """
 """)
 
 stage('wallet-engine', """
-version: 2
+version: 3
 depends:patches/wallet-engine.patch
 win:
     SET "GIT_LFS_SKIP_SMUDGE=1"
@@ -2098,7 +1991,7 @@ win_mac:
 # flushes a cache whose generated source the CI prune had already deleted.
 # The wallet-engine patch rewrites those sources, so it is a dependency here.
 stage('tdesktop_rust', """
-version: 2.""" + tlottieRevision + '.' + walletEngineRevision + """
+version: 3.""" + tlottieRevision + '.' + walletEngineRevision + """
 depends:patches/wallet-engine.patch
 win:
     SET "RUSTUP_HOME=%THIRDPARTY_DIR%\\rust\\rustup"

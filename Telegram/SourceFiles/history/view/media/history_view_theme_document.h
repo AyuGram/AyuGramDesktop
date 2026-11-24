@@ -148,11 +148,13 @@ public:
 	TextWithEntities subtitle() override;
 	rpl::producer<QString> button() override;
 	int buttonSkip() override;
+	std::optional<Ui::Premium::MiniStarsType> buttonMinistars() override;
 	void draw(
 		Painter &p,
 		const PaintContext &context,
 		const QRect &geometry) override;
 	ClickHandlerPtr createViewLink() override;
+	ClickHandlerPtr createButtonLink() override;
 
 	rpl::producer<> changes() override;
 
@@ -172,13 +174,21 @@ private:
 		not_null<const HistoryMessageSuggestion*> suggestion,
 		bool expired);
 	void clearKeyboard();
+	void paintOnchainOfferRibbon(QPainter &p, const QRect &geometry);
+	void armOnchainOfferTick();
+	void removeButton();
 
 	const not_null<Element*> _parent;
 	const Data::GiftCode &_data;
 	std::unique_ptr<Ui::Text::CustomEmoji> _patternEmoji;
 	QImage _backgroundCache;
 	base::flat_map<float64, QImage> _patternCache;
+	QImage _ribbonCache;
+	QString _ribbonText;
 	bool _backroundPatterned = false;
+	bool _review = false;
+	bool _withdraw = false;
+	TimeId _shownLeft = 0;
 	mutable std::optional<Sticker> _sticker;
 	rpl::event_stream<> _changes;
 	base::Timer _changeTimer;

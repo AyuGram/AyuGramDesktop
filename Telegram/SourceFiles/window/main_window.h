@@ -206,6 +206,7 @@ private:
 	[[nodiscard]] Core::WindowPosition nextInitialChildPosition(
 		SeparateId childId);
 	[[nodiscard]] QRect countInitialGeometry(Core::WindowPosition position);
+	void correctFirstGeometry();
 	void rememberOwnGeometry(QRect geometry);
 	void rememberOwnBodyMargins(QRect inner);
 	void rememberOwnRequestedGeometry();

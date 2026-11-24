@@ -17,7 +17,7 @@ public:
 	explicit Canvases(QtBackend::Diagnostic diagnostic);
 	~Canvases();
 
-	void run(
+	[[nodiscard]] QString run(
 		int id,
 		int width,
 		int height,
@@ -31,6 +31,7 @@ public:
 		int height,
 		std::vector<uint8_t> &rgba);
 	void release(int id);
+	void clear();
 	void refill();
 	[[nodiscard]] const QImage *bitmap(int id) const;
 

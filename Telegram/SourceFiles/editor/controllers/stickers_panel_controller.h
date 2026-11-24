@@ -8,11 +8,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/unique_qptr.h"
+#include "data/data_message_reaction_id.h"
+#include "ui/effects/animations.h"
+#include "ui/emoji_config.h"
 
 namespace ChatHelpers {
 class TabbedPanel;
 class Show;
 } // namespace ChatHelpers
+
+namespace HistoryView::Reactions {
+class Selector;
+} // namespace HistoryView::Reactions
+
+namespace Main {
+class Session;
+} // namespace Main
 
 namespace Ui {
 class RpWidget;
@@ -32,13 +43,31 @@ public:
 	StickersPanelController(
 		not_null<Ui::RpWidget*> panelContainer,
 		std::shared_ptr<ChatHelpers::Show> show,
-		bool withAudio);
+		bool withAudio,
+		bool storyWidgets = false);
+	~StickersPanelController();
 
+	[[nodiscard]] Main::Session &session() const;
 	[[nodiscard]] auto stickerChosen() const
 	-> rpl::producer<not_null<DocumentData*>>;
+	[[nodiscard]] auto gifChosen() const
+	-> rpl::producer<not_null<DocumentData*>>;
+	[[nodiscard]] rpl::producer<EmojiPtr> emojiChosen() const;
+	[[nodiscard]] rpl::producer<EmojiPtr> textEmojiChosen() const;
+	[[nodiscard]] Ui::RpWidget *textEmojiPanel() const;
+	void toggleTextEmojiPanel(QPoint globalAnchor);
+	void hideTextEmojiPanel();
 	[[nodiscard]] rpl::producer<> photoRequests() const;
 	[[nodiscard]] rpl::producer<> audioRequests() const;
 	[[nodiscard]] rpl::producer<> linkRequests() const;
+	[[nodiscard]] rpl::producer<> locationRequests() const;
+	[[nodiscard]] rpl::producer<> weatherRequests() const;
+	[[nodiscard]] auto reactionRequests() const
+	-> rpl::producer<Data::ReactionId>;
+	void showReactionsSelector(QRect globalItemRect);
+	void hideReactionsSelector();
+	[[nodiscard]] auto reactionPicked() const
+	-> rpl::producer<Data::ReactionId>;
 	[[nodiscard]] rpl::producer<bool> panelShown() const;
 
 	void setShowRequestChanges(rpl::producer<ShowRequest> &&showRequest);
@@ -46,7 +75,22 @@ public:
 	void setMoveRequestChanges(rpl::producer<QPoint> &&moveRequest);
 
 private:
+	struct ReactionsHiding;
+
+	void placeReactionsSelector(QRect itemRect);
+	void updateReactionsShowState();
+	void fadeOutReactionsSelector();
+
+	const not_null<Ui::RpWidget*> _panelContainer;
+	const std::shared_ptr<ChatHelpers::Show> _show;
 	const base::unique_qptr<ChatHelpers::TabbedPanel> _stickersPanel;
+	const base::unique_qptr<ChatHelpers::TabbedPanel> _textEmojiPanel;
+	std::unique_ptr<HistoryView::Reactions::Selector> _reactionsSelector;
+	int _reactionsWidth = 0;
+	int _reactionsCategoriesTop = 0;
+	std::vector<std::unique_ptr<ReactionsHiding>> _hiding;
+	Ui::Animations::Simple _reactionsShowing;
+	rpl::event_stream<Data::ReactionId> _reactionPicked;
 
 };
 

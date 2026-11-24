@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/object_ptr.h"
+#include "data/data_boosts.h"
 #include "info/info_controller.h" // Key
 #include "info/profile/info_profile_badge.h"
 #include "info/profile/tabs/info_profile_tab_top_bar_bindings.h"
@@ -15,6 +16,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
+
+namespace Api {
+class Boosts;
+} // namespace Api
 
 namespace Data {
 class ForumTopic;
@@ -92,6 +97,13 @@ class TopBarActionButton;
 
 struct TopBarActionButtonStyle;
 
+enum class TopBarAction : quint64 {
+	AddStory = (1 << 0),
+};
+
+[[nodiscard]] bool TopBarActionHidden(TopBarAction action);
+void SetTopBarActionHidden(TopBarAction action, bool hidden);
+
 class TopBar final : public Ui::RpWidget {
 public:
 	enum class Source {
@@ -115,9 +127,9 @@ public:
 
 	struct AnimatedPatternPoint {
 		QPointF basePosition;
-		float64 size;
-		float64 startTime;
-		float64 endTime;
+		float64 size = 0.;
+		float64 startTime = 0.;
+		float64 endTime = 0.;
 	};
 
 	TopBar(not_null<Ui::RpWidget*> parent, Descriptor descriptor);
@@ -144,9 +156,6 @@ public:
 	void setColorProfileIndex(std::optional<uint8> index);
 	void setPatternEmojiId(std::optional<DocumentId> patternEmojiId);
 	void setLocalEmojiStatusId(EmojiStatusId emojiStatusId);
-	void addTopBarEditButton(
-		not_null<Window::SessionController*> controller,
-		Wrap wrap);
 
 	rpl::producer<int> desiredHeightValue() const override;
 
@@ -180,14 +189,23 @@ private:
 	void fillTopBarMenu(
 		not_null<Window::SessionController*> controller,
 		const Ui::Menu::MenuCallback &addAction);
-	void setupUserpicButton(not_null<Window::SessionController*> controller);
+	Fn<void()> setupUserpicButton(
+		not_null<Window::SessionController*> controller);
 	void setupBirthdayEffect();
 	void startUploadOverlay();
 	void setupActions(not_null<Window::SessionController*> controller);
+	void setupMyProfileActions(
+		not_null<Window::SessionController*> controller,
+		Fn<void()> choosePhoto);
 	void setupPills(
 		not_null<Window::SessionController*> controller,
 		Fn<void()> showSavedMusic);
 	void applyPillsReserve(int reserve);
+	void openBoostsSectionForStory(
+		not_null<Window::SessionController*> controller);
+	void setupStoryDrop(
+		not_null<TopBarActionButton*> button,
+		not_null<Window::SessionController*> controller);
 	void searchInCommunity(not_null<Window::SessionController*> controller);
 	void finalizeActions(
 		const std::vector<not_null<TopBarActionButton*>> &buttons);
@@ -364,11 +382,11 @@ private:
 	rpl::event_stream<> _backClicks;
 	Ui::Controls::SwipeBackResult _swipeBackData;
 
-	base::unique_qptr<Ui::IconButton> _topBarButton;
 	base::unique_qptr<Ui::FadeWrap<Ui::IconButton>> _tabMenuToggle;
 	base::unique_qptr<Ui::FadeWrap<Ui::IconButton>> _tabSearchToggle;
 	base::unique_qptr<Ui::FadeWrap<Ui::IconButton>> _tabGroupToggle;
 	base::unique_qptr<Ui::PopupMenu> _peerMenu;
+	base::unique_qptr<Ui::PopupMenu> _actionContextMenu;
 
 	Ui::RpWidget *_actionMore = nullptr;
 
@@ -397,6 +415,9 @@ private:
 	std::vector<Ui::OutlineSegment> _storySegments;
 	bool _hasStories = false;
 	bool _hasLiveStories = false;
+	Api::Boosts *_boostsApi = nullptr;
+	std::optional<Data::BoostStatus> _boostsStatus;
+	rpl::variable<bool> _storyBoostsLoading = false;
 
 	std::optional<uint8> _localColorProfileIndex;
 	std::optional<DocumentId> _localPatternEmojiId;

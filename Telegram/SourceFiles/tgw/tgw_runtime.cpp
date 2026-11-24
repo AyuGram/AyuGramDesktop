@@ -9,7 +9,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
-#include "core/src/renderer.h"
 #include "core/application.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -25,8 +24,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "tgw/tgw_bridge.h"
 #include "tgw/tgw_emoji_images.h"
 #include "tgw/tgw_intl.h"
+#include "tgw/tgw_kept_budget.h"
 #include "tgw/tgw_media.h"
+#include "tgw/tgw_remote.h"
+#include "tgw/tgw_render_thread.h"
 #include "tgw/tgw_renderer.h"
+#include "tgw/tgw_renderer_work.h"
 #include "tgw/tgw_resources.h"
 #include "tgw/tgw_state.h"
 #include "tgw/tgw_storage.h"
@@ -47,9 +50,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Tgw {
 
+struct HostedRun {
+	std::weak_ptr<MessageMemory> memory;
+	base::weak_ptr<Runtime> owner;
+	base::weak_ptr<RendererCore> core;
+	HostedDecision decision;
+	Fn<void(const HostedDecision &decision)> observe;
+	uint64 serial = 0;
+	uint64 work = 0;
+	int broken = 0;
+	bool bound = false;
+	bool finished = false;
+};
+
 struct MessageMemory {
 	std::optional<double> height;
 	QByteArray html;
+	std::vector<std::shared_ptr<HostedRun>> runs;
+	base::flat_set<not_null<const Runtime*>> waiters;
 	// WHY: equal bytes prove no ownership after an A -> B -> A edit, so each
 	// runtime keeps the serial of the content it was built for, and a host of
 	// older content never changes the crash count of the newer content.
@@ -61,12 +79,8 @@ struct MessageMemory {
 namespace {
 
 constexpr auto kMaxAlive = 8;
-// WHY: a card scrolled back into view shows its kept picture instead of
-// painting it again in the middle of the scroll, within this many bytes.
-constexpr auto kKeptPictureBytes = int64(48) * 1024 * 1024;
 constexpr auto kMaxCrashes = 2;
 constexpr auto kMaxNotes = 100;
-constexpr auto kMaxLogLine = 240;
 constexpr auto kMaxNoteLength = kMaxLogLine + 16;
 constexpr auto kMaxLogDetails = 2;
 constexpr auto kHostLogLimit = 5000;
@@ -86,7 +100,7 @@ static_assert(kMaxNotes * kMaxNoteLength * int(sizeof(QChar))
 static_assert(kSnapshotBytes + kNotesBytes < kLogBytes);
 
 #ifdef _DEBUG
-constexpr auto kCpuLimitScale = 4.; // unoptimized Debug QuickJS runs ~3x slower
+constexpr auto kCpuLimitScale = 4.; // unoptimized Debug glue runs slower
 #else
 constexpr auto kCpuLimitScale = 1.;
 #endif // _DEBUG
@@ -117,7 +131,9 @@ struct Job {
 	QByteArray html;
 	std::shared_ptr<twidget::SandboxResources> resources;
 	std::shared_ptr<twidget::IntlProvider> intl;
-	twidget::RendererFactory factory;
+	RendererCore::HostedHandlers platform;
+	std::shared_ptr<twidget::SandboxHostedWait> wait;
+	Fn<void(const HostPointer &host)> tap;
 	Fn<void(const twidget::WidgetAction &)> action;
 	RendererCore::RequestHandler request;
 	RendererCore::WalletHandler wallet;
@@ -135,6 +151,7 @@ struct Job {
 
 struct Built {
 	HostPointer host;
+	std::shared_ptr<twidget::SandboxHostedChannel> channel;
 	twidget::WidgetData data;
 	QString error;
 };
@@ -151,7 +168,6 @@ struct Registry {
 	uint64 hiddenSerial = 0;
 	uint64 keptSerial = 0;
 	uint64 queueSerial = 0;
-	uint64 hostSerial = 0;
 	uint64 requestSerial = 0;
 	int reserved = 0;
 	int jobs = 0;
@@ -171,7 +187,20 @@ void RememberHtml(MessageMemory &memory, const QByteArray &html) {
 		memory.html = html;
 		++memory.contentSerial;
 		memory.crashes = 0;
+		memory.runs.clear();
+		memory.waiters.clear();
 	}
+}
+
+[[nodiscard]] bool TakeWaiters(const HostedRun &run) {
+	const auto memory = run.memory.lock();
+	if (!memory
+		|| (memory->contentSerial != run.serial)
+		|| memory->waiters.empty()) {
+		return false;
+	}
+	memory->waiters.clear();
+	return true;
 }
 
 void RememberItemHtml(
@@ -252,6 +281,62 @@ void JobDone() {
 	CheckDrained();
 }
 
+[[nodiscard]] bool BusyStoppingEngines() {
+	if (!Busy() && StopRemoteEngines([] { JobDone(); })) {
+		++Runtimes().jobs;
+	}
+	return Busy();
+}
+
+void ReleaseRoute(RendererCore *core) {
+	if (core) {
+		++Runtimes().jobs;
+		core->releaseRoute([] {
+			JobDone();
+		});
+	}
+}
+
+void SealRoute(RendererCore *core) {
+	if (core) {
+		core->forget();
+		ReleaseRoute(core);
+	}
+}
+
+void DropCore(std::unique_ptr<RendererCore> core) {
+	SealRoute(core.get());
+}
+
+[[nodiscard]] HostedDecision SettledDecision(HostedOutcome transport) {
+	return {
+		.reason = (transport == HostedOutcome::Stalled)
+			? StalledReason()
+			: (transport == HostedOutcome::Ordinary)
+			? tr::lng_tgw_stopped(tr::now)
+			: QString(),
+		.outcome = transport,
+		.transport = transport,
+	};
+}
+
+[[nodiscard]] bool RunsDeciding(
+		const MessageMemory &memory,
+		uint64 serial,
+		const HostedRun *self,
+		bool (RendererCore::*deciding)() const) {
+	for (const auto &run : memory.runs) {
+		if ((run.get() == self) || (run->serial != serial)) {
+			continue;
+		}
+		const auto core = run->core.get();
+		if (!run->bound || !core || (core->*deciding)()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 Reservation::Reservation(Fn<void()> released)
 : _released(std::move(released)) {
 	++Runtimes().reserved;
@@ -279,13 +364,23 @@ void HostDeleter::operator()(twidget::WidgetHost *host) const {
 	return style::DevicePixelRatio() * style::Scale() / 100.;
 }
 
+[[nodiscard]] RendererSize SizeRequest(int width, double maxHeight) {
+	return {
+		.width = CssFromLogical(width),
+		.maxHeight = maxHeight,
+		.cardWidth = width,
+		.scale = style::Scale(),
+	};
+}
+
 [[nodiscard]] ResizeAnchor AnchorOf(const RendererCore &core) {
 	return core.bottomAnchored() ? ResizeAnchor::Bottom : ResizeAnchor::Top;
 }
 
 void ApplyTheme(
 		twidget::WidgetHost &host,
-		const twidget::WidgetTheme &theme) {
+		const twidget::WidgetTheme &theme,
+		uint64 token) {
 	const auto apply = [&] {
 		host.onHostThread([&] {
 			host.setTheme(theme);
@@ -297,6 +392,7 @@ void ApplyTheme(
 	// wraps its code in String(), shadowed here to call no widget global.
 	host.probe("0); function String() { return ''; } return (0");
 	apply();
+	Test::WidgetThemeApplied(host, theme, token);
 }
 
 [[nodiscard]] twidget::WidgetHostOptions DefaultHostOptions(
@@ -388,23 +484,6 @@ void ApplyTheme(
 	};
 }
 
-[[nodiscard]] QString Clip(QString text, int length = kMaxLogLine) {
-	if (text.size() <= length) {
-		return text;
-	}
-	const auto ellipsis = u"..."_q;
-	text.truncate(length - ellipsis.size());
-	if (text.at(text.size() - 1).isHighSurrogate()) {
-		text.chop(1);
-	}
-	return text + ellipsis;
-}
-
-[[nodiscard]] QString Clip(const std::string &text) {
-	const auto size = std::min(text.size(), size_t(kMaxLogLine) * 4);
-	return Clip(QString::fromUtf8(text.data(), int(size)));
-}
-
 // fromStdString() strips a leading U+FEFF, and the copy must be exact.
 [[nodiscard]] QString DecodeCopiedText(const std::string &text) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -448,6 +527,15 @@ void ApplyTheme(
 	Unexpected("State in Tgw::StateName.");
 }
 
+[[nodiscard]] QString StartedNote(EnginePlace place) {
+	switch (place) {
+	case EnginePlace::Helper: return u"Started, its engine, validator and "
+		"renderer run in the widget helper."_q;
+	case EnginePlace::Nowhere: return u"Started, its engine does not run."_q;
+	}
+	Unexpected("Place in Tgw::StartedNote.");
+}
+
 [[nodiscard]] int Bytes(const QString &line) {
 	return (int(line.size()) + 1) * int(sizeof(QChar));
 }
@@ -471,10 +559,10 @@ void AppendState(
 		}
 	};
 	if (diagnostics.dead) {
-		add(u"Died: "_q + Clip(*diagnostics.dead));
+		add(u"Died: "_q + ClipLogLine(*diagnostics.dead));
 	}
 	if (diagnostics.lastError) {
-		add(u"Last error: "_q + Clip(*diagnostics.lastError));
+		add(u"Last error: "_q + ClipLogLine(*diagnostics.lastError));
 	}
 	add(u"Loaded: %1, rendered: %2, nodes: %3, height: %4."_q.arg(
 		YesNo(diagnostics.loaded),
@@ -516,11 +604,11 @@ void AppendKinds(
 	for (const auto &[kind, entry] : diagnostics.diags) {
 		const auto &[count, details] = entry;
 		auto block = QStringList{
-			u"%1 x%2"_q.arg(Clip(kind), QString::number(count)),
+			u"%1 x%2"_q.arg(ClipLogLine(kind), QString::number(count)),
 		};
 		const auto take = std::min(int(details.size()), kMaxLogDetails);
 		for (auto i = 0; i != take; ++i) {
-			block.push_back(u"  "_q + Clip(details[i]));
+			block.push_back(u"  "_q + ClipLogLine(details[i]));
 		}
 		auto bytes = 0;
 		for (const auto &line : block) {
@@ -551,7 +639,7 @@ void AppendTail(
 	auto from = int(entries.size());
 	while (from > 0) {
 		const auto &[first, second] = entries[from - 1];
-		auto line = u"%1: %2"_q.arg(Clip(first), Clip(second));
+		auto line = u"%1: %2"_q.arg(ClipLogLine(first), ClipLogLine(second));
 		if (!Take(left, line)) {
 			break;
 		}
@@ -584,18 +672,31 @@ void AppendTail(
 	return lines.join(QChar('\n'));
 }
 
+[[nodiscard]] HostPointer CreateHost(
+		Job &job,
+		std::shared_ptr<twidget::SandboxHostedChannel> channel) {
+	auto deleter = HostDeleter{ std::move(job.slot) };
+	auto html = std::string(job.html.constData(), size_t(job.html.size()));
+	return HostPointer(
+		new twidget::WidgetHost(
+			std::move(html),
+			std::move(job.theme),
+			job.width,
+			job.options,
+			std::move(channel),
+			std::move(job.intl),
+			std::move(job.wait)),
+		std::move(deleter));
+}
+
 [[nodiscard]] Built Build(Job job) {
+	auto result = Built();
 	try {
-		auto host = HostPointer(
-			new twidget::WidgetHost(
-				std::string(job.html.constData(), size_t(job.html.size())),
-				std::move(job.theme),
-				job.width,
-				job.options,
-				std::move(job.resources),
-				std::move(job.factory),
-				std::move(job.intl)),
-			HostDeleter{ std::move(job.slot) });
+		result.channel = HostedChannel(std::move(job.resources));
+		if (!job.platform.channel(result.channel)) {
+			return result;
+		}
+		auto host = CreateHost(job, result.channel);
 		host->onAction = std::move(job.action);
 		host->onRequest = std::move(job.request);
 		host->onWallet = std::move(job.wallet);
@@ -603,16 +704,20 @@ void AppendTail(
 		host->onWatchPublicData = std::move(job.watch);
 		host->onStorageCommit = std::move(job.storage);
 		host->stoppedLabel = std::move(job.stoppedLabel);
-		return {
-			.host = std::move(host),
-			.data = std::move(job.options.data),
-		};
+		host->onPlatformMessage = std::move(job.platform.message);
+		host->onPlatformRequest = std::move(job.platform.request);
+		host->onDeath = std::move(job.platform.death);
+		host->keepsRenderer = true;
+		if (job.tap) {
+			job.tap(host);
+		}
+		result.host = std::move(host);
+		result.data = std::move(job.options.data);
 	} catch (const std::exception &e) {
-		return {
-			.error = u"Could not create the sandbox: %1"_q.arg(
-				QString::fromUtf8(e.what())),
-		};
+		result.error = u"Could not create the sandbox: %1"_q.arg(
+			QString::fromUtf8(e.what()));
 	}
+	return result;
 }
 
 } // namespace
@@ -620,6 +725,8 @@ void AppendTail(
 struct Runtime::Host {
 	HostPointer pointer;
 	base::weak_ptr<Runtime> owner;
+	Fn<void(twidget::WidgetHost &host)> keep;
+	Fn<void(twidget::WidgetHost &host)> observe;
 	uint64 id = 0;
 	uint64 storage = 0;
 	bool sampling = false;
@@ -669,17 +776,23 @@ Runtime::~Runtime() {
 	if (list.empty()) {
 		registry.applicationLifetime.destroy();
 	}
+	_memory->waiters.remove(this);
 	invalidate_weak_ptrs(this);
 	_liveLifetime.destroy();
+	_stillLifetime.destroy();
 	breakCrashRun();
 	if (_live) {
 		_live->detach();
 	}
+	SealRoute(_live.get());
+	SealRoute(_still.get());
 	if (heavy()) {
 		PostCheck();
 	}
 	if (const auto host = base::take(_host)) {
 		StorageHostRetired(host->storage);
+		Test::WidgetHostRetired(*host->pointer);
+		host->observe = nullptr;
 		host->retired = true;
 		Sample(host);
 		if (host->watching) {
@@ -690,7 +803,7 @@ Runtime::~Runtime() {
 
 bool Runtime::IsQuitPrevent() {
 	Drain();
-	if (!Busy()) {
+	if (!BusyStoppingEngines()) {
 		return false;
 	}
 	LOG(("Tgw prevents quit, stopping widget sandboxes..."));
@@ -699,12 +812,20 @@ bool Runtime::IsQuitPrevent() {
 
 bool Runtime::IsExitPrevent(Fn<void()> retry) {
 	Drain();
-	if (!Busy()) {
+	if (!BusyStoppingEngines()) {
 		return false;
 	}
 	// A JS task may still call into app statics until its engine is joined.
 	Runtimes().exitRetry = std::move(retry);
 	return true;
+}
+
+void Runtime::Finish() {
+	FinishEmojiImages();
+	FinishRenderThread([] {
+		RendererWork::DestroyAll();
+		ClearEmojiTiles();
+	});
 }
 
 void Runtime::StateChanged(
@@ -775,7 +896,10 @@ std::optional<int> Runtime::height() const {
 }
 
 RendererCore *Runtime::core() const {
-	return (_live && _live->loaded()) ? _live.get() : _still.get();
+	const auto live = _live
+		&& _live->loaded()
+		&& (!_still || _live->height().has_value());
+	return live ? _live.get() : _still.get();
 }
 
 RendererCore *Runtime::interactive() const {
@@ -806,6 +930,20 @@ void Runtime::attachView(
 	if (_live) {
 		_live->resetInput();
 	}
+	_memory->waiters.remove(this);
+	if (!heavy()) {
+		gatePaint();
+		if (_request.paint == Demand::GatedPaint) {
+			_request.paint = Demand::None;
+			if (!_request.recovery) {
+				_queueSerial = 0;
+			}
+		}
+		_request.owned = false;
+	} else if ((_state == State::Constructing) && _live->observedDeciding()) {
+		_request.paint = Demand::None;
+		_request.owned = false;
+	}
 	if (stopped()) {
 		release();
 	}
@@ -818,13 +956,30 @@ void Runtime::attachView(
 }
 
 void Runtime::setSize(int width, double maxHeight) {
-	if (_width == width && _maxHeight == maxHeight) {
-		return;
-	}
 	_width = width;
 	_maxHeight = maxHeight;
-	if (_live || _still) {
-		applySize();
+	applySize();
+}
+
+void Runtime::setCut(Images::CornersMaskRef corners, bool autoHeight) {
+	auto cut = RendererCut{
+		.ratio = style::DevicePixelRatio(),
+		.autoHeight = autoHeight,
+	};
+	for (auto i = 0; i != 4; ++i) {
+		if (const auto mask = corners.p[i]) {
+			cut.corners[i] = *mask;
+		}
+	}
+	if (_cut && (*_cut == cut)) {
+		return;
+	}
+	_cut = std::make_unique<RendererCut>(std::move(cut));
+	if (_live) {
+		_live->setCut(*_cut);
+	}
+	if (_still) {
+		_still->setCut(*_cut);
 	}
 }
 
@@ -891,7 +1046,7 @@ void Runtime::setWindow(not_null<QWidget*> window) {
 
 void Runtime::painted() {
 	_keptSerial = 0;
-	if (heavy() || (stopped() && _displayDeferred)) {
+	if ((heavy() && _request.owned) || (stopped() && _displayDeferred)) {
 		if (!_visible) {
 			PostCheck();
 		}
@@ -902,7 +1057,10 @@ void Runtime::painted() {
 	} else if (!startable()) {
 		return;
 	}
-	_painted = true;
+	if (_request.paint == Demand::None) {
+		_request.paint = Demand::Paint;
+	}
+	gatePaint();
 	PostCheck();
 }
 
@@ -910,42 +1068,57 @@ void Runtime::unload() {
 	_windowLifetime.destroy();
 	_window = nullptr;
 	_windowKnown = false;
-	_painted = false;
-	_queueSerial = 0;
+	cancelStart();
 	const auto wasHeavy = heavy();
 	release();
 	if (wasHeavy) {
 		addNote(u"Released with the unloaded messages."_q);
 	}
-	if (_still && _still->frameBytes()) {
-		_keptSerial = ++Runtimes().keptSerial;
-		TrimKeptPictures();
+	if (_still) {
+		if (!_keptSerial) {
+			_keptSerial = ++Runtimes().keptSerial;
+		}
+		TrimKept();
 	}
 }
 
-void Runtime::TrimKeptPictures() {
-	auto kept = std::vector<not_null<Runtime*>>();
-	auto bytes = int64();
-	for (const auto &runtime : Runtimes().list) {
-		if (runtime->_keptSerial && runtime->_still) {
-			kept.push_back(runtime);
-			bytes += runtime->_still->frameBytes();
-		}
-	}
-	if (bytes <= kKeptPictureBytes) {
+void Runtime::TrimKept() {
+	auto &registry = Runtimes();
+	if (registry.draining) {
 		return;
 	}
-	ranges::sort(kept, ranges::less(), [](not_null<Runtime*> runtime) {
-		return runtime->_keptSerial;
-	});
-	for (const auto &runtime : kept) {
-		bytes -= runtime->_still->frameBytes();
-		runtime->_still->dropFrame();
-		runtime->_keptSerial = 0;
-		if (bytes <= kKeptPictureBytes) {
-			break;
+	auto owners = std::vector<not_null<Runtime*>>();
+	auto stills = std::vector<KeptBudget::Entry>();
+	for (const auto &runtime : registry.list) {
+		if (const auto still = runtime->_still.get()) {
+			owners.push_back(runtime);
+			stills.push_back({
+				.pixels = still->frameBytes(),
+				.unloaded = runtime->_keptSerial,
+				.work = still->workId(),
+			});
 		}
 	}
+	const auto trim = KeptBudget::PlanTrim(stills);
+	if (trim.drop.empty()) {
+		return;
+	}
+	auto dropped = int64();
+	for (const auto index : trim.drop) {
+		owners[index]->_still->dropFrame();
+		dropped += stills[index].pixels;
+	}
+	const auto totals = KeptBudget::Read();
+	DEBUG_LOG(("Tgw: kept trim, unloaded pictures %1 of %2, dropped %3, "
+		"on screen %4; queued %5 (peak %6), pictures %7 (peak %8)."
+		).arg(trim.unloadedBytes
+		).arg(KeptBudget::kPictureLimit
+		).arg(dropped
+		).arg(trim.visibleBytes
+		).arg(totals.queued
+		).arg(totals.queuedPeak
+		).arg(totals.physical
+		).arg(totals.physicalPeak));
 }
 
 QString Runtime::logText() const {
@@ -981,7 +1154,9 @@ QString Runtime::logText() const {
 	for (const auto &note : _notes) {
 		lines.push_back(note);
 	}
-	return Clip(lines.join(QChar('\n')), kLogBytes / int(sizeof(QChar)));
+	return ClipLogLine(
+		lines.join(QChar('\n')),
+		kLogBytes / int(sizeof(QChar)));
 }
 
 void Runtime::requestLog(Fn<void(const QString &text)> done) {
@@ -1111,6 +1286,7 @@ void Runtime::Drain() {
 		return;
 	}
 	registry.draining = true;
+	RefuseRemoteEngines();
 	if (StopResources([] { JobDone(); })) {
 		++registry.jobs;
 	}
@@ -1122,8 +1298,14 @@ void Runtime::Drain() {
 	for (const auto &weak : runtimes) {
 		if (const auto strong = weak.get()) {
 			strong->_logDone = nullptr;
+			strong->cancelStart();
 			strong->release();
+			strong->_stillKept = false;
+			SealRoute(strong->_still.get());
 		}
+	}
+	if (RenderThreadBarrier([] { JobDone(); })) {
+		++registry.jobs;
 	}
 }
 
@@ -1132,21 +1314,30 @@ void Runtime::Sample(const std::shared_ptr<Host> &host) {
 	if (host->sampling) {
 		return;
 	} else if (host->retired && (registry.draining || !host->owner)) {
+		host->keep = nullptr;
 		host->pointer = nullptr;
+		return;
+	} else if (host->retired && host->keep && host->theming) {
 		return;
 	}
 	const auto last = host->retired;
 	const auto request = ++registry.requestSerial;
 	auto pointer = last ? base::take(host->pointer) : host->pointer;
+	auto keep = last ? base::take(host->keep) : nullptr;
 	host->sampling = true;
 	++registry.jobs;
 	crl::async([
 		host = host,
 		pointer = std::move(pointer),
+		keep = std::move(keep),
 		request,
 		last
 	]() mutable {
 		auto text = Summarize(*pointer);
+		if (keep) {
+			keep(*pointer);
+			keep = nullptr;
+		}
 		pointer = nullptr;
 		crl::on_main([
 			host = std::move(host),
@@ -1180,7 +1371,7 @@ void Runtime::RefreshVisibility() {
 	for (const auto &runtime : registry.list) {
 		if ((runtime->heavy()
 				|| runtime->stopped()
-				|| runtime->_painted
+				|| runtime->demanded()
 				|| runtime->_displayDeferred)
 			&& (runtime->queryVisible() != runtime->_visible)) {
 			changed.push_back(runtime);
@@ -1211,6 +1402,7 @@ void Runtime::ScheduleStarts() {
 	auto &registry = Runtimes();
 	const auto serial = registry.queueSerial;
 	auto queue = std::vector<not_null<Runtime*>>();
+	auto stopping = std::vector<base::weak_ptr<Runtime>>();
 	auto waiting = 0;
 	auto owned = 0;
 	auto visibleOwned = 0;
@@ -1225,6 +1417,11 @@ void Runtime::ScheduleStarts() {
 			}
 		} else if (!runtime->wantsStart()) {
 			runtime->_queueSerial = 0;
+			if (runtime->demanded()
+				&& runtime->_visible
+				&& runtime->crashedOut()) {
+				stopping.push_back(runtime.get());
+			}
 		} else {
 			if (!runtime->_queueSerial) {
 				runtime->_queueSerial = ++registry.queueSerial;
@@ -1260,9 +1457,16 @@ void Runtime::ScheduleStarts() {
 		if (!victim) {
 			break;
 		}
-		victim->release();
-		victim->addNote(u"Released off screen to stay in the limit."_q);
+		victim->releaseAttempt(
+			Discard::Capacity,
+			u"Released off screen to stay in the limit."_q);
 		--owned;
+	}
+	for (const auto &weak : stopping) {
+		if (const auto strong = weak.get()) {
+			strong->stopForCrashes();
+			strong->displayChanged(true);
+		}
 	}
 }
 
@@ -1295,12 +1499,35 @@ bool Runtime::startable() const {
 		&& !Core::Quitting();
 }
 
-bool Runtime::wantsStart() const {
-	return _painted
-		&& _visible
-		&& !heavy()
-		&& startable()
-		&& !StorageRetiring(_item);
+bool Runtime::demanded() const {
+	return _request.recovery || (_request.paint != Demand::None);
+}
+
+bool Runtime::wantsStart() {
+	if (!demanded()
+		|| !_visible
+		|| heavy()
+		|| !startable()
+		|| StorageRetiring(_item)) {
+		_memory->waiters.remove(this);
+		return false;
+	} else if (runsDeciding()) {
+		if (_request.paint == Demand::Paint) {
+			_request.paint = Demand::GatedPaint;
+		}
+		_memory->waiters.emplace(this);
+		return false;
+	}
+	_memory->waiters.remove(this);
+	return true;
+}
+
+bool Runtime::runsDeciding(const HostedRun *self) const {
+	return RunsDeciding(
+		*_memory,
+		_contentSerial,
+		self,
+		&RendererCore::deciding);
 }
 
 bool Runtime::queryVisible() const {
@@ -1314,38 +1541,111 @@ bool Runtime::queryVisible() const {
 		_view.get());
 }
 
-bool Runtime::recordStop(not_null<RendererCore*> renderer) {
-	_stopReason = Clip(renderer->stopReason());
+void Runtime::recordStop(not_null<RendererCore*> renderer) {
+	_stopReason = ClipLogLine(renderer->stopReason());
 	_stopFatal = renderer->stopFatal();
-	if (_stopFatal
-		&& currentContent()
-		&& (_memory->crashes < kMaxCrashes)) {
-		return (++_memory->crashes == kMaxCrashes);
-	}
-	return false;
 }
 
-void Runtime::breakCrashRun() {
-	if (_state == State::Live && _live->stopped()) {
-		// A release may overtake the stop that RendererCore::frame() posted.
-		if (recordStop(_live.get())) {
-			_item->history()->owner().requestItemRepaint(_item);
-		}
-		return;
-	}
-	if (_state == State::Live
+int Runtime::breakCrashRun() {
+	const auto healthy = (_state == State::Live)
 		&& _live->hasContent()
 		&& !_live->stopped()
 		&& currentContent()
-		&& (_memory->crashes < kMaxCrashes)) {
-		_memory->crashes = 0;
+		&& (_memory->crashes < kMaxCrashes);
+	if (!healthy) {
+		return 0;
 	}
+	const auto withdrawal = _live->withdrawRoute();
+	if (withdrawal.ended || withdrawal.decided) {
+		return 0;
+	}
+	const auto result = base::take(_memory->crashes);
+	const auto work = _live->workId();
+	for (const auto &run : _memory->runs) {
+		if (run->work == work) {
+			run->broken = result;
+		}
+	}
+	return result;
+}
+
+void Runtime::FinishRun(
+		std::shared_ptr<HostedRun> run,
+		HostedDecision decision) {
+	if (std::exchange(run->finished, true)) {
+		return;
+	}
+	run->decision = std::move(decision);
+	const auto memory = run->memory.lock();
+	if (memory) {
+		auto &runs = memory->runs;
+		runs.erase(ranges::remove(runs, run), end(runs));
+	}
+	const auto limitReached = memory && ChargeRun(*run, *memory);
+	if (const auto observe = base::take(run->observe)) {
+		observe(run->decision);
+	}
+	if (TakeWaiters(*run)) {
+		PostCheck();
+	}
+	const auto owner = run->owner.get();
+	if (owner && (owner->_request.run == run)) {
+		owner->applyFinal(*run);
+	}
+	if (!limitReached) {
+		return;
+	}
+	for (const auto &runtime : Runtimes().list) {
+		if (runtime->_memory == memory) {
+			const auto item = runtime->_item;
+			item->history()->owner().requestItemRepaint(item);
+			return;
+		}
+	}
+}
+
+void Runtime::RunGone(
+		const std::shared_ptr<HostedRun> &run,
+		const HostedWithdrawal &withdrawal) {
+	if (withdrawal.claimed) {
+		FinishRun(run, {
+			.reason = tr::lng_tgw_stopped(tr::now),
+			.outcome = HostedOutcome::Ordinary,
+		});
+	} else if (!withdrawal.ended) {
+		FinishRun(run, HostedDecision());
+	} else if (withdrawal.settled != HostedOutcome::None) {
+		FinishRun(run, SettledDecision(withdrawal.settled));
+	}
+}
+
+bool Runtime::ChargeRun(HostedRun &run, MessageMemory &memory) {
+	if (!ChargesCrash(run.decision.outcome)
+		|| (memory.contentSerial != run.serial)) {
+		return false;
+	}
+	memory.crashes = std::max(memory.crashes, base::take(run.broken));
+	if (memory.crashes >= kMaxCrashes) {
+		return false;
+	}
+	++memory.crashes;
+	if (const auto owner = run.owner.get()) {
+		owner->addNote(u"Counted a crash, %1 of %2: %3"_q.arg(
+			QString::number(memory.crashes),
+			QString::number(kMaxCrashes),
+			run.decision.reason));
+	}
+	return (memory.crashes == kMaxCrashes);
 }
 
 void Runtime::start() {
 	if (heavy() || !startable()) {
 		return;
 	}
+	_request.run = nullptr;
+	_request.started = false;
+	_request.left = false;
+	_request.owned = true;
 	const auto generation = ++_generation;
 	_state = State::Waiting;
 	_stopReason = QString();
@@ -1367,6 +1667,115 @@ void Runtime::release() {
 	}
 }
 
+void Runtime::cancelStart() {
+	_request = Request();
+	_queueSerial = 0;
+	_memory->waiters.remove(this);
+}
+
+void Runtime::gatePaint() {
+	if ((_request.paint == Demand::Paint)
+		&& RunsDeciding(
+			*_memory,
+			_contentSerial,
+			nullptr,
+			&RendererCore::observedDeciding)) {
+		_request.paint = Demand::GatedPaint;
+	}
+}
+
+void Runtime::releaseAttempt(Discard discard, const QString &note) {
+	const auto capacity = (discard == Discard::Capacity);
+	const auto withdrawal = (_state == State::Constructing)
+		? _live->withdrawRoute((discard == Discard::Own)
+			|| (discard == Discard::Sibling)
+			|| _request.recovery)
+		: HostedWithdrawal();
+	const auto own = !capacity
+		&& ((discard == Discard::Own)
+			|| withdrawal.ended
+			|| withdrawal.claimed
+			|| withdrawal.decided);
+	if (capacity && _request.owned) {
+		_request.paint = Demand::None;
+	} else if ((own || (discard == Discard::Sibling))
+		&& (_request.paint == Demand::Paint)) {
+		_request.paint = Demand::GatedPaint;
+	}
+	_request.owned = _request.owned && own;
+	release();
+	addNote(!own
+		? note
+		: withdrawal.ended
+		? u"Released, its widget helper ended before it started."_q
+		: withdrawal.claimed
+		? u"Released, its widget engine died before it started."_q
+		: u"Released, it stopped before its start."_q);
+	_request.left = true;
+	const auto run = _request.run;
+	if (run && run->finished) {
+		applyFinal(*run);
+	}
+}
+
+void Runtime::applyFinal(const HostedRun &run) {
+	const auto live = livesWork(run.work);
+	if (!live && !_request.left) {
+		return;
+	}
+	_request.run = nullptr;
+	const auto &decision = run.decision;
+	if (ChargesCrash(decision.outcome)) {
+		_request.recovery = false;
+		if (!live && _request.owned) {
+			stopForRun(decision);
+		}
+	} else if ((decision.outcome == HostedOutcome::Spared)
+		&& _request.started
+		&& currentContent()) {
+		_request.recovery = true;
+		if (live) {
+			// A decision taken inside a withdrawal must not reenter retire().
+			crl::on_main(this, [=, work = run.work] {
+				restartSpared(work);
+			});
+		} else {
+			PostCheck();
+		}
+	}
+}
+
+void Runtime::stopForRun(const HostedDecision &decision) {
+	if (!ChargesCrash(decision.outcome)
+		|| (_state != State::Released)
+		|| !currentContent()) {
+		return;
+	}
+	_stopReason = ClipLogLine(decision.reason);
+	_stopFatal = true;
+	_visible = queryVisible();
+	retire(State::Stopped);
+	addNote(u"Stopped (fatal): "_q + _stopReason);
+	displayChanged(true);
+	if (!_visible) {
+		release();
+	}
+}
+
+bool Runtime::livesWork(uint64 work) const {
+	return (_state == State::Live)
+		&& (_live->workId() == work)
+		&& currentContent();
+}
+
+void Runtime::restartSpared(uint64 work) {
+	if (!livesWork(work)) {
+		return;
+	}
+	release();
+	addNote(u"Released to restart after its widget helper ended."_q);
+}
+
 void Runtime::resourcesReady(
 		int generation,
 		std::shared_ptr<twidget::SandboxResources> resources) {
@@ -1376,6 +1785,7 @@ void Runtime::resourcesReady(
 		failResources();
 		return;
 	} else if (Core::Quitting() || !currentContent()) {
+		cancelStart();
 		release();
 		return;
 	} else if (crashedOut()) {
@@ -1383,10 +1793,15 @@ void Runtime::resourcesReady(
 		displayChanged(true);
 		return;
 	} else if (StorageRetiring(_item)) {
-		release();
-		addNote(u"Released, an earlier sandbox is still handing over "
+		releaseAttempt(
+			Discard::Storage,
+			u"Released, an earlier sandbox is still handing over "
 			"its storage."_q);
-		_repaint();
+		return;
+	} else if (runsDeciding()) {
+		releaseAttempt(
+			Discard::Sibling,
+			u"Released, a run of the same widget is still being decided."_q);
 		return;
 	}
 	construct(std::move(resources));
@@ -1394,10 +1809,15 @@ void Runtime::resourcesReady(
 
 void Runtime::construct(
 		std::shared_ptr<twidget::SandboxResources> resources) {
+	PrepareRemoteEngines();
 	const auto width = CssFromLogical(_width);
 	const auto ratio = CoreRatio();
 	_live = std::make_unique<RendererCore>(width, ratio);
-	_live->setMaxHeight(_maxHeight);
+	const auto run = createRun();
+	if (_cut) {
+		_live->setCut(*_cut);
+	}
+	_live->setSize(SizeRequest(_width, _maxHeight));
 	subscribeLive();
 	_state = State::Constructing;
 	_hostVisible = _visible;
@@ -1413,14 +1833,18 @@ void Runtime::construct(
 	auto storage = OpenStorageHost(_item);
 	const auto id = storage.id;
 	StorageHostVisibility(id, _hostVisible);
+	const auto label = tr::lng_tgw_stopped(tr::now);
 	auto job = Job{
 		.html = _html,
 		.resources = std::move(resources),
 		.intl = CreateHostIntl(),
-		// leak and conformance checks need the validated ops only renderers get
-		.factory = Test::TapWidgetRenderer(
+		.platform = _live->hostedHandlers(label),
+		.wait = _live->hostedWait(),
+		.tap = Test::TapHostedWidget(
 			_item->globalId(),
-			_live->hostFactory()),
+			_live->workId(),
+			*_theme,
+			&run->observe),
 		.action = _live->hostActionHandler(),
 		.request = _live->hostRequestHandler(),
 		.wallet = _live->hostWalletHandler(),
@@ -1431,7 +1855,7 @@ void Runtime::construct(
 			_item->globalId(),
 			std::move(options)),
 		.theme = *_theme,
-		.stoppedLabel = tr::lng_tgw_stopped(tr::now).toStdString(),
+		.stoppedLabel = label.toStdString(),
 		// WHY: the slot is freed after ~WidgetHost delivered its last commits,
 		// which were posted to main before, so the host leaves the store only
 		// after they were applied and before the next Check() starts anyone.
@@ -1447,18 +1871,48 @@ void Runtime::construct(
 	crl::async([=, job = std::move(job)]() mutable {
 		auto built = Build(std::move(job));
 		crl::on_main([=, built = std::move(built)]() mutable {
+			run->bound = true;
+			if (!run->finished && TakeWaiters(*run)) {
+				PostCheck();
+			}
 			if (const auto strong = weak.get()) {
 				strong->constructed(
 					generation,
 					base::take(built.host),
 					built.data,
 					built.error,
-					id);
+					id,
+					built.channel);
 			}
 			built.host = nullptr;
+			DropChannel(base::take(built.channel));
 			JobDone();
 		});
 	});
+}
+
+std::shared_ptr<HostedRun> Runtime::createRun() {
+	auto result = std::make_shared<HostedRun>(HostedRun{
+		.memory = _memory,
+		.owner = base::make_weak(this),
+		.core = base::make_weak(_live.get()),
+		.serial = _contentSerial,
+		.work = _live->workId(),
+	});
+	_memory->runs.push_back(result);
+	_request.run = result;
+	_live->setHostedRun({
+		.decided = [run = result](HostedDecision decision) {
+			FinishRun(run, std::move(decision));
+		},
+		.settled = [run = result](HostedOutcome transport) {
+			FinishRun(run, SettledDecision(transport));
+		},
+		.gone = [run = result](HostedWithdrawal withdrawal) {
+			RunGone(run, withdrawal);
+		},
+	});
+	return result;
 }
 
 void Runtime::constructed(
@@ -1466,80 +1920,106 @@ void Runtime::constructed(
 		std::shared_ptr<twidget::WidgetHost> host,
 		const twidget::WidgetData &data,
 		const QString &error,
-		uint64 storage) {
+		uint64 storage,
+		std::weak_ptr<twidget::SandboxHostedChannel> channel) {
 	if (generation != _generation || _state != State::Constructing) {
 		return;
-	} else if (!host) {
+	} else if (!host && !error.isEmpty()) {
 		fail(error);
 		return;
 	} else if (Core::Quitting() || !currentContent()) {
+		cancelStart();
 		release();
 		return;
 	} else if (crashedOut()) {
 		stopForCrashes();
 		displayChanged(true);
 		return;
+	} else if (!host || _live->deciding()) {
+		releaseAttempt(Discard::Own, QString());
+		return;
+	} else if (runsDeciding(_request.run.get())) {
+		releaseAttempt(
+			Discard::Sibling,
+			u"Released, a run of the same widget is still being decided."_q);
+		return;
 	} else if (!SameTheme(*_hostTheme, *_theme)) {
 		// Its engine would boot in the stale theme ahead of setTheme().
-		release();
-		addNote(u"Released, the theme changed before it started."_q);
-		_repaint();
+		releaseAttempt(
+			Discard::Stale,
+			u"Released, the theme changed before it started."_q);
 		return;
 	} else if (StorageHostStale(storage)) {
-		release();
-		addNote(u"Released, its storage changed before it started."_q);
-		_repaint();
+		releaseAttempt(
+			Discard::Stale,
+			u"Released, its storage changed before it started."_q);
 		return;
 	} else if (data != HostData(_item)) {
 		// Its scripts would read the stale data ahead of setData().
-		release();
-		addNote(u"Released, its data changed before it started."_q);
-		_repaint();
+		releaseAttempt(
+			Discard::Stale,
+			u"Released, its data changed before it started."_q);
 		return;
 	}
 	_host = std::make_shared<Host>(Host{
 		.pointer = std::move(host),
 		.owner = base::make_weak(this),
-		.id = ++Runtimes().hostSerial,
+		.id = _live->workId(),
 		.storage = storage,
 	});
+	_host->observe = Test::WidgetThemeObservation(*_host->pointer);
 	_lastHost = _host->id;
 	_logDone = nullptr;
 	_state = State::Live;
-	addNote(u"Started."_q);
-	const auto width = CssFromLogical(_width);
-	if (_live->width() != width) {
-		_live->setWidth(width);
-	}
-	_live->setMaxHeight(_maxHeight);
+	_request.paint = Demand::None;
+	_request.recovery = false;
+	_request.started = true;
+	_live->setSize(SizeRequest(_width, _maxHeight));
 	syncHostVisibility();
 	syncHostSafeArea();
 	Test::WatchWidgetHost(_item->globalId(), *_host->pointer, _live.get());
-	_live->bindHost(_host->pointer.get());
+	if (!_live->bindHost(_host->pointer, channel)) {
+		fail(u"Could not start, the messages for its renderer overflowed "
+			"before the widget helper took them."_q);
+		return;
+	}
+	addNote(StartedNote(ChosenEnginePlace()));
 	_host->pointer->start();
 }
 
-void Runtime::retire(State state) {
+void Runtime::retire(State state, bool keepOwnDeath) {
 	const auto wasHeavy = heavy();
 	++_generation;
 	_state = state;
-	_painted = false;
 	_queueSerial = 0;
+	if (state != State::Released) {
+		cancelStart();
+	}
 	_liveLifetime.destroy();
+	auto keep = Fn<void(twidget::WidgetHost &host)>();
 	if (_live) {
+		const auto ended = _live->withdrawRoute(keepOwnDeath).ended;
 		_live->detach();
-		if (_live->loaded()) {
-			_still = std::move(_live);
+		if (!_live->loaded()) {
+			addNote(u"Its start did not finish."_q);
+			DropCore(base::take(_live));
+		} else if (_still && !_live->height()) {
+			DropCore(base::take(_live));
+		} else {
+			_stillLifetime.destroy();
+			DropCore(std::exchange(_still, std::move(_live)));
+			subscribeStill();
+			keep = keepStill(ended);
 			_displayDeferred = _displayDeferred
 				|| (height() != _shownHeight);
-		} else {
-			addNote(u"Its start did not finish."_q);
-			_live = nullptr;
 		}
 	}
 	if (const auto host = base::take(_host)) {
 		StorageHostRetired(host->storage);
+		Test::WidgetHostRetired(*host->pointer);
+		host->observe = nullptr;
 		host->retired = true;
+		host->keep = std::move(keep);
 		Sample(host);
 		if (host->watching) {
 			WatchersChanged();
@@ -1551,10 +2031,34 @@ void Runtime::retire(State state) {
 	}
 }
 
+Fn<void(twidget::WidgetHost &host)> Runtime::keepStill(bool ended) {
+	_stillKept = false;
+	const auto draining = Runtimes().draining || Core::Quitting();
+	if (ended) {
+		if (draining || !_host || !_still->holdRoute(_host->pointer)) {
+			ReleaseRoute(_still.get());
+		}
+		return nullptr;
+	}
+	auto result = draining ? nullptr : _still->keepRoute();
+	if (result) {
+		_stillKept = true;
+		addNote(u"Kept its document in the widget helper."_q);
+		return result;
+	} else if (!draining
+		&& !_still->routeChecked()
+		&& !_still->documentGone()) {
+		addNote(u"Closed its document in the widget helper, "
+			"it could not be kept."_q);
+	}
+	ReleaseRoute(_still.get());
+	return nullptr;
+}
+
 void Runtime::stopForCrashes() {
 	_stopReason = u"%1 crashes in a row."_q.arg(kMaxCrashes);
 	_stopFatal = false;
-	retire(State::Stopped);
+	retire(State::Stopped, true);
 	addNote(u"Stopped: "_q + _stopReason);
 }
 
@@ -1574,14 +2078,21 @@ void Runtime::subscribeLive() {
 	const auto renderer = _live.get();
 	renderer->updates(
 	) | rpl::on_next([=](RendererCore::Changes changes) {
+		const auto client = bool(changes & (Change::Loaded | Change::Client));
+		if (changes & Change::Loaded) {
+			syncHostTheme();
+		}
+		if (changes & Change::Cursor) {
+			cursorChanged(renderer);
+		}
 		if (changes & Change::Stopped) {
-			coreStopped(renderer);
-		} else {
+			coreStopped(renderer, client);
+		} else if (changes & ~(Change::Cursor | Change::Selection)) {
 			coreUpdated(
 				renderer,
 				bool(changes
 					& (Change::Repaint | Change::Content | Change::Loaded)),
-				bool(changes & Change::Loaded));
+				client);
 		}
 	}, _liveLifetime);
 
@@ -1611,42 +2122,100 @@ void Runtime::subscribeLive() {
 	}, _liveLifetime);
 }
 
+void Runtime::subscribeStill() {
+	using Change = RendererCore::Change;
+	const auto renderer = _still.get();
+	renderer->updates(
+	) | rpl::on_next([=](RendererCore::Changes changes) {
+		stillUpdated(
+			renderer,
+			bool(changes & Change::Stopped),
+			bool(changes & Change::Repaint),
+			bool(changes & Change::Client));
+	}, _stillLifetime);
+
+	renderer->keptUpdates(
+	) | rpl::on_next([=] {
+		stillKeptChanged(renderer);
+	}, _stillLifetime);
+}
+
 void Runtime::coreUpdated(
 		not_null<RendererCore*> renderer,
 		bool repaint,
-		bool finished) {
-	if (renderer.get() != _live.get() || !renderer->loaded()) {
+		bool client) {
+	if (renderer.get() != _live.get()
+		|| !renderer->loaded()
+		|| (_still && !renderer->height())) {
 		return;
 	}
-	if (_still) {
-		renderer->takeFrameFrom(*_still);
+	const auto handoff = (_still != nullptr);
+	if (handoff) {
+		_stillLifetime.destroy();
+		_stillKept = false;
+		DropCore(base::take(_still));
+		_keptSerial = 0;
 	}
-	_still = nullptr;
-	_keptSerial = 0;
-	if (finished) {
+	if (handoff || client) {
 		markHeight(true);
 	}
 	displayChanged(repaint);
 }
 
-void Runtime::coreStopped(not_null<RendererCore*> renderer) {
+void Runtime::cursorChanged(not_null<RendererCore*> renderer) {
+	if (renderer.get() == _live.get()) {
+		_item->history()->owner().notifyViewLayoutChange(_view);
+	}
+}
+
+void Runtime::coreStopped(not_null<RendererCore*> renderer, bool client) {
 	if (renderer.get() != _live.get() || _state != State::Live) {
 		return;
 	}
-	const auto limitReached = recordStop(renderer);
+	recordStop(renderer);
 	// A scroll away may not have reached the posted Check() yet.
 	_visible = queryVisible();
 	retire(State::Stopped);
 	addNote(u"Stopped%1: %2"_q.arg(
 		_stopFatal ? u" (fatal)"_q : QString(),
 		_stopReason));
+	if (client) {
+		markHeight(true);
+	}
 	displayChanged(true);
 	if (!_visible) {
 		release();
 	}
-	if (limitReached) {
-		// Other views of the message apply the limit only when painted.
-		_item->history()->owner().requestItemRepaint(_item);
+}
+
+void Runtime::stillUpdated(
+		not_null<RendererCore*> renderer,
+		bool stopped,
+		bool repaint,
+		bool client) {
+	if (renderer.get() != _still.get()) {
+		return;
+	} else if (repaint && _keptSerial) {
+		TrimKept();
+	}
+	if (!currentContent()) {
+		return;
+	}
+	if (stopped) {
+		const auto fatal = renderer->stopFatal();
+		addNote(u"Stopped after it was released%1: %2"_q.arg(
+			fatal ? u" (fatal)"_q : QString(),
+			renderer->stopReason()));
+	}
+	if (client) {
+		markHeight(true);
+	}
+	displayChanged(repaint);
+}
+
+void Runtime::stillKeptChanged(not_null<RendererCore*> renderer) {
+	if (renderer.get() == _still.get() && base::take(_stillKept)) {
+		addNote(u"Its document kept in the widget helper is gone."_q);
 	}
 }
 
@@ -1748,34 +2317,57 @@ void Runtime::watchChanged(not_null<RendererCore*> renderer, bool on) {
 }
 
 void Runtime::syncHostVisibility() {
+	// The stream times a frame request by the visibility admitted before it.
+	if (_host && _hostVisible != _visible) {
+		_hostVisible = _visible;
+		_host->pointer->setVisible(_visible);
+		StorageHostVisibility(_host->storage, _visible);
+	}
 	if (_live) {
 		_live->setOnScreen(_visible);
 	}
 	if (_visible) {
 		postShownDisplay();
 	}
-	if (_host && _hostVisible != _visible) {
-		_hostVisible = _visible;
-		_host->pointer->setVisible(_visible);
-		StorageHostVisibility(_host->storage, _visible);
-	}
 }
 
 void Runtime::syncHostTheme() {
-	if (!_host || _host->theming || SameTheme(*_hostTheme, *_theme)) {
+	if (!_host) {
+		return;
+	} else if (_host->theming) {
+		Test::WidgetThemeSelected(*_host->pointer, *_theme);
 		return;
 	}
-	_hostTheme = _theme;
+	auto observe = Fn<void(twidget::WidgetHost &host)>();
+	if (!SameTheme(*_hostTheme, *_theme)) {
+		_host->observe = nullptr;
+		_hostTheme = _theme;
+		addNote(u"Switched to a new %1 theme."_q.arg(
+			QString::fromStdString(_hostTheme->colorScheme)));
+	} else if (_host->observe && _live && _live->loaded()) {
+		observe = base::take(_host->observe);
+	} else {
+		return;
+	}
+	// One probing job per host at a time, and Sample() keeps only after it.
 	_host->theming = true;
-	addNote(u"Switched to a new %1 theme."_q.arg(
-		QString::fromStdString(_hostTheme->colorScheme)));
 	++Runtimes().jobs;
+	const auto token = observe
+		? uint64()
+		: Test::WidgetThemeScheduled(*_host->pointer, *_hostTheme);
 	crl::async([
 		host = _host,
 		pointer = _host->pointer,
-		theme = _hostTheme
+		theme = _hostTheme,
+		observe = std::move(observe),
+		token
 	]() mutable {
-		ApplyTheme(*pointer, *theme);
+		if (observe) {
+			observe(*pointer);
+			observe = nullptr;
+		} else {
+			ApplyTheme(*pointer, *theme, token);
+		}
 		pointer = nullptr;
 		crl::on_main([host = std::move(host)] {
 			ThemeDone(host);
@@ -1788,6 +2380,8 @@ void Runtime::ThemeDone(const std::shared_ptr<Host> &host) {
 	const auto owner = host->owner.get();
 	if (owner && owner->_host == host) {
 		owner->syncHostTheme();
+	} else if (host->retired && host->pointer) {
+		Sample(host);
 	}
 	JobDone();
 }
@@ -1806,23 +2400,13 @@ void Runtime::syncHostSafeArea() {
 }
 
 void Runtime::applySize() {
-	// WHY: the list layout that calls HtmlWidget::countCurrentSize() lays
-	// the new height out right after setSize(), so a resize or a repaint
-	// requested from here would re-enter that same layout.
-	_sizing = true;
-	const auto guard = gsl::finally([&] { _sizing = false; });
-	const auto was = effectiveHeight();
-	const auto width = CssFromLogical(_width);
+	const auto size = SizeRequest(_width, _maxHeight);
 	if (_still) {
-		_still->setWidth(width);
-		_still->setMaxHeight(_maxHeight);
+		_still->setSize(size);
 	}
 	if (_live) {
-		_live->setWidth(width);
-		_live->setMaxHeight(_maxHeight);
+		_live->setSize(size);
 	}
-	displayChanged(false);
-	markHeight(effectiveHeight() != was);
 }
 
 int Runtime::effectiveHeight() const {
@@ -1862,10 +2446,6 @@ void Runtime::displayChanged(bool repaint) {
 	const auto hidden = !_visible
 		&& (_state == State::Live || _state == State::Stopped);
 	markHeight(hidden);
-	if (_sizing) {
-		_shownHeight = now;
-		return;
-	}
 	const auto resize = (_shownHeight != now);
 	if (!resize && !repaint) {
 		return;
@@ -1883,10 +2463,6 @@ void Runtime::displayChanged(bool repaint) {
 }
 
 void Runtime::postShownDisplay() {
-	const auto shown = core();
-	if (shown && shown->renderer()->dirty()) {
-		_displayDeferred = true;
-	}
 	if (!_displayDeferred || _displayPosted) {
 		return;
 	}
@@ -1920,7 +2496,7 @@ void Runtime::heavyStateChanged(bool wasHeavy) {
 
 void Runtime::addNote(const QString &text) {
 	_notes.push_back(
-		QTime::currentTime().toString(u"HH:mm:ss "_q) + Clip(text));
+		QTime::currentTime().toString(u"HH:mm:ss "_q) + ClipLogLine(text));
 	if (int(_notes.size()) > kMaxNotes) {
 		_notes.erase(begin(_notes));
 	}
@@ -1948,12 +2524,29 @@ void Runtime::applySample(
 	}
 }
 
+QString ClipLogLine(QString text, int length) {
+	if (text.size() <= length) {
+		return text;
+	}
+	const auto ellipsis = u"..."_q;
+	text.truncate(length - ellipsis.size());
+	if (text.at(text.size() - 1).isHighSurrogate()) {
+		text.chop(1);
+	}
+	return text + ellipsis;
+}
+
+QString ClipLogLine(const std::string &text) {
+	const auto size = std::min(text.size(), size_t(kMaxLogLine) * 4);
+	return ClipLogLine(QString::fromUtf8(text.data(), int(size)));
+}
+
 double CssFromLogical(int logical) {
 	return logical * 100. / style::Scale();
 }
 
 int LogicalHeight(double css) {
-	return int(std::ceil(css * style::Scale() / 100.));
+	return LogicalHeight(css, style::Scale());
 }
 
 int LogicalWidth(double css) {

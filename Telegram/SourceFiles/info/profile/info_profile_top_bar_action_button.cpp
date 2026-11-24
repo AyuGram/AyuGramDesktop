@@ -21,6 +21,22 @@ namespace {
 constexpr auto kIconFadeStart = 0.4;
 constexpr auto kIconFadeRange = 1.0 - kIconFadeStart;
 
+// A label shrinks before it gets elided.
+[[nodiscard]] style::font FittingFont(const QString &text, int width) {
+	const auto &font = st::infoProfileTopBarActionButtonFont;
+	if (font->width(text) <= width) {
+		return font;
+	}
+	const auto min = st::infoProfileTopBarActionButtonMinFontSize;
+	for (auto size = font->size() - 1; size > min; --size) {
+		auto smaller = style::font(size, font->flags(), font->family());
+		if (smaller->width(text) <= width) {
+			return smaller;
+		}
+	}
+	return style::font(min, font->flags(), font->family());
+}
+
 } // namespace
 
 TopBarActionButton::TopBarActionButton(
@@ -113,6 +129,18 @@ void TopBarActionButton::setStyle(const TopBarActionButtonStyle &style) {
 	update();
 }
 
+void TopBarActionButton::setDragHover(bool hover) {
+	if (_dragHover == hover) {
+		return;
+	}
+	_dragHover = hover;
+	_overAnimation.start(
+		[=] { update(); },
+		_dragHover ? 0. : 1.,
+		_dragHover ? 1. : 0.,
+		st::universalDuration);
+}
+
 void TopBarActionButton::paintEvent(QPaintEvent *e) {
 	auto p = Painter(this);
 
@@ -127,13 +155,26 @@ void TopBarActionButton::paintEvent(QPaintEvent *e) {
 		p.drawRoundedRect(rect(), st::boxRadius, st::boxRadius);
 
 		const auto hovered = _rippleColor
-			? _overAnimation.value(isOver() ? 1. : 0.)
+			? _overAnimation.value((isOver() || _dragHover) ? 1. : 0.)
 			: 0.;
 		if (hovered > 0.) {
 			p.setOpacity(progress * hovered);
 			p.setBrush(*_rippleColor);
 			p.drawRoundedRect(rect(), st::boxRadius, st::boxRadius);
 			p.setOpacity(progress);
+		}
+		if (_dragHover) {
+			const auto border = st::infoProfileTopBarActionButtonDragBorder;
+			const auto half = border / 2.;
+			p.setPen(QPen(
+				_fgColor ? *_fgColor : st::windowBoldFg->c,
+				border));
+			p.setBrush(Qt::NoBrush);
+			p.drawRoundedRect(
+				QRectF(rect()).marginsRemoved(
+					{ half, half, half, half }),
+				st::boxRadius - half,
+				st::boxRadius - half);
 		}
 	}
 
@@ -178,8 +219,6 @@ void TopBarActionButton::paintEvent(QPaintEvent *e) {
 		p.setPen(st::windowBoldFg);
 	}
 
-	p.setFont(st::infoProfileTopBarActionButtonFont);
-
 	const auto textScale = std::max(kIconFadeStart, progress);
 	const auto textRect = rect()
 		- QMargins(0, st::infoProfileTopBarActionButtonTextTop, 0, 0);
@@ -188,9 +227,13 @@ void TopBarActionButton::paintEvent(QPaintEvent *e) {
 	p.scale(textScale, textScale);
 	p.translate(-textCenter);
 
-	const auto elidedText = st::infoProfileTopBarActionButtonFont->elided(
+	const auto available = textRect.width()
+		- 2 * st::infoProfileTopBarActionButtonTextPadding;
+	const auto font = FittingFont(_text, available);
+	p.setFont(font);
+	const auto elidedText = font->elided(
 		_text,
-		textRect.width(),
+		available,
 		Qt::ElideMiddle);
 	p.drawText(textRect, elidedText, style::al_top);
 }

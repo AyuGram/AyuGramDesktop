@@ -21,7 +21,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/peer_gifts/info_peer_gifts_widget.h"
 #include "info/profile/info_profile_actions.h"
 #include "info/profile/info_profile_icon.h"
-#include "info/profile/info_profile_section_stack.h"
 #include "info/profile/info_profile_top_bar.h"
 #include "info/profile/info_profile_values.h"
 #include "info/profile/info_profile_widget.h"
@@ -32,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/info_memento.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "media/stories/media_stories_post.h"
 #include "mtproto/sender.h"
 #include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
@@ -282,7 +282,8 @@ void InnerWidget::setupTop() {
 	} else if (_isStackBottom || _myProfile) {
 		if (_peer->isSelf()) {
 			createProfileTop();
-		} else if (_peer->owner().stories().hasArchive(_peer)) {
+		} else if (_peer->owner().stories().hasArchive(_peer)
+			|| ::Media::Stories::CanPostStory(_peer)) {
 			createButtons();
 		} else {
 			startTop();
@@ -311,44 +312,63 @@ void InnerWidget::createProfileTop() {
 		_peer,
 		_topBarColor.value());
 
-	using namespace Profile;
-	auto stack = SectionStack(_top);
-	BuildProfileDetailsSections(
-		stack,
+	const auto skip = st::infoProfileSkip;
+	Ui::AddSkip(_top, skip);
+	auto blocks = Ui::VerticalBlocks(_top, {
+		.skip = skip,
+		.duration = st::infoSlideDuration,
+	});
+	Profile::AddDetailsBlocks(
+		blocks,
 		_controller,
 		_peer,
 		nullptr,
 		nullptr,
 		{ v::null });
 
-	stack.addPlainSeparator();
-	const auto addButton = [&](object_ptr<Ui::SlideWrap<>> button) {
-		const auto raw = button.data();
-		stack.add({
-			.widget = std::move(button),
-			.shown = raw->toggledValue(),
-		});
-		return raw;
-	};
-	const auto buttons = {
-		addButton(makeGiftsButton()),
-		addButton(makeArchiveButton()),
-		addButton(makeRecentButton()),
-	};
-	stack.finalize();
+	blocks.addSeparator();
 	// Layout insertion shows even wrappers whose initial toggle is off.
-	for (const auto button : buttons) {
-		button->finishAnimating();
-	}
+	blocks.add(makeGiftsButton())->finishAnimating();
+	blocks.add(makeArchiveButton())->finishAnimating();
+	blocks.add(makeRecentButton())->finishAnimating();
+	Ui::AddSkip(_top, skip);
 
 	finalizeTop(false);
 }
 
 void InnerWidget::createButtons() {
 	startTop();
+	if (auto post = makePostButton()) {
+		_top->add(std::move(post))->finishAnimating();
+	}
 	_top->add(makeArchiveButton())->finishAnimating();
 	_top->add(makeRecentButton())->finishAnimating();
 	finalizeTop();
+}
+
+object_ptr<Ui::SlideWrap<>> InnerWidget::makePostButton() {
+	Expects(_top != nullptr);
+
+	if (!::Media::Stories::CanPostStory(_peer)) {
+		return nullptr;
+	}
+	auto wrap = object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
+		_top,
+		object_ptr<Ui::SettingsButton>(
+			_top,
+			tr::lng_story_post_button(),
+			st::infoSharedMediaButton));
+	const auto post = wrap.data()->entity();
+	post->addClickHandler([=] {
+		::Media::Stories::PostStory(
+			_controller->parentController(),
+			_peer);
+	});
+	object_ptr<Profile::FloatingIcon>(
+		post,
+		st::infoIconMediaStories,
+		st::infoSharedMediaButtonIconPosition)->show();
+	return wrap;
 }
 
 object_ptr<Ui::SlideWrap<>> InnerWidget::makeArchiveButton() {
@@ -703,7 +723,7 @@ void InnerWidget::refreshEmpty() {
 		&& albumId
 		&& (albumId != Data::kStoriesAlbumIdArchive)
 		&& _peer->canEditStories();
-	_albumEmpty = albumCanAdd;
+	_albumEmpty = albumCanAdd || (albumId == Data::kStoriesAlbumIdSaved);
 	if (albumCanAdd) {
 		auto empty = object_ptr<Ui::VerticalLayout>(this);
 		empty->add(

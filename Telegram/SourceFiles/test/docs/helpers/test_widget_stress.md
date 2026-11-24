@@ -61,9 +61,10 @@ Use something else when:
   files are not results.
 - **One load per launch.** A launch may name several loads, but a ladder of
   nine levels already takes about three minutes; keep one load per launch
-  under the 600 s watchdog and let the driver merge the launches.
+  under the runner's watchdog (`TDESKTOP_TEST_WATCHDOG`, at most 3600 s) and
+  let the driver merge the launches.
 - **Renderer timing overlay.** The renderer figures need the disposable
-  `tgw_renderer.cpp` hunk of [test_widget_host](test_widget_host.md#the-overlay),
+  hunk of [test_widget_host](test_widget_host.md#the-overlay),
   kept in the campaign's overlay with the scenario and never committed.
   Without it every measured level is a runner error ("no renderer work was
   recorded"), never an all-null success.
@@ -354,7 +355,7 @@ observations are below.
 | `device.window` | An extra key (the schema allows them): `width` and `height`, the placed top-level `QWidget`'s logical size; `layout`, the session controller's column layout (`one-column` for an accepted launch); `filtersSidebar`, whether the chat filters sidebar takes its width. `null` when never read. Part of `device`, so the merge refuses a launch whose window differs from the file's. |
 | `pass` | `measure` or `production`. |
 | `config.requested` | Measure: `compat` and `CLIENTS.md`'s table (`cpuLimitMs` 500, `cpuQuotaMs` 10000, `cpuQuotaWindowMs` 1000, `mainThreadQuotaMs` 10000, `maxTimers` 256, `memoryLimitBytes` 67108864, `features` `["webAnimations"]`); production: `strict`. Both: `width`, `theme` `light`, `warmupMs`, `measureMs`. |
-| `config.applied` | The first level's host options exactly as they entered its `Job` (`policy`, the limits, `cpuKillAfterMs`, `features`, `devicePixelRatio`: the product's core ratio, not the window's), the first measured card's core CSS width and the scheme its renderer got. Every later level must match all three. |
+| `config.applied` | The first level's host options exactly as they entered its `Job` (`policy`, the limits, `cpuKillAfterMs`, `features`, `devicePixelRatio`: the product's core ratio, not the window's), the first measured card's core CSS width and the scheme its widget read itself. Every later level must match all three. |
 | `date`, `notes` | The first launch's start (UTC); the runner's definitions, the smoke marker, the live runner's observation note, then `notes`. |
 | `desktop` | `frameSource`; `screen` (name, geometry, refresh rate, surface) and `scales` (`windowDpr`, `coreRatio` = `style::DevicePixelRatio() * style::Scale() / 100`, `uiScale`); `launches`, one record per accepted launch. |
 
@@ -362,7 +363,9 @@ A launch record has its id, date, loads, entries, durations, screen,
 scales and `window` (as in `device`), and the live runner's readings:
 `themeBefore` and `theme` (embedded theme, cloud, theme file, night,
 wallpaper kind, accent colorizer, `windowBg`), `themeChanged`,
-`rendererTheme` (the first measured renderer's `colorScheme` and `params`),
+`rendererTheme` (the first measured renderer's `colorScheme` and `params`,
+as its widget read them itself, with their `source`,
+[Hosted levels](#hosted-levels)),
 `placement` (every screen with its name, geometry, available geometry,
 refresh rate, scale and whether it is the primary; the chosen one; the
 window before; the first move's `target` and the settled window's
@@ -390,7 +393,7 @@ delivered since install) and `stopped` when the ladder stopped.
 | `loaded`, `bootMs` | The host's `loaded` and its own `loadedMs`, from the host's creation. |
 | `dead`, `diedAtMs` | The level's death ([below](#deaths)): the host's first dead reason verbatim, and steady-clock ms from the host's creation to the change that carried it; for a stop the desktop decided itself, `RendererCore`'s stop reason and an estimate of the host clock at the runner's first reading of it. |
 | `frames` | `count` intervals, nearest-rank `p50`/`p95` and `max` of the window's update intervals (above); fewer than two updates give count 0 and nulls. |
-| `renderer` | Complete groups of the measured core's work inside the window: each timed `frame()` attempt's own time plus the message and tick work since the attempt before it; the first group is partial and discarded, trailing work is kept apart. An attempt may end before the QPainter replay when the list has not laid out the card's size; it still closes its group, and `desktop.rendererWork` counts the attempts that painted an image apart. `msPerFrame` the mean, `p95Ms` the nearest rank, `displayListOps` the last sampled attempt's list size; no sample gives nulls. |
+| `renderer` | Complete groups of the measured core's work inside the window: each timed `Frame` event's own time (a paint request of `RendererWork::raster()` on a posted work turn outside the list's paint, or the replay of a list the helper painted, [test_widget_host](test_widget_host.md#the-overlay)) plus the message and tick work since the attempt before it; the first group is partial and discarded, trailing work is kept apart. An attempt without a replay (a paint request, or a list the card cannot take) still closes its group, and `desktop.rendererWork` counts apart the attempts whose own replay painted. `msPerFrame` the mean, `p95Ms` the nearest rank, `displayListOps` the last sampled attempt's list size; no sample gives nulls. Only Telegram's share, as `desktop.rendererScope` says ([Hosted levels](#hosted-levels)). |
 | `host` | `SandboxStats` deltas of `jsMs`, `queries`, `queryMs` over the snapshots' actual seconds; `throttledTasks` the delta; `opsPerSec` the newest host's validated ops in the window; `maxBatchOps` its largest batch since creation; `nodes` and `memoryBytes` at the end. A counter going backwards is a named error and null. |
 | `widget` | The last `data-stress` value at or before the start (else the first after it) and the last at or before the end: `fps`, `frames` and `jank` differences, `maxGap` the largest published inside the window, `last` the end value. |
 | `errors`, `diags` | The host's first 20 error logs verbatim, then the runner's errors, each `runner: `; diag kind to count. |
@@ -405,9 +408,11 @@ instrument failures are runner errors, never deaths.
 
 A level's death is, in order: the host's own `dead` other than
 `terminated`; a stop the desktop decided itself; then the host's own value,
-`terminated` included. A paint bound's refusal of the widget's frames stops
-its `RendererCore` and retires the runtime without the host, so the host
-watch never carries that stop ([test_widget_host](test_widget_host.md)).
+`terminated` included. A paint bound's refusal of the widget's frames,
+found in `RendererWork::raster()` on a work turn, stops its `RendererCore`
+once the posted answer carrying it reaches the chat, and that retires the
+runtime without the host, so the host watch never carries that stop
+([test_widget_host](test_widget_host.md)).
 The runner reads it with the fixture's `WidgetDesktopStop()` for the
 level's watched core ([test_widget_fixture](test_widget_fixture.md)) and
 latches its first answer with that reading's `crl::profile()`. It reads on
@@ -425,8 +430,9 @@ reading, and `diedAtMs` `loadedMs + (that reading - loadedAt) / 1000` in
 floating point, the host clock at the first reading that saw the stop,
 null without both loading anchors (`loadedMs`, and `loadedAt`, the merge
 that saw `loaded`). That is an estimate, not a measurement of the stop:
-the first reading comes after the stop by the readings' lag (main-thread
-painting, the posted retirement, the gaps between stages), and the merge
+the first reading comes after the stop by the readings' lag (the work
+turn that found it, the posted answer that publishes it and retires the
+runtime, main-thread painting, the gaps between stages), and the merge
 that saw `loaded` after the load by the host callback's. The run file's
 notes say so. A window's
 end takes only a stop seen before its stamp: one first seen later is never
@@ -434,9 +440,10 @@ dated into it, as a host death after the end is not. A host's own reason
 is never replaced, and without a desktop stop a `terminated` stays.
 
 `desktop` of an entry: `measured`, `windowMs`, `updates`, `rendererWork`
-(samples, frames, `replayedFrames` and `unreplayedFrames` (the frame()
-attempts inside the window that replayed the display list into an image,
-and those that returned before it), ticks, messages, foreign,
+(samples, frames, `replayedFrames` and `unreplayedFrames` (the raster
+attempts inside the window whose own replay painted, and those that did
+not),
+ticks, messages, foreign,
 `partialGroupMs`, `trailingWorkMs`, `trailingWorkEvents`), `statsAgeMs`
 (`start`, `end`), `errorLogs`, `values` (`received`, `inWindow`, `late`,
 `lastText`), `runnerErrors`; and the live runner's: `oneAlive` (what was
@@ -448,7 +455,57 @@ the actual `warmupMs`, `focusAndCursor`), `window` (the start and end checks
 with their lock, window and covering readings, `samples`, `sampleEveryMs`,
 `sampleCostMs`, `changed`, and `coverAndLock`, the worker's samples above,
 `null` for a level without a window), `hosts` (`optionsCalls`, `attached`,
-`generation`), `cardCssWidth`, `scheme`, `updatesDropped`.
+`generation`), `cardCssWidth`, `scheme`, `updatesDropped`, `rendererScope`
+and `helperWork` ([Hosted levels](#hosted-levels)).
+
+#### Hosted levels
+
+The level's widget runs in the widget helper
+([Remote engines](test_widget_fixture.md#remote-engines)) and the ops tap
+sits on its hosted host
+([test_widget_ops](test_widget_ops.md#hosted-widgets)):
+
+- **Renderer scope.** `desktop.rendererScope` is `telegram-replay` (no
+  helper records, as in a Release harness, whose helper has no Debug tap)
+  or `telegram-replay+helper` (with them). A level's `renderer` is
+  Telegram's share alone, its answers and its replay of each accepted
+  list ([test_widget_host](test_widget_host.md#the-helpers-share)).
+- **Helper work.** The runner asks for the helper's renderer work at each
+  injection (`TimeWidgetHelperWork()`, a room of 65536 events) and writes
+  `desktop.helperWork`: `asked`, `windowed`, `capacity`, `dropped`,
+  `malformed`, `total` and `byKind` (each `count`, `ms`, `waitedMs`, the part
+  spent waiting for Telegram's answers, and `ownMs`), `frames` (events that
+  sent a `Frame` or a `FrameDelta`, by `frameBytes > 0` on its unsigned
+  value) and `overflows`, over the level's window, or all of it for a
+  level without one. Every sum is a checked addition: an event that would overflow one is
+  left out and counted in `overflows`. A record that ends after its own
+  receipt is malformed at the tap, not filtered out of the window as a
+  late operation would be. A dropped or malformed record, and
+  any overflow, is a level error (`helper work: N records dropped (M
+  malformed) at C events`, `helper work: N events would overflow the
+  level's time sums`), as a scan gap of the tap is (`ops tap: N
+  observations were not taken: ...`).
+- **Theme.** A level's theme is what its widget read itself after
+  the runtime applied the newest theme
+  ([The effective theme](test_widget_ops.md#the-effective-theme)), judged
+  by `CheckWidgetTheme()`, the predicate the conformance runner's load and
+  theme switch readers share. Without that reading, or while the
+  application of a theme the runtime selected for the host has not been
+  recorded yet, also while a running job of another theme holds it back
+  (the old reading certifies nothing then, even one of the same scheme),
+  the level has the error `theme: theme-unobserved: ...` or
+  `theme: theme-pending: ...` and its theme is not compared further.
+  Otherwise an applied scheme other than `light` (`theme: the runtime
+  applied the scheme [...]`), a reading that differs from the applied theme
+  (`theme: the widget reads another theme than the runtime applied: ...`,
+  a wrong palette key with the right scheme included), and a read scheme
+  or `colorScheme` other than `light` are level errors. In Debug the
+  scheme and palette the helper's renderer got, as its tap mirrored them,
+  must also be what the widget read (every palette key the renderer got,
+  the read palette completing the rest), and the theme message it got must
+  be the one the runtime applied. The launch record's `rendererTheme` then
+  says where the theme came from in `source`: `effective` (a Release
+  harness) or `effective+helper-mirror` (Debug).
 
 ### Rows and Checks
 
@@ -516,16 +573,37 @@ ran the whole runner on Windows (the placement on the fastest screen, the
 one-column window on top, the idle check, the layout capture, the
 endpoint and 500 ms main-thread window checks, the self-check with
 `_SELF_CHECK`, 127 schema-valid entries per pass, each with one host).
-Not yet in the app: the worker's in-window samples, the card capture and
-the replay counts, compiled in Debug and Release (Win32, MSVC), their
-arithmetic passing the 15 rows `RunWidgetStressSelfCheck()` had then,
-outside it. The Release runs above ran the placement while its reading,
-target and settle were still the runner's own; since
+The worker's in-window samples, the card capture and the replay counts
+compiled in Debug and Release (Win32, MSVC), and their arithmetic
+passed the 15 rows `RunWidgetStressSelfCheck()` had then, outside the
+app. That task's Win32 Release smoke exercised all three after the
+measured passes (its `work/test.md`, Attempt 2, Run 4, Test 12). The five
+`backdrop-area` levels each recorded four worker samples in a 2000 ms
+window, with no sample failure or unreplayed frame. The capture showed
+a 390 CSS px card in the light theme. The negative control's in-window
+cover was caught by sample 5, and its launch was refused. The Win32
+Debug stress runs of
+`2026/10/31/stop-a-widget-on-its-last-picture-when-the-paint-bounds-refuse-its-frames`
+also took the runner's card captures and counted replays for their
+measured levels (its `work/test.md`, Attempt 1, Runs 1 to 3, Tests 1, 4,
+5 and 7).
+The executed passes timed `RendererCore::frame()` attempts
+inside the list's paint; no pass has timed the raster attempts on posted
+work turns described above yet
+([test_widget_host](test_widget_host.md#verification)). The Release runs
+above ran the placement while its reading, target and settle were still
+the runner's own; since
 `2026/10/31/put-the-conformance-runners-window-in-the-one-column-layout`
 they are the [fixture's](test_widget_fixture.md#one-column-window), and
-the runner has not placed its window through them in the app yet: that
-task's evidence campaign runs a Debug stress-kit smoke for the placement
-gates and the `placement` record.
+the runner placed its window through them in that task's Windows Win32
+Debug stress-kit smoke (its `work/test.md`, Attempt 1, Run 3, Tests 10
+and 11, `evidence/index.md` and `evidence/run-3-stress-launch.json`).
+From a normal two-column window with its body at the one-column
+threshold, the gates passed for the fastest screen, one column and
+staying on top. The launch file's `placement` record kept its base
+shapes and the first move's pre-move values. With the timing overlay
+absent, the launch was refused at the first level for
+`no renderer work was recorded`.
 
 The self-check now has 16 rows. Its `desktop stop:` row merges literal
 desktop stops into the control level's window end: a null and a
@@ -538,9 +616,32 @@ stamp or without `loadedMs`. The
 [deaths](#deaths) reading, its merge and that row compiled in the Windows
 Win32 Debug build of
 `2026/10/31/stop-a-widget-on-its-last-picture-when-the-paint-bounds-refuse-its-frames`;
-the self-check runs only from an overlay (`_SELF_CHECK` above), so that
-task's evidence loop runs it and the live reading, neither of which has
-run yet.
+the self-check runs only from an overlay (`_SELF_CHECK` above). That
+task ran it in the Windows Win32 Debug client at DPR 2 (its
+`work/test.md`, Attempt 1, Run 7, Test 10). The 16 rows passed, including
+`widget stress: desktop stop:`, and the count Check passed. In the
+stress runs (Runs 1 to 3, Tests 2, 5 and 8), the runner wrote each
+desktop-stopped level's `Paint limit exceeded:` reason as `dead` with an
+estimated `diedAtMs`. Each such stop came before its level's window
+(`evidence/run-json-excerpts.json`).
+
+The [hosted levels](#hosted-levels)' readings (`rendererScope`,
+`helperWork` with its checked sums, the effective theme check and
+`rendererTheme.source`) were added by
+`2026/11/14/run-widget-validators-and-renderers-in-the-macos-helper`,
+compiled in the macOS Debug build and syntax-checked with the Release
+command line with and without `TDESKTOP_RELEASE_TEST_HARNESS`. That
+task's macOS Debug campaign ran the 76 strict levels hosted and
+`in-process` through its overlay's `stress-pages` leg under a locked
+console. The same levels loaded and stopped in both arms (its
+`work/test.md`, Attempt 1, check A4d, runs 3 and 4,
+`evidence/stress/stress-arms.txt`). In its separate `theme` leg,
+`CheckWidgetTheme()` read a dropped theme application as `wrong` in
+hosted Debug run 5 and hosted arm64 Release run 10 with the harness
+(check A4c, `evidence/conformance/theme.md` and
+`evidence/conformance/theme-run-10.md`). The runner's four hosted
+readings and the control with overflowing helper stamps have yet to run
+in the app.
 
 ## Related guidance
 

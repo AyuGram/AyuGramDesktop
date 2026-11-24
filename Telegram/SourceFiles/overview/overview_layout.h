@@ -22,6 +22,7 @@ struct OverviewFileLayout;
 } // namespace style
 
 namespace Data {
+struct FileOrigin;
 class Media;
 class PhotoMedia;
 class DocumentMedia;
@@ -208,6 +209,8 @@ struct MediaOptions {
 	bool storyShowPinned = false;
 	bool storyHidden = false;
 	bool storyShowHidden = false;
+	float aspectRatio = 0.;
+	std::shared_ptr<const Data::FileOrigin> origin;
 };
 
 class Photo final : public ItemBase {
@@ -241,6 +244,8 @@ private:
 	void clearSpoiler();
 
 	const not_null<PhotoData*> _data;
+	const float _aspectRatio;
+	const std::shared_ptr<const Data::FileOrigin> _origin;
 	mutable std::shared_ptr<Data::PhotoMedia> _dataMedia;
 	std::unique_ptr<Ui::SpoilerAnimation> _spoiler;
 
@@ -362,6 +367,8 @@ private:
 
 	const not_null<DocumentData*> _data;
 	PhotoData *_videoCover = nullptr;
+	const float _aspectRatio;
+	const std::shared_ptr<const Data::FileOrigin> _origin;
 	mutable std::shared_ptr<Data::DocumentMedia> _dataMedia;
 	mutable std::shared_ptr<Data::PhotoMedia> _videoCoverMedia;
 	StatusText _status;
@@ -390,7 +397,8 @@ public:
 		not_null<Delegate*> delegate,
 		not_null<HistoryItem*> parent,
 		not_null<DocumentData*> voice,
-		const style::OverviewFileLayout &st);
+		const style::OverviewFileLayout &st,
+		bool globalSearch);
 
 	void initDimensions() override;
 	void paint(Painter &p, const QRect &clip, TextSelection selection, const PaintContext *context) override;
@@ -421,13 +429,17 @@ private:
 	ClickHandlerPtr _namel;
 
 	const style::OverviewFileLayout &_st;
+	const bool _globalSearch;
 
 	Ui::Text::String _name;
 	Ui::Text::String _details;
 	Ui::Text::String _caption;
 	int _nameVersion = 0;
+	rpl::lifetime _searchNameLifetime;
 
 	void updateName();
+	void watchSearchName();
+	void updateSearchName();
 	bool updateStatusText();
 
 };

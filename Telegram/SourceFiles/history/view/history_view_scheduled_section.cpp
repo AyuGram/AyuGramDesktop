@@ -294,7 +294,12 @@ ScheduledWidget::ScheduledWidget(
 	Window::SetupSwipeBackSection(this, _scroll, _inner);
 }
 
-ScheduledWidget::~ScheduledWidget() = default;
+ScheduledWidget::~ScheduledWidget() {
+	if (const auto box = _sendFilesBox.data()) {
+		box->closeBox();
+	}
+	_composeControls->closeSendAsFileBox();
+}
 
 void ScheduledWidget::topicDestroyed() {
 	const auto window = &controller()->window();
@@ -653,6 +658,7 @@ bool ScheduledWidget::confirmSendingFiles(
 			: Api::SendType::Scheduled),
 		SendMenu::Details(),
 		[=](const TextWithTags &text) { _composeControls->setText(text); });
+	_sendFilesBox = box.data();
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,
@@ -833,6 +839,7 @@ void ScheduledWidget::sendVoice(
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		prepareSendAction(options));
 	_composeControls->clearListenState();
 }

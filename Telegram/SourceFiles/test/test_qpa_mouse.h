@@ -102,7 +102,9 @@ enum class QpaMouseType {
 // the button pressed or released, Qt::NoButton for a move; |buttons| is
 // what is held after the event, as QWindowSystemInterface takes it: a
 // press includes |button|, a release no longer does, a held move carries
-// the held buttons.
+// the held buttons. |modifiers| go with the event, and Qt makes them its
+// cached keyboard state (QGuiApplication::keyboardModifiers()), as for
+// real input.
 struct QpaMouseEvent {
 	QpaMouseType type = QpaMouseType::Move;
 	QPoint point;
@@ -196,13 +198,33 @@ struct QpaMouseEnd {
 // presses still hold, through the saved QWindow while it lives and no
 // popup or modal is in the way, else by clearing just those bits; releases
 // a grab that appeared after the first delivery; delivers a
-// QWindowSystemInterface leave - each inside Settle - and reads the end
-// state. A sequence that never sent anything changes nothing. Called again
-// with no delivery in between, end() sends nothing and returns the same
-// reading; a delivery after it opens the sequence again. The destructor
-// delivers nothing. Left behind by design: Qt's last cursor position (the
-// last delivered point), and Qt's current mouse window and last mouse
-// receiver, which the leave clears.
+// QWindowSystemInterface leave - each inside Settle - then sets Qt's
+// cached keyboard modifiers to Qt::NoModifier, and reads the end state.
+// Until then the last delivery's modifiers stay cached, as its held
+// buttons stay held. A sequence that never sent anything changes nothing.
+// Called again with no delivery in between, end() sends nothing and
+// returns the same reading; a delivery after it opens the sequence again.
+// The destructor delivers nothing. Left behind by design: Qt's last cursor
+// position (the last delivered point), and Qt's current mouse window and
+// last mouse receiver, which the leave clears.
+//
+// Held moves built from the OS pointer. While the sequence's own presses
+// hold a button, an application event filter it owns gives every
+// non-spontaneous QEvent::MouseMove that reaches a QWindow with source
+// Qt::MouseEventSynthesizedByApplication and a button the sequence holds -
+// what lib_ui's SendSynteticMouseEvent sends from QCursor::pos(), as
+// Ui::ScrollArea::scrolled() does on every scroll position change - the
+// sequence's last delivered logical point, mapped into that window, before
+// Qt routes it to the pressed widget. So a held press stays where the
+// sequence put it, as a real pointer would: on the widget through a scroll,
+// or outside it after a deliberate move outside delivered through the
+// sequence. The filter only repositions such a move: it sends nothing,
+// forces no click, and neither moves the OS cursor nor changes Qt's last
+// cursor position. It exists from before the dispatch of the delivery
+// that first leaves a button held until before the dispatch of the one
+// that releases the last, the start of end() or the destructor; moves the
+// sequence delivers, and anything after end(), are unchanged. Reference:
+// docs/helpers/test_qpa_mouse.md, "Held moves built from the OS pointer".
 class QpaMouseSequence final {
 public:
 	explicit QpaMouseSequence(QWidget *target);
@@ -218,10 +240,14 @@ public:
 	[[nodiscard]] Qt::MouseButtons held() const;
 
 private:
+	class HeldPointer;
+
 	QPointer<QWidget> _target;
 	QPointer<QWidget> _top;
 	QPointer<QWindow> _window;
 	QPointer<QWidget> _grabberBefore;
+	std::unique_ptr<HeldPointer> _heldPointer;
+	QPointF _lastGlobal;
 	QPointF _lastNativeLocal;
 	QPointF _lastNativeGlobal;
 	QpaMouseEnd _end;
@@ -342,10 +368,34 @@ struct QpaMouseDrag {
 // positive control, every refusal, a paced gesture under its own armed
 // console shield (test_console_shield.h) with no veto, and a clean end
 // state after each leg. It arms and releases that shield itself, so it is
-// appended before AppendConsoleShieldSelfTest, which comes last. Defined
-// in test_qpa_mouse_self_test.cpp. Reference:
+// appended before AppendConsoleShieldSelfTest, which comes last. On
+// Windows its fixture first shows a small topmost window of its own around
+// the OS cursor, never activated, whose client area is a native child
+// window that takes the resting cursor's messages: Qt finds its own window
+// at the cursor yet tracks none there while the probes hold the mouse
+// capture. It destroys that window last in its teardown or
+// Runner::onFinish; meanwhile a click at the cursor reaches the child, not
+// the window beneath. It moves neither the cursor nor any window it does
+// not own. Defined in test_qpa_mouse_self_test.cpp. Reference:
 // docs/helpers/test_qpa_mouse_self_test.md; measured results:
 // docs/helpers/test_qpa_mouse.md, "Verification".
 void AppendQpaMouseSelfTest(not_null<Runner*> runner);
+
+// The held-move filter measuring itself on a purpose-built
+// Ui::AbstractButton inside a Ui::ScrollArea, in a shown ordinary top-level
+// window it creates against the screen edges away from the OS pointer,
+// with no account, chats list or network. The held leg presses the button
+// through a sequence, scrolls the area by Ui::ScrollArea::scrollToY inside
+// Test::Settle and releases at the press point: lib_ui's
+// application-synthesized held move must reach the window at a point
+// outside the button (else the leg fails as unreached), the button must
+// get it at the sequence's point, read Over at the release and fire
+// exactly one click. The control moves through the sequence to a point
+// outside the button before the scroll and releases there: no click.
+// QCursor::pos() must read the same before and after. Built with
+// DESKTOP_APP_DISABLE_PRIVATE_QT_API every stage is N/A. Defined in
+// test_qpa_mouse_held_self_test.cpp. Reference:
+// docs/helpers/test_qpa_mouse_held_self_test.md.
+void AppendQpaMouseHeldPointerSelfTest(not_null<Runner*> runner);
 
 } // namespace Test

@@ -42,18 +42,43 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Dialogs {
 namespace {
 
+constexpr auto kButtonLayoutPasses = 8;
+
 [[nodiscard]] QString FormatUnconfirmedAuthMessage(
 		const std::vector<Data::UnreviewedAuth> &list) {
 	if (list.empty()) {
 		return QString();
 	} else if (list.size() == 1) {
 		const auto &auth = list.at(0);
+		if (auth.botId) {
+			return tr::lng_unconfirmed_auth_single_bot(
+				tr::now,
+				lt_bot,
+				auth.botName.isEmpty()
+					? tr::lng_status_bot(tr::now)
+					: auth.botName,
+				lt_from,
+				auth.device.isEmpty()
+					? auth.location
+					: auth.location.isEmpty()
+					? auth.device
+					: auth.device + u", "_q + auth.location);
+		}
 		return tr::lng_unconfirmed_auth_single(
 			tr::now,
 			lt_from,
 			auth.device,
 			lt_country,
 			auth.location);
+	}
+	const auto hasBots = ranges::any_of(list, [](const auto &auth) {
+		return auth.botId != 0;
+	});
+	if (hasBots) {
+		return tr::lng_unconfirmed_auth_connections(
+			tr::now,
+			lt_count,
+			list.size());
 	}
 	auto commonLocation = list.at(0).location;
 	for (auto i = 1; i < list.size(); ++i) {
@@ -204,8 +229,9 @@ int UnconfirmedAuthWrap::resizeGetHeight(int newWidth) {
 not_null<UnconfirmedAuthWrap*> CreateUnconfirmedAuthContent(
 		not_null<Ui::RpWidget*> parent,
 		rpl::producer<std::vector<Data::UnreviewedAuth>> list,
-		Fn<void(bool)> callback,
-		rpl::producer<float64> collapseProgress) {
+		Fn<void(bool, Fn<void()>)> callback,
+		rpl::producer<float64> collapseProgress,
+		rpl::producer<bool> busy) {
 	const auto wrap = Ui::CreateChild<UnconfirmedAuthWrap>(
 		parent,
 		object_ptr<Ui::VerticalLayout>(parent));
@@ -229,7 +255,11 @@ not_null<UnconfirmedAuthWrap*> CreateUnconfirmedAuthContent(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			tr::lng_unconfirmed_auth_title(),
+			rpl::duplicate(list) | rpl::map([](const auto &list) {
+				return (list.size() == 1 && list.front().botId)
+					? tr::lng_unconfirmed_auth_title_bot()
+					: tr::lng_unconfirmed_auth_title();
+			}) | rpl::flatten_latest(),
 			st::dialogsUnconfirmedAuthTitle),
 		padding,
 		style::al_top);
@@ -239,7 +269,9 @@ not_null<UnconfirmedAuthWrap*> CreateUnconfirmedAuthContent(
 	content->add(
 		object_ptr<Ui::FlatLabel>(
 			content,
-			std::move(list) | rpl::map(FormatUnconfirmedAuthMessage),
+			rpl::duplicate(list) | rpl::filter([](const auto &list) {
+				return !list.empty();
+			}) | rpl::map(FormatUnconfirmedAuthMessage),
 			st::dialogsUnconfirmedAuthAbout),
 		padding,
 		style::al_top)->setTryMakeSimilarLines(true);
@@ -256,18 +288,35 @@ not_null<UnconfirmedAuthWrap*> CreateUnconfirmedAuthContent(
 		buttons,
 		tr::lng_unconfirmed_auth_deny(),
 		st::dialogsUnconfirmedAuthButtonNo);
-	yes->setClickedCallback([=] {
-		wrap->toggle(false, anim::type::normal);
-		base::call_delayed(st::universalDuration, wrap, [=] {
-			callback(true);
-		});
-	});
-	no->setClickedCallback([=] {
-		wrap->toggle(false, anim::type::normal);
-		base::call_delayed(st::universalDuration, wrap, [=] {
-			callback(false);
-		});
-	});
+	struct State {
+		bool busy = false;
+		bool empty = false;
+	};
+	const auto state = wrap->lifetime().make_state<State>();
+	rpl::combine(std::move(list), std::move(busy)) | rpl::on_next([=](
+			const auto &list,
+			bool busy) {
+		state->busy = busy;
+		state->empty = list.empty();
+		yes->setDisabled(busy || state->empty);
+		no->setDisabled(busy || state->empty);
+		yes->setText(busy
+			? tr::lng_contacts_loading()
+			: tr::lng_unconfirmed_auth_confirm());
+	}, wrap->lifetime());
+	const auto submit = [=](bool confirmed) {
+		if (yes->isDisabled()) {
+			return;
+		}
+		yes->setDisabled(true);
+		no->setDisabled(true);
+		callback(confirmed, crl::guard(wrap, [=] {
+			yes->setDisabled(state->busy || state->empty);
+			no->setDisabled(state->busy || state->empty);
+		}));
+	};
+	yes->setClickedCallback([=] { submit(true); });
+	no->setClickedCallback([=] { submit(false); });
 	buttons->sizeValue(
 	) | rpl::filter_size(
 	) | rpl::on_next([=](const QSize &s) {
@@ -388,21 +437,43 @@ void TopBarSuggestionContent::setRightButton(
 		sizeValue(),
 		_rightButton->sizeValue()
 	) | rpl::on_next([=](QSize outer, QSize inner) {
-		const auto cardHeight = _geometry.cardInnerHeight
-			? _geometry.cardInnerHeight
-			: (outer.height() - rect::m::sum::v(margins));
-		const auto verticalGap = (cardHeight - inner.height()) / 2;
-		const auto rightInset = _geometry.rightInset
-			? _geometry.rightInset
-			: (margins.right() + verticalGap);
 		_rightButton->moveToRight(
-			rightInset,
-			margins.top() + verticalGap,
+			rightButtonInset(outer.height()),
+			margins.top() + rightButtonVerticalGap(outer.height()),
 			outer.width());
 	}, _rightButton->lifetime());
 	_rightButton->setFullRadius(true);
 	_rightButton->setClickedCallback(std::move(callback));
 	_rightButton->show();
+	_rightButton->widthValue() | rpl::on_next([=] {
+		if (width() > 0) {
+			resizeToWidth(width());
+		}
+		update();
+	}, _rightButton->lifetime());
+}
+
+int TopBarSuggestionContent::rightButtonVerticalGap(int outerHeight) const {
+	const auto &margins = st::dialogsTopBarSuggestionMargins;
+	const auto cardHeight = _geometry.cardInnerHeight
+		? _geometry.cardInnerHeight
+		: (outerHeight - rect::m::sum::v(margins));
+	return (cardHeight - _rightButton->height()) / 2;
+}
+
+int TopBarSuggestionContent::rightButtonInset(int outerHeight) const {
+	return _geometry.rightInset
+		? _geometry.rightInset
+		: (st::dialogsTopBarSuggestionMargins.right()
+			+ rightButtonVerticalGap(outerHeight));
+}
+
+int TopBarSuggestionContent::rightButtonSkip(int outerHeight) const {
+	return _rightButton
+		? (rightButtonInset(outerHeight)
+			+ _rightButton->width()
+			+ st::dialogsTopBarSuggestionMargins.right())
+		: 0;
 }
 
 void TopBarSuggestionContent::setRightBadge(rpl::producer<int> count) {
@@ -502,16 +573,21 @@ void TopBarSuggestionContent::draw(QPainter &p) {
 			: 0)
 		- leftPadding
 		- rightPadding;
-	const auto availableWidth = availableWidthNoPhoto
+	const auto availableWidthNoButton = availableWidthNoPhoto
 		- (_rightHide ? _rightHide->width() : 0)
 		- (_rightBadgeText.isEmpty() ? 0 : _rightBadgeSize.width());
+	const auto availableWidth = _rightButton
+		? std::min(
+			availableWidthNoButton,
+			outer.width() - rightButtonSkip(outer.height()) - leftPadding)
+		: availableWidthNoButton;
 	const auto titleRight = leftPadding;
 	const auto hasSecondLineTitle = availableWidth < _contentTitle.maxWidth();
 	const auto paused = On(PowerSaving::kEmojiChat)
 		|| (_emojiPaused && _emojiPaused());
 	p.setPen(st::windowActiveTextFg);
 	p.setPen(st::windowFg);
-	{
+	if (availableWidth > 0) {
 		const auto left = leftPadding;
 		const auto top = topPadding;
 		_contentTitle.draw(p, {
@@ -524,7 +600,7 @@ void TopBarSuggestionContent::draw(QPainter &p) {
 			.elisionLines = hasSecondLineTitle ? 2 : 1,
 		});
 	}
-	{
+	if (availableWidth > 0) {
 		const auto left = leftPadding;
 		const auto top = hasSecondLineTitle
 			? (topPadding
@@ -650,16 +726,53 @@ int TopBarSuggestionContent::resizeGetHeight(int newWidth) {
 		return int(base::SafeRound(
 			withMargins * (1. - _collapseProgress)));
 	}
-	const auto topPadding = st::msgReplyPadding.top();
-	const auto bottomPadding = st::msgReplyPadding.top();
 	const auto availableWidthNoPhoto = newWidth
 		- rect::m::sum::h(margins)
 		- (_rightArrow
 			? (_rightArrow->width() / 4 * 3) // Takes full height.
 			: 0)
 		- _leftPadding;
-	const auto availableWidth = availableWidthNoPhoto
+	const auto availableWidthNoButton = availableWidthNoPhoto
 		- (_rightHide ? _rightHide->width() : 0);
+	if (!_rightButton) {
+		return int(base::SafeRound(
+			fullHeightFor(availableWidthNoButton)
+				* (1. - _collapseProgress)));
+	}
+	const auto availableFor = [&](int outerHeight) {
+		return std::min(
+			availableWidthNoButton,
+			newWidth
+				- rightButtonSkip(outerHeight)
+				- margins.left()
+				- _leftPadding);
+	};
+	// The button inset grows with the height, which can wrap more text.
+	auto outerHeight = height();
+	auto settled = false;
+	for (auto i = 0; i != kButtonLayoutPasses; ++i) {
+		const auto available = availableFor(outerHeight);
+		const auto full = fullHeightFor(available);
+		if (full == outerHeight) {
+			settled = (available > 0);
+			break;
+		}
+		outerHeight = full;
+	}
+	if (!settled) {
+		const auto tallest = (_geometry.cardInnerHeight
+			? _geometry.cardInnerHeight
+			: st::sponsoredMessageBarMaxHeight) + rect::m::sum::v(margins);
+		const auto available = availableFor(tallest);
+		outerHeight = (available > 0) ? fullHeightFor(available) : tallest;
+	}
+	return int(base::SafeRound(outerHeight * (1. - _collapseProgress)));
+}
+
+int TopBarSuggestionContent::fullHeightFor(int availableWidth) const {
+	const auto &margins = st::dialogsTopBarSuggestionMargins;
+	const auto topPadding = st::msgReplyPadding.top();
+	const auto bottomPadding = st::msgReplyPadding.top();
 	if (availableWidth <= 0) {
 		return topPadding + bottomPadding + rect::m::sum::v(margins);
 	}
@@ -692,8 +805,7 @@ int TopBarSuggestionContent::resizeGetHeight(int newWidth) {
 	const auto capped = std::min(
 		natural,
 		st::sponsoredMessageBarMaxHeight);
-	const auto withMargins = capped + rect::m::sum::v(margins);
-	return int(base::SafeRound(withMargins * (1. - _collapseProgress)));
+	return capped + rect::m::sum::v(margins);
 }
 
 void TopBarSuggestionContent::setCollapseProgress(

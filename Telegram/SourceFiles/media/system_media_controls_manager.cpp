@@ -45,6 +45,14 @@ constexpr auto kSkipMs = crl::time(15 * 1000);
 	Unexpected("RepeatModeToLoopStatus in SystemMediaControlsManager");
 }
 
+void SetPlaybackRateRange(
+		not_null<base::Platform::SystemMediaControls*> controls,
+		bool controllable) {
+	controls->setPlaybackRateRange(
+		controllable ? kSpeedMin : 1.,
+		controllable ? kSpeedMax : 1.);
+}
+
 [[nodiscard]] std::optional<AudioMsgId::Type> ActivePlayerType() {
 	using namespace Media::Player;
 	const auto player = instance();
@@ -65,18 +73,34 @@ bool SystemMediaControlsManager::Supported() {
 }
 
 float64 SystemMediaControlsManager::lookupPlaybackRate() const {
+	return (_streamed && _streamed->valid()) ? _streamed->speed() : 1.;
+}
+
+void SystemMediaControlsManager::applyAudioPlaybackSpeed(float64 speed) {
 	const auto mediaPlayer = Media::Player::instance();
-	const auto type = mediaPlayer->getActiveType();
-	const auto current = mediaPlayer->current(type);
-	if (!current || !current.changeablePlaybackSpeed()) {
-		return 1.;
+	const auto current = mediaPlayer->current(mediaPlayer->getActiveType());
+	if (!current.changeablePlaybackSpeed()
+		|| !Media::Audio::SupportsSpeedControl()) {
+		return;
 	}
 	const auto document = current.audio();
-	return (document
+	const auto music = document
 		&& !document->isVoiceMessage()
-		&& !document->isVideoMessage())
-		? Core::App().settings().audioPlaybackSpeed()
-		: Core::App().settings().voicePlaybackSpeed();
+		&& !document->isVideoMessage();
+	auto &settings = Core::App().settings();
+	const auto saved = music
+		? settings.audioPlaybackSpeed()
+		: settings.voicePlaybackSpeed();
+	// a speed boost overrides the saved speed while held
+	if (lookupPlaybackRate() != saved) {
+		return;
+	} else if (music) {
+		settings.setAudioPlaybackSpeed(speed);
+	} else {
+		settings.setVoicePlaybackSpeed(speed);
+	}
+	Core::App().saveSettingsDelayed();
+	mediaPlayer->updatePlaybackSpeed();
 }
 
 void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
@@ -113,12 +137,16 @@ void SystemMediaControlsManager::applyPlayerTrack(AudioMsgId::Type audioType) {
 		// the track is changed
 		// or when the position is changed by the user.
 		_controls->setPosition(state.position);
-		_controls->setPlaybackRate(lookupPlaybackRate());
 
 		_streamed = std::make_unique<Media::Streaming::Instance>(
 			document,
 			current.contextId(),
 			nullptr);
+		SetPlaybackRateRange(
+			_controls.get(),
+			current.changeablePlaybackSpeed()
+				&& Media::Audio::SupportsSpeedControl());
+		_controls->setPlaybackRate(lookupPlaybackRate());
 	}
 
 	// Setting a thumbnail can take a long time,
@@ -199,8 +227,13 @@ void SystemMediaControlsManager::syncPlayerStateToControls() {
 	_controls->setEnabled(true);
 	_controls->setIsPlayPauseEnabled(true);
 	_controls->setIsStopEnabled(true);
+	_controls->setIsSeekEnabled(true);
 	_controls->setIsNextEnabled(mediaPlayer->nextAvailable(*type));
 	_controls->setIsPreviousEnabled(mediaPlayer->previousAvailable(*type));
+	syncLoopAndShuffleToControls();
+	if (_controls->volumeSupported()) {
+		_controls->setVolume(Core::App().settings().songVolume());
+	}
 	const auto state = mediaPlayer->getState(*type);
 	_controls->setPlaybackStatus(IsStoppedOrStopping(state.state)
 		? PlaybackStatus::Stopped
@@ -210,6 +243,13 @@ void SystemMediaControlsManager::syncPlayerStateToControls() {
 	_lastAudioMsgId = AudioMsgId();
 	applyPlayerTrack(*type);
 	_controls->updateDisplay();
+}
+
+void SystemMediaControlsManager::syncLoopAndShuffleToControls() {
+	const auto &settings = Core::App().settings();
+	_controls->setLoopStatus(
+		RepeatModeToLoopStatus(settings.playerRepeatMode()));
+	_controls->setShuffle(settings.playerOrderMode() == OrderMode::Shuffle);
 }
 
 SystemMediaControlsManager::SystemMediaControlsManager()
@@ -254,11 +294,18 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		if (_videoDelegate) {
 			return;
 		}
-		if (_controls->seekingSupported()) {
-			const auto type = mediaPlayer->getActiveType();
-			_controls->setPosition(mediaPlayer->getState(type).position);
-		}
 		_controls->setPlaybackStatus(status);
+	}, _lifetime);
+
+	mediaPlayer->updatedNotifier(
+	) | trackFilter | rpl::map([=] {
+		return lookupPlaybackRate();
+	}) | rpl::distinct_until_changed(
+	) | rpl::on_next([=](float64 rate) {
+		if (_videoDelegate) {
+			return;
+		}
+		_controls->setPlaybackRate(rate);
 	}, _lifetime);
 
 	rpl::merge(
@@ -278,6 +325,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 				mediaPlayer->previousAvailable(type));
 			_controls->setIsPlayPauseEnabled(true);
 			_controls->setIsStopEnabled(true);
+			_controls->setIsSeekEnabled(true);
 			_controls->setPlaybackStatus(PlaybackStatus::Playing);
 			_controls->updateDisplay();
 		} else {
@@ -366,16 +414,6 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		_controls->setShuffle(mode == OrderMode::Shuffle);
 	}, _lifetime);
 
-	rpl::merge(
-		Core::App().settings().voicePlaybackSpeedChanges() | rpl::to_empty,
-		Core::App().settings().audioPlaybackSpeedChanges() | rpl::to_empty
-	) | rpl::on_next([=] {
-		if (_videoDelegate) {
-			return;
-		}
-		_controls->setPlaybackRate(lookupPlaybackRate());
-	}, _lifetime);
-
 	_controls->commandRequests(
 	) | rpl::on_next([=](Command command) {
 		if (_videoDelegate) {
@@ -390,7 +428,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 			case Command::Quit: _videoDelegate->smtcStop(); break;
 			case Command::SkipForward:
 			case Command::SkipBackward: {
-				if (_videoState.duration > 0) {
+				if (_videoState.seekable && _videoState.duration > 0) {
 					const auto delta = (command == Command::SkipForward)
 						? kSkipMs
 						: -kSkipMs;
@@ -462,6 +500,12 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		}
 	}, _lifetime);
 
+	// revert what a client wrote if it wasn't applied
+	_controls->commandRequests(
+	) | rpl::on_next([=](Command) {
+		syncLoopAndShuffleToControls();
+	}, _lifetime);
+
 	if (_controls->seekingSupported()) {
 		rpl::merge(
 			mediaPlayer->seekingChanges(AudioMsgId::Type::Song),
@@ -471,8 +515,7 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		}) | rpl::map([=] {
 			const auto type = mediaPlayer->getActiveType();
 			return mediaPlayer->getState(type).position;
-		}) | rpl::distinct_until_changed(
-		) | rpl::on_next([=](int position) {
+		}) | rpl::on_next([=](int position) {
 			if (_videoDelegate) {
 				return;
 			}
@@ -483,8 +526,10 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 		_controls->seekRequests(
 		) | rpl::on_next([=](float64 progress) {
 			if (_videoDelegate) {
-				_videoDelegate->smtcSeek(
-					crl::time(progress * _videoState.duration));
+				if (_videoState.seekable) {
+					_videoDelegate->smtcSeek(
+						crl::time(progress * _videoState.duration));
+				}
 				return;
 			}
 			const auto type = mediaPlayer->getActiveType();
@@ -499,6 +544,27 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 			}
 			const auto type = mediaPlayer->getActiveType();
 			_controls->setPosition(mediaPlayer->getState(type).position);
+		}, _lifetime);
+
+		_controls->playbackRateChangeRequests(
+		) | rpl::on_next([=](float64 rate) {
+			const auto actual = [=] {
+				return _videoDelegate
+					? _videoState.speed
+					: lookupPlaybackRate();
+			};
+			if (rate == actual()) {
+				return;
+			} else if (!std::isfinite(rate) || rate <= 0.) {
+			} else if (!_videoDelegate) {
+				applyAudioPlaybackSpeed(
+					std::clamp(rate, kSpeedMin, kSpeedMax));
+			} else if (_videoState.speedControllable) {
+				_videoDelegate->smtcSetSpeed(
+					std::clamp(rate, kSpeedMin, kSpeedMax));
+			}
+			// the value written by a client stays otherwise
+			_controls->setPlaybackRate(actual());
 		}, _lifetime);
 	}
 
@@ -521,13 +587,36 @@ SystemMediaControlsManager::SystemMediaControlsManager()
 			_controls->setVolume(volume);
 		}, _lifetime);
 
-		_controls->volumeChangeRequests(
-		) | rpl::on_next([](float64 volume) {
-			Player::mixer()->setSongVolume(volume);
-			if (volume > 0) {
-				Core::App().settings().setRememberedSongVolume(volume);
+		Core::App().settings().videoVolumeChanges(
+		) | rpl::on_next([=](float64 volume) {
+			if (_videoDelegate) {
+				_controls->setVolume(volume);
 			}
-			Core::App().settings().setSongVolume(volume);
+		}, _lifetime);
+
+		_controls->volumeChangeRequests(
+		) | rpl::on_next([=](float64 volume) {
+			const auto current = [=] {
+				return _videoDelegate
+					? Core::App().settings().videoVolume()
+					: Core::App().settings().songVolume();
+			};
+			const auto clamped = std::isnan(volume)
+				? current()
+				: std::clamp(volume, 0., 1.);
+			if (clamped == current()) {
+			} else if (_videoDelegate) {
+				_videoDelegate->smtcSetVolume(clamped);
+			} else {
+				Player::mixer()->setSongVolume(clamped);
+				if (clamped > 0) {
+					Core::App().settings().setRememberedSongVolume(clamped);
+				}
+				Core::App().settings().setSongVolume(clamped);
+				Core::App().saveSettingsDelayed();
+			}
+			// volume changes are silent if the value is the same
+			_controls->setVolume(current());
 		}, _lifetime);
 	}
 
@@ -548,6 +637,7 @@ void SystemMediaControlsManager::videoStart(
 	_controls->setEnabled(true);
 	_controls->setIsPlayPauseEnabled(true);
 	_controls->setIsStopEnabled(true);
+	_controls->setIsSeekEnabled(state.seekable);
 	_controls->setIsNextEnabled(state.nextAvailable);
 	_controls->setIsPreviousEnabled(state.previousAvailable);
 	_controls->setTitle(state.title);
@@ -556,8 +646,11 @@ void SystemMediaControlsManager::videoStart(
 	if (_controls->seekingSupported()) {
 		_controls->setDuration(state.duration);
 		_controls->setPosition(state.position);
-		_controls->setPlaybackRate(
-			Core::App().settings().videoPlaybackSpeed());
+		SetPlaybackRateRange(_controls.get(), state.speedControllable);
+		_controls->setPlaybackRate(state.speed);
+	}
+	if (_controls->volumeSupported()) {
+		_controls->setVolume(Core::App().settings().videoVolume());
 	}
 	_controls->setPlaybackStatus(state.playing
 		? PlaybackStatus::Playing
@@ -571,30 +664,36 @@ void SystemMediaControlsManager::videoUpdate(VideoState state) {
 	}
 	using PlaybackStatus
 		= base::Platform::SystemMediaControls::PlaybackStatus;
+	// position requests from inside the calls below read _videoState
+	const auto was = std::exchange(_videoState, state);
 	auto display = false;
-	if (state.title != _videoState.title) {
+	if (state.title != was.title) {
 		_controls->setTitle(state.title);
 		display = true;
 	}
-	if (state.artist != _videoState.artist) {
+	if (state.artist != was.artist) {
 		_controls->setArtist(state.artist);
 		display = true;
 	}
-	if (state.nextAvailable != _videoState.nextAvailable) {
+	if (state.nextAvailable != was.nextAvailable) {
 		_controls->setIsNextEnabled(state.nextAvailable);
 	}
-	if (state.previousAvailable != _videoState.previousAvailable) {
+	if (state.previousAvailable != was.previousAvailable) {
 		_controls->setIsPreviousEnabled(state.previousAvailable);
 	}
-	const auto statusChanged = (state.playing != _videoState.playing);
+	if (state.seekable != was.seekable) {
+		_controls->setIsSeekEnabled(state.seekable);
+	}
+	const auto statusChanged = (state.playing != was.playing);
 	if (_controls->seekingSupported()) {
-		if (state.duration != _videoState.duration) {
+		if (state.duration != was.duration) {
 			_controls->setDuration(state.duration);
 		}
-		if (statusChanged || !state.playing) {
-			_controls->setPosition(state.position);
-			_controls->setPlaybackRate(
-				Core::App().settings().videoPlaybackSpeed());
+		if (state.speedControllable != was.speedControllable) {
+			SetPlaybackRateRange(_controls.get(), state.speedControllable);
+		}
+		if (state.speed != was.speed) {
+			_controls->setPlaybackRate(state.speed);
 		}
 	}
 	if (statusChanged) {
@@ -605,7 +704,14 @@ void SystemMediaControlsManager::videoUpdate(VideoState state) {
 	if (display) {
 		_controls->updateDisplay();
 	}
-	_videoState = state;
+}
+
+void SystemMediaControlsManager::videoSeeked() {
+	if (!_inited || !_videoDelegate || !_controls->seekingSupported()) {
+		return;
+	}
+	_controls->setPosition(_videoState.position);
+	_controls->updateDisplay();
 }
 
 void SystemMediaControlsManager::videoSetThumbnail(const QImage &thumbnail) {

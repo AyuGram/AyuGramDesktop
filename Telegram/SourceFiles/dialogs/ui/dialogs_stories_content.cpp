@@ -7,7 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_stories_content.h"
 
+#include "api/api_stories.h"
+#include "apiwrap.h"
+#include "boxes/story_drafts_box.h"
+
 #include "base/unixtime.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -16,12 +22,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
+#include "data/data_story_drafts.h"
 #include "data/data_user.h"
 #include "dialogs/ui/dialogs_stories_list.h"
 #include "info/stories/info_stories_widget.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
+#include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "media/stories/media_stories_post.h"
 #include "media/stories/media_stories_stealth.h"
 #include "lang/lang_keys.h"
 #include "ui/dynamic_image.h"
@@ -34,6 +43,7 @@ namespace Dialogs::Stories {
 namespace {
 
 constexpr auto kShownLastCount = 3;
+constexpr auto kAddStoryButtonHiddenPref = "dialogs-add-story-hidden"_cs;
 
 class State final {
 public:
@@ -42,11 +52,17 @@ public:
 	[[nodiscard]] Content next();
 
 private:
+	using Userpics = base::flat_map<
+		not_null<PeerData*>,
+		std::shared_ptr<Ui::DynamicImage>>;
+
+	[[nodiscard]] std::shared_ptr<Ui::DynamicImage> userpic(
+		not_null<PeerData*> peer,
+		Userpics &used) const;
+	void applyUploads(Content &result, Userpics &userpics);
 	const not_null<Data::Stories*> _data;
 	const Data::StorySourcesList _list;
-	base::flat_map<
-		not_null<PeerData*>,
-		std::shared_ptr<Ui::DynamicImage>> _userpics;
+	Userpics _userpics;
 
 };
 
@@ -59,34 +75,100 @@ Content State::next() {
 	const auto &sources = _data->sources(_list);
 	auto result = Content{ .total = int(sources.size()) };
 	result.elements.reserve(sources.size());
-	auto userpics = base::flat_map<
-		not_null<PeerData*>,
-		std::shared_ptr<Ui::DynamicImage>>();
+	auto userpics = Userpics();
 	userpics.reserve(sources.size());
 	for (const auto &info : sources) {
 		const auto source = _data->source(info.id);
 		Assert(source != nullptr);
 
-		auto userpic = std::shared_ptr<Ui::DynamicImage>();
 		const auto peer = source->peer;
-		if (const auto i = _userpics.find(peer); i != end(_userpics)) {
-			userpic = i->second;
-		} else {
-			userpic = Ui::MakeUserpicThumbnail(peer, true);
-		}
-		userpics.emplace(peer, userpic);
-		result.elements.push_back({
-			.id = uint64(peer->id.value),
-			.name = peer->shortName(),
-			.thumbnail = std::move(userpic),
-			.count = info.count,
-			.unreadCount = info.unreadCount,
-			.hasVideoStream = info.hasVideoStream ? 1U : 0U,
-			.skipSmall = peer->isSelf() ? 1U : 0U,
-		});
+		result.elements.push_back(
+			{
+				.id = uint64(peer->id.value),
+				.name = peer->shortName(),
+				.thumbnail = userpic(peer, userpics),
+				.count = info.count,
+				.unreadCount = info.unreadCount,
+				.hasVideoStream = info.hasVideoStream
+					? 1U
+					: 0U,
+				.skipSmall = peer->isSelf() ? 1U : 0U,
+				.mine = peer->isSelf() ? 1U : 0U,
+				.mineUnread = (peer->isSelf()
+					&& !source->ids.empty()
+					&& source->ids.back().id
+						> _data->viewedSelfTill())
+					? 1U
+					: 0U,
+			});
+	}
+	if (_list == Data::StorySourcesList::NotHidden) {
+		applyUploads(result, userpics);
+		const auto self = _data->session().user();
+		result.placeMyStoryFirst(Media::Stories::CanPostStory(self)
+			? Fn<Element()>([&] {
+				return Element{
+					.id = uint64(self->id.value),
+					.name = tr::lng_stories_my_name(
+						tr::now),
+					.thumbnail = userpic(self, userpics),
+					.skipSmall = 1U,
+					.mine = 1U,
+				};
+			})
+			: nullptr);
 	}
 	_userpics = std::move(userpics);
 	return result;
+}
+
+std::shared_ptr<Ui::DynamicImage> State::userpic(
+		not_null<PeerData*> peer,
+		Userpics &used) const {
+	const auto i = _userpics.find(peer);
+	return used.emplace(
+		peer,
+		(i != end(_userpics))
+			? i->second
+			: Ui::MakeUserpicThumbnail(peer, true)).first->second;
+}
+
+void State::applyUploads(Content &result, Userpics &userpics) {
+	const auto &uploads = _data->session().api().stories().uploads();
+	for (const auto &upload : uploads) {
+		const auto peer = upload.peer;
+		const auto id = uint64(peer->id.value);
+		const auto i = ranges::find(result.elements, id, &Element::id);
+		const auto progress = uint32(std::clamp(
+			int(std::round(upload.progress * 100)),
+			0,
+			100));
+		if (i != end(result.elements)) {
+			i->uploading = 1;
+			i->mineUnread = 1;
+			i->uploadFailed = upload.error.isEmpty() ? 0U : 1U;
+			i->uploadProgress = progress;
+			continue;
+		}
+		result.elements.insert(
+			begin(result.elements),
+			{
+				.id = id,
+				.name = (peer->isSelf()
+					? tr::lng_story_my_story(tr::now)
+					: peer->shortName()),
+				.thumbnail = userpic(peer, userpics),
+				.skipSmall = peer->isSelf() ? 1U : 0U,
+				.mine = peer->isSelf() ? 1U : 0U,
+				.mineUnread = 1U,
+				.uploading = 1,
+				.uploadFailed = upload.error.isEmpty()
+					? 0U
+					: 1U,
+				.uploadProgress = progress,
+			});
+		++result.total;
+	}
 }
 
 } // namespace
@@ -100,9 +182,12 @@ rpl::producer<Content> ContentForSession(
 		const auto state = result.make_state<State>(stories, list);
 		rpl::single(
 			rpl::empty
-		) | rpl::then(
-			stories->sourcesChanged(list)
-		) | rpl::on_next([=] {
+		) | rpl::then(rpl::merge(
+			stories->sourcesChanged(list),
+			session->api().stories().uploadsChanges(),
+			session->appConfig().refreshed(),
+			stories->viewedSelfTillChanged()
+		)) | rpl::on_next([=] {
 			consumer.put_next(state->next());
 		}, result);
 		return result;
@@ -222,7 +307,30 @@ void FillSourceMenu(
 	const auto owner = &controller->session().data();
 	const auto peer = owner->peer(PeerId(request.id));
 	const auto &add = request.callback;
+	const auto api = &controller->session().api().stories();
+	for (const auto &upload : api->uploads()) {
+		if (upload.peer != peer || upload.error.isEmpty()) {
+			continue;
+		}
+		const auto id = upload.id;
+		add(tr::lng_story_upload_retry(tr::now), [=] {
+			api->retry(id);
+		}, &st::menuIconRestore);
+		add(tr::lng_story_upload_cancel(tr::now), [=] {
+			api->remove(id);
+		}, &st::menuIconDelete);
+	}
+	if (!peer->isSelf() && Media::Stories::CanPostStory(peer)) {
+		add(tr::lng_story_post_button(tr::now), [=] {
+			Media::Stories::PostStory(controller, peer);
+		}, &st::menuIconStoryPost);
+	}
 	if (peer->isSelf()) {
+		if (owner->stories().drafts().count() > 0) {
+			add(tr::lng_story_drafts_button(tr::now), [=] {
+				ShowStoryDraftsBox(controller);
+			}, &st::menuIconEdit);
+		}
 		add(tr::lng_stories_archive_button(tr::now), [=] {
 			controller->showSection(Info::Stories::Make(
 				peer,
@@ -231,6 +339,11 @@ void FillSourceMenu(
 		add(tr::lng_stories_my_title(tr::now), [=] {
 			controller->showSection(Info::Stories::Make(peer));
 		}, &st::menuIconStoriesSavedSection);
+		if (AddStoryButtonHidden()) {
+			add(tr::lng_profile_action_return_story_button(tr::now), [] {
+				SetAddStoryButtonHidden(false);
+			}, &st::menuIconStoryPost);
+		}
 	} else {
 		const auto group = peer->isMegagroup();
 		const auto channel = peer->isChannel();
@@ -276,6 +389,14 @@ void FillSourceMenu(
 			}, &st::menuIconUnarchive);
 		}
 	}
+}
+
+bool AddStoryButtonHidden() {
+	return Core::App().settings().readPref<bool>(kAddStoryButtonHiddenPref);
+}
+
+void SetAddStoryButtonHidden(bool hidden) {
+	Core::App().settings().writePref<bool>(kAddStoryButtonHiddenPref, hidden);
 }
 
 } // namespace Dialogs::Stories

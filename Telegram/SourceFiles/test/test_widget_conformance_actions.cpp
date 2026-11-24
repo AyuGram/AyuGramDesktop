@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "test/test_log.h"
 #include "test/test_palette.h"
 #include "test/test_runner.h"
+#include "test/test_widget_conformance_death.h"
 #include "test/test_widget_conformance_input.h"
 #include "test/test_widget_conformance_state.h"
 #include "test/test_widget_fixture.h"
@@ -284,15 +285,16 @@ void EndInput(ConformanceRun &run, int i) {
 		const ConformanceState &state,
 		const ConformanceRun &run) {
 	const auto runtime = FixtureOwnRuntime(*state.fixture, run.message->id);
-	const auto frozen = ReadWidgetOps(*run.message->tap).fatalFrozen;
+	const auto reading = ReadWidgetOps(*run.message->tap);
+	const auto charged = WidgetTapCharged(reading);
 	return !WidgetFixtureItem(*state.fixture, run.message->id)
 		? u"the widget message is gone"_q
 		: !runtime
 		? u"the list shows no runtime for the card"_q
 		: (runtime->state() != RuntimeState::Live)
 		? (u"the runtime is "_q + RuntimeStateName(runtime->state()))
-		: (frozen > 0)
-		? u"the host sent a fatal frozen notice"_q
+		: charged
+		? DeathPlaceholder(true)
 		: QString();
 }
 
@@ -635,11 +637,14 @@ void ResolveAction(ConformanceRun &run, int i) {
 		FullMsgId id) {
 	const auto runtime = fixture ? FixtureOwnRuntime(*fixture, id) : nullptr;
 	const auto core = runtime ? runtime->interactive() : nullptr;
-	return core
-		? u"pressed=%1 hovered=%2"_q.arg(
-			NumberText(core->pressed() ? 1 : 0),
-			NumberText(core->hovered() ? 1 : 0))
-		: u"no core"_q;
+	if (!core) {
+		return u"no core"_q;
+	}
+	const auto hovered = (HistoryView::Element::HoveredLink()
+		== runtime->view().get());
+	return u"pressed=%1 hovered=%2"_q.arg(
+		NumberText(core->pressed() ? 1 : 0),
+		NumberText(hovered ? 1 : 0));
 }
 
 void StartSequence(
@@ -874,12 +879,24 @@ void PerformKey(ConformanceState &state, ConformanceRun &run, int i) {
 	return (restored ? 1 : 0) + (switched ? 1 : 0);
 }
 
-[[nodiscard]] bool SchemeReached(
+// The widget's theme since the action's first reading: its own effective
+// reading at a theme applied after that reading (CheckWidgetTheme(), as the
+// load and stress readers judge it). Missing or superseded is Unobserved, a
+// reading of another theme Wrong.
+[[nodiscard]] WidgetThemeCheck SwitchedTheme(
 		const Action &live,
 		const WidgetOpsLatest &latest) {
-	return (latest.generation == live.before.generation)
-		&& (latest.scheme == ThemeTarget(live).toStdString())
-		&& (latest.schemeChanges > live.before.schemeChanges);
+	const auto target = ThemeTarget(live).toStdString();
+	return CheckWidgetTheme(latest, target, &live.before);
+}
+
+[[nodiscard]] QString VerdictName(WidgetThemeVerdict verdict) {
+	switch (verdict) {
+	case WidgetThemeVerdict::Matches: return u"matches"_q;
+	case WidgetThemeVerdict::Unobserved: return u"unobserved"_q;
+	case WidgetThemeVerdict::Wrong: return u"wrong"_q;
+	}
+	return u"unknown"_q;
 }
 
 // The chain's restore and switch of the action, judged whether or not
@@ -930,17 +947,28 @@ void JudgeTheme(
 		return true;
 	}
 	const auto latest = ReadWidgetOpsLatest(*run.message->tap);
-	return SchemeReached(live, latest)
+	const auto check = SwitchedTheme(live, latest);
+	return (check.verdict == WidgetThemeVerdict::Matches)
 		|| (crl::now() - live.waitStarted >= kThemeBound);
 }
 
-void RecordTheme(ConformanceRun &run, int i) {
+// The switch's record and verdict: a refused palette chain, a runtime no
+// longer live when the wait ended (whatever the tap read late), and a
+// widget theme left unobserved are refusals of the action; a measured
+// wrong theme leaves the action performed, as delivered input the product
+// mishandled, and fails the run with its own runner refusal.
+void RecordTheme(
+		const ConformanceState &state,
+		ConformanceRun &run,
+		int i) {
 	auto &actions = *run.live;
 	auto &live = actions.actions[i];
 	if (live.finished) {
 		return;
 	}
+	const auto dead = LiveRefusal(state, run);
 	const auto latest = ReadWidgetOpsLatest(*run.message->tap);
+	const auto check = SwitchedTheme(live, latest);
 	const auto transitions = Transitions(live);
 	const auto &switched = *live.switched;
 	live.json.insert(u"palette"_q, QJsonObject{
@@ -960,7 +988,22 @@ void RecordTheme(ConformanceRun &run, int i) {
 		},
 		{ u"generationBefore"_q, live.before.generation },
 		{ u"generationAfter"_q, latest.generation },
-		{ u"reached"_q, SchemeReached(live, latest) },
+		{ u"appliedBefore"_q, live.before.appliedThemes },
+		{ u"appliedAfter"_q, latest.appliedThemes },
+		{ u"effectiveSerial"_q, latest.effectiveSerial },
+		{
+			u"effectiveScheme"_q,
+			QString::fromStdString(latest.effectiveScheme),
+		},
+		{ u"verdict"_q, VerdictName(check.verdict) },
+		{ u"detail"_q, QString::fromStdString(check.detail) },
+		{
+			u"reached"_q,
+			dead.isEmpty() && (check.verdict == WidgetThemeVerdict::Matches),
+		},
+		{ u"liveRefusal"_q, dead },
+		{ u"pending"_q, qint64(latest.themePending) },
+		{ u"hostRetired"_q, latest.hostRetired },
 		{ u"waitMs"_q, qint64(crl::now() - live.waitStarted) },
 		{ u"themeMessage"_q, QString::fromStdString(latest.themeMessage) },
 	});
@@ -990,7 +1033,24 @@ void RecordTheme(ConformanceRun &run, int i) {
 					NumberText(transitions),
 					NumberText(switched.after.night ? 1 : 0),
 					ThemeTarget(live)));
+	} else if (!dead.isEmpty()) {
+		Conclude(run, i, u"not-live"_q, dead);
+	} else if (check.verdict == WidgetThemeVerdict::Unobserved) {
+		Conclude(
+			run,
+			i,
+			u"theme-unobserved"_q,
+			QString::fromStdString(check.detail));
 	} else {
+		if (check.verdict == WidgetThemeVerdict::Wrong) {
+			AddRefusal(
+				run,
+				u"theme-mismatch"_q,
+				u"%1 to %2: %3"_q.arg(
+					ActionTitle(run, i),
+					ThemeTarget(live),
+					QString::fromStdString(check.detail)));
+		}
 		Conclude(run, i, QString(), QString());
 	}
 }
@@ -1633,7 +1693,7 @@ void AppendTheme(
 			return ThemeDecided(*state, state->runs[index], i);
 		},
 		.then = [=] {
-			RecordTheme(state->runs[index], i);
+			RecordTheme(*state, state->runs[index], i);
 		},
 		.timeout = kThemeBound + kDefaultStageTimeout,
 	});

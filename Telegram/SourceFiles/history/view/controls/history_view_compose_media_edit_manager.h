@@ -51,6 +51,10 @@ public:
 		std::shared_ptr<ChatHelpers::Show> show = nullptr);
 
 	[[nodiscard]] Image *mediaPreview();
+	static void PaintPreviewHover(
+		Painter &p,
+		QRect rect,
+		float64 opacity);
 	void paintCoverUpload(Painter &p, QRect to);
 
 	[[nodiscard]] bool spoilered() const;

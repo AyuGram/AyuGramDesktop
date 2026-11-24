@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_restore_shell.h"
 
+#include "base/platform/base_platform_info.h"
 #include "base/event_filter.h"
 #include "lang/lang_keys.h"
 #include "platform/platform_main_window.h"
@@ -32,6 +33,10 @@ RestoreShell::RestoreShell(
 	_window->setMinimumSize(
 		QSize(st::windowShellMinWidth, st::windowShellMinHeight));
 	setupBody();
+	if (Platform::IsWindows()) {
+		// Only a native window is placed with its target screen's metrics.
+		_window->createWinId();
+	}
 	applyPosition(position);
 	base::install_event_filter(_window.get(), [=](not_null<QEvent*> e) {
 		if (e->type() == QEvent::Close) {
@@ -117,12 +122,10 @@ Core::WindowPosition RestoreShell::countPositionForSave() const {
 	}
 	if (state == Qt::WindowMaximized || state == Qt::WindowFullScreen) {
 		result.maximized = 1;
-		const auto normal = _window->normalGeometry().marginsRemoved(
-			_window->frameMargins());
-		result.x = normal.x() - screenGeometry.x();
-		result.y = normal.y() - screenGeometry.y();
-		result.w = normal.width();
-		result.h = normal.height();
+		result.x = _normalBody.x() - screenGeometry.x();
+		result.y = _normalBody.y() - screenGeometry.y();
+		result.w = _normalBody.width();
+		result.h = _normalBody.height();
 		return result;
 	}
 	const auto body = _window->body();
@@ -165,6 +168,7 @@ void RestoreShell::applyPosition(Core::WindowPosition position) {
 		initial,
 		QSize(st::windowShellMinWidth, st::windowShellMinHeight),
 		u"Shell"_q);
+	_normalBody = geometry;
 	_window->setGeometry(geometry);
 	if (position.maximized) {
 		_window->setWindowState(Qt::WindowMaximized);

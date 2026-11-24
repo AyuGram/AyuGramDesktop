@@ -24,8 +24,10 @@ inline constexpr auto kManifestIdScheme = 6;
 [[nodiscard]] int RecoverLangIdFromSerialized(quint64 raw, int scheme);
 
 [[nodiscard]] inline int LangIdSchemeForAppVersion(int version) {
-#if defined Q_OS_MAC || defined Q_PROCESSOR_ARM
+#if defined Q_OS_MACOS || defined Q_PROCESSOR_ARM
 	return kManifestIdScheme;
+#elif defined Q_OS_LINUX
+	return (version > 0 && version < 3001012) ? 5 : kManifestIdScheme;
 #else
 	return (version > 0 && version < 7003002) ? 5 : kManifestIdScheme;
 #endif

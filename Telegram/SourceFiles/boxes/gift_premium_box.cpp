@@ -484,6 +484,8 @@ using SpinnerState = Data::GiftUpgradeSpinner::State;
 	return result;
 }
 
+} // namespace
+
 void AddUniqueGiftPropertyRows(
 		not_null<Ui::RpWidget*> container,
 		std::shared_ptr<ChatHelpers::Show> show,
@@ -611,6 +613,8 @@ void AddUniqueGiftPropertyRows(
 			SpinnerState::FinishedBackdrop),
 		margin);
 }
+
+namespace {
 
 [[nodiscard]] object_ptr<Ui::RpWidget> MakeStarGiftStarsValue(
 		not_null<Ui::TableLayout*> table,
@@ -1149,7 +1153,7 @@ void GiveawayInfoBox(
 		: (rpl::producer<TextWithEntities>)(nullptr);
 
 	if (resultText) {
-		const auto &st = st::changePhoneDescription;
+		const auto &st = st::giveawayResultLabel;
 		const auto skip = st.style.font->height * 0.5;
 		auto label = object_ptr<Ui::FlatLabel>(
 			box.get(),
@@ -1162,7 +1166,7 @@ void GiveawayInfoBox(
 			object_ptr<Ui::PaddingWrap<Ui::FlatLabel>>(
 				box.get(),
 				std::move(label),
-				QMargins(0, skip, 0, skip)),
+				QMargins(skip, skip, skip, skip)),
 			style::al_justify);
 		result->paintRequest() | rpl::on_next([=] {
 			auto p = QPainter(result);
@@ -1529,7 +1533,7 @@ void AddStarGiftTable(
 				show,
 				PeerId(entry.bareGiftResaleRecipientId)),
 			st::giveawayGiftCodePeerMargin);
-	} else if (unique && entry.bareGiftOwnerId) {
+	} else if (unique && !unique->fixedSale && entry.bareGiftOwnerId) {
 		const auto ownerId = PeerId(entry.bareGiftOwnerId);
 		const auto was = std::make_shared<std::optional<CollectibleId>>();
 		const auto handleChange = [=](
@@ -1560,7 +1564,7 @@ void AddStarGiftTable(
 			MakePeerWithStatusValue(table, show, ownerId, handleChange),
 			st::giveawayGiftCodePeerMargin);
 	} else if (unique) {
-		if (!unique->ownerName.isEmpty()) {
+		if (!unique->fixedSale && !unique->ownerName.isEmpty()) {
 			AddTableRow(
 				table,
 				tr::lng_gift_unique_owner(),

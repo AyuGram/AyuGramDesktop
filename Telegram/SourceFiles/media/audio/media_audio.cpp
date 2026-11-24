@@ -147,8 +147,8 @@ void Start(not_null<Instance*> instance) {
 	qRegisterMetaType<AudioMsgId>();
 	qRegisterMetaType<VoiceWaveform>();
 
-	const auto loglevel = getenv("ALSOFT_LOGLEVEL");
-	LOG(("OpenAL Logging Level: %1").arg(loglevel ? loglevel : "(not set)"));
+	LOG(("OpenAL Logging Level: %1").arg(
+		qEnvironmentVariable("ALSOFT_LOGLEVEL", u"(not set)"_q)));
 
 	MixerInstance = new Player::Mixer(instance);
 }
@@ -981,7 +981,8 @@ void Mixer::stop(const AudioMsgId &audio, State state) {
 }
 
 void Mixer::stopAndClear() {
-	Track *current_audio = nullptr, *current_song = nullptr;
+	auto current_audio = (Track*)nullptr;
+	auto current_song = (Track*)nullptr;
 	{
 		QMutexLocker lock(&AudioMutex);
 		if ((current_audio = trackForType(AudioMsgId::Type::Voice))) {
