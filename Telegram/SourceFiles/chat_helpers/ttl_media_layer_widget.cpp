@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_screenshot_protection.h"
 #include "data/data_document.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_session.h"
 #include "editor/editor_layer_widget.h"
 #include "history/history.h"
@@ -210,15 +211,43 @@ PreviewWrap::PreviewWrap(
 		close->setFullRadius(true);
 		close->setClickedCallback(closeCallback);
 
+		// AyuGram: let the user save an incoming view-once media
+		// right from the viewer.
+		const auto document = item->media()
+			? item->media()->document()
+			: nullptr;
+		const auto save = (document && !item->out())
+			? Ui::CreateChild<Ui::RoundButton>(
+				this,
+				(isRound
+					? tr::lng_context_save_video()
+					: tr::lng_context_save_audio_file()),
+				st::ttlMediaButton)
+			: nullptr;
+		if (save) {
+			save->setFullRadius(true);
+			const auto itemId = item->fullId();
+			save->setClickedCallback([=] {
+				DocumentSaveClickHandler::SaveAndTrack(
+					itemId,
+					document,
+					DocumentSaveClickHandler::Mode::ToNewFile);
+			});
+		}
+
 		rpl::combine(
 			sizeValue(),
 			_elementInner.value()
 		) | rpl::on_next([=](QSize size, QRect inner) {
-			close->moveToLeft(
-				inner.x() + (inner.width() - close->width()) / 2,
-				(size.height()
-					- close->height()
-					- st::ttlMediaButtonBottomSkip));
+			const auto skip = st::ttlMediaButtonBottomSkip;
+			const auto top = size.height() - close->height() - skip;
+			const auto full = close->width()
+				+ (save ? (skip + save->width()) : 0);
+			const auto left = inner.x() + (inner.width() - full) / 2;
+			close->moveToLeft(left, top);
+			if (save) {
+				save->moveToLeft(left + close->width() + skip, top);
+			}
 		}, close->lifetime());
 	}
 

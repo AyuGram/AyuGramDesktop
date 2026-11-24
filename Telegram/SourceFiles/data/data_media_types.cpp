@@ -1096,9 +1096,12 @@ MediaFile::MediaFile(
 , _spoiler(args.spoiler) {
 	parent->history()->owner().registerDocumentItem(_document, parent);
 
-	if (_ttlSeconds) {
-		_document->setForbidsFileSave();
-	}
+	// AyuGram: allow downloading files with ttl (see ItemHasTtl),
+	// otherwise "Save As..." for view-once round / voice messages
+	// is shown in the context menu but silently does nothing.
+	//if (_ttlSeconds) {
+	//	_document->setForbidsFileSave();
+	//}
 
 	if (!_emoji.isEmpty()) {
 		if (const auto emoji = Ui::Emoji::Find(_emoji)) {
