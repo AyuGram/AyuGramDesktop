@@ -31,6 +31,10 @@ inline bool SkipTaskbarSupported() {
 
 void ActivateThisProcess();
 
+// Writes the chosen AyuGram icon into the app bundle,
+// so it stays in Dock and Finder while the app is closed.
+void SaveApplicationIconToBundle();
+
 inline uint64 ActivationWindowId(not_null<QWidget*> window) {
 	return 1;
 }

@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/audio/media_audio.h"
 #include "window/window_controller.h"
 #include "base/platform/mac/base_utilities_mac.h"
+#include "base/platform/base_platform_custom_app_icon.h"
 #include "base/platform/base_platform_info.h"
 #include "base/timer.h"
 #include "styles/style_window.h"
@@ -208,6 +209,47 @@ void SetApplicationIcon(const QIcon &icon) {
             NSApplication.sharedApplication.applicationIconImage = icon;
         }
     }
+}
+
+void SaveApplicationIconToBundle() {
+#ifndef OS_MAC_STORE
+	const auto &settings = AyuSettings::getInstance();
+	const auto resource = settings.appIcon().isEmpty()
+		? QString("AppIcon-Default")
+		: (QString("AppIcon-")
+			+ settings.appIcon()[0].toUpper()
+			+ settings.appIcon().mid(1));
+	if (resource == QString("AppIcon-Default")) {
+		base::Platform::ClearCustomAppIcon();
+		return;
+	}
+	auto image = QImage();
+	@autoreleasepool {
+		NSImage *icon = [NSBundle.mainBundle
+			imageForResource:Q2NSString(resource)];
+		NSRect rect = NSMakeRect(0, 0, 1024, 1024);
+		CGImageRef cgImage = icon
+			? [icon CGImageForProposedRect:&rect context:nil hints:nil]
+			: nil;
+		if (cgImage) {
+			NSBitmapImageRep *rep = [[NSBitmapImageRep alloc]
+				initWithCGImage:cgImage];
+			NSData *png = [rep
+				representationUsingType:NSBitmapImageFileTypePNG
+				properties:@{}];
+			if (png) {
+				image = QImage::fromData(QByteArray::fromNSData(png), "PNG");
+			}
+			[rep release];
+		}
+	}
+	if (image.isNull()) {
+		LOG(("Icon Error: Could not load \"%1\" from the bundle."
+			).arg(resource));
+		return;
+	}
+	base::Platform::SetCustomAppIcon(std::move(image));
+#endif // OS_MAC_STORE
 }
 
 } // namespace Platform

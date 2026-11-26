@@ -11,6 +11,7 @@
 #include "ayu/ui/ayu_logo.h"
 #include "core/application.h"
 #include "main/main_domain.h"
+#include "platform/platform_specific.h"
 #include "styles/style_ayu_styles.h"
 #include "ui/painter.h"
 #include "window/main_window.h"
@@ -43,6 +44,10 @@ void applyIcon() {
 #ifdef Q_OS_WIN
 	AyuAssets::loadAppIco();
 	reloadAppIconFromTaskBar();
+#endif
+
+#ifdef Q_OS_MAC
+	Platform::SaveApplicationIconToBundle();
 #endif
 
 	Window::OverrideApplicationIcon(AyuAssets::currentAppLogo());
