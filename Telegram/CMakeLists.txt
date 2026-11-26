@@ -2628,6 +2628,23 @@ endif()
 
 set_target_properties(Telegram PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${output_folder})
 
+if (APPLE AND NOT build_macstore AND NOT CMAKE_GENERATOR STREQUAL Xcode)
+    # Xcode signs the bundle itself. Other generators leave only the
+    # linker's ad-hoc signature on the executable, without the bundle
+    # identifier or a sealed Info.plist, so macOS can't match the app to
+    # the microphone and camera permissions the user granted.
+    set(AYU_MAC_CODESIGN_IDENTITY "-" CACHE STRING
+        "Identity to sign the macOS app bundle with, \"-\" for ad-hoc.")
+    add_custom_command(TARGET Telegram
+    POST_BUILD
+        COMMAND codesign --force --deep
+            --sign "${AYU_MAC_CODESIGN_IDENTITY}"
+            --entitlements "${CMAKE_CURRENT_SOURCE_DIR}/Telegram/${bundle_entitlements}"
+            "$<TARGET_BUNDLE_DIR:Telegram>"
+        VERBATIM
+    )
+endif()
+
 if (MSVC)
     target_link_libraries(Telegram
     PRIVATE
