@@ -88,7 +88,19 @@ def inline_rpl_handler(node, arguments, opening_line, line_at):
         and line_at(lifetime.start_byte) == line_at(lifetime.end_byte - 1))
 
 
-def call_layout_error(node, line_at):
+def inline_final_lambda(arguments, opening_line, source, line_starts, line_at):
+    if len(arguments) != 2:
+        return False
+    value, callback = arguments
+    if value.type == "lambda_expression" or callback.type != "lambda_expression":
+        return False
+    body = callback.child_by_field_name("body")
+    return (body is not None
+        and line_at(body.start_byte) == opening_line
+        and fits_width(source[line_starts[opening_line - 1]:body.start_byte + 1]))
+
+
+def call_layout_error(node, source, line_starts, line_at):
     call = node.child_by_field_name("arguments")
     if call is None or call.has_error:
         return None
@@ -101,7 +113,9 @@ def call_layout_error(node, line_at):
     if len(arguments) <= 1:
         return None
     if (inline_lambda_branches(node, arguments, opening_line, line_at)
-            or inline_rpl_handler(node, arguments, opening_line, line_at)):
+            or inline_rpl_handler(node, arguments, opening_line, line_at)
+            or inline_final_lambda(
+                arguments, opening_line, source, line_starts, line_at)):
         return None
     previous_line = opening_line
     for argument in arguments:
@@ -208,7 +222,7 @@ def include_blocks(source, root, line_starts, line_at):
         block = []
         for node in pending.pop().named_children:
             path = node.child_by_field_name("path") if node.type == "preproc_include" else None
-            if path is not None and path.type in ("string_literal", "system_lib_string"):
+            if path is not None and path.type == "string_literal":
                 start = line_starts[line_at(node.start_byte) - 1]
                 end = node.end_byte
                 line = source[start:end]
@@ -236,15 +250,12 @@ def include_sort_key(name):
 def include_edits(source, root, path, line_starts, line_at):
     own = os.fsencode(Path(path).with_suffix(".h").as_posix()) if path else None
     for block in include_blocks(source, root, line_starts, line_at):
-        groups = [[], [], [], []]
+        groups = [[], [], []]
         for _, _, name, line in block:
             header = name[1:-1]
-            if (own is not None and name.startswith(b'"')
-                    and (own == header or own.endswith(b"/" + header))):
+            if own is not None and (own == header or own.endswith(b"/" + header)):
                 group = 0
             elif name.startswith(b'"styles/style_'):
-                group = 3
-            elif name.startswith(b"<"):
                 group = 2
             else:
                 group = 1
@@ -655,7 +666,7 @@ def layout_errors(source, added_lines, path=""):
                 change = bisect_left(added_lines, first)
                 if change < len(added_lines) and added_lines[change] <= arrow:
                     yield first, MEMBER_CALL_MESSAGE
-            error = call_layout_error(node, line_at)
+            error = call_layout_error(node, source, line_starts, line_at)
             if error is not None:
                 yield error
         elif node.type in ("init_declarator", "assignment_expression"):

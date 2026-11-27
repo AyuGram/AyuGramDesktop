@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_utility.h"
 
+#include "ffmpeg/ffmpeg_utility.h"
 #include "media/streaming/media_streaming_common.h"
 #include "ui/image/image_prepare.h"
 #include "ui/painter.h"
-#include "ffmpeg/ffmpeg_utility.h"
 
 namespace Media {
 namespace Streaming {
@@ -57,8 +57,12 @@ FFmpeg::AvErrorWrap ProcessPacket(Stream &stream, FFmpeg::Packet &&packet) {
 		native->data ? native : nullptr); // Drain on eof.
 	if (error.code() == AVERROR(ENOSYS) && stream.softwareFallback) {
 		// Hardware-only decoder couldn't get hardware acceleration
-		if (auto codec = FFmpeg::MakeCodecPointer(
-				*base::take(stream.softwareFallback))) {
+		stream.softwareFallback = false;
+		if (auto codec = FFmpeg::MakeCodecPointer({
+				.parameters = stream.parameters.get(),
+				.timeBase = stream.timeBase,
+				.videoMaxArea = kMaxFrameArea,
+			})) {
 			stream.codec = std::move(codec);
 			error = avcodec_send_packet(
 				stream.codec.get(),

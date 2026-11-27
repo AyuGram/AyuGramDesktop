@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 
 using "ui/basic.style";
+using "ui/chat/chat.style";
 using "ui/widgets/widgets.style";
 using "ui/menu_icons.style";
 using "media/player/media_player.style";
@@ -590,6 +591,9 @@ storiesMenuWithIcons: mediaviewMenu;
 storiesPopupMenuWithIcons: PopupMenu(storiesPopupMenu) {
 	scrollPadding: margins(0px, 5px, 0px, 5px);
 	menu: storiesMenuWithIcons;
+}
+storiesMusicMenuTitle: FlatLabel(historyHasCustomEmoji) {
+	textFg: groupCallMemberNotJoinedStatus;
 }
 storiesMenuWithIconsAttention: Menu(storiesMenuWithIcons) {
 	itemFg: attentionButtonFg;
@@ -1196,6 +1200,7 @@ storiesStealthToast: Toast(defaultMultilineToast) {
 
 storiesStealthStyle: StealthBoxStyle {
 	box: storiesStealthBox;
+	dark: true;
 	buttonLabel: FlatLabel(defaultFlatLabel) {
 		style: semiboldTextStyle;
 		textFg: storiesComposeWhiteText;
@@ -1219,6 +1224,21 @@ storiesStealthStyle: StealthBoxStyle {
 	featureNextIcon: icon{{ "stories/stealth_25m", storiesComposeBlue }};
 	logoIcon: icon{{ "stories/stealth_logo", storiesComposeWhiteText }};
 	logoBg: storiesComposeBlue;
+}
+
+storiesPremiumPreviewBox: Box(groupCallBox) {
+	buttonPadding: margins(12px, 12px, 12px, 12px);
+	buttonHeight: 44px;
+}
+storiesPremiumPreviewLimits: PremiumLimits(defaultPremiumLimits) {
+	listTitle: FlatLabel(defaultFlatLabel) {
+		textFg: groupCallMembersFg;
+		palette: groupCallTextPalette;
+	}
+	listAbout: FlatLabel(boxDividerLabel) {
+		textFg: groupCallMemberNotJoinedStatus;
+		palette: groupCallTextPalette;
+	}
 }
 
 storiesSendStoryRadio: Radio(defaultRadio) {

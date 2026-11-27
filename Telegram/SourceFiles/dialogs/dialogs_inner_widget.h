@@ -11,12 +11,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "base/timer.h"
 #include "data/data_messages.h"
-#include "dialogs/dialogs_archive_slide.h"
-#include "dialogs/dialogs_removed_row_slide.h"
 #include "dialogs/ui/dialogs_quick_action_context.h"
+#include "dialogs/dialogs_archive_slide.h"
 #include "dialogs/dialogs_community_rows_view.h"
 #include "dialogs/dialogs_inner_widget_accessibility.h"
 #include "dialogs/dialogs_key.h"
+#include "dialogs/dialogs_removed_row_slide.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/animations.h"
 #include "ui/dragging_scroll_manager.h"
@@ -630,7 +630,9 @@ private:
 	bool restoreChatsFilterScrollState(FilterId filterId);
 
 	[[nodiscard]] not_null<Ui::QuickActionContext*> ensureQuickAction(
-		int64 key);
+		int64 key,
+		Ui::QuickActionTrigger trigger);
+	[[nodiscard]] Ui::QuickActionContext *activeMiddleQuickAction() const;
 	void deactivateQuickAction();
 	void updateQuickActionRow(int64 key);
 

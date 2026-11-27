@@ -8,11 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/editor_video_layer_button.h"
 
 #include "lang/lang_keys.h"
+#include "ui/effects/ripple_animation.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
-#include "ui/effects/ripple_animation.h"
-#include "styles/style_editor.h"
 #include "ui/ui_utility.h"
+
+#include "styles/style_audio_disc_button.h"
+#include "styles/style_editor.h"
 
 #include <QtGui/QPainterPath>
 
@@ -20,7 +22,7 @@ namespace Editor {
 namespace {
 
 constexpr auto kTooltipDelay = crl::time(1000);
-constexpr auto kBadgeHaloTopLeft = QPointF(12., 11.);
+constexpr auto kBadgeHaloTopLeft = QPointF(13.5, 12.25);
 constexpr auto kBadgeHaloSide = 15.;
 constexpr auto kIconViewBoxSide = 24.;
 
@@ -28,7 +30,7 @@ constexpr auto kIconViewBoxSide = 24.;
 
 VideoLayerButton::VideoLayerButton(QWidget *parent)
 : RippleButton(parent, st::photoEditorRotateButton.ripple) {
-	resize(Size(st::photoEditorAudioDiscSize));
+	resize(Size(st::audioDiscSize));
 	setLocked(true, anim::type::instant);
 
 	events(
@@ -92,8 +94,8 @@ void VideoLayerButton::paintEvent(QPaintEvent *e) {
 
 	const auto activeProgress = _activeAnimation.value(_locked ? 0. : 1.);
 	if (activeProgress > 0.) {
-		const auto ring = float64(st::photoEditorAudioDiscRing);
-		auto ringColor = st::photoEditorAudioDiscRingFg->c;
+		const auto ring = float64(st::audioDiscRing);
+		auto ringColor = st::audioDiscRingFg->c;
 		ringColor.setAlphaF(ringColor.alphaF() * activeProgress);
 		auto pen = QPen(ringColor);
 		pen.setWidthF(ring);

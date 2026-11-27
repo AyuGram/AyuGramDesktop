@@ -7,16 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "window/section_widget.h"
-#include "window/section_memento.h"
+#include "base/timer.h"
+#include "data/data_messages.h"
+#include "data/data_report.h"
 #include "history/view/history_view_corner_buttons.h"
 #include "history/view/history_view_list_widget.h"
 #include "history/history_item_helpers.h"
 #include "history/history_view_top_toast.h"
-#include "data/data_messages.h"
-#include "data/data_report.h"
 #include "ui/controls/swipe_handler_data.h"
-#include "base/timer.h"
+#include "window/section_memento.h"
+#include "window/section_widget.h"
 
 class History;
 class BotKeyboard;
@@ -694,6 +694,13 @@ public:
 		return _originId;
 	}
 
+	void setSilentMissingMessage(bool silent) {
+		_silentMissingMessage = silent;
+	}
+	[[nodiscard]] bool silentMissingMessage() const {
+		return _silentMissingMessage;
+	}
+
 	Data::ForumTopic *topicForRemoveRequests() const override;
 	Data::SavedSublist *sublistForRemoveRequests() const override;
 
@@ -726,6 +733,7 @@ private:
 	std::shared_ptr<Data::RepliesList> _replies;
 	QVector<FullMsgId> _replyReturns;
 	FullMsgId _originId;
+	bool _silentMissingMessage = false;
 	bool _activateChooseForReport = false;
 	bool _sendBotStart = false;
 	bool _maybeSendBotStart = false;

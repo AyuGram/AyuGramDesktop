@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_file.h"
 
-#include "media/streaming/media_streaming_loader.h"
-#include "media/streaming/media_streaming_file_delegate.h"
 #include "ffmpeg/ffmpeg_utility.h"
+#include "media/streaming/media_streaming_file_delegate.h"
+#include "media/streaming/media_streaming_loader.h"
 
 namespace Media {
 namespace Streaming {
@@ -169,18 +169,19 @@ Stream File::Context::initStream(
 			// ignore cover streams
 			return Stream();
 		}
-		auto descriptor = FFmpeg::CodecDescriptor{
-			.stream = info,
+		result.codec = FFmpeg::MakeCodecPointer({
+			.parameters = info->codecpar,
+			.timeBase = info->time_base,
 			.hwAllowed = options.hwAllow,
 			.videoMaxArea = kMaxFrameArea,
-		};
-		result.codec = FFmpeg::MakeCodecPointer(descriptor);
+		});
 		if (!result.codec) {
 			return result;
 		} else if (result.codec->codec
 			!= FFmpeg::FindDecoder(result.codec.get())) {
-			descriptor.hwAllowed = false;
-			result.softwareFallback = descriptor;
+			result.parameters = FFmpeg::CopyCodecParameters(
+				info->codecpar);
+			result.softwareFallback = bool(result.parameters);
 		}
 		result.rotation = FFmpeg::ReadRotationFromMetadata(info);
 		result.aspect = FFmpeg::ValidateAspectRatio(
@@ -194,7 +195,10 @@ Stream File::Context::initStream(
 		if (!result.frequency) {
 			return result;
 		}
-		result.codec = FFmpeg::MakeCodecPointer({ .stream = info });
+		result.codec = FFmpeg::MakeCodecPointer({
+			.parameters = info->codecpar,
+			.timeBase = info->time_base,
+		});
 		if (!result.codec) {
 			return result;
 		}

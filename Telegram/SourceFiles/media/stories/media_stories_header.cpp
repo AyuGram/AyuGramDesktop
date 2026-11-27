@@ -13,8 +13,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
-#include "media/stories/media_stories_controller.h"
 #include "lang/lang_keys.h"
+#include "media/stories/media_stories_controller.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/layers/box_content.h"
 #include "ui/text/custom_emoji_helper.h"
@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rp_widget.h"
 #include "ui/ui_utility.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_media_view.h"
 
@@ -257,6 +258,9 @@ struct MadePrivacyBadge {
 }
 
 [[nodiscard]] Timestamp ComposeDetails(HeaderData data, TimeId now) {
+	if (data.preview) {
+		return { tr::lng_bot_media_previews(tr::now) };
+	}
 	auto result = ComposeTimestamp(data.date, now);
 	if (data.edited) {
 		result.text.append(' '

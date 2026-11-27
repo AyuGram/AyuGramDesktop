@@ -50,9 +50,12 @@ void SessionData::withSession(Callback &&callback) {
 	}
 }
 
-void SessionData::notifyConnectionInited(const SessionOptions &options) {
+void SessionData::notifyConnectionInited(
+		const SessionOptions &options,
+		uint64 reInitGeneration) {
 	QReadLocker optionsLock(&_optionsLock);
-	if (options.cloudLangCode == _options.cloudLangCode
+	if (reInitGeneration == _reInitGeneration
+		&& options.cloudLangCode == _options.cloudLangCode
 		&& options.systemLangCode == _options.systemLangCode
 		&& options.langPackName == _options.langPackName
 		&& options.proxy == _options.proxy) {
@@ -238,8 +241,9 @@ void Session::restart() {
 	}
 	refreshOptions();
 	if (const auto captured = _private) {
+		const auto reInitGeneration = _data->reInitGeneration();
 		InvokeQueued(captured, [=] {
-			captured->restartNow();
+			captured->restartNow(reInitGeneration);
 		});
 	}
 }
@@ -265,10 +269,9 @@ void Session::refreshOptions() {
 		useTcp));
 }
 
-void Session::reInitConnection() {
+void Session::prepareReInitConnection() {
+	_data->advanceReInitGeneration();
 	refreshOptions();
-	setConnectionNotInited();
-	restart();
 }
 
 void Session::setConnectionNotInited() {
@@ -492,11 +495,10 @@ bool Session::releaseGenericKeyCreationOnDone(
 		DEBUG_LOG(("AuthKey Info: Persistent key changed "
 			"while binding temporary, dcWithShift %1"
 			).arg(_shiftedDcId));
-		return false;
+	} else {
+		DEBUG_LOG(("AuthKey Info: Session key bound, setting, dcWithShift %1"
+			).arg(_shiftedDcId));
 	}
-
-	DEBUG_LOG(("AuthKey Info: Session key bound, setting, dcWithShift %1"
-		).arg(_shiftedDcId));
 
 	const auto dcId = _dc->id();
 	const auto instance = _instance;
@@ -507,7 +509,7 @@ bool Session::releaseGenericKeyCreationOnDone(
 			instance->dcTemporaryKeyChanged(dcId);
 		}
 	});
-	return true;
+	return result;
 }
 
 void Session::releaseKeyCreationOnFail() {

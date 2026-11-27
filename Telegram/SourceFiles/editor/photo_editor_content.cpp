@@ -8,18 +8,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_content.h"
 
 #include "base/algorithm.h"
+#include "editor/scene/scene_item_video.h"
 #include "editor/editor_audio_disc_button.h"
-#include "editor/editor_video_layer_button.h"
 #include "editor/editor_crop.h"
 #include "editor/editor_enhance_indicator.h"
 #include "editor/editor_paint.h"
-#include "editor/scene/scene_item_video.h"
+#include "editor/editor_video_layer_button.h"
 #include "history/history_drag_area.h"
 #include "media/view/media_view_pip.h"
 #include "storage/storage_media_prepare.h"
 #include "ui/effects/animation_value_f.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+
 #include "styles/style_editor.h"
 
 #include <QtGui/QClipboard>
@@ -759,6 +760,33 @@ void PhotoEditorContent::applyModifications(
 	}
 	_modifications = std::move(modifications);
 	update();
+}
+
+bool PhotoEditorContent::transformBackgroundVideo(int angle, bool flip) {
+	const auto video = _paint->backgroundVideo();
+	if (!video) {
+		return false;
+	}
+	auto placement = video->placement();
+	const auto rotated = std::remainder(placement.rotation + angle, 360.);
+	const auto canvas = _canvas.current().size();
+	const auto media = video->contentRect();
+	if (angle && !media.isEmpty() && !canvas.isEmpty()) {
+		const auto fit = [&](float64 rotation) {
+			const auto bounds = QTransform()
+				.rotate(rotation)
+				.mapRect(media);
+			return std::min(
+				canvas.width() / bounds.width(),
+				canvas.height() / bounds.height());
+		};
+		placement.scale *= fit(rotated) / fit(placement.rotation);
+	}
+	placement.rotation = flip ? -rotated : rotated;
+	placement.flipped = placement.flipped != flip;
+	video->applyPlacement(placement);
+	_paint->keepResult();
+	return true;
 }
 
 void PhotoEditorContent::save(PhotoModifications &modifications) {

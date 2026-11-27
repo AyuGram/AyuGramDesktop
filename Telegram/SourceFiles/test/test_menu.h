@@ -35,8 +35,11 @@ namespace Test {
 // 2026/08/28/complete-server-history-details-hash-and-paging ended.
 //
 // The opposite mistake costs a run just as surely: a one-shot grab taken in
-// the turn that called popup() lands on a show-animation frame with almost
-// nothing painted on it, which is run 2's blank p1e_menu_peer_nohash.
+// the turn that called popup() usually lands on a show-animation frame with
+// almost nothing painted on it, which is run 2's blank p1e_menu_peer_nohash.
+// Usually, not always: on Windows that turn can already paint a partly
+// shown frame (docs/helpers/test_menu.md#the-opening-turn-grab-row says
+// why), so a same-turn grab is no frame to rely on either way.
 //
 // So the readiness here carries content identity only - the widget is a
 // Ui::PopupMenu, it is visible, its geometry is non-empty and it carries
@@ -103,10 +106,11 @@ struct PopupMenuReading {
 // knows the position and the way the product opens its menu.
 // |skipReason|, when given, becomes the Stage::skipReason of both stages
 // this appends - the opener and the capture - read when each begins; left
-// empty the helper behaves exactly as before. A campaign gates a
-// popup-capture leg on a locked Windows console with
-// [] { return Test::ConsoleLockGate(Test::ReadConsoleLock()); }
-// (test_console_lock.h).
+// empty the helper behaves exactly as before. A locked Windows console is
+// no reason to skip a popup-capture leg: arm Test::ArmPopupHold
+// (test_popup_hold.h) before the menu opens and release it after the last
+// leg that needs it open across turns, so the deactivation does not close
+// the menu between turns.
 void CapturePopupMenu(
 	not_null<Runner*> runner,
 	const QString &name,
@@ -119,12 +123,30 @@ void CapturePopupMenu(
 // This helper measuring itself, in six stages. It opens a real
 // Ui::PopupMenu of its own over the primary window and, in the turn that
 // opened it, shows the two predicates disagreeing: the content-identity
-// readiness accepts while the inner menu is still hidden and a one-shot
-// prepared grab still refuses. It then captures through both branches of
+// readiness accepts while the inner menu is still hidden. In that same turn
+// it takes one PreparedWidgetCapture::prepare() of the menu, the
+// opening-turn grab row. It then captures through both branches of
 // CapturePopupMenu - the already-open one and, after closing the menu, the
 // one that opens it - and asserts the refusal texts of a null, a widget
 // that is no menu, an empty menu and a popup handed to the painting-layer
 // root resolver.
+//
+// The opening-turn grab row, "a one-shot prepared grab in the opening turn
+// refuses the frame instead of saving it". Its premise is the show
+// animation's blank first frame, and it reads that premise from the menu
+// itself: the open stage subscribes to Ui::PopupMenu::showStateValue() for
+// its own call and keeps the last state emitted before prepare() and the
+// last one emitted during it. Only the grab's own state decides; the
+// earlier one is context. A grab that emitted appearing=1 at opacity 0
+// reached the premise: PASS when prepare() refused it, FAIL when prepare()
+// accepted it. Any other grab is a named "TEST_RESULT: N/A" whose reason
+// begins "not reached:" and names an advanced frame painted, a show
+// animation already finished or no state emitted by the grab, beside both
+// states and the accepted flag - one launch's timing, never a pass and
+// never a fixture-gate failure. The decision never reads LooksBlank, so a
+// prepared capture that accepts the blank first frame still FAILs. The N/A
+// is real on Windows, where the opening turn can paint a partly shown menu;
+// docs/helpers/test_menu.md#the-opening-turn-grab-row says why.
 //
 // It needs no session, no chats list, no network and no account fixture.
 // The only thing it asks of the process is a primary window to parent the
@@ -133,34 +155,38 @@ void CapturePopupMenu(
 // failure: every refusal it demonstrates is observed through a value that
 // logs nothing - PopupMenuReady returning false, PopupMenuDetails's text,
 // PreparedWidgetCapture::prepare()'s pendingReason() - and is asserted as a
-// passing Check whose details carry the refused reading verbatim. Its
-// before-leg, the wedged stage this helper removes, is produced by gating
-// on menu()->isVisible() and re-running the identical scenario, never by a
+// passing Check whose details carry the refused reading verbatim. The one
+// exception is the opening-turn grab row's named N/A above, written when
+// that launch's grab did not paint the blank first frame. Its before-leg,
+// the wedged stage this helper removes, is produced by gating on
+// menu()->isVisible() and re-running the identical scenario, never by a
 // stage that fails on purpose.
 //
 // A locked Windows console. The application is deactivated there and Qt
-// closes the shown menu before the next turn: Attempt 1 Runs 1 and 2 of
+// closes a shown popup on QEvent::ApplicationDeactivate before the next
+// turn: without a hold, Attempt 1 Runs 1 and 2 of
 // 2026/10/07/add-a-same-turn-context-menu-reader-and-a-retried-clipboard-round-trip-to-the-test-harness
 // (work/test.md) timed out on "target is not visible" right after the open
-// stage passed. So the four stages that need the menu open across turns -
-// the popup_menu_open capture, close, and the popup_menu_reopened opener
-// and capture - are TEST_RESULT: N/A by a skipReason that names the lock
-// and prints the Test::ReadConsoleLock() reading (test_console_lock.h). It
-// is read when the open stage pops the menu and again when each of those
-// stages begins, and kept once it reads locked: a menu popped or held while
-// locked is already closed. The open stage (decided from the opening turn),
-// refusal text and the teardown still run and decide, the scenario
-// continues past the self-test, and the open stage Notes the CONSOLE_LOCK
-// row it read. The translucency premise stays a named hard fixture gate:
-// Check, while the lock is a skip: a locked console is a scheduling
-// condition - rerun on an unlocked console, where the same host certifies
-// the capture (Run 3) - and a host without translucent windows can never
-// certify that premise at all. Nothing is gated off Windows: on macOS a
-// packed launch with CGSSessionScreenIsLocked true ran this self-test with
-// 0 FAIL (2026/10/06/add-a-post-paint-capture-sampler-to-the-harness,
-// work/test.md, Test 2), so Test::ConsoleLockGate answers only in a
-// Windows build: on macOS the probe reads the session's lock and the open
-// stage prints it, and nothing is gated.
+// stage passed. So the open stage arms Test::ArmPopupHold
+// (test_popup_hold.h) with the label popup-menu-self-test right before it
+// pops the menu, and Notes the Test::ReadConsoleLock() row
+// (test_console_lock.h) it read there. The four stages that need the menu
+// open across turns - the popup_menu_open capture, close, and the
+// popup_menu_reopened opener and capture - then run and decide on a locked
+// console as on an unlocked one. The teardown hides and destroys the
+// fixture, releases the hold and Notes "popup menu self-test: popup hold
+// released, deactivations stopped=<n> - <CONSOLE_LOCK row>"; when a
+// timeout skips the teardown, Runner::onFinish releases it. No Check
+// asserts a nonzero count: whether a deactivation reaches the open menu
+// depends on the console. The self-test holds and releases its own arm, so
+// a campaign appends it outside its own popup hold, never inside one. The
+// translucency premise stays a named hard fixture gate Check: a host
+// without translucent windows can never certify it. Off Windows the hold
+// stops nothing: on macOS a packed launch with CGSSessionScreenIsLocked
+// true ran this self-test with 0 FAIL
+// (2026/10/06/add-a-post-paint-capture-sampler-to-the-harness,
+// work/test.md, Test 2), because a locked macOS console does not close a
+// shown popup.
 void AppendPopupMenuCaptureSelfTest(not_null<Runner*> runner);
 
 // A context menu, read in the turn that built it.
@@ -243,8 +269,9 @@ void AppendPopupMenuCaptureSelfTest(not_null<Runner*> runner);
 // behaves exactly as before. test_chat_menu.cpp reads the list's resolved
 // message through it.
 //
-// No pixels. A grab in the building turn lands on a blank show-animation
-// frame (the comment at the top of this file), so the reader takes none.
+// No pixels. A grab in the building turn usually lands on a blank
+// show-animation frame, and on Windows sometimes on a partly shown one (the
+// comment at the top of this file), so the reader takes none.
 // A frame stays with CapturePopupMenu, as a supplementary leg taken while
 // the menu is still open.
 //

@@ -1,8 +1,16 @@
+7.4.7 (26.11.26)
+
+- Add music to stories.
+- Cancel story uploads from the stories list.
+- Improve text rendering on Windows.
+- Several crash fixes.
+- Bug fixes and other minor improvements.
+
 7.4.6 (23.11.26)
 
 - On-chain gifts offers and sales from your Money section.
 - Memory safe and process isolated html widgets.
-- Stories dafting and posting.
+- Stories drafting and posting.
 - Bot preview stories.
 
 7.4.5 beta (19.11.26)

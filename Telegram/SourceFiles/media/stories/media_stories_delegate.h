@@ -40,6 +40,7 @@ enum class SiblingType {
 class Delegate {
 public:
 	[[nodiscard]] virtual not_null<Ui::RpWidget*> storiesWrap() = 0;
+	[[nodiscard]] virtual not_null<Ui::RpWidget*> storiesAreaWrap() = 0;
 	[[nodiscard]] virtual auto storiesShow()
 		-> std::shared_ptr<ChatHelpers::Show> = 0;
 	[[nodiscard]] virtual auto storiesStickerOrEmojiChosen()
@@ -49,6 +50,7 @@ public:
 		not_null<Main::Session*> session,
 		FullStoryId id,
 		Data::StoriesContext context) = 0;
+	virtual void storiesJumpToPreview(int index) = 0;
 	virtual void storiesClose() = 0;
 	[[nodiscard]] virtual bool storiesPaused() = 0;
 	[[nodiscard]] virtual rpl::producer<bool> storiesLayerShown() = 0;

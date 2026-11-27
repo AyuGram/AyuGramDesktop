@@ -7,20 +7,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/view/media_view_open_common.h"
 
-#include "history/history_item.h"
 #include "data/data_media_types.h"
 #include "data/data_web_page.h"
+#include "history/history_item.h"
 
 namespace Media::View {
 
 OpenRequest::OpenRequest(
 	Window::SessionController *controller,
-	StandaloneGallery gallery,
+	BotPreviewGallery gallery,
 	int index,
 	Data::FileOrigin origin)
 : _controller(controller)
 , _fileOrigin(std::move(origin))
-, _gallery(std::make_shared<StandaloneGallery>(std::move(gallery))) {
+, _gallery(std::make_shared<BotPreviewGallery>(std::move(gallery)))
+, _galleryIndex(index) {
 	Expects(index >= 0 && index < _gallery->media.size());
 	const auto &item = _gallery->media[index];
 	if (const auto photo = std::get_if<not_null<PhotoData*>>(&item)) {

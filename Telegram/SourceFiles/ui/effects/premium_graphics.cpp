@@ -9,20 +9,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "data/data_premium_subscription_option.h"
 #include "lang/lang_keys.h"
-#include "ui/abstract_button.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/gradient.h"
 #include "ui/effects/numbers_animation.h"
 #include "ui/effects/premium_bubble.h"
-#include "ui/text/text_utilities.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_options.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/abstract_button.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
@@ -742,7 +743,6 @@ void ShowListBox(
 		std::vector<ListEntry> entries) {
 	box->setWidth(st::boxWideWidth);
 
-	const auto &stLabel = st::defaultFlatLabel;
 	const auto &titlePadding = st::settingsPremiumPreviewTitlePadding;
 	const auto &aboutPadding = st::settingsPremiumPreviewAboutPadding;
 	const auto iconTitlePadding = st::settingsPremiumPreviewIconTitlePadding;
@@ -759,13 +759,13 @@ void ShowListBox(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				base::take(entry.title) | rpl::map(tr::bold),
-				stLabel),
+				st.listTitle),
 			entry.icon ? iconTitlePadding : titlePadding);
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				base::take(entry.about),
-				st::boxDividerLabel),
+				st.listAbout),
 			entry.icon ? iconAboutPadding : aboutPadding);
 		if (const auto outlined = entry.icon) {
 			if (!icons) {

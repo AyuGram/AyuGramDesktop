@@ -8,12 +8,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_todo_list.h"
 
 #include "api/api_text_entities.h"
-#include "data/data_user.h"
-#include "data/data_session.h"
+#include "api/api_text_entities.h"
 #include "base/call_delayed.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
-#include "api/api_text_entities.h"
 #include "ui/text/text_options.h"
 
 namespace {
@@ -25,6 +25,18 @@ const TodoListItem *ItemById(const std::vector<TodoListItem> &list, int id) {
 
 TodoListItem *ItemById(std::vector<TodoListItem> &list, int id) {
 	return const_cast<TodoListItem*>(ItemById(std::as_const(list), id));
+}
+
+[[nodiscard]] bool SetTaskCompletion(
+		TodoListItem &task,
+		PeerData *by,
+		TimeId date) {
+	if (task.completedBy == by && task.completionDate == date) {
+		return false;
+	}
+	task.completedBy = by;
+	task.completionDate = date;
+	return true;
 }
 
 } // namespace
@@ -100,9 +112,7 @@ bool TodoListData::applyCompletions(
 			? owner().peer(peerFromMTP(completion->vcompleted_by())).get()
 			: nullptr;
 		const auto date = completion ? completion->vdate().v : TimeId();
-		if (item.completedBy != by || item.completionDate != date) {
-			item.completedBy = by;
-			item.completionDate = date;
+		if (SetTaskCompletion(item, by, date)) {
 			changed = true;
 		}
 	}
@@ -115,23 +125,30 @@ bool TodoListData::applyCompletions(
 void TodoListData::apply(
 		not_null<HistoryItem*> item,
 		const MTPDmessageActionTodoCompletions &data) {
+	auto changed = false;
 	for (const auto &id : data.vcompleted().v) {
 		if (const auto task = itemById(id.v)) {
-			task->completedBy = item->from();
-			task->completionDate = item->date();
+			if (SetTaskCompletion(*task, item->from(), item->date())) {
+				changed = true;
+			}
 		}
 	}
 	for (const auto &id : data.vincompleted().v) {
 		if (const auto task = itemById(id.v)) {
-			task->completedBy = nullptr;
-			task->completionDate = TimeId();
+			if (SetTaskCompletion(*task, nullptr, TimeId())) {
+				changed = true;
+			}
 		}
+	}
+	if (changed) {
+		++version;
 	}
 	owner().notifyTodoListUpdateDelayed(this);
 }
 
 void TodoListData::apply(const MTPDmessageActionTodoAppendTasks &data) {
 	const auto limit = TodoListData::kMaxOptions;
+	const auto was = items.size();
 	for (const auto &task : data.vlist().v) {
 		if (items.size() < limit) {
 			const auto parsed = TodoListItemFromMTP(
@@ -141,6 +158,9 @@ void TodoListData::apply(const MTPDmessageActionTodoAppendTasks &data) {
 				items.push_back(std::move(parsed));
 			}
 		}
+	}
+	if (items.size() != was) {
+		++version;
 	}
 	owner().notifyTodoListUpdateDelayed(this);
 }

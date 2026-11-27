@@ -7,24 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "editor/photo_editor.h"
 
+#include "api/api_stories.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
 #include "core/core_settings.h"
-#include "api/api_stories.h"
-#include "editor/color_picker.h"
 #include "editor/controllers/controllers.h"
+#include "editor/color_picker.h"
 #include "editor/editor_caption_bar.h"
 #include "editor/photo_editor_content.h"
 #include "editor/photo_editor_controls.h"
 #include "lang/lang_keys.h"
 #include "media/audio/media_audio_capture.h"
 #include "ui/controls/round_video_recorder.h"
-#include "webrtc/webrtc_video_track.h"
-#include "window/window_controller.h"
-#include "window/window_session_controller.h"
 #include "ui/layers/layer_manager.h"
 #include "ui/layers/layer_widget.h"
 #include "ui/wrap/fade_wrap.h"
+#include "webrtc/webrtc_video_track.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_editor.h"
 
@@ -321,7 +322,8 @@ PhotoEditor::PhotoEditor(
 			this,
 			sessionShow,
 			data.composeSound,
-			data.story.has_value())
+			data.story.has_value(),
+			data.story && data.story->showStoryAreas)
 		: nullptr,
 	std::make_unique<UndoController>(),
 	show,
@@ -504,7 +506,10 @@ PhotoEditor::PhotoEditor(
 
 	_controls->rotateRequests(
 	) | rpl::on_next([=](int angle) {
-		_modifications.angle += 90;
+		if (_content->transformBackgroundVideo(angle, false)) {
+			return;
+		}
+		_modifications.angle += angle;
 		if (_modifications.angle >= 360) {
 			_modifications.angle -= 360;
 		}
@@ -513,6 +518,9 @@ PhotoEditor::PhotoEditor(
 
 	_controls->flipRequests(
 	) | rpl::on_next([=] {
+		if (_content->transformBackgroundVideo(0, true)) {
+			return;
+		}
 		_modifications.flipped = !_modifications.flipped;
 		_content->applyModifications(_modifications);
 	}, lifetime());

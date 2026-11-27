@@ -30,6 +30,7 @@ set(style_files
     ui/effects/premium.style
     ui/effects/premium_limits.style
     ui/color_indices.style
+    ui/controls/audio_disc_button.style
     ui/controls/ttl_media.style
     ui/controls/userpic_button.style
     boxes/boxes.style
@@ -194,6 +195,8 @@ PRIVATE
     dialogs/ui/dialogs_quick_action.h
     dialogs/ui/dialogs_stories_list.cpp
     dialogs/ui/dialogs_stories_list.h
+    dialogs/ui/dialogs_story_upload_cancel.cpp
+    dialogs/ui/dialogs_story_upload_cancel.h
     dialogs/ui/dialogs_top_bar_suggestion_content.cpp
     dialogs/ui/dialogs_top_bar_suggestion_content.h
     dialogs/ui/posts_search_intro.cpp
@@ -545,6 +548,8 @@ PRIVATE
     ui/controls/button_busy.h
     ui/controls/button_context_menu.cpp
     ui/controls/button_context_menu.h
+    ui/controls/audio_disc_button.cpp
+    ui/controls/audio_disc_button.h
     ui/controls/button_labels.cpp
     ui/controls/button_labels.h
     ui/controls/call_button.cpp

@@ -7,11 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "editor/video_item_timeline.h"
 
-#include "editor/editor_audio_menu.h"
 #include "editor/video/video_clip.h"
 #include "editor/video/video_timeline.h"
 #include "editor/video/video_timeline_seeker.h"
+#include "editor/editor_audio_menu.h"
 #include "ui/widgets/popup_menu.h"
+
 #include "styles/style_editor.h"
 
 #include <QtGui/QContextMenuEvent>
@@ -75,7 +76,9 @@ rpl::producer<crl::time> VideoItemTimeline::lengthChanges() const {
 void VideoItemTimeline::refreshTrim() {
 	if (_timeline) {
 		const auto trim = _clip->trim();
-		_timeline->setTrim(trim.from, trim.till);
+		_timeline->setTrim(
+			trim.from,
+			trim.from + _clip->loopDuration());
 	}
 }
 

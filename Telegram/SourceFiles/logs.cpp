@@ -7,17 +7,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "logs.h"
 
-#include "platform/platform_specific.h"
 #include "core/crash_reports.h"
 #include "core/launcher.h"
 #include "core/update_channel.h"
 #include "core/version.h"
 #include "mtproto/facade.h"
+#include "platform/platform_specific.h"
 
 namespace {
 
+constexpr auto kLogPartMinutes = 15;
+
 std::atomic<int> ThreadCounter/* = 0*/;
 thread_local bool WritingEntryFlag/* = false*/;
+thread_local bool LockingPartsFlag = false;
 
 class WritingEntryScope final {
 public:
@@ -28,6 +31,12 @@ public:
 		WritingEntryFlag = false;
 	}
 };
+
+[[nodiscard]] int32 CurrentLogPart(tm &local) {
+	const auto now = time(nullptr);
+	mylocaltime(&local, &now);
+	return (local.tm_hour * 60 + local.tm_min) / kLogPartMinutes;
+}
 
 } // namespace
 
@@ -63,11 +72,11 @@ QString _logsFilePath(LogDataType type, const QString &postfix = QString()) {
 int32 LogsStartIndexChosen = -1;
 QString _logsEntryStart() {
 	static thread_local auto threadId = ThreadCounter++;
-	static auto index = 0;
+	static auto index = std::atomic<uint64>(1);
 
 	const auto tm = QDateTime::currentDateTime();
 
-	return QString("[%1 %2-%3]").arg(tm.toString("hh:mm:ss.zzz"), QString("%1").arg(threadId, 2, 10, QChar('0'))).arg(++index, 7, 10, QChar('0'));
+	return QString("[%1 %2-%3]").arg(tm.toString("hh:mm:ss.zzz"), QString("%1").arg(threadId, 2, 10, QChar('0'))).arg(index.fetch_add(1, std::memory_order_relaxed), 7, 10, QChar('0'));
 }
 
 class LogsDataFields {
@@ -111,18 +120,33 @@ public:
 	}
 
 	void write(LogDataType type, const QString &msg) {
-		QMutexLocker lock(_logsMutex(type));
+		if (type != LogDataMain && LockingPartsFlag) {
+			return; // a fatal report raised while locking parts can't wait for their locks
+		}
+		const auto locking = gsl::finally([=] {
+			if (type != LogDataMain) {
+				LockingPartsFlag = false;
+			}
+		});
+		auto lock = QMutexLocker(_logsMutex(type));
+		if (type != LogDataMain) {
+			auto local = tm();
+			if (CurrentLogPart(local) != part) {
+				lock.unlock(); // reopenDebug() and LOG() must run with no log mutex held
+				for (const auto &failure : reopenDebug()) {
+					LOG((failure));
+				}
+				lock.relock();
+			}
+			LockingPartsFlag = true;
+		}
 		WritingEntryScope scope;
 
-		if (type != LogDataMain) {
-			reopenDebug();
-		}
 		const auto file = files[type].get();
-		if (!file || !file->isOpen()) {
-			return;
+		if (file && file->isOpen()) {
+			file->write(msg.toUtf8());
+			file->flush();
 		}
-		file->write(msg.toUtf8());
-		file->flush();
 	}
 
 private:
@@ -236,28 +260,41 @@ NEW LOGGING INSTANCE STARTED!!!\n\
 			}
 
 			return true;
-		} else if (type != LogDataMain) {
-			LOG(("Could not open debug log '%1': %2").arg(files[type]->fileName(), files[type]->errorString()));
 		}
 		return false;
 	}
 
-	void reopenDebug() {
-		time_t t = time(NULL);
-		struct tm tm;
-		mylocaltime(&tm, &t);
+	[[nodiscard]] QStringList reopenDebug() {
+		LockingPartsFlag = true;
+		const auto locking = gsl::finally([] { LockingPartsFlag = false; });
+		WritingEntryScope scope;
+		const auto debugLock = QMutexLocker(_logsMutex(LogDataDebug));
+		const auto mtpLock = QMutexLocker(_logsMutex(LogDataMtp));
 
-		static const int switchEach = 15; // minutes
-		int32 newPart = (tm.tm_min + tm.tm_hour * 60) / switchEach;
-		if (newPart == part) return;
-
+		auto local = tm();
+		const auto newPart = CurrentLogPart(local);
+		if (newPart == part) {
+			return {};
+		}
 		part = newPart;
 
-		int32 dayIndex = (tm.tm_year + 1900) * 10000 + (tm.tm_mon + 1) * 100 + tm.tm_mday;
-		QString postfix = QString("_%4_%5").arg((part * switchEach) / 60, 2, 10, QChar('0')).arg((part * switchEach) % 60, 2, 10, QChar('0'));
+		const auto dayIndex = (local.tm_year + 1900) * 10000
+			+ (local.tm_mon + 1) * 100
+			+ local.tm_mday;
+		const auto minutes = part * kLogPartMinutes;
+		const auto postfix = u"_%1_%2"_q
+			.arg(minutes / 60, 2, 10, QChar('0'))
+			.arg(minutes % 60, 2, 10, QChar('0'));
 
-		reopen(LogDataDebug, dayIndex, postfix);
-		reopen(LogDataMtp, dayIndex, postfix);
+		auto failures = QStringList();
+		for (const auto type : { LogDataDebug, LogDataMtp }) {
+			if (!reopen(type, dayIndex, postfix)) {
+				failures.push_back(u"Could not open debug log '%1': %2"_q.arg(
+					files[type]->fileName(),
+					files[type]->errorString()));
+			}
+		}
+		return failures;
 	}
 
 };

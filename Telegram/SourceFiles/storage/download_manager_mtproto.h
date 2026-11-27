@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "data/data_file_origin.h"
 #include "base/timer.h"
 #include "base/weak_ptr.h"
+#include "data/data_file_origin.h"
 
 class ApiWrap;
 
@@ -99,15 +99,19 @@ private:
 		int timeouts = 0; // Since all sessions had successes >= required.
 		int totalRequested = 0;
 	};
+	struct KillSessionsWhen {
+		crl::time when = 0;
+		bool retry = false;
+	};
 
 	void checkSendNext();
 	void checkSendNext(MTP::DcId dcId, Queue &queue);
 	bool trySendNextPart(MTP::DcId dcId, Queue &queue);
 
-	void killSessionsSchedule(MTP::DcId dcId);
+	void killSessionsSchedule(MTP::DcId dcId, bool retry = false);
 	void killSessionsCancel(MTP::DcId dcId);
 	void killSessions();
-	void killSessions(MTP::DcId dcId);
+	[[nodiscard]] bool killSessions(MTP::DcId dcId, bool retry);
 
 	void resetGeneration();
 	void sessionTimedOut(MTP::DcId dcId, int index);
@@ -121,7 +125,7 @@ private:
 	base::flat_map<MTP::DcId, DcBalanceData> _balanceData;
 	base::Timer _resetGenerationTimer;
 
-	base::flat_map<MTP::DcId, crl::time> _killSessionsWhen;
+	base::flat_map<MTP::DcId, KillSessionsWhen> _killSessionsWhen;
 	base::Timer _killSessionsTimer;
 
 	base::flat_map<MTP::DcId, Queue> _queues;
@@ -211,6 +215,8 @@ private:
 	virtual void cancelOnFail() = 0;
 
 	void cancelRequest(mtpRequestId requestId);
+	void failRequest(mtpRequestId requestId);
+	void failFinishedRequest(const RequestData &requestData, bool hashes);
 	void makeRequest(const RequestData &requestData);
 	void normalPartLoaded(
 		const MTPupload_File &result,

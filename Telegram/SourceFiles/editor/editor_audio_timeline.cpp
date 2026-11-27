@@ -7,14 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "editor/editor_audio_timeline.h"
 
-#include "editor/editor_audio_menu.h"
-#include "editor/photo_editor_common.h"
 #include "editor/video/video_segment_player.h"
 #include "editor/video/video_timeline_seeker.h"
+#include "editor/editor_audio_menu.h"
+#include "editor/photo_editor_common.h"
 #include "media/media_audio_waveform.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+
+#include "styles/style_audio_disc_button.h"
 #include "styles/style_editor.h"
 
 #include <QtCore/QFileInfo>
@@ -257,7 +259,7 @@ void AudioTimeline::paintTextLine(
 		int centerY,
 		int width) {
 	const auto icon = st::photoEditorAudioTimelineIcon;
-	const auto image = st::photoEditorAudioDiscIcon.instance(
+	const auto image = st::audioDiscIcon.instance(
 		st::videoTimelineFg->c);
 	p.setClipRect(x, centerY - height(), width, height() * 2);
 	p.setRenderHint(QPainter::SmoothPixmapTransform);

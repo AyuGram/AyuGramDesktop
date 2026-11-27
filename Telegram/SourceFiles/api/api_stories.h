@@ -32,6 +32,10 @@ namespace Storage {
 struct UploadedMedia;
 } // namespace Storage
 
+namespace Window {
+class Controller;
+} // namespace Window
+
 namespace Api {
 
 inline constexpr auto kStoryDefaultPeriod = 86400;
@@ -48,12 +52,22 @@ struct SendStoryPhoto {
 	QString path;
 };
 
+struct StoryMusicFile {
+	QString path;
+	QByteArray content;
+	QString title;
+	QString performer;
+	QImage cover;
+	crl::time duration = 0;
+};
+
 struct SendStoryVideo {
 	std::shared_ptr<Media::Encode::VideoSource> source;
 	QImage cover;
 	QString path;
 	bool hasAudio = false;
 	std::shared_ptr<Media::Encode::Job> job;
+	std::optional<StoryMusicFile> music;
 };
 
 struct SendStoryRepost {
@@ -85,6 +99,7 @@ struct StoryToSend {
 	bool noForwards = false;
 	bool editCaption = false;
 	bool editPrivacy = false;
+	bool removeMusic = false;
 
 	Fn<void(StoryId id, TimeId expiresAt)> sent;
 	Fn<void(const QString &error)> failed;
@@ -153,7 +168,6 @@ public:
 
 	[[nodiscard]] auto blocklistValue()
 		-> rpl::producer<std::vector<not_null<PeerData*>>>;
-	[[nodiscard]] bool blocklistLoaded() const;
 	void reloadBlocklist();
 	void saveBlocklist(
 		std::vector<not_null<PeerData*>> peers,
@@ -163,11 +177,11 @@ public:
 	[[nodiscard]] rpl::producer<> uploadsChanges() const;
 	[[nodiscard]] rpl::producer<StorySent> sent() const;
 
-	[[nodiscard]] bool uploadingFor(not_null<PeerData*> peer) const;
-
 	[[nodiscard]] bool posting() const;
 	void cancelPosting();
-	void stopPostingWithConfirmation(Fn<void()> done);
+	void stopPostingWithConfirmation(
+		Fn<void()> done,
+		Window::Controller *window = nullptr);
 
 private:
 	struct Upload;
@@ -192,11 +206,13 @@ private:
 	void prepareFile(
 		not_null<Upload*> upload,
 		const QString &path,
-		QImage &&image);
+		QImage &&image,
+		const StoryMusicFile *music = nullptr);
 	void prepared(uint64 id, std::shared_ptr<FilePrepareResult> result);
 	void uploaded(
 		not_null<Upload*> upload,
 		const Storage::UploadedMedia &data);
+	void registerMusic(not_null<Upload*> upload, MTPInputMedia media);
 	void updateProgress(not_null<Upload*> upload, float64 progress);
 	void sendRequest(
 		not_null<Upload*> upload,

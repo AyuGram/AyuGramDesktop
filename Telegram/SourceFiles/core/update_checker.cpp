@@ -34,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/window_session_controller.h"
 #include "settings/sections/settings_advanced.h"
 #include "settings/settings_intro.h"
+#include "test/test_agent.h"
 #include "ui/layers/box_content.h"
 
 #include <QtCore/QJsonDocument>
@@ -2085,7 +2086,9 @@ void Updater::start(bool forceWait) {
 	}
 
 	_timer.cancel();
-	if (!cAutoUpdate() || _action != Action::Waiting) {
+	if (!cAutoUpdate()
+		|| _action != Action::Waiting
+		|| Test::SuppressUpdateChecks()) {
 		return;
 	}
 

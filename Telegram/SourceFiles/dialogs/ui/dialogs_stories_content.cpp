@@ -9,9 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_stories.h"
 #include "apiwrap.h"
-#include "boxes/story_drafts_box.h"
-
 #include "base/unixtime.h"
+#include "boxes/story_drafts_box.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/data_changes.h"
@@ -28,15 +27,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/stories/info_stories_widget.h"
 #include "info/info_controller.h"
 #include "info/info_memento.h"
+#include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "media/stories/media_stories_post.h"
 #include "media/stories/media_stories_stealth.h"
-#include "lang/lang_keys.h"
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/painter.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_menu_icons.h"
 
 namespace Dialogs::Stories {
@@ -138,6 +138,8 @@ void State::applyUploads(Content &result, Userpics &userpics) {
 	for (const auto &upload : uploads) {
 		const auto peer = upload.peer;
 		const auto id = uint64(peer->id.value);
+		const auto failed = !upload.error.isEmpty();
+		const auto uploadId = failed ? 0 : upload.id;
 		const auto i = ranges::find(result.elements, id, &Element::id);
 		const auto progress = uint32(std::clamp(
 			int(std::round(upload.progress * 100)),
@@ -146,8 +148,9 @@ void State::applyUploads(Content &result, Userpics &userpics) {
 		if (i != end(result.elements)) {
 			i->uploading = 1;
 			i->mineUnread = 1;
-			i->uploadFailed = upload.error.isEmpty() ? 0U : 1U;
+			i->uploadFailed = failed ? 1U : 0U;
 			i->uploadProgress = progress;
+			i->uploadId = uploadId;
 			continue;
 		}
 		result.elements.insert(
@@ -162,10 +165,9 @@ void State::applyUploads(Content &result, Userpics &userpics) {
 				.mine = peer->isSelf() ? 1U : 0U,
 				.mineUnread = 1U,
 				.uploading = 1,
-				.uploadFailed = upload.error.isEmpty()
-					? 0U
-					: 1U,
+				.uploadFailed = failed ? 1U : 0U,
 				.uploadProgress = progress,
+				.uploadId = uploadId,
 			});
 		++result.total;
 	}
@@ -308,6 +310,20 @@ void FillSourceMenu(
 	const auto peer = owner->peer(PeerId(request.id));
 	const auto &add = request.callback;
 	const auto api = &controller->session().api().stories();
+	const auto uploads = ranges::views::reverse(api->uploads());
+	const auto uploading = ranges::find_if(
+		uploads,
+		[=](const Api::StoryUpload &upload) {
+			return (upload.peer == peer)
+				&& upload.error.isEmpty();
+		});
+	if (uploading != end(uploads)) {
+		const auto id = uploading->id;
+		add(
+			tr::lng_story_sure_stop_title(tr::now),
+			[=] { ConfirmCancelUpload(controller, id); },
+			&st::menuIconCancel);
+	}
 	for (const auto &upload : api->uploads()) {
 		if (upload.peer != peer || upload.error.isEmpty()) {
 			continue;
@@ -389,6 +405,23 @@ void FillSourceMenu(
 			}, &st::menuIconUnarchive);
 		}
 	}
+}
+
+void ConfirmCancelUpload(
+		not_null<Window::SessionController*> controller,
+		uint64 uploadId) {
+	const auto api = &controller->session().api().stories();
+	const auto &uploads = api->uploads();
+	const auto upload = ranges::find(
+		uploads,
+		uploadId,
+		&Api::StoryUpload::id);
+	if (upload == end(uploads) || !upload->error.isEmpty()) {
+		return;
+	}
+	api->stopPostingWithConfirmation(
+		crl::guard(api, [=] { api->remove(uploadId); }),
+		&controller->window());
 }
 
 bool AddStoryButtonHidden() {

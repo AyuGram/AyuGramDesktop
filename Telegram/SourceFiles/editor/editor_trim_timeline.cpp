@@ -8,11 +8,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/editor_trim_timeline.h"
 
 #include "base/event_filter.h"
+#include "ui/text/format_values.h"
 #include "ui/widgets/fields/masked_input_field.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
-#include "ui/text/format_values.h"
 #include "ui/ui_utility.h"
+
 #include "styles/style_editor.h"
 
 #include <QtGui/QPainterPath>
@@ -26,6 +27,7 @@ constexpr auto kZoomStep = 1.2;
 constexpr auto kZoomSnap = 0.001;
 constexpr auto kMinVisibleSpan = crl::time(2000);
 constexpr auto kMinSelection = crl::time(100);
+constexpr auto kCompactZoom = 4;
 constexpr auto kCompactHandleSpans = 3;
 constexpr auto kEdgeScrollFrame = crl::time(16);
 constexpr auto kEdgeScrollSpeed = 9.; // Per second per pixel of overshoot.
@@ -39,13 +41,14 @@ constexpr auto kScrollToSelectionDuration = crl::time(250);
 
 constexpr auto kStampPrecision = 3;
 
-[[nodiscard]] QString Stamp(crl::time value, int precision = 1) {
-	const auto digits = QString::number(value % 1000).rightJustified(
-		kStampPrecision,
-		'0');
+[[nodiscard]] QString Stamp(crl::time value) {
 	return Ui::FormatDurationText(int(value / 1000))
 		+ '.'
-		+ digits.left(precision);
+		+ QString::number((value % 1000) / 100);
+}
+
+[[nodiscard]] QString StampRange(crl::time from, crl::time till) {
+	return Stamp(from) + u" \u2013 "_q + Stamp(till);
 }
 
 [[nodiscard]] bool IsRangeDash(QChar ch) {
@@ -97,6 +100,14 @@ constexpr auto kStampPrecision = 3;
 		milliseconds *= 10;
 	}
 	return (seconds * 60 + wholeValue) * 1000 + milliseconds;
+}
+
+[[nodiscard]] std::optional<crl::time> ParseEditedStamp(
+		QStringView text,
+		crl::time current) {
+	return (text == Stamp(current))
+		? std::optional<crl::time>(current)
+		: ParseStamp(text);
 }
 
 [[nodiscard]] QStringList SplitStamps(const QString &text) {
@@ -201,16 +212,11 @@ TrimTimeline::TrimTimeline(
 		: limit;
 	_cover = std::clamp(descriptor.cover, _from, _till);
 	const auto &font = st::videoTimelineDurationStyle.font;
-	const auto separator = u" \u2013 "_q;
+	const auto rangeWidth = font->width(StampRange(_duration, _duration));
 	if (_trimOnly) {
-		_labelWidth = font->width(
-			Stamp(_duration) + separator + Stamp(_duration));
+		_labelWidth = rangeWidth;
 	}
-	const auto widest = Stamp(_duration, kStampPrecision)
-		+ separator
-		+ Stamp(_duration, kStampPrecision);
-	_durationFieldWidth = font->width(widest)
-		+ st::videoTimelineDurationFieldSkip;
+	_durationFieldWidth = rangeWidth + st::videoTimelineDurationFieldSkip;
 
 	sizeValue(
 	) | rpl::on_next([=] {
@@ -264,7 +270,7 @@ QRect TrimTimeline::labelRect() const {
 TrimTimeline::DurationLabel TrimTimeline::durationLabel() const {
 	const auto text = (_till - _from >= _duration)
 		? Stamp(_till - _from)
-		: (Stamp(_from) + u" \u2013 "_q + Stamp(_till));
+		: StampRange(_from, _till);
 	const auto label = labelRect();
 	const auto &font = st::videoTimelineDurationStyle.font;
 	const auto width = font->width(text);
@@ -341,9 +347,7 @@ QRect TrimTimeline::durationFieldRect() const {
 }
 
 QString TrimTimeline::durationEditText() const {
-	return Stamp(_from, kStampPrecision)
-		+ u" \u2013 "_q
-		+ Stamp(_till, kStampPrecision);
+	return StampRange(_from, _till);
 }
 
 void TrimTimeline::updateDurationFieldGeometry() {
@@ -420,11 +424,11 @@ void TrimTimeline::applyDurationText(const QString &text) {
 	if (parts.isEmpty() || parts.size() > 2) {
 		return;
 	}
-	const auto till = ParseStamp(parts.back());
+	const auto till = ParseEditedStamp(parts.back(), _till);
 	const auto from = (parts.size() > 1)
-		? ParseStamp(parts.front())
+		? ParseEditedStamp(parts.front(), _from)
 		: std::optional<crl::time>(_from);
-	if (!from || !till) {
+	if (!from || !till || (*from == _from && *till == _till)) {
 		return;
 	}
 	setTrim(std::min(*from, *till), std::max(*from, *till));
@@ -528,7 +532,13 @@ void TrimTimeline::setSizeLabel(const QString &text) {
 }
 
 float64 TrimTimeline::maxZoom() const {
-	return std::max(_duration / float64(kMinVisibleSpan), 1.);
+	const auto span = _trimOnly
+		? std::clamp(
+			_duration / kCompactZoom,
+			kMinSelection,
+			kMinVisibleSpan)
+		: kMinVisibleSpan;
+	return std::max(_duration / float64(span), 1.);
 }
 
 bool TrimTimeline::setVisibleRange(float64 zoom, float64 from) {
@@ -994,7 +1004,9 @@ void TrimTimeline::paintEvent(QPaintEvent *e) {
 	p.setClipping(false);
 
 	paintSelection(p, strip);
-	p.setClipPath(path);
+	if (!_trimOnly) {
+		p.setClipPath(path);
+	}
 	paintOverview(p, strip);
 	p.setClipping(false);
 	paintHead(p, strip);
@@ -1076,10 +1088,11 @@ void TrimTimeline::paintOverview(QPainter &p, const QRect &strip) {
 	}
 	const auto span = visibleSpan();
 	const auto height = st::videoTimelineScrollHeight;
-	const auto top = strip.y()
-		+ strip.height()
-		- st::videoTimelineScrollSkip
-		- height;
+	const auto bottom = rect::bottom(strip);
+	const auto skip = st::videoTimelineScrollSkip;
+	const auto top = _trimOnly
+		? (bottom + skip)
+		: (bottom - skip - height);
 	const auto radius = height / 2.;
 	p.setPen(Qt::NoPen);
 
@@ -1105,6 +1118,9 @@ void TrimTimeline::paintOverview(QPainter &p, const QRect &strip) {
 	p.setBrush(thumb);
 	p.drawRoundedRect(QRectF(left, top, width, height), radius, radius);
 
+	if (_trimOnly && _from == 0 && _till == _duration) {
+		return;
+	}
 	const auto scale = strip.width() / float64(_duration);
 	const auto selectionHeight = st::videoTimelineOverviewSelectionHeight;
 	const auto selectionLeft = strip.x() + _from * scale;

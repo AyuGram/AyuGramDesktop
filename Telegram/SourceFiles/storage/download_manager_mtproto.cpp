@@ -7,14 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/download_manager_mtproto.h"
 
+#include "apiwrap.h"
+#include "base/openssl_help.h"
+#include "data/data_document.h"
+#include "data/data_session.h"
+#include "main/main_session.h"
 #include "mtproto/facade.h"
 #include "mtproto/mtproto_auth_key.h"
 #include "mtproto/mtproto_response.h"
-#include "main/main_session.h"
-#include "data/data_session.h"
-#include "data/data_document.h"
-#include "apiwrap.h"
-#include "base/openssl_help.h"
 
 namespace Storage {
 namespace {
@@ -355,14 +355,21 @@ void DownloadManagerMtproto::removeSession(MTP::DcId dcId) {
 	Assert(session.requested == kMaxWaitedInSession * kMaxSessionsCount);
 
 	dc.sessions.pop_back();
-	api().instance().killSession(MTP::downloadDcId(dcId, index));
+	// A part migrated here from another datacenter keeps the session alive.
+	if (!api().instance().killSessionIfIdle(MTP::downloadDcId(dcId, index))
+		&& !dc.totalRequested) {
+		killSessionsSchedule(dcId, true);
+	}
 
 	dc.lastSessionRemove = crl::now();
 }
 
-void DownloadManagerMtproto::killSessionsSchedule(MTP::DcId dcId) {
+void DownloadManagerMtproto::killSessionsSchedule(MTP::DcId dcId, bool retry) {
 	if (!_killSessionsWhen.contains(dcId)) {
-		_killSessionsWhen.emplace(dcId, crl::now() + kKillSessionTimeout);
+		_killSessionsWhen.emplace(dcId, KillSessionsWhen{
+			.when = crl::now() + kKillSessionTimeout,
+			.retry = retry,
+		});
 	}
 	if (!_killSessionsTimer.isActive()) {
 		_killSessionsTimer.callOnce(kKillSessionTimeout + 5);
@@ -380,35 +387,49 @@ void DownloadManagerMtproto::killSessions() {
 	const auto now = crl::now();
 	auto left = kKillSessionTimeout;
 	for (auto i = begin(_killSessionsWhen); i != end(_killSessionsWhen); ) {
-		if (i->second <= now) {
-			killSessions(i->first);
-			i = _killSessionsWhen.erase(i);
-		} else {
-			if (i->second - now < left) {
-				left = i->second - now;
+		auto &entry = i->second;
+		if (entry.when <= now) {
+			if (killSessions(i->first, entry.retry)) {
+				i = _killSessionsWhen.erase(i);
+				continue;
 			}
-			++i;
+			entry.when = now + kKillSessionTimeout;
+			entry.retry = true;
 		}
+		if (entry.when - now < left) {
+			left = entry.when - now;
+		}
+		++i;
 	}
 	if (!_killSessionsWhen.empty()) {
 		_killSessionsTimer.callOnce(left);
 	}
 }
 
-void DownloadManagerMtproto::killSessions(MTP::DcId dcId) {
+bool DownloadManagerMtproto::killSessions(MTP::DcId dcId, bool retry) {
 	const auto i = _balanceData.find(dcId);
-	if (i != end(_balanceData)) {
-		auto &dc = i->second;
-		Assert(dc.totalRequested == 0);
+	if (i == end(_balanceData)) {
+		return true;
+	}
+	auto &dc = i->second;
+	Assert(dc.totalRequested == 0);
+	if (!retry) {
 		auto sessions = base::take(dc.sessions);
 		dc = DcBalanceData();
-		for (auto j = 0; j != int(sessions.size()); ++j) {
-			Assert(sessions[j].requested == 0);
-			sessions[j] = DcSessionBalanceData();
-			api().instance().stopSession(MTP::downloadDcId(dcId, j));
+		for (auto &session : sessions) {
+			Assert(session.requested == 0);
+			session = DcSessionBalanceData();
 		}
 		dc.sessions = base::take(sessions);
 	}
+	auto &instance = api().instance();
+	auto allRetired = true;
+	for (auto j = 0; j != kMaxSessionsCount; ++j) {
+		if (!instance.killSessionIfIdle(MTP::downloadDcId(dcId, j))) {
+			allRetired = false;
+		}
+	}
+	return allRetired;
 }
 
 DownloadMtprotoTask::DownloadMtprotoTask(
@@ -461,11 +482,11 @@ void DownloadMtprotoTask::refreshFileReferenceFrom(
 	if (const auto v = std::get_if<StorageFileLocation>(&_location.data)) {
 		v->refreshFileReference(updates);
 		if (v->fileReference() == current) {
-			cancelOnFail();
+			failRequest(requestId);
 			return;
 		}
 	} else {
-		cancelOnFail();
+		failRequest(requestId);
 		return;
 	}
 	if (_sentRequests.contains(requestId)) {
@@ -768,7 +789,7 @@ void DownloadMtprotoTask::getCdnFileHashesDone(
 		case CheckCdnHashResult::Invalid: {
 			LOG(("API Error: Wrong cdnFileHash for offset %1."
 				).arg(uncheckedData.offset));
-			cancelOnFail();
+			failFinishedRequest(requestData, true);
 			return;
 		} break;
 
@@ -791,7 +812,7 @@ void DownloadMtprotoTask::getCdnFileHashesDone(
 			"Could not find cdnFileHash for offset %1 "
 			"after getCdnFileHashes request."
 			).arg(requestData.offset));
-		cancelOnFail();
+		failFinishedRequest(requestData, true);
 		return;
 	}
 	requestMoreCdnFileHashes();
@@ -908,6 +929,34 @@ void DownloadMtprotoTask::cancelRequest(mtpRequestId requestId) {
 	}
 }
 
+void DownloadMtprotoTask::failRequest(mtpRequestId requestId) {
+	if (!_sentRequests.contains(requestId)) {
+		cancelOnFail();
+		return;
+	}
+	const auto hashes = (_cdnHashesRequestId == requestId);
+	const auto requestData = finishSentRequest(
+		requestId,
+		FinishRequestReason::Cancel);
+	const auto owner = _owner;
+	const auto dcId = this->dcId();
+	failFinishedRequest(requestData, hashes);
+
+	// 'this' may be deleted at this point.
+	owner->checkSendNextAfterSuccess(dcId);
+}
+
+void DownloadMtprotoTask::failFinishedRequest(
+		const RequestData &requestData,
+		bool hashes) {
+	if (hashes) {
+		_cdnUncheckedParts.clear();
+	} else {
+		_cdnUncheckedParts.remove(requestData);
+	}
+	cancelOnFail();
+}
+
 void DownloadMtprotoTask::addToQueue(int priority) {
 	_owner->enqueue(this, priority);
 }
@@ -951,7 +1000,7 @@ bool DownloadMtprotoTask::partFailed(
 	if (MTP::IsDefaultHandledError(error)) {
 		return false;
 	}
-	cancelOnFail();
+	failRequest(requestId);
 	return true;
 }
 

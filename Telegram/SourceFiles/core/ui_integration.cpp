@@ -480,11 +480,19 @@ bool UiIntegration::handleUrlClick(
 	} else if (local.startsWith(u"tg://"_q, Qt::CaseInsensitive)) {
 		Core::App().openLocalUrl(local, context);
 		return true;
-	} else if (local.startsWith(u"tonsite://"_q, Qt::CaseInsensitive)) {
-		Core::App().iv().showTonSite(local, context);
-		return true;
 	} else if (local.startsWith(u"internal:"_q, Qt::CaseInsensitive)) {
 		Core::App().openInternalUrl(local, context);
+		return true;
+	} else if (Core::App().passcodeLocked()) {
+		// A locked app opens no window of its own and logs in nowhere.
+		const auto my = context.value<ClickHandlerContext>();
+		if (!my.keepWebAuthTokens
+			&& !local.startsWith(u"tonsite://"_q, Qt::CaseInsensitive)) {
+			File::OpenUrl(original);
+		}
+		return true;
+	} else if (local.startsWith(u"tonsite://"_q, Qt::CaseInsensitive)) {
+		Core::App().iv().showTonSite(local, context);
 		return true;
 	} else if (Iv::PreferForUri(url)
 		&& !context.value<ClickHandlerContext>().ignoreIv) {

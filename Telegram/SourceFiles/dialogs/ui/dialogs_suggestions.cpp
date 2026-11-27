@@ -10,9 +10,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_chat_participants.h"
 #include "api/api_peer_search.h"
 #include "apiwrap.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "base/event_filter.h"
 #include "base/unixtime.h"
-#include "base/qt/qt_key_modifiers.h"
 #include "boxes/choose_filter_box.h"
 #include "boxes/peer_list_box.h"
 #include "core/application.h"
@@ -45,19 +45,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "inline_bots/bot_attach_web_view.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "settings/sections/settings_premium.h"
 #include "settings/settings_common.h"
 #include "settings/settings_credits_graphics.h"
-#include "settings/sections/settings_premium.h"
 #include "storage/storage_shared_media.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/swipe_handler.h"
 #include "ui/effects/loading_element.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/slide_animation.h"
-#include "ui/toast/toast.h"
 #include "ui/text/custom_emoji_helper.h"
 #include "ui/text/custom_emoji_text_badge.h"
 #include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/discrete_sliders.h"
@@ -65,18 +65,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
-#include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
 #include "ui/delayed_activation.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/painter.h"
 #include "ui/search_field_controller.h"
+#include "ui/ui_utility.h"
 #include "ui/unread_badge_paint.h"
 #include "ui/unread_counter_format.h"
-#include "ui/ui_utility.h"
+#include "window/window_peer_menu.h"
 #include "window/window_separate_id.h"
 #include "window/window_session_controller.h"
-#include "window/window_peer_menu.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_dialogs.h"
@@ -1853,6 +1854,32 @@ void Suggestions::setupChats() {
 		_emptyRecent->toggle(count == 0, anim::type::instant);
 	}, _recent->wrap->lifetime());
 
+	const auto refreshRecent = [=] {
+		if (_cachedRecent.isEmpty()) {
+			return;
+		}
+		const auto list = _recent->wrap->entity();
+		const auto pos = list->mapTo(_chatsScroll.get(), QPoint());
+		const auto clip = _cachedRecent.translated(-pos);
+		const auto dirty = list->changedUserpicRows(clip);
+		_dirtyChatRows += dirty.translated(pos);
+	};
+	auto &session = _controller->session();
+	session.downloaderTaskFinished(
+	) | rpl::on_next(refreshRecent, lifetime());
+	session.changes().peerUpdates(
+		Data::PeerUpdate::Flag::Photo
+	) | rpl::on_next(refreshRecent, lifetime());
+
+	_topPeers->userpicUpdates() | rpl::on_next([=](QRect rect) {
+		const auto scroll = _chatsScroll.get();
+		rect.moveTopLeft(_topPeers->mapTo(scroll, rect.topLeft()));
+		rect = rect.intersected(_cachedTopPeers);
+		if (!rect.isEmpty()) {
+			_dirtyChatRows += rect;
+		}
+	}, _topPeers->lifetime());
+
 	_topPeers->emptyValue() | rpl::on_next([=](bool empty) {
 		_topPeersWrap->toggle(!empty, anim::type::instant);
 	}, _topPeers->lifetime());
@@ -3119,6 +3146,15 @@ void Suggestions::startShownAnimation(bool shown, Fn<void()> finish) {
 		if (now < st::columnMinimalWidthLeft) {
 			resize(st::columnMinimalWidthLeft, height());
 		}
+		const auto scroll = _chatsScroll.get();
+		const auto visibleRect = [&](QWidget *widget) {
+			const auto pos = widget->mapTo(scroll, QPoint());
+			return widget->isVisibleTo(this)
+				? QRect(pos, widget->size()) & scroll->rect()
+				: QRect();
+		};
+		_cachedTopPeers = visibleRect(_topPeers);
+		_cachedRecent = visibleRect(_recent->wrap->entity());
 		_cache = Ui::GrabWidget(this);
 		if (now < st::columnMinimalWidthLeft) {
 			resize(now, height());
@@ -3143,6 +3179,9 @@ void Suggestions::finishShow() {
 
 	_shownAnimation.stop();
 	_cache = QPixmap();
+	_cachedTopPeers = QRect();
+	_cachedRecent = QRect();
+	_dirtyChatRows = QRegion();
 
 	_tabsScroll->show();
 	const auto key = _key.current();
@@ -3209,6 +3248,18 @@ void Suggestions::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 	p.fillRect(e->rect(), color);
 	if (!_cache.isNull()) {
+		if (!_dirtyChatRows.isEmpty()) {
+			const auto dirty = std::exchange(
+				_dirtyChatRows,
+				QRegion());
+			const auto pos = dirty.boundingRect().topLeft();
+			auto painter = QPainter(&_cache);
+			Ui::RenderWidget(
+				painter,
+				_chatsScroll.get(),
+				_chatsScroll->mapTo(this, pos),
+				dirty);
+		}
 		const auto slide = st::topPeers.height + st::searchedBarHeight;
 		p.setOpacity(opacity);
 		p.drawPixmap(0, (opacity - 1.) * slide, _cache);

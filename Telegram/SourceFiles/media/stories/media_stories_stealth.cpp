@@ -22,15 +22,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/painter.h"
-#include "window/window_controller.h"
 #include "window/window_session_controller.h"
-#include "styles/style_media_view.h"
-#include "styles/style_media_stories.h"
+
 #include "styles/style_layers.h"
+#include "styles/style_media_stories.h"
+#include "styles/style_media_view.h"
 #include "styles/style_menu_icons.h"
 
 namespace Media::Stories {
@@ -242,6 +242,7 @@ struct State {
 		rpl::single(QString()),
 		st.box.button);
 	const auto raw = result.data();
+	raw->setFullRadius(true);
 	raw->setTextTransform(Ui::RoundButtonTextTransform::ToUpper);
 
 	const auto label = Ui::CreateChild<Ui::FlatLabel>(
@@ -327,17 +328,14 @@ struct State {
 		button->resizeToWidth(st::boxWideWidth
 			- st.box.buttonPadding.left()
 			- st.box.buttonPadding.right());
-		button->setClickedCallback([=] {
+		button->setClickedCallback([=, dark = st.dark] {
 			const auto now = data->state.current();
 			if (now.mode.enabledTill > now.now) {
 				show->showToast(ToastActivated());
 				box->closeBox();
 			} else if (!now.premium) {
 				data->requested = false;
-				if (const auto window = show->resolveWindow()) {
-					ShowPremiumPreviewBox(window, PremiumFeature::Stories);
-					window->window().activate();
-				}
+				ShowStoriesPremiumPreviewBox(show, dark);
 			} else if (now.mode.cooldownTill > now.now) {
 				show->showToast(ToastCooldown());
 				box->closeBox();

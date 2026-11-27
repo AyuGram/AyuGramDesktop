@@ -8,8 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "ui/text/text.h"
-#include "ui/userpic_view.h"
 #include "ui/widgets/buttons.h"
+#include "ui/userpic_view.h"
 
 namespace Ui {
 class RadioView;
@@ -49,7 +49,6 @@ public:
 	void setDivider(bool divider);
 
 	[[nodiscard]] QString subtitle() const;
-	[[nodiscard]] bool hasRadio() const;
 
 protected:
 	int resizeGetHeight(int newWidth) override;

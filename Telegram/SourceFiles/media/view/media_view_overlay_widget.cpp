@@ -7,121 +7,122 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/view/media_view_overlay_widget.h"
 
-#include "apiwrap.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_peer_photo.h"
 #include "api/api_polls.h"
-#include "base/base_file_utilities.h"
+#include "apiwrap.h"
+#include "base/platform/base_platform_haptic.h"
+#include "base/platform/base_platform_info.h"
 #include "base/qt/qt_common_adapters.h"
+#include "base/base_file_utilities.h"
+#include "base/event_filter.h"
+#include "base/power_save_blocker.h"
+#include "base/qt_signal_producer.h"
+#include "base/random.h"
 #include "base/timer_rpl.h"
-#include "lang/lang_keys.h"
-#include "menu/menu_sponsored.h"
+#include "base/unixtime.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/moderate_messages_box.h"
 #include "boxes/premium_preview_box.h"
+#include "boxes/report_messages_box.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/core_screenshot_protection.h"
+#include "core/crash_reports.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
-#include "core/ui_integration.h"
-#include "core/crash_reports.h"
 #include "core/sandbox.h"
 #include "core/shortcuts.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/tooltip.h"
-#include "ui/wrap/padding_wrap.h"
-#include "ui/controls/swipe_handler.h"
-#include "ui/controls/swipe_handler_data.h"
-#include "ui/controls/ttl_media.h"
-#include "ui/layers/layer_manager.h"
-#include "ui/text/text_utilities.h"
-#include "ui/chat/chat_style.h"
-#include "ui/platform/ui_platform_utility.h"
-#include "ui/platform/ui_platform_window_title.h"
-#include "ui/toast/toast.h"
-#include "ui/text/format_values.h"
-#include "ui/item_text_options.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/power_saving.h"
-#include "ui/cached_round_corners.h"
-#include "ui/gl/gl_window.h"
-#include "ui/boxes/confirm_box.h"
-#include "ui/ui_utility.h"
-#include "info/info_memento.h"
-#include "info/info_controller.h"
-#include "info/statistics/info_statistics_widget.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/moderate_messages_box.h"
-#include "boxes/report_messages_box.h"
-#include "media/audio/media_audio.h"
-#include "media/view/media_view_group_thumbs.h"
-#include "media/view/media_view_pip.h"
-#include "media/view/media_view_overlay_raster.h"
-#include "media/view/media_view_overlay_opengl.h"
-#include "media/view/media_view_overlay_rhi.h"
-#include "media/view/media_view_playback_sponsored.h"
-#include "media/view/media_view_video_stream.h"
-#include "media/stories/media_stories_share.h"
-#include "media/stories/media_stories_view.h"
-#include "media/stories/media_stories_post.h"
-#include "media/streaming/media_streaming_document.h"
-#include "media/streaming/media_streaming_player.h"
-#include "media/player/media_player_instance.h"
-#include "history/history.h"
-#include "history/history_item_helpers.h"
-#include "history/view/media/history_view_media.h"
-#include "history/view/media/history_view_media_common.h"
-#include "history/view/history_view_group_call_bar.h"
-#include "history/view/reactions/history_view_reactions_selector.h"
+#include "core/ui_integration.h"
 #include "data/components/sponsored_messages.h"
-#include "data/data_group_call.h"
-#include "data/data_session.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/data_user.h"
+#include "data/data_document_media.h"
+#include "data/data_document_resolver.h"
+#include "data/data_download_manager.h"
+#include "data/data_file_click_handler.h"
+#include "data/data_group_call.h"
 #include "data/data_media_rotation.h"
 #include "data/data_peer_values.h"
 #include "data/data_photo_media.h"
-#include "data/data_document_media.h"
-#include "data/data_document_resolver.h"
-#include "data/data_file_click_handler.h"
-#include "data/data_download_manager.h"
 #include "data/data_poll.h"
-#include "window/themes/window_theme_preview.h"
-#include "window/window_peer_menu.h"
-#include "window/window_controller.h"
-#include "base/platform/base_platform_haptic.h"
-#include "base/platform/base_platform_info.h"
-#include "base/power_save_blocker.h"
-#include "base/random.h"
-#include "base/unixtime.h"
-#include "base/qt_signal_producer.h"
-#include "base/event_filter.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/view/media/history_view_media.h"
+#include "history/view/media/history_view_media_common.h"
+#include "history/view/reactions/history_view_reactions_selector.h"
+#include "history/view/history_view_group_call_bar.h"
+#include "history/history.h"
+#include "history/history_item_helpers.h"
+#include "info/statistics/info_statistics_widget.h"
+#include "info/info_controller.h"
+#include "info/info_memento.h"
+#include "lang/lang_keys.h"
+#include "layout/layout_document_generic_preview.h"
 #include "main/main_account.h"
 #include "main/main_domain.h" // Domain::activeSessionValue.
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "layout/layout_document_generic_preview.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_instance.h"
+#include "media/stories/media_stories_post.h"
+#include "media/stories/media_stories_share.h"
+#include "media/stories/media_stories_view.h"
+#include "media/streaming/media_streaming_document.h"
+#include "media/streaming/media_streaming_player.h"
+#include "media/view/media_view_group_thumbs.h"
+#include "media/view/media_view_overlay_opengl.h"
+#include "media/view/media_view_overlay_raster.h"
+#include "media/view/media_view_overlay_rhi.h"
+#include "media/view/media_view_pip.h"
+#include "media/view/media_view_playback_sponsored.h"
+#include "media/view/media_view_video_stream.h"
+#include "menu/menu_sponsored.h"
 #include "platform/platform_file_utilities.h"
 #include "platform/platform_overlay_widget.h"
 #include "platform/platform_specific.h"
+#include "platform/platform_text_recognition.h"
 #include "storage/file_download.h"
 #include "storage/storage_account.h"
-#include "styles/style_chat_style.h"
-#include "styles/style_media_view.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/chat/chat_style.h"
+#include "ui/controls/swipe_handler.h"
+#include "ui/controls/swipe_handler_data.h"
+#include "ui/controls/ttl_media.h"
+#include "ui/gl/gl_window.h"
+#include "ui/layers/layer_manager.h"
+#include "ui/platform/ui_platform_utility.h"
+#include "ui/platform/ui_platform_window_title.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/dropdown_menu.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/tooltip.h"
+#include "ui/wrap/padding_wrap.h"
+#include "ui/cached_round_corners.h"
+#include "ui/item_text_options.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
+#include "ui/ui_utility.h"
+#include "window/themes/window_theme_preview.h"
+#include "window/window_controller.h"
+#include "window/window_peer_menu.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_chat_style.h"
 #include "styles/style_dialogs.h"
+#include "styles/style_media_view.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_ttl_media.h"
-#include "platform/platform_text_recognition.h"
 
 #include <QGraphicsOpacityEffect>
 
@@ -677,6 +678,8 @@ OverlayWidget::OverlayWidget()
 , _surface(
 	Ui::GL::CreateSurface(_body, chooseRenderer(_wrap->backend())))
 , _widget(_surface->rpWidget())
+, _storyAreaLayer(std::make_unique<Ui::RpWidget>(_body))
+, _storyCaptionLayer(std::make_unique<Ui::RpWidget>(_body))
 , _fullscreen(Core::App().settings().mediaViewPosition().maximized == 2)
 , _windowed(Core::App().settings().mediaViewPosition().maximized == 0)
 , _quality(Core::App().settings().videoQuality())
@@ -693,6 +696,7 @@ OverlayWidget::OverlayWidget()
 	return isSpeedBoostShown();
 }) {
 	_layerBg->setStyleOverrides(&st::groupCallBox, &st::groupCallLayerBox);
+	setupStoryCaptionLayer();
 	_layerBg->setHideByBackgroundClick(true);
 	_layerBg->layerShownValue(
 	) | rpl::filter(rpl::mappers::_1) | rpl::on_next([=] {
@@ -1690,10 +1694,6 @@ void OverlayWidget::refreshNavVisibility() {
 	if (_stories) {
 		_leftNavVisible = _stories->subjumpAvailable(-1);
 		_rightNavVisible = _stories->subjumpAvailable(1);
-	} else if (_gallery) {
-		_leftNavVisible = _index && (*_index > 0);
-		_rightNavVisible = _index
-			&& (*_index + 1 < _gallery->media.size());
 	} else if (_instantViewMediaData) {
 		_leftNavVisible = _index && (*_index > 0);
 		_rightNavVisible = _index
@@ -2793,10 +2793,11 @@ OverlayWidget::ContentGeometry OverlayWidget::contentGeometry() const {
 	if (_stories) {
 		auto result = storiesContentGeometry(_stories->contentLayout());
 		if (!_caption.isEmpty()) {
-			result.bottomShadowSkip = _widget->height()
-				- _captionRect.y()
-				+ st::mediaviewCaptionStyle.font->height
-				- st::storiesShadowBottom.height();
+			const auto hidden = _storyCaptionLayer->isHidden();
+			const auto shadow = storyCaptionShadow();
+			result.bottomShadowSkip = hidden
+				? height() - rect::bottom(shadow)
+				: -st::storiesShadowBottom.height();
 		}
 		return result;
 	}
@@ -4627,10 +4628,12 @@ int OverlayWidget::height() const {
 }
 
 void OverlayWidget::update() {
+	updateStoryCaptionLayer();
 	_widget->update();
 }
 
 void OverlayWidget::update(const QRegion &region) {
+	updateStoryCaptionLayer();
 	_widget->update(region);
 }
 
@@ -4754,6 +4757,9 @@ void OverlayWidget::show(OpenRequest request) {
 		_firstOpenedPeerPhoto = (contextPeer != nullptr);
 		_openFileOrigin = request.fileOrigin();
 		_gallery = request.gallery();
+		if (_gallery) {
+			prepareBotPreview(request.galleryIndex());
+		}
 		assignMediaPointer(photo);
 
 		displayPhoto(photo);
@@ -4785,6 +4791,9 @@ void OverlayWidget::show(OpenRequest request) {
 		clearControlsState();
 		_openFileOrigin = request.fileOrigin();
 		_gallery = request.gallery();
+		if (_gallery) {
+			prepareBotPreview(request.galleryIndex());
+		}
 
 		_streamingStartPaused = false;
 		if (call) {
@@ -5175,7 +5184,33 @@ bool OverlayWidget::initStreaming(const StartStreaming &startStreaming) {
 
 	if (_streamed) {
 		return true;
+	} else if (!prepareStreaming()) {
+		return false;
 	}
+
+	const auto continuing = startStreaming.continueStreaming
+		&& _pip
+		&& (_pip->wrapped.shared().get()
+			== _streamed->instance.shared().get());
+	if (startStreaming.continueStreaming) {
+		_pip = nullptr;
+	}
+	if (!continuing
+		|| (!_streamed->instance.player().active()
+			&& !_streamed->instance.player().finished())) {
+		startStreamingPlayer(startStreaming);
+	} else {
+		if (_streamed->instance.player().ready()) {
+			markStreamedReady();
+		} else {
+			_streamed->ready = false;
+		}
+		updatePlaybackState();
+	}
+	return true;
+}
+
+bool OverlayWidget::prepareStreaming() {
 	initStreamingThumbnail();
 	if (!createStreamingObjects()) {
 		if (_document) {
@@ -5204,26 +5239,6 @@ bool OverlayWidget::initStreaming(const StartStreaming &startStreaming) {
 			.height = uint32(quality),
 		});
 	}, _streamed->instance.lifetime());
-
-	const auto continuing = startStreaming.continueStreaming
-		&& _pip
-		&& (_pip->wrapped.shared().get()
-			== _streamed->instance.shared().get());
-	if (startStreaming.continueStreaming) {
-		_pip = nullptr;
-	}
-	if (!continuing
-		|| (!_streamed->instance.player().active()
-			&& !_streamed->instance.player().finished())) {
-		startStreamingPlayer(startStreaming);
-	} else {
-		if (_streamed->instance.player().ready()) {
-			markStreamedReady();
-		} else {
-			_streamed->ready = false;
-		}
-		updatePlaybackState();
-	}
 	return true;
 }
 
@@ -5831,7 +5846,9 @@ void OverlayWidget::playbackControlsSeekProgress(crl::time position) {
 	Expects(_streamed != nullptr);
 
 	if (!_streamed->instance.player().paused()
-		&& !_streamed->instance.player().finished()) {
+		&& !_streamed->instance.player().finished()
+		&& (_streamed->instance.player().failed()
+			!= Streaming::Error::LoadFailed)) {
 		_streamed->pausedBySeek = true;
 		playbackPauseResume();
 	}
@@ -5840,9 +5857,14 @@ void OverlayWidget::playbackControlsSeekProgress(crl::time position) {
 void OverlayWidget::playbackControlsSeekFinished(crl::time position) {
 	Expects(_streamed != nullptr);
 
-	_streamingStartPaused = !_streamed->pausedBySeek
-		&& !_streamed->instance.player().finished();
-	restartAtSeekPosition(position);
+	if (_streamed->instance.player().failed()
+		== Streaming::Error::LoadFailed) {
+		restartFailedStreamingAt(position);
+	} else {
+		_streamingStartPaused = !_streamed->pausedBySeek
+			&& !_streamed->instance.player().finished();
+		restartAtSeekPosition(position);
+	}
 	activateControls();
 }
 
@@ -5982,14 +6004,18 @@ void OverlayWidget::applyVideoQuality(VideoQuality value) {
 	if (!canInitStreaming() || !initStreaming(startStreaming)) {
 		redisplayContent();
 	} else {
-		if (_fullScreenVideo != wasFullScreen) {
-			_fullScreenVideo = wasFullScreen;
-			if (_streamed->controls) {
-				_streamed->controls->setInFullScreen(_fullScreenVideo);
-			}
-		}
-		refreshCaption();
+		restoreReplacedStreaming(wasFullScreen);
 	}
+}
+
+void OverlayWidget::restoreReplacedStreaming(bool wasFullScreen) {
+	if (_fullScreenVideo != wasFullScreen) {
+		_fullScreenVideo = wasFullScreen;
+		if (_streamed->controls) {
+			_streamed->controls->setInFullScreen(_fullScreenVideo);
+		}
+	}
+	refreshCaption();
 }
 
 void OverlayWidget::switchToPip() {
@@ -6053,6 +6079,10 @@ not_null<Ui::RpWidget*> OverlayWidget::storiesWrap() {
 	return _body;
 }
 
+not_null<Ui::RpWidget*> OverlayWidget::storiesAreaWrap() {
+	return _storyAreaLayer.get();
+}
+
 std::shared_ptr<ChatHelpers::Show> OverlayWidget::storiesShow() {
 	return uiShow();
 }
@@ -6114,6 +6144,29 @@ void OverlayWidget::storiesRedisplay(not_null<Data::Story*> story) {
 	}, [&](v::null_t) {
 		displayDocument(nullptr, anim::activation::background);
 	});
+}
+
+void OverlayWidget::storiesJumpToPreview(int index) {
+	const auto delta = index - *_index;
+	const auto entity = entityByIndex(index);
+	prepareBotPreview(index);
+	moveToEntity(entity, delta);
+}
+
+void OverlayWidget::prepareBotPreview(int index) {
+	Expects(_gallery != nullptr);
+
+	clearStreaming();
+	_index = index;
+	setStoriesPeer(_gallery->bot);
+	const auto video = std::get_if<not_null<DocumentData*>>(
+		&_gallery->media[index]);
+	_stories->showPreview(
+		_gallery->bot,
+		video ? video->get() : nullptr,
+		index,
+		int(_gallery->media.size()));
+	_dropdown->raise();
 }
 
 void OverlayWidget::storiesClose() {
@@ -6714,7 +6767,7 @@ void OverlayWidget::paint(not_null<Renderer*> renderer) {
 		if (!_stories) {
 			renderer->paintFooter(footerGeometry(), opacity);
 		}
-		if (!(_stories ? _stories->skipCaption() : _caption.isEmpty())) {
+		if (!_stories && !_caption.isEmpty()) {
 			renderer->paintCaption(captionGeometry(), opacity);
 		}
 		if (_groupThumbs) {
@@ -8076,6 +8129,7 @@ void OverlayWidget::setStoriesPeer(PeerData *peer) {
 		_videoStream = nullptr;
 		_stories = nullptr;
 		_storiesSession = nullptr;
+		updateStoryCaptionLayer();
 		_storiesChanged.fire({});
 		updateNavigationControlsGeometry();
 	} else if (_storiesSession != session) {
@@ -8207,10 +8261,12 @@ bool OverlayWidget::moveToEntity(const Entity &entity, int preloadDelta) {
 		});
 	} else if (_peer) {
 		setContext(_peer);
-	} else {
+	} else if (!_gallery) {
 		setContext(v::null);
 	}
-	clearStreaming();
+	if (!_gallery) {
+		clearStreaming();
+	}
 	_streamingStartPaused = false;
 	if (auto photo = std::get_if<not_null<PhotoData*>>(&entity.data)) {
 		displayPhoto(*photo);
@@ -8588,11 +8644,15 @@ bool OverlayWidget::updateOverState(Over newState) {
 void OverlayWidget::updateOver(QPoint pos) {
 	ClickHandlerPtr lnk;
 	auto lnkhost = (ClickHandlerHost*)nullptr;
+	const auto captionShown = !_stories
+		|| !_storyCaptionLayer->isHidden();
 	if (isSaveMsgShown() && _saveMsg.contains(pos)) {
 		auto textState = _saveMsgText.getState(pos - _saveMsg.topLeft() - QPoint(st::mediaviewSaveMsgPadding.left(), st::mediaviewSaveMsgPadding.top()), _saveMsg.width() - st::mediaviewSaveMsgPadding.left() - st::mediaviewSaveMsgPadding.right());
 		lnk = textState.link;
 		lnkhost = this;
-	} else if (_captionRect.contains(pos) && !_fullScreenVideo) {
+	} else if (captionShown
+		&& _captionRect.contains(pos)
+		&& !_fullScreenVideo) {
 		auto request = Ui::Text::StateRequestElided();
 		const auto lineHeight = st::mediaviewCaptionStyle.font->height;
 		request.lines = _captionRect.height() / lineHeight;
@@ -8603,10 +8663,13 @@ void OverlayWidget::updateOver(QPoint pos) {
 			lnk = ensureCaptionExpandLink();
 		}
 		lnkhost = this;
-	} else if (_stories && captionGeometry().contains(pos)) {
+	} else if (_stories
+		&& captionShown
+		&& captionGeometry().contains(pos)) {
 		const auto padding = st::mediaviewCaptionPadding;
+		const auto inner = captionGeometry().marginsRemoved(padding);
 		const auto handler = _stories->lookupRepostHandler(
-			pos - captionGeometry().marginsRemoved(padding).topLeft());
+			pos - inner.topLeft());
 		if (handler) {
 			lnk = handler.link;
 			lnkhost = handler.host;
@@ -9223,22 +9286,8 @@ void OverlayWidget::updateSaveMsg() {
 void OverlayWidget::findCurrent() {
 	using namespace rpl::mappers;
 	if (_gallery) {
-		const auto photo = [=](not_null<PhotoData*> data) {
-			return data == _photo;
-		};
-		const auto document = [=](not_null<DocumentData*> data) {
-			return data == _document;
-		};
-		const auto current = [&](const GalleryMedia &item) {
-			return v::match(item, photo, document);
-		};
-		const auto &items = _gallery->media;
-		const auto i = ranges::find_if(items, current);
-		_index = (i != end(items))
-			? std::make_optional(int(i - begin(items)))
-			: std::nullopt;
 		_fullIndex = _index;
-		_fullCount = items.size();
+		_fullCount = _gallery->media.size();
 	} else if (_instantViewMediaData) {
 		const auto key = instantViewMediaKey();
 		const auto &items = *_instantViewMediaData;

@@ -80,6 +80,7 @@ struct SiblingView;
 enum class SiblingType;
 struct ContentLayout;
 class CaptionFullView;
+class MusicDisc;
 class RepostView;
 enum class ReactionsMode;
 class StoryAreaView;
@@ -133,6 +134,7 @@ public:
 
 	[[nodiscard]] Data::Story *story() const;
 	[[nodiscard]] not_null<Ui::RpWidget*> wrap() const;
+	[[nodiscard]] not_null<Ui::RpWidget*> areaWrap() const;
 	[[nodiscard]] Layout layout() const;
 	[[nodiscard]] rpl::producer<Layout> layoutValue() const;
 	[[nodiscard]] ContentLayout contentLayout() const;
@@ -157,6 +159,11 @@ public:
 	-> rpl::producer<ChatHelpers::FileChosen>;
 
 	void show(not_null<Data::Story*> story, Data::StoriesContext context);
+	void showPreview(
+		not_null<PeerData*> bot,
+		DocumentData *video,
+		int index,
+		int count);
 	void jumpTo(not_null<Data::Story*> story, Data::StoriesContext context);
 	void ready();
 
@@ -333,12 +340,14 @@ private:
 
 	FullStoryId _shown;
 	TextWithEntities _captionText;
+	std::unique_ptr<MusicDisc> _musicDisc;
 	Data::StoriesContext _context;
 	std::optional<Data::StoriesSource> _source;
 	std::optional<StoriesList> _list;
 	FullStoryId _waitingForId;
 	int _waitingForDelta = 0;
 	int _index = 0;
+	int _previewCount = 0;
 	int _sliderIndex = 0;
 	int _sliderCount = 0;
 	bool _started = false;

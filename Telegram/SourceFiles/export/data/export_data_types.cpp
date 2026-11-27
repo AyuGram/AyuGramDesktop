@@ -276,7 +276,7 @@ std::vector<TextPart> ParseText(
 		const QVector<MTPMessageEntity> &entities) {
 	using Type = TextPart::Type;
 	const auto text = QString::fromUtf8(data.v);
-	const auto size = data.v.size();
+	const auto size = int(text.size());
 	const auto mid = [&](int offset, int length) {
 		return text.mid(offset, length).toUtf8();
 	};
@@ -1811,6 +1811,8 @@ UserpicsSlice ParseUserpicsSlice(
 	}, [&](const MTPDstarGiftUnique &gift) {
 		return ActionStarGift{
 			.giftId = uint64(gift.vid().v),
+			.title = ParseString(gift.vtitle()),
+			.num = gift.vnum().v,
 		};
 	});
 }
@@ -2661,8 +2663,8 @@ ServiceAction ParseServiceAction(
 			data.vamount().v,
 			qs(data.vcurrency())).toUtf8();
 		content.amount = CreditsAmount(
-			data.vamount().v / uint64(1'000'000'000),
-			data.vamount().v % uint64(1'000'000'000),
+			data.vcrypto_amount().v / uint64(1'000'000'000),
+			data.vcrypto_amount().v % uint64(1'000'000'000),
 			CreditsType::Ton);
 		result.content = content;
 	}, [&](const MTPDmessageActionPrizeStars &data) {
@@ -2710,8 +2712,6 @@ ServiceAction ParseServiceAction(
 				| ranges::views::transform(ParseTodoListItem)
 				| ranges::to_vector,
 		};
-	}, [&](const MTPDmessageActionPollAppendAnswer &data) {
-		result.content = ActionPollAppendAnswer{};
 	}, [&](const MTPDmessageActionSuggestedPostApproval &data) {
 		result.content = ActionSuggestedPostApproval{
 			.rejectComment = data.vreject_comment().value_or_empty(),
@@ -2763,6 +2763,7 @@ ServiceAction ParseServiceAction(
 		auto content = ParseStarGift(data.vgift());
 		content.offer = true;
 		content.offerDeclined = true;
+		content.offerOutcome = true;
 		content.offerExpired = data.is_expired();
 		content.offerPrice = CreditsAmountFromTL(data.vprice());
 		result.content = content;
@@ -2950,20 +2951,6 @@ Message ParseMessage(
 		}
 		if (const auto postAuthor = data.vpost_author()) {
 			result.signature = ParseString(*postAuthor);
-		}
-		if (const auto replyTo = data.vreply_to()) {
-			replyTo->match([&](const MTPDmessageReplyHeader &data) {
-				if (const auto replyToMsg = data.vreply_to_msg_id()) {
-					result.replyToMsgId = replyToMsg->v;
-					result.replyToPeerId = data.vreply_to_peer_id()
-						? ParsePeerId(*data.vreply_to_peer_id())
-						: PeerId(0);
-				} else {
-					// #TODO export replies
-				}
-			}, [&](const MTPDmessageReplyStoryHeader &data) {
-				// #TODO export stories
-			});
 		}
 		if (const auto viaBotId = data.vvia_bot_id()) {
 			result.viaBotId = viaBotId->v;
@@ -3608,19 +3595,22 @@ Utf8String FormatMoneyAmount(int64 amount, const Utf8String &currency) {
 		QString::fromUtf8(currency)).toUtf8();
 }
 
-Utf8String FormatGramsAmount(int64 nanos) {
-	constexpr auto kNanos = uint64(kNanosInGram);
-
-	const auto negative = (nanos < 0);
-	const auto absolute = negative ? (0 - uint64(nanos)) : uint64(nanos);
-	const auto whole = absolute / kNanos;
-	auto fraction = NumberToString(absolute % kNanos, 9);
+Utf8String FormatDecimalAmount(bool negative, uint64 whole, uint64 nano) {
+	auto fraction = NumberToString(nano, 9);
 	while (fraction.endsWith('0')) {
 		fraction.chop(1);
 	}
 	return (negative ? Utf8String("-") : Utf8String())
 		+ NumberToString(whole)
-		+ (fraction.isEmpty() ? Utf8String() : ('.' + fraction))
+		+ (fraction.isEmpty() ? Utf8String() : ('.' + fraction));
+}
+
+Utf8String FormatGramsAmount(int64 nanos) {
+	constexpr auto kNanos = uint64(kNanosInGram);
+
+	const auto negative = (nanos < 0);
+	const auto absolute = negative ? (0 - uint64(nanos)) : uint64(nanos);
+	return FormatDecimalAmount(negative, absolute / kNanos, absolute % kNanos)
 		+ ((absolute == kNanos) ? " Gram" : " Grams");
 }
 

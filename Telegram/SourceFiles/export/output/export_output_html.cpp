@@ -443,6 +443,7 @@ public:
 	const Peer &peer(PeerId peerId) const;
 	const User &user(UserId userId) const;
 
+	QByteArray peerName(PeerId peerId) const;
 	QByteArray wrapPeerName(PeerId peerId) const;
 	QByteArray wrapUserName(UserId userId) const;
 	QByteArray wrapUserNames(const std::vector<UserId> &data) const;
@@ -480,11 +481,13 @@ auto PeersMap::user(UserId userId) const -> const User & {
 	return empty;
 }
 
-QByteArray PeersMap::wrapPeerName(PeerId peerId) const {
+QByteArray PeersMap::peerName(PeerId peerId) const {
 	const auto result = peer(peerId).name();
-	return result.isEmpty()
-		? QByteArray("Deleted")
-		: SerializeString(result);
+	return result.isEmpty() ? QByteArray("Deleted") : result;
+}
+
+QByteArray PeersMap::wrapPeerName(PeerId peerId) const {
+	return SerializeString(peerName(peerId));
 }
 
 QByteArray PeersMap::wrapUserName(UserId userId) const {
@@ -4027,7 +4030,7 @@ auto HtmlWriter::Wrap::pushMessage(
 			"when you added it in the attachment menu."_q
 			: data.fromRequest
 			? "You allowed this bot to message you in his web-app."_q
-			: data.app.isEmpty()
+			: data.appId
 			? ("You allowed this bot to message you when you opened "
 				+ SerializeString(data.app))
 			: ("You allowed this bot to message you when you logged in on "
@@ -4241,6 +4244,15 @@ auto HtmlWriter::Wrap::pushMessage(
 			+ QString::number(data.amount).toUtf8()
 			+ " Telegram Stars.";
 	}, [&](const ActionStarGift &data) {
+		if (data.offer) {
+			const auto other = message.out ? dialog.peerId : message.fromId;
+			const auto expires = data.offerExpireAt;
+			return SerializeString(GiftOfferText(
+				data,
+				message.out,
+				peers.peerName(other),
+				FormatDateText(expires) + " at " + FormatTimeText(expires)));
+		}
 		return serviceFrom
 			+ " sent you a gift of "
 			+ QByteArray::number(data.stars)
@@ -6465,9 +6477,11 @@ Result HtmlWriter::writeDialogSlice(const Data::MessagesSlice &data) {
 				return result;
 			} else if (const auto next = switchToNextChatFile(newIndex)) {
 				Assert(saved.has_value() || _lastMessageInfo != nullptr);
-				_lastMessageIdsPerFile.push_back(saved
-					? saved->id
-					: _lastMessageInfo->id);
+				const auto id = saved ? saved->id : _lastMessageInfo->id;
+				_lastMessageIdsPerFile.push_back(
+					_lastMessageIdsPerFile.empty()
+						? id
+						: std::max(id, _lastMessageIdsPerFile.back()));
 				block = QByteArray();
 				_lastMessageInfo = nullptr;
 				previous = nullptr;
@@ -6722,9 +6736,7 @@ Result HtmlWriter::writeSections() {
 }
 
 QByteArray HtmlWriter::wrapMessageLink(int messageId, QByteArray text) {
-	const auto it = ranges::find_if(_lastMessageIdsPerFile, [&](int maxMessageId) {
-		return messageId <= maxMessageId;
-	});
+	const auto it = ranges::lower_bound(_lastMessageIdsPerFile, messageId);
 	if (it == end(_lastMessageIdsPerFile)) {
 		return "<a href=\"#go_to_message"
 			+ Data::NumberToString(messageId)

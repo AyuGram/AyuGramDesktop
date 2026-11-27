@@ -7,44 +7,113 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_chat_section.h"
 
+#include "api/api_bot.h"
+#include "api/api_chat_participants.h"
+#include "api/api_editing.h"
+#include "api/api_forward_reply.h"
+#include "api/api_sending.h"
+#include "apiwrap.h"
+#include "base/qt/qt_key_modifiers.h"
+#include "base/call_delayed.h"
+#include "base/event_filter.h"
+#include "base/timer_rpl.h"
+#include "boxes/peers/edit_peer_permissions_box.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/premium_limits_box.h"
+#include "boxes/premium_preview_box.h"
+#include "boxes/send_files_box.h"
+#include "chat_helpers/bot_keyboard.h"
+#include "chat_helpers/message_field.h"
+#include "chat_helpers/tabbed_selector.h"
+#include "core/application.h"
+#include "core/click_handler_types.h"
+#include "core/mime_type.h"
+#include "core/shortcuts.h"
+#include "data/business/data_shortcut_messages.h"
+#include "data/components/ephemeral_messages.h"
+#include "data/components/recent_inline_bots.h"
+#include "data/components/scheduled_messages.h"
+#include "data/components/sponsored_messages.h"
+#include "data/notify/data_notify_settings.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_compose_stash.h"
+#include "data/data_drafts.h"
+#include "data/data_forum.h"
+#include "data/data_forum_topic.h"
+#include "data/data_histories.h"
+#include "data/data_history_messages.h"
+#include "data/data_msg_id.h"
+#include "data/data_peer_values.h"
+#include "data/data_premium_limits.h"
+#include "data/data_replies_list.h"
+#include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_send_action.h"
+#include "data/data_session.h"
+#include "data/data_shared_media.h"
+#include "data/data_user.h"
 #include "history/admin_log/history_admin_log_section.h"
-#include "history/view/controls/history_view_top_controls.h"
 #include "history/view/controls/history_view_bottom_controls.h"
 #include "history/view/controls/history_view_compose_controls.h"
 #include "history/view/controls/history_view_compose_search.h"
 #include "history/view/controls/history_view_compose_stash.h"
 #include "history/view/controls/history_view_draft_options.h"
 #include "history/view/controls/history_view_suggest_options.h"
+#include "history/view/controls/history_view_top_controls.h"
 #include "history/view/history_view_about_view.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_draw_to_reply.h"
 #include "history/view/history_view_group_members_widget.h"
 #include "history/view/history_view_paid_reaction_toast.h"
-#include "history/view/history_view_top_bar_widget.h"
-#include "history/view/history_view_schedule_box.h"
-#include "history/view/history_view_sticker_toast.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/history_view_scheduled_section.h"
-#include "history/view/history_view_service_message.h"
-#include "history/view/history_view_subsection_tabs.h"
-#include "history/view/history_view_pinned_tracker.h"
 #include "history/view/history_view_pinned_section.h"
-#include "history/view/history_view_translate_tracker.h"
+#include "history/view/history_view_pinned_tracker.h"
+#include "history/view/history_view_schedule_box.h"
+#include "history/view/history_view_scheduled_section.h"
 #include "history/view/history_view_self_forwards_tagger.h"
-#include "history/view/history_view_draw_to_reply.h"
+#include "history/view/history_view_service_message.h"
+#include "history/view/history_view_sticker_toast.h"
+#include "history/view/history_view_subsection_tabs.h"
+#include "history/view/history_view_top_bar_widget.h"
+#include "history/view/history_view_translate_tracker.h"
 #include "history/history.h"
 #include "history/history_drag_area.h"
 #include "history/history_inner_widget.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
-#include "history/history_view_pull_to_next_channel.h"
 #include "history/history_item_reply_markup.h"
 #include "history/history_view_pull_to_next_channel.h"
+#include "history/history_view_pull_to_next_channel.h"
+#include "info/profile/info_profile_values.h"
+#include "inline_bots/inline_bot_result.h"
+#include "iv/editor/iv_editor_session.h"
 #include "iv/iv_rich_message_serializer.h"
 #include "iv/iv_rich_page.h"
+#include "lang/lang_instance.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "media/player/media_player_instance.h"
+#include "menu/menu_timecode_action.h"
+#include "settings/business/settings_quick_replies.h"
+#include "storage/localimageloader.h"
+#include "storage/storage_account.h"
+#include "storage/storage_folder_archive.h"
+#include "storage/storage_media_prepare.h"
+#include "support/support_autocomplete.h"
+#include "support/support_common.h"
+#include "support/support_preload.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/chat/chat_style.h"
 #include "ui/chat/choose_theme_controller.h"
 #include "ui/chat/pinned_bar.h"
-#include "ui/chat/chat_style.h"
 #include "ui/controls/swipe_handler.h"
+#include "ui/effects/message_sending_animation_controller.h"
+#include "ui/effects/message_sending_text_flight.h"
 #include "ui/layers/generic_box.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/elastic_scroll.h"
@@ -52,88 +121,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
-#include "ui/text/format_values.h"
-#include "ui/text/text_utilities.h"
-#include "ui/effects/message_sending_animation_controller.h"
-#include "ui/effects/message_sending_text_flight.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/screen_reader_mode.h"
 #include "ui/ui_utility.h"
-#include "base/timer_rpl.h"
-#include "api/api_bot.h"
-#include "api/api_chat_participants.h"
-#include "api/api_editing.h"
-#include "api/api_forward_reply.h"
-#include "api/api_sending.h"
-#include "apiwrap.h"
-#include "boxes/premium_preview_box.h"
-#include "data/business/data_shortcut_messages.h"
-#include "settings/business/settings_quick_replies.h"
-#include "ui/boxes/confirm_box.h"
-#include "chat_helpers/bot_keyboard.h"
-#include "chat_helpers/message_field.h"
-#include "chat_helpers/tabbed_selector.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/send_files_box.h"
-#include "boxes/premium_limits_box.h"
-#include "boxes/peers/edit_peer_permissions_box.h"
 #include "window/window_controller.h"
-#include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
-#include "base/call_delayed.h"
-#include "base/event_filter.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "core/application.h"
-#include "core/shortcuts.h"
-#include "core/click_handler_types.h"
-#include "core/mime_type.h"
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "media/player/media_player_instance.h"
-#include "menu/menu_timecode_action.h"
-#include "data/components/ephemeral_messages.h"
-#include "data/components/recent_inline_bots.h"
-#include "data/components/scheduled_messages.h"
-#include "data/components/sponsored_messages.h"
-#include "data/data_histories.h"
-#include "data/data_history_messages.h"
-#include "data/data_msg_id.h"
-#include "data/data_saved_messages.h"
-#include "data/data_saved_sublist.h"
-#include "data/data_session.h"
-#include "data/data_user.h"
-#include "data/data_chat.h"
-#include "data/data_channel.h"
-#include "data/data_forum.h"
-#include "data/data_forum_topic.h"
-#include "data/data_replies_list.h"
-#include "data/data_peer_values.h"
-#include "data/data_changes.h"
-#include "data/data_compose_stash.h"
-#include "data/data_drafts.h"
-#include "data/data_shared_media.h"
-#include "data/data_send_action.h"
-#include "data/data_premium_limits.h"
-#include "data/notify/data_notify_settings.h"
-#include "storage/storage_folder_archive.h"
-#include "storage/storage_media_prepare.h"
-#include "storage/storage_account.h"
-#include "storage/localimageloader.h"
-#include "support/support_autocomplete.h"
-#include "support/support_common.h"
-#include "support/support_preload.h"
-#include "inline_bots/inline_bot_result.h"
-#include "info/profile/info_profile_values.h"
-#include "iv/editor/iv_editor_session.h"
-#include "lang/lang_instance.h"
-#include "lang/lang_keys.h"
+#include "window/window_session_controller.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
-#include "styles/style_window.h"
-#include "styles/style_boxes.h"
 #include "styles/style_layers.h"
+#include "styles/style_window.h"
 
 #include <limits>
 #include <QtCore/QMimeData>
@@ -1478,6 +1479,22 @@ Data::ForumTopic *ChatWidget::resolvedTopic() {
 	return forum->enforceTopicFor(rootId);
 }
 
+bool ChatWidget::monoforumReplyMissing() const {
+	const auto channel = _peer->asChannel();
+	if (mode() != Mode::History
+		|| !channel
+		|| !channel->amMonoforumAdmin()
+		|| channel->monoforumDisabled()) {
+		return false;
+	}
+	const auto reply = _composeControls->replyingToMessage();
+	return !reply.messageId || (reply.messageId.peer != _peer->id);
+}
+
+bool ChatWidget::monoforumReplyRequired() const {
+	return !_composeControls->isEditingMessage() && monoforumReplyMissing();
+}
+
 void ChatWidget::refreshCanSendMessages() {
 	_canSendMessagesLifetime.destroy();
 	const auto apply = [=](bool can) {
@@ -1644,11 +1661,12 @@ void ChatWidget::setupComposeControls() {
 		listCancelRequest();
 	}, lifetime());
 
+	// Ends in ~ListWidget, before a child popup's close refocuses the field.
 	_composeControls->focusedValue(
 	) | rpl::skip(1) | rpl::filter(rpl::mappers::_1) | rpl::on_next([=] {
 		_inner->clearTextSelection();
 		_inner->hideElementOverlay();
-	}, lifetime());
+	}, _inner->lifetime());
 
 	_composeControls->replyingToMessageValue(
 	) | rpl::skip(1) | rpl::on_next([=](FullReplyTo) {
@@ -2503,7 +2521,20 @@ void ChatWidget::supportInsertText(const QString &text) {
 }
 
 void ChatWidget::supportShareContact(Support::Contact contact) {
-	supportInsertText(contact.comment);
+	const auto field = _composeControls->fieldForMention();
+	const auto undoOnClose = !contact.comment.isEmpty()
+		|| !field
+		|| field->textCursor().hasSelection();
+	if (contact.comment.isEmpty() || !field) {
+		supportInsertText(contact.comment);
+	} else {
+		field->setFocus();
+		auto cursor = field->textCursor();
+		cursor.beginEditBlock();
+		cursor.insertText(contact.comment);
+		cursor.endEditBlock();
+		field->ensureCursorVisible();
+	}
 	contact.comment = _composeControls->fieldLastText();
 
 	const auto submit = [=](Qt::KeyboardModifiers modifiers) {
@@ -2525,10 +2556,12 @@ void ChatWidget::supportShareContact(Support::Contact contact) {
 		_history,
 		contact,
 		crl::guard(this, submit)));
-	box->boxClosing(
-	) | rpl::on_next([=] {
-		_composeControls->undoFieldChange();
-	}, lifetime());
+	if (undoOnClose) {
+		box->boxClosing(
+		) | rpl::on_next([=] {
+			_composeControls->undoFieldChange();
+		}, lifetime());
+	}
 }
 
 void ChatWidget::sendRichDraft(
@@ -3033,6 +3066,9 @@ void ChatWidget::sendBotStartCommand() {
 	session().api().sendBotStart(controller()->uiShow(), _peer->asUser());
 	updateControlsVisibility();
 	updateControlsGeometry();
+	if (Ui::InFocusChain(this)) {
+		_composeControls->focus();
+	}
 }
 
 bool ChatWidget::clearMaybeSendStart() {
@@ -3978,8 +4014,9 @@ void ChatWidget::showAtPosition(
 	}
 	_lastShownAt = position.fullId;
 	controller()->setActiveChatEntry(activeChat());
-	const auto ignore = _repliesRootId
-		&& (position.fullId.msg == _repliesRootId);
+	const auto ignore = params.silentMissingMessage
+		|| (_repliesRootId
+			&& (position.fullId.msg == _repliesRootId));
 	_inner->showAtPosition(
 		position,
 		params,
@@ -3993,7 +4030,8 @@ void ChatWidget::updateAdaptiveLayout() {
 }
 
 Dialogs::RowDescriptor ChatWidget::activeChat() const {
-	const auto messageId = _lastShownAt
+	// Min, Max and Unread positions have no peer and name no message.
+	const auto messageId = _lastShownAt.peer
 		? _lastShownAt
 		: FullMsgId(_peer->id, ShowAtUnreadMsgId);
 	if (_sublist) {
@@ -4505,6 +4543,7 @@ void ChatWidget::restoreState(not_null<ChatMemento*> memento) {
 			Window::SectionShow::Way::Forward,
 			anim::type::instant);
 		params.highlight = memento->highlight();
+		params.silentMissingMessage = memento->silentMissingMessage();
 		showAtPosition(Data::MessagePosition{
 			.fullId = ResolveHighlightId(_history, highlight),
 			.date = TimeId(0),

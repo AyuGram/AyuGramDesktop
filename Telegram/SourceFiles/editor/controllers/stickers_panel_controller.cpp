@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "editor/controllers/stickers_panel_controller.h"
 
-#include "boxes/premium_preview_box.h"
 #include "base/algorithm.h"
+#include "boxes/premium_preview_box.h"
 #include "chat_helpers/tabbed_panel.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "data/data_document.h"
@@ -18,12 +18,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/controls/location_picker.h"
-#include "ui/emoji_config.h"
 #include "ui/effects/animation_value.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/ui_utility.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/emoji_config.h"
+#include "ui/ui_utility.h"
 #include "window/window_session_controller.h" // Window::GifPauseReason
 
 #include "styles/style_chat_helpers.h"
@@ -37,18 +37,18 @@ namespace {
 // Works around MSVC 14.44 ICE on bitfields set in a member-init list.
 [[nodiscard]] ChatHelpers::ComposeFeatures PrepareFeatures(
 		bool withAudio,
-		bool storyWidgets,
+		bool storyAreas,
 		bool locationAvailable) {
 	return {
 		.megagroupSet = false,
 		.stickersSettings = false,
 		.openStickerSets = false,
 		.photoButton = true,
-		.reactionButton = storyWidgets,
+		.reactionButton = storyAreas,
 		.audioButton = withAudio,
-		.linkButton = storyWidgets,
-		.locationButton = storyWidgets && locationAvailable,
-		.weatherButton = storyWidgets,
+		.linkButton = storyAreas,
+		.locationButton = storyAreas && locationAvailable,
+		.weatherButton = storyAreas,
 	};
 }
 
@@ -111,7 +111,8 @@ StickersPanelController::StickersPanelController(
 	not_null<Ui::RpWidget*> panelContainer,
 	std::shared_ptr<ChatHelpers::Show> show,
 	bool withAudio,
-	bool storyWidgets)
+	bool storyWidgets,
+	bool storyAreas)
 : _panelContainer(panelContainer)
 , _show(show)
 , _stickersPanel(MakePanel(
@@ -122,7 +123,7 @@ StickersPanelController::StickersPanelController(
 		: ChatHelpers::TabbedSelector::Mode::MediaEditor,
 	PrepareFeatures(
 		withAudio,
-		storyWidgets,
+		storyAreas,
 		Ui::LocationPicker::Available(
 			Ui::ResolveMapsConfig(&session())))))
 , _textEmojiPanel(storyWidgets

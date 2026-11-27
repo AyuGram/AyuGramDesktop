@@ -7,107 +7,108 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_inner_widget.h"
 
-#include "dialogs/dialogs_three_state_icon.h"
-#include "dialogs/ui/chat_search_empty.h"
-#include "dialogs/ui/chat_search_in.h"
-#include "dialogs/ui/dialogs_layout.h"
-#include "dialogs/ui/dialogs_message_view.h"
-#include "dialogs/ui/dialogs_video_userpic.h"
-#include "dialogs/dialogs_indexed_list.h"
-#include "dialogs/dialogs_row.h"
-#include "dialogs/dialogs_community_requestable_list.h"
-#include "dialogs/dialogs_widget.h"
-#include "dialogs/dialogs_search_from_controllers.h"
-#include "dialogs/dialogs_search_tags.h"
-#include "dialogs/dialogs_quick_action.h"
-#include "history/view/history_view_context_menu.h"
-#include "history/view/media/history_view_save_document_action.h"
-#include "history/view/history_view_subsection_tabs.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_item_helpers.h"
+#include "api/api_chat_filters.h"
+#include "apiwrap.h"
+#include "base/platform/base_platform_info.h"
+#include "base/qt/qt_common_adapters.h"
+#include "base/call_delayed.h"
+#include "base/options.h"
+#include "base/unixtime.h"
+#include "boxes/filters/edit_filter_box.h"
+#include "boxes/peers/edit_forum_topic_box.h"
+#include "boxes/contacts_box.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/peer_list_box.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
 #include "core/shortcuts.h"
 #include "core/ui_integration.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/text/text_utilities.h"
-#include "ui/text/text_options.h"
-#include "ui/dynamic_thumbnails.h"
-#include "ui/vertical_list.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/screen_reader_mode.h"
-#include "ui/ui_utility.h"
 #include "data/components/sponsored_messages.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_chat_filters.h"
+#include "data/data_community.h"
 #include "data/data_document.h"
 #include "data/data_drafts.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
 #include "data/data_forum_icons.h"
-#include "data/data_session.h"
-#include "data/data_channel.h"
-#include "data/data_community.h"
 #include "data/data_forum_topic.h"
-#include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_peer_values.h"
 #include "data/data_histories.h"
-#include "data/data_chat_filters.h"
-#include "data/data_changes.h"
 #include "data/data_media_types.h"
 #include "data/data_message_reactions.h"
+#include "data/data_peer_values.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
-#include "data/data_stories.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "data/stickers/data_stickers.h"
 #include "data/data_send_action.h"
-#include "base/call_delayed.h"
-#include "base/platform/base_platform_info.h"
-#include "base/unixtime.h"
-#include "base/options.h"
+#include "data/data_session.h"
+#include "data/data_stories.h"
+#include "data/data_user.h"
+#include "dialogs/ui/chat_search_empty.h"
+#include "dialogs/ui/chat_search_in.h"
+#include "dialogs/ui/dialogs_layout.h"
+#include "dialogs/ui/dialogs_message_view.h"
+#include "dialogs/ui/dialogs_video_userpic.h"
+#include "dialogs/dialogs_community_requestable_list.h"
+#include "dialogs/dialogs_indexed_list.h"
+#include "dialogs/dialogs_quick_action.h"
+#include "dialogs/dialogs_row.h"
+#include "dialogs/dialogs_search_from_controllers.h"
+#include "dialogs/dialogs_search_tags.h"
+#include "dialogs/dialogs_three_state_icon.h"
+#include "dialogs/dialogs_widget.h"
+#include "history/view/media/history_view_save_document_action.h"
+#include "history/view/history_view_context_menu.h"
+#include "history/view/history_view_subsection_tabs.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_helpers.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
-#include "settings/settings_common.h"
-#include "storage/storage_account.h"
-#include "apiwrap.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "menu/menu_mark_as_read.h"
 #include "menu/menu_sponsored.h"
+#include "settings/settings_common.h"
+#include "storage/storage_account.h"
+#include "ui/chat/chats_filter_tag.h"
+#include "ui/controls/delete_message_context_action.h"
+#include "ui/effects/loading_element.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/effects/thanos_effect_session.h"
+#include "ui/text/text_options.h"
+#include "ui/text/text_utilities.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/multi_select.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/dynamic_thumbnails.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
+#include "ui/ui_utility.h"
+#include "ui/unread_badge.h"
+#include "ui/vertical_list.h"
 #include "window/notifications_manager.h"
 #include "window/window_controller.h"
-#include "window/window_session_controller.h"
 #include "window/window_peer_menu.h"
-#include "ui/chat/chats_filter_tag.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/effects/loading_element.h"
-#include "ui/effects/thanos_effect_session.h"
-#include "ui/controls/delete_message_context_action.h"
-#include "ui/widgets/multi_select.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/unread_badge.h"
-#include "boxes/contacts_box.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/filters/edit_filter_box.h"
-#include "boxes/peers/edit_forum_topic_box.h"
-#include "boxes/peer_list_box.h"
-#include "api/api_chat_filters.h"
-#include "base/qt/qt_common_adapters.h"
-#include "styles/style_dialogs.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
 #include "styles/style_chat_helpers.h"
-#include "styles/style_widgets.h"
 #include "styles/style_color_indices.h"
+#include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
-#include "styles/style_window.h"
 #include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_widgets.h"
+#include "styles/style_window.h"
 
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
@@ -2666,6 +2667,9 @@ void InnerWidget::processGlobalForceClick(QPoint globalPosition) {
 }
 
 void InnerWidget::mousePressEvent(QMouseEvent *e) {
+	if (activeMiddleQuickAction()) {
+		clearPressed();
+	}
 	selectByMouse(e->globalPos());
 
 	_pressButton = e->button();
@@ -2810,6 +2814,7 @@ void InnerWidget::mousePressEvent(QMouseEvent *e) {
 	}
 	ClickHandler::pressed();
 	if (anim::Disabled()
+		&& !activeMiddleQuickAction()
 		&& !_chatPreviewScheduled
 		&& (!_pressed || !_pressed->entry()->isPinnedDialog(_filterId))) {
 		mousePressReleased(e->globalPos(), e->button(), e->modifiers());
@@ -2869,10 +2874,9 @@ bool InnerWidget::addQuickActionRipple(
 		return false;
 	}
 	const auto key = history->peer->id.value;
-	const auto context = ensureQuickAction(key);
-	if (context->data) {
-		return false;
-	}
+	const auto context = ensureQuickAction(
+		key,
+		Ui::QuickActionTrigger::MiddleButton);
 
 	auto name = ResolveQuickDialogLottieIconName(type);
 	const auto rowHeight = row->height();
@@ -2882,7 +2886,17 @@ bool InnerWidget::addQuickActionRipple(
 	});
 	context->action = action;
 	context->label = type;
-	context->icon->jumpTo(context->icon->framesCount() - 1, [=] {
+	const auto frame = context->icon->framesCount() - 1;
+	if (anim::Disabled()) {
+		context->staticFeedback = true;
+		context->icon->jumpTo(frame, std::move(updateCallback));
+		updateQuickActionRow(key);
+		return true;
+	}
+	auto ready = [=] {
+		if (_activeQuickAction.get() != context) {
+			return;
+		}
 		const auto size = QSize(
 			st::dialogsQuickActionRippleSize,
 			rowHeight);
@@ -2912,7 +2926,10 @@ bool InnerWidget::addQuickActionRipple(
 		}
 		context->ripple->add(QPoint(size.width() / 2, size.height() / 2));
 		context->rippleFg->add(QPoint(size.width() / 2, size.height() / 2));
-	});
+	};
+	context->icon->jumpTo(
+		frame,
+		crl::guard(this, std::move(ready)));
 
 	return true;
 }
@@ -3235,6 +3252,17 @@ void InnerWidget::mousePressReleased(
 	const auto pressedTopicJump = _pressedTopicJump;
 	const auto pressedRightButton = _pressedRightButton;
 	auto pressed = _pressed;
+	const auto quick = activeMiddleQuickAction();
+	const auto quickHistory = (quick
+		&& pressButton == Qt::MiddleButton
+		&& button == Qt::MiddleButton
+		&& pressed
+		&& pressed == _selected)
+		? pressed->history()
+		: nullptr;
+	const auto quickAction = quickHistory
+		? quick->action
+		: Ui::QuickDialogAction::Disabled;
 	clearPressed();
 	auto hashtagPressed = _hashtagPressed;
 	setHashtagPressed(-1);
@@ -3262,28 +3290,12 @@ void InnerWidget::mousePressReleased(
 	if (_pressedRightButtonData && _pressedRightButtonData->ripple) {
 		_pressedRightButtonData->ripple->lastStop();
 	}
-	if ((pressButton == Qt::MiddleButton)
-		&& _activeQuickAction
-		&& pressed
-		&& !_activeQuickAction->data) {
-		if (const auto history = pressed->history()) {
-			const auto raw = _activeQuickAction.get();
-			if (raw->ripple) {
-				raw->ripple->lastStop();
-			}
-			if (raw->rippleFg) {
-				raw->rippleFg->lastStop();
-			}
-
-			if (pressed == _selected) {
-				PerformQuickDialogAction(
-					_controller,
-					history->peer,
-					raw->action,
-					_filterId);
-			}
-			deactivateQuickAction();
-		}
+	if (quickHistory) {
+		PerformQuickDialogAction(
+			_controller,
+			quickHistory->peer,
+			quickAction,
+			_filterId);
 	}
 	updateSelectedRow();
 	if (!wasDragging && button == Qt::LeftButton) {
@@ -3386,6 +3398,9 @@ void InnerWidget::setPressed(
 }
 
 void InnerWidget::clearPressed() {
+	if (activeMiddleQuickAction()) {
+		deactivateQuickAction();
+	}
 	setPressed(nullptr, false, false);
 }
 
@@ -4336,7 +4351,10 @@ void InnerWidget::contextMenuEvent(QContextMenuEvent *e) {
 
 	_menuRow = row;
 	if (_pressButton != Qt::LeftButton) {
-		mousePressReleased(e->globalPos(), _pressButton, e->modifiers());
+		const auto button = (_pressButton == Qt::MiddleButton)
+			? Qt::NoButton
+			: _pressButton;
+		mousePressReleased(e->globalPos(), button, e->modifiers());
 	}
 
 	_menu = base::make_unique_q<Ui::PopupMenu>(
@@ -6869,10 +6887,17 @@ void InnerWidget::setSwipeContextData(
 		return;
 	}
 	if (!data) {
-		_activeQuickAction = nullptr;
+		if (const auto active = _activeQuickAction.get()) {
+			if ((active->trigger == Ui::QuickActionTrigger::Swipe)
+				&& (active->data.msgBareId == key)) {
+				_activeQuickAction = nullptr;
+			}
+		}
 		return;
 	}
-	const auto context = ensureQuickAction(key);
+	const auto context = ensureQuickAction(
+		key,
+		Ui::QuickActionTrigger::Swipe);
 	if (!context->icon) {
 		prepareQuickAction(key, Core::App().settings().quickDialogAction());
 	}
@@ -6902,11 +6927,14 @@ void InnerWidget::setSwipeContextData(
 	}
 }
 
-not_null<Ui::QuickActionContext*> InnerWidget::ensureQuickAction(int64 key) {
+not_null<Ui::QuickActionContext*> InnerWidget::ensureQuickAction(
+		int64 key,
+		Ui::QuickActionTrigger trigger) {
 	Expects(key != 0);
 
 	if (_activeQuickAction) {
-		if (_activeQuickAction->data.msgBareId == key) {
+		if (_activeQuickAction->data.msgBareId == key
+			&& _activeQuickAction->trigger == trigger) {
 			return _activeQuickAction.get();
 		} else {
 			deactivateQuickAction();
@@ -6914,6 +6942,7 @@ not_null<Ui::QuickActionContext*> InnerWidget::ensureQuickAction(int64 key) {
 	}
 	_activeQuickAction = std::make_unique<Ui::QuickActionContext>();
 	_activeQuickAction->data.msgBareId = key;
+	_activeQuickAction->trigger = trigger;
 	return _activeQuickAction.get();
 }
 
@@ -6948,7 +6977,9 @@ bool InnerWidget::prepareQuickAction(
 	if (type == Dialogs::Ui::QuickDialogActionLabel::Disabled) {
 		return false;
 	}
-	const auto context = ensureQuickAction(key);
+	const auto context = ensureQuickAction(
+		key,
+		Ui::QuickActionTrigger::Swipe);
 	context->icon = Lottie::MakeIcon({
 		.name = ResolveQuickDialogLottieIconName(type),
 		.sizeOverride = Size(st::dialogsQuickActionSize),
@@ -6962,11 +6993,29 @@ void InnerWidget::clearQuickActions() {
 	_inactiveQuickActions.clear();
 }
 
+Ui::QuickActionContext *InnerWidget::activeMiddleQuickAction() const {
+	const auto active = _activeQuickAction.get();
+	return (active
+		&& active->trigger == Ui::QuickActionTrigger::MiddleButton)
+		? active
+		: nullptr;
+}
+
 void InnerWidget::deactivateQuickAction() {
 	if (_activeQuickAction) {
-		_activeQuickAction->finishedAt = crl::now();
-		_inactiveQuickActions.push_back(
-			QuickActionPtr{ _activeQuickAction.release() });
+		auto context = std::move(_activeQuickAction);
+		const auto key = context->data.msgBareId;
+		if (context->ripple) {
+			context->ripple->lastStop();
+		}
+		if (context->rippleFg) {
+			context->rippleFg->lastStop();
+		}
+		if (!context->staticFeedback) {
+			context->finishedAt = crl::now();
+			_inactiveQuickActions.push_back(std::move(context));
+		}
+		updateQuickActionRow(key);
 	}
 }
 

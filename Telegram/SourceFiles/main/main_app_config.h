@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "mtproto/sender.h"
 #include "base/algorithm.h"
+#include "mtproto/sender.h"
 
 namespace Ui {
 struct ColorIndicesCompressed;
@@ -159,6 +159,7 @@ public:
 	[[nodiscard]] std::vector<StarsColoring> groupCallColorings() const;
 
 	[[nodiscard]] std::vector<std::vector<int>> craftAttributePermilles() const;
+	[[nodiscard]] bool craftMintedFirstSource() const;
 
 	void refresh(bool force = false);
 

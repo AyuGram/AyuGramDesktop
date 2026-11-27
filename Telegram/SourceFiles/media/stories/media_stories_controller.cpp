@@ -22,8 +22,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/update_checker.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
-#include "data/data_group_call.h"
 #include "data/data_file_origin.h"
+#include "data/data_group_call.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
@@ -32,22 +32,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_strip.h"
 #include "history/view/history_view_paid_reaction_toast.h"
 #include "history/history_location_manager.h"
+#include "info/stories/info_stories_common.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "media/audio/media_audio.h"
 #include "media/stories/media_stories_caption_full_view.h"
 #include "media/stories/media_stories_delegate.h"
 #include "media/stories/media_stories_header.h"
-#include "media/stories/media_stories_sibling.h"
-#include "media/stories/media_stories_slider.h"
+#include "media/stories/media_stories_music.h"
 #include "media/stories/media_stories_reactions.h"
 #include "media/stories/media_stories_recent_views.h"
 #include "media/stories/media_stories_reply.h"
 #include "media/stories/media_stories_repost_view.h"
 #include "media/stories/media_stories_share.h"
+#include "media/stories/media_stories_sibling.h"
+#include "media/stories/media_stories_slider.h"
 #include "media/stories/media_stories_stealth.h"
 #include "media/stories/media_stories_view.h"
-#include "media/audio/media_audio.h"
-#include "info/stories/info_stories_common.h"
 #include "payments/payments_reaction_process.h"
 #include "settings/settings_credits_graphics.h"
 #include "ui/boxes/confirm_box.h"
@@ -60,6 +61,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/round_rect.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h" // defaultReportBox
 #include "styles/style_media_view.h"
 #include "styles/style_userpic_button.h"
@@ -359,6 +361,7 @@ Controller::Controller(not_null<Delegate*> delegate)
 }
 
 Controller::~Controller() {
+	_musicDisc = nullptr;
 	_captionFullView = nullptr;
 	_repostView = nullptr;
 	changeShown(nullptr);
@@ -578,6 +581,10 @@ not_null<Ui::RpWidget*> Controller::wrap() const {
 	return _wrap;
 }
 
+not_null<Ui::RpWidget*> Controller::areaWrap() const {
+	return _delegate->storiesAreaWrap();
+}
+
 Layout Controller::layout() const {
 	Expects(_layout.current().has_value());
 
@@ -688,6 +695,7 @@ void Controller::showFullCaption() {
 	}
 	_captionFullView = std::make_unique<CaptionFullView>(this);
 	updateContentFaded();
+	_delegate->storiesRepaint();
 }
 
 void Controller::captionClosing() {
@@ -701,6 +709,7 @@ void Controller::captionClosed() {
 		_wrap->setFocus();
 	}
 	_captionFullView = nullptr;
+	_delegate->storiesRepaint();
 }
 
 std::shared_ptr<ChatHelpers::Show> Controller::uiShow() const {
@@ -904,6 +913,10 @@ void Controller::show(
 	captionClosed();
 	_repostView = validateRepostView(story);
 	_captionText = story->caption();
+	const auto music = story->music();
+	_musicDisc = (!unsupported && music && music->song())
+		? std::make_unique<MusicDisc>(this, music, storyId)
+		: nullptr;
 	_contentFaded = false;
 	_contentFadeAnimation.stop();
 	const auto document = story->document();
@@ -962,6 +975,32 @@ void Controller::show(
 
 	updatePlayingAllowed();
 	peer->updateFull();
+}
+
+void Controller::showPreview(
+		not_null<PeerData*> bot,
+		DocumentData *video,
+		int index,
+		int count) {
+	Expects(!_shown);
+	Expects(index >= 0 && index < count);
+
+	_index = index;
+	_previewCount = count;
+	_paused = false;
+	_started = false;
+	_photoPlayback = video
+		? nullptr
+		: std::make_unique<PhotoPlayback>(this);
+	const auto header = HeaderData{
+		.peer = bot,
+		.video = (video != nullptr),
+		.silent = (video && video->isSilentVideo()),
+		.preview = true,
+	};
+	_header->show(header, nullptr);
+	_slider->show({ .index = index, .total = count });
+	updatePlayingAllowed();
 }
 
 void Controller::jumpTo(
@@ -1151,7 +1190,7 @@ void Controller::volumeChangeFinished() {
 }
 
 void Controller::updatePlayingAllowed() {
-	if (!_shown) {
+	if (!_shown && !_previewCount) {
 		return;
 	}
 	_header->updatePauseState();
@@ -1228,8 +1267,13 @@ void Controller::updatePhotoPlayback(const Player::TrackState &state) {
 
 void Controller::updatePlayback(const Player::TrackState &state) {
 	_slider->updatePlayback(state);
+	if (_musicDisc) {
+		_musicDisc->setPlaying(Player::ShowPauseIcon(state.state));
+	}
 	updatePowerSaveBlocker(state);
-	maybeMarkAsRead(state);
+	if (!_previewCount) {
+		maybeMarkAsRead(state);
+	}
 	if (Player::IsStoppedAtEnd(state.state)) {
 		if (!subjumpFor(1)) {
 			_delegate->storiesClose();
@@ -1362,6 +1406,9 @@ void Controller::markAsRead() {
 
 bool Controller::subjumpAvailable(int delta) const {
 	const auto index = _index + delta;
+	if (_previewCount) {
+		return index >= 0 && index < _previewCount;
+	}
 	if (index < 0) {
 		return _siblingLeft && _siblingLeft->shownId().valid();
 	} else if (index >= shownCount()) {
@@ -1371,6 +1418,13 @@ bool Controller::subjumpAvailable(int delta) const {
 }
 
 bool Controller::subjumpFor(int delta) {
+	if (_previewCount) {
+		if (!subjumpAvailable(delta)) {
+			return false;
+		}
+		_delegate->storiesJumpToPreview(_index + delta);
+		return true;
+	}
 	if (delta > 0) {
 		markAsRead();
 	}

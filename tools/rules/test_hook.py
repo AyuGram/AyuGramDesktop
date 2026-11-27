@@ -164,8 +164,8 @@ class CallLayoutFix(unittest.TestCase):
             b'#include "data/stickers/a.h" // needed by the panel\r\n'
             b'#include "data/stickers/z.h"\r\n'
             b'#include "data/data_user.h"\r\n\r\n'
-            b'#include <QtCore/QtMath>\r\n\r\n'
             b'#include "styles/style_panel.h"\r\n'
+            b'#include <QtCore/QtMath>\r\n'
             b'// Keep this group separate.\r\n'
             b'#include "a.h"\r\n'
             b'#if FEATURE\r\n'
@@ -684,6 +684,44 @@ class StagedHook(unittest.TestCase):
             "\t\tnotify();\n"
             "\t});\n}\n"})
         self.assertEqual(code, 0, why)
+
+    def test_call_layout_allows_fitting_final_lambda(self):
+        head = "(label, [=](int count) {"
+        name = "f" * (78 - 8 - len(head))
+        code, why = self.stage({"a.cpp": "void setup() {\n"
+            "\tbox->addButton(rpl::duplicate(submit), [=] {\n"
+            "\t\trefresh();\n"
+            "\t\tnotify();\n"
+            "\t});\n"
+            f"\t{name}{head}\n"
+            "\t\trefresh(count);\n"
+            "\t\tnotify();\n"
+            "\t});\n"
+            "}\n"})
+        self.assertEqual(code, 0, why)
+
+    def test_call_layout_rejects_other_packed_final_lambdas(self):
+        head = "(label, [=] {"
+        name = "f" * (79 - 8 - len(head))
+        code, why = self.stage({"a.cpp": "void setup() {\n"
+            f"\t{name}{head}\n"
+            "\t\trefresh();\n"
+            "\t});\n"
+            "\tobserve([] {}, [=] {\n"
+            "\t\trefresh();\n"
+            "\t});\n"
+            "\tobserve(label, flags, [=] {\n"
+            "\t\trefresh();\n"
+            "\t});\n"
+            "\tobserve(label, [=](\n"
+            "\t\t\tint first,\n"
+            "\t\t\tint last) {\n"
+            "\t\trefresh(first, last);\n"
+            "\t});\n"
+            "}\n"})
+        self.assertEqual(code, 1, why)
+        for line in (2, 5, 8, 11):
+            self.assertIn(f"a.cpp:{line}: Put each argument", why)
 
     def test_call_layout_keeps_other_callbacks_under_argument_rules(self):
         code, why = self.stage({"a.cpp": "void subscribe() {\n"

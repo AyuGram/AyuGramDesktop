@@ -9,7 +9,7 @@ should call.
 
 | Module | Kind | Use |
 | --- | --- | --- |
-| [test_agent](test_agent.md) | API | Runtime gate, startup overrides and fixture access |
+| [test_agent](test_agent.md) | API | Runtime gate, startup overrides with `TDESKTOP_TEST_*` escapes (scale, a fresh run download folder or a startup refusal, update checks suppressed per process, no automatic URL-handler registration, macOS App Nap hold), their product queries and fixture access |
 | [test_runner](test_runner.md) | API | Stages, gated groups, bounded readiness and exact-object actions |
 | [test_gated_stage](test_gated_stage.md) | Self-test | Self-tests for explicit and inherited gated skips |
 | [test_session_gate](test_session_gate.md) | API | Test-account gate, switching, restoration and explicit production legs |
@@ -43,6 +43,7 @@ should call.
 | [test_corner_patch](test_corner_patch.md) | API | Rounded-corner comparisons and controls |
 | [test_marking_read](test_marking_read.md) | API | Prevent primary-window read marking |
 | [test_window_exposure](test_window_exposure.md) | API | Keep covered windows painting without activation |
+| [test_application_state](test_application_state.md) | API | Inject the application's inactive and active state that `Core::App().appDeactivatedValue()` follows, read back, with named refusals and without touching the focus window; with its self-test |
 | [test_layer_root](test_layer_root.md) | Self-test | Self-test for the painting-layer resolver |
 | [test_via_window](test_via_window.md) | Self-test | Self-test for window-mapped captures |
 | [test_toast_capture](test_toast_capture.md) | API | Isolated toast-subtree captures, shown/hiding/gone toast state with a bounded gone wait, and painted-content captures |
@@ -54,7 +55,8 @@ should call.
 | [test_style](test_style.md) | API | Settled palette samples and baseline checks |
 | [test_palette](test_palette.md) | API | Switch and restore palettes while respecting system following |
 | [test_panel](test_panel.md) | API | Separate-panel discovery, show-cache readiness and typed fixture sizing |
-| [test_menu](test_menu.md) | API | Same-turn menu readings and their later-turn retake, actions, keyboard activation of accessible custom rows, and captures |
+| [test_menu](test_menu.md) | API | Same-turn menu readings and their later-turn retake, actions, keyboard activation of accessible custom rows, and captures; the capture self-test decides its opening-turn grab row on the menu's own show state |
+| [test_popup_hold](test_popup_hold.md) | API | Opt-in hold that keeps widget popups open when a Windows application deactivates, counts what it stopped, and releases on finish |
 | [test_chat_menu](test_chat_menu.md) | API | Attribute chat-list context menus to the exact message |
 | [test_chat_show](test_chat_show.md) | API | Show a chat-list message wholly in view, painted, ready and hovered before input |
 | [test_chat_show_self_test](test_chat_show_self_test.md) | Self-test | Self-test for chat-list show acceptance, re-correction and named refusals |

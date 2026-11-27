@@ -8,8 +8,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/send_story_row.h"
 
 #include "data/data_peer.h"
-#include "ui/painter.h"
 #include "ui/widgets/checkbox.h"
+#include "ui/painter.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_widgets.h"
 
@@ -65,10 +66,6 @@ void SendStoryRow::setDivider(bool divider) {
 
 QString SendStoryRow::subtitle() const {
 	return _content.subtitle;
-}
-
-bool SendStoryRow::hasRadio() const {
-	return (_radio != nullptr);
 }
 
 int SendStoryRow::rowHeight() const {

@@ -11,8 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/compose/compose_show.h"
-#include "chat_helpers/stickers_lottie.h"
 #include "chat_helpers/stickers_emoji_pack.h"
+#include "chat_helpers/stickers_lottie.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -25,12 +25,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_sticker_player.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_element.h"
-#include "history/history_item_reply_markup.h"
-#include "history/history_item.h"
 #include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_reply_markup.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "media/stories/media_stories_controller.h"
-#include "lang/lang_keys.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/emoji_fly_animation.h"
 #include "ui/effects/path_shift_gradient.h"
@@ -40,8 +40,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/animated_icon.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "styles/style_chat_helpers.h"
+
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_media_view.h"
 #include "styles/style_widgets.h"
 #include "styles/style_window.h"
@@ -1091,7 +1092,7 @@ auto Reactions::makeSuggestedReactionWidget(
 	const Data::SuggestedReaction &reaction)
 -> std::unique_ptr<StoryAreaView> {
 	return std::make_unique<ReactionView>(
-		_controller->wrap(),
+		_controller->areaWrap(),
 		&_controller->uiShow()->session(),
 		reaction);
 }
@@ -1101,7 +1102,7 @@ auto Reactions::makeWeatherAreaWidget(
 	rpl::producer<bool> weatherInCelsius)
 -> std::unique_ptr<StoryAreaView> {
 	return std::make_unique<WeatherView>(
-		_controller->wrap(),
+		_controller->areaWrap(),
 		&_controller->uiShow()->session(),
 		data,
 		std::move(weatherInCelsius));

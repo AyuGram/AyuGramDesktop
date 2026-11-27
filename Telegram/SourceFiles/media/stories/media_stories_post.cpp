@@ -7,16 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/stories/media_stories_post.h"
 
-#include "media/stories/media_stories_discard_prompt.h"
-
 #include "apiwrap.h"
+#include "base/random.h"
+#include "base/variant.h"
 #include "boxes/premium_preview_box.h"
 #include "boxes/premium_story_limits_box.h"
 #include "boxes/send_story_box.h"
 #include "boxes/story_drafts_box.h"
-
-#include "base/random.h"
-#include "base/variant.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
@@ -32,23 +29,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_story.h"
 #include "data/data_story_drafts.h"
 #include "data/data_user.h"
-#include "editor/editor_enhance.h"
-#include "editor/editor_layer_widget.h"
-#include "editor/editor_message_source.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_item_components.h"
-#include "editor/editor_story_areas.h"
-#include "editor/photo_editor.h"
-#include "editor/photo_editor_common.h"
 #include "editor/scene/scene.h"
 #include "editor/scene/scene_draft.h"
 #include "editor/scene/scene_item_video.h"
+#include "editor/editor_enhance.h"
+#include "editor/editor_layer_widget.h"
+#include "editor/editor_message_source.h"
+#include "editor/editor_story_areas.h"
+#include "editor/photo_editor.h"
+#include "editor/photo_editor_common.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "info/channel_statistics/boosts/info_boosts_widget.h"
 #include "info/info_memento.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "media/stories/media_stories_discard_prompt.h"
 #include "media/media_video_canvas.h"
 #include "media/media_video_encode.h"
 #include "media/media_video_frames.h"
@@ -61,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 
@@ -163,6 +162,7 @@ void SetupStoryEditorClose(
 		.period = setup.period ? setup.period : Api::kStoryDefaultPeriod,
 		.periodChoice = !setup.editing,
 		.showCaption = !setup.preview,
+		.showStoryAreas = !setup.preview,
 		.sceneItems = setup.sceneItems,
 		.sceneFiles = setup.sceneFiles,
 		.storyAudio = setup.storyAudio,
@@ -415,6 +415,12 @@ void SetupStoryEditorClose(
 	};
 }
 
+[[nodiscard]] QString StoryAudioTitle(const Editor::AudioTrack &audio) {
+	return (audio.title.isEmpty() && audio.performer.isEmpty())
+		? QFileInfo(audio.path).completeBaseName()
+		: audio.title;
+}
+
 [[nodiscard]] Api::SendStoryMedia StoryPhotoMedia(
 		QImage composed,
 		const QImage &image,
@@ -475,9 +481,23 @@ void SetupStoryEditorClose(
 			.maxDuration = Api::kStoryVideoMaxDuration,
 		});
 	job.silentLoop = false;
+	auto music = std::optional<Api::StoryMusicFile>();
+	if (const auto audio = mods.paint ? mods.paint->audio() : nullptr) {
+		if (!audio->empty() && audio->volume > 0.) {
+			music = Api::StoryMusicFile{
+				.path = audio->path,
+				.content = audio->content,
+				.title = StoryAudioTitle(*audio),
+				.performer = audio->performer,
+				.cover = audio->cover,
+				.duration = audio->duration,
+			};
+		}
+	}
 	return Api::SendStoryVideo{
 		.cover = std::move(composed),
 		.job = std::make_shared<Media::Encode::Job>(std::move(job)),
+		.music = std::move(music),
 	};
 }
 
@@ -767,7 +787,7 @@ struct CollectedStoryDraft {
 		if (const auto audio = mods.paint->audio()) {
 			if (!audio->empty()) {
 				auto &to = draft.audio;
-				to.title = audio->title;
+				to.title = StoryAudioTitle(*audio);
 				to.performer = audio->performer;
 				to.duration = audio->duration;
 				to.from = audio->from;
@@ -1574,6 +1594,7 @@ void EditStory(
 				.path = source.draft.audioPath,
 				.title = source.draft.audio.title,
 				.performer = source.draft.audio.performer,
+				.cover = source.draft.audioCover,
 				.duration = source.draft.audio.duration,
 				.from = source.draft.audio.from,
 				.till = source.draft.audio.till,
@@ -1600,6 +1621,23 @@ void EditStory(
 					source.send);
 			}
 			if (captionChanged || result.mediaChanged) {
+				using Video = Api::SendStoryVideo;
+				auto &media = result.media;
+				const auto video = std::get_if<Video>(&media);
+				const auto removeMusic = result.mediaChanged
+					&& fromSource
+					&& !setup.storyAudio.empty()
+					&& (*found)->music()
+					&& (!video || !video->music);
+				const auto &original = setup.storyAudio.path;
+				if (fromSource
+					&& video
+					&& video->music
+					&& (*found)->music()
+					&& !original.isEmpty()
+					&& video->music->path == original) {
+					video->music.reset();
+				}
 				session->api().stories().send({
 					.peer = (*found)->peer(),
 					.media = (result.mediaChanged
@@ -1613,6 +1651,7 @@ void EditStory(
 					.channelPosts = std::move(result.channelPosts),
 					.editId = (*found)->id(),
 					.editCaption = captionChanged,
+					.removeMusic = removeMusic,
 					.sent = pending
 						? Fn<void(StoryId, TimeId)>(
 							[=](StoryId, TimeId expiresAt) {
@@ -1905,15 +1944,17 @@ void ShowCanSendStoryError(
 		ShowPremiumPreviewBox(controller, PremiumFeature::Stories);
 		return;
 	case Type::BoostsRequired:
-		controller->showToast(tr::lng_story_boosts_required(tr::now));
 		if (peer->isChannel()) {
 			if (ctx.openBoosts) {
 				ctx.openBoosts();
 			} else {
-				controller->showSection(Info::Boosts::Make(peer));
+				controller->showSection(
+					Info::Boosts::MakeForStory(peer));
 			}
 		} else {
 			stopLoading();
+			controller->showToast(
+				tr::lng_story_boosts_required(tr::now));
 		}
 		return;
 	case Type::CountLimit:

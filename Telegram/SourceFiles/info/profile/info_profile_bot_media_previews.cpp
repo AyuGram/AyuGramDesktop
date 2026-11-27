@@ -16,11 +16,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history_item.h"
-#include "info/info_controller.h"
 #include "info/media/info_media_list_widget.h"
 #include "info/profile/tabs/adapters/info_profile_tab_sub_controller.h"
 #include "info/profile/tabs/info_profile_tab_skeleton.h"
 #include "info/profile/info_profile_bot_preview_provider.h"
+#include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
@@ -98,7 +98,7 @@ private:
 	void setCover(not_null<DocumentData*> document, crl::time position);
 	void chooseMedia(std::optional<Medium> replaced = std::nullopt);
 	void upload(
-		Api::SendStoryMedia media,
+		Api::BotMediaPreviewUpload::Media media,
 		std::optional<Medium> replaced);
 	void finishUpload(
 		std::optional<Medium> published,
@@ -126,6 +126,7 @@ private:
 	std::unique_ptr<Api::BotMediaPreviewUpload> _upload;
 	std::optional<QString> _language;
 	std::vector<QString> _languages;
+	base::flat_set<QString> _draftLanguages;
 	base::flat_map<QString, MediaList> _lists;
 	std::shared_ptr<const Data::FileOrigin> _origin;
 	Status _status = Status::Loading;
@@ -287,12 +288,24 @@ void PreviewPage::load() {
 
 void PreviewPage::loaded(Api::BotMediaPreviewList list) {
 	if (_language && _language->isEmpty()) {
+		auto languages = std::vector<QString>();
 		for (auto &code : list.languages) {
 			if (!code.isEmpty()
-				&& !ranges::contains(_languages, code)) {
-				_languages.push_back(std::move(code));
+				&& !ranges::contains(languages, code)) {
+				_draftLanguages.remove(code);
+				languages.push_back(std::move(code));
 			}
 		}
+		languages.insert(
+			end(languages),
+			begin(_draftLanguages),
+			end(_draftLanguages));
+		for (const auto &code : _languages) {
+			if (!ranges::contains(languages, code)) {
+				_lists.remove(code);
+			}
+		}
+		_languages = std::move(languages);
 	}
 	items() = std::move(list.media);
 	_uploadFooterHeight = 0;
@@ -606,6 +619,7 @@ void PreviewPage::switchLanguage(QString language, bool created) {
 		return;
 	}
 	if (created && !ranges::contains(_languages, language)) {
+		_draftLanguages.emplace(language);
 		_languages.push_back(language);
 	}
 	_language = std::move(language);
@@ -623,7 +637,7 @@ void PreviewPage::open(int index) {
 			&& _language == language
 			&& ranges::contains(items(), item);
 	};
-	auto gallery = StandaloneGallery{ .media = items() };
+	auto gallery = BotPreviewGallery{ .bot = _bot, .media = items() };
 	if (_editable) {
 		const auto edit = [=](Medium item) {
 			if (valid(item)) {
@@ -657,16 +671,12 @@ void PreviewPage::open(int index) {
 void PreviewPage::setCover(
 		not_null<DocumentData*> document,
 		crl::time position) {
-	_status = Status::Saving;
-	refreshFooter();
-	const auto fail = [=](QString) {
-		changeFailed(tr::lng_bot_media_previews_save_failed());
+	const auto cover = Api::BotMediaPreviewUpload::VideoCover{
+		.document = document,
+		.origin = origin(),
+		.position = position,
 	};
-	const auto done = [=] {
-		_origin = std::make_shared<Data::FileOrigin>(origin());
-		load();
-	};
-	_api.setCover(*_language, document, position, done, fail);
+	upload(cover, document);
 }
 
 void PreviewPage::chooseMedia(std::optional<Medium> replaced) {
@@ -703,13 +713,15 @@ void PreviewPage::chooseMedia(std::optional<Medium> replaced) {
 }
 
 void PreviewPage::upload(
-		Api::SendStoryMedia media,
+		Api::BotMediaPreviewUpload::Media media,
 		std::optional<Medium> replaced) {
 	if (!_upload) {
 		_upload = std::make_unique<Api::BotMediaPreviewUpload>(_bot);
 	}
-	const auto photo = std::get_if<Api::SendStoryPhoto>(&media);
-	const auto video = std::get_if<Api::SendStoryVideo>(&media);
+	const auto story = std::get_if<Api::SendStoryMedia>(&media);
+	const auto photo = std::get_if<Api::SendStoryPhoto>(story);
+	const auto video = std::get_if<Api::SendStoryVideo>(story);
+	const auto cover = !story;
 	const auto thumbnail = photo
 		? photo->image
 		: video ? video->cover : QImage();
@@ -731,6 +743,10 @@ void PreviewPage::upload(
 			changeFailed(std::move(error));
 		};
 		const auto saved = [=](std::optional<Medium> published) {
+			if (cover) {
+				_origin = std::make_shared<Data::FileOrigin>(
+					origin());
+			}
 			finishUpload(published, replacing);
 		};
 		_api.save(
@@ -750,6 +766,7 @@ void PreviewPage::upload(
 void PreviewPage::finishUpload(
 		std::optional<Medium> published,
 		std::optional<int> replacing) {
+	_draftLanguages.remove(*_language);
 	if (published) {
 		auto &list = items();
 		if (replacing) {
@@ -799,6 +816,7 @@ void PreviewPage::remove(MediaList selected) {
 		if (leave) {
 			const auto code = *_language;
 			_lists.remove(code);
+			_draftLanguages.remove(code);
 			const auto tail = ranges::remove(_languages, code);
 			_languages.erase(tail, end(_languages));
 			switchLanguage(QString());

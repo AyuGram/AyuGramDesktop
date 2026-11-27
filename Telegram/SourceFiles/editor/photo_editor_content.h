@@ -7,14 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
-#include "ui/effects/animations.h"
-
 #include "editor/editor_enhance.h"
 #include "editor/photo_editor_common.h"
 #include "editor/photo_editor_inner_common.h"
 #include "media/media_video_canvas.h"
+#include "ui/effects/animations.h"
 #include "ui/image/image.h"
+#include "ui/rp_widget.h"
 
 #include <QtGui/QPixmap>
 
@@ -74,6 +73,7 @@ public:
 	void setDurationsLinked(bool linked);
 	[[nodiscard]] rpl::producer<> durationsLinkChanges() const;
 	void applyAspectRatio(float64 ratio);
+	[[nodiscard]] bool transformBackgroundVideo(int angle, bool flip);
 	void setExpansionRoom(bool room);
 	void save(PhotoModifications &modifications);
 

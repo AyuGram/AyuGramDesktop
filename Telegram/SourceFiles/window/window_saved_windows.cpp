@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_community.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
+#include "data/data_messages.h"
 #include "data/data_peer.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
@@ -21,11 +22,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_thread.h"
 #include "data/data_user.h"
 #include "dialogs/ui/restore_windows_offer.h"
-#include "history/history.h"
 #include "history/admin_log/history_admin_log_section.h"
 #include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_pinned_section.h"
 #include "history/view/history_view_scheduled_section.h"
+#include "history/history.h"
 #include "info/media/info_media_widget.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
@@ -37,12 +38,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_account.h"
 #include "storage/storage_shared_media.h"
 #include "ui/layers/layer_widget.h"
-#include "ui/ui_utility.h"
 #include "ui/wrap/fade_wrap.h"
+#include "ui/ui_utility.h"
 #include "window/window_columns.h"
 #include "window/window_controller.h"
 #include "window/window_restore_shell.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_basic.h"
 #include "styles/style_dialogs.h"
 
@@ -62,6 +64,13 @@ constexpr auto kColumnsInfo = qint32(4);
 constexpr auto kPrefKey = std::string_view("windows_state");
 constexpr auto kRestoreKey = std::string_view("windows_state.restore");
 constexpr auto kAskedKey = std::string_view("windows_state.asked");
+
+[[nodiscard]] MsgId ReadSavedMsgId(qint64 msg) {
+	// The end of a chat was once saved as its sentinel message id.
+	const auto id = MsgId(msg);
+	const auto sentinel = Data::MaxMessagePosition.fullId.msg;
+	return (IsServerMsgId(id) && (id != sentinel)) ? id : MsgId();
+}
 
 [[nodiscard]] bool ValidType(int type) {
 	switch (SeparateType(type)) {
@@ -406,7 +415,7 @@ struct StoredColumns {
 				.topicRootId = MsgId(root),
 				.monoforumPeer = PeerId(BareId(mono)),
 				.monoforumAccessHash = monoHash,
-				.msgId = MsgId(msg),
+				.msgId = ReadSavedMsgId(msg),
 				.section = SavedChatSection(section),
 			});
 		}
@@ -1565,10 +1574,6 @@ void SavedWindows::createWindow(const Step &step) {
 		return;
 	}
 	const auto existed = (_app->separateWindowFor(id) != nullptr);
-	auto showAtMsgId = MsgId(0);
-	if (!data.chats.empty() && SameChat(data.chats.back(), data.thread)) {
-		showAtMsgId = data.chats.back().msgId;
-	}
 	const auto position = step.shell
 		? step.shell->countPositionForSave()
 		: data.position;
@@ -1592,7 +1597,7 @@ void SavedWindows::createWindow(const Step &step) {
 		_restorePosition = position;
 		_restoreColumns = data.columns;
 	}
-	const auto window = _app->ensureSeparateWindowFor(id, showAtMsgId);
+	const auto window = _app->ensureSeparateWindowFor(id);
 	_restorePosition = std::nullopt;
 	_restoreColumns = std::nullopt;
 	if (existed && validPosition && data.columns) {
@@ -1711,7 +1716,8 @@ void SavedWindows::replayChats(
 			&& entries.size() == 1
 			&& !entries.front().rootId
 			&& entries.front().section == SavedChatSection::Chat
-			&& entries.front().thread == windowThread)) {
+			&& entries.front().thread == windowThread
+			&& !entries.front().msgId)) {
 		return;
 	}
 	const auto &first = entries.front();
@@ -1730,6 +1736,7 @@ void SavedWindows::replayChats(
 			anim::activation::background);
 		params.allowDuplicateInStack = true;
 		params.preferCurrentWindow = true;
+		params.silentMissingMessage = true;
 		return params;
 	};
 	if (window->id().hasChatsList()
@@ -1777,6 +1784,7 @@ void SavedWindows::replayChats(
 				},
 				msgId);
 			memento->setFromTopic(topic);
+			memento->setSilentMissingMessage(true);
 			controller->showSection(std::move(memento), params);
 		} else if (const auto rootId = entries[i].rootId) {
 			auto memento = std::make_shared<HistoryView::ChatMemento>(
@@ -1785,6 +1793,7 @@ void SavedWindows::replayChats(
 					.repliesRootId = rootId,
 				},
 				msgId);
+			memento->setSilentMissingMessage(true);
 			controller->showSection(std::move(memento), params);
 		} else {
 			controller->showThread(thread, msgId, params);
