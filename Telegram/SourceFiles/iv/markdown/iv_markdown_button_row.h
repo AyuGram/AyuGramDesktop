@@ -7,9 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "iv/markdown/iv_markdown_prepare.h"
-
 #include "base/timer.h"
+#include "iv/markdown/iv_markdown_prepare.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/glare.h"
 #include "ui/effects/ripple_animation.h"
@@ -99,6 +98,9 @@ struct RichButtonLoadingCoverage {
 
 [[nodiscard]] const style::icon *RichButtonIcon(
 	HistoryMessageMarkupButton::Type type);
+[[nodiscard]] QString RichButtonUrl(
+	HistoryMessageMarkupButton::Type type,
+	const QByteArray &data);
 [[nodiscard]] QString RichButtonTooltip(
 	HistoryMessageMarkupButton::Type type,
 	const QByteArray &data,

@@ -7,14 +7,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "window/section_widget.h"
-#include "window/section_memento.h"
-#include "history/view/history_view_list_widget.h"
-#include "history/view/history_view_corner_buttons.h"
 #include "data/data_messages.h"
+#include "history/view/history_view_corner_buttons.h"
+#include "history/view/history_view_list_widget.h"
+#include "window/section_memento.h"
+#include "window/section_widget.h"
 
 class History;
 class QImage;
+class SendFilesBox;
 enum class SendMediaType;
 
 namespace Api {
@@ -245,6 +246,7 @@ private:
 	object_ptr<TopBarWidget> _topBar;
 	object_ptr<Ui::PlainShadow> _topBarShadow;
 	std::unique_ptr<ComposeControls> _composeControls;
+	QPointer<SendFilesBox> _sendFilesBox;
 	bool _skipScrollEvent = false;
 	bool _choosingAttach = false;
 

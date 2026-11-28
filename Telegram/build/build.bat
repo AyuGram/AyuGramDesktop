@@ -225,15 +225,8 @@ if %AlphaVersion% neq 0 (
   )
 )
 
-set "LockDir=%SolutionPath%\.build.lock"
-if exist "%LockDir%\" (
-  echo Another build.bat seems to be running ^(found %LockDir%, remove it if stale^)!
-  exit /b 1
-)
-mkdir "%LockDir%" || exit /b 1
 call :build
 set "ErrorCode=%errorlevel%"
-rmdir "%LockDir%"
 cd "%FullExecPath%"
 exit /b %ErrorCode%
 
@@ -266,6 +259,7 @@ call :sign "%BinaryName%.exe"
 
 if %BuildUWP% equ 0 (
   call :sign "Updater.exe"
+  call :sign "modules\%Platform%\TelegramWidgetHelper.exe"
 
   if %AlphaVersion% equ 0 (
     iscc /dMyAppVersion=%AppVersionStrSmall% /dMyAppVersionZero=%AppVersionStr% /dMyAppVersionFull=%AppVersionStrFull% "/dReleasePath=%ReleasePath%" "/dMyBuildTarget=%BuildTarget%" %IsccNameParam% "%FullScriptPath%setup.iss" || goto error
@@ -273,9 +267,9 @@ if %BuildUWP% equ 0 (
   )
 
   if %BuildARM% neq 0 (
-    call Packer.exe -version %VersionForPacker% -path %BinaryName%.exe -path Updater.exe -target %BuildTarget% -channel %UpdateChannel% -keys-loc "%ResourcesPath%\update" -emit-signing-input signing-input.bin || goto error
+    call Packer.exe -version %VersionForPacker% -path %BinaryName%.exe -path Updater.exe -path "modules\%Platform%\TelegramWidgetHelper.exe" -target %BuildTarget% -channel %UpdateChannel% -keys-loc "%ResourcesPath%\update" -emit-signing-input signing-input.bin || goto error
   ) else (
-    call Packer.exe -version %VersionForPacker% -path %BinaryName%.exe -path Updater.exe -path "modules\%Platform%\d3d\d3dcompiler_47.dll" -target %BuildTarget% -channel %UpdateChannel% -keys-loc "%ResourcesPath%\update" -emit-signing-input signing-input.bin || goto error
+    call Packer.exe -version %VersionForPacker% -path %BinaryName%.exe -path Updater.exe -path "modules\%Platform%\TelegramWidgetHelper.exe" -path "modules\%Platform%\d3d\d3dcompiler_47.dll" -target %BuildTarget% -channel %UpdateChannel% -keys-loc "%ResourcesPath%\update" -emit-signing-input signing-input.bin || goto error
   )
   call :signupdate
   call Packer.exe -channel %UpdateChannel% -keys-loc "%ResourcesPath%\update" -unsigned "%UpdateFile%.unsigned" -embed-signatures %ReleaseCloudKeyId%:release-cloud.sig -local-key "%ReleaseLocalKey%" -local-key-id %ReleaseLocalKeyId% || goto error
@@ -296,6 +290,7 @@ if %BuildUWP% equ 0 (
   )
 ) else (
   call :sign "StartupTask.exe"
+  call :sign "modules\%Platform%\TelegramWidgetHelper.exe"
 )
 
 for /f ^"usebackq^ eol^=^
@@ -317,7 +312,9 @@ if %BuildUWP% neq 0 (
   cd "%HomePath%"
 
   if %BuildARM% equ 0 (
-    mkdir "%ReleasePath%\AppX\modules\%Platform%\d3d"
+    mkdir "%ReleasePath%\AppX\modules\%Platform%\d3d" || goto error
+  ) else (
+    mkdir "%ReleasePath%\AppX\modules\%Platform%" || goto error
   )
   xcopy "Resources\uwp\AppX\*" "%ReleasePath%\AppX\" /E
   set "ResourcePath=%ReleasePath%\AppX\AppxManifest.xml"
@@ -326,6 +323,7 @@ if %BuildUWP% neq 0 (
 
   xcopy "%ReleasePath%\%BinaryName%.exe" "%ReleasePath%\AppX\"
   xcopy "%ReleasePath%\StartupTask.exe" "%ReleasePath%\AppX\"
+  xcopy "%ReleasePath%\modules\%Platform%\TelegramWidgetHelper.exe" "%ReleasePath%\AppX\modules\%Platform%\" || goto error
   if %BuildARM% equ 0 (
     xcopy "%ReleasePath%\modules\%Platform%\d3d\d3dcompiler_47.dll" "%ReleasePath%\AppX\modules\%Platform%\d3d\"
   )
@@ -349,12 +347,13 @@ if %BuildUWP% neq 0 (
   if not exist "%ReleasePath%\deploy" mkdir "%ReleasePath%\deploy"
   if not exist "%ReleasePath%\deploy\%AppVersionStrMajor%" mkdir "%ReleasePath%\deploy\%AppVersionStrMajor%"
   if %BuildARM% neq 0 (
-    mkdir "%DeployPath%\%BinaryName%" || goto error
+    mkdir "%DeployPath%\%BinaryName%\modules\%Platform%" || goto error
   ) else (
     mkdir "%DeployPath%\%BinaryName%\modules\%Platform%\d3d" || goto error
   )
 
   move "%ReleasePath%\%BinaryName%.exe" "%DeployPath%\%BinaryName%\" || goto error
+  xcopy "%ReleasePath%\modules\%Platform%\TelegramWidgetHelper.exe" "%DeployPath%\%BinaryName%\modules\%Platform%\" || goto error
   if %BuildARM% equ 0 (
     xcopy "%ReleasePath%\modules\%Platform%\d3d\d3dcompiler_47.dll" "%DeployPath%\%BinaryName%\modules\%Platform%\d3d\" || goto error
   )

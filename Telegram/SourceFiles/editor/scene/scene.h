@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <editor/photo_editor_inner_common.h>
 #include <editor/scene/scene_item_base.h>
+#include "ui/effects/animations.h"
 
 #include <QGraphicsScene>
 
@@ -20,11 +21,18 @@ class RpWidget;
 
 namespace Editor {
 
+inline const auto kRaiseZOrderSequence = QKeySequence("ctrl+]");
+inline const auto kLowerZOrderSequence = QKeySequence("ctrl+[");
+
 class ItemCanvas;
+class ItemLocation;
+class ItemReaction;
 class ItemShape;
 class ItemText;
 class NumberedItem;
 class TextEditController;
+class VideoClip;
+struct AudioTrack;
 
 class Scene final : public QGraphicsScene {
 public:
@@ -42,6 +50,9 @@ public:
 
 	Scene(const QRectF &rect);
 	~Scene();
+	void setCanvasRect(const QRectF &rect);
+	[[nodiscard]] QRectF canvasRect() const;
+	void setStickyGuides(std::optional<float64> x, std::optional<float64> y);
 	void applyBrush(const QColor &color, float64 size, Brush::Tool tool);
 	void setBlurSource(Fn<QImage(QRect)> source);
 	void setTextDefaults(
@@ -60,11 +71,41 @@ public:
 
 	[[nodiscard]] std::vector<ItemPtr> items(
 		Qt::SortOrder order = Qt::DescendingOrder) const;
+	void renderBaked(
+		QPainter *p,
+		const QRectF &target,
+		const QRectF &source = QRectF());
+	[[nodiscard]] auto reactionPickRequests() const
+	-> rpl::producer<not_null<ItemReaction*>>;
+	void requestReactionPick(not_null<ItemReaction*> item);
+	[[nodiscard]] rpl::producer<> canvasPresses() const;
+	[[nodiscard]] rpl::producer<Qt::MouseButton> canvasReleases() const;
+	[[nodiscard]] rpl::producer<> itemContextMenuRequests() const;
+	void noteItemContextMenu();
+	[[nodiscard]] auto locationPickRequests() const
+	-> rpl::producer<not_null<ItemLocation*>>;
+	void requestLocationPick(not_null<ItemLocation*> item);
 	[[nodiscard]] bool hasAnimatedItems() const;
+	[[nodiscard]] bool hasAnimatedResult() const;
+	[[nodiscard]] bool hasSoundResult() const;
 	void releaseAnimations();
+
+	void setAudio(std::shared_ptr<AudioTrack> audio);
+	[[nodiscard]] std::shared_ptr<AudioTrack> audio() const;
+	[[nodiscard]] rpl::producer<> audioChanges() const;
+	void setAudioSelected(bool selected);
+	[[nodiscard]] bool audioSelected() const;
+	[[nodiscard]] rpl::producer<bool> audioSelectedChanges() const;
+	[[nodiscard]] bool canEqualizeDurations() const;
+	void equalizeDurations();
+	void matchDurations(crl::time duration);
+	[[nodiscard]] bool durationsLinked() const;
+	void setDurationsLinked(bool linked);
+	[[nodiscard]] rpl::producer<> durationsLinkChanges() const;
 	void addItem(ItemPtr item);
 	void removeItem(not_null<QGraphicsItem*> item);
 	void removeItem(const ItemPtr &item);
+	void videoClipChanged(not_null<NumberedItem*> item);
 	[[nodiscard]] rpl::producer<> addsItem() const;
 	[[nodiscard]] rpl::producer<> removesItem() const;
 
@@ -79,6 +120,8 @@ public:
 
 	void startTextEditing(ItemText *item);
 	void createTextAtCenter(int rotation, bool flipped);
+	void setTextEmojiPanel(QWidget *panel);
+	void insertText(const QString &text);
 	void setTextColor(const QColor &color);
 	void setSelectedTextColor(const QColor &color);
 	void setSelectedShapeBrush(const QColor &color, float64 strokeWidth);
@@ -90,12 +133,17 @@ public:
 	[[nodiscard]] rpl::producer<bool> textEditStates() const;
 	[[nodiscard]] rpl::producer<QColor> shapeItemSelections() const;
 	[[nodiscard]] rpl::producer<> shapeItemDeselections() const;
+	[[nodiscard]] auto videoClipSelections() const
+		-> rpl::producer<std::shared_ptr<VideoClip>>;
 
 	[[nodiscard]] bool hasUndo() const;
 	[[nodiscard]] bool hasRedo() const;
 
 	void performUndo();
 	void performRedo();
+	void raiseItem(not_null<ItemBase*> item);
+	void lowerItem(not_null<ItemBase*> item);
+	void pinToBottom(not_null<ItemBase*> item);
 
 	void save(SaveState state);
 	void restore(SaveState state);
@@ -106,13 +154,29 @@ protected:
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 	void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 private:
+	class StickyGuidesItem;
 	struct CapturedPlacement {
 		std::shared_ptr<ItemBase> item;
 		ItemBase::Placement placement;
 	};
+	struct StickyGuide {
+		Ui::Animations::Simple animation;
+		float64 position = 0.;
+		bool shown = false;
+	};
 
 	void removeIf(Fn<bool(const ItemPtr &)> proj);
+	void setStickyGuide(
+		Qt::Orientation orientation,
+		std::optional<float64> position);
+	void hideStickyGuides();
+	[[nodiscard]] float64 stickyGuideMargin() const;
+	[[nodiscard]] QRectF stickyGuideRect(Qt::Orientation orientation) const;
+	void paintStickyGuide(QPainter &p, Qt::Orientation orientation) const;
 	void capturePlacements();
+	void refreshVideoClipSelection();
+	void updateVideoClipsSound();
+	void checkDurationsLink();
 	void commitPlacements();
 	void startShapeDrawing(const QPointF &position);
 	void updateShapeDrawing(
@@ -120,20 +184,24 @@ private:
 		Qt::KeyboardModifiers modifiers);
 	void applyDraftFrame(float64 width, float64 height);
 	void finishShapeDrawing(bool apply);
+	void changeItemZOrder(not_null<ItemBase*> item, int step);
 	[[nodiscard]] std::shared_ptr<ItemShape> createShape(
 		int size,
 		const QPointF &center) const;
 
 	const std::shared_ptr<ItemCanvas> _canvas;
 	const std::shared_ptr<float64> _lastZ;
+	const std::unique_ptr<StickyGuidesItem> _stickyGuides;
 	const std::unique_ptr<TextEditController> _textEdit;
 	Fn<QImage(QRect)> _blurSource;
 
 	std::vector<ItemPtr> _items;
 	std::unordered_map<QGraphicsItem*, ItemPtr> _itemsByPointer;
 	std::vector<CapturedPlacement> _capturedPlacements;
+	QRectF _canvasRect;
+	StickyGuide _stickyGuideX;
+	StickyGuide _stickyGuideY;
 
-	float64 _lastLineZ = 0.;
 	float64 _currentZoom = 1.;
 	int _itemNumber = 0;
 
@@ -150,10 +218,27 @@ private:
 	rpl::event_stream<QColor> _textItemSelections;
 	rpl::event_stream<> _textItemDeselections;
 	rpl::event_stream<QColor> _shapeItemSelections;
+	rpl::event_stream<not_null<ItemReaction*>> _reactionPickRequests;
+	rpl::event_stream<not_null<ItemLocation*>> _locationPickRequests;
+	rpl::event_stream<> _canvasPresses;
+	rpl::event_stream<Qt::MouseButton> _canvasReleases;
+	rpl::event_stream<> _itemContextMenuRequests;
 	rpl::event_stream<> _shapeItemDeselections;
 	rpl::event_stream<bool> _pendingShapeStates;
+	rpl::event_stream<std::shared_ptr<VideoClip>> _videoClipSelections;
+	rpl::event_stream<> _audioChanges;
+	rpl::event_stream<bool> _audioSelectedChanges;
+	rpl::event_stream<> _durationsLinkChanges;
 	ItemText *_selectedTextItem = nullptr;
 	ItemShape *_selectedShapeItem = nullptr;
+	VideoClip *_selectedVideoClip = nullptr;
+	std::shared_ptr<AudioTrack> _audio;
+	std::shared_ptr<AudioTrack> _keptAudio;
+	std::shared_ptr<AudioTrack> _savedAudio;
+	bool _audioSelected = false;
+	bool _durationsLinked = false;
+	bool _keptDurationsLinked = false;
+	bool _savedDurationsLinked = false;
 	rpl::lifetime _lifetime;
 
 };

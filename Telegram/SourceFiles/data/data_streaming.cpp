@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_streaming.h"
 
-#include "data/data_photo.h"
 #include "data/data_document.h"
-#include "data/data_session.h"
 #include "data/data_file_origin.h"
+#include "data/data_photo.h"
+#include "data/data_session.h"
+#include "media/streaming/media_streaming_document.h"
 #include "media/streaming/media_streaming_loader.h"
 #include "media/streaming/media_streaming_reader.h"
-#include "media/streaming/media_streaming_document.h"
 
 namespace Data {
 namespace {
@@ -88,7 +88,7 @@ Streaming::Streaming(not_null<Session*> owner)
 Streaming::~Streaming() = default;
 
 template <typename Data>
-[[nodiscard]] std::shared_ptr<Streaming::Reader> Streaming::sharedReader(
+std::shared_ptr<Streaming::Reader> Streaming::sharedReader(
 		base::flat_map<not_null<Data*>, std::weak_ptr<Reader>> &readers,
 		not_null<Data*> data,
 		FileOrigin origin,
@@ -116,7 +116,7 @@ template <typename Data>
 }
 
 template <typename Data>
-[[nodiscard]] std::shared_ptr<Streaming::Document> Streaming::sharedDocument(
+std::shared_ptr<Streaming::Document> Streaming::sharedDocument(
 		base::flat_map<not_null<Data*>, std::weak_ptr<Document>> &documents,
 		base::flat_map<not_null<Data*>, std::weak_ptr<Reader>> &readers,
 		not_null<Data*> data,
@@ -229,6 +229,20 @@ void Streaming::keepAlive(not_null<DocumentData*> document) {
 
 void Streaming::keepAlive(not_null<PhotoData*> photo) {
 	keepAlive(_photoDocuments, photo);
+}
+
+void Streaming::forgetFailed(
+		not_null<DocumentData*> document,
+		not_null<const Document*> shared,
+		not_null<const Reader*> reader) {
+	const auto i = _fileDocuments.find(document);
+	if (i != end(_fileDocuments) && i->second.lock().get() == shared) {
+		_fileDocuments.erase(i);
+	}
+	const auto j = _fileReaders.find(document);
+	if (j != end(_fileReaders) && j->second.lock().get() == reader) {
+		_fileReaders.erase(j);
+	}
 }
 
 void Streaming::clearKeptAlive() {

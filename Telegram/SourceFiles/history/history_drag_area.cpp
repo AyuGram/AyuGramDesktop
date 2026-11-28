@@ -7,26 +7,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_drag_area.h"
 
+#include "apiwrap.h"
 #include "base/event_filter.h"
-#include "ui/boxes/confirm_box.h"
 #include "boxes/sticker_set_box.h"
-#include "inline_bots/inline_bot_result.h"
-#include "inline_bots/inline_bot_layout_item.h"
+#include "core/application.h"
+#include "core/local_url_handlers.h"
+#include "core/mime_type.h"
 #include "dialogs/ui/dialogs_layout.h"
 #include "history/history_widget.h"
-#include "storage/localstorage.h"
+#include "inline_bots/inline_bot_layout_item.h"
+#include "inline_bots/inline_bot_result.h"
 #include "lang/lang_keys.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
+#include "storage/localstorage.h"
+#include "storage/storage_media_prepare.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/widgets/shadow.h"
+#include "ui/cached_round_corners.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "ui/cached_round_corners.h"
-#include "mainwindow.h"
-#include "apiwrap.h"
-#include "mainwidget.h"
-#include "storage/storage_media_prepare.h"
-#include "core/application.h"
-#include "core/mime_type.h"
-#include "core/local_url_handlers.h"
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
 #include "styles/style_window.h"
@@ -57,7 +58,9 @@ constexpr auto kDragAreaEvents = {
 		}
 	}
 	if (!modifiers) {
-		return state;
+		return (state == DragState::FilesArchive)
+			? DragState::Files
+			: state;
 	}
 	return (state == DragState::PhotoFiles)
 		? DragState::PhotoFilesArchive
@@ -68,8 +71,18 @@ constexpr auto kDragAreaEvents = {
 
 [[nodiscard]] bool IsPromotedToArchive(Storage::MimeDataState state) {
 	using DragState = Storage::MimeDataState;
-	return (state == DragState::PhotoFilesArchive)
+	return (state == DragState::FilesArchive)
+		|| (state == DragState::FilesArchiveOnly)
+		|| (state == DragState::PhotoFilesArchive)
 		|| (state == DragState::MediaFilesArchive);
+}
+
+[[nodiscard]] bool PhotoAreaSendsMedia(Storage::MimeDataState state) {
+	using DragState = Storage::MimeDataState;
+	return (state == DragState::PhotoFiles)
+		|| (state == DragState::MediaFiles)
+		|| (state == DragState::Image)
+		|| (state == DragState::Media);
 }
 
 [[nodiscard]] QString DetectProxyLink(const QMimeData *data) {
@@ -124,6 +137,8 @@ DragArea::Areas DragArea::SetupDragAreaToContainer(
 	attachDragDocument->hide();
 	attachDragPhoto->hide();
 
+	attachDragDocument->setIcon(&st::dragIconFiles);
+
 	attachDragDocument->raise();
 	attachDragPhoto->raise();
 
@@ -149,6 +164,21 @@ DragArea::Areas DragArea::SetupDragAreaToContainer(
 	const auto moveToTop = [=](not_null<DragArea*> w) {
 		w->move(st::dragMargin.left(), st::dragMargin.top());
 	};
+	const auto documentHeight = [=](int full) {
+		const auto smaller = full / 3;
+		const auto mediaPreferred
+			= Core::App().settings().sendFilesWay().sendImagesAsPhotos();
+		const auto &smallerIcon = mediaPreferred
+			? st::dragIconFiles
+			: st::dragIconMedia;
+		if (!PhotoAreaSendsMedia(*attachDragBaseState)
+			|| (smaller < DragArea::MinimalHeight()
+				+ smallerIcon.height()
+				+ st::dragIconSkip)) {
+			return full / 2;
+		}
+		return mediaPreferred ? smaller : (full - smaller);
+	};
 	// Relayouting the container can synthesize a mouse move, and Qt
 	// re-dispatches Enter/Leave for it before qt_last_mouse_receiver is
 	// updated, so the container gets the same Leave again. That comes back
@@ -172,20 +202,21 @@ DragArea::Areas DragArea::SetupDragAreaToContainer(
 		case DragState::MediaFiles:
 		case DragState::MediaFilesArchive:
 		case DragState::Folder:
-		case DragState::FilesArchive:
+		case DragState::FilesArchive: {
+			const auto full = height() - verticalMargins;
 			attachDragDocument->resize(
 				width() - horizontalMargins,
-				(height() - verticalMargins) / 2);
+				documentHeight(full));
 			moveToTop(attachDragDocument);
 			attachDragPhoto->resize(
 				attachDragDocument->width(),
-				attachDragDocument->height());
+				full - attachDragDocument->height());
 			attachDragPhoto->move(
 				st::dragMargin.left(),
 				height()
 					- attachDragPhoto->height()
 					- st::dragMargin.bottom());
-		break;
+		} break;
 		case DragState::FilesArchiveOnly:
 		case DragState::FolderArchiveOnly:
 		case DragState::Image:
@@ -201,6 +232,11 @@ DragArea::Areas DragArea::SetupDragAreaToContainer(
 			setAcceptDropsField(*attachDragState == DragState::None);
 		}
 		updateAttachGeometry();
+		if (*attachDragState != DragState::None) {
+			attachDragPhoto->setIcon(PhotoAreaSendsMedia(*attachDragState)
+				? &st::dragIconMedia
+				: &st::dragIconArchive);
+		}
 
 		switch (*attachDragState) {
 		case DragState::None:
@@ -590,6 +626,11 @@ void DragArea::setText(const QString &text, const QString &subtext) {
 	update();
 }
 
+void DragArea::setIcon(const style::icon *icon) {
+	_icon = icon;
+	update();
+}
+
 void DragArea::paintEvent(QPaintEvent *e) {
 	Painter p(this);
 
@@ -612,15 +653,31 @@ void DragArea::paintEvent(QPaintEvent *e) {
 	Ui::Shadow::paint(p, inner, width(), st::boxRoundShadow);
 	Ui::FillRoundRect(p, inner, st::boxBg, Ui::BoxCorners);
 
-	p.setPen(anim::pen(
+	const auto color = anim::color(
 		st::dragColor,
 		st::dragDropColor,
-		_a_in.value(_in ? 1. : 0.)));
+		_a_in.value(_in ? 1. : 0.));
+	p.setPen(color);
+
+	const auto icon = (_icon
+		&& (height() >= MinimalHeight() + _icon->height() + st::dragIconSkip))
+		? _icon
+		: nullptr;
+	const auto shift = icon ? ((icon->height() + st::dragIconSkip) / 2) : 0;
+	const auto textTop = (height() - st::dragHeight) / 2 + shift;
+	if (icon) {
+		icon->paint(
+			p,
+			(width() - icon->width()) / 2,
+			textTop - st::dragIconSkip - icon->height(),
+			width(),
+			color);
+	}
 
 	p.setFont(st::dragFont);
 	const auto rText = QRect(
 		0,
-		(height() - st::dragHeight) / 2,
+		textTop,
 		width(),
 		st::dragFont->height);
 	p.drawText(rText, _text, QTextOption(style::al_top));
@@ -628,7 +685,7 @@ void DragArea::paintEvent(QPaintEvent *e) {
 	p.setFont(st::dragSubfont);
 	const auto rSubtext = QRect(
 		0,
-		(height() + st::dragHeight) / 2 - st::dragSubfont->height,
+		textTop + st::dragHeight - st::dragSubfont->height,
 		width(),
 		st::dragSubfont->height * 2);
 	p.drawText(rSubtext, _subtext, QTextOption(style::al_top));

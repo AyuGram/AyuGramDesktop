@@ -9,8 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/unixtime.h"
 #include "boxes/gift_premium_box.h"
-#include "chat_helpers/stickers_gift_box_pack.h"
 #include "chat_helpers/stickers_dice_pack.h"
+#include "chat_helpers/stickers_gift_box_pack.h"
 #include "countries/countries_instance.h"
 #include "data/data_channel.h"
 #include "data/data_media_types.h"
@@ -23,11 +23,57 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "ui/effects/credits_graphics.h"
 #include "ui/text/text_utilities.h"
+
 #include "styles/style_chat.h"
 
 namespace HistoryView {
 
 constexpr auto kOutlineRatio = 0.85;
+
+namespace {
+
+void PushGiveawayBadge(
+		const Fn<void(std::unique_ptr<MediaGenericPart>)> &push,
+		not_null<Element*> parent,
+		Fn<StickerWithBadgePart::Data()> sticker,
+		uint64 credits,
+		int quantity) {
+	push(std::make_unique<StickerWithBadgePart>(
+		parent,
+		nullptr,
+		std::move(sticker),
+		st::chatGiveawayStickerPadding,
+		credits
+			? QString::number(credits)
+			: tr::lng_prizes_badge(
+				tr::now,
+				lt_amount,
+				QString::number(quantity)),
+		credits
+			? Ui::CreditsWhiteDoubledIcon(
+				st::chatGiveawayCreditsIconHeight,
+				kOutlineRatio)
+			: QImage(),
+		credits
+			? std::make_optional(st::creditsBg3->c)
+			: std::nullopt));
+}
+
+[[nodiscard]] auto MakePushText(
+		const Fn<void(std::unique_ptr<MediaGenericPart>)> &push) {
+	return [&push](
+			TextWithEntities text,
+			QMargins margins = {},
+			const base::flat_map<uint16, ClickHandlerPtr> &links = {}) {
+		push(std::make_unique<MediaGenericTextPart>(
+			std::move(text),
+			margins,
+			st::defaultTextStyle,
+			links));
+	};
+}
+
+} // namespace
 
 auto GenerateGiveawayStart(
 	not_null<Element*> parent,
@@ -51,36 +97,9 @@ auto GenerateGiveawayStart(
 				.stopOnLastFrame = true,
 			};
 		};
-		push(std::make_unique<StickerWithBadgePart>(
-			parent,
-			nullptr,
-			sticker,
-			st::chatGiveawayStickerPadding,
-			data->credits
-				? QString::number(data->credits)
-				: tr::lng_prizes_badge(
-					tr::now,
-					lt_amount,
-					QString::number(quantity)),
-			data->credits
-				? Ui::CreditsWhiteDoubledIcon(
-					st::chatGiveawayCreditsIconHeight,
-					kOutlineRatio)
-				: QImage(),
-			data->credits
-				? std::make_optional(st::creditsBg3->c)
-				: std::nullopt));
+		PushGiveawayBadge(push, parent, sticker, data->credits, quantity);
 
-		auto pushText = [&](
-				TextWithEntities text,
-				QMargins margins = {},
-				const base::flat_map<uint16, ClickHandlerPtr> &links = {}) {
-			push(std::make_unique<MediaGenericTextPart>(
-				std::move(text),
-				margins,
-				st::defaultTextStyle,
-				links));
-		};
+		auto pushText = MakePushText(push);
 		pushText(
 			tr::bold(
 				tr::lng_prizes_title(tr::now, lt_count, quantity)),
@@ -225,36 +244,9 @@ auto GenerateGiveawayResults(
 				.stopOnLastFrame = true,
 			};
 		};
-		push(std::make_unique<StickerWithBadgePart>(
-			parent,
-			nullptr,
-			sticker,
-			st::chatGiveawayStickerPadding,
-			data->credits
-				? QString::number(data->credits)
-				: tr::lng_prizes_badge(
-					tr::now,
-					lt_amount,
-					QString::number(quantity)),
-			data->credits
-				? Ui::CreditsWhiteDoubledIcon(
-					st::chatGiveawayCreditsIconHeight,
-					kOutlineRatio)
-				: QImage(),
-			data->credits
-				? std::make_optional(st::creditsBg3->c)
-				: std::nullopt));
+		PushGiveawayBadge(push, parent, sticker, data->credits, quantity);
 
-		auto pushText = [&](
-				TextWithEntities text,
-				QMargins margins = {},
-				const base::flat_map<uint16, ClickHandlerPtr> &links = {}) {
-			push(std::make_unique<MediaGenericTextPart>(
-				std::move(text),
-				margins,
-				st::defaultTextStyle,
-				links));
-		};
+		auto pushText = MakePushText(push);
 		const auto isSingleWinner = (data->winnersCount == 1);
 		pushText(
 			(isSingleWinner

@@ -63,11 +63,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "window/section_widget.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
-#include "styles/style_chat_helpers.h"
 #include "styles/style_chat.h"
-#include "styles/style_menu_icons.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
 
 namespace Settings {
 namespace {
@@ -269,6 +270,7 @@ private:
 	QPointer<ListWidget> _inner;
 	std::unique_ptr<Ui::RpWidget> _controlsWrap;
 	std::unique_ptr<ComposeControls> _composeControls;
+	QPointer<SendFilesBox> _sendFilesBox;
 	rpl::event_stream<> _showBackRequests;
 	bool _skipScrollEvent = false;
 
@@ -374,6 +376,10 @@ ShortcutMessages::ShortcutMessages(
 		&controller->session(),
 		static_cast<ListDelegate*>(this));
 	_inner->overrideChatMode(ElementChatMode::Default);
+	const auto inner = _inner.data();
+	Tgw::ListScroll::WatchInput(
+		_scroll,
+		crl::guard(inner, [=] { Tgw::ListScroll::Input(inner); }));
 
 	_scroll->sizeValue() | rpl::filter([](QSize size) {
 		return !size.isEmpty();
@@ -410,7 +416,16 @@ ShortcutMessages::ShortcutMessages(
 	}, lifetime());
 }
 
-ShortcutMessages::~ShortcutMessages() = default;
+ShortcutMessages::~ShortcutMessages() {
+	// The Info host may already be half deleted, so don't restore the text.
+	if (const auto box = _sendFilesBox.data()) {
+		box->setCancelledCallback(nullptr);
+		box->closeBox();
+	}
+	if (_composeControls) {
+		_composeControls->closeSendAsFileBox(false);
+	}
+}
 
 void ShortcutMessages::refreshEmptyText() {
 	const auto &shortcut = _shortcut.current();
@@ -1200,6 +1215,7 @@ void ShortcutMessages::sendVoice(ComposeControls::VoiceToSend &&data) {
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		std::move(action));
 
 	_composeControls->cancelReplyMessage();
@@ -1357,6 +1373,7 @@ bool ShortcutMessages::confirmSendingFiles(
 		Api::SendType::Normal,
 		SendMenu::Details(),
 		[=](const TextWithTags &text) { _composeControls->setText(text); });
+	_sendFilesBox = box.data();
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,

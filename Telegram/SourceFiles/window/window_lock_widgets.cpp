@@ -7,26 +7,28 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_lock_widgets.h"
 
+#include "api/api_text_entities.h"
 #include "base/platform/base_platform_info.h"
 #include "base/call_delayed.h"
+#include "base/openssl_help.h"
 #include "base/system_unlock.h"
-#include "lang/lang_keys.h"
-#include "storage/storage_domain.h"
-#include "mainwindow.h"
 #include "core/application.h"
-#include "api/api_text_entities.h"
+#include "lang/lang_keys.h"
+#include "main/main_domain.h"
+#include "mainwindow.h"
+#include "storage/storage_domain.h"
 #include "ui/text/text.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/fields/password_input.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
-#include "ui/widgets/fields/password_input.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
-#include "ui/toast/toast.h"
 #include "ui/ui_utility.h"
 #include "window/window_controller.h"
-#include "window/window_slide_animation.h"
 #include "window/window_session_controller.h"
-#include "main/main_domain.h"
+#include "window/window_slide_animation.h"
+
 #include "styles/style_layers.h"
 #include "styles/style_passcode_box.h"
 #include "styles/style_window_lock_widgets.h"
@@ -38,23 +40,28 @@ constexpr auto kSystemUnlockDelay = crl::time(1000);
 
 } // namespace
 
-PasscodeAttempt TryPasscode(const QString &passcode) {
+PasscodeAttempt TryPasscode(
+		const QString &passcode,
+		Fn<void(bool correct)> done) {
 	if (passcode.isEmpty()) {
 		return PasscodeAttempt::Empty;
 	} else if (!passcodeCanTry()) {
 		return PasscodeAttempt::Flood;
 	}
-	const auto utf8 = passcode.toUtf8();
-	auto &domain = Core::App().domain();
-	const auto correct = domain.started()
-		? domain.local().checkPasscode(utf8)
-		: (domain.start(utf8) == Storage::StartResult::Success);
-	if (!correct) {
-		cSetPasscodeBadTries(cPasscodeBadTries() + 1);
-		cSetPasscodeLastTry(crl::now());
-		return PasscodeAttempt::Wrong;
-	}
-	return PasscodeAttempt::Correct;
+	auto utf8 = passcode.toUtf8();
+	const auto cleanse = gsl::finally([&] {
+		OPENSSL_cleanse(utf8.data(), utf8.size());
+	});
+	auto counted = [done = std::move(done)](bool correct) {
+		if (!correct && Core::App().passcodeLocked()) {
+			cSetPasscodeBadTries(cPasscodeBadTries() + 1);
+			cSetPasscodeLastTry(crl::now());
+		}
+		done(correct);
+	};
+	return Core::App().domain().tryPasscode(utf8, std::move(counted))
+		? PasscodeAttempt::Started
+		: PasscodeAttempt::Busy;
 }
 
 LockWidget::LockWidget(QWidget *parent, not_null<Controller*> window)
@@ -277,7 +284,15 @@ void PasscodeLockWidget::paintContent(QPainter &p) {
 }
 
 void PasscodeLockWidget::submit() {
-	switch (TryPasscode(_passcode->text())) {
+	auto done = crl::guard(this, [=](bool correct) {
+		setDeriving(false);
+		if (correct) {
+			Core::App().unlockPasscode(); // Destroys this widget.
+		} else {
+			error();
+		}
+	});
+	switch (TryPasscode(_passcode->text(), std::move(done))) {
 	case PasscodeAttempt::Empty:
 		_passcode->showError();
 		return;
@@ -286,13 +301,12 @@ void PasscodeLockWidget::submit() {
 		_passcode->showError();
 		update();
 		return;
-	case PasscodeAttempt::Wrong:
-		error();
+	case PasscodeAttempt::Busy:
 		return;
-	case PasscodeAttempt::Correct:
-		break;
+	case PasscodeAttempt::Started:
+		setDeriving(true);
+		return;
 	}
-	Core::App().unlockPasscode(); // Destroys this widget.
 }
 
 void PasscodeLockWidget::error() {
@@ -300,6 +314,18 @@ void PasscodeLockWidget::error() {
 	_passcode->selectAll();
 	_passcode->showError();
 	update();
+}
+
+void PasscodeLockWidget::setDeriving(bool deriving) {
+	_passcode->setDisabled(deriving);
+	_submit->setDisabled(deriving);
+	_submit->setAttribute(Qt::WA_TransparentForMouseEvents, deriving);
+	_submit->setTextFgOverride(deriving
+		? std::make_optional(st::passcodeSubmit.numbersTextFg->c)
+		: std::nullopt);
+	if (!deriving) {
+		_passcode->setFocusFast();
+	}
 }
 
 void PasscodeLockWidget::changed() {
@@ -477,7 +503,9 @@ void TermsBox::prepare() {
 
 void TermsBox::keyPressEvent(QKeyEvent *e) {
 	if (e->key() == Qt::Key_Enter || e->key() == Qt::Key_Return) {
-		_agreeClicks.fire({});
+		if (!e->isAutoRepeat()) {
+			triggerButton(0);
+		}
 	} else {
 		BoxContent::keyPressEvent(e);
 	}

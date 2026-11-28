@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "dialogs/ui/dialogs_message_view.h"
+#include "dialogs/dialogs_entry.h"
+#include "dialogs/dialogs_key.h"
 #include "ui/effects/animations.h"
 #include "ui/text/text.h"
 #include "ui/unread_badge.h"
 #include "ui/userpic_view.h"
-#include "dialogs/dialogs_entry.h"
-#include "dialogs/dialogs_key.h"
-#include "dialogs/ui/dialogs_message_view.h"
 
 class History;
 class HistoryItem;
@@ -117,6 +117,10 @@ public:
 		bool hasUnreadBadgesAbove) const final override;
 
 	[[nodiscard]] bool lookupIsInTopicJump(int x, int y) const;
+	[[nodiscard]] bool lookupIsInCommunityBadge(
+		int x,
+		int y,
+		const style::DialogRow &st) const;
 	void stopLastRipple() override;
 	void clearRipple() override;
 	void addTopicJumpRipple(
@@ -192,6 +196,7 @@ private:
 		uint32 storiesHasVideoStream : 1 = 0;
 		uint32 active : 1 = 0;
 		uint32 hidden : 1 = 0;
+		uint32 communityMember : 1 = 0;
 	};
 
 	void setCornerBadgeShown(

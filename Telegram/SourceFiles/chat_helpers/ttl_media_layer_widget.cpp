@@ -13,10 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document.h"
 #include "data/data_session.h"
 #include "editor/editor_layer_widget.h"
+#include "history/view/media/history_view_document.h"
+#include "history/view/history_view_element.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "history/view/history_view_element.h"
-#include "history/view/media/history_view_document.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mainwidget.h"
@@ -25,17 +25,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/effects/path_shift_gradient.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/tooltip.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
-#include "window/section_widget.h" // Window::ChatThemeValueFromPeer.
 #include "window/themes/window_theme.h"
+#include "window/section_widget.h" // Window::ChatThemeValueFromPeer.
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
@@ -172,6 +173,10 @@ PreviewWrap::PreviewWrap(
 		if (data.view == _element.get()) {
 			update(_elementGeometry);
 		}
+	}, lifetime());
+	session->data().peerDecorationsUpdated(
+	) | rpl::on_next([=] {
+		update(_elementGeometry);
 	}, lifetime());
 	session->data().itemViewRefreshRequest(
 	) | rpl::on_next([=](not_null<const HistoryItem*> item) {
@@ -387,6 +392,7 @@ void ShowTTLMediaLayerWidget(
 		std::move(preview));
 	layer->lifetime().add([] { ::Media::Player::instance()->stop(); });
 	Core::App().screenshotProtection().addContentReason(
+		controller->widget(),
 		rpl::single(true),
 		layer->lifetime());
 	base::install_event_filter(layer.get(), [=](not_null<QEvent*> e) {

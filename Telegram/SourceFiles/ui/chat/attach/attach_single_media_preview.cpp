@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/chat/attach/attach_single_media_preview.h"
 
-#include "editor/photo_editor_common.h"
-#include "ui/chat/attach/attach_prepare.h"
 #include "core/mime_type.h"
+#include "editor/photo_editor_common.h"
 #include "lottie/lottie_single_player.h"
+#include "ui/chat/attach/attach_prepare.h"
 
 namespace Ui {
 
@@ -27,7 +27,8 @@ SingleMediaPreview *SingleMediaPreview::Create(
 	if (const auto image = std::get_if<PreparedFileInformation::Image>(
 			&file.information->media)) {
 		preview = Editor::ImageModified(image->data, image->modifications);
-		animated = animationPreview = image->animated;
+		animated = image->animated || file.hasAudioEditScene();
+		animationPreview = image->animated;
 		hasModifications = !image->modifications.empty();
 	} else if (const auto video = std::get_if<PreparedFileInformation::Video>(
 			&file.information->media)) {
@@ -61,9 +62,11 @@ SingleMediaPreview *SingleMediaPreview::Create(
 		file.spoiler,
 		animationPreview ? file.path : QString(),
 		type);
-	result->setModifyAllowed(file.canEditVideo());
+	result->setModifyAllowed(
+		file.canEditVideo() || file.hasAudioEditScene());
 	result->setCanShowHighQualityBadge(file.canUseHighQualityPhoto());
-	result->setCanShowAnimatedBadge(file.hasAnimatedEditScene());
+	result->setCanShowAnimatedBadge(file.hasAnimatedEditScene()
+		&& !file.hasAudioEditScene());
 	result->setVideoQuality(file.videoQuality());
 	return result;
 }

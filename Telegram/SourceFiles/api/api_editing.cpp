@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_editing.h"
 
-#include "apiwrap.h"
 #include "api/api_media.h"
 #include "api/api_text_entities.h"
+#include "apiwrap.h"
 #include "base/random.h"
+#include "boxes/abstract_box.h" // Ui::show().
 #include "core/application.h"
-#include "ui/boxes/confirm_box.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/welcome_messages.h"
@@ -31,7 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mtproto/mtproto_response.h"
-#include "boxes/abstract_box.h" // Ui::show().
+#include "ui/boxes/confirm_box.h"
 
 // AyuGram includes
 #include "ayu/utils/telegram_helpers.h"
@@ -413,21 +413,28 @@ void EditMessageWithUploadedMedia(
 		not_null<HistoryItem*> item,
 		SendOptions options,
 		MTPInputMedia media) {
+	const auto session = &item->history()->session();
+	const auto peer = item->history()->peer;
+	const auto itemId = item->fullId();
 	const auto done = [=](Fn<void()> applyUpdates) {
-		if (item) {
+		if (const auto item = session->data().message(itemId)) {
 			item->removeFromSharedMediaIndex();
 			item->clearSavedMedia();
+			item->addToSharedMediaIndex();
 			item->setIsLocalUpdateMedia(true);
-			applyUpdates();
+		}
+		applyUpdates();
+		if (const auto item = session->data().message(itemId)) {
 			item->setIsLocalUpdateMedia(false);
 		}
 	};
 	const auto fail = [=](const QString &error) {
-		const auto session = &item->history()->session();
 		const auto notModified = (error == u"MESSAGE_NOT_MODIFIED"_q);
 		const auto mediaInvalid = (error == u"MEDIA_NEW_INVALID"_q);
 		if (notModified || mediaInvalid) {
-			item->returnSavedMedia();
+			if (const auto item = session->data().message(itemId)) {
+				item->returnSavedMedia();
+			}
 			session->data().sendHistoryChangeNotifications();
 			if (mediaInvalid) {
 				Ui::show(
@@ -435,7 +442,7 @@ void EditMessageWithUploadedMedia(
 					Ui::LayerOption::KeepOther);
 			}
 		} else {
-			session->api().sendMessageFail(error, item->history()->peer);
+			session->api().sendMessageFail(error, peer);
 		}
 	};
 
@@ -573,16 +580,17 @@ mtpRequestId EditTextMessage(
 		auto takeInputMedia = Fn<std::optional<MTPInputMedia>()>(nullptr);
 		auto takeFileReference = Fn<QByteArray()>(nullptr);
 		auto refreshCover = Fn<void(Fn<void(PhotoData*)>)>(nullptr);
+		const auto ttlSeconds = media->ttlSeconds();
 		if (const auto photo = media->photo()) {
 			using Flag = MTPDinputMediaPhoto::Flag;
 			const auto flags = Flag()
-				| (media->ttlSeconds() ? Flag::f_ttl_seconds : Flag())
+				| (ttlSeconds ? Flag::f_ttl_seconds : Flag())
 				| (spoilered ? Flag::f_spoiler : Flag());
 			takeInputMedia = [=] {
 				return MTP_inputMediaPhoto(
 					MTP_flags(flags),
 					photo->mtpInput(),
-					MTP_int(media->ttlSeconds()),
+					MTP_int(ttlSeconds),
 					MTPInputDocument()); // video
 			};
 			takeFileReference = [=] { return photo->fileReference(); };
@@ -595,7 +603,7 @@ mtpRequestId EditTextMessage(
 				: media->videoCover());
 			const auto videoTimestamp = media->videoTimestamp();
 			const auto flags = Flag()
-				| (media->ttlSeconds() ? Flag::f_ttl_seconds : Flag())
+				| (ttlSeconds ? Flag::f_ttl_seconds : Flag())
 				| (spoilered ? Flag::f_spoiler : Flag())
 				| (videoTimestamp ? Flag::f_video_timestamp : Flag())
 				| (*cover ? Flag::f_video_cover : Flag());
@@ -606,7 +614,7 @@ mtpRequestId EditTextMessage(
 					(*cover
 						? (*cover)->mtpInput()
 						: MTPInputPhoto()),
-					MTP_int(media->ttlSeconds()),
+					MTP_int(ttlSeconds),
 					MTP_int(videoTimestamp),
 					MTPstring()); // query
 			};
@@ -632,10 +640,18 @@ mtpRequestId EditTextMessage(
 			: QByteArray();
 		const auto coverRefreshed = std::make_shared<bool>(false);
 		const auto origin = item->fullId();
-		const auto api = &item->history()->session().api();
+		const auto session = &item->history()->session();
+		const auto api = &session->api();
 		const auto performRequest = [=](
 				const auto &repeatRequest,
 				mtpRequestId originalRequestId) -> mtpRequestId {
+			const auto item = session->data().message(origin);
+			if (!item) {
+				if (fail) {
+					fail(u"MESSAGE_ID_INVALID"_q, originalRequestId);
+				}
+				return originalRequestId;
+			}
 			const auto handleReference = [=](
 					const QString &error,
 					mtpRequestId requestId) {
@@ -748,7 +764,10 @@ mtpRequestId EditRichMessage(
 			const auto &repeatRequest,
 			mtpRequestId originalRequestId,
 			bool refreshed) -> mtpRequestId {
-		const auto current = richMessage ? richMessage() : std::nullopt;
+		const auto item = session->data().message(origin);
+		const auto current = (item && richMessage)
+			? richMessage()
+			: std::nullopt;
 		const auto requestId = originalRequestId ? originalRequestId : 0;
 		if (!current) {
 			if (fail) {

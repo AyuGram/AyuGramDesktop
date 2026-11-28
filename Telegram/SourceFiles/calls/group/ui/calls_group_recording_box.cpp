@@ -11,9 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 #include "ui/image/image_prepare.h"
 #include "ui/layers/generic_box.h"
-#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
+
 #include "styles/style_basic.h"
 #include "styles/style_calls.h"
 #include "styles/style_layers.h"
@@ -184,8 +185,9 @@ void RecordingInfo::prepareVideo() {
 
 	wrap->sizeValue(
 	) | rpl::on_next([=](const QSize &size) {
-		const auto wHalf = size.width() / icons.size();
-		for (auto i = 0; i < icons.size(); i++) {
+		const auto count = int(icons.size());
+		const auto wHalf = size.width() / count;
+		for (auto i = 0; i != count; ++i) {
 			const auto &icon = icons[i];
 			icon->moveToLeft(
 				wHalf * i + (wHalf - icon->width()) / 2,

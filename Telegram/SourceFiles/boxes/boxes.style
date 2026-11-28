@@ -187,6 +187,92 @@ backgroundScroll: ScrollArea(boxScroll) {
 
 sendMediaPreviewSize: 308px;
 sendMediaPreviewHeightMax: 1280;
+sendStoryBox: Box(defaultBox) {
+	buttonPadding: margins(16px, 12px, 16px, 12px);
+	buttonHeight: 42px;
+	buttonWide: true;
+	button: RoundButton(defaultActiveButton) {
+		height: 42px;
+		radius: 21px;
+		textTop: 12px;
+		style: semiboldTextStyle;
+	}
+}
+storyRowHeight: 56px;
+storyRowSendAsHeight: 62px;
+storyRowRadioLeft: 14px;
+storyRowIconLeft: 53px;
+storyRowIconLeftNoRadio: 16px;
+storyRowIconSize: 40px;
+storyRowTextLeft: 105px;
+storyRowTextLeftNoRadio: 68px;
+storyRowTextRight: 20px;
+storyRowTitleTop: 10px;
+storyRowSubtitleTop: 31px;
+storyRowTitleStyle: TextStyle(semiboldTextStyle) {
+	font: font(14px semibold);
+}
+storyRowSubtitleStyle: defaultTextStyle;
+storyRowArrowSize: 8px;
+storyRowArrowSkip: 4px;
+storyRowArrowStroke: 2px;
+storyRowChevronSize: 6px;
+storyRowChevronRight: 31px;
+storyRowChevronStroke: 2px;
+storyRowChevronOpacity: 0.3;
+storyPrivacyIconEveryone: icon {{ "stories/privacy_everyone", historyPeerUserpicFg }};
+storyPrivacyIconContacts: icon {{ "stories/privacy_contacts", historyPeerUserpicFg }};
+storyPrivacyIconCloseFriends: icon {{ "stories/privacy_close_friends", historyPeerUserpicFg }};
+storyPrivacyIconSelected: icon {{ "stories/privacy_selected", historyPeerUserpicFg }};
+
+SendStoryRowStyle {
+	radio: Radio;
+	titleFg: color;
+	subtitleFg: color;
+	subtitleLinkFg: color;
+	dividerBg: color;
+	ripple: RippleAnimation;
+}
+
+sendStoryRowStyle: SendStoryRowStyle {
+	radio: defaultRadio;
+	titleFg: boxTextFg;
+	subtitleFg: windowSubTextFg;
+	subtitleLinkFg: windowActiveTextFg;
+	dividerBg: boxDividerBg;
+	ripple: defaultRippleAnimation;
+}
+
+SendStoryBoxStyle {
+	box: Box;
+	close: IconButton;
+	subsectionTitle: FlatLabel;
+	dividerText: DividerLabel;
+	row: SendStoryRowStyle;
+	peerList: PeerList;
+	multiSelect: MultiSelect;
+}
+storyAudioSearchHeight: 36px;
+storyAudioSearchMargins: margins(20px, 8px, 20px, 8px);
+storyAudioSearchIcon: icon {{ "box_search", menuIconFg }};
+storyAudioSearchIconLeft: 10px;
+storyAudioSearchFieldLeft: 36px;
+storyAudioSearchFieldRight: 10px;
+storyAudioSearchField: InputField(defaultMultiSelectSearchField) {
+}
+storyAudioRowHeight: 56px;
+storyAudioRowThumbLeft: 12px;
+storyAudioRowThumbTop: 6px;
+storyAudioRowThumbSize: 44px;
+storyAudioRowTextLeft: 72px;
+storyAudioRowTextRight: 12px;
+storyAudioRowTitleTop: 9px;
+storyAudioRowTitleFont: font(15px semibold);
+storyAudioRowInfoTop: 29px;
+storyAudioRowInfoFont: font(13px);
+storyAudioRowRing: 2px;
+storyAudioRowRingInset: 3px;
+storyAudioEmptyPadding: margins(24px, 16px, 24px, 8px);
 sendMediaRowSkip: 10px;
 
 editMediaHintLabel: FlatLabel(defaultFlatLabel) {
@@ -261,6 +347,9 @@ changePhoneDescription: FlatLabel(defaultFlatLabel) {
 	minWidth: 332px;
 	align: align(top);
 	textFg: windowSubTextFg;
+}
+giveawayResultLabel: FlatLabel(changePhoneDescription) {
+	minWidth: 1px;
 }
 changePhoneDescriptionPadding: margins(0px, 1px, 0px, 8px);
 changePhoneIconPadding: margins(0px, 39px, 0px, 5px);
@@ -540,17 +629,156 @@ moderateBoxExpandTextStyle: TextStyle(boxTextStyle) {
 moderateBoxExpandToggleSize: 4px;
 moderateBoxExpandToggleFourStrokes: 3px;
 
-profileQrFont: font(fsize bold);
-profileQrBackgroundRadius: 12px;
-profileQrIcon: icon{{ "qr_mini", windowActiveTextFg }};
-profileQrBackgroundMargins: margins(36px, 12px, 36px, 12px);
-profileQrBackgroundPadding: margins(0px, 24px, 0px, 24px);
+peerQrBox: Box(defaultBox) {
+	buttonPadding: margins(0px, 0px, 0px, 0px);
+	buttonHeight: 0px;
+	shadowIgnoreTopSkip: true;
+}
+peerQrBoxWidth: aboutWidth;
+peerQrCardWidth: 288px;
+peerQrCardSkip: 20px;
+peerQrUsernameSkip: 18px;
+peerQrUsernameLarge: font(36px bold);
+peerQrUsernameMedium: font(30px bold);
+peerQrUsernameSmall: font(23px bold);
+peerQrUsernameMin: 13px;
+peerQrCardShadowRadius: 21px;
+peerQrCardShadowShift: 7px;
+peerQrPillSkip: 13px;
+peerQrPillHeight: 26px;
+peerQrDriftSpeed: 6px;
+peerQrButtonSkip: 16px;
+peerQrButton: IconButton(defaultIconButton) {
+	width: 40px;
+	height: 40px;
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 40px;
+	ripple: RippleAnimation(defaultRippleAnimation) {
+		color: shadowFg;
+	}
+}
+peerQrClose: IconButton(peerQrButton) {
+	icon: icon {{ "box_button_close", windowFg }};
+	iconOver: icon {{ "box_button_close", windowFg }};
+}
+peerQrCopy: IconButton(peerQrButton) {
+	icon: icon {{ "menu/copy", windowFg }};
+	iconOver: icon {{ "menu/copy", windowFg }};
+}
+peerQrShare: IconButton(peerQrButton) {
+	icon: icon {{ "menu/share", windowFg }};
+	iconOver: icon {{ "menu/share", windowFg }};
+}
+peerQrButtonLoading: InfiniteRadialAnimation(defaultInfiniteRadialAnimation) {
+	size: size(20px, 20px);
+	thickness: 2px;
+}
+peerQrTitle: FlatLabel(boxTitle) {
+}
+peerQrAbout: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	minWidth: 100px;
+}
+peerQrPillFont: font(13px);
+peerQrPillPadding: margins(10px, 0px, 13px, 0px);
+peerQrPillStarBox: 14px;
+peerQrPillStarSkip: 2px;
+peerQrPillStar: icon {{ "premium/star-11x11", windowFg }};
+peerQrPillTextStyle: TextStyle(defaultTextStyle) {
+	font: peerQrPillFont;
+}
+peerQrPillStarEmoji: IconEmoji {
+	icon: peerQrPillStar;
+	padding: margins(1px, 5px, 0px, 0px);
+}
+peerQrMenuReset: icon {{ "chat/refresh-24x24", menuIconColor }};
+peerQrMenuTimerOff: icon {{ "menu/timer_off-24x24", menuIconColor }};
+peerQrMenuAboutFont: font(12px);
+peerQrToastTimer: icon {{ "menu/timer", toastFg }};
+peerQrToastCheck: icon {{ "toast/check", toastFg }};
+peerQrWaveOvershoot: 71px;
+peerQrWaveGlowFrom: 107px;
+peerQrWaveGlowTill: 67px;
+peerQrWaveBlend: 190px;
+peerQrColors: IconButton(peerQrButton) {
+	width: 48px;
+	icon: icon {{ "menu/colors", windowFg }};
+	iconOver: icon {{ "menu/colors", windowFg }};
+	rippleAreaPosition: point(4px, 0px);
+}
+peerQrEmoji: IconButton(peerQrColors) {
+	icon: icon {{ "menu/emoji", windowFg }};
+	iconOver: icon {{ "menu/emoji", windowFg }};
+}
+peerQrGift: IconButton(peerQrColors) {
+	icon: icon {{ "menu/gift_premium", windowFg }};
+	iconOver: icon {{ "menu/gift_premium", windowFg }};
+}
+peerQrPanelMargin: 10px;
+peerQrPanelPadding: 11px;
+peerQrPanelRadius: 24px;
+peerQrPanelFade: 14px;
+peerQrPanelSkip: 12px;
+peerQrPanelScroll: ScrollArea(defaultScrollArea) {
+	barHidden: true;
+}
+peerQrSwatchSkip: 12px;
+peerQrSwatchRing: 2px;
+peerQrSwatchRingInset: 6px;
+peerQrSwatchRise: 8px;
+peerQrEmojiSkipX: 80px;
+peerQrEmojiSkipY: 66px;
+peerQrEmojiSize: 32px;
+peerQrEmojiOffsetMin: 3px;
+peerQrEmojiOffsetMax: 10px;
+peerQrEmojiBob: 3px;
+peerQrLayerBand: 98px;
+peerQrLayerGlideBrake: 9px;
+peerQrLayerGlideMax: 900px;
+peerQrGiftModelSize: 78px;
+peerQrGiftModelSkipX: 150px;
+peerQrGiftModelSkipY: 132px;
+peerQrGiftModelOffset: 16px;
+peerQrGiftModelFrame: 116px;
+peerQrGiftSymbolSize: 20px;
+peerQrGiftSymbolSkipX: 39px;
+peerQrGiftSymbolSkipY: 33px;
+peerQrGiftSymbolJitterX: 17px;
+peerQrGiftSymbolJitterY: 14px;
+peerQrGiftSkip: 9px;
+peerQrGiftRadius: 14px;
+peerQrGiftsEmptyPadding: margins(16px, 8px, 16px, 12px);
+peerQrGiftsEmptySticker: 80px;
+peerQrGiftsEmptyTitleSkip: 4px;
+peerQrGiftsEmptyTextSkip: 2px;
+peerQrGiftsEmptyTextWidth: 240px;
+peerQrGiftsEmptyButtonSkip: 10px;
+peerQrGiftsEmptyTitle: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	style: TextStyle(defaultTextStyle) {
+		font: font(15px semibold);
+	}
+}
+peerQrGiftsEmptyText: FlatLabel(defaultFlatLabel) {
+	align: align(top);
+	minWidth: 100px;
+}
+peerQrGiftsBrowse: RoundButton(defaultActiveButton) {
+	width: -40px;
+	height: 34px;
+	textTop: 8px;
+	fullRadius: true;
+}
 
 foldersMenu: PopupMenu(popupMenuWithIcons) {
 	maxHeight: 320px;
 	menu: Menu(menuWithIcons) {
 		itemPadding: margins(54px, 8px, 44px, 8px);
 	}
+}
+
+ownedStickerSetsMenu: PopupMenu(popupMenuWithIcons) {
+	maxHeight: 320px;
 }
 
 futureOwnerBox: Box(defaultBox) {

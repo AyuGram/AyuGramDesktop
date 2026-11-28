@@ -7,27 +7,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/player/media_player_panel.h"
 
-#include "media/player/media_player_instance.h"
-#include "info/media/info_media_list_widget.h"
-#include "info/saved/info_saved_music_widget.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "data/data_session.h"
-#include "data/data_document.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_document.h"
 #include "data/data_forum_topic.h"
-#include "data/data_saved_messages.h"
-#include "data/data_saved_sublist.h"
-#include "ui/widgets/shadow.h"
+#include "data/data_session.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "info/media/info_media_list_widget.h"
+#include "info/saved/info_saved_music_widget.h"
+#include "main/main_session.h"
+#include "mainwindow.h"
+#include "media/player/media_player_instance.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/widgets/shadow.h"
 #include "ui/cached_round_corners.h"
 #include "ui/ui_utility.h"
-#include "mainwindow.h"
-#include "main/main_session.h"
-#include "styles/style_overview.h"
-#include "styles/style_media_player.h"
+
 #include "styles/style_info.h"
+#include "styles/style_media_player.h"
+#include "styles/style_overview.h"
 
 namespace Media {
 namespace Player {
@@ -317,13 +316,12 @@ void Panel::refreshList() {
 			_scroll->scrollToY(newScrollTop);
 		}, weak->lifetime());
 
-		// MSVC BUG + REGRESSION rpl::mappers::tuple :(
 		using namespace rpl::mappers;
 		rpl::combine(
 			_scroll->scrollTopValue(),
-			_scroll->heightValue()
-		) | rpl::on_next([=](int top, int height) {
-			const auto bottom = top + height;
+			_scroll->heightValue(),
+			tuple(_1, _1 + _2)
+		) | rpl::on_next([=](int top, int bottom) {
 			weak->setVisibleTopBottom(top, bottom);
 		}, weak->lifetime());
 
@@ -369,12 +367,8 @@ Data::ForumTopic *Panel::listTopic() const {
 }
 
 Data::SavedSublist *Panel::listSublist() const {
-	const auto monoforum = (_listPeer && _listSublistPeerId)
-		? _listPeer->monoforum()
-		: nullptr;
-	return monoforum
-		? monoforum->sublistLoaded(
-			_listPeer->owner().peer(_listSublistPeerId))
+	return _listPeer
+		? _listPeer->monoforumSublistFor(_listSublistPeerId)
 		: nullptr;
 }
 

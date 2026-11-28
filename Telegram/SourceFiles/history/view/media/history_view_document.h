@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "history/view/media/history_view_file.h"
 #include "base/runtime_composer.h"
+#include "history/view/media/history_view_file.h"
 
 struct HistoryDocumentNamed;
 struct HistoryDocumentThumbed;
@@ -182,7 +182,6 @@ private:
 	mutable TooltipFilename _tooltipFilename;
 
 	TtlPaintCallback _drawTtl;
-	std::shared_ptr<rpl::lifetime> _ttlLifetime;
 
 	mutable float64 _voiceHoverProgress = -1;
 

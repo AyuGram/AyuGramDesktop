@@ -24,8 +24,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
-#include "main/session/session_show.h"
 #include "main/session/send_as_peers.h"
+#include "main/session/session_show.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "payments/ui/payments_reaction_box.h"
@@ -95,15 +95,6 @@ void TryAddingPaidReaction(
 }
 
 } // namespace
-
-bool LookupMyPaidAnonymous(not_null<HistoryItem*> item) {
-	for (const auto &entry : item->topPaidReactionsWithLocal()) {
-		if (entry.my) {
-			return !entry.peer;
-		}
-	}
-	return false;
-}
 
 void TryAddingPaidReaction(
 		not_null<HistoryItem*> item,

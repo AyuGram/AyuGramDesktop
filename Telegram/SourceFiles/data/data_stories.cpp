@@ -7,23 +7,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_stories.h"
 
-#include "base/unixtime.h"
 #include "apiwrap.h"
+#include "base/const_string.h"
+#include "base/unixtime.h"
 #include "core/application.h"
 #include "data/components/top_peers.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_document.h"
-#include "data/data_group_call.h"
 #include "data/data_folder.h"
+#include "data/data_group_call.h"
 #include "data/data_photo.h"
-#include "data/data_user.h"
 #include "data/data_session.h"
+#include "data/data_story_drafts.h"
+#include "data/data_story_edit_sources.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
+#include "storage/storage_account.h"
 #include "ui/layers/show.h"
 #include "ui/text/text_utilities.h"
 
@@ -35,6 +39,7 @@ namespace Data {
 namespace {
 
 constexpr auto kMaxResolveTogether = 100;
+constexpr auto kViewedSelfTillPref = "stories_viewed_self_till"_cs;
 constexpr auto kIgnorePreloadAroundIfLoaded = 15;
 constexpr auto kPreloadAroundCount = 30;
 constexpr auto kMarkAsReadDelay = 3 * crl::time(1000);
@@ -194,6 +199,8 @@ Stories::Stories(not_null<Session*> owner)
 , _incrementViewsTimer([=] { sendIncrementViewsRequests(); })
 , _pollingTimer([=] { sendPollingRequests(); })
 , _pollingViewsTimer([=] { sendPollingViewsRequests(); }) {
+	_viewedSelfTill = session().local().readPref<QByteArray>(
+		kViewedSelfTillPref).toInt();
 	crl::on_main(this, [=] {
 		session().changes().peerUpdates(
 			Data::PeerUpdate::Flag::Rights
@@ -224,6 +231,20 @@ Stories::Stories(not_null<Session*> owner)
 Stories::~Stories() {
 	Expects(_pollingSettings.empty());
 	Expects(_pollingViews.empty());
+}
+
+StoryEditSources &Stories::editSources() {
+	if (!_editSources) {
+		_editSources = std::make_unique<StoryEditSources>(&session());
+	}
+	return *_editSources;
+}
+
+StoryDrafts &Stories::drafts() {
+	if (!_drafts) {
+		_drafts = std::make_unique<StoryDrafts>(&session());
+	}
+	return *_drafts;
 }
 
 void Stories::clear() {
@@ -737,6 +758,7 @@ void Stories::loadMore(StorySourcesList list) {
 		MTP_string(_sourcesStates[index])
 	)).done([=](const MTPstories_AllStories &result) {
 		_loadMoreRequestId[index] = 0;
+		const auto wasKnown = sourcesKnown(list);
 
 		result.match([&](const MTPDstories_allStories &data) {
 			_owner->processUsers(data.vusers());
@@ -752,6 +774,9 @@ void Stories::loadMore(StorySourcesList list) {
 		result.match([&](const auto &data) {
 			apply(data.vstealth_mode());
 		});
+		if (!wasKnown && sourcesKnown(list)) {
+			_sourcesChanged[index].fire({});
+		}
 
 		preloadListsMore();
 	}).fail([=] {
@@ -1139,12 +1164,13 @@ const std::vector<StoriesSourceInfo> &Stories::sources(
 	return _sources[static_cast<int>(list)];
 }
 
-bool Stories::sourcesLoaded(StorySourcesList list) const {
-	return _sourcesLoaded[static_cast<int>(list)];
-}
-
 rpl::producer<> Stories::sourcesChanged(StorySourcesList list) const {
 	return _sourcesChanged[static_cast<int>(list)].events();
+}
+
+bool Stories::sourcesKnown(StorySourcesList list) const {
+	const auto index = static_cast<int>(list);
+	return _sourcesLoaded[index] || !_sourcesStates[index].isEmpty();
 }
 
 rpl::producer<PeerId> Stories::sourceChanged() const {
@@ -1238,6 +1264,7 @@ void Stories::loadAround(FullStoryId id, StoriesContext context) {
 
 void Stories::markAsRead(FullStoryId id, bool viewed) {
 	if (id.peer == _owner->session().userPeerId()) {
+		setViewedSelfTill(id.story);
 		return;
 	}
 	const auto maybeStory = lookup(id);
@@ -1265,6 +1292,25 @@ void Stories::markAsRead(FullStoryId id, bool viewed) {
 	}
 	_markReadPending.emplace(id.peer);
 	_markReadTimer.callOnce(kMarkAsReadDelay);
+}
+
+StoryId Stories::viewedSelfTill() const {
+	return _viewedSelfTill;
+}
+
+void Stories::setViewedSelfTill(StoryId tillId) {
+	if (tillId <= _viewedSelfTill) {
+		return;
+	}
+	_viewedSelfTill = tillId;
+	session().local().writePref<QByteArray>(
+		kViewedSelfTillPref,
+		QByteArray::number(tillId));
+	_viewedSelfTillChanged.fire({});
+}
+
+rpl::producer<> Stories::viewedSelfTillChanged() const {
+	return _viewedSelfTillChanged.events();
 }
 
 bool Stories::bumpReadTill(PeerId peerId, StoryId maxReadTill) {
@@ -1795,11 +1841,6 @@ bool Stories::albumIdsCountKnown(PeerId peerId, int albumId) const {
 	return set && (set->total >= 0);
 }
 
-bool Stories::albumIdsLoaded(PeerId peerId, int albumId) const {
-	const auto set = albumIdsSet(peerId, albumId);
-	return set && set->loaded;
-}
-
 void Stories::albumIdsLoadMore(PeerId peerId, int albumId) {
 	albumIdsLoadMore(peerId, albumId, false);
 }
@@ -2120,11 +2161,6 @@ void Stories::notifyAlbumUpdate(StoryAlbumUpdate &&update) {
 			albumIdsLoadMore(peerId, albumId, true);
 		}
 	}
-	_albumUpdates.fire(std::move(update));
-}
-
-rpl::producer<StoryAlbumUpdate> Stories::albumUpdates() const {
-	return _albumUpdates.events();
 }
 
 void Stories::setPinnedToTop(
@@ -2340,24 +2376,6 @@ void Stories::decrementPreloadingMainSources() {
 
 	if (!--_preloadingMainSourcesCounter
 		&& rebuildPreloadSources(StorySourcesList::NotHidden)) {
-		continuePreloading();
-	}
-}
-
-void Stories::incrementPreloadingHiddenSources() {
-	Expects(_preloadingHiddenSourcesCounter >= 0);
-
-	if (++_preloadingHiddenSourcesCounter == 1
-		&& rebuildPreloadSources(StorySourcesList::Hidden)) {
-		continuePreloading();
-	}
-}
-
-void Stories::decrementPreloadingHiddenSources() {
-	Expects(_preloadingHiddenSourcesCounter > 0);
-
-	if (!--_preloadingHiddenSourcesCounter
-		&& rebuildPreloadSources(StorySourcesList::Hidden)) {
 		continuePreloading();
 	}
 }

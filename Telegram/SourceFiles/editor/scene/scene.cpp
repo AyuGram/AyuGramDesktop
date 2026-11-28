@@ -13,18 +13,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/scene/scene_item_shape.h"
 #include "editor/scene/scene_item_text.h"
 #include "editor/scene/scene_text_editing.h"
+#include "editor/video/video_clip.h"
+#include "editor/photo_editor_common.h"
 #include "ui/image/image_prepare.h"
 #include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/rp_widget.h"
+
 #include "styles/style_editor.h"
 
 #include <QGraphicsSceneMouseEvent>
 #include <QtMath>
 
 namespace Editor {
-namespace {
-
-using ItemPtr = std::shared_ptr<NumberedItem>;
 
 class ItemAction : public NumberedItem {
 public:
@@ -32,6 +33,10 @@ public:
 
 	virtual void apply() = 0;
 	virtual void revert() = 0;
+
+	ItemAction *asAction() override {
+		return this;
+	}
 
 	QRectF boundingRect() const override {
 		return QRectF();
@@ -70,6 +75,10 @@ private:
 		NumberedItem::Status status = Status::Normal;
 	} _saved, _keeped;
 };
+
+namespace {
+
+using ItemPtr = std::shared_ptr<NumberedItem>;
 
 class ItemEraser final : public ItemAction {
 public:
@@ -145,6 +154,46 @@ private:
 	std::vector<Target> _targets;
 };
 
+class ItemZOrder final : public ItemAction {
+public:
+	struct Target {
+		std::shared_ptr<NumberedItem> item;
+		float64 before = 0.;
+		float64 after = 0.;
+	};
+
+	explicit ItemZOrder(std::vector<Target> targets)
+	: _targets(std::move(targets)) {
+	}
+
+	void apply() override {
+		for (const auto &target : _targets) {
+			target.item->setZValue(target.after);
+		}
+	}
+
+	void revert() override {
+		for (const auto &target : _targets) {
+			target.item->setZValue(target.before);
+		}
+	}
+
+	void restore(SaveState state) override {
+		if (!hasState(state)) {
+			return;
+		}
+		ItemAction::restore(state);
+		if (isNormalStatus()) {
+			apply();
+		} else if (isUndidStatus()) {
+			revert();
+		}
+	}
+
+private:
+	std::vector<Target> _targets;
+};
+
 bool SkipMouseEvent(not_null<QGraphicsSceneMouseEvent*> event) {
 	return event->isAccepted() || (event->button() == Qt::RightButton);
 }
@@ -152,16 +201,49 @@ bool SkipMouseEvent(not_null<QGraphicsSceneMouseEvent*> event) {
 constexpr auto kShapeDragThreshold = 4.;
 constexpr auto kShapeSnapAngle = 45.;
 constexpr auto kDraftShapeOpacity = 0.5;
+constexpr auto kStickyGuideDuration = crl::time(150);
+constexpr auto kItemsBaseZ = 9000.;
+constexpr auto kOverlayZ = 1e6;
 
 } // namespace
+
+class Scene::StickyGuidesItem final : public QGraphicsItem {
+public:
+	explicit StickyGuidesItem(not_null<Scene*> scene)
+	: _scene(scene) {
+		setAcceptedMouseButtons(Qt::NoButton);
+		setZValue(kOverlayZ);
+	}
+
+	QRectF boundingRect() const override {
+		return _scene->canvasRect() + Margins(_scene->stickyGuideMargin());
+	}
+
+	void paint(
+			QPainter *p,
+			const QStyleOptionGraphicsItem *,
+			QWidget *) override {
+		_scene->paintStickyGuide(*p, Qt::Horizontal);
+		_scene->paintStickyGuide(*p, Qt::Vertical);
+	}
+
+	void updateGeometry() {
+		prepareGeometryChange();
+	}
+
+private:
+	const not_null<Scene*> _scene;
+
+};
 
 Scene::Scene(const QRectF &rect)
 : QGraphicsScene(rect)
 , _canvas(std::make_shared<ItemCanvas>())
-, _lastZ(std::make_shared<float64>(9000.))
+, _lastZ(std::make_shared<float64>(kItemsBaseZ))
+, _stickyGuides(std::make_unique<StickyGuidesItem>(this))
 , _textEdit(std::make_unique<TextEditController>(this)) {
 	QGraphicsScene::addItem(_canvas.get());
-	_canvas->clearPixmap();
+	QGraphicsScene::addItem(_stickyGuides.get());
 
 	_canvas->grabContentRequests(
 	) | rpl::on_next([=](ItemCanvas::Content &&content) {
@@ -207,7 +289,6 @@ Scene::Scene(const QRectF &rect)
 					maskPos,
 					std::move(targets));
 				addItem(eraser);
-				_canvas->setZValue(++_lastLineZ);
 			}
 			return;
 		}
@@ -242,6 +323,7 @@ Scene::Scene(const QRectF &rect)
 			}
 			const auto canvasVisible = _canvas->isVisible();
 			_canvas->setVisible(false);
+			_stickyGuides->setVisible(false);
 			{
 				auto p = QPainter(&source);
 				render(
@@ -250,6 +332,7 @@ Scene::Scene(const QRectF &rect)
 					QRectF(captureRect),
 					Qt::IgnoreAspectRatio);
 			}
+			_stickyGuides->setVisible(true);
 			_canvas->setVisible(canvasVisible);
 			auto blurred = Images::BlurLargeImage(
 				std::move(source),
@@ -281,15 +364,15 @@ Scene::Scene(const QRectF &rect)
 			const auto item = std::make_shared<ItemLine>(
 				std::move(blurPixmap));
 			item->setPos(maskPos);
+			item->setZValue((*_lastZ)++);
 			addItem(item);
-			_canvas->setZValue(++_lastLineZ);
 			return;
 		}
 		const auto item = std::make_shared<ItemLine>(
 			std::move(content.pixmap));
 		item->setPos(content.position);
+		item->setZValue((*_lastZ)++);
 		addItem(item);
-		_canvas->setZValue(++_lastLineZ);
 	}, _lifetime);
 
 	QObject::connect(
@@ -297,6 +380,9 @@ Scene::Scene(const QRectF &rect)
 		&QGraphicsScene::selectionChanged,
 		[=] {
 			const auto selected = selectedItems();
+			if (!selected.empty()) {
+				setAudioSelected(false);
+			}
 			auto *textItem = (ItemText*)(nullptr);
 			auto *shapeItem = (ItemShape*)(nullptr);
 			if (selected.size() == 1) {
@@ -322,7 +408,26 @@ Scene::Scene(const QRectF &rect)
 					_shapeItemDeselections.fire({});
 				}
 			}
+			refreshVideoClipSelection();
 		});
+}
+
+void Scene::refreshVideoClipSelection() {
+	const auto selected = selectedItems();
+	auto clip = std::shared_ptr<VideoClip>();
+	if (selected.size() == 1) {
+		if (const auto item = itemShared(selected.front())) {
+			if (const auto raw = item->videoClip()) {
+				clip = std::shared_ptr<VideoClip>(item, raw);
+			}
+		}
+	}
+	if (clip.get() == _selectedVideoClip) {
+		return;
+	}
+	_selectedVideoClip = clip.get();
+	updateVideoClipsSound();
+	_videoClipSelections.fire(std::move(clip));
 }
 
 void Scene::cancelDrawing() {
@@ -339,12 +444,15 @@ void Scene::addItem(ItemPtr item) {
 		return;
 	}
 	item->setNumber(_itemNumber++);
-	if (item->scene() != this) {
-		QGraphicsScene::addItem(item.get());
-	}
 	const auto raw = item.get();
 	_items.push_back(std::move(item));
 	_itemsByPointer.emplace(raw, _items.back());
+	if (raw->scene() != this) {
+		QGraphicsScene::addItem(raw);
+	}
+	if (raw->videoClip()) {
+		checkDurationsLink();
+	}
 	_addsItem.fire({});
 }
 
@@ -360,10 +468,21 @@ void Scene::removeItem(not_null<QGraphicsItem*> item) {
 
 void Scene::removeItem(const ItemPtr &item) {
 	item->setStatus(NumberedItem::Status::Removed);
+	if (item->videoClip()) {
+		checkDurationsLink();
+	}
 	_removesItem.fire({});
 }
 
+void Scene::videoClipChanged(not_null<NumberedItem*> item) {
+	checkDurationsLink();
+	if (item->isSelected()) {
+		refreshVideoClipSelection();
+	}
+}
+
 void Scene::mousePressEvent(QGraphicsSceneMouseEvent *event) {
+	setAudioSelected(false);
 	if (_shapeTool.pending) {
 		if (event->button() == Qt::LeftButton) {
 			event->accept();
@@ -384,15 +503,122 @@ void Scene::mousePressEvent(QGraphicsSceneMouseEvent *event) {
 		_textEdit->finishEditing(true);
 		QGraphicsScene::mousePressEvent(event);
 		capturePlacements();
+		_canvasPresses.fire({});
 		return;
 	}
 
 	QGraphicsScene::mousePressEvent(event);
 	capturePlacements();
-	if (SkipMouseEvent(event) || !sceneRect().contains(event->scenePos())) {
+	_canvasPresses.fire({});
+	if (SkipMouseEvent(event)
+		|| !_canvas->drawableRect().contains(event->scenePos())) {
 		return;
 	}
+	_canvas->setZValue(*_lastZ);
 	_canvas->handleMousePressEvent(event);
+}
+
+void Scene::setCanvasRect(const QRectF &rect) {
+	if (_canvasRect == rect) {
+		return;
+	}
+	_stickyGuides->updateGeometry();
+	_canvasRect = rect;
+	_canvas->setCanvasRect(canvasRect());
+}
+
+QRectF Scene::canvasRect() const {
+	return _canvasRect.isNull() ? sceneRect() : _canvasRect;
+}
+
+void Scene::setStickyGuides(
+		std::optional<float64> x,
+		std::optional<float64> y) {
+	setStickyGuide(Qt::Horizontal, x);
+	setStickyGuide(Qt::Vertical, y);
+}
+
+void Scene::setStickyGuide(
+		Qt::Orientation orientation,
+		std::optional<float64> position) {
+	auto &guide = (orientation == Qt::Horizontal)
+		? _stickyGuideX
+		: _stickyGuideY;
+	const auto shown = position.has_value();
+	if (!shown && !guide.shown) {
+		return;
+	}
+	const auto was = stickyGuideRect(orientation);
+	if (shown) {
+		guide.position = *position;
+	}
+	if (guide.shown != shown) {
+		guide.shown = shown;
+		guide.animation.start(
+			[=] { _stickyGuides->update(stickyGuideRect(orientation)); },
+			shown ? 0. : 1.,
+			shown ? 1. : 0.,
+			kStickyGuideDuration);
+	}
+	_stickyGuides->update(was);
+	_stickyGuides->update(stickyGuideRect(orientation));
+}
+
+void Scene::hideStickyGuides() {
+	for (const auto guide : { &_stickyGuideX, &_stickyGuideY }) {
+		guide->animation.stop();
+		guide->shown = false;
+	}
+	_stickyGuides->update();
+}
+
+float64 Scene::stickyGuideMargin() const {
+	const auto zoom = (_currentZoom > 0.) ? _currentZoom : 1.;
+	return st::photoEditorStickyLineWidth / zoom;
+}
+
+QRectF Scene::stickyGuideRect(Qt::Orientation orientation) const {
+	const auto &guide = (orientation == Qt::Horizontal)
+		? _stickyGuideX
+		: _stickyGuideY;
+	const auto canvas = canvasRect();
+	const auto margin = stickyGuideMargin();
+	return (orientation == Qt::Horizontal)
+		? QRectF(
+			guide.position - margin,
+			canvas.top(),
+			margin * 2,
+			canvas.height())
+		: QRectF(
+			canvas.left(),
+			guide.position - margin,
+			canvas.width(),
+			margin * 2);
+}
+
+void Scene::paintStickyGuide(
+		QPainter &p,
+		Qt::Orientation orientation) const {
+	const auto &guide = (orientation == Qt::Horizontal)
+		? _stickyGuideX
+		: _stickyGuideY;
+	const auto opacity = guide.animation.value(guide.shown ? 1. : 0.);
+	if (opacity <= 0.) {
+		return;
+	}
+	const auto canvas = canvasRect();
+	auto color = QColor(Qt::white);
+	color.setAlphaF(opacity);
+	p.setPen(QPen(color, stickyGuideMargin()));
+	if (orientation == Qt::Horizontal) {
+		p.drawLine(
+			QPointF(guide.position, canvas.top()),
+			QPointF(guide.position, canvas.bottom()));
+	} else {
+		p.drawLine(
+			QPointF(canvas.left(), guide.position),
+			QPointF(canvas.right(), guide.position));
+	}
 }
 
 void Scene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
@@ -403,6 +629,7 @@ void Scene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event) {
 	}
 	QGraphicsScene::mouseReleaseEvent(event);
 	commitPlacements();
+	_canvasReleases.fire_copy(event->button());
 	if (SkipMouseEvent(event) || _textEdit->editing()) {
 		return;
 	}
@@ -436,6 +663,7 @@ void Scene::setPendingShape(std::optional<PendingShape> pending) {
 		_textEdit->finishEditing(true);
 		clearSelection();
 		clearFocus();
+		setAudioSelected(false);
 	}
 	if (was != now) {
 		_pendingShapeStates.fire_copy(now);
@@ -619,6 +847,57 @@ void Scene::setSelectedTextColor(const QColor &color) {
 	}
 }
 
+void Scene::renderBaked(
+		QPainter *p,
+		const QRectF &target,
+		const QRectF &source) {
+	auto hidden = std::vector<QGraphicsItem*>();
+	for (const auto &item : _items) {
+		if (item->isVisible() && !item->bakes()) {
+			item->setVisible(false);
+			hidden.push_back(item.get());
+		}
+	}
+	render(p, target, source);
+	for (const auto item : hidden) {
+		item->setVisible(true);
+	}
+}
+
+auto Scene::reactionPickRequests() const
+-> rpl::producer<not_null<ItemReaction*>> {
+	return _reactionPickRequests.events();
+}
+
+void Scene::requestReactionPick(not_null<ItemReaction*> item) {
+	_reactionPickRequests.fire_copy(item);
+}
+
+rpl::producer<> Scene::canvasPresses() const {
+	return _canvasPresses.events();
+}
+
+rpl::producer<Qt::MouseButton> Scene::canvasReleases() const {
+	return _canvasReleases.events();
+}
+
+rpl::producer<> Scene::itemContextMenuRequests() const {
+	return _itemContextMenuRequests.events();
+}
+
+void Scene::noteItemContextMenu() {
+	_itemContextMenuRequests.fire({});
+}
+
+auto Scene::locationPickRequests() const
+-> rpl::producer<not_null<ItemLocation*>> {
+	return _locationPickRequests.events();
+}
+
+void Scene::requestLocationPick(not_null<ItemLocation*> item) {
+	_locationPickRequests.fire_copy(item);
+}
+
 void Scene::setSelectedShapeBrush(
 		const QColor &color,
 		float64 strokeWidth) {
@@ -659,6 +938,11 @@ rpl::producer<> Scene::shapeItemDeselections() const {
 	return _shapeItemDeselections.events();
 }
 
+auto Scene::videoClipSelections() const
+-> rpl::producer<std::shared_ptr<VideoClip>> {
+	return _videoClipSelections.events();
+}
+
 void Scene::setBlurSource(Fn<QImage(QRect)> source) {
 	_blurSource = std::move(source);
 }
@@ -687,7 +971,7 @@ std::vector<ItemPtr> Scene::items(
 bool Scene::hasAnimatedItems() const {
 	for (const auto &item : _items) {
 		const auto animated = item->isNormalStatus()
-			? dynamic_cast<ItemAnimated*>(item.get())
+			? item->asAnimated()
 			: nullptr;
 		if (animated && animated->animated() && animated->hasContent()) {
 			return true;
@@ -696,12 +980,175 @@ bool Scene::hasAnimatedItems() const {
 	return false;
 }
 
+bool Scene::hasAnimatedResult() const {
+	return (_audio != nullptr) || hasAnimatedItems();
+}
+
+void Scene::updateVideoClipsSound() {
+	const auto apply = [&](bool enabled) {
+		for (const auto &item : _items) {
+			const auto clip = item->videoClip();
+			if (clip && ((clip == _selectedVideoClip) == enabled)) {
+				clip->setSoundEnabled(enabled);
+			}
+		}
+	};
+	apply(false);
+	apply(true);
+}
+
+bool Scene::hasSoundResult() const {
+	if (_audio && (_audio->volume > 0.)) {
+		return true;
+	}
+	for (const auto &item : _items) {
+		const auto clip = item->videoClip();
+		if (clip
+			&& item->isNormalStatus()
+			&& clip->animated()
+			&& clip->sounding()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void Scene::releaseAnimations() {
 	for (const auto &item : _items) {
-		if (const auto animated = dynamic_cast<ItemAnimated*>(item.get())) {
+		if (const auto animated = item->asAnimated()) {
 			animated->releasePlayers();
 		}
 	}
+}
+
+void Scene::setAudio(std::shared_ptr<AudioTrack> audio) {
+	if (audio && audio->empty()) {
+		audio = nullptr;
+	}
+	if (_audio == audio) {
+		return;
+	}
+	_audio = std::move(audio);
+	if (!_audio) {
+		setAudioSelected(false);
+	}
+	_audioChanges.fire({});
+	checkDurationsLink();
+}
+
+std::shared_ptr<AudioTrack> Scene::audio() const {
+	return _audio;
+}
+
+rpl::producer<> Scene::audioChanges() const {
+	return _audioChanges.events();
+}
+
+void Scene::setAudioSelected(bool selected) {
+	if (selected && !_audio) {
+		return;
+	} else if (_audioSelected == selected) {
+		return;
+	}
+	if (selected) {
+		setPendingShape(std::nullopt);
+		_textEdit->finishEditing(true);
+		clearSelection();
+		clearFocus();
+	}
+	_audioSelected = selected;
+	_audioSelectedChanges.fire_copy(selected);
+}
+
+bool Scene::audioSelected() const {
+	return _audioSelected;
+}
+
+rpl::producer<bool> Scene::audioSelectedChanges() const {
+	return _audioSelectedChanges.events();
+}
+
+bool Scene::canEqualizeDurations() const {
+	if (!_audio) {
+		return false;
+	}
+	for (const auto &item : _items) {
+		if (item->isNormalStatus() && item->videoClip()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void Scene::equalizeDurations() {
+	auto shortest = _audio ? _audio->length() : crl::time(0);
+	for (const auto &item : _items) {
+		const auto clip = item->isNormalStatus()
+			? item->videoClip()
+			: nullptr;
+		if (clip) {
+			const auto loop = clip->loopDuration();
+			if (loop > 0 && (!shortest || loop < shortest)) {
+				shortest = loop;
+			}
+		}
+	}
+	matchDurations(shortest);
+}
+
+void Scene::matchDurations(crl::time duration) {
+	auto clips = std::vector<VideoClip*>();
+	auto shortest = duration;
+	if (_audio) {
+		shortest = std::min(shortest, _audio->duration - _audio->from);
+	}
+	for (const auto &item : _items) {
+		const auto clip = item->isNormalStatus()
+			? item->videoClip()
+			: nullptr;
+		const auto full = clip ? clip->duration() : crl::time(0);
+		if (full > 0) {
+			shortest = std::min(shortest, full - clip->trim().from);
+			clips.push_back(clip);
+		}
+	}
+	if (shortest <= 0) {
+		return;
+	}
+	for (const auto clip : clips) {
+		const auto from = clip->trim().from;
+		clip->setTrim({ from, from + shortest });
+	}
+	if (_audio) {
+		_audio->till = _audio->from + shortest;
+	}
+}
+
+bool Scene::durationsLinked() const {
+	return _durationsLinked;
+}
+
+void Scene::setDurationsLinked(bool linked) {
+	if (_durationsLinked == linked) {
+		return;
+	}
+	_durationsLinked = linked;
+	if (linked) {
+		equalizeDurations();
+	}
+}
+
+rpl::producer<> Scene::durationsLinkChanges() const {
+	return _durationsLinkChanges.events();
+}
+
+void Scene::checkDurationsLink() {
+	if (_durationsLinked && !canEqualizeDurations()) {
+		_durationsLinked = false;
+	} else if (_durationsLinked) {
+		equalizeDurations();
+	}
+	_durationsLinkChanges.fire({});
 }
 
 std::shared_ptr<float64> Scene::lastZ() const {
@@ -720,6 +1167,7 @@ float64 Scene::currentZoom() const {
 void Scene::updateZoom(float64 zoom) {
 	_currentZoom = zoom;
 	_canvas->updateZoom(zoom);
+	_stickyGuides->updateGeometry();
 	for (const auto &item : items()) {
 		if (item->type() >= ItemBase::Type) {
 			static_cast<ItemBase*>(item.get())->updateZoom(zoom);
@@ -744,10 +1192,13 @@ void Scene::performUndo() {
 		return item->isNormalStatus() && item->undoable();
 	});
 	if (it != filtered.end()) {
-		if (const auto action = dynamic_cast<ItemAction*>(it->get())) {
+		if (const auto action = (*it)->asAction()) {
 			action->revert();
 		}
 		(*it)->setStatus(NumberedItem::Status::Undid);
+		if ((*it)->videoClip()) {
+			checkDurationsLink();
+		}
 	}
 }
 
@@ -756,11 +1207,67 @@ void Scene::performRedo() {
 
 	const auto it = ranges::find_if(filtered, &NumberedItem::isUndidStatus);
 	if (it != filtered.end()) {
-		if (const auto action = dynamic_cast<ItemAction*>(it->get())) {
+		if (const auto action = (*it)->asAction()) {
 			action->apply();
 		}
 		(*it)->setStatus(NumberedItem::Status::Normal);
+		if ((*it)->videoClip()) {
+			checkDurationsLink();
+		}
 	}
+}
+
+void Scene::raiseItem(not_null<ItemBase*> item) {
+	changeItemZOrder(item, 1);
+}
+
+void Scene::lowerItem(not_null<ItemBase*> item) {
+	changeItemZOrder(item, -1);
+}
+
+void Scene::pinToBottom(not_null<ItemBase*> item) {
+	item->setZValue(kItemsBaseZ - 1.);
+}
+
+void Scene::changeItemZOrder(not_null<ItemBase*> item, int step) {
+	if (item->isBackground()) {
+		return;
+	}
+	const auto z = item->zValue();
+	auto best = ItemPtr();
+	for (const auto &candidate : _items) {
+		if (candidate.get() == item
+			|| candidate->asAction()
+			|| !candidate->isNormalStatus()
+			|| ((candidate->type() >= ItemBase::Type)
+				&& static_cast<const ItemBase*>(
+					candidate.get())->isBackground())) {
+			continue;
+		}
+		const auto candidateZ = candidate->zValue();
+		const auto closer = (step > 0)
+			? (candidateZ > z)
+			: (candidateZ < z);
+		if (!closer) {
+			continue;
+		} else if (!best
+			|| (step > 0
+				? (candidateZ < best->zValue())
+				: (candidateZ > best->zValue()))) {
+			best = candidate;
+		}
+	}
+	if (!best) {
+		return;
+	}
+	const auto bestZ = best->zValue();
+	best->setZValue(z);
+	item->setZValue(bestZ);
+	addItem(std::make_shared<ItemZOrder>(
+		std::vector<ItemZOrder::Target>{
+			{ .item = itemShared(item), .before = z, .after = bestZ },
+			{ .item = best, .before = bestZ, .after = z },
+		}));
 }
 
 void Scene::capturePlacements() {
@@ -805,6 +1312,11 @@ void Scene::removeIf(Fn<bool(const ItemPtr &)> proj) {
 			// Scene loses ownership of an item.
 			// It seems for some reason this line causes a crash. =(
 			// QGraphicsScene::removeItem(item.get());
+			item->setSelected(false);
+			item->setVisible(false);
+			if (const auto animated = item->asAnimated()) {
+				animated->releasePlayers();
+			}
 		} else {
 			copy.push_back(item);
 		}
@@ -842,8 +1354,16 @@ void Scene::save(SaveState state) {
 	for (const auto &item : _items) {
 		item->save(state);
 	}
+	auto &saved = (state == SaveState::Keep) ? _keptAudio : _savedAudio;
+	saved = _audio ? std::make_shared<AudioTrack>(*_audio) : nullptr;
+	auto &savedLinked = (state == SaveState::Keep)
+		? _keptDurationsLinked
+		: _savedDurationsLinked;
+	savedLinked = _durationsLinked;
+	setAudioSelected(false);
 	clearSelection();
 	cancelDrawing();
+	hideStickyGuides();
 }
 
 void Scene::restore(SaveState state) {
@@ -854,12 +1374,29 @@ void Scene::restore(SaveState state) {
 	for (const auto &item : _items) {
 		item->restore(state);
 	}
+	const auto &saved = (state == SaveState::Keep)
+		? _keptAudio
+		: _savedAudio;
+	setAudioSelected(false);
+	setAudio(saved ? std::make_shared<AudioTrack>(*saved) : nullptr);
+	_durationsLinked = (state == SaveState::Keep)
+		? _keptDurationsLinked
+		: _savedDurationsLinked;
+	checkDurationsLink();
 	clearSelection();
 	cancelDrawing();
 }
 
 void Scene::createTextAtCenter(int rotation, bool flipped) {
 	_textEdit->createAtCenter(rotation, flipped);
+}
+
+void Scene::setTextEmojiPanel(QWidget *panel) {
+	_textEdit->setEmojiPanel(panel);
+}
+
+void Scene::insertText(const QString &text) {
+	_textEdit->insertText(text);
 }
 
 void Scene::startTextEditing(ItemText *item) {
@@ -873,6 +1410,7 @@ Scene::~Scene() {
 		QGraphicsScene::removeItem(pending.get());
 	}
 	QGraphicsScene::removeItem(_canvas.get());
+	QGraphicsScene::removeItem(_stickyGuides.get());
 	for (const auto &item : items()) {
 		QGraphicsScene::removeItem(item.get());
 	}

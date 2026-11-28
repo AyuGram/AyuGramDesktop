@@ -125,7 +125,6 @@ public:
 
 	[[nodiscard]] crl::time getPositionMs() const;
 	[[nodiscard]] crl::time getDurationMs() const;
-	void pauseResumeVideo();
 
 	void stop();
 	void error();
@@ -173,7 +172,7 @@ private:
 
 	QAtomicInt _autoPausedGif = 0;
 	QAtomicInt _videoPauseRequest = 0;
-	int32 _threadIndex;
+	int32 _threadIndex = 0;
 
 	friend class Manager;
 

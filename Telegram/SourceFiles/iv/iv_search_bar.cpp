@@ -9,12 +9,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "dialogs/ui/dialogs_pill.h"
 #include "lang/lang_keys.h"
+#include "styles/palette.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/painter.h"
 
-#include "styles/palette.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_iv.h"
@@ -153,11 +153,7 @@ void SearchBar::paintPill(QPainter &p) const {
 	auto hq = PainterHighQualityEnabler(p);
 	const auto pill = pillRect();
 	const auto radius = pill.height() / 2;
-	_pillShadow->paint(p, pill, radius);
-	p.setBrush(st::dialogsBg);
-	p.setPen(Qt::NoPen);
-	p.drawRoundedRect(pill, radius, radius);
-	Dialogs::PaintPillOutline(p, pill, radius);
+	Dialogs::PaintPillBackground(p, *_pillShadow, pill, radius);
 }
 
 void SearchBar::updateControlsGeometry() {

@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/discrete_sliders.h"
 
 #include "ui/effects/ripple_animation.h"
+
 #include "styles/style_widgets.h"
 
 namespace Ui {
@@ -77,13 +78,6 @@ void DiscreteSlider::selectSection(int index) {
 		}
 	}
 	startRipple(index);
-}
-
-void DiscreteSlider::setAdditionalContentWidthToSection(int index, int w) {
-	if (index >= 0 && index < _sections.size()) {
-		auto &section = _sections[index];
-		section.contentWidth = section.label.maxWidth() + w;
-	}
 }
 
 int DiscreteSlider::sectionsCount() const {
@@ -291,14 +285,15 @@ const style::SettingsSlider &SettingsSlider::st() const {
 }
 
 int SettingsSlider::centerOfSection(int section) const {
-	const auto widths = countSectionsWidths(0);
 	auto result = 0;
-	if (section >= 0 && section < widths.size()) {
-		for (auto i = 0; i < section; i++) {
-			result += widths[i];
+	auto index = 0;
+	enumerateSections([&](const Section &data) {
+		if (index++ == section) {
+			result = data.left + (data.width / 2);
+			return false;
 		}
-		result += widths[section] / 2;
-	}
+		return true;
+	});
 	return result;
 }
 

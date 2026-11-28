@@ -7,23 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/emoji_sets_manager.h"
 
-#include "mtproto/dedicated_file_loader.h"
-#include "ui/wrap/vertical_layout.h"
-#include "ui/wrap/fade_wrap.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/effects/animations.h"
-#include "ui/effects/radial_animation.h"
-#include "ui/emoji_config.h"
-#include "ui/painter.h"
-#include "ui/ui_utility.h"
 #include "core/application.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
+#include "mtproto/dedicated_file_loader.h"
 #include "storage/storage_cloud_blob.h"
-#include "styles/style_layers.h"
+#include "ui/effects/animations.h"
+#include "ui/effects/radial_animation.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/labels.h"
+#include "ui/wrap/fade_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/emoji_config.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_layers.h"
 
 namespace Ui {
 namespace Emoji {
@@ -41,9 +42,9 @@ inline auto PreviewPath(int i) {
 
 const auto kSets = {
 	Set{ { 0,    0,         0, "Mac" },       PreviewPath(0) },
-	Set{ { 1, 2774, 8'455'034, "Android" },   PreviewPath(1) },
-	Set{ { 2, 2775, 5'713'503, "Twemoji" },   PreviewPath(2) },
-	Set{ { 3, 2776, 7'347'332, "JoyPixels" }, PreviewPath(3) },
+	Set{ { 1, 3223, 7'854'643, "Android" },   PreviewPath(1) },
+	Set{ { 2, 3224, 6'072'532, "Twemoji" },   PreviewPath(2) },
+	Set{ { 3, 3225, 7'805'861, "JoyPixels" }, PreviewPath(3) },
 };
 
 using Loading = MTP::DedicatedLoader::Progress;

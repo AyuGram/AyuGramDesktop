@@ -7,34 +7,35 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_row.h"
 
+#include "base/unixtime.h"
+#include "data/data_channel.h"
+#include "data/data_community.h"
+#include "data/data_folder.h"
+#include "data/data_forum.h"
+#include "data/data_peer_values.h"
+#include "data/data_session.h"
+#include "data/data_stories.h"
+#include "data/data_user.h"
+#include "dialogs/ui/dialogs_layout.h"
+#include "dialogs/ui/dialogs_video_userpic.h"
+#include "dialogs/dialogs_entry.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lang/lang_keys.h"
 #include "ui/chat/chat_theme.h" // CountAverageColor.
-#include "ui/color_contrast.h"
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/outline_segments.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/effects/ttl_icon.h"
 #include "ui/effects/round_checkbox.h"
+#include "ui/effects/ttl_icon.h"
 #include "ui/image/image_prepare.h"
 #include "ui/text/custom_emoji_text_badge.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
+#include "ui/color_contrast.h"
 #include "ui/painter.h"
-#include "dialogs/dialogs_entry.h"
-#include "dialogs/ui/dialogs_video_userpic.h"
-#include "dialogs/ui/dialogs_layout.h"
-#include "data/data_channel.h"
-#include "data/data_community.h"
-#include "data/data_folder.h"
-#include "data/data_forum.h"
-#include "data/data_session.h"
-#include "data/data_stories.h"
-#include "data/data_peer_values.h"
-#include "data/data_user.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "lang/lang_keys.h"
-#include "base/unixtime.h"
+
 #include "styles/style_dialogs.h"
 
 // AyuGram includes
@@ -217,7 +218,7 @@ constexpr auto kBlurRadius = 24;
 
 	const auto innerRect = QRect(QPoint(), partRect.size())
 		- st::dialogsTTLBadgeInnerMargins;
-	const auto ttlText = Ui::FormatTTLTiny(ttl);
+	const auto ttlText = Ui::FormatTTLBadge(ttl);
 
 	Ui::PaintTimerIcon(q, innerRect, ttlText, st::premiumButtonFg->c);
 
@@ -835,6 +836,7 @@ void Row::paintUserpic(
 		&& !(badgeUser && Data::IsUserOnline(badgeUser))
 		&& !subscribed
 		&& !insideCommunity;
+	_cornerBadgeUserpic->communityMember = communityMember ? 1 : 0;
 	if (keyChanged
 		|| !_cornerBadgeUserpic->layersManager.isFinished()
 		|| activeChanged
@@ -905,6 +907,26 @@ void Row::paintUserpic(
 bool Row::lookupIsInTopicJump(int x, int y) const {
 	const auto history = this->history();
 	return history && history->lastItemDialogsView().isInTopicJump(x, y);
+}
+
+bool Row::lookupIsInCommunityBadge(
+		int x,
+		int y,
+		const style::DialogRow &st) const {
+	if (!_cornerBadgeUserpic
+		|| !_cornerBadgeUserpic->communityMember
+		|| !_cornerBadgeUserpic->layersManager.isSameLayer(kTopLayer)) {
+		return false;
+	}
+	const auto size = st::dialogsCommunityBadgeSize;
+	const auto &skip = st::dialogsCommunityBadgeSkip;
+	const auto stroke = st::dialogsCommunityBadgeStroke;
+	return QRect(
+		st.padding.left() + st.photoSize - skip.x() - size,
+		st.padding.top() + st.photoSize - skip.y() - size,
+		size,
+		size
+	).marginsAdded({ stroke, stroke, stroke, stroke }).contains(x, y);
 }
 
 void Row::stopLastRipple() {

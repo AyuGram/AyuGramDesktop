@@ -49,8 +49,25 @@ settingsAttentionButtonWithIcon: SettingsButton(settingsButton) {
 	textFg: attentionButtonFg;
 	textFgOver: attentionButtonFgOver;
 }
+settingsFaqKeysLegendIcon: icon {{ "menu/keyboard", menuIconColor }};
+settingsFaqKeysLegendIconOver: icon {{ "menu/keyboard", windowBoldFgOver }};
+settingsFaqKeysLegend: IconButton {
+	width: 40px;
+	height: 40px;
+
+	icon: settingsFaqKeysLegendIcon;
+	iconOver: settingsFaqKeysLegendIconOver;
+	iconPosition: point(6px, 6px);
+
+	ripple: defaultRippleAnimation;
+	rippleAreaPosition: point(0px, 0px);
+	rippleAreaSize: 40px;
+}
 settingsExperimentalTitle: FlatLabel(defaultFlatLabel) {
 	minWidth: 100px;
+}
+settingsExperimentalTitleDisabled: FlatLabel(settingsExperimentalTitle) {
+	textFg: windowSubTextFg;
 }
 settingsExperimentalAbout: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
@@ -195,6 +212,7 @@ settingLocalPasscodeError: FlatLabel(changePhoneError) {
 settingLocalPasscodeDescriptionBottomSkip: 15px;
 settingLocalPasscodeIconPadding: margins(0px, 19px, 0px, 5px);
 settingLocalPasscodeButtonPadding: margins(0px, 19px, 0px, 35px);
+settingLocalPasscodeMeterPadding: margins(0px, 8px, 0px, 0px);
 
 settingsInfoPhotoHeight: 162px;
 settingsInfoPhotoSize: 100px;
@@ -529,6 +547,7 @@ settingsSearchResultNoIcon: SettingsButton(settingsSearchResult) {
 	padding: margins(22px, 4px, 22px, 4px);
 }
 settingsSearchResultDetails: FlatLabel(settingsNotificationTypeDetails) {
+	maxHeight: 20px;
 }
 settingsSearchNoResults: FlatLabel(defaultFlatLabel) {
 	textFg: windowSubTextFg;
@@ -753,5 +772,15 @@ detailedSettingsButtonStyle: DetailedSettingsButtonStyle {
 	descriptionBottomSkip: 8px;
 	descriptionRightSkip: 4px;
 }
+
+logoutOptionsButtonStyle: DetailedSettingsButtonStyle(detailedSettingsButtonStyle) {
+	iconPadding: 3px;
+	iconForegroundPadding: 2px;
+}
+
+logoutIconAddAccount: icon {{ "logout/add_account-24x24", menuIconColor }};
+logoutIconSetPasscode: icon {{ "logout/set_passcode-24x24", menuIconColor }};
+logoutIconClearCache: icon {{ "logout/clear_cache-24x24", menuIconColor }};
+logoutIconContactSupport: icon {{ "logout/contact_support-24x24", menuIconColor }};
 
 settingsToastStarIcon: icon {{ "toast/star", toastFg }};

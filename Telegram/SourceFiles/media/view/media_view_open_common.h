@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "data/data_cloud_themes.h"
+#include "data/data_file_origin.h"
 #include "data/data_stories.h"
 
 class DocumentData;
@@ -20,6 +21,18 @@ class SessionController;
 } // namespace Window
 
 namespace Media::View {
+
+using GalleryMedia = std::variant<
+	not_null<PhotoData*>,
+	not_null<DocumentData*>>;
+
+struct BotPreviewGallery {
+	not_null<PeerData*> bot;
+	std::vector<GalleryMedia> media;
+	Fn<void(GalleryMedia)> edit;
+	Fn<void(GalleryMedia)> remove;
+	Fn<void(not_null<DocumentData*>, crl::time)> setCover;
+};
 
 struct OpenRequest {
 public:
@@ -48,6 +61,11 @@ public:
 	, _photo(photo)
 	, _peer(peer) {
 	}
+	OpenRequest(
+		Window::SessionController *controller,
+		BotPreviewGallery gallery,
+		int index,
+		Data::FileOrigin origin);
 
 	OpenRequest(
 		Window::SessionController *controller,
@@ -155,6 +173,15 @@ public:
 	[[nodiscard]] bool showDrawButton() const {
 		return _showDrawButton;
 	}
+	[[nodiscard]] const Data::FileOrigin &fileOrigin() const {
+		return _fileOrigin;
+	}
+	[[nodiscard]] const auto &gallery() const {
+		return _gallery;
+	}
+	[[nodiscard]] int galleryIndex() const {
+		return _galleryIndex;
+	}
 
 private:
 	Window::SessionController *_controller = nullptr;
@@ -170,6 +197,9 @@ private:
 	bool _continueStreaming = false;
 	crl::time _startTime = 0;
 	bool _showDrawButton = false;
+	Data::FileOrigin _fileOrigin;
+	std::shared_ptr<const BotPreviewGallery> _gallery;
+	int _galleryIndex = 0;
 
 	std::shared_ptr<Data::GroupCall> _call;
 	QString _callLinkSlug;

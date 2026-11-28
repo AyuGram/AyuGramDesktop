@@ -7,41 +7,41 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/localimageloader.h"
 
-#include "api/api_text_entities.h"
 #include "api/api_sending.h"
-#include "data/data_document.h"
-#include "data/data_session.h"
-#include "data/data_user.h"
+#include "api/api_text_entities.h"
+#include "base/random.h"
+#include "base/unixtime.h"
+#include "boxes/abstract_box.h"
+#include "boxes/premium_limits_box.h"
+#include "boxes/send_files_box.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
-#include "base/unixtime.h"
-#include "base/random.h"
-#include "editor/scene/scene_item_sticker.h"
+#include "data/data_document.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
 #include "editor/scene/scene.h"
+#include "editor/scene/scene_item_sticker.h"
 #include "editor/video/video_editor_common.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lang/lang_keys.h"
+#include "lottie/lottie_animation.h"
+#include "main/main_session.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
 #include "media/audio/media_audio.h"
 #include "media/clip/media_clip_reader.h"
 #include "media/media_video_encode.h"
 #include "mtproto/facade.h"
-#include "lottie/lottie_animation.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "boxes/abstract_box.h"
-#include "boxes/send_files_box.h"
-#include "boxes/premium_limits_box.h"
-#include "ui/boxes/confirm_box.h"
-#include "ui/chat/attach/attach_prepare.h"
-#include "ui/image/image_prepare.h"
-#include "lang/lang_keys.h"
 #include "storage/file_download.h"
 #include "storage/storage_folder_archive.h"
 #include "storage/storage_media_prepare.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/chat/attach/attach_prepare.h"
+#include "ui/image/image_prepare.h"
 #include "window/themes/window_theme_preview.h"
-#include "mainwidget.h"
-#include "mainwindow.h"
-#include "main/main_session.h"
 
 #include <QtCore/QBuffer>
 #include <QtGui/QImageWriter>
@@ -529,7 +529,8 @@ FileLoadTask::FileLoadTask(Args &&args)
 , _sendLargePhotos(args.sendLargePhotos)
 , _animationJob(std::move(args.animationJob))
 , _animationAsGif(args.animationAsGif)
-, _archive(std::move(args.archive)) {
+, _archive(std::move(args.archive))
+, _temporaryPath(std::move(args.temporaryPath)) {
 	Expects(_to.options.scheduled
 		|| _to.options.shortcutId
 		|| !_to.replaceMediaOf
@@ -545,6 +546,7 @@ FileLoadTask::FileLoadTask(VoiceArgs &&args)
 , _duration(args.duration)
 , _waveform(std::move(args.waveform))
 , _type(args.video ? SendMediaType::Round : SendMediaType::Audio)
+, _videoSource(std::move(args.videoSource))
 , _caption(std::move(args.caption)) {
 }
 
@@ -730,6 +732,7 @@ void FileLoadTask::process(ProcessArgs &&args) {
 		.spoiler = _spoiler,
 		.album = _album,
 	});
+	_result->temporaryPath = _temporaryPath;
 	if (const auto cover = _videoCover.get()) {
 		cover->process();
 		if (const auto &result = cover->peekResult()) {
@@ -762,15 +765,17 @@ void FileLoadTask::process(ProcessArgs &&args) {
 					Qt::IgnoreAspectRatio,
 					Qt::SmoothTransformation);
 			}
+			const auto gif = _animationAsGif && still->music.empty();
 			auto information = std::make_unique<
 				Ui::PreparedFileInformation>();
 			information->filemime = "video/mp4";
 			information->media = Ui::PreparedFileInformation::Video{
-				.isGifv = _animationAsGif,
+				.isGifv = gif,
 				.supportsStreaming = true,
+				.hasAudio = !still->music.empty(),
 				.duration = still->duration,
 				.thumbnail = std::move(preview),
-				.modifications = { .gif = _animationAsGif },
+				.modifications = { .gif = gif },
 			};
 			_information = std::move(information);
 			_content = QByteArray();
@@ -958,6 +963,27 @@ void FileLoadTask::process(ProcessArgs &&args) {
 			if (video->supportsStreaming) {
 				flags |= MTPDdocumentAttributeVideo::Flag::f_supports_streaming;
 			}
+			if (_videoSource) {
+				_result->videoSource = _videoSource;
+				const auto duration = Media::Encode::TranscodedDuration(
+					*_videoSource,
+					video->duration);
+				video->duration = duration;
+				const auto target = Media::Encode::TranscodedSize(
+					*_videoSource,
+					video->thumbnail.size());
+				if (!target.isEmpty()) {
+					coverWidth = target.width();
+					coverHeight = target.height();
+					if (!video->thumbnail.isNull()) {
+						video->thumbnail = base::take(video->thumbnail)
+							.scaled(
+								target,
+								Qt::IgnoreAspectRatio,
+								Qt::SmoothTransformation);
+					}
+				}
+			}
 			const auto realSeconds = video->duration / 1000.;
 			attributes.push_back(MTP_documentAttributeVideo(
 				MTP_flags(flags),
@@ -996,14 +1022,18 @@ void FileLoadTask::process(ProcessArgs &&args) {
 			auto coverHeight = video->thumbnail.height();
 			auto realSeconds = video->duration / 1000.;
 			const auto gif = video->modifications.gif && !_forceFile;
+			// WHY: a soundless source sent as a video gets a silent track
+			// added, so the server still has to be told it has no sound.
+			const auto silent = gif || !video->hasAudio;
+			// A GIF is sent as an animated mp4, so re-encode anything else.
 			const auto convertForGif = gif
-				&& video->isGifv
 				&& (filemime != u"video/mp4"_q);
 			const auto convert = (!Core::IsMimeSentAsVideo(filemime)
 					|| convertForGif)
 				&& !video->isWebmSticker
 				&& (filesize < Media::Encode::MaxTranscodeSourceSize());
-			if (!_forceFile
+			if (args.allowVideoTranscode
+				&& !_forceFile
 				&& !video->thumbnail.isNull()
 				&& (convert
 					|| Editor::VideoEdited(
@@ -1068,7 +1098,7 @@ void FileLoadTask::process(ProcessArgs &&args) {
 				if (video->supportsStreaming) {
 					flags |= MTPDdocumentAttributeVideo::Flag::f_supports_streaming;
 				}
-				if (gif) {
+				if (silent) {
 					flags |= MTPDdocumentAttributeVideo::Flag::f_nosound;
 				}
 				const auto startTs = _result->videoCoverOffset;

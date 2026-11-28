@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -237,13 +238,12 @@ void Location::chooseOnMap() {
 		strong->activate();
 		return;
 	}
-	const auto callback = [=](Data::InputVenue venue) {
+	const auto callback = [=](
+			Data::LocationPoint point,
+			Core::GeoAddress address) {
 		auto copy = _data.current();
-		copy.point = Data::LocationPoint(
-			venue.lat,
-			venue.lon,
-			Data::LocationPoint::NoAccessHash);
-		copy.address = venue.address;
+		copy.point = point;
+		copy.address = std::move(address.name);
 		_data = std::move(copy);
 	};
 	const auto session = &controller()->session();
@@ -258,7 +258,6 @@ void Location::chooseOnMap() {
 		.parent = controller()->widget(),
 		.config = _config,
 		.chooseLabel = tr::lng_maps_point_set(),
-		.session = session,
 		.initial = initial,
 		.callback = crl::guard(this, callback),
 		.quit = [] { Shortcuts::Launch(Shortcuts::Command::Quit); },

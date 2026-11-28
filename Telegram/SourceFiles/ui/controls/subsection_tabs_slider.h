@@ -8,9 +8,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "dialogs/dialogs_common.h"
+#include "ui/widgets/buttons.h"
 #include "ui/round_rect.h"
 #include "ui/rp_widget.h"
-#include "ui/widgets/buttons.h"
 
 namespace style {
 struct ChatTabsVertical;
@@ -59,29 +59,28 @@ public:
 	void setData(SubsectionTab &&data);
 	[[nodiscard]] DynamicImage *userpic() const;
 
-	void setActiveShown(float64 activeShown);
 	void setIsPinned(bool pinned);
 	[[nodiscard]] bool isPinned() const;
 	void setPinnedPosition(bool isFirst, bool isLast);
 	[[nodiscard]] bool isFirstPinned() const;
 	[[nodiscard]] bool isLastPinned() const;
+	void setPinnedIconSpace(bool reserve);
 	virtual void setBackgroundMargin(int margin);
-	void setShift(int shift);
 
 protected:
 	virtual void dataUpdatedHook() = 0;
+	virtual void updateSize() = 0;
 	virtual void invalidateCache() = 0;
 
 	void contextMenuEvent(QContextMenuEvent *e) override;
 
 	const not_null<SubsectionButtonDelegate*> _delegate;
 	SubsectionTab _data;
-	float64 _activeShown = 0.;
 	bool _isPinned = false;
 	bool _isFirstPinned = false;
 	bool _isLastPinned = false;
+	bool _reservePinnedIcon = false;
 	int _backgroundMargin = 0;
-	int _shift = 0;
 
 };
 
@@ -132,7 +131,6 @@ protected:
 
 	void paintEvent(QPaintEvent *e) override;
 
-	[[nodiscard]] int lookupSectionIndex(QPoint position) const;
 	[[nodiscard]] Range getFinalActiveRange() const;
 	[[nodiscard]] Range getCurrentActiveRange() const;
 	void activate(int index);

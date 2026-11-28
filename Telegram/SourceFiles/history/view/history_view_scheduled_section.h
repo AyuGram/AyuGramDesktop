@@ -7,13 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "window/section_widget.h"
-#include "window/section_memento.h"
-#include "history/view/history_view_list_widget.h"
-#include "history/view/history_view_corner_buttons.h"
 #include "data/data_messages.h"
+#include "history/view/history_view_corner_buttons.h"
+#include "history/view/history_view_list_widget.h"
+#include "window/section_memento.h"
+#include "window/section_widget.h"
 
 class History;
+class SendFilesBox;
 enum class SendMediaType;
 struct SendingAlbum;
 
@@ -224,6 +225,7 @@ private:
 	void clearProcessingVideoTracking(bool fast);
 
 	void setupComposeControls();
+	void topicDestroyed();
 
 	void setupDragArea();
 
@@ -297,6 +299,7 @@ private:
 	object_ptr<TopBarWidget> _topBar;
 	object_ptr<Ui::PlainShadow> _topBarShadow;
 	std::unique_ptr<ComposeControls> _composeControls;
+	QPointer<SendFilesBox> _sendFilesBox;
 	bool _skipScrollEvent = false;
 
 	Data::MessagePosition _processingVideoPosition;
@@ -346,9 +349,11 @@ public:
 		return _sentToScheduledId;
 	}
 
+	Data::ForumTopic *topicForRemoveRequests() const override;
+
 private:
 	const not_null<History*> _history;
-	const Data::ForumTopic *_forumTopic;
+	Data::ForumTopic *_forumTopic;
 	ListMemento _list;
 	MsgId _sentToScheduledId = 0;
 

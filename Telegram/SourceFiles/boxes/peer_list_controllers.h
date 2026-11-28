@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "boxes/peer_list_box.h"
 #include "base/flat_set.h"
-#include "base/weak_ptr.h"
 #include "base/timer.h"
+#include "base/weak_ptr.h"
+#include "boxes/peer_list_box.h"
 #include "mtproto/sender.h"
 
 class History;
@@ -40,8 +40,6 @@ namespace Window {
 class SessionController;
 } // namespace Window
 
-[[nodiscard]] object_ptr<Ui::BoxContent> PrepareContactsBox(
-	not_null<Window::SessionController*> sessionController);
 [[nodiscard]] QBrush PeerListStoriesGradient(const style::PeerList &st);
 
 struct PeerListStoriesCounts {
@@ -328,7 +326,9 @@ private:
 
 };
 
-class ChooseTopicSearchController : public PeerListSearchController {
+class ChooseTopicSearchController
+	: public PeerListSearchController
+	, public base::has_weak_ptr {
 public:
 	explicit ChooseTopicSearchController(not_null<Data::Forum*> forum);
 

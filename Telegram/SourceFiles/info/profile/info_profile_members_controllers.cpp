@@ -8,15 +8,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_members_controllers.h"
 
 #include "boxes/peers/edit_participants_box.h"
-#include "info/profile/info_profile_values.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
-#include "ui/unread_badge.h"
+#include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/painter.h"
-#include "styles/style_info.h"
+#include "ui/unread_badge.h"
+
 #include "styles/style_boxes.h"
+#include "styles/style_info.h"
 #include "styles/style_widgets.h"
 
 namespace Info {
@@ -104,6 +105,13 @@ QSize MemberListRow::tagSize() const {
 QSize MemberListRow::rightActionSize() const {
 	const auto tag = tagSize();
 	const auto remove = removeSize();
+	if (tag.isEmpty() && !remove.isEmpty()) {
+		// Without a tag the remove pill keeps to the name line.
+		const auto &st = st::defaultPeerListItem;
+		const auto top = st.namePosition.y()
+			+ (st.nameStyle.font->height - remove.height()) / 2;
+		return QSize(remove.width(), top + remove.height());
+	}
 	const auto w = std::max(tag.width(), remove.width());
 	return (w > 0)
 		? QSize(w, st::defaultPeerListItem.height)
@@ -485,6 +493,27 @@ void MemberListRow::paintRemove(
 		_removeTextWidth);
 
 	p.setOpacity(o);
+}
+
+int MemberListRow::paintNameIconGetLeadingWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int outerWidth,
+		bool selected) {
+	if (!_refreshCallback) {
+		_refreshCallback = repaint;
+	}
+	return PeerListRow::paintNameIconGetLeadingWidth(
+		p,
+		std::move(repaint),
+		now,
+		nameLeft,
+		nameTop,
+		outerWidth,
+		selected);
 }
 
 void MemberListRow::elementsPaint(

@@ -129,6 +129,7 @@ struct InlineBotQuery {
 InlineBotQuery ParseInlineBotQuery(
 	not_null<Main::Session*> session,
 	not_null<const Ui::InputField*> field);
+[[nodiscard]] TextWithEntities PreventInlineBotQuery(TextWithEntities text);
 
 struct AutocompleteQuery {
 	QString query;
@@ -157,6 +158,7 @@ public:
 
 	void parseNow();
 	void setDisabled(bool disabled);
+	[[nodiscard]] bool disabled() const;
 
 	[[nodiscard]] const rpl::variable<QStringList> &list() const {
 		return _list;
@@ -209,7 +211,6 @@ struct FreezeInfoStyleOverride {
 	const style::FlatLabel *infoTitle = nullptr;
 	const style::FlatLabel *infoAbout = nullptr;
 };
-[[nodiscard]] FreezeInfoStyleOverride DarkFreezeInfoStyle();
 
 enum class FrozenWriteRestrictionType {
 	MessageField,
@@ -227,6 +228,10 @@ std::unique_ptr<Ui::AbstractButton> AyuForwardWriteRestriction(
 void SelectTextInFieldWithMargins(
 	not_null<Ui::InputField*> field,
 	const TextSelection &selection);
+
+[[nodiscard]] TextSelection EditFieldSelection(
+	const TextWithTags &text,
+	TextSelection selection);
 
 [[nodiscard]] TextWithEntities PaidSendButtonText(tr::now_t, int stars);
 [[nodiscard]] rpl::producer<TextWithEntities> PaidSendButtonText(

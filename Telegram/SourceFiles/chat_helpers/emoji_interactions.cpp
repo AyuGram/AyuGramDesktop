@@ -7,20 +7,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/emoji_interactions.h"
 
+#include "apiwrap.h"
+#include "base/random.h"
 #include "chat_helpers/stickers_emoji_pack.h"
-#include "history/history_item.h"
-#include "history/history.h"
-#include "history/view/history_view_element.h"
-#include "history/view/media/history_view_sticker.h"
-#include "main/main_session.h"
-#include "data/data_session.h"
 #include "data/data_changes.h"
-#include "data/data_peer.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "history/view/media/history_view_sticker.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "main/main_session.h"
 #include "ui/emoji_config.h"
-#include "base/random.h"
-#include "apiwrap.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonArray>
@@ -137,7 +137,7 @@ void EmojiInteractions::startAutoplay(
 		return;
 	}
 	const auto &list = pack.animationsForEmoji(emoji);
-	if (list.empty()) {
+	if (list.empty() || !item->markEmojiInteractionWatched()) {
 		return;
 	}
 	auto &animations = _autoplay[item];
@@ -195,7 +195,7 @@ void EmojiInteractions::startIncoming(
 		}
 		const auto listSize = int(list.size());
 		const auto index = (single.index - 1);
-		if (index < listSize) {
+		if (index >= 0 && index < listSize) {
 			const auto document = (begin(list) + index)->second;
 			const auto media = document->createMediaView();
 			media->checkStickerLarge();
@@ -511,7 +511,7 @@ EmojiInteractionsBunch EmojiInteractions::Parse(const QByteArray &json) {
 	for (const auto interaction : actions) {
 		const auto object = interaction.toObject();
 		const auto index = object.value("i").toInt();
-		if (index < 0 || index > 10) {
+		if (index < 1 || index > 10) {
 			LOG(("API Error: Bad interaction index: %1").arg(index));
 			return {};
 		}

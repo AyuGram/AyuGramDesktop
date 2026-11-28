@@ -7,38 +7,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "overview/overview_layout.h"
 
-#include "overview/overview_checkbox.h"
-#include "overview/overview_layout_delegate.h"
+#include "apiwrap.h"
+#include "base/unixtime.h"
+#include "boxes/sticker_set_box.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h" // TextContext
 #include "data/data_document.h"
+#include "data/data_document_media.h"
 #include "data/data_document_resolver.h"
-#include "data/data_session.h"
-#include "data/data_web_page.h"
+#include "data/data_file_click_handler.h"
 #include "data/data_peer.h"
 #include "data/data_photo_media.h"
-#include "data/data_document_media.h"
-#include "data/data_file_click_handler.h"
-#include "ui/boxes/confirm_box.h"
-#include "lang/lang_keys.h"
-#include "layout/layout_selection.h"
-#include "storage/file_upload.h"
-#include "main/main_session.h"
-#include "media/audio/media_audio.h"
-#include "media/media_common.h"
-#include "media/player/media_player_instance.h"
-#include "storage/localstorage.h"
+#include "data/data_session.h"
+#include "data/data_web_page.h"
+// DrawThumbnailAsSongCover
+#include "history/view/media/history_view_document.h"
+#include "history/view/media/history_view_media_common.h"
+#include "history/view/history_view_cursor_state.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/media/history_view_media_common.h"
-#include "history/view/media/history_view_document.h" // DrawThumbnailAsSongCover
 #include "iv/iv_instance.h"
-#include "base/unixtime.h"
-#include "boxes/sticker_set_box.h"
+#include "lang/lang_keys.h"
+#include "layout/layout_selection.h"
+#include "main/main_session.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_instance.h"
+#include "media/media_common.h"
+#include "overview/overview_checkbox.h"
+#include "overview/overview_layout_delegate.h"
+#include "storage/file_upload.h"
+#include "storage/localstorage.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/effects/round_checkbox.h"
 #include "ui/effects/spoiler_mess.h"
 #include "ui/image/image.h"
@@ -51,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_chat_style.h"
@@ -87,10 +90,17 @@ using ::Media::ValidFrameSize;
 	return ValidFrameSize(document->dimensions, kMaxInlineArea);
 }
 
-[[nodiscard]] ClickHandlerPtr MakeUrlHandler(const QString &url) {
-	return UrlClickHandler::IsSuspicious(url)
-		? std::make_shared<HiddenUrlClickHandler>(url)
-		: std::make_shared<UrlClickHandler>(url, false);
+[[nodiscard]] ClickHandlerPtr MakeUrlHandler(
+		const QString &url,
+		EntityType type) {
+	return Ui::Integration::Instance().createLinkHandler(
+		EntityLinkData{
+			.text = url,
+			.data = url,
+			.type = type,
+			.shown = EntityLinkShown::Partial,
+		},
+		Ui::Text::MarkedContext());
 }
 
 void OpenPreferringIv(
@@ -389,6 +399,8 @@ Photo::Photo(
 	MediaOptions options)
 : ItemBase(delegate, parent)
 , _data(photo)
+, _aspectRatio(options.aspectRatio)
+, _origin(std::move(options.origin))
 , _spoiler((options.spoiler || parent->isMediaSensitive())
 	? std::make_unique<Ui::SpoilerAnimation>([=] {
 		delegate->repaintItem(this);
@@ -415,7 +427,8 @@ Photo::Photo(
 	if (_data->inlineThumbnailBytes().isEmpty()
 		&& (_data->hasExact(Data::PhotoSize::Small)
 			|| _data->hasExact(Data::PhotoSize::Thumbnail))) {
-		_data->load(Data::PhotoSize::Small, parent->fullId());
+		const auto origin = _origin ? *_origin : parent->fullId();
+		_data->load(Data::PhotoSize::Small, origin);
 	}
 }
 
@@ -433,16 +446,20 @@ ClickHandlerPtr Photo::makeOpenPhotoHandler() {
 
 void Photo::initDimensions() {
 	_maxw = 2 * st::overviewPhotoMinSize;
-	_minh = _story ? int(base::SafeRound(_maxw * kStoryRatio)) : _maxw;
+	const auto ratio = _aspectRatio
+		? _aspectRatio
+		: (_story ? kStoryRatio : 1.);
+	_minh = int(base::SafeRound(_maxw * ratio));
 }
 
 int32 Photo::resizeGetHeight(int32 width) {
-	width = std::min(width, _maxw);
+	width = _aspectRatio ? width : std::min(width, _maxw);
 	if (_width != width) {
 		_width = width;
-		_height = _story
-			? int(base::SafeRound(_width * kStoryRatio))
-			: _width;
+		const auto ratio = _aspectRatio
+			? _aspectRatio
+			: (_story ? kStoryRatio : 1.);
+		_height = int(base::SafeRound(_width * ratio));
 	}
 	return _height;
 }
@@ -601,10 +618,11 @@ void Photo::ensureDataMediaCreated() const {
 		return;
 	}
 	_dataMedia = _data->createMediaView();
+	const auto origin = _origin ? *_origin : parent()->fullId();
 	if (_data->inlineThumbnailBytes().isEmpty()) {
-		_dataMedia->wanted(Data::PhotoSize::Small, parent()->fullId());
+		_dataMedia->wanted(Data::PhotoSize::Small, origin);
 	}
-	_dataMedia->wanted(Data::PhotoSize::Thumbnail, parent()->fullId());
+	_dataMedia->wanted(Data::PhotoSize::Thumbnail, origin);
 	delegate()->registerHeavyItem(this);
 }
 
@@ -655,6 +673,8 @@ Video::Video(
 : RadialProgressItem(delegate, parent)
 , _data(video)
 , _videoCover(LookupVideoCover(video, parent))
+, _aspectRatio(options.aspectRatio)
+, _origin(std::move(options.origin))
 , _duration(Ui::FormatDurationText(_data->duration() / 1000))
 , _durationw(st::normalFont->width(_duration))
 , _spoiler((options.spoiler || parent->isMediaSensitive())
@@ -682,12 +702,13 @@ Video::Video(
 			setDocumentLinks(_data);
 		}));
 	}
+	const auto origin = _origin ? *_origin : parent->fullId();
 	if (!_videoCover) {
-		_data->loadThumbnail(parent->fullId());
+		_data->loadThumbnail(origin);
 	} else if (_videoCover->inlineThumbnailBytes().isEmpty()
 		&& (_videoCover->hasExact(Data::PhotoSize::Small)
 			|| _videoCover->hasExact(Data::PhotoSize::Thumbnail))) {
-		_videoCover->load(Data::PhotoSize::Small, parent->fullId());
+		_videoCover->load(Data::PhotoSize::Small, origin);
 	}
 }
 
@@ -695,16 +716,20 @@ Video::~Video() = default;
 
 void Video::initDimensions() {
 	_maxw = 2 * st::overviewPhotoMinSize;
-	_minh = _story ? int(base::SafeRound(_maxw * kStoryRatio)) : _maxw;
+	const auto ratio = _aspectRatio
+		? _aspectRatio
+		: (_story ? kStoryRatio : 1.);
+	_minh = int(base::SafeRound(_maxw * ratio));
 }
 
 int32 Video::resizeGetHeight(int32 width) {
-	width = std::min(width, _maxw);
+	width = _aspectRatio ? width : std::min(width, _maxw);
 	if (_width != width) {
 		_width = width;
-		_height = _story
-			? int(base::SafeRound(_width * kStoryRatio))
-			: _width;
+		const auto ratio = _aspectRatio
+			? _aspectRatio
+			: (_story ? kStoryRatio : 1.);
+		_height = int(base::SafeRound(_width * ratio));
 	}
 	return _height;
 }
@@ -906,12 +931,13 @@ void Video::ensureDataMediaCreated() const {
 		return;
 	}
 	_dataMedia = _data->createMediaView();
+	const auto origin = _origin ? *_origin : parent()->fullId();
 	if (_videoCover) {
 		_videoCoverMedia = _videoCover->createMediaView();
-		_videoCover->load(Data::PhotoSize::Large, parent()->fullId());
+		_videoCover->load(Data::PhotoSize::Large, origin);
 	} else {
 		_dataMedia->goodThumbnailWanted();
-		_dataMedia->thumbnailWanted(parent()->fullId());
+		_dataMedia->thumbnailWanted(origin);
 	}
 	delegate()->registerHeavyItem(this);
 }
@@ -970,7 +996,7 @@ TextState Video::getState(
 		StateRequest request) const {
 	if (hasPoint(point)) {
 		ensureDataMediaCreated();
-		const auto link = _sensitiveSpoiler
+		const auto link = (_sensitiveSpoiler || _origin)
 			? _openl
 			: (_data->loading() || _data->uploading())
 			? _cancell
@@ -1009,7 +1035,8 @@ Voice::Voice(
 	not_null<Delegate*> delegate,
 	not_null<HistoryItem*> parent,
 	not_null<DocumentData*> voice,
-	const style::OverviewFileLayout &st)
+	const style::OverviewFileLayout &st,
+	bool globalSearch)
 : RadialProgressItem(delegate, parent)
 , _data(voice)
 , _namel(std::make_shared<DocumentOpenClickHandler>(
@@ -1018,13 +1045,17 @@ Voice::Voice(
 		delegate->openDocument(_data, id);
 	}),
 	parent->fullId()))
-, _st(st) {
+, _st(st)
+, _globalSearch(globalSearch) {
 	AddComponents(Info::Bit());
 
 	setDocumentLinks(_data);
 	_data->loadThumbnail(parent->fullId());
 
 	updateName();
+	if (_globalSearch) {
+		watchSearchName();
+	}
 	const auto dateText = tr::link(
 		langDateTime(base::unixtime::parse(parent->date()))); // Link 1.
 	_details.setMarkedText(
@@ -1056,8 +1087,8 @@ void Voice::paint(Painter &p, const QRect &clip, TextSelection selection, const 
 		}
 	}
 	const auto showPause = updateStatusText();
-	const auto nameVersion = parent()->fromOriginal()->nameVersion();
-	if (_nameVersion < nameVersion) {
+	if (!_globalSearch
+		&& _nameVersion < parent()->fromOriginal()->nameVersion()) {
 		updateName();
 	}
 	const auto radial = isRadialAnimation();
@@ -1140,9 +1171,25 @@ void Voice::paint(Painter &p, const QRect &clip, TextSelection selection, const 
 		icon->paintInCenter(p, inner);
 	}
 
-	if (clip.intersects(style::rtlrect(nameleft, nametop, namewidth, st::semiboldFont->height, _width))) {
+	const auto nameRect = style::rtlrect(
+		nameleft,
+		nametop,
+		namewidth,
+		st::semiboldFont->height,
+		_width);
+	if (clip.intersects(nameRect)) {
 		p.setPen(st::historyFileNameInFg);
-		_name.drawLeftElided(p, nameleft, nametop, namewidth, _width);
+		_name.draw(
+			p,
+			Ui::Text::PaintContext{
+				.position = nameRect.topLeft(),
+				.availableWidth = namewidth,
+				.palette = &p.textPalette(),
+				.paused = p.inactive()
+					|| (context && context->paused),
+				.pausedEmoji = On(PowerSaving::kEmojiChat),
+				.elisionLines = 1,
+			});
 	}
 
 	if (clip.intersects(style::rtlrect(nameleft, statustop, namewidth, st::normalFont->height, _width))) {
@@ -1296,7 +1343,9 @@ const style::RoundCheckbox &Voice::checkboxStyle() const {
 }
 
 void Voice::updateName() {
-	if (parent()->Has<HistoryMessageForwarded>()) {
+	if (_globalSearch) {
+		updateSearchName();
+	} else if (parent()->Has<HistoryMessageForwarded>()) {
 		const auto info = parent()->originalHiddenSenderInfo();
 		const auto name = info
 			? tr::lng_forwarded(tr::now, lt_user, info->nameText().toString())
@@ -2030,6 +2079,8 @@ Link::Link(
 
 	auto textWithEntities = parent->originalText();
 	QString mainUrl;
+	_page = media ? media->webpage() : nullptr;
+	auto pageShown = false;
 
 	auto text = textWithEntities.text;
 	const auto &entities = textWithEntities.entities;
@@ -2042,18 +2093,29 @@ Link::Link(
 		const auto customUrl = entity.data();
 		const auto entityText = text.mid(entity.offset(), entity.length());
 		const auto url = customUrl.isEmpty() ? entityText : customUrl;
+		const auto linkType = (type != EntityType::CustomUrl)
+			? type
+			: customUrl.isEmpty()
+			? EntityType::Url
+			: EntityType::CustomUrl;
 		if (_links.empty()) {
 			mainUrl = url;
 		}
-		_links.push_back(LinkEntry(url, entityText));
+		if (_page && !pageShown && type == EntityType::Url) {
+			pageShown = UrlMatchesWebPage(_page, url);
+		}
+		_links.push_back(LinkEntry(url, entityText, linkType));
 	}
 	if (_links.empty()) {
 		if (const auto media = parent->media()) {
 			if (const auto webpage = media->webpage()) {
 				if (!webpage->displayUrl.isEmpty()
 					&& !webpage->url.isEmpty()) {
-					_links.push_back(
-						LinkEntry(webpage->displayUrl, webpage->url));
+					_links.push_back(LinkEntry(
+						webpage->displayUrl,
+						webpage->url,
+						EntityType::Url));
+					pageShown = true;
 				}
 			}
 		}
@@ -2081,8 +2143,14 @@ Link::Link(
 		}
 	}
 
-	const auto createHandler = MakeUrlHandler;
-	_page = media ? media->webpage() : nullptr;
+	const auto mainType = _page
+		? (pageShown ? EntityType::Url : EntityType::CustomUrl)
+		: _links.empty()
+		? EntityType::Url
+		: _links.front().type;
+	const auto createHandler = [=](const QString &url) {
+		return MakeUrlHandler(url, mainType);
+	};
 	if (_page) {
 		mainUrl = _page->url;
 		if (_page->document) {
@@ -2174,21 +2242,32 @@ Link::Link(
 	}
 	_titlew = st::semiboldFont->width(_title);
 
-	setupLinks(textWithEntities, mainUrl);
+	setupLinks(textWithEntities, mainUrl, mainType);
+
+	if (parent->hideLinks()) {
+		const auto peer = parent->history()->peer->migrateToOrMe();
+		if (!peer->barSettings()) {
+			peer->session().api().requestPeerSettings(peer);
+		}
+	}
 }
 
 void Link::setupLinks(
 		const TextWithEntities &text,
-		const QString &mainUrl) {
+		const QString &mainUrl,
+		EntityType mainType) {
 	const auto page = _page;
 	const auto ivCapable = [=](const QString &url) {
 		return Iv::PreferForUri(url)
 			|| (page && page->iv && UrlMatchesWebPage(page, url));
 	};
-	const auto makeHandler = [&](const QString &url, bool iv) {
-		return iv
+	const auto makeHandler = [&](
+			const QString &url,
+			bool iv,
+			EntityType type) {
+		return (iv && type == EntityType::Url)
 			? ClickHandlerPtr(std::make_shared<IvLink>(page, text, url))
-			: MakeUrlHandler(url);
+			: MakeUrlHandler(url, type);
 	};
 	static const auto kLinkOptions = TextParseOptions{
 		0,
@@ -2197,8 +2276,10 @@ void Link::setupLinks(
 		Qt::LayoutDirectionAuto,
 	};
 	for (auto &link : _links) {
-		const auto iv = ivCapable(link.url);
-		link.handler = makeHandler(link.url, iv);
+		const auto iv = (link.type == EntityType::CustomUrl)
+			? Iv::PreferForUri(link.url)
+			: (link.type == EntityType::Url) && ivCapable(link.url);
+		link.handler = makeHandler(link.url, iv, link.type);
 		auto markup = iv
 			? Ui::Text::IconEmoji(&st::overviewLinkIvIcon)
 			: TextWithEntities();
@@ -2218,10 +2299,13 @@ void Link::setupLinks(
 		? mainUrl
 		: (page ? page->url : QString());
 	if (!titleUrl.isEmpty()) {
-		_titlel = makeHandler(titleUrl, ivCapable(titleUrl));
+		_titlel = makeHandler(titleUrl, ivCapable(titleUrl), mainType);
 	}
 
-	if (!mainUrl.isEmpty() && ivCapable(mainUrl)) {
+	const auto mainIv = !mainUrl.isEmpty() && ivCapable(mainUrl);
+	if (mainIv && mainType != EntityType::Url) {
+		_photol = MakeUrlHandler(mainUrl, mainType);
+	} else if (mainIv) {
 		const auto previous = _photol;
 		_photol = std::make_shared<LambdaClickHandler>([=](
 				ClickContext context) {
@@ -2264,6 +2348,9 @@ int32 Link::resizeGetHeight(int32 width) {
 	_width = std::min(width, _maxw);
 	int32 w = _width - st::linksPhotoSize - st::linksPhotoPadding;
 	for (const auto &link : _links) {
+		if (link.type == EntityType::CustomUrl) {
+			continue;
+		}
 		if (const auto handler = std::dynamic_pointer_cast<TextClickHandler>(
 				link.handler)) {
 			handler->setFullDisplayed(w >= link.text.maxWidth());
@@ -2481,8 +2568,9 @@ TextState Link::getState(
 		QPoint point,
 		StateRequest request) const {
 	int32 left = st::linksPhotoSize + st::linksPhotoPadding, top = st::linksMargin.top() + st::linksBorder, w = _width - left;
+	const auto linksHidden = parent()->hideLinks();
 	if (style::rtlrect(0, top, st::linksPhotoSize, st::linksPhotoSize, _width).contains(point)) {
-		return { parent(), _photol };
+		return { parent(), linksHidden ? nullptr : _photol };
 	}
 
 	if (!_title.isEmpty() && _text.isEmpty() && _links.size() == 1) {
@@ -2495,7 +2583,7 @@ TextState Link::getState(
 				std::min(w, _titlew),
 				st::semiboldFont->height,
 				_width).contains(point)) {
-			return { parent(), _titlel };
+			return { parent(), linksHidden ? nullptr : _titlel };
 		}
 		top += st::webPageTitleFont->height;
 	}
@@ -2510,7 +2598,10 @@ TextState Link::getState(
 				std::min(w, width),
 				st::normalFont->height,
 				_width).contains(point)) {
-			return { parent(), link.handler };
+			// The chat keeps e-mails of such messages clickable.
+			const auto hidden = linksHidden
+				&& (link.type != EntityType::Email);
+			return { parent(), hidden ? nullptr : link.handler };
 		}
 		top += st::normalFont->height;
 	}
@@ -2521,9 +2612,13 @@ const style::RoundCheckbox &Link::checkboxStyle() const {
 	return st::overviewSmallCheck;
 }
 
-Link::LinkEntry::LinkEntry(const QString &url, const QString &display)
+Link::LinkEntry::LinkEntry(
+	const QString &url,
+	const QString &display,
+	EntityType type)
 : url(url)
-, display(display) {
+, display(display)
+, type(type) {
 }
 
 // Copied from inline_bot_layout_internal.

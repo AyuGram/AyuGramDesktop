@@ -60,6 +60,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_thumbnails.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -1119,7 +1120,6 @@ void AuctionBidBox(not_null<GenericBox*> box, AuctionBidBoxArgs &&args) {
 				MakeAveragePriceValue(raw, tooltip, name, price),
 				st::giveawayGiftCodeLabelMargin,
 				st::giveawayGiftCodeValueMargin);
-			raw->resizeToWidth(raw->widthNoMargins());
 		}, raw->lifetime());
 	}
 	return result;
@@ -1265,7 +1265,8 @@ void AuctionGotGiftsBox(
 							return;
 						}
 						indices = ranges::views::ints(
-							0
+							0,
+							ranges::unreachable
 						) | ranges::views::take(
 							v.size()
 						) | ranges::to_vector;

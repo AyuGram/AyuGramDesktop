@@ -29,6 +29,10 @@ public:
 	int type() const override;
 
 	[[nodiscard]] QColor color() const;
+	[[nodiscard]] ShapeType shapeType() const;
+	[[nodiscard]] float64 strokeWidth() const;
+	[[nodiscard]] bool fill() const;
+	[[nodiscard]] float64 bend() const;
 	void setColor(const QColor &color);
 	void setStrokeWidth(float64 width);
 	void setBend(float64 bend);
@@ -49,6 +53,7 @@ protected:
 	void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 	void hoverMoveEvent(QGraphicsSceneHoverEvent *event) override;
+	[[nodiscard]] QRectF visibleRect() const override;
 private:
 	struct ArrowPoints {
 		QPointF start;

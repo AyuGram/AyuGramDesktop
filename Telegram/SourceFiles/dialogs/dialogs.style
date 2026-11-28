@@ -201,10 +201,14 @@ dialogsCommunityBadgeLine: 1px;
 
 dialogsTTLBadgeSize: 20px;
 dialogsTTLBadgeInnerMargins: margins(2px, 2px, 2px, 2px);
+dialogsTTLBadgeMinFont: font(7px semibold);
 // Relative to a photo place, not a whole userpic place.
 dialogsTTLBadgeSkip: point(1px, 1px);
 dialogsCommunityHiddenBadgeIcon: icon{{ "community/requests_hidden", premiumButtonFg }};
 dialogsCommunityHiddenBadgePadding: 4px;
+dialogsCommunityJoinedIcon: icon{{ "folders/folder_existing_chats", windowActiveTextFg }};
+dialogsCommunityViewableIcon: icon{{ "poll/filled/filled_poll_view-22x22", windowActiveTextFg }};
+dialogsCommunityRequestableIcon: icon{{ "community/requests_hidden-22x22", windowActiveTextFg }};
 
 dialogsSpeakingStrokeNumerator: 16px;
 dialogsSpeakingDenominator: 8.;
@@ -797,6 +801,10 @@ dialogsStoriesListInfo: DialogsStoriesList(dialogsStoriesList) {
 dialogsStoriesListMine: DialogsStoriesList(dialogsStoriesListInfo) {
 	readOpacity: 1.;
 }
+dialogsStoriesAddSize: 18px;
+dialogsStoriesAddLine: 2px;
+dialogsStoriesAddStroke: 2px;
+dialogsStoriesAddHalf: 4px;
 dialogsStoriesTooltip: ImportantTooltip(defaultImportantTooltip) {
 	padding: margins(0px, 0px, 0px, 0px);
 }

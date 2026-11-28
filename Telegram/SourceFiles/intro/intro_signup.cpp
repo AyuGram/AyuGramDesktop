@@ -8,14 +8,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "intro/intro_signup.h"
 
 #include "boxes/abstract_box.h"
-#include "intro/intro_widget.h"
 #include "core/file_utilities.h"
-#include "ui/boxes/confirm_box.h"
+#include "intro/intro_widget.h"
 #include "lang/lang_keys.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
-#include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
+
 #include "styles/style_intro.h"
 #include "styles/style_userpic_button.h"
 
@@ -41,6 +42,12 @@ SignupWidget::SignupWidget(
 	) | rpl::on_next([=] {
 		refreshLang();
 	}, lifetime());
+
+	const auto submitted = [=] { submit(); };
+	_first->submits(
+	) | rpl::on_next(submitted, _first->lifetime());
+	_last->submits(
+	) | rpl::on_next(submitted, _last->lifetime());
 
 	if (_invertOrder) {
 		setTabOrder(_last, _first);
@@ -115,6 +122,7 @@ void SignupWidget::nameSubmitDone(const MTPauth_Authorization &result) {
 }
 
 void SignupWidget::nameSubmitFail(const MTP::Error &error) {
+	_sentRequest = 0;
 	if (MTP::IsFloodError(error)) {
 		showError(tr::lng_flood_error());
 		if (_invertOrder) {

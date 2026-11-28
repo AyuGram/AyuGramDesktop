@@ -33,9 +33,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/gradient_round_button.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
-#include "ui/top_background_gradient.h"
 #include "ui/painter.h"
+#include "ui/top_background_gradient.h"
 #include "ui/ui_utility.h"
+
 #include "styles/style_credits.h"
 #include "styles/style_layers.h"
 
@@ -190,7 +191,7 @@ const auto kGiftAnimations = std::array<GiftAnimationConfig, 7>{{ {
 		float64 rotationY,
 		int faceIndex) {
 	struct Vec3 {
-		float64 x, y, z;
+		float64 x = 0., y = 0., z = 0.;
 
 		Vec3 operator+(const Vec3 &o) const {
 			return { x + o.x, y + o.y, z + o.z };
@@ -372,7 +373,7 @@ void PaintCubeFace(
 		float64 rotationX,
 		float64 rotationY) {
 	struct Vec3 {
-		float64 x, y, z;
+		float64 x = 0., y = 0., z = 0.;
 
 		Vec3 operator*(float64 s) const {
 			return { x * s, y * s, z * s };
@@ -400,8 +401,8 @@ void PaintCubeFace(
 	}};
 
 	struct FaceDepth {
-		int index;
-		float64 z;
+		int index = 0;
+		float64 z = 0.;
 	};
 	auto visible = std::vector<FaceDepth>();
 	visible.reserve(3);
@@ -685,7 +686,7 @@ void PaintCube(
 
 struct GiftFlightPosition {
 	QPointF origin;
-	float64 scale;
+	float64 scale = 0.;
 };
 
 [[nodiscard]] GiftFlightPosition ComputeGiftFlightPosition(
@@ -720,7 +721,7 @@ struct GiftFlightPosition {
 [[nodiscard]] FacePlacement GetCameraFacingFreeFace(
 		not_null<const CraftAnimationState*> state) {
 	struct Vec3 {
-		float64 x, y, z;
+		float64 x = 0., y = 0., z = 0.;
 	};
 
 	const auto rotateY = [](Vec3 v, float64 angle) {
@@ -1376,6 +1377,7 @@ void SetupCraftProgressTitle(
 		.name = u"craft_progress"_q,
 		.sizeOverride = iconSize,
 		.limitFps = true,
+		.untracked = true,
 	});
 	const auto icon = owned.get();
 	iconWidget->lifetime().add([kept = std::move(owned)] {});
@@ -1891,7 +1893,7 @@ void StartCraftAnimation(
 					const auto wasTotal = box->parentWidget()->height();
 					const auto wasButtons = wasTotal - wasContent;
 
-					container->clear();
+					container->detachRows();
 					container->add(std::move(success->owned));
 
 					box->setStyle(st::giftBox);

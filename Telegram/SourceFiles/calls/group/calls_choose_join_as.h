@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/weak_ptr.h"
 #include "base/object_ptr.h"
+#include "base/weak_ptr.h"
 
 class PeerData;
 
@@ -44,6 +44,7 @@ public:
 private:
 	void requestList();
 	void processList(std::vector<not_null<PeerData*>> &&list);
+	void showScheduleBox(JoinInfo info);
 	void finish(JoinInfo info);
 
 	struct ChannelsListRequest {

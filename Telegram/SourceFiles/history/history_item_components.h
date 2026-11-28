@@ -12,10 +12,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_poll.h"
 #include "history/history_item.h"
 #include "spellcheck/spellcheck_types.h" // LanguageId.
-#include "ui/empty_userpic.h"
+#include "ui/chat/message_bubble.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/chat/message_bubble.h"
+#include "ui/empty_userpic.h"
 
 #include <memory>
 
@@ -59,6 +59,7 @@ struct CornersMaskRef;
 
 namespace Iv {
 struct RichPage;
+struct RichQuote;
 } // namespace Iv
 
 namespace HistoryView {
@@ -205,6 +206,9 @@ struct HistoryMessageForwarded
 	void create(
 		const HistoryMessageVia *via,
 		not_null<const HistoryItem*> item) const;
+	[[nodiscard]] TextWithEntities phrase(
+		const HistoryMessageVia *via,
+		TextWithEntities userpic = {}) const;
 
 	[[nodiscard]] bool forwardOfForward() const {
 		return savedFromSender || savedFromHiddenSenderInfo;
@@ -323,8 +327,11 @@ private:
 
 struct ReplyFields {
 	[[nodiscard]] ReplyFields clone(not_null<HistoryItem*> parent) const;
+	[[nodiscard]] const TextWithEntities &displayQuote() const;
+	[[nodiscard]] MessageHighlightId highlight() const;
 
 	TextWithEntities quote;
+	std::shared_ptr<const Iv::RichQuote> richQuote;
 	std::unique_ptr<Data::Media> externalMedia;
 	PeerId externalSenderId = 0;
 	QString externalSenderName;
@@ -619,6 +626,7 @@ private:
 		~Button();
 
 		Ui::Text::String text = { 1 };
+		Ui::Text::String textWithoutIcon = { 1 };
 		QRect rect;
 		int characters = 0;
 		float64 howMuchOver = 0.;
@@ -874,6 +882,54 @@ struct HistoryServicePaymentRefund
 	QString transactionId;
 	QString currency;
 	uint64 amount = 0;
+};
+
+struct HistoryServiceGramTransfer
+: RuntimeComponent<HistoryServiceGramTransfer, HistoryItem> {
+	[[nodiscard]] QString commentText() const;
+
+	int64 amount = 0;
+	QString peerAddress;
+	QString transactionId;
+	QString comment;
+	QString onrampProvider;
+	QString failReason;
+	bool commentEncrypted = false;
+};
+
+struct HistoryServiceTonConnectRequest
+: RuntimeComponent<HistoryServiceTonConnectRequest, HistoryItem> {
+	uint64 sessionId = 0;
+	QString topic;
+	QString dappName;
+	TextWithEntities notificationText;
+	rpl::lifetime lifetime;
+	TimeId expires = 0;
+	bool accepted = false;
+	bool declined = false;
+};
+
+struct HistoryServiceGiftOnchainOffer
+: RuntimeComponent<HistoryServiceGiftOnchainOffer, HistoryItem> {
+	ClickHandlerPtr originalOfferLink;
+	std::shared_ptr<Data::UniqueGift> gift;
+	QString address;
+	uint64 offerId = 0;
+	int64 amount = 0;
+	std::optional<int64> buyerRefund;
+	std::optional<int64> fine;
+	TimeId expiresAt = 0;
+	int feeBps = 0;
+	int limitedCount = 0;
+	int limitedLeft = 0;
+	bool accepted : 1 = false;
+	bool declined : 1 = false;
+	bool cancelled : 1 = false;
+	bool expired : 1 = false;
+	bool settled : 1 = false;
+	bool buyer : 1 = false;
+	bool cancelling : 1 = false;
+	bool withdrawing : 1 = false;
 };
 
 enum class HistorySelfDestructType {

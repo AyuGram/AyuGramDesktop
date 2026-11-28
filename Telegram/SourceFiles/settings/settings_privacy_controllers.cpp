@@ -13,10 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/unixtime.h"
-#include "boxes/abstract_box.h"
-#include "boxes/peer_list_controllers.h"
 #include "boxes/peers/peer_short_info_box.h"
 #include "boxes/peers/prepare_short_info_box.h"
+#include "boxes/abstract_box.h"
+#include "boxes/peer_list_controllers.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
 #include "data/data_changes.h"
@@ -29,9 +29,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_common.h"
 #include "editor/photo_editor_layer_widget.h"
 #include "history/admin_log/history_admin_log_item.h"
+#include "history/view/history_view_message.h"
 #include "history/history.h"
 #include "history/history_item_components.h"
-#include "history/view/history_view_message.h"
+#include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "settings/sections/settings_premium.h"
@@ -39,21 +40,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/chat_theme.h"
-#include "ui/painter.h"
-#include "ui/vertical_list.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "window/section_widget.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
-#include "styles/style_settings.h"
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 
 #include <QtGui/QGuiApplication>
 #include <QtGui/QClipboard>
@@ -64,10 +66,6 @@ namespace {
 using UserPrivacy = Api::UserPrivacy;
 using PrivacyRule = Api::UserPrivacy::Rule;
 using Option = EditPrivacyBox::Option;
-
-[[nodiscard]] QString PublicLinkByPhone(not_null<UserData*> user) {
-	return user->session().createInternalLinkFull('+' + user->phone());
-}
 
 class BlockPeerBoxController final : public ChatsListBoxController {
 public:
@@ -420,7 +418,6 @@ void BlockedBoxController::handleBlockedEvent(not_null<PeerData*> user) {
 	} else if (auto row = delegate()->peerListFindRow(user->id.value)) {
 		delegate()->peerListRemoveRow(row);
 		delegate()->peerListRefreshRows();
-		_rowsCountChanges.fire(delegate()->peerListFullRowsCount());
 	}
 }
 
@@ -445,7 +442,6 @@ bool BlockedBoxController::appendRow(not_null<PeerData*> peer) {
 		return false;
 	}
 	delegate()->peerListAppendRow(createRow(peer));
-	_rowsCountChanges.fire(delegate()->peerListFullRowsCount());
 	return true;
 }
 
@@ -454,7 +450,6 @@ bool BlockedBoxController::prependRow(not_null<PeerData*> peer) {
 		return false;
 	}
 	delegate()->peerListPrependRow(createRow(peer));
-	_rowsCountChanges.fire(delegate()->peerListFullRowsCount());
 	return true;
 }
 
@@ -477,10 +472,6 @@ std::unique_ptr<PeerListRow> BlockedBoxController::createRow(
 	}();
 	row->setCustomStatus(status);
 	return row;
-}
-
-rpl::producer<int> BlockedBoxController::rowsCountChanges() const {
-	return _rowsCountChanges.events();
 }
 
 PhoneNumberPrivacyController::PhoneNumberPrivacyController(
@@ -520,7 +511,7 @@ auto PhoneNumberPrivacyController::warning() const
 				auto base = TextWithEntities{
 					warning + "\n\n" + added + "\n",
 				};
-				const auto link = PublicLinkByPhone(self);
+				const auto link = Info::Profile::PublicLinkByPhone(self);
 				return base.append(tr::link(link, link));
 			});
 	}) | rpl::flatten_latest();
@@ -529,7 +520,7 @@ auto PhoneNumberPrivacyController::warning() const
 void PhoneNumberPrivacyController::prepareWarningLabel(
 		not_null<Ui::FlatLabel*> warning) const {
 	warning->overrideLinkClickHandler([=] {
-		QGuiApplication::clipboard()->setText(PublicLinkByPhone(
+		QGuiApplication::clipboard()->setText(Info::Profile::PublicLinkByPhone(
 			_controller->session().user()));
 		_controller->window().showToast({
 			.text = { tr::lng_username_copied(tr::now) },

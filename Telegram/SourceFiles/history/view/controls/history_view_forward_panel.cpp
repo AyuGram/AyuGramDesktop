@@ -7,17 +7,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/controls/history_view_forward_panel.h"
 
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_item_helpers.h"
-#include "history/history_item_components.h"
-#include "history/view/history_view_item_preview.h"
+#include "apiwrap.h"
+#include "boxes/peer_list_controllers.h"
+#include "core/ui_integration.h"
+#include "data/data_changes.h"
+#include "data/data_forum_topic.h"
+#include "data/data_media_types.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
-#include "data/data_media_types.h"
-#include "data/data_forum_topic.h"
 #include "data/data_user.h"
+#include "history/view/history_view_item_preview.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
 #include "iv/editor/iv_editor_session.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/chat/forward_options_box.h"
 #include "ui/effects/spoiler_mess.h"
@@ -25,20 +30,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
-#include "core/ui_integration.h"
-#include "lang/lang_keys.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
-
-#include "apiwrap.h"
-#include "boxes/peer_list_controllers.h"
-#include "data/data_changes.h"
-#include "settings/settings_common.h"
-#include "ui/widgets/buttons.h"
-#include "styles/style_menu_icons.h"
-#include "styles/style_settings.h"
 
 namespace HistoryView::Controls {
 namespace {
@@ -361,88 +357,6 @@ void ClearDraftReplyTo(
 	if (thread) {
 		history->session().api().saveDraftToCloudDelayed(thread);
 	}
-}
-
-void EditWebPageOptions(
-		std::shared_ptr<ChatHelpers::Show> show,
-		not_null<WebPageData*> webpage,
-		Data::WebPageDraft draft,
-		Fn<void(Data::WebPageDraft)> done) {
-	show->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(u"Link Preview"_q);
-
-		struct State {
-			rpl::variable<Data::WebPageDraft> result;
-			Ui::SettingsButton *large = nullptr;
-			Ui::SettingsButton *small = nullptr;
-		};
-		const auto state = box->lifetime().make_state<State>(State{
-			.result = draft,
-			});
-
-		state->large = Settings::AddButtonWithIcon(
-			box->verticalLayout(),
-			rpl::single(u"Force large media"_q),
-			st::settingsButton,
-			{ &st::menuIconMakeBig });
-		state->large->setClickedCallback([=] {
-			auto copy = state->result.current();
-			copy.forceLargeMedia = true;
-			copy.forceSmallMedia = false;
-			state->result = copy;
-		});
-
-		state->small = Settings::AddButtonWithIcon(
-			box->verticalLayout(),
-			rpl::single(u"Force small media"_q),
-			st::settingsButton,
-			{ &st::menuIconMakeSmall });
-		state->small->setClickedCallback([=] {
-			auto copy = state->result.current();
-			copy.forceSmallMedia = true;
-			copy.forceLargeMedia = false;
-			state->result = copy;
-		});
-
-		state->result.value(
-		) | rpl::on_next([=](const Data::WebPageDraft &draft) {
-			state->large->setColorOverride(draft.forceLargeMedia
-				? st::windowActiveTextFg->c
-				: std::optional<QColor>());
-			state->small->setColorOverride(draft.forceSmallMedia
-				? st::windowActiveTextFg->c
-				: std::optional<QColor>());
-		}, box->lifetime());
-
-		Settings::AddButtonWithIcon(
-			box->verticalLayout(),
-			state->result.value(
-			) | rpl::map([=](const Data::WebPageDraft &draft) {
-				return draft.invert
-					? u"Above message"_q
-					: u"Below message"_q;
-			}),
-			st::settingsButton,
-			{ &st::menuIconChangeOrder }
-		)->setClickedCallback([=] {
-			auto copy = state->result.current();
-			copy.invert = !copy.invert;
-			state->result = copy;
-		});
-
-		box->addButton(tr::lng_settings_save(), [=] {
-			const auto weak = base::make_weak(box.get());
-			auto result = state->result.current();
-			result.manual = true;
-			done(result);
-			if (const auto strong = weak.get()) {
-				strong->closeBox();
-			}
-		});
-		box->addButton(tr::lng_cancel(), [=] {
-			box->closeBox();
-		});
-	}));
 }
 
 bool HasOnlyForcedForwardedInfo(const HistoryItemsList &list) {

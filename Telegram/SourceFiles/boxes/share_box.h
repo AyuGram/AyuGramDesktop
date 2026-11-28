@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/layers/box_content.h"
 #include "base/timer.h"
 #include "history/view/history_view_schedule_box.h"
+#include "mtproto/sender.h"
 #include "ui/chat/forward_options_box.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/round_checkbox.h"
-#include "mtproto/sender.h"
+#include "ui/layers/box_content.h"
 
 class History;
 
@@ -77,7 +77,8 @@ void FastShareMessageToSelf(
 void FastShareMessage(
 	std::shared_ptr<Main::SessionShow> show,
 	not_null<HistoryItem*> item,
-	ShareBoxStyleOverrides st = {});
+	ShareBoxStyleOverrides st = {},
+	Window::SessionController *controller = nullptr);
 void FastShareMessage(
 	not_null<Window::SessionController*> controller,
 	not_null<HistoryItem*> item,
@@ -90,6 +91,10 @@ void FastShareLink(
 	std::shared_ptr<Main::SessionShow> show,
 	const QString &url,
 	ShareBoxStyleOverrides st = {});
+[[nodiscard]] base::weak_qptr<Ui::BoxContent> FastShareImage(
+	std::shared_ptr<Main::SessionShow> show,
+	QImage image,
+	const QString &caption);
 
 struct RecipientMoneyRestrictionError;
 [[nodiscard]] auto ShareMessageMoneyRestrictionError()
@@ -122,6 +127,7 @@ public:
 		CountMessagesCallback countMessagesCallback;
 		SubmitCallback submitCallback;
 		FilterCallback filterCallback;
+		Fn<void()> repostStoryCallback;
 		object_ptr<Ui::RpWidget> bottomWidget = { nullptr };
 		rpl::producer<QString> copyLinkText;
 		rpl::producer<QString> titleOverride;

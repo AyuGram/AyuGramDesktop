@@ -12,24 +12,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_media_types.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "history/history.h"
-#include "history/history_item_components.h"
+#include "history/view/media/history_view_media_common.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_reply.h"
-#include "history/view/media/history_view_media_common.h"
+#include "history/history.h"
+#include "history/history_item_components.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/chat/chat_style.h"
-#include "ui/empty_userpic.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
-#include "ui/rect.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h" // Ui::Text::Wrapped.
+#include "ui/empty_userpic.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 
@@ -255,16 +256,19 @@ QSize Contact::countOptimalSize() {
 	}
 
 	const auto vcardBoxFactory = _vcardBoxFactory;
+	const auto mediaEditor = (_parent->context() == Context::MediaEditor);
 	_buttons.clear();
-	if (_contact) {
-		const auto message = tr::lng_contact_send_message(tr::now).toUpper();
+	if (mediaEditor) {
+		_mainButton.link = nullptr;
+	} else if (_contact) {
+		const auto message = tr::lng_contact_send_message(tr::now, tr::upper);
 		_buttons.push_back({
 			message,
 			st::semiboldFont->width(message),
 			SendMessageClickHandler(_contact),
 		});
 		if (!_contact->isContact()) {
-			const auto add = tr::lng_contact_add(tr::now).toUpper();
+			const auto add = tr::lng_contact_add(tr::now, tr::upper);
 			_buttons.push_back({
 				add,
 				st::semiboldFont->width(add),
@@ -273,14 +277,14 @@ QSize Contact::countOptimalSize() {
 		}
 		_mainButton.link = _buttons.front().link;
 	} else if (vcardBoxFactory) {
-		const auto view = tr::lng_contact_details_button(tr::now).toUpper();
+		const auto view = tr::lng_contact_details_button(tr::now, tr::upper);
 		_buttons.push_back({
 			view,
 			st::semiboldFont->width(view),
 			AddContactClickHandler(_parent->data()),
 		});
 	}
-	if (vcardBoxFactory) {
+	if (vcardBoxFactory && !mediaEditor) {
 		_mainButton.link = std::make_shared<LambdaClickHandler>([=](
 				const ClickContext &context) {
 			const auto my = context.other.value<ClickHandlerContext>();

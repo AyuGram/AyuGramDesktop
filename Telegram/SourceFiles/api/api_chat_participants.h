@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
 #include "data/data_chat_participant_status.h"
 #include "mtproto/sender.h"
-#include "base/timer.h"
 
 class ApiWrap;
 class ChannelData;
@@ -88,7 +88,7 @@ private:
 class ChatParticipants final {
 public:
 	struct Parsed {
-		const int availableCount;
+		const int availableCount = 0;
 		const std::vector<ChatParticipant> list;
 	};
 

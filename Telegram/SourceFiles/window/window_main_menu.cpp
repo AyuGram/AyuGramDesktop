@@ -11,14 +11,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "boxes/about_box.h"
-#include "core/update_channel.h"
-#include "boxes/peer_list_controllers.h"
+#include "boxes/contacts_box.h"
 #include "boxes/premium_preview_box.h"
 #include "calls/group/calls_group_common.h"
 #include "calls/calls_box_controller.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/update_channel.h"
 #include "data/data_changes.h"
 #include "data/data_document_media.h"
 #include "data/data_folder.h"
@@ -26,14 +26,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "data/data_stories.h"
 #include "data/data_user.h"
-#include "info/info_memento.h"
 #include "info/profile/info_profile_badge.h"
-#include "settings/settings_common.h"
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/stories/info_stories_widget.h"
+#include "info/info_memento.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
+#include "main/main_app_config.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -41,6 +41,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_advanced.h"
 #include "settings/sections/settings_calls.h"
 #include "settings/sections/settings_information.h"
+#include "settings/settings_common.h"
 #include "storage/localstorage.h"
 #include "storage/storage_account.h"
 #include "support/support_templates.h"
@@ -52,25 +53,29 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/snowflakes.h"
 #include "ui/effects/toggle_arrow.h"
-#include "ui/painter.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
-#include "ui/ui_utility.h"
-#include "ui/unread_badge_paint.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/new_badges.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
+#include "ui/unread_badge_paint.h"
+#include "ui/vertical_list.h"
+#include "wallet/wallet_panel.h"
 #include "window/themes/window_theme.h"
 #include "window/window_controller.h"
 #include "window/window_main_menu_helpers.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h" // popupMenuExpandedSeparator
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
+#include "styles/style_wallet.h"
 #include "styles/style_window.h"
 #include "styles/style_window_main_menu.h"
 
@@ -542,6 +547,7 @@ void MainMenu::setupArchive() {
 				controller->openFolder(f);
 			}
 			controller->window().hideSettingsAndLayer();
+			controller->removeLayerBlackout();
 		}
 	};
 	const auto checkArchive = [=] {
@@ -715,7 +721,7 @@ void MainMenu::setupMenu() {
 				{ &st::menuIconProfile })
 		)->setClickedCallback([=] {
 			controller->showSection(
-				Info::Stories::Make(controller->session().user()));
+				Info::Stories::MakeMyProfile(controller->session().user()));
 		});
 
 		if (settings.showBotsInDrawer())
@@ -766,6 +772,28 @@ void MainMenu::setupMenu() {
 			{ &st::menuIconSavedMessages }
 		)->setClickedCallback([=] {
 			controller->showPeerHistory(controller->session().user());
+		});
+		const auto session = &controller->session();
+		const auto wallet = _menu->add(
+			object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
+				_menu,
+				CreateButtonWithIcon(
+					_menu,
+					tr::lng_wallet_menu(),
+					st::mainMenuButton,
+					{ &st::walletMenuIcon })));
+		Ui::NewBadge::AddAfterButtonText(
+			wallet->entity(),
+			tr::lng_wallet_menu(),
+			st::mainMenuButton);
+		wallet->toggleOn(session->appConfig().value(
+		) | rpl::map([=] {
+			return session->appConfig().walletAvailable();
+		}) | rpl::distinct_until_changed());
+		wallet->finishAnimating();
+		wallet->entity()->setClickedCallback([=] {
+			controller->window().hideSettingsAndLayer();
+			Wallet::ShowWallet(session);
 		});
 
 		if (settings.showLReadToggleInDrawer()) {

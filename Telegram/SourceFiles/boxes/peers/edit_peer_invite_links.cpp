@@ -7,33 +7,32 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peers/edit_peer_invite_links.h"
 
-#include "data/data_peer.h"
-#include "data/data_user.h"
-#include "data/data_chat.h"
+#include "api/api_invite_links.h"
+#include "apiwrap.h"
+#include "base/unixtime.h"
+#include "base/weak_ptr.h"
+#include "boxes/peers/edit_peer_invite_link.h"
+#include "boxes/peer_list_controllers.h"
 #include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_peer.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
+#include "lang/lang_keys.h"
 #include "main/session/session_show.h"
 #include "main/main_session.h"
-#include "api/api_invite_links.h"
 #include "settings/settings_credits_graphics.h"
-#include "ui/wrap/slide_wrap.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
-#include "lang/lang_keys.h"
-#include "ui/boxes/confirm_box.h"
-#include "boxes/peer_list_controllers.h"
-#include "boxes/peers/edit_peer_invite_link.h"
-#include "apiwrap.h"
-#include "base/weak_ptr.h"
-#include "base/unixtime.h"
+
 #include "styles/style_info.h"
 #include "styles/style_layers.h" // st::boxDividerLabel
 #include "styles/style_menu_icons.h"
-
-#include <QtSvg/QSvgRenderer>
 
 namespace {
 
@@ -728,13 +727,11 @@ void LinksController::rowPaintIcon(
 			p.drawEllipse(rect);
 		}
 		if (color == Color::Subscription) {
-			auto svg = QSvgRenderer(u":/gui/links_subscription.svg"_q);
-			const auto r = QRect(
+			PaintSubscriptionBadge(p, QRectF(
 				(inner - st::inviteLinkSubscriptionSize) / 2,
 				(inner - st::inviteLinkSubscriptionSize) / 2,
 				st::inviteLinkSubscriptionSize,
-				st::inviteLinkSubscriptionSize);
-			svg.render(&p, r);
+				st::inviteLinkSubscriptionSize));
 		} else {
 			(color == Color::Revoked
 				? st::inviteLinkRevokedIcon

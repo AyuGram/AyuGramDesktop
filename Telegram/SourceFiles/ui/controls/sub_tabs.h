@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
 #include "ui/effects/animations.h"
+#include "ui/rp_widget.h"
 
 namespace style {
 struct SubTabs;
@@ -132,8 +132,8 @@ private:
 	bool _reorderEnable = false;
 	Ui::Animations::Basic _shakeAnimation;
 	struct PinnedInterval {
-		int from;
-		int to;
+		int from = 0;
+		int to = 0;
 	};
 	std::vector<PinnedInterval> _pinnedIntervals;
 

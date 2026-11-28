@@ -7,21 +7,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/star_gift_craft_box.h"
 
+#include "api/api_credits.h"
+#include "api/api_premium.h"
+#include "apiwrap.h"
 #include "base/call_delayed.h"
 #include "base/event_filter.h"
 #include "base/random.h"
 #include "base/timer_rpl.h"
 #include "base/unixtime.h"
 #include "boxes/star_gift_auction_box.h"
+#include "boxes/star_gift_box.h"
 #include "boxes/star_gift_craft_animation.h"
 #include "boxes/star_gift_preview_box.h"
 #include "boxes/star_gift_resale_box.h"
-#include "apiwrap.h"
-#include "api/api_credits.h"
-#include "api/api_premium.h"
-#include "boxes/star_gift_box.h"
-#include "data/components/gift_auctions.h"
 #include "core/ui_integration.h"
+#include "data/components/gift_auctions.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_document.h"
 #include "data/data_session.h"
@@ -46,6 +46,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h" // stickerPanDeleteIconFg
 #include "styles/style_credits.h"
@@ -418,14 +419,17 @@ AbstractButton *MakeRemoveButton(
 			nullptr,
 			&Entry::button);
 		const auto canRemove = (count > 1);
-		const auto secondHasAddress = state->entries[1].gift
-			&& !state->entries[1].gift.unique->giftAddress.isEmpty();
+		const auto &second = state->entries[1].gift.unique;
+		const auto replaceFirst = second
+			&& !second->giftAddress.isEmpty()
+			&& !session->appConfig().craftMintedFirstSource();
 		for (auto i = 0; i != 4; ++i) {
 			auto &entry = state->entries[i];
 			if (entry.button) {
 				delete base::take(entry.remove);
 				if (canRemove) {
-					const auto needReplace = (i == 0) && secondHasAddress;
+					const auto needReplace = !i
+						&& replaceFirst;
 					const auto callback = [=] {
 						if (needReplace) {
 							state->editRequests.fire_copy(0);
@@ -673,7 +677,8 @@ void ShowSelectGiftBox(
 		Fn<void(GiftForCraft)> chosen,
 		std::vector<GiftForCraft> selected,
 		Fn<void()> boxClosed,
-		bool firstSlot) {
+		bool firstSlot,
+		bool allowResale = true) {
 	struct Entry {
 		Data::SavedStarGift gift;
 		GiftButton *button = nullptr;
@@ -683,6 +688,7 @@ void ShowSelectGiftBox(
 
 		Data::CraftGiftsDescriptor craft;
 		Data::ResaleGiftsDescriptor resale;
+		int pending = 0;
 
 		rpl::lifetime craftLifetime;
 		rpl::lifetime resaleLifetime;
@@ -690,6 +696,7 @@ void ShowSelectGiftBox(
 
 	const auto session = &controller->session();
 	const auto state = std::make_shared<State>();
+	const auto resaleOptions = LookupResaleGiftsOptions(session->user(), true);
 
 	const auto make = [=](not_null<GenericBox*> box) {
 		box->setTitle(tr::lng_gift_craft_select_title());
@@ -701,16 +708,21 @@ void ShowSelectGiftBox(
 			box->verticalLayout(),
 			tr::lng_gift_craft_select_your());
 
-		const auto got = crl::guard(box, [=](
-				std::shared_ptr<Data::UniqueGift> gift) {
-			if (ShowCraftLaterError(box->uiShow(), gift)
-				|| (firstSlot
-					&& ShowCraftAddressError(box->uiShow(), gift))) {
+		using UniqueGiftPtr = std::shared_ptr<Data::UniqueGift>;
+		const auto choose = [=](UniqueGiftPtr gift) {
+			if (ShowCraftLaterError(box->uiShow(), gift)) {
+				return;
+			} else if (firstSlot
+				&& ShowCraftAddressError(
+					box->uiShow(),
+					session,
+					gift)) {
 				return;
 			}
 			chosen(GiftForCraft{ .unique = gift });
 			box->closeBox();
-		});
+		};
+		const auto got = crl::guard(box, choose);
 
 		AddCraftGiftsList(
 			controller,
@@ -719,21 +731,20 @@ void ShowSelectGiftBox(
 			selected,
 			got);
 
-		if (const auto count = state->resale.count) {
+		if (ShouldShowResaleGifts(resaleOptions, state->resale)) {
 			AddSubsectionTitle(
 				box->verticalLayout(),
 				tr::lng_gift_craft_select_market(
 					lt_count,
-					rpl::single(count * 1.)));
+					rpl::single(state->resale.count * 1.)));
 
 			AddResaleGiftsList(
 				controller,
 				session->user(),
 				box->verticalLayout(),
 				state->resale,
-				nullptr,
-				got,
-				true);
+				resaleOptions,
+				got);
 		}
 
 		box->addButton(tr::lng_box_ok(), [=] {
@@ -745,6 +756,7 @@ void ShowSelectGiftBox(
 		controller->show(Box(make));
 	});
 
+	state->pending = allowResale ? 2 : 1;
 	state->craftLifetime = Data::CraftGiftsSlice(
 		session,
 		giftId
@@ -752,20 +764,24 @@ void ShowSelectGiftBox(
 		state->craftLifetime.destroy();
 
 		state->craft = std::move(info);
-		if (state->resale.giftId) {
+		if (!--state->pending) {
 			show();
 		}
 	});
 
+	if (!allowResale) {
+		return;
+	}
+
 	state->resaleLifetime = Data::ResaleGiftsSlice(
 		session,
 		giftId,
-		{ .forCraft = true }
+		resaleOptions.filter
 	) | rpl::on_next([=](Data::ResaleGiftsDescriptor &&info) {
 		state->resaleLifetime.destroy();
 
 		state->resale = std::move(info);
-		if (state->craft.giftId) {
+		if (!--state->pending) {
 			show();
 		}
 	});
@@ -1164,7 +1180,6 @@ void Craft(
 			inputs.push_back(
 				Api::InputSavedStarGiftId(gift.manageId, gift.unique));
 		}
-		const auto weak = base::make_weak(controller);
 		const auto session = &controller->session();
 		session->api().request(MTPpayments_CraftStarGift(
 			MTP_vector<MTPInputSavedStarGift>(inputs)
@@ -1177,7 +1192,7 @@ void Craft(
 				const auto action = (slug == input.unique->slug)
 					? Data::GiftUpdate::Action::Upgraded
 					: Data::GiftUpdate::Action::Delete;
-				controller->session().data().notifyGiftUpdate({
+				session->data().notifyGiftUpdate({
 					.id = input.manageId,
 					.slug = input.unique->slug,
 					.action = action,
@@ -1517,7 +1532,10 @@ void MakeCraftContent(
 		}
 		const auto &gifts = state->chosen.current();
 		if (!gifts.empty()
-			&& ShowCraftAddressError(box->uiShow(), gifts.front().unique)) {
+			&& ShowCraftAddressError(
+				box->uiShow(),
+				&controller->session(),
+				gifts.front().unique)) {
 			return;
 		}
 		state->crafting = true;
@@ -1644,6 +1662,29 @@ void ShowGiftCraftBox(
 	}));
 }
 
+void StartCraftFrom(
+		not_null<Window::SessionController*> controller,
+		std::shared_ptr<Data::UniqueGift> gift,
+		Data::SavedStarGiftId savedId) {
+	const auto initial = GiftForCraft{ gift, savedId };
+	const auto &config = controller->session().appConfig();
+	if (gift->giftAddress.isEmpty() || config.craftMintedFirstSource()) {
+		ShowGiftCraftBox(controller, { initial }, false);
+		return;
+	}
+	const auto withPrimary = [=](GiftForCraft primary) {
+		ShowGiftCraftBox(controller, { primary, initial }, false);
+	};
+	ShowSelectGiftBox(
+		controller,
+		gift->initialGiftId,
+		crl::guard(controller, withPrimary),
+		{ initial },
+		[] {},
+		true,
+		false);
+}
+
 } // namespace
 
 void ShowGiftCraftInfoBox(
@@ -1692,21 +1733,20 @@ void ShowGiftCraftInfoBox(
 		box->setWidth(st::boxWideWidth);
 		box->setNoContentMargin(true);
 
-		box->addButton(tr::lng_gift_craft_start_button(), [=] {
+		const auto start = [=] {
 			const auto auctions = &controller->session().giftAuctions();
-			const auto show = crl::guard(box, [=] {
-				ShowGiftCraftBox(
-					controller,
-					{ GiftForCraft{ gift, savedId } },
-					false);
+			const auto open = [=] {
+				StartCraftFrom(controller, gift, savedId);
 				box->closeBox();
-			});
+			};
+			const auto show = crl::guard(box, open);
 			if (auctions->attributes(gift->initialGiftId)) {
 				show();
 			} else {
 				auctions->requestAttributes(gift->initialGiftId, show);
 			}
-		});
+		};
+		box->addButton(tr::lng_gift_craft_start_button(), start);
 	}));
 }
 
@@ -1755,8 +1795,10 @@ void ShowCraftLaterError(
 
 bool ShowCraftAddressError(
 		std::shared_ptr<Show> show,
+		not_null<Main::Session*> session,
 		std::shared_ptr<Data::UniqueGift> gift) {
-	if (gift->giftAddress.isEmpty()) {
+	if (gift->giftAddress.isEmpty()
+		|| session->appConfig().craftMintedFirstSource()) {
 		return false;
 	}
 	show->show(MakeInformBox({

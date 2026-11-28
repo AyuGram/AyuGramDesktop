@@ -7,20 +7,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/calls_video_incoming.h"
 
-#include "ui/gl/gl_surface.h"
-#include "ui/gl/gl_shader.h"
+#include "media/view/media_view_pip.h"
 #include "ui/gl/gl_image.h"
 #include "ui/gl/gl_primitives.h"
+#include "ui/gl/gl_shader.h"
+#include "ui/gl/gl_surface.h"
 #include "ui/rhi/rhi_renderer.h"
 #include "ui/rhi/rhi_shader.h"
 #include "ui/painter.h"
-#include "media/view/media_view_pip.h"
 #include "webrtc/webrtc_video_track.h"
+
 #include "styles/style_calls.h"
 
 #include <QOpenGLShader>
 #include <QOpenGLBuffer>
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 #include <rhi/qrhi.h>
 #endif
 
@@ -351,7 +352,7 @@ void Panel::Incoming::RendererGL::paint(
 
 	FillTexturedRectangle(f, &*program);
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 	if (!shadowRect.empty()) {
 		f.glEnable(GL_BLEND);
 		f.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -368,7 +369,7 @@ void Panel::Incoming::RendererGL::paint(
 
 		FillTexturedRectangle(f, &*_imageProgram, 4);
 	}
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void Panel::Incoming::RendererGL::validateShadowImage() {
@@ -491,7 +492,7 @@ void Panel::Incoming::RendererSW::initBottomShadow() {
 }
 
 void Panel::Incoming::RendererSW::fillTopShadow(QPainter &p) {
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 	const auto widget = _owner->widget();
 	const auto width = widget->parentWidget()->width();
 	const auto left = (_owner->_topControlsAlignment == style::al_left);
@@ -511,7 +512,7 @@ void Panel::Incoming::RendererSW::fillTopShadow(QPainter &p) {
 	p.setClipRect(fill);
 	icon.paint(p, position - widget->pos(), width);
 	p.restore();
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void Panel::Incoming::RendererSW::fillBottomShadow(QPainter &p) {
@@ -538,15 +539,15 @@ void Panel::Incoming::RendererSW::fillBottomShadow(QPainter &p) {
 			factor * fill.height()));
 }
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
 // std140 puts the vec3 at offset 16, the NDC Y flip fills the hole.
 struct IncomingShadowUniforms {
 	float viewport[2];
-	float fragCoordYUp;
-	float flipY;
+	float fragCoordYUp = 0.;
+	float flipY = 0.;
 	float shadow[3];
-	float _pad1;
+	float _pad1 = 0.;
 };
 static_assert(sizeof(IncomingShadowUniforms) == 32);
 
@@ -581,24 +582,38 @@ public:
 		if (_initialized && _rhi == rhi) {
 			return;
 		}
+		releaseResources();
+		const auto guard = gsl::finally([&] {
+			if (!_initialized) {
+				releaseResources();
+			}
+		});
 		_rhi = rhi;
 		_vertexBuffer = rhi->newBuffer(
 			QRhiBuffer::Dynamic,
 			QRhiBuffer::VertexBuffer,
 			4 * 4 * sizeof(float));
-		_vertexBuffer->create();
+		if (!_vertexBuffer->create()) {
+			return;
+		}
 		_uniformBuffer = rhi->newBuffer(
 			QRhiBuffer::Dynamic,
 			QRhiBuffer::UniformBuffer,
 			256);
-		_uniformBuffer->create();
+		if (!_uniformBuffer->create()) {
+			return;
+		}
 		_sampler = rhi->newSampler(
 			QRhiSampler::Linear, QRhiSampler::Linear,
 			QRhiSampler::None,
 			QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
-		_sampler->create();
+		if (!_sampler->create()) {
+			return;
+		}
 		_placeholder = rhi->newTexture(QRhiTexture::BGRA8, QSize(1, 1));
-		_placeholder->create();
+		if (!_placeholder->create()) {
+			return;
+		}
 
 		const auto rpDesc = rt->renderPassDescriptor();
 		const auto vs = Ui::Rhi::ShaderFromFile(
@@ -626,7 +641,9 @@ public:
 				1, QRhiShaderResourceBinding::FragmentStage,
 				_placeholder, _sampler),
 		});
-		_argb32Srb->create();
+		if (!_argb32Srb->create()) {
+			return;
+		}
 
 		_argb32Pipeline = rhi->newGraphicsPipeline();
 		_argb32Pipeline->setShaderStages({
@@ -638,7 +655,9 @@ public:
 			QRhiGraphicsPipeline::TriangleStrip);
 		_argb32Pipeline->setShaderResourceBindings(_argb32Srb);
 		_argb32Pipeline->setRenderPassDescriptor(rpDesc);
-		_argb32Pipeline->create();
+		if (!_argb32Pipeline->create()) {
+			return;
+		}
 
 		_yuv420Srb = rhi->newShaderResourceBindings();
 		_yuv420Srb->setBindings({
@@ -657,7 +676,9 @@ public:
 				3, QRhiShaderResourceBinding::FragmentStage,
 				_placeholder, _sampler),
 		});
-		_yuv420Srb->create();
+		if (!_yuv420Srb->create()) {
+			return;
+		}
 
 		_yuv420Pipeline = rhi->newGraphicsPipeline();
 		_yuv420Pipeline->setShaderStages({
@@ -669,9 +690,11 @@ public:
 			QRhiGraphicsPipeline::TriangleStrip);
 		_yuv420Pipeline->setShaderResourceBindings(_yuv420Srb);
 		_yuv420Pipeline->setRenderPassDescriptor(rpDesc);
-		_yuv420Pipeline->create();
+		if (!_yuv420Pipeline->create()) {
+			return;
+		}
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 		const auto shadowFs = Ui::Rhi::ShaderFromFile(
 			u":/shaders/argb32.frag.qsb"_q);
 
@@ -679,14 +702,21 @@ public:
 			QRhiBuffer::Dynamic,
 			QRhiBuffer::VertexBuffer,
 			4 * 4 * sizeof(float));
-		_shadowVertexBuffer->create();
+		if (!_shadowVertexBuffer->create()) {
+			return;
+		}
 		_shadowUniformBuffer = rhi->newBuffer(
 			QRhiBuffer::Dynamic,
 			QRhiBuffer::UniformBuffer,
 			256);
-		_shadowUniformBuffer->create();
+		if (!_shadowUniformBuffer->create()) {
+			return;
+		}
 
 		validateShadowImage();
+		if (!_shadowTexture) {
+			return;
+		}
 
 		_shadowSrb = rhi->newShaderResourceBindings();
 		_shadowSrb->setBindings({
@@ -699,7 +729,9 @@ public:
 				QRhiShaderResourceBinding::FragmentStage,
 				_shadowTexture, _sampler),
 		});
-		_shadowSrb->create();
+		if (!_shadowSrb->create()) {
+			return;
+		}
 
 		QRhiGraphicsPipeline::TargetBlend blend;
 		blend.enable = true;
@@ -718,7 +750,9 @@ public:
 			QRhiGraphicsPipeline::TriangleStrip);
 		_shadowBlendPipeline->setShaderResourceBindings(_shadowSrb);
 		_shadowBlendPipeline->setRenderPassDescriptor(rpDesc);
-		_shadowBlendPipeline->create();
+		if (!_shadowBlendPipeline->create()) {
+			return;
+		}
 #endif
 
 		_initialized = true;
@@ -728,23 +762,38 @@ public:
 			QRhi *rhi,
 			QRhiRenderTarget *rt,
 			QRhiCommandBuffer *cb) override {
+		if (!rhi || rhi->isDeviceLost() || !rt || !cb) {
+			return;
+		}
+		initialize(rhi, rt, cb);
+		if (!_initialized) {
+			return;
+		}
 		_rhi = rhi;
 		const auto markGuard = gsl::finally([&] {
 			_owner->_track->markFrameShown();
 		});
 		const auto data = _owner->_track->frameWithInfo(false);
 		if (data.format == Webrtc::FrameFormat::None) {
-			auto *rub = rhi->nextResourceUpdateBatch();
-			cb->beginPass(rt, Qt::black, { 1.0f, 0 }, rub);
+			cb->beginPass(rt, Qt::black, { 1.0f, 0 });
 			cb->endPass();
 			return;
 		}
 
 		auto *rub = rhi->nextResourceUpdateBatch();
+		const auto guard = gsl::finally([&] {
+			if (rub) {
+				rub->release();
+			}
+		});
 		const auto rgbaFrame =
 			(data.format == Webrtc::FrameFormat::ARGB32);
-		const auto upload = (_trackFrameIndex != data.index);
-		_trackFrameIndex = data.index;
+		const auto upload = (_trackFrameIndex != data.index)
+			|| (rgbaFrame
+				? (!_rgbaTexture || _rgbaSize != data.original.size())
+				: (!_yTexture || !_uTexture || !_vTexture
+					|| _lumaSize != data.yuv420->size
+					|| _chromaSize != data.yuv420->chromaSize));
 		const auto rotation = data.rotation;
 
 		auto *pipeline = _argb32Pipeline;
@@ -758,7 +807,10 @@ public:
 				delete _rgbaTexture;
 				_rgbaTexture = rhi->newTexture(
 					QRhiTexture::BGRA8, image.size());
-				_rgbaTexture->create();
+				if (!_rgbaTexture->create()) {
+					_initialized = false;
+					return;
+				}
 				_rgbaSize = image.size();
 			}
 			if (upload) {
@@ -790,7 +842,10 @@ public:
 					delete _yTexture;
 					_yTexture = rhi->newTexture(
 						QRhiTexture::R8, yuv->size);
-					_yTexture->create();
+					if (!_yTexture->create()) {
+						_initialized = false;
+						return;
+					}
 					_lumaSize = yuv->size;
 				}
 				auto yDesc = QRhiTextureSubresourceUploadDescription(
@@ -805,11 +860,17 @@ public:
 					delete _uTexture;
 					_uTexture = rhi->newTexture(
 						QRhiTexture::R8, yuv->chromaSize);
-					_uTexture->create();
+					if (!_uTexture->create()) {
+						_initialized = false;
+						return;
+					}
 					delete _vTexture;
 					_vTexture = rhi->newTexture(
 						QRhiTexture::R8, yuv->chromaSize);
-					_vTexture->create();
+					if (!_vTexture->create()) {
+						_initialized = false;
+						return;
+					}
 					_chromaSize = yuv->chromaSize;
 				}
 				auto uDesc = QRhiTextureSubresourceUploadDescription(
@@ -844,7 +905,10 @@ public:
 					_vTexture, _sampler),
 			});
 		}
-		srb->create();
+		if (!srb->create()) {
+			_initialized = false;
+			return;
+		}
 
 		const auto pw = float(rt->pixelSize().width());
 		const auto ph = float(rt->pixelSize().height());
@@ -900,11 +964,11 @@ public:
 		rub->updateDynamicBuffer(
 			_vertexBuffer, 0, sizeof(coords), coords);
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 		prepareTitleShadow(rub, pw, ph);
 #endif
 
-		cb->beginPass(rt, Qt::black, { 1.0f, 0 }, rub);
+		cb->beginPass(rt, Qt::black, { 1.0f, 0 }, base::take(rub));
 		cb->setGraphicsPipeline(pipeline);
 		cb->setShaderResources(srb);
 		cb->setViewport({ 0, 0, pw, ph });
@@ -912,11 +976,12 @@ public:
 		cb->setVertexInput(0, 1, &vbuf);
 		cb->draw(4);
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 		paintTitleShadow(cb, pw, ph);
 #endif
 
 		cb->endPass();
+		_trackFrameIndex = data.index;
 	}
 
 	// Only records resource updates, must be called outside a render
@@ -1012,7 +1077,10 @@ public:
 		}
 		_shadowTexture = _rhi->newTexture(
 			QRhiTexture::BGRA8, full);
-		_shadowTexture->create();
+		if (!_shadowTexture->create()) {
+			delete base::take(_shadowTexture);
+			return;
+		}
 		_shadowSize = full;
 		_shadowUploadImage = std::move(image);
 	}
@@ -1050,6 +1118,13 @@ public:
 		delete _vertexBuffer; _vertexBuffer = nullptr;
 		delete _uniformBuffer; _uniformBuffer = nullptr;
 		delete _sampler; _sampler = nullptr;
+		_trackFrameIndex = -1;
+		_rgbaSize = QSize();
+		_lumaSize = QSize();
+		_chromaSize = QSize();
+		_shadowSize = QSize();
+		_shadowUploadImage = QImage();
+		_rhi = nullptr;
 		_initialized = false;
 	}
 
@@ -1084,7 +1159,7 @@ private:
 	QRect _shadowRightRect;
 	bool _initialized = false;
 };
-#endif // Qt >= 6.7
+#endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
 Panel::Incoming::Incoming(
 	not_null<QWidget*> parent,
@@ -1113,7 +1188,7 @@ void Panel::Incoming::setControlsAlignment(style::align align) {
 
 Ui::GL::ChosenRenderer Panel::Incoming::chooseRenderer(
 		Ui::GL::Backend backend) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 	if (backend == Ui::GL::Backend::QRhi) {
 		_opengl = true;
 		return {
@@ -1121,7 +1196,7 @@ Ui::GL::ChosenRenderer Panel::Incoming::chooseRenderer(
 			.backend = Ui::GL::Backend::QRhi,
 		};
 	}
-#endif // Qt >= 6.7
+#endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API
 	_opengl = (backend == Ui::GL::Backend::OpenGL);
 	return {
 		.renderer = (_opengl

@@ -7,8 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "info/media/info_media_common.h"
+#include "base/weak_ptr.h"
 #include "data/data_shared_media.h"
+#include "info/media/info_media_common.h"
 
 namespace Info {
 class AbstractController;
@@ -16,7 +17,10 @@ class AbstractController;
 
 namespace Info::Media {
 
-class Provider final : public ListProvider, private ListSectionDelegate {
+class Provider final
+	: public ListProvider
+	, private ListSectionDelegate
+	, public base::has_weak_ptr {
 public:
 	explicit Provider(not_null<AbstractController*> controller);
 
@@ -125,5 +129,11 @@ private:
 	rpl::lifetime _viewerLifetime;
 
 };
+
+[[nodiscard]] std::unique_ptr<BaseLayout> CreateLayout(
+	not_null<Overview::Layout::Delegate*> delegate,
+	not_null<HistoryItem*> item,
+	Type type,
+	bool globalSearch = false);
 
 } // namespace Info::Media

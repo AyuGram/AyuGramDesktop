@@ -7,14 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_wall_paper.h"
 
+#include "core/application.h"
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
+#include "main/main_session.h"
 #include "storage/serialize_common.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/color_int_conversion.h"
-#include "core/application.h"
-#include "main/main_session.h"
 
 namespace Ui {
 
@@ -319,12 +319,6 @@ QString WallPaper::shareUrl(not_null<Main::Session*> session) const {
 	return params.isEmpty() ? base : (base + '?' + params.join('&'));
 }
 
-void WallPaper::loadDocumentThumbnail() const {
-	if (_document) {
-		_document->loadThumbnail(fileOrigin());
-	}
-}
-
 void WallPaper::loadDocument() const {
 	if (_document) {
 		_document->save(fileOrigin(), QString());
@@ -429,12 +423,6 @@ WallPaper WallPaper::withBlurred(bool blurred) const {
 WallPaper WallPaper::withPatternIntensity(int intensity) const {
 	auto result = *this;
 	result._intensity = intensity;
-	return result;
-}
-
-WallPaper WallPaper::withGradientRotation(int rotation) const {
-	auto result = *this;
-	result._rotation = rotation;
 	return result;
 }
 

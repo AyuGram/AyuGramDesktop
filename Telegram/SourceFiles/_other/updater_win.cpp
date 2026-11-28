@@ -9,6 +9,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/platform/win/base_windows_safe_library.h"
 
+#include <exdisp.h>
+#include <servprov.h>
+#include <shldisp.h>
+
+#include <limits>
+#include <memory>
+
+#ifdef ShellExecute
+#undef ShellExecute // shellapi.h would rename the IShellDispatch2 method
+#endif // ShellExecute
+
 bool _debug = false;
 
 wstring updaterName, updaterDir, updateTo, exeName, customWorkingDir, customKeyFile;
@@ -17,28 +28,28 @@ bool equal(const wstring &a, const wstring &b) {
 	return !_wcsicmp(a.c_str(), b.c_str());
 }
 
-void updateError(const WCHAR *msg, DWORD errorCode) {
-	WCHAR errMsg[2048];
-	LPWSTR errorTextFormatted = nullptr;
-	auto formatFlags = FORMAT_MESSAGE_FROM_SYSTEM
-		| FORMAT_MESSAGE_ALLOCATE_BUFFER
-		| FORMAT_MESSAGE_IGNORE_INSERTS;
+wstring FormatUpdateError(const wstring &message, DWORD errorCode) {
+	auto errorText = LPWSTR(nullptr);
 	FormatMessage(
-		formatFlags,
-		NULL,
+		FORMAT_MESSAGE_FROM_SYSTEM
+			| FORMAT_MESSAGE_ALLOCATE_BUFFER
+			| FORMAT_MESSAGE_IGNORE_INSERTS,
+		nullptr,
 		errorCode,
 		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPWSTR)&errorTextFormatted,
+		reinterpret_cast<LPWSTR>(&errorText),
 		0,
-		0);
-	auto errorText = errorTextFormatted
-		? errorTextFormatted
-		: L"(Unknown error)";
-	wsprintf(errMsg, L"%s, error code: %d\nError message: %s", msg, errorCode, errorText);
+		nullptr);
+	const auto guard = std::unique_ptr<void, decltype(&LocalFree)>(
+		errorText,
+		&LocalFree);
+	return message + L"\nError code: " + std::to_wstring(errorCode)
+		+ L"\nError message: " + (errorText ? errorText : L"(Unknown error)");
+}
 
-	MessageBox(0, errMsg, L"Update error!", MB_ICONERROR);
-
-	LocalFree(errorTextFormatted);
+void updateError(const WCHAR *msg, DWORD errorCode) {
+	const auto text = FormatUpdateError(msg, errorCode);
+	MessageBox(0, text.c_str(), L"Update error!", MB_ICONERROR);
 }
 
 HANDLE _logFile = 0;
@@ -94,6 +105,137 @@ void writeLog(const wstring &msg) {
 		closeLog();
 		return;
 	}
+}
+
+namespace {
+
+constexpr auto kProcessExitTimeout = DWORD(5000);
+
+bool ParsePositiveInteger(const WCHAR *text, ULONGLONG &result) {
+	result = 0;
+	for (; *text; ++text) {
+		if (*text < L'0' || *text > L'9') {
+			return false;
+		}
+		const auto digit = ULONGLONG(*text - L'0');
+		if (result > (std::numeric_limits<ULONGLONG>::max() - digit) / 10) {
+			return false;
+		}
+		result = result * 10 + digit;
+	}
+	return result != 0;
+}
+
+} // namespace
+
+bool ParseUpdateProcess(
+		const WCHAR *id,
+		const WCHAR *created,
+		DWORD &processId,
+		ULONGLONG &creationTime) {
+	auto parsedId = ULONGLONG(0);
+	auto parsedTime = ULONGLONG(0);
+	if (!ParsePositiveInteger(id, parsedId)
+		|| parsedId > std::numeric_limits<DWORD>::max()
+		|| !ParsePositiveInteger(created, parsedTime)) {
+		return false;
+	}
+	processId = DWORD(parsedId);
+	creationTime = parsedTime;
+	return true;
+}
+
+DWORD FinishUpdateProcess(DWORD processId, ULONGLONG creationTime) {
+	if (!processId || !creationTime || processId == GetCurrentProcessId()) {
+		return ERROR_INVALID_PARAMETER;
+	}
+	writeLog(L"Waiting for update parent " + std::to_wstring(processId)
+		+ L" (created " + std::to_wstring(creationTime) + L").");
+	const auto process = std::unique_ptr<void, decltype(&CloseHandle)>(
+		OpenProcess(
+			SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+			FALSE,
+			processId),
+		&CloseHandle);
+	if (!process) {
+		const auto error = GetLastError();
+		return (error == ERROR_INVALID_PARAMETER) ? ERROR_SUCCESS : error;
+	}
+	auto created = FILETIME();
+	auto exited = FILETIME();
+	auto kernel = FILETIME();
+	auto user = FILETIME();
+	if (!GetProcessTimes(process.get(), &created, &exited, &kernel, &user)) {
+		return GetLastError();
+	}
+	const auto actualTime = (ULONGLONG(created.dwHighDateTime) << 32)
+		| created.dwLowDateTime;
+	if (actualTime != creationTime) {
+		writeLog(L"Update parent already exited; process id was reused.");
+		return ERROR_SUCCESS;
+	}
+	auto wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+	if (wait == WAIT_TIMEOUT) {
+		const auto termination = std::unique_ptr<void, decltype(&CloseHandle)>(
+			OpenProcess(
+				PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE,
+				FALSE,
+				processId),
+			&CloseHandle);
+		if (!termination) {
+			return GetLastError();
+		}
+		if (!GetProcessTimes(
+				termination.get(),
+				&created,
+				&exited,
+				&kernel,
+				&user)) {
+			return GetLastError();
+		}
+		const auto terminationTime = (ULONGLONG(created.dwHighDateTime) << 32)
+			| created.dwLowDateTime;
+		if (terminationTime != creationTime) {
+			return ERROR_SUCCESS;
+		}
+		writeLog(L"Update parent teardown timed out; terminating it.");
+		if (!TerminateProcess(termination.get(), ERROR_PROCESS_ABORTED)) {
+			const auto error = GetLastError();
+			wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+			return (wait == WAIT_OBJECT_0)
+				? ERROR_SUCCESS
+				: error;
+		}
+		wait = WaitForSingleObject(process.get(), kProcessExitTimeout);
+	}
+	return (wait == WAIT_OBJECT_0)
+		? ERROR_SUCCESS
+		: (wait == WAIT_TIMEOUT)
+		? ERROR_TIMEOUT
+		: GetLastError();
+}
+
+// WHY: the parent keeps running while a privileged install copies, and
+// Windows cannot overwrite a mapped image or library, only rename it, so a
+// shared target moves aside and the leftover goes with the next reboot.
+bool ReplaceSharedFile(const wstring &from, const wstring &to) {
+	const auto fresh = to + L".new";
+	const auto aside = to + L".old";
+	DeleteFile(fresh.c_str());
+	if (!CopyFile(from.c_str(), fresh.c_str(), FALSE)) {
+		return false;
+	}
+	DeleteFile(aside.c_str());
+	if (!MoveFileEx(to.c_str(), aside.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+		DeleteFile(fresh.c_str());
+		return false;
+	} else if (!MoveFileEx(fresh.c_str(), to.c_str(), 0)) {
+		MoveFileEx(aside.c_str(), to.c_str(), 0);
+		DeleteFile(fresh.c_str());
+		return false;
+	}
+	MoveFileEx(aside.c_str(), nullptr, MOVEFILE_DELAY_UNTIL_REBOOT);
+	return true;
 }
 
 void fullClearPath(const wstring &dir) {
@@ -248,23 +390,39 @@ bool update() {
 	for (size_t i = 0; i < from.size(); ++i) {
 		wstring fname = from[i], tofname = to[i];
 		BOOL copyResult;
+		auto movedAside = false;
 		do {
 			writeLog(L"Copying file '" + fname + L"' to '" + tofname + L"'..");
 			int copyTries = 0;
+			auto errorCode = DWORD(0);
 			do {
 				copyResult = CopyFile(fname.c_str(), tofname.c_str(), FALSE);
-				if (!copyResult) {
-					++copyTries;
-					Sleep(100);
-				} else {
+				if (copyResult) {
 					break;
 				}
+				errorCode = GetLastError();
+				if (errorCode == ERROR_SHARING_VIOLATION
+					&& !movedAside
+					&& ReplaceSharedFile(fname, tofname)) {
+					movedAside = true;
+					copyResult = TRUE;
+					writeLog(L"Replaced the shared target aside: " + tofname);
+					break;
+				}
+				++copyTries;
+				Sleep(100);
 			} while (copyTries < 100);
 			if (!copyResult) {
-				writeLog(L"Error: failed to copy, asking to retry..");
-				WCHAR errMsg[2048];
-				wsprintf(errMsg, L"Failed to update Telegram :(\n%s is not accessible.", tofname.c_str());
-				if (MessageBox(0, errMsg, L"Update error!", MB_ICONERROR | MB_RETRYCANCEL) != IDRETRY) {
+				const auto error = FormatUpdateError(
+					L"Failed to update Telegram :(\nCould not copy:\n"
+						+ fname + L"\nTo:\n" + tofname,
+					errorCode);
+				writeLog(error);
+				if (MessageBox(
+						0,
+						error.c_str(),
+						L"Update error!",
+						MB_ICONERROR | MB_RETRYCANCEL) != IDRETRY) {
 					delFolder();
 					return false;
 				}
@@ -332,6 +490,177 @@ void updateRegistry() {
 	}
 }
 
+namespace {
+
+struct ComReleaser {
+	void operator()(IUnknown *object) const;
+};
+
+struct BstrDeleter {
+	void operator()(OLECHAR *string) const;
+};
+
+template <typename Interface>
+using ComPtr = std::unique_ptr<Interface, ComReleaser>;
+
+using Bstr = std::unique_ptr<OLECHAR, BstrDeleter>;
+
+void ComReleaser::operator()(IUnknown *object) const {
+	object->Release();
+}
+
+void BstrDeleter::operator()(OLECHAR *string) const {
+	SysFreeString(string);
+}
+
+template <typename Interface>
+[[nodiscard]] ComPtr<Interface> ComQuery(IUnknown *object, REFIID iid) {
+	auto result = (void*)nullptr;
+	if (!object
+		|| FAILED(object->QueryInterface(iid, &result))
+		|| !result) {
+		return nullptr;
+	}
+	return ComPtr<Interface>(static_cast<Interface*>(result));
+}
+
+[[nodiscard]] VARIANT BstrVariant(const Bstr &string) {
+	auto result = VARIANT();
+	result.vt = VT_BSTR;
+	result.bstrVal = string.get();
+	return result;
+}
+
+// WHY: the elevated updater must start the new version with the user's
+// token without trusting the user-writable working directory; the desktop
+// view's automation object lives in the user's own unelevated explorer.exe.
+[[nodiscard]] ComPtr<IShellDispatch2> DesktopShellDispatch() {
+	auto windowsRaw = (void*)nullptr;
+	if (FAILED(CoCreateInstance(
+			CLSID_ShellWindows,
+			nullptr,
+			CLSCTX_LOCAL_SERVER,
+			IID_IShellWindows,
+			&windowsRaw))
+		|| !windowsRaw) {
+		writeLog(L"Error: could not reach the shell windows.");
+		return nullptr;
+	}
+	const auto windows = ComPtr<IShellWindows>(
+		static_cast<IShellWindows*>(windowsRaw));
+
+	auto location = VARIANT();
+	location.vt = VT_I4;
+	location.lVal = CSIDL_DESKTOP;
+	auto root = VARIANT();
+	root.vt = VT_EMPTY;
+	auto hwnd = long(0);
+	auto desktopRaw = (IDispatch*)nullptr;
+	if (FAILED(windows->FindWindowSW(
+			&location,
+			&root,
+			SWC_DESKTOP,
+			&hwnd,
+			SWFO_NEEDDISPATCH,
+			&desktopRaw))
+		|| !desktopRaw) {
+		writeLog(L"Error: could not find the desktop window.");
+		return nullptr;
+	}
+	const auto desktop = ComPtr<IDispatch>(desktopRaw);
+
+	const auto provider = ComQuery<IServiceProvider>(
+		desktop.get(),
+		IID_IServiceProvider);
+	auto browserRaw = (void*)nullptr;
+	if (!provider
+		|| FAILED(provider->QueryService(
+			SID_STopLevelBrowser,
+			IID_IShellBrowser,
+			&browserRaw))
+		|| !browserRaw) {
+		writeLog(L"Error: could not reach the desktop browser.");
+		return nullptr;
+	}
+	const auto browser = ComPtr<IShellBrowser>(
+		static_cast<IShellBrowser*>(browserRaw));
+
+	auto viewRaw = (IShellView*)nullptr;
+	if (FAILED(browser->QueryActiveShellView(&viewRaw)) || !viewRaw) {
+		writeLog(L"Error: could not reach the desktop view.");
+		return nullptr;
+	}
+	const auto view = ComPtr<IShellView>(viewRaw);
+
+	auto backgroundRaw = (void*)nullptr;
+	if (FAILED(view->GetItemObject(
+			SVGIO_BACKGROUND,
+			IID_IDispatch,
+			&backgroundRaw))
+		|| !backgroundRaw) {
+		writeLog(L"Error: could not reach the desktop automation object.");
+		return nullptr;
+	}
+	const auto background = ComPtr<IDispatch>(
+		static_cast<IDispatch*>(backgroundRaw));
+
+	const auto folderView = ComQuery<IShellFolderViewDual>(
+		background.get(),
+		IID_IShellFolderViewDual);
+	auto applicationRaw = (IDispatch*)nullptr;
+	if (!folderView
+		|| FAILED(folderView->get_Application(&applicationRaw))
+		|| !applicationRaw) {
+		writeLog(L"Error: could not reach the desktop shell application.");
+		return nullptr;
+	}
+	const auto application = ComPtr<IDispatch>(applicationRaw);
+
+	auto result = ComQuery<IShellDispatch2>(
+		application.get(),
+		IID_IShellDispatch2);
+	if (!result) {
+		writeLog(L"Error: the desktop shell application is not scriptable.");
+	}
+	return result;
+}
+
+[[nodiscard]] bool LaunchUnelevated(
+		const wstring &executable,
+		const wstring &arguments,
+		const wstring &directory) {
+	const auto shell = DesktopShellDispatch();
+	if (!shell) {
+		return false;
+	}
+	const auto file = Bstr(SysAllocString(executable.c_str()));
+	const auto parameters = Bstr(SysAllocString(arguments.c_str()));
+	const auto folder = Bstr(SysAllocString(directory.c_str()));
+	const auto operation = Bstr(SysAllocString(L"open"));
+	if (!file || !parameters || !folder || !operation) {
+		writeLog(L"Error: could not allocate the launch strings.");
+		return false;
+	}
+	auto show = VARIANT();
+	show.vt = VT_I4;
+	show.lVal = SW_SHOWNORMAL;
+	const auto result = shell->ShellExecute(
+		file.get(),
+		BstrVariant(parameters),
+		BstrVariant(folder),
+		BstrVariant(operation),
+		show);
+	if (result != S_OK) {
+		writeLog(FormatUpdateError(
+			L"The desktop shell did not execute the new version.",
+			DWORD(result)));
+		return false;
+	}
+	return true;
+}
+
+} // namespace
+
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdParamarg, int cmdShow) {
 	base::Platform::InitDynamicLibraries();
 
@@ -342,18 +671,39 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 
 	writeLog(L"Updaters started..");
 
-	LPWSTR *args;
-	int argsCount;
+	auto argsCount = 0;
+	auto processId = DWORD(0);
+	auto processCreated = ULONGLONG(0);
+	auto processArgumentsValid = true;
 
 	bool needupdate = false, autostart = false, debug = false, writeprotected = false, startintray = false;
-	args = CommandLineToArgvW(GetCommandLine(), &argsCount);
+	bool justupdate = false, updated = false;
+	const auto args = CommandLineToArgvW(GetCommandLine(), &argsCount);
+	const auto argsGuard = std::unique_ptr<void, decltype(&LocalFree)>(
+		args,
+		&LocalFree);
 	if (args) {
 		for (int i = 1; i < argsCount; ++i) {
 			writeLog(std::wstring(L"Argument: ") + args[i]);
 			if (equal(args[i], L"-update")) {
 				needupdate = true;
+			} else if (equal(args[i], L"-finishprocess")) {
+				if (processId
+					|| i + 2 >= argsCount
+					|| !ParseUpdateProcess(
+						args[i + 1],
+						args[i + 2],
+						processId,
+						processCreated)) {
+					processArgumentsValid = false;
+				} else {
+					writeLog(std::wstring(L"Argument: ") + args[++i]);
+					writeLog(std::wstring(L"Argument: ") + args[++i]);
+				}
 			} else if (equal(args[i], L"-autostart")) {
 				autostart = true;
+			} else if (equal(args[i], L"-justupdate")) {
+				justupdate = true;
 			} else if (equal(args[i], L"-debug")) {
 				debug = _debug = true;
 				openLog();
@@ -388,6 +738,10 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		if (exeName.empty()) {
 			exeName = L"AyuGram.exe";
 		}
+		if (!processArgumentsValid) {
+			writeLog(L"Invalid update process arguments; "
+				L"continuing without process handoff.");
+		}
 		if (needupdate) writeLog(L"Need to update!");
 		if (autostart) writeLog(L"From autostart!");
 		if (writeprotected) writeLog(L"Write Protected folder!");
@@ -403,7 +757,18 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 					updateTo = updaterDir;
 				}
 				writeLog(L"Update to: " + updateTo);
+				if (needupdate && processId && processArgumentsValid) {
+					const auto error = FinishUpdateProcess(
+						processId,
+						processCreated);
+					if (error != ERROR_SUCCESS) {
+						writeLog(FormatUpdateError(
+							L"Could not finish closing Telegram; continuing with copy retries.",
+							error));
+					}
+				}
 				if (needupdate && update()) {
+					updated = true;
 					updateRegistry();
 				}
 				if (writeprotected) { // if we can't clear all tupdates\ready (Updater.exe is there) - clear only version
@@ -419,7 +784,6 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		} else {
 			writeLog(L"Error: short exe name!");
 		}
-		LocalFree(args);
 	} else {
 		writeLog(L"Error: No command line arguments!");
 	}
@@ -436,47 +800,20 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 	}
 	writeLog(L"Result arguments: " + targs);
 
-	bool executed = false;
-	if (writeprotected) { // run un-elevated
-		writeLog(L"Trying to run un-elevated by temp.lnk");
+	bool executed = justupdate;
+	if (justupdate) {
+		writeLog(L"Just updating, the parent relaunches..");
+	} else if (writeprotected) { // run un-elevated
+		writeLog(L"Trying to run un-elevated through the desktop shell..");
 
 		HRESULT hres = CoInitialize(0);
 		if (SUCCEEDED(hres)) {
-			IShellLink* psl;
-			HRESULT hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
-			if (SUCCEEDED(hres)) {
-				IPersistFile* ppf;
-
-				wstring exe = updateTo + exeName, dir = updateTo;
-				psl->SetArguments((targs.size() ? targs.substr(1) : targs).c_str());
-				psl->SetPath(exe.c_str());
-				psl->SetWorkingDirectory(dir.c_str());
-				psl->SetDescription(L"");
-
-				hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
-
-				if (SUCCEEDED(hres)) {
-					wstring lnk = L"tupdates\\temp\\temp.lnk";
-					hres = ppf->Save(lnk.c_str(), TRUE);
-					if (!SUCCEEDED(hres)) {
-						lnk = L"tupdates\\ready\\temp.lnk"; // old
-						hres = ppf->Save(lnk.c_str(), TRUE);
-					}
-					ppf->Release();
-
-					if (SUCCEEDED(hres)) {
-						writeLog(L"Executing un-elevated through link..");
-						ShellExecute(0, 0, L"explorer.exe", lnk.c_str(), 0, SW_SHOWNORMAL);
-						executed = true;
-					} else {
-						writeLog(L"Error: ppf->Save failed");
-					}
-				} else {
-					writeLog(L"Error: Could not create interface IID_IPersistFile");
-				}
-				psl->Release();
-			} else {
-				writeLog(L"Error: could not create instance of IID_IShellLink");
+			executed = LaunchUnelevated(
+				updateTo + exeName,
+				targs.size() ? targs.substr(1) : targs,
+				updateTo);
+			if (executed) {
+				writeLog(L"Executed un-elevated through the desktop shell.");
 			}
 			CoUninitialize();
 		} else {
@@ -484,13 +821,19 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPWSTR cmdPara
 		}
 	}
 	if (!executed) {
-		ShellExecute(0, 0, (updateTo + exeName).c_str(), (L"-noupdate" + targs).c_str(), 0, SW_SHOWNORMAL);
+		ShellExecuteW(
+			0,
+			0,
+			(updateTo + exeName).c_str(),
+			(L"-noupdate" + targs).c_str(),
+			updateTo.empty() ? nullptr : updateTo.c_str(),
+			SW_SHOWNORMAL);
 	}
 
-	writeLog(L"Executed '" + exeName + L"', closing log and quitting..");
+	writeLog(L"Closing log and quitting..");
 	closeLog();
 
-	return 0;
+	return (needupdate && !updated) ? 1 : 0;
 }
 
 static const WCHAR *_programName = L"Telegram Desktop"; // folder in APPDATA, if current path is unavailable for writing

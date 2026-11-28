@@ -8,19 +8,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "editor/photo_editor_controls.h"
 
 #include "editor/controllers/controllers.h"
+#include "editor/audio_track_timeline.h"
+#include "editor/editor_keys_legend.h"
+#include "editor/video_item_timeline.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
 #include "ui/effects/round_checkbox.h"
 #include "ui/image/image_prepare.h"
-#include "ui/qt_object_factory.h"
+#include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
-#include "ui/widgets/menu/menu_action.h"
-#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/widgets/tooltip.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/painter.h"
+#include "ui/qt_object_factory.h"
 #include "ui/rect.h"
+#include "ui/ui_utility.h"
+
 #include "styles/style_editor.h"
 #include "styles/style_media_player.h" // mediaPlayerMenuCheck
 
@@ -470,36 +477,191 @@ ButtonBar::ButtonBar(
 	}, lifetime());
 }
 
-class TextToolButton final : public Ui::AbstractButton {
+class TrimShortestButton final
+	: public Ui::IconButton
+	, public Ui::AbstractTooltipShower {
 public:
-	TextToolButton(not_null<QWidget*> parent)
-	: AbstractButton(parent) {
-		resize(
-			st::photoEditorTextButtonSize.width(),
-			st::photoEditorTextButtonSize.height());
+	explicit TrimShortestButton(QWidget *parent)
+	: IconButton(parent, st::photoEditorRotateButton)
+	, _icon(Lottie::MakeIcon({
+		.path = u":/animations/photo_editor_trim_shortest.tgs"_q,
+		.color = &st::photoEditorButtonIconFg,
+		.sizeOverride = QSize(
+			st::photoEditorTrimShortestIconSize,
+			st::photoEditorTrimShortestIconSize),
+	})) {
 		events(
 		) | rpl::on_next([=](not_null<QEvent*> event) {
-			if (event->type() == QEvent::Enter
-				|| event->type() == QEvent::Leave) {
-				update();
+			if (event->type() == QEvent::Enter) {
+				Ui::Tooltip::Show(1000, this);
+			} else if (event->type() == QEvent::Leave) {
+				Ui::Tooltip::Hide();
 			}
 		}, lifetime());
 	}
 
-private:
-	void paintEvent(QPaintEvent *) override {
-		auto p = QPainter(this);
-		auto hq = PainterHighQualityEnabler(p);
-		auto font = st::semiboldFont->f;
-		font.setPixelSize(QWidget::rect().height() / 2);
-		p.setFont(font);
-		p.setPen(isOver()
-			? st::photoEditorButtonIconFgOver
-			: st::photoEditorButtonIconFg);
-		p.translate(0, st::photoEditorTextButtonGlyphSkip);
-		p.drawText(QWidget::rect(), style::al_center, u"A"_q);
+	void setActive(bool active, anim::type animated) {
+		if (_active == active) {
+			return;
+		}
+		_active = active;
+		const auto last = _icon->framesCount() - 1;
+		const auto repaint = [=] { update(); };
+		if (animated == anim::type::instant) {
+			_icon->jumpTo(active ? last : 0, repaint);
+		} else {
+			_icon->animate(repaint, active ? 0 : last, active ? last : 0);
+		}
 	}
+	QString tooltipText() const override {
+		return tr::lng_photo_editor_trim_shortest(tr::now);
+	}
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+	bool tooltipWindowActive() const override {
+		return Ui::AppInFocus() && Ui::InFocusChain(window());
+	}
+
+protected:
+	void paintEvent(QPaintEvent *e) override {
+		auto p = Painter(this);
+		paintRipple(p, st().rippleAreaPosition);
+		const auto last = std::max(_icon->framesCount() - 1, 1);
+		const auto progress = _icon->frameIndex() / float64(last);
+		const auto idle = anim::color(
+			st::photoEditorButtonIconFg,
+			st::photoEditorButtonIconFgOver,
+			iconOverOpacity());
+		_icon->paintInCenter(p, rect(), anim::color(
+			idle,
+			st::photoEditorButtonIconFgActive,
+			progress));
+	}
+
+private:
+	const std::unique_ptr<Lottie::Icon> _icon;
+	bool _active = false;
+
 };
+
+class SaveButton final
+	: public Ui::IconButton
+	, public Ui::AbstractTooltipShower {
+public:
+	explicit SaveButton(QWidget *parent)
+	: IconButton(parent, st::photoEditorSaveButton) {
+		events(
+		) | rpl::on_next([=](not_null<QEvent*> event) {
+			if (event->type() == QEvent::Enter) {
+				Ui::Tooltip::Show(1000, this);
+			} else if (event->type() == QEvent::Leave) {
+				Ui::Tooltip::Hide();
+			}
+		}, lifetime());
+	}
+	void setSaveEnabled(bool enabled) {
+		setEnabled(enabled);
+		if (enabled) {
+			setIconColorOverride(std::nullopt);
+		} else {
+			auto color = st::photoEditorButtonIconFg->c;
+			color.setAlphaF(
+				color.alphaF() * st::photoEditorButtonDisabledOpacity);
+			setIconColorOverride(color);
+		}
+	}
+
+	QString tooltipText() const override {
+		return isEnabled()
+			? tr::lng_story_save_file(tr::now)
+			: tr::lng_story_preparing_video(tr::now);
+	}
+	QPoint tooltipPos() const override {
+		return QCursor::pos();
+	}
+	bool tooltipWindowActive() const override {
+		return Ui::AppInFocus() && Ui::InFocusChain(window());
+	}
+
+};
+
+class TextToolButton final : public Ui::AbstractButton {
+public:
+	TextToolButton(not_null<QWidget*> parent, bool supportsEmoji);
+
+	void setEditing(bool editing);
+
+	[[nodiscard]] bool emojiMode() const;
+
+private:
+	void updateAccessibleName();
+
+	void paintEvent(QPaintEvent *) override;
+
+	const bool _supportsEmoji;
+	bool _emoji = false;
+
+};
+
+TextToolButton::TextToolButton(not_null<QWidget*> parent, bool supportsEmoji)
+: AbstractButton(parent)
+, _supportsEmoji(supportsEmoji) {
+	resize(
+		st::photoEditorTextButtonSize.width(),
+		st::photoEditorTextButtonSize.height());
+	updateAccessibleName();
+	events(
+	) | rpl::on_next([=](not_null<QEvent*> event) {
+		if (event->type() == QEvent::Enter
+			|| event->type() == QEvent::Leave) {
+			update();
+		}
+	}, lifetime());
+}
+
+void TextToolButton::setEditing(bool editing) {
+	const auto emoji = _supportsEmoji && editing;
+	if (_emoji == emoji) {
+		return;
+	}
+	_emoji = emoji;
+	updateAccessibleName();
+	update();
+}
+
+bool TextToolButton::emojiMode() const {
+	return _emoji;
+}
+
+void TextToolButton::updateAccessibleName() {
+	setAccessibleName(_emoji
+		? tr::lng_photo_editor_insert_emoji(tr::now)
+		: tr::lng_photo_editor_text_placeholder(tr::now));
+}
+
+void TextToolButton::paintEvent(QPaintEvent *) {
+	auto p = QPainter(this);
+	auto hq = PainterHighQualityEnabler(p);
+	const auto content = rect().translated(
+		0,
+		st::photoEditorTextButtonGlyphSkip);
+	if (_emoji) {
+		const auto &button = st::photoEditorTextEmojiButton;
+		const auto &icon = isOver()
+			? button.iconOver
+			: button.icon;
+		icon.paintInCenter(p, content);
+		return;
+	}
+	auto font = st::semiboldFont->f;
+	font.setPixelSize(QWidget::rect().height() / 2);
+	p.setFont(font);
+	p.setPen(isOver()
+		? st::photoEditorButtonIconFgOver
+		: st::photoEditorButtonIconFg);
+	p.drawText(content, style::al_center, u"A"_q);
+}
 
 PhotoEditorControls::PhotoEditorControls(
 	not_null<Ui::RpWidget*> parent,
@@ -511,6 +673,9 @@ PhotoEditorControls::PhotoEditorControls(
 : RpWidget(parent)
 , _imageSize(imageSize)
 , _originalRatio(data.originalRatio)
+, _fixedCrop(data.fixedCrop)
+, _canvasMode(data.story && !data.story->canvasMedia.isNull())
+, _storyPhoto(data.story && data.story->videoObject.empty())
 , _bg(st::roundedBg)
 , _buttonHeight(st::photoEditorButtonBarHeight)
 , _transformButtons(base::make_unique_q<ButtonBar>(this, _bg))
@@ -551,6 +716,9 @@ PhotoEditorControls::PhotoEditorControls(
 		_transformButtons,
 		st::photoEditorCornersButton)
 	: nullptr)
+, _saveButton((data.hasSaveButton || data.story.has_value())
+	? base::make_unique_q<SaveButton>(_transformButtons)
+	: nullptr)
 , _transformDone(base::make_unique_q<EdgeButton>(
 	_transformButtons,
 	(data.confirm.isEmpty() ? tr::lng_box_done(tr::now) : data.confirm),
@@ -579,7 +747,9 @@ PhotoEditorControls::PhotoEditorControls(
 			_paintBottomButtons,
 			st::photoEditorStickersButton)
 		: nullptr)
-, _textButton(base::make_unique_q<TextToolButton>(_paintBottomButtons))
+, _textButton(base::make_unique_q<TextToolButton>(
+	_paintBottomButtons,
+	data.story && controllers->stickersPanelController))
 , _shapesButton(base::make_unique_q<Ui::IconButton>(
 	_paintBottomButtons,
 	st::photoEditorShapesButton))
@@ -589,9 +759,47 @@ PhotoEditorControls::PhotoEditorControls(
 	_buttonHeight,
 	st::photoEditorEdgeButtonBg,
 	st::mediaviewTextLinkFg,
-	st::photoEditorRotateButton.ripple)) {
+	st::photoEditorRotateButton.ripple))
+, _videoTimeline(base::make_unique_q<Ui::FadeWrap<VideoItemTimeline>>(
+	this,
+	object_ptr<VideoItemTimeline>(this)))
+, _audioTimeline(base::make_unique_q<Ui::FadeWrap<AudioTrackTimeline>>(
+	this,
+	object_ptr<AudioTrackTimeline>(this)))
+, _trimShortest(base::make_unique_q<Ui::FadeWrap<Ui::IconButton>>(
+	this,
+	object_ptr<TrimShortestButton>(this)))
+, _keysLegend(base::make_unique_q<KeysLegendButton>(this, [=] {
+	return KeysLegendContext{
+		.mode = _mode.current().mode,
+		.fixedCrop = _fixedCrop,
+		.timeline = _videoTimelineShown || _audioTimelineShown,
+		.canvasMode = _canvasMode,
+		.storyPhoto = _storyPhoto,
+	};
+})) {
 
 	_shapesFilled = shapesFilled;
+	const auto panel = controllers->stickersPanelController.get();
+	_textButton->setClickedCallback([=] {
+		if (_textButton->emojiMode()) {
+			panel->toggleTextEmojiPanel(
+				_textButton->mapToGlobal(
+					QPoint(_textButton->width() / 2, 0)));
+		} else {
+			_textRequests.fire({});
+		}
+	});
+	_videoTimeline->hide(anim::type::instant);
+	_videoTimeline->setDuration(st::photoEditorBarAnimationDuration);
+	_audioTimeline->hide(anim::type::instant);
+	_audioTimeline->setDuration(st::photoEditorBarAnimationDuration);
+	_trimShortest->hide(anim::type::instant);
+	_trimShortest->setDuration(st::photoEditorBarAnimationDuration);
+	_paintTopButtons->geometryValue(
+	) | rpl::on_next([=] {
+		updateTimelinesGeometry();
+	}, lifetime());
 	_shapesButton->setClickedCallback([=] {
 		if (_shapeToolActive) {
 			_shapeRequests.fire({ .action = ShapeRequest::Action::Cancel });
@@ -629,6 +837,10 @@ PhotoEditorControls::PhotoEditorControls(
 		current->moveToLeft(
 			(size.width() - current->width()) / 2,
 			buttonsTop);
+
+		_keysLegend->moveToLeft(st::photoEditorKeysButtonLeft, buttonsTop);
+		_keysLegend->setVisible(
+			current->x() >= _keysLegend->x() + _keysLegend->width());
 
 		if (_about) {
 			const auto &margin = st::photoEditorAboutMargin;
@@ -680,6 +892,8 @@ PhotoEditorControls::PhotoEditorControls(
 		_paintBottomButtons->shownValue() | rpl::to_empty,
 		_paintTopButtons->geometryValue() | rpl::to_empty,
 		_paintTopButtons->shownValue() | rpl::to_empty,
+		_keysLegend->geometryValue() | rpl::to_empty,
+		_keysLegend->shownValue() | rpl::to_empty,
 		std::move(aboutChanges)
 	) | rpl::on_next([=] {
 		updateInputMask();
@@ -849,6 +1063,9 @@ PhotoEditorControls::PhotoEditorControls(
 					selected ? check : nullptr);
 			};
 			add(
+				tr::lng_photo_editor_corners_circle(tr::now),
+				RoundedCornersLevel::Circle);
+			add(
 				tr::lng_photo_editor_corners_large(tr::now),
 				RoundedCornersLevel::Large);
 			add(
@@ -901,11 +1118,15 @@ rpl::producer<> PhotoEditorControls::paintModeRequests() const {
 }
 
 rpl::producer<> PhotoEditorControls::textRequests() const {
-	return _textButton->clicks() | rpl::to_empty;
+	return _textRequests.events();
 }
 
 rpl::producer<ShapeRequest> PhotoEditorControls::shapeRequests() const {
 	return _shapeRequests.events();
+}
+
+void PhotoEditorControls::setTextEditing(bool editing) {
+	_textButton->setEditing(editing);
 }
 
 void PhotoEditorControls::setShapeToolActive(bool active) {
@@ -1027,6 +1248,18 @@ rpl::producer<> PhotoEditorControls::cancelRequests() const {
 	}) | rpl::to_empty);
 }
 
+rpl::producer<> PhotoEditorControls::saveRequests() const {
+	return _saveButton
+		? (_saveButton->clicks() | rpl::to_empty)
+		: (rpl::never<>() | rpl::type_erased);
+}
+
+void PhotoEditorControls::setSaveEnabled(bool enabled) {
+	if (const auto button = static_cast<SaveButton*>(_saveButton.get())) {
+		button->setSaveEnabled(enabled);
+	}
+}
+
 rpl::producer<float64> PhotoEditorControls::aspectRatioChanges() const {
 	return _aspectRatioChanges.events();
 }
@@ -1128,6 +1361,7 @@ void PhotoEditorControls::updateInputMask() {
 	add(_transformButtons);
 	add(_paintBottomButtons);
 	add(_paintTopButtons);
+	add(_keysLegend);
 	if (_about && !_about->isHidden()) {
 		const auto geometry = _about->geometry() & visibleRect;
 		if (!geometry.isEmpty()) {
@@ -1160,7 +1394,119 @@ rpl::producer<bool> PhotoEditorControls::colorLineShownValue() const {
 	return _paintTopButtons->shownValue();
 }
 
+void PhotoEditorControls::setVideoClip(std::shared_ptr<VideoClip> clip) {
+	const auto shown = (clip != nullptr);
+	_videoTimelineShown = shown;
+	updateTrimShortest();
+	if (shown) {
+		_videoTimeline->entity()->setClip(std::move(clip));
+		updateTimelineGeometry(_videoTimeline.get());
+	}
+	_videoTimeline->toggle(shown, anim::type::normal);
+	if (!shown) {
+		_videoTimeline->entity()->setClip(nullptr);
+	}
+}
+
+void PhotoEditorControls::setAudioTrack(std::shared_ptr<AudioTrack> track) {
+	const auto shown = (track != nullptr);
+	_audioTimelineShown = shown;
+	updateTrimShortest();
+	_audioTimeline->entity()->setTrack(std::move(track));
+	if (shown) {
+		updateTimelineGeometry(_audioTimeline.get());
+	}
+	_audioTimeline->toggle(shown, anim::type::normal);
+}
+
+void PhotoEditorControls::setTrimShortestAvailable(bool available) {
+	if (_trimShortestAvailable == available) {
+		return;
+	}
+	_trimShortestAvailable = available;
+	updateTrimShortest();
+}
+
+void PhotoEditorControls::setTrimShortestActive(
+		bool active,
+		anim::type animated) {
+	const auto button = static_cast<TrimShortestButton*>(
+		_trimShortest->entity());
+	button->setActive(active, animated);
+}
+
+void PhotoEditorControls::refreshTimelines() {
+	_videoTimeline->entity()->refreshTrim();
+	_audioTimeline->entity()->refreshTrim();
+}
+
+void PhotoEditorControls::refreshAudioVolume() {
+	_audioTimeline->entity()->refreshVolume();
+}
+
+void PhotoEditorControls::commitTimelineEdits() {
+	_videoTimeline->entity()->commitPendingEdit();
+	_audioTimeline->entity()->commitPendingEdit();
+}
+
+rpl::producer<> PhotoEditorControls::trimShortestRequests() const {
+	return _trimShortest->entity()->clicks() | rpl::to_empty;
+}
+
+rpl::producer<crl::time> PhotoEditorControls::trimLengthChanges() const {
+	return rpl::merge(
+		_videoTimeline->entity()->lengthChanges(),
+		_audioTimeline->entity()->lengthChanges());
+}
+
+rpl::producer<> PhotoEditorControls::audioRemoveRequests() const {
+	return _audioTimeline->entity()->removeRequests();
+}
+
+void PhotoEditorControls::updateTrimShortest() {
+	const auto shown = _trimShortestAvailable
+		&& (_videoTimelineShown || _audioTimelineShown);
+	if (shown == _trimShortest->toggled()) {
+		return;
+	}
+	_trimShortest->toggle(shown, anim::type::normal);
+	if (shown || _videoTimelineShown || _audioTimelineShown) {
+		updateTimelinesGeometry();
+	}
+}
+
+void PhotoEditorControls::updateTimelinesGeometry() {
+	updateTimelineGeometry(_videoTimeline.get());
+	updateTimelineGeometry(_audioTimeline.get());
+}
+
+void PhotoEditorControls::updateTimelineGeometry(
+		not_null<Ui::RpWidget*> timeline) {
+	const auto bar = _paintTopButtons->geometry();
+	const auto skip = st::photoEditorTimelineSkip;
+	const auto left = _undoButton->width() + skip;
+	const auto trimShortest = _trimShortest->toggled()
+		? (_trimShortest->width() + skip)
+		: 0;
+	const auto width = bar.width()
+		- left
+		- trimShortest
+		- _redoButton->width()
+		- skip;
+	timeline->resizeToWidth(std::max(width, 1));
+	timeline->moveToLeft(bar.x() + left, bar.y());
+	_trimShortest->moveToLeft(
+		bar.x() + left + std::max(width, 1) + skip,
+		bar.y());
+}
+
 bool PhotoEditorControls::handleKeyPress(not_null<QKeyEvent*> e) const {
+	if ((e->key() == Qt::Key_Question) || (e->text() == u"?"_q)) {
+		if (!e->isAutoRepeat()) {
+			_keysLegend->toggle();
+		}
+		return true;
+	}
 	_keyPresses.fire(std::move(e));
 	return true;
 }

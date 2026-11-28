@@ -10,28 +10,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QDateTime>
 
 #include "data/data_credits.h"
-#include "data/data_file_origin.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
+#include "data/data_file_origin.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
-#include "history/view/media/history_view_sticker_player.h"
 #include "info/bot/starref/info_bot_starref_common.h"
-#include "info/userpic/info_userpic_emoji_builder_preview.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/effects/spoiler_mess.h"
-#include "ui/empty_userpic.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/text/custom_emoji_instance.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/number_input.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/empty_userpic.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
+
 #include "styles/style_channel_earn.h"
 #include "styles/style_color_indices.h"
 #include "styles/style_credits.h"
@@ -514,32 +513,6 @@ PaintRoundImageCallback GeneratePaidMediaPaintCallback(
 		GeneratePaidPhotoPaintCallback(photo, update),
 		GeneratePaidPhotoPaintCallback(second, update),
 		totalCount);
-}
-
-PaintRoundImageCallback GenerateGiftStickerUserpicCallback(
-		not_null<Main::Session*> session,
-		uint64 stickerId,
-		Fn<void()> update) {
-	struct State {
-		std::optional<UserpicBuilder::PreviewPainter> painter;
-		int size = 0;
-	};
-	const auto state = std::make_shared<State>();
-	//const auto document = session->data().document(stickerId);
-	return [=](Painter &p, int x, int y, int outerWidth, int size) {
-		if (state->size != size || !state->painter) {
-			state->size = size;
-			state->painter.emplace(size * M_SQRT2);
-			state->painter->setDocument(
-				session->data().document(stickerId),
-				update);
-		}
-		const auto skip = int(base::SafeRound((size * (M_SQRT2 - 1.)) / 2.));
-		auto hq = PainterHighQualityEnabler(p);
-		p.translate(x - skip, y - skip);
-		state->painter->paintForeground(p);
-		p.translate(skip - x, skip - y);
-	};
 }
 
 Fn<PaintRoundImageCallback(Fn<void()>)> PaintPreviewCallback(

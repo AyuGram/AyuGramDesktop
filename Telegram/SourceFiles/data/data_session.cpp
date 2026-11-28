@@ -7,41 +7,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_session.h"
 
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "main/main_app_config.h"
-#include "apiwrap.h"
-#include "mainwidget.h"
 #include "api/api_bot.h"
 #include "api/api_premium.h"
 #include "api/api_text_entities.h"
 #include "api/api_user_names.h"
+#include "apiwrap.h"
+#include "base/platform/base_platform_info.h"
+#include "base/call_delayed.h"
+#include "base/options.h"
+#include "base/random.h"
+#include "base/unixtime.h"
+#include "boxes/abstract_box.h"
 #include "chat_helpers/stickers_lottie.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "core/mime_type.h" // Core::IsMimeSticker
-#include "ui/image/image_location_factory.h" // Images::FromPhotoSize
-#include "ui/text/format_values.h" // Ui::FormatPhone
-#include "ui/color_int_conversion.h"
-#include "export/export_manager.h"
-#include "export/view/export_view_panel_controller.h"
-#include "mtproto/mtproto_config.h"
-#include "window/notifications_manager.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/history_item_components.h"
-#include "history/history_streamed_drafts.h"
-#include "history/view/media/history_view_media.h"
-#include "history/view/history_view_element.h"
-#include "inline_bots/inline_bot_layout_item.h"
-#include "storage/storage_account.h"
-#include "storage/storage_encrypted_file.h"
-#include "media/player/media_player_instance.h" // instance()->play()
-#include "media/audio/media_audio.h"
-#include "boxes/abstract_box.h"
-#include "passport/passport_form_controller.h"
-#include "iv/iv_data.h"
-#include "lang/lang_keys.h" // tr::lng_deleted(tr::now) in user name
 #include "data/business/data_business_chatbots.h"
 #include "data/business/data_business_info.h"
 #include "data/business/data_shortcut_messages.h"
@@ -49,49 +29,72 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/welcome_messages.h"
-#include "data/stickers/data_stickers.h"
 #include "data/notify/data_notify_settings.h"
+#include "data/stickers/data_stickers.h"
 #include "data/data_ai_compose_tones.h"
 #include "data/data_bot_app.h"
 #include "data/data_changes.h"
-#include "data/data_group_call.h"
-#include "data/data_folder.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_file_origin.h"
-#include "data/data_download_manager.h"
-#include "data/data_web_page.h"
-#include "iv/iv_rich_page.h"
-#include "data/data_game.h"
-#include "data/data_poll.h"
-#include "data/data_replies_list.h"
 #include "data/data_chat_filters.h"
-#include "dialogs/dialogs_entry.h"
-#include "dialogs/dialogs_row.h"
-#include "base/options.h"
-#include "data/data_send_action.h"
-#include "data/data_message_reactions.h"
-#include "data/data_emoji_statuses.h"
-#include "data/data_forum_icons.h"
 #include "data/data_cloud_themes.h"
+#include "data/data_download_manager.h"
+#include "data/data_emoji_statuses.h"
+#include "data/data_file_origin.h"
+#include "data/data_folder.h"
+#include "data/data_forum.h"
+#include "data/data_forum_icons.h"
+#include "data/data_forum_topic.h"
+#include "data/data_game.h"
+#include "data/data_group_call.h"
+#include "data/data_histories.h"
+#include "data/data_media_rotation.h"
+#include "data/data_message_reactions.h"
+#include "data/data_peer_values.h"
+#include "data/data_poll.h"
+#include "data/data_premium_limits.h"
+#include "data/data_replies_list.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
+#include "data/data_send_action.h"
 #include "data/data_stories.h"
 #include "data/data_streaming.h"
-#include "data/data_media_rotation.h"
-#include "data/data_histories.h"
-#include "data/data_peer_values.h"
-#include "data/data_premium_limits.h"
-#include "data/data_forum.h"
-#include "data/data_forum_topic.h"
 #include "data/data_todo_list.h"
-#include "base/platform/base_platform_info.h"
-#include "base/unixtime.h"
-#include "base/call_delayed.h"
-#include "base/random.h"
+#include "data/data_user.h"
+#include "data/data_web_page.h"
+#include "dialogs/dialogs_entry.h"
+#include "dialogs/dialogs_row.h"
+#include "export/view/export_view_panel_controller.h"
+#include "export/export_manager.h"
+#include "history/view/media/history_view_media.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "history/history_streamed_drafts.h"
+#include "inline_bots/inline_bot_layout_item.h"
+#include "iv/iv_data.h"
+#include "iv/iv_rich_page.h"
+#include "lang/lang_keys.h" // tr::lng_deleted(tr::now) in user name
+#include "main/main_app_config.h"
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "mainwidget.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_instance.h" // instance()->play()
+#include "mtproto/mtproto_config.h"
+#include "passport/passport_form_controller.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
+#include "storage/storage_account.h"
+#include "storage/storage_encrypted_file.h"
+#include "tgw/tgw_storage.h"
+#include "ui/image/image_location_factory.h" // Images::FromPhotoSize
+#include "ui/text/format_values.h" // Ui::FormatPhone
+#include "ui/color_int_conversion.h"
+#include "wallet/wallet_session.h"
+#include "wallet/wallet_transfer_messages.h"
+#include "window/notifications_manager.h"
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -127,7 +130,7 @@ void CheckForSwitchInlineButton(not_null<HistoryItem*> item) {
 		return;
 	}
 	if (const auto user = item->history()->peer->asUser()) {
-		if (!user->isBot() || !user->botInfo->inlineReturnTo.key) {
+		if (!user->isBot() || !user->botInfo->inlineReturnTo().key) {
 			return;
 		}
 		if (const auto markup = item->Get<HistoryMessageReplyMarkup>()) {
@@ -275,6 +278,7 @@ void EnumerateWebPagePhotos(
 	case WebPageType::Story:
 	case WebPageType::StoryAlbum:
 	case WebPageType::NewBot:
+	case WebPageType::BotInvite:
 	case WebPageType::VoiceChat:
 	case WebPageType::Livestream:
 	case WebPageType::ConferenceCall: return true;
@@ -373,6 +377,32 @@ Session::Session(not_null<Main::Session*> session)
 	setupChannelLeavingViewer();
 	setupPeerNameViewer();
 	setupUserIsContactViewer();
+
+	session->changes().peerUpdates(
+		PeerUpdate::Flag::VerifyInfo
+	) | rpl::on_next([=](const PeerUpdate &update) {
+		auto affected = std::vector<base::weak_ptr<ViewElement>>();
+		for (const auto &[item, views] : _views) {
+			for (const auto &view : views) {
+				if (view->displayFrom() == update.peer
+					&& view->displayFromName()
+					&& view->hasBubble()) {
+					view->setPendingResize();
+					affected.push_back(base::make_weak(view.get()));
+				}
+			}
+		}
+		for (const auto &weak : affected) {
+			if (const auto view = weak.get()) {
+				requestViewRepaint(view);
+				if (view->pendingResize()) {
+					requestViewResize(view);
+				} else {
+					notifyViewLayoutChange(view);
+				}
+			}
+		}
+	}, _lifetime);
 
 	_chatsList.unreadStateChanges(
 	) | rpl::on_next([=] {
@@ -567,6 +597,9 @@ void Session::clear() {
 	_contactsList.clear();
 	for (const auto &[id, folder] : _folders) {
 		folder->clearChatsList();
+
+		// Folders outlive clear(), don't leave them with dangling rows.
+		removeChatListEntry(folder.get());
 	}
 	_chatsList.clear();
 	_chatsFilters->clear();
@@ -657,7 +690,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 		return data.vid().v;
 	}));
 	auto minimal = false;
-	const MTPUserStatus *status = nullptr;
+	auto status = (const MTPUserStatus*)nullptr;
 	const MTPUserStatus emptyStatus = MTP_userStatusEmpty();
 
 	using UpdateFlag = PeerUpdate::Flag;
@@ -740,6 +773,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				| Flag::MutualContact
 				| Flag::DiscardMinPhoto
 				| Flag::StoriesHidden
+				| Flag::CloseFriend
 				: Flag());
 		const auto storiesState = minimal
 			? std::optional<Data::Stories::PeerSourceState>()
@@ -782,6 +816,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 					? Flag()
 					: Flag::DiscardMinPhoto)
 				| (data.is_stories_hidden() ? Flag::StoriesHidden : Flag())
+				| (data.is_close_friend() ? Flag::CloseFriend : Flag())
 				: Flag());
 		result->setFlags((result->flags() & ~flagsMask) | flagsSet);
 		result->setBotVerifyDetailsIcon(
@@ -833,7 +868,7 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 				? result->phone()
 				: qs(data.vphone().value_or_empty());
 			const auto uname = minimal
-				? result->username()
+				? result->editableUsername()
 				: TextUtilities::SingleLine(
 					qs(data.vusername().value_or_empty()));
 
@@ -1246,6 +1281,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 		}
 	}, [&](const MTPDchannelForbidden &data) {
 		const auto channel = result->asChannel();
+		Tgw::ClearChatStorage(_session, channel->id);
 
 		auto wasInChannel = channel->amIn();
 		auto canViewAdmins = channel->canViewAdmins();
@@ -1712,6 +1748,7 @@ History *Session::historyLoaded(const PeerData *peer) {
 }
 
 void Session::deleteConversationLocally(not_null<PeerData*> peer) {
+	Tgw::DeleteChatStorage(_session, peer->id);
 	const auto markLeft = [&] {
 		if (const auto channel = peer->asMegagroup()) {
 			channel->addFlags(ChannelDataFlag::Left);
@@ -2009,24 +2046,6 @@ void Session::requestDocumentViewRepaint(
 	}
 }
 
-void Session::requestPollViewRepaint(not_null<const PollData*> poll) {
-	if (const auto i = _pollViews.find(poll); i != _pollViews.end()) {
-		for (const auto &view : i->second) {
-			requestViewResize(view);
-		}
-	}
-}
-
-void Session::requestTodoListViewRepaint(
-		not_null<const TodoListData*> todolist) {
-	if (const auto i = _todoListViews.find(todolist)
-		; i != _todoListViews.end()) {
-		for (const auto &view : i->second) {
-			requestViewResize(view);
-		}
-	}
-}
-
 void Session::documentLoadProgress(not_null<DocumentData*> document) {
 	requestDocumentViewRepaint(document);
 	_documentLoadProgress.fire_copy(document);
@@ -2151,9 +2170,11 @@ HistoryItem *Session::changeMessageId(PeerId peerId, MsgId wasId, MsgId nowId) {
 	return item;
 }
 
-bool Session::queryItemVisibility(not_null<HistoryItem*> item) const {
+bool Session::queryItemVisibility(
+		not_null<HistoryItem*> item,
+		const ViewElement *view) const {
 	auto result = false;
-	_itemVisibilityQueries.fire({ item, &result });
+	_itemVisibilityQueries.fire({ item, &result, view });
 	return result;
 }
 
@@ -2171,16 +2192,18 @@ bool Session::queryDocumentVisibility(
 }
 
 
-[[nodiscard]] auto Session::itemVisibilityQueries() const
+auto Session::itemVisibilityQueries() const
 -> rpl::producer<Session::ItemVisibilityQuery> {
 	return _itemVisibilityQueries.events();
 }
 
 void Session::itemVisibilitiesUpdated() {
-	// This could be rewritten in a more generic form, like:
-	// rpl::producer<> itemVisibilitiesUpdates()
-	// if someone else requires those methods, using fast for now.
 	Core::App().downloadManager().itemVisibilitiesUpdated(_session);
+	_itemVisibilitiesUpdates.fire({});
+}
+
+rpl::producer<> Session::itemVisibilitiesUpdates() const {
+	return _itemVisibilitiesUpdates.events();
 }
 
 void Session::notifyItemIdChange(IdChange event) {
@@ -3350,8 +3373,14 @@ void Session::checkMediaDestroys() {
 void Session::registerFormattedDateUpdate(
 		TimeId when,
 		not_null<HistoryView::Element*> view) {
-	_formattedDateUpdates[when].push_back(
-		base::make_weak(view.get()));
+	auto &list = _formattedDateUpdates[when];
+	const auto already = ranges::any_of(list, [&](const auto &weak) {
+		return (weak.get() == view.get());
+	});
+	if (already) {
+		return;
+	}
+	list.push_back(base::make_weak(view.get()));
 	const auto nearest = _formattedDateUpdates.begin()->first;
 	if (nearest < when && _formattedDateTimer.isActive()) {
 		return;
@@ -3393,6 +3422,7 @@ void Session::checkFormattedDateUpdates() {
 void Session::processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data) {
+	Tgw::ClearMessagesStorage(_session, peerId, data);
 	const auto list = messagesList(peerId);
 	const auto affected = historyLoaded(peerId);
 	if (!list && !affected) {
@@ -3430,6 +3460,7 @@ void Session::processMessagesDeleted(
 }
 
 void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
+	Tgw::ClearNonChannelStorage(_session, data);
 	auto toDestroy = std::vector<not_null<HistoryItem*>>();
 	auto historiesToCheck = base::flat_set<not_null<History*>>();
 	for (const auto &messageId : data) {
@@ -3662,9 +3693,23 @@ HistoryItem *Session::addNewMessage(
 			if (const auto streamed = h->streamedDraftsIfExists()) {
 				if (const auto adopted = streamed->adoptIncoming(
 						data.c_message())) {
+					fillMessagePeers(peerId, data);
 					CheckForSwitchInlineButton(adopted);
 					return adopted;
 				}
+			}
+		}
+	}
+
+	if (type == NewMessageType::Unread
+		&& data.type() == mtpc_messageService) {
+		if (const auto h = historyLoaded(peerId)) {
+			auto &drafts = _session->wallet().transferMessages();
+			if (const auto adopted = drafts.adopt(
+					h,
+					id,
+					data.c_messageService())) {
+				return adopted;
 			}
 		}
 	}
@@ -3716,13 +3761,6 @@ bool Session::unreadBadgeMutedIgnoreOne(Dialogs::Key key) const {
 		? key.entry()->chatListUnreadState()
 		: Dialogs::UnreadState();
 	return computeUnreadBadgeMuted(_chatsList.unreadState() - remove);
-}
-
-int Session::unreadOnlyMutedBadge() const {
-	const auto state = _chatsList.unreadState();
-	return Core::App().settings().countUnreadMessages()
-		? state.messagesMuted
-		: state.chatsMuted;
 }
 
 rpl::producer<> Session::unreadBadgeChanges() const {
@@ -3967,7 +4005,9 @@ void Session::photoApplyFields(
 			sizes,
 			std::greater<>(),
 			level);
-		return (level(*result) == kInvalidIndex) ? sizes.end() : result;
+		return (result == sizes.end() || level(*result) == kInvalidIndex)
+			? sizes.end()
+			: result;
 	};
 	const auto image = [&](const QByteArray &levels) {
 		const auto i = find(levels);
@@ -3983,7 +4023,9 @@ void Session::photoApplyFields(
 		}
 		const auto area = [](const MTPVideoSize &size) {
 			return size.match([](const MTPDvideoSize &data) {
-				return data.vsize().v ? (data.vw().v * data.vh().v) : 0;
+				return (data.vsize().v > 0)
+					? (data.vw().v * data.vh().v)
+					: 0;
 			}, [](const MTPDvideoSizeEmojiMarkup &) {
 				return 0;
 			}, [](const MTPDvideoSizeStickerMarkup &) {
@@ -4318,22 +4360,6 @@ void Session::documentApplyFields(
 	if (dc != 0 && access != 0) {
 		document->setRemoteLocation(dc, access, fileReference);
 	}
-}
-
-not_null<DocumentData*> Session::venueIconDocument(const QString &icon) {
-	const auto i = _venueIcons.find(icon);
-	if (i != end(_venueIcons)) {
-		return i->second;
-	}
-	const auto result = documentFromWeb(MTP_webDocumentNoProxy(
-		MTP_string(u"https://ss3.4sqi.net/img/categories_v2/"_q
-			+ icon
-			+ u"_64.png"_q),
-		MTP_int(0),
-		MTP_string("image/png"),
-		MTP_vector<MTPDocumentAttribute>()), {}, {});
-	_venueIcons.emplace(icon, result);
-	return result;
 }
 
 not_null<WebPageData*> Session::webpage(WebPageId id) {
@@ -4978,15 +5004,9 @@ not_null<PollData*> Session::processPoll(const MTPDmessageMediaPoll &data) {
 				media.document = processDocument(*document);
 			}
 		}, [&](const MTPDmessageMediaGeo &data) {
-			data.vgeo().match([&](const MTPDgeoPoint &point) {
-				media.geo = LocationPoint(point);
-			}, [](const MTPDgeoPointEmpty &) {
-			});
+			media.geo = LocationPoint::FromMTP(data.vgeo());
 		}, [&](const MTPDmessageMediaVenue &data) {
-			data.vgeo().match([&](const MTPDgeoPoint &point) {
-				media.geo = LocationPoint(point);
-			}, [](const MTPDgeoPointEmpty &) {
-			});
+			media.geo = LocationPoint::FromMTP(data.vgeo());
 		}, [](const auto &) {
 		});
 	}
@@ -6088,7 +6108,13 @@ auto Session::joinChatWebViewDecision() const
 }
 
 rpl::producer<not_null<PeerData*>> Session::peerDecorationsUpdated() const {
-	return _peerDecorationsUpdated.events();
+	return rpl::merge(
+		_peerDecorationsUpdated.events(),
+		session().changes().peerUpdates(
+			PeerUpdate::Flag::BarSettings
+		) | rpl::map([](const PeerUpdate &update) {
+			return update.peer;
+		}));
 }
 
 void Session::viewTagsChanged(

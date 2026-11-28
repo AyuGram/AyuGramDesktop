@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_service_box.h"
+#include "history/view/media/history_view_sticker.h"
 #include "info/peer_gifts/info_peer_gifts_common.h"
 
 namespace Data {
@@ -52,7 +52,6 @@ public:
 	void unloadHeavyPart() override;
 
 private:
-	[[nodiscard]] bool incomingGift() const;
 	[[nodiscard]] bool outgoingGift() const;
 	[[nodiscard]] bool tonGift() const;
 	[[nodiscard]] bool starGift() const;

@@ -7,14 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_web_page.h"
 
+#include "base/qt/qt_key_modifiers.h"
 #include "base/unixtime.h"
 #include "core/application.h"
-#include "countries/countries_instance.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "window/window_session_controller.h"
-#include "iv/iv_instance.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
+#include "countries/countries_instance.h"
 #include "data/components/sponsored_messages.h"
 #include "data/data_file_click_handler.h"
 #include "data/data_photo_media.h"
@@ -30,17 +28,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "iv/iv_instance.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "menu/menu_sponsored.h"
 #include "ui/chat/chat_style.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/power_saving.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 
 // AyuGram includes
@@ -195,8 +196,6 @@ constexpr auto kLogEntryPreviewLines = 2;
 		? tr::lng_view_button_voice_chat_channel(tr::now)
 		: (type == WebPageType::ConferenceCall)
 		? tr::lng_view_button_call(tr::now)
-		: (type == WebPageType::Bot)
-		? tr::lng_view_button_bot(tr::now)
 		: (type == WebPageType::User)
 		? tr::lng_view_button_user(tr::now)
 		: (type == WebPageType::BotApp)
@@ -213,6 +212,8 @@ constexpr auto kLogEntryPreviewLines = 2;
 		? tr::lng_view_button_collection(tr::now)
 		: (type == WebPageType::NewBot)
 		? tr::lng_view_button_newbot(tr::now)
+		: (type == WebPageType::BotInvite)
+		? tr::lng_view_button_botinvite(tr::now)
 		: (type == WebPageType::Auction)
 		? ((page->auction
 			&& page->auction->endDate
@@ -243,7 +244,6 @@ constexpr auto kLogEntryPreviewLines = 2;
 		|| (type == WebPageType::ChannelBoost)
 		|| (type == WebPageType::ChannelWithRequest)
 		|| (type == WebPageType::Giftcode)
-		// || (type == WebPageType::Bot)
 		|| (type == WebPageType::User)
 		|| (type == WebPageType::VoiceChat)
 		|| (type == WebPageType::Livestream)
@@ -262,7 +262,8 @@ constexpr auto kLogEntryPreviewLines = 2;
 		|| (type == WebPageType::GiftCollection)
 		|| (type == WebPageType::ComposeAiTone)
 		|| (type == WebPageType::Auction)
-		|| (type == WebPageType::NewBot);
+		|| (type == WebPageType::NewBot)
+		|| (type == WebPageType::BotInvite);
 }
 
 } // namespace
@@ -419,8 +420,9 @@ QSize WebPage::countOptimalSize() {
 		|| (sponsored && !sponsored->hasMedia && _data->photo));
 
 	// Detect _openButtonWidth before counting paddings.
+	const auto mediaEditor = (_parent->context() == Context::MediaEditor);
 	_openButton = Ui::Text::String();
-	if (HasButton(_data)) {
+	if (!mediaEditor && HasButton(_data)) {
 		const auto context = Core::TextContext({
 			.session = &_data->session(),
 			.customEmojiLoopLimit = 1,
@@ -430,7 +432,9 @@ QSize WebPage::countOptimalSize() {
 			PageToPhrase(_data),
 			kMarkupTextOptions,
 			context);
-	} else if (sponsored && !sponsored->buttonText.isEmpty()) {
+	} else if (!mediaEditor
+		&& sponsored
+		&& !sponsored->buttonText.isEmpty()) {
 		auto phrase = TextWithEntities{ tr::upper(sponsored->buttonText) };
 		if (!sponsored->isLinkInternal) {
 			phrase.append(st::historyExternalLinkIcon);
@@ -694,7 +698,7 @@ QSize WebPage::countOptimalSize() {
 	const auto articleMinHeight = siteNameHeight
 		+ titleMinHeight
 		+ descriptionMinHeight;
-	const auto articlePhotoMaxWidth = _asArticle
+	const auto articlePhotoMaxWidth = asArticle()
 		? (st::webPagePhotoDelta
 			+ std::max(
 				ArticleThumbWidth(_data->photo, articleMinHeight),
@@ -743,7 +747,9 @@ QSize WebPage::countOptimalSize() {
 		accumulate_max(maxWidth, maxMediaWidth);
 		minHeight += _attach->minHeight() - rect::m::sum::v(bubble);
 	}
-	if (_data->type == WebPageType::Video && _data->duration) {
+	if (_data->type == WebPageType::Video
+		&& _data->duration
+		&& !mediaEditor) {
 		_duration = Ui::FormatDurationText(_data->duration);
 		_durationWidth = st::msgDateFont->width(_duration);
 	}
@@ -1058,7 +1064,9 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 				*backgroundEmojiCache,
 				backgroundEmojiData->firstGiftFrame);
 		}
-	} else if (factcheck && factcheck->expandable) {
+	} else if (factcheck
+		&& factcheck->expandable
+		&& (_parent->context() != Context::MediaEditor)) {
 		const auto &icon = factcheck->expanded ? _st.collapse : _st.expand;
 		const auto &position = factcheck->expanded
 			? _st.collapsePosition
@@ -1341,7 +1349,8 @@ void WebPage::draw(Painter &p, const PaintContext &context) const {
 			&& _collage.empty()
 			&& _data->photo
 			&& !_data->document) {
-			if (_attach->isReadyForOpen()) {
+			if (_attach->isReadyForOpen()
+				&& (_parent->context() != Context::MediaEditor)) {
 				if (_data->siteName == u"YouTube"_q) {
 					st->youtubeIcon().paint(
 						p,
@@ -1436,7 +1445,9 @@ WebPage::FactcheckData *WebPage::factcheckData() const {
 }
 
 WebPage::HintData *WebPage::hintData() const {
-	if (const auto sponsored = sponsoredData()) {
+	if (_parent->context() == Context::MediaEditor) {
+		return nullptr;
+	} else if (const auto sponsored = sponsoredData()) {
 		return sponsored->hint.link ? &sponsored->hint : nullptr;
 	} else if (const auto factcheck = factcheckData()) {
 		return factcheck->hint.link ? &factcheck->hint : nullptr;
@@ -1781,7 +1792,9 @@ bool WebPage::toggleSelectionByHandlerClick(const ClickHandlerPtr &p) const {
 	return _attach && _attach->toggleSelectionByHandlerClick(p);
 }
 
-bool WebPage::allowTextSelectionByHandler(const ClickHandlerPtr &p) const {
+bool WebPage::allowTextSelectionByHandler(
+		const ClickHandlerPtr &p,
+		bool fromTouch) const {
 	return (p == _openl);
 }
 

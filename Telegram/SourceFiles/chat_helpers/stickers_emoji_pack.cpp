@@ -7,33 +7,36 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/stickers_emoji_pack.h"
 
+#include "apiwrap.h"
+#include "base/call_delayed.h"
 #include "chat_helpers/stickers_emoji_image_loader.h"
-#include "history/view/history_view_element.h"
-#include "history/history_item.h"
-#include "history/history.h"
-#include "lottie/lottie_common.h"
-#include "ui/emoji_config.h"
-#include "ui/text/text_isolated_emoji.h"
-#include "ui/image/image.h"
-#include "ui/rect.h"
-#include "main/main_session.h"
+#include "chat_helpers/stickers_lottie.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
-#include "data/data_document.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "core/core_settings.h"
-#include "core/application.h"
-#include "base/call_delayed.h"
-#include "chat_helpers/stickers_lottie.h"
 #include "history/view/media/history_view_sticker.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lottie/lottie_common.h"
 #include "lottie/lottie_single_player.h"
-#include "apiwrap.h"
+#include "main/main_session.h"
+#include "ui/image/image.h"
+#include "ui/text/text_isolated_emoji.h"
+#include "ui/emoji_config.h"
+#include "ui/rect.h"
+
 #include "styles/style_chat.h"
 
 #include <QtCore/QBuffer>
 
 namespace Stickers {
 namespace {
+
+constexpr auto kStandardEmojiSetName = "RestrictedEmoji";
 
 constexpr auto kRefreshTimeout = 7200 * crl::time(1000);
 constexpr auto kEmojiCachesCount = 4;
@@ -324,6 +327,47 @@ std::unique_ptr<Lottie::SinglePlayer> EmojiPack::effectPlayer(
 	return std::make_unique<Lottie::SinglePlayer>(std::move(shared), request);
 }
 
+DocumentId EmojiPack::standardEmojiDocument(EmojiPtr emoji) {
+	if (!_standardRequested) {
+		_standardRequested = true;
+		refreshStandard();
+	}
+	const auto i = _standard.find(emoji);
+	return (i != end(_standard)) ? i->second->id : DocumentId();
+}
+
+void EmojiPack::refreshStandard() {
+	if (_standardRequestId) {
+		return;
+	}
+	_standardRequestId = _session->api().request(MTPmessages_GetStickerSet(
+		MTP_inputStickerSetShortName(MTP_string(kStandardEmojiSetName)),
+		MTP_int(0) // hash
+	)).done([=](const MTPmessages_StickerSet &result) {
+		_standardRequestId = 0;
+		result.match([&](const MTPDmessages_stickerSet &data) {
+			applyStandardSet(data);
+		}, [](const MTPDmessages_stickerSetNotModified &) {
+			LOG(("API Error: Unexpected messages.stickerSetNotModified."));
+		});
+	}).fail([=] {
+		_standardRequestId = 0;
+	}).send();
+}
+
+void EmojiPack::applyStandardSet(const MTPDmessages_stickerSet &data) {
+	const auto stickers = collectStickers(data.vdocuments().v);
+	auto were = base::take(_standard);
+	for (const auto &pack : data.vpacks().v) {
+		pack.match([&](const MTPDstickerPack &data) {
+			applyPack(data, stickers, _standard);
+		});
+	}
+	if (_standard != were) {
+		_refreshed.fire({});
+	}
+}
+
 void EmojiPack::refresh() {
 	if (_requestId) {
 		return;
@@ -372,7 +416,7 @@ void EmojiPack::applySet(const MTPDmessages_stickerSet &data) {
 
 	for (const auto &pack : data.vpacks().v) {
 		pack.match([&](const MTPDstickerPack &data) {
-			applyPack(data, stickers);
+			applyPack(data, stickers, _map);
 		});
 	}
 
@@ -462,7 +506,6 @@ void EmojiPack::refreshAll() {
 }
 
 void EmojiPack::refreshItems(EmojiPtr emoji) {
-	const auto i = _items.find(IsolatedEmoji{ { emoji } });
 	if (!emoji->colored()) {
 		if (const auto count = emoji->variantsCount()) {
 			for (auto i = 0; i != count; ++i) {
@@ -470,6 +513,9 @@ void EmojiPack::refreshItems(EmojiPtr emoji) {
 			}
 		}
 	}
+	// Refreshing variants recreates views synchronously, which may erase
+	// keys from _items, so look up the entry only after that.
+	const auto i = _items.find(IsolatedEmoji{ { emoji } });
 	if (i == end(_items)) {
 		return;
 	}
@@ -495,7 +541,8 @@ void EmojiPack::refreshItems(
 
 void EmojiPack::applyPack(
 		const MTPDstickerPack &data,
-		const base::flat_map<uint64, not_null<DocumentData*>> &map) {
+		const base::flat_map<uint64, not_null<DocumentData*>> &map,
+		base::flat_map<EmojiPtr, not_null<DocumentData*>> &to) {
 	const auto emoji = [&] {
 		return Ui::Emoji::Find(qs(data.vemoticon()));
 	}();
@@ -509,7 +556,7 @@ void EmojiPack::applyPack(
 		return nullptr;
 	}();
 	if (emoji && document) {
-		_map.emplace_or_assign(emoji, document);
+		to.emplace_or_assign(emoji, document);
 	}
 }
 

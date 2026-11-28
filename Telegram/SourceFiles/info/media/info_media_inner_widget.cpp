@@ -9,23 +9,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <rpl/flatten_latest.h>
 #include "boxes/abstract_box.h"
-#include "info/media/info_media_list_widget.h"
-#include "info/media/info_media_buttons.h"
-#include "info/media/info_media_empty_widget.h"
-#include "info/profile/info_profile_icon.h"
-#include "info/info_controller.h"
 #include "data/data_forum_topic.h"
 #include "data/data_peer.h"
-#include "data/data_saved_sublist.h"
+#include "info/media/info_media_buttons.h"
+#include "info/media/info_media_empty_widget.h"
+#include "info/media/info_media_list_widget.h"
+#include "info/profile/info_profile_icon.h"
+#include "info/info_controller.h"
+#include "lang/lang_keys.h"
+#include "ui/widgets/box_content_divider.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/discrete_sliders.h"
 #include "ui/widgets/shadow.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/box_content_divider.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/search_field_controller.h"
+
 #include "styles/style_info.h"
-#include "lang/lang_keys.h"
 
 namespace Info {
 namespace Media {
@@ -82,9 +82,6 @@ void InnerWidget::createTypeButtons() {
 	const auto topic = _controller->key().topic();
 	const auto sublist = _controller->key().sublist();
 	const auto topicRootId = topic ? topic->rootId() : MsgId();
-	const auto monoforumPeerId = sublist
-		? sublist->sublistPeer()->id
-		: PeerId();
 	const auto migrated = _controller->migrated();
 	const auto addMediaButton = [&](
 			Type buttonType,
@@ -97,7 +94,7 @@ void InnerWidget::createTypeButtons() {
 			_controller,
 			peer,
 			topicRootId,
-			monoforumPeerId,
+			sublist,
 			migrated,
 			buttonType,
 			tracker);

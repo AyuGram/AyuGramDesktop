@@ -10,8 +10,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "base/unique_qptr.h"
 #include "base/weak_ptr.h"
-#include "ui/platform/ui_platform_utility.h"
 #include "ui/layers/layer_widget.h"
+#include "ui/platform/ui_platform_utility.h"
 
 #include <QtCore/QRect>
 #include <QtCore/QSize>
@@ -46,7 +46,6 @@ public:
 		anim::type animated) override;
 	void hideLayers(anim::type animated) override;
 	void setAnchor(
-		std::optional<QRect> geometry,
 		std::optional<QSize> outerSize,
 		Platform::ForeignParent transientParent);
 	ShowFactory showFactory() override;
@@ -75,14 +74,14 @@ private:
 	};
 
 	void closeEntry(SeparatePanel *panel);
-	void hideAllPanels();
+	void hidePanel(base::unique_qptr<SeparatePanel> panel);
 
 	std::vector<Entry> _entries;
-	std::optional<QRect> _anchorGeometry;
 	std::optional<QSize> _anchorOuterSize;
 	Platform::ForeignParent _transientParent;
 	rpl::event_stream<> _boxAdded;
 	rpl::event_stream<> _boxClosed;
+	std::vector<base::unique_qptr<SeparatePanel>> _closing;
 
 };
 

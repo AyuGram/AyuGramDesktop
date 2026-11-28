@@ -11,10 +11,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/markdown/iv_markdown_article_layout_blocks.h"
 #include "iv/markdown/iv_markdown_prepare.h"
 #include "lang/lang_keys.h"
-
 #include "rpl/lifetime.h"
-
 #include "styles/palette.h"
+
 #include "styles/style_iv.h"
 
 #include <algorithm>
@@ -511,6 +510,14 @@ void MediaBlock::setMediaPixelScale(double scale) {
 
 double MediaBlock::mediaPixelScale() const {
 	return _mediaPixelScale;
+}
+
+void MediaBlock::setBubbleRounding(Ui::BubbleRounding rounding) {
+	_bubbleRounding = rounding;
+}
+
+Ui::BubbleRounding MediaBlock::bubbleRounding() const {
+	return _bubbleRounding;
 }
 
 void MediaBlock::requestRepaint(QRect articleRect) const {

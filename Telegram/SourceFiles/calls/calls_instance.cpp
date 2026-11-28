@@ -7,41 +7,41 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/calls_instance.h"
 
-#include "calls/calls_call.h"
-#include "calls/group/calls_group_common.h"
+#include "apiwrap.h"
+#include "base/unixtime.h"
+#include "boxes/abstract_box.h" // Ui::show().
 #include "calls/group/calls_choose_join_as.h"
 #include "calls/group/calls_group_call.h"
-#include "calls/group/calls_group_rtmp.h"
-#include "chat_helpers/compose/compose_show.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "mtproto/mtproto_dh_utils.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "main/session/session_show.h"
-#include "main/main_app_config.h"
-#include "main/main_session.h"
-#include "main/main_account.h"
-#include "apiwrap.h"
-#include "lang/lang_keys.h"
-#include "ui/boxes/confirm_box.h"
 #include "calls/group/calls_group_call.h"
+#include "calls/group/calls_group_common.h"
 #include "calls/group/calls_group_panel.h"
+#include "calls/group/calls_group_rtmp.h"
+#include "calls/calls_call.h"
 #include "calls/calls_call.h"
 #include "calls/calls_panel.h"
-#include "data/data_user.h"
-#include "data/data_group_call.h"
+#include "chat_helpers/compose/compose_show.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
+#include "data/data_group_call.h"
 #include "data/data_histories.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lang/lang_keys.h"
+#include "main/session/session_show.h"
+#include "main/main_account.h"
+#include "main/main_app_config.h"
+#include "main/main_session.h"
 #include "media/audio/media_audio_track.h"
-#include "platform/platform_specific.h"
-#include "ui/toast/toast.h"
-#include "base/unixtime.h"
 #include "mtproto/mtproto_config.h"
-#include "boxes/abstract_box.h" // Ui::show().
+#include "mtproto/mtproto_dh_utils.h"
+#include "platform/platform_specific.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/toast/toast.h"
 
 #include <tgcalls/VideoCaptureInterface.h>
 #include <tgcalls/StaticThreads.h>
@@ -447,6 +447,10 @@ void Instance::createCall(
 			destroyCall(raw);
 		}, raw->lifetime());
 
+		if (_currentCall && _currentCall->ratingInPanel()) {
+			_currentCall->finishRating();
+			destroyCall(_currentCall.get());
+		}
 		if (_currentCall) {
 			_currentCallPanel->replaceCall(raw);
 			std::swap(_currentCall, call);
@@ -836,7 +840,7 @@ void Instance::handleSignalingData(
 }
 
 bool Instance::inCall() const {
-	if (!_currentCall) {
+	if (!_currentCall || _currentCall->ratingInPanel()) {
 		return false;
 	}
 	const auto state = _currentCall->state();
@@ -1045,13 +1049,6 @@ std::shared_ptr<tgcalls::VideoCaptureInterface> Instance::getVideoCapture(
 	return result;
 }
 
-const ConferenceInvites &Instance::conferenceInvites(
-		CallId conferenceId) const {
-	static const auto kEmpty = ConferenceInvites();
-	const auto i = _conferenceInvites.find(conferenceId);
-	return (i != end(_conferenceInvites)) ? i->second : kEmpty;
-}
-
 void Instance::registerConferenceInvite(
 		CallId conferenceId,
 		not_null<UserData*> user,
@@ -1216,6 +1213,10 @@ void Instance::showConferenceInvite(
 			destroyCall(raw);
 		}, raw->lifetime());
 
+		if (_currentCall && _currentCall->ratingInPanel()) {
+			_currentCall->finishRating();
+			destroyCall(_currentCall.get());
+		}
 		if (_currentCall) {
 			_currentCallPanel->replaceCall(raw);
 			std::swap(_currentCall, call);

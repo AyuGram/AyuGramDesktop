@@ -5,22 +5,21 @@ the official desktop application for the Telegram messaging service.
 For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
-#include "dialogs/suggestions/suggestion.h"
-
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
 #include "data/components/promo_suggestions.h"
 #include "data/data_changes.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "dialogs/suggestions/suggestion.h"
 #include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/text/text_utilities.h"
-#include "ui/ui_utility.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_userpic_button.h"
 
 namespace Dialogs::TopBarSuggestions {
@@ -78,16 +77,7 @@ void Activate(ActivateArgs args) {
 	});
 
 	content->setClickedCallback([=] {
-		const auto syntetic = [=](QEvent::Type type) {
-			Ui::SendSynteticMouseEvent(
-				upload,
-				type,
-				Qt::LeftButton,
-				upload->mapToGlobal(QPoint(0, 0)));
-		};
-		syntetic(QEvent::MouseMove);
-		syntetic(QEvent::MouseButtonPress);
-		syntetic(QEvent::MouseButtonRelease);
+		upload->clicked({}, Qt::LeftButton);
 	});
 	content->setContent(
 		tr::lng_dialogs_suggestions_userpics_title(

@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
+#include "base/timer.h"
+#include "ui/layers/box_content.h"
 #include "ui/empty_userpic.h"
+#include "ui/rows_scroll_cache.h"
+#include "ui/rp_widget.h"
 #include "ui/unread_badge.h"
 #include "ui/userpic_view.h"
-#include "ui/layers/box_content.h"
-#include "ui/rows_scroll_cache.h"
-#include "base/timer.h"
 
 namespace style {
 struct PeerList;
@@ -524,7 +524,6 @@ public:
 		return _selectSt;
 	}
 	const style::PeerList &computeListSt() const;
-	const style::MultiSelect &computeSelectSt() const;
 
 	virtual Main::Session &session() const = 0;
 
@@ -558,6 +557,15 @@ public:
 	}
 	virtual bool rowTrackPressSkipMouseSelection() {
 		return false;
+	}
+
+	virtual bool rowDragSelectStart(not_null<PeerListRow*> row) {
+		return false;
+	}
+	virtual void rowDragSelectUpdate(
+			const std::vector<not_null<PeerListRow*>> &rows) {
+	}
+	virtual void rowDragSelectFinish() {
 	}
 
 	virtual void loadMoreRows() {
@@ -726,7 +734,6 @@ public:
 	PeerListRowId updateFromParentDrag(QPoint globalPosition);
 	void dragLeft();
 
-	void setIgnoreHiddenRowsOnSearch(bool value);
 	void setShowSectionHeaders(bool shown);
 
 	struct SectionLetter {
@@ -744,6 +751,7 @@ public:
 	void prependRowFromSearchResult(not_null<PeerListRow*> row);
 	PeerListRow *findRow(PeerListRowId id);
 	std::optional<QPoint> lastRowMousePosition() const;
+	[[nodiscard]] QRegion changedUserpicRows(QRect clip);
 	void updateRow(not_null<PeerListRow*> row) {
 		updateRow(row, RowIndex());
 	}
@@ -937,6 +945,10 @@ private:
 	void clearAllContent();
 	void handleMouseMove(QPoint globalPosition);
 	void mousePressReleased(Qt::MouseButton button);
+	void updateDragSelect(QPoint globalPosition);
+	void finishDragSelect();
+	[[nodiscard]] int dragSelectIndexAt(QPoint globalPosition) const;
+	[[nodiscard]] int dragSelectScrollDelta(QPoint globalPosition) const;
 	void initDecorateWidget(Ui::RpWidget *widget);
 
 	const style::PeerList &_st;
@@ -956,6 +968,7 @@ private:
 	std::optional<QPoint> _lastMousePosition;
 	Qt::MouseButton _pressButton = Qt::LeftButton;
 	std::optional<QPoint> _trackPressStart;
+	std::optional<PeerListRowId> _dragSelectFrom;
 
 	rpl::event_stream<Ui::ScrollToRequest> _scrollToRequests;
 
@@ -975,7 +988,6 @@ private:
 	int _aboveHeight = 0;
 	int _belowHeight = 0;
 	bool _hideEmpty = false;
-	bool _ignoreHiddenRowsOnSearch = false;
 	object_ptr<Ui::RpWidget> _aboveWidget = { nullptr };
 	object_ptr<Ui::RpWidget> _aboveSearchWidget = { nullptr };
 	object_ptr<Ui::RpWidget> _belowWidget = { nullptr };

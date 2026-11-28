@@ -8,13 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "media/view/media_view_overlay_renderer.h"
-#include "ui/rhi/rhi_renderer.h"
 #include "ui/rhi/rhi_image.h"
-#ifdef Q_OS_MAC
+#include "ui/rhi/rhi_renderer.h"
+#ifdef Q_OS_MACOS
 #include "media/view/media_view_metal_texture.h"
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
 class QRhi;
 class QRhiBuffer;
@@ -95,7 +95,7 @@ private:
 		not_null<const style::icon*> icon;
 	};
 
-	void createPipelines();
+	[[nodiscard]] bool createPipelines();
 	void validateControlsFade();
 	void validateControls();
 	void invalidateControls();
@@ -151,6 +151,7 @@ private:
 	QRhiBuffer *_fillVertexBuffer = nullptr;
 	QRhiBuffer *_uniformBuffer = nullptr;
 	QRhiSampler *_sampler = nullptr;
+	QRhiSampler *_mipmapSampler = nullptr;
 	QRhiTexture *_placeholderTexture = nullptr;
 
 	QRhiGraphicsPipeline *_imagePipeline = nullptr;
@@ -186,7 +187,7 @@ private:
 	QSize _chromaSize;
 	bool _chromaNV12 = false;
 	bool _usingExternalVideoTextures = false;
-	int _trackFrameIndex = 0;
+	int _trackFrameIndex = -1;
 	int _streamedIndex = 0;
 
 	struct PoolTexture {
@@ -212,7 +213,7 @@ private:
 	bool _shadowTopFlip = false;
 	bool _shadowsForStories = false;
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	MetalTextureCache _metalTextureCache;
 #endif
 
@@ -226,4 +227,4 @@ private:
 
 } // namespace Media::View
 
-#endif // Qt >= 6.7
+#endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API

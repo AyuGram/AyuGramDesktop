@@ -8,16 +8,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/premium_top_bar.h"
 
 #include "lottie/lottie_icon.h"
-#include "ui/color_contrast.h"
-#include "ui/painter.h"
+#include "ui/effects/premium_coin.h"
+#include "ui/effects/premium_diamond.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/effects/premium_star.h"
 #include "ui/effects/premium_star_particles.h"
-#include "ui/effects/premium_diamond.h"
-#include "ui/effects/premium_coin.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/fade_wrap.h"
+#include "ui/color_contrast.h"
+#include "ui/painter.h"
 #include "ui/rect.h"
+
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
 
@@ -119,6 +120,7 @@ TopBar::TopBar(
 , _titleFont(st.titleFont)
 , _titlePadding(st.titlePadding)
 , _aboutMaxWidth(st.aboutMaxWidth)
+, _lottieTop(descriptor.lottieTop)
 , _about(this, std::move(descriptor.about), st.about)
 , _ministars(
 		this,
@@ -139,15 +141,6 @@ TopBar::TopBar(
 		_star3d->flungStrength() | rpl::on_next([=](float64 strength) {
 			_particles3d->fling(strength);
 		}, lifetime());
-		if (descriptor.showFinished) {
-			std::move(
-				descriptor.showFinished
-			) | rpl::on_next([=] {
-				if (_star3d) {
-					_star3d->startEnter();
-				}
-			}, lifetime());
-		}
 	} else if (descriptor.use3dDiamond && Diamond::Supported()) {
 		_diamond3d = CreateChild<Diamond>(this);
 		_particles3d = std::make_unique<StarParticles>([=](
@@ -165,6 +158,17 @@ TopBar::TopBar(
 		});
 		_coin3d->flungStrength() | rpl::on_next([=](float64 strength) {
 			_particles3d->fling(strength);
+		}, lifetime());
+	}
+	if (descriptor.showFinished && (_star3d || _diamond3d)) {
+		std::move(
+			descriptor.showFinished
+		) | rpl::on_next([=] {
+			if (_star3d) {
+				_star3d->startEnter();
+			} else if (_diamond3d) {
+				_diamond3d->startEnter();
+			}
 		}, lifetime());
 	}
 
@@ -203,12 +207,17 @@ TopBar::TopBar(
 		} else if (_logo == u"diamond"_q) {
 			if (!_diamond3d) {
 				_lottie = Lottie::MakeIcon({
-					.name = u"diamond"_q,
-					.sizeOverride = starSize,
+					.name = (descriptor.lottie.isEmpty()
+						? u"diamond"_q
+						: descriptor.lottie),
+					.sizeOverride = (descriptor.lottieSize.isEmpty()
+						? starSize
+						: descriptor.lottieSize),
 				});
 				_lottie->animate(
 					[=] {
-						update(_starRect.toRect() + Margins(st::lineWidth));
+						update(_starRect.toRect().united(lottieRect())
+							+ Margins(st::lineWidth));
 					},
 					0,
 					_lottie->framesCount() - 1);
@@ -369,6 +378,16 @@ void TopBar::resizeEvent(QResizeEvent *e) {
 	RpWidget::resizeEvent(e);
 }
 
+QRect TopBar::lottieRect() const {
+	return QRect(
+		int(_starRect.left()
+			+ (_starRect.width() - _lottie->width()) / 2
+			- st::lineWidth * 6),
+		int(_starRect.top() + _lottieTop),
+		_lottie->width(),
+		_lottie->height());
+}
+
 void TopBar::paintEvent(QPaintEvent *e) {
 	auto p = QPainter(this);
 
@@ -403,16 +422,13 @@ void TopBar::paintEvent(QPaintEvent *e) {
 			_ministars.paint(p);
 		}
 		if (_lottie) {
-			_lottie->paint(
-				p,
-				_starRect.left()
-					+ (_starRect.width() - _lottie->width()) / 2
-					- st::lineWidth * 6,
-				_starRect.top());
+			const auto lottie = lottieRect();
+			_lottie->paint(p, lottie.x(), lottie.y());
 			if (!_lottie->animating() && _lottie->frameIndex() > 0) {
 				_lottie->animate(
 					[=] {
-						update(_starRect.toRect() + Margins(st::lineWidth));
+						update(_starRect.toRect().united(lottieRect())
+							+ Margins(st::lineWidth));
 					},
 					0,
 					_lottie->framesCount() - 1);

@@ -18,18 +18,17 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/ui_integration.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
 #include "data/data_changes.h"
 #include "data/data_document.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "data/stickers/data_stickers.h"
 #include "editor/photo_editor_common.h"
 #include "editor/photo_editor_layer_widget.h"
 #include "history/view/controls/history_view_characters_limit.h"
 #include "info/profile/info_profile_values.h"
-#include "ui/wrap/padding_wrap.h"
 #include "info/userpic/info_userpic_emoji_builder_common.h"
 #include "info/userpic/info_userpic_emoji_builder_menu_item.h"
 #include "lang/lang_keys.h"
@@ -37,25 +36,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_frame_generator.h"
 #include "main/main_session.h"
 #include "settings/settings_common.h"
-#include "ui/animated_icon.h"
-#include "ui/controls/emoji_button_factory.h"
-#include "ui/controls/emoji_button.h"
-#include "ui/controls/userpic_button.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/controls/emoji_button.h"
+#include "ui/controls/emoji_button_factory.h"
+#include "ui/controls/userpic_button.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 #include "ui/text/text_entity.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
-#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/wrap/vertical_layout.h"
+#include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/animated_icon.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_edit_peer_members.h"
@@ -107,7 +108,7 @@ void SendRequest(
 			first,
 			last,
 			user->nameOrPhone,
-			user->username());
+			user->editableUsername());
 		user->session().api().applyUpdates(result);
 		if (const auto settings = user->barSettings()) {
 			const auto flags = PeerBarSetting::AddContact
@@ -256,9 +257,9 @@ private:
 	Ui::InputField *_notesField = nullptr;
 	Ui::InputField *_firstNameField = nullptr;
 	base::unique_qptr<ChatHelpers::TabbedPanel> _emojiPanel;
-	base::unique_qptr<Ui::PopupMenu> _photoMenu;
 	std::unique_ptr<Ui::AnimatedIcon> _suggestIcon;
 	std::unique_ptr<Ui::AnimatedIcon> _cameraIcon;
+	base::unique_qptr<Ui::PopupMenu> _photoMenu;
 	Ui::RpWidget *_suggestIconWidget = nullptr;
 	Ui::RpWidget *_cameraIconWidget = nullptr;
 	QString _phone;
@@ -755,13 +756,17 @@ void Controller::setupDeleteContactButton() {
 			tr::now,
 			lt_contact,
 			_user->name());
+		const auto user = _user;
+		const auto weak = base::make_weak(_box);
 		const auto deleteSure = [=](Fn<void()> &&close) {
 			close();
-			_user->session().api().request(MTPcontacts_DeleteContacts(
-				MTP_vector<MTPInputUser>(1, _user->inputUser())
+			user->session().api().request(MTPcontacts_DeleteContacts(
+				MTP_vector<MTPInputUser>(1, user->inputUser())
 			)).done([=](const MTPUpdates &result) {
-				_user->session().api().applyUpdates(result);
-				_box->closeBox();
+				user->session().api().applyUpdates(result);
+				if (const auto box = weak.get()) {
+					box->closeBox();
+				}
 			}).send();
 		};
 		_window->show(Ui::MakeConfirmBox({
@@ -837,7 +842,7 @@ void Controller::showPhotoMenu(bool suggest) {
 					[=](QImage &&editedImage) {
 						processChosenPhoto(std::move(editedImage), suggest);
 					},
-					qvariant_cast<QImage>(data->imageData()));
+					QGuiApplication::clipboard()->image());
 			};
 			_photoMenu->addAction(
 				tr::lng_profile_photo_from_clipboard(tr::now),

@@ -7,15 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
+#include "base/object_ptr.h"
 #include "chat_helpers/bot_command.h"
 #include "dialogs/dialogs_key.h"
 #include "media/player/media_player_float.h" // FloatSectionDelegate
-#include "base/object_ptr.h"
+#include "ui/rp_widget.h"
 #include "window/window_section_common.h"
 
 #include <optional>
 
+class History;
 class PeerData;
 class UserData;
 
@@ -209,6 +210,8 @@ public:
 	virtual bool confirmSendingFiles(not_null<const QMimeData*> data) {
 		return false;
 	}
+	virtual void insertTextAtCursor(const QString &text) {
+	}
 
 	virtual bool notify_switchInlineBotButtonReceived(
 			const QString &query,
@@ -275,6 +278,8 @@ public:
 
 protected:
 	void paintEvent(QPaintEvent *e) override;
+
+	void showHistoryAfterThreadDestroyed(not_null<History*> history);
 
 	// A size-changing setGeometryWithTopMoved() can deliver the shift to
 	// the section twice: Ui::RpWidget fires its geometry stream before

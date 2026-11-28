@@ -7,16 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "window/section_widget.h"
-#include "window/section_memento.h"
+#include "base/timer.h"
+#include "data/data_messages.h"
+#include "data/data_report.h"
 #include "history/view/history_view_corner_buttons.h"
 #include "history/view/history_view_list_widget.h"
 #include "history/history_item_helpers.h"
 #include "history/history_view_top_toast.h"
-#include "data/data_messages.h"
-#include "data/data_report.h"
 #include "ui/controls/swipe_handler_data.h"
-#include "base/timer.h"
+#include "window/section_memento.h"
+#include "window/section_widget.h"
 
 class History;
 class BotKeyboard;
@@ -66,6 +66,8 @@ class ForumTopic;
 struct DrawToReplyRequest;
 } // namespace Data
 
+class SendFilesBox;
+
 namespace Support {
 class Autocomplete;
 struct Contact;
@@ -75,6 +77,7 @@ namespace HistoryView {
 
 namespace Controls {
 struct VoiceToSend;
+class StashManager;
 } // namespace Controls
 
 class Element;
@@ -153,6 +156,7 @@ public:
 
 	bool confirmSendingFiles(const QStringList &files) override;
 	bool confirmSendingFiles(not_null<const QMimeData*> data) override;
+	void insertTextAtCursor(const QString &text) override;
 	bool notify_switchInlineBotButtonReceived(
 		const QString &query,
 		UserData *samePeerBot,
@@ -198,6 +202,7 @@ public:
 		not_null<HistoryItem*> first,
 		not_null<HistoryItem*> second) override;
 	void listSelectionChanged(SelectedItems &&items) override;
+	void listTextSelectionUpdated() override;
 	void listMarkReadTill(not_null<HistoryItem*> item) override;
 	void listItemsAddedToEnd(
 		const std::vector<not_null<Element*>> &items,
@@ -322,6 +327,8 @@ private:
 	void onScroll();
 	void scrollToCurrentVoiceMessage(FullMsgId fromId, FullMsgId toId);
 	void closeCurrent();
+	void topicDestroyed();
+	void sublistDestroyed();
 	void unreadCountUpdated();
 	void updateInnerVisibleArea();
 	void updateControlsGeometry();
@@ -340,7 +347,9 @@ private:
 		Data::MessagePosition position,
 		FullMsgId originItemId,
 		const Window::SectionShow &params);
-	void finishSending();
+	void finishSending(const Api::SendOptions &options);
+	void setupSendingLanding();
+	[[nodiscard]] bool showsSendingItem(not_null<HistoryItem*> item) const;
 
 	void setupComposeControls();
 	void setupSwipeReplyAndBack();
@@ -353,6 +362,7 @@ private:
 
 	void setupDragArea();
 	void setupShortcuts();
+	void setupComposeStash();
 
 	void searchRequested();
 	void searchInTopic();
@@ -370,6 +380,7 @@ private:
 		bool useCurrentWebPageDraft,
 		Api::SendOptions options,
 		Fn<void()> done);
+	void sendReplyToForward(Api::SendOptions options);
 	void sendRichDraft(
 		std::shared_ptr<const Iv::RichPage> page,
 		Api::SendOptions options);
@@ -397,6 +408,8 @@ private:
 	[[nodiscard]] MsgId resolveTopicRootId(const FullReplyTo &replyTo) const;
 	[[nodiscard]] MsgId resolvedTopicRootId() const;
 	[[nodiscard]] Data::ForumTopic *resolvedTopic();
+	[[nodiscard]] bool monoforumReplyMissing() const;
+	[[nodiscard]] bool monoforumReplyRequired() const;
 	void refreshCanSendMessages();
 	void refreshResolvedTopicRootState();
 	void setKeyboardReplyTo(HistoryItem *item);
@@ -533,7 +546,7 @@ private:
 	MsgId _repliesKeyboardHiddenId = 0;
 	HistoryItem *_repliesRoot = nullptr;
 	Data::ForumTopic *_topic = nullptr;
-	mutable Data::ForumTopic *_creatingBotTopic = nullptr;
+	mutable base::weak_ptr<Data::ForumTopic> _creatingBotTopic;
 	mutable bool _newTopicDiscarded = false;
 	std::shared_ptr<Data::RepliesList> _replies;
 	rpl::lifetime _repliesLifetime;
@@ -598,6 +611,8 @@ private:
 
 	FullMsgId _lastShownAt;
 	HistoryView::CornerButtons _cornerButtons;
+	std::unique_ptr<Controls::StashManager> _stash;
+	QPointer<SendFilesBox> _sendFilesBox;
 	std::unique_ptr<Support::Autocomplete> _supportAutocomplete;
 	rpl::lifetime _topicLifetime;
 	rpl::lifetime _historySponsoredPreloading;
@@ -679,6 +694,13 @@ public:
 		return _originId;
 	}
 
+	void setSilentMissingMessage(bool silent) {
+		_silentMissingMessage = silent;
+	}
+	[[nodiscard]] bool silentMissingMessage() const {
+		return _silentMissingMessage;
+	}
+
 	Data::ForumTopic *topicForRemoveRequests() const override;
 	Data::SavedSublist *sublistForRemoveRequests() const override;
 
@@ -711,6 +733,7 @@ private:
 	std::shared_ptr<Data::RepliesList> _replies;
 	QVector<FullMsgId> _replyReturns;
 	FullMsgId _originId;
+	bool _silentMissingMessage = false;
 	bool _activateChooseForReport = false;
 	bool _sendBotStart = false;
 	bool _maybeSendBotStart = false;

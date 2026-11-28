@@ -9,8 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
 
-#include "storage/storage_cloud_blob.h"
 #include "base/unique_qptr.h"
+#include "storage/storage_cloud_blob.h"
 
 namespace Main {
 class Session;
@@ -28,13 +28,15 @@ MTP::DedicatedLoader::Location GetDownloadLocation(int id);
 [[nodiscard]] QString DictionariesPath();
 [[nodiscard]] QString DictPathByLangId(int langId);
 bool UnpackDictionary(const QString &path, int langId);
+[[nodiscard]] bool DictionaryDownloaded(int langId);
+[[nodiscard]] bool IsSystemDictionary(int langId);
 [[nodiscard]] bool DictionaryExists(int langId);
 bool RemoveDictionary(int langId);
 [[nodiscard]] bool IsEn(int langId);
 
-bool WriteDefaultDictionary();
 std::vector<Dict> Dictionaries();
 rpl::producer<> DictionariesChanged();
+[[nodiscard]] std::vector<Dict> DictionariesFromSystem();
 void RefreshDictionariesManifest(not_null<Main::Session*> session);
 
 void Start(not_null<Main::Session*> session);

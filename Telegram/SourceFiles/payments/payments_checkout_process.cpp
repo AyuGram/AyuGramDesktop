@@ -7,24 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "payments/payments_checkout_process.h"
 
-#include "payments/payments_form.h"
-#include "payments/ui/payments_panel.h"
-#include "main/main_session.h"
-#include "main/main_account.h"
-#include "storage/storage_account.h"
-#include "history/history_item.h"
-#include "history/history.h"
-#include "data/data_user.h" // UserData::isBot.
+#include "api/api_cloud_password.h"
+#include "apiwrap.h"
 #include "boxes/passcode_box.h"
-#include "core/local_url_handlers.h" // TryConvertUrlToLocal.
-#include "core/file_utilities.h" // File::OpenUrl.
-#include "core/core_cloud_password.h" // Core::CloudPasswordState
 #include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/core_cloud_password.h" // Core::CloudPasswordState
 #include "core/core_screenshot_protection.h"
+#include "core/file_utilities.h" // File::OpenUrl.
+#include "core/local_url_handlers.h" // TryConvertUrlToLocal.
+#include "data/data_user.h" // UserData::isBot.
+#include "history/history.h"
+#include "history/history_item.h"
 #include "lang/lang_keys.h"
-#include "apiwrap.h"
-#include "api/api_cloud_password.h"
+#include "main/main_account.h"
+#include "main/main_session.h"
+#include "payments/ui/payments_panel.h"
+#include "payments/payments_form.h"
+#include "storage/storage_account.h"
 #include "webview/webview_dialog.h"
 #include "window/themes/window_theme.h"
 
@@ -338,6 +338,7 @@ CheckoutProcess::CheckoutProcess(
 	}, _lifetime);
 
 	Core::App().screenshotProtection().addContentReason(
+		_panel->widget(),
 		_screenshotProtection.value(),
 		_panel->lifetime());
 
@@ -406,8 +407,14 @@ void CheckoutProcess::handleFormUpdate(const FormUpdate &update) {
 		showForm();
 		const auto submitted = (_submitState == SubmitState::Validating);
 		_submitState = SubmitState::Validated;
-		if (submitted) {
+		if (!submitted) {
+			return;
+		}
+		const auto &options = _form->shippingOptions();
+		if (options.list.empty()) {
 			panelSubmit();
+		} else if (options.selectedId.isEmpty()) {
+			chooseShippingOption();
 		}
 	}, [&](const PaymentMethodUpdate &data) {
 		showForm();
@@ -985,7 +992,10 @@ QVariant CheckoutProcess::panelClickHandlerContext() {
 void CheckoutProcess::performInitialSilentValidation() {
 	const auto &invoice = _form->invoice();
 	const auto &saved = _form->information();
+	// WHY: a flexible invoice makes the server forward the address to the
+	// bot as a shipping query, so validation must wait for the user's Pay.
 	if (invoice.receipt
+		|| invoice.isFlexible
 		|| (invoice.isNameRequested && saved.name.isEmpty())
 		|| (invoice.isEmailRequested && saved.email.isEmpty())
 		|| (invoice.isPhoneRequested && saved.phone.isEmpty())

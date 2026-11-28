@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "history/view/media/history_view_media.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
+#include "history/view/media/history_view_media.h"
 
 // AyuGram includes
 #include "ui/effects/animations.h"
@@ -103,7 +103,6 @@ public:
 		return true;
 	}
 	QRect groupItemRect(int index) const override;
-	[[nodiscard]] Media *partMediaAt(QPoint point) const;
 	bool enforceBubbleWidth() const override;
 	int contributedMaxMonospaceWidth() const override;
 

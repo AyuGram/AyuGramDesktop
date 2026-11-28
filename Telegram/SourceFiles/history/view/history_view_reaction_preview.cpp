@@ -11,27 +11,28 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "boxes/sticker_set_box.h"
 #include "core/shortcuts.h"
-#include "data/data_document.h"
-#include "data/data_photo.h"
-#include "data/data_message_reactions.h"
-#include "data/data_session.h"
 #include "data/stickers/data_custom_emoji.h"
+#include "data/data_document.h"
+#include "data/data_message_reactions.h"
+#include "data/data_photo.h"
+#include "data/data_session.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "mainwindow.h"
-#include "ui/cached_special_layer_shadow_corners.h"
 #include "ui/effects/show_animation.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/dropdown_menu.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
 #include "ui/wrap/fade_wrap.h"
+#include "ui/cached_special_layer_shadow_corners.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
-#include "ui/text/text_utilities.h"
 #include "window/window_media_preview.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_layers.h"
 
@@ -255,7 +256,8 @@ bool ShowReactionPreview(
 					: tr::lng_context_animated_reaction)(
 						lt_name,
 						rpl::single(Ui::Text::Colorized(packName)),
-						tr::rich));
+						tr::rich),
+				st::reactionPreviewPackLabel);
 			state->label->setAttribute(Qt::WA_TransparentForMouseEvents);
 			const auto backgroundRaw = state->background.get();
 			const auto labelRaw = state->label.get();
@@ -300,7 +302,7 @@ bool ShowReactionPreview(
 		if (backgroundRaw && labelRaw) {
 			const auto maxLabelWidth = labelRaw->textMaxWidth() / 2;
 			labelRaw->resizeToWidth(maxLabelWidth);
-			const auto labelHeight = labelRaw->height() * 2;
+			const auto labelHeight = labelRaw->height();
 			const auto padding = st::msgServicePadding;
 			const auto innerWidth = maxLabelWidth + rect::m::sum::h(padding);
 			const auto innerHeight = labelHeight + rect::m::sum::v(padding);

@@ -7,17 +7,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "inline_bots/inline_results_widget.h"
 
-#include "data/data_user.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "inline_bots/inline_bot_result.h"
 #include "inline_bots/inline_results_inner.h"
 #include "main/main_session.h"
-#include "window/window_session_controller.h"
-#include "ui/widgets/shadow.h"
-#include "ui/widgets/scroll_area.h"
 #include "ui/image/image_prepare.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/shadow.h"
 #include "ui/cached_round_corners.h"
 #include "ui/ui_utility.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h"
 
 namespace InlineBots {
@@ -181,10 +182,6 @@ void Widget::paintContent(QPainter &p) {
 	auto sidesHeight = horizontal.height();
 	p.fillRect(myrtlrect(inner.x() + inner.width() - st::emojiScroll.width, sidesTop, st::emojiScroll.width, sidesHeight), st::emojiPanBg);
 	p.fillRect(myrtlrect(inner.x(), sidesTop, st::roundRadiusSmall, sidesHeight), st::emojiPanBg);
-}
-
-void Widget::moveByBottom() {
-	updateContentHeight();
 }
 
 void Widget::hideFast() {
@@ -486,7 +483,7 @@ void Widget::onInlineRequest() {
 
 bool Widget::refreshInlineRows(int *added) {
 	auto it = _inlineCache.find(_inlineQuery);
-	const CacheEntry *entry = nullptr;
+	auto entry = (const CacheEntry*)nullptr;
 	if (it != _inlineCache.cend()) {
 		if (!it->second->results.empty() || !it->second->switchPmText.isEmpty()) {
 			entry = it->second.get();

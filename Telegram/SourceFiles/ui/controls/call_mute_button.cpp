@@ -8,18 +8,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/call_mute_button.h"
 
 #include "base/flat_map.h"
-#include "ui/abstract_button.h"
-#include "ui/effects/shake_animation.h"
-#include "ui/paint/blobs.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
-#include "ui/controls/call_button.h"
-#include "ui/widgets/labels.h"
-#include "ui/ui_utility.h"
 #include "base/random.h"
 #include "styles/palette.h"
-#include "styles/style_widgets.h"
+#include "ui/controls/call_button.h"
+#include "ui/effects/shake_animation.h"
+#include "ui/paint/blobs.h"
+#include "ui/widgets/labels.h"
+#include "ui/abstract_button.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/ui_utility.h"
+
 #include "styles/style_calls.h"
+#include "styles/style_widgets.h"
 
 #include <QtCore/QtMath>
 #include <QtCore/QCoreApplication>
@@ -643,10 +644,22 @@ void CallMuteButton::refreshLabels() {
 		return size.width();
 	}) | rpl::distinct_until_changed(
 	) | rpl::on_next([=](int w) {
-		_centerLabel->setMaxWidth(w);
-		_label->setMaxWidth(w);
-		_sublabel->setMaxWidth(w);
+		const auto labels = std::max(w, _labelsMaxWidth);
+		_centerLabel->setMaxWidth(labels);
+		_label->setMaxWidth(labels);
+		_sublabel->setMaxWidth(labels);
 	}, _centerLabel->lifetime());
+}
+
+void CallMuteButton::setLabelsMaxWidth(int width) {
+	if (_labelsMaxWidth == width) {
+		return;
+	}
+	_labelsMaxWidth = width;
+	const auto labels = std::max(_content->width(), _labelsMaxWidth);
+	_centerLabel->setMaxWidth(labels);
+	_label->setMaxWidth(labels);
+	_sublabel->setMaxWidth(labels);
 }
 
 void CallMuteButton::refreshIcons() {

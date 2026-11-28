@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_thread.h"
 
-#include "data/data_forum.h"
-#include "data/data_forum_topic.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
+#include "data/data_forum.h"
+#include "data/data_forum_topic.h"
 #include "data/data_peer.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
@@ -157,13 +157,15 @@ void Thread::clearNotifications() {
 	_notifications.clear();
 }
 
-void Thread::clearIncomingNotifications() {
+void Thread::clearIncomingNotifications(
+		Fn<bool(not_null<HistoryItem*>)> filter) {
 	if (!peer()->isSelf()) {
-		const auto proj = [](ItemNotification notification) {
-			return notification.item->out();
+		const auto incoming = [&](ItemNotification notification) {
+			return !notification.item->out()
+				&& (!filter || filter(notification.item));
 		};
 		_notifications.erase(
-			ranges::remove(_notifications, false, proj),
+			ranges::remove_if(_notifications, incoming),
 			end(_notifications));
 	}
 }
@@ -216,7 +218,7 @@ void Thread::setUnreadMarkFlag(bool unread) {
 	}
 }
 
-[[nodiscard]] bool Thread::hasPinnedMessages() const {
+bool Thread::hasPinnedMessages() const {
 	return (_flags & Flag::HasPinnedMessages);
 }
 

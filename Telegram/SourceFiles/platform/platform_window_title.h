@@ -16,14 +16,18 @@ inline bool NativeTitleRequiresShadow() {
 	return Platform::IsWindows();
 }
 
+inline bool WindowTitleAlignsLeft() {
+	return IsMac26_0OrGreater();
+}
+
 int PreviewTitleHeight();
-void PreviewWindowFramePaint(QImage &preview, const style::palette &palette, QRect body, int outerWidth);
+void PreviewWindowFramePaint(QImage &preview, const style::palette &palette, QColor bg, QRect body, int outerWidth);
 
 } // namespace Platform
 
 // Platform dependent implementations.
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 
 namespace Platform {
 
@@ -31,10 +35,10 @@ inline int PreviewTitleHeight() {
 	return Window::Theme::DefaultPreviewTitleHeight();
 }
 
-inline void PreviewWindowFramePaint(QImage &preview, const style::palette &palette, QRect body, int outerWidth) {
+inline void PreviewWindowFramePaint(QImage &preview, const style::palette &palette, QColor bg, QRect body, int outerWidth) {
 	return Window::Theme::DefaultPreviewWindowFramePaint(preview, palette, body, outerWidth);
 }
 
 } // namespace Platform
 
-#endif // !Q_OS_MAC
+#endif // !Q_OS_MACOS

@@ -14,12 +14,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
+#include "test/test_l10n_seams.h"
 #include "ui/chat/chat_style.h"
 
 namespace Main {
 namespace {
 
 constexpr auto kRefreshTimeout = 3600 * crl::time(1000);
+
+[[nodiscard]] GiftResaleFilterMode ParseGiftResaleFilterMode(
+		const QString &value) {
+	if (value == u"visible"_q) {
+		return GiftResaleFilterMode::Visible;
+	} else if (value == u"hidden"_q) {
+		return GiftResaleFilterMode::Hidden;
+	}
+	return GiftResaleFilterMode::Default;
+}
 
 } // namespace
 
@@ -141,14 +152,6 @@ int AppConfig::pinnedGiftsLimit() const {
 	return get<int>(u"stargifts_pinned_to_top_limit"_q, 6);
 }
 
-int AppConfig::giftCollectionsLimit() const {
-	return get<int>(u"stargifts_collections_limit"_q, 10);
-}
-
-int AppConfig::giftCollectionGiftsLimit() const {
-	return get<int>(u"stargifts_collection_gifts_limit"_q, 500);
-}
-
 bool AppConfig::callsDisabledForSession() const {
 	const auto authorizations = _account->sessionExists()
 		? &_account->session().api().authorizations()
@@ -192,6 +195,24 @@ int64 AppConfig::giftResaleNanoTonMax() const {
 
 int AppConfig::giftResaleNanoTonThousandths() const {
 	return get<int>(u"ton_stargift_resale_commission_permille"_q, 800);
+}
+
+bool AppConfig::giftResaleFragmentEnabled() const {
+	return get<bool>(u"stargifts_fragment_resale_enabled"_q, false);
+}
+
+GiftResaleFilterMode AppConfig::giftResaleTonFilter() const {
+	return ParseGiftResaleFilterMode(
+		get<QString>(u"stargifts_ton_resale"_q, u"default"_q));
+}
+
+GiftResaleFilterMode AppConfig::giftResaleStarsFilter() const {
+	return ParseGiftResaleFilterMode(
+		get<QString>(u"stargifts_stars_resale"_q, u"default"_q));
+}
+
+bool AppConfig::giftOnchainOffersEnabled() const {
+	return get<bool>(u"onchain_stargift_offers_enabled"_q, true);
 }
 
 int AppConfig::pollOptionsLimit() const {
@@ -278,12 +299,36 @@ QString AppConfig::ageVerifyBotUsername() const {
 	return get<QString>(u"verify_age_bot_username"_q, QString());
 }
 
-int AppConfig::storiesAlbumsLimit() const {
-	return get<int>(u"stories_albums_limit"_q, 100);
+QString AppConfig::oldWalletBotUsername() const {
+	return get<QString>(u"old_wallet_bot_username"_q, u"wallet"_q);
+}
+
+bool AppConfig::walletAvailable() const {
+	return get<bool>(u"wallet_available"_q, true);
 }
 
 int AppConfig::storiesAlbumLimit() const {
 	return get<int>(u"stories_album_stories_limit"_q, 1000);
+}
+
+bool AppConfig::storiesPostingAvailable() const {
+	const auto value = get<QString>(u"stories_posting"_q, u"enabled"_q);
+	return (value != u"disabled"_q);
+}
+
+bool AppConfig::storiesPostingPremiumOnly() const {
+	const auto value = get<QString>(u"stories_posting"_q, u"enabled"_q);
+	return (value == u"premium"_q);
+}
+
+bool AppConfig::storiesEntitiesPremiumOnly() const {
+	const auto value = get<QString>(u"stories_entities"_q, u"premium"_q);
+	return (value == u"premium"_q);
+}
+
+bool AppConfig::storiesEntitiesAvailable() const {
+	const auto value = get<QString>(u"stories_entities"_q, u"premium"_q);
+	return (value != u"disabled"_q);
 }
 
 int AppConfig::groupCallMessageLengthLimit() const {
@@ -411,6 +456,9 @@ auto AppConfig::getValue(const QString &key, Extractor &&extractor) const {
 }
 
 bool AppConfig::getBool(const QString &key, bool fallback) const {
+	if (const auto value = Test::OverrideAppConfigBool(key)) {
+		return *value;
+	}
 	return getValue(key, [&](const MTPJSONValue &value) {
 		return value.match([&](const MTPDjsonBool &data) {
 			return mtpIsTrue(data.vvalue());
@@ -421,6 +469,9 @@ bool AppConfig::getBool(const QString &key, bool fallback) const {
 }
 
 double AppConfig::getDouble(const QString &key, double fallback) const {
+	if (const auto value = Test::OverrideAppConfigDouble(key)) {
+		return *value;
+	}
 	return getValue(key, [&](const MTPJSONValue &value) {
 		return value.match([&](const MTPDjsonNumber &data) {
 			return data.vvalue().v;
@@ -433,6 +484,9 @@ double AppConfig::getDouble(const QString &key, double fallback) const {
 QString AppConfig::getString(
 		const QString &key,
 		const QString &fallback) const {
+	if (const auto value = Test::OverrideAppConfigString(key)) {
+		return *value;
+	}
 	return getValue(key, [&](const MTPJSONValue &value) {
 		return value.match([&](const MTPDjsonString &data) {
 			return qs(data.vvalue());
@@ -704,6 +758,10 @@ std::vector<std::vector<int>> AppConfig::craftAttributePermilles() const {
 			{ 70, 190, 460 },
 			{ 60, 180, 450, 1000 },
 		});
+}
+
+bool AppConfig::craftMintedFirstSource() const {
+	return get<bool>(u"stargifts_craft_minted_first_source"_q, false);
 }
 
 } // namespace Main

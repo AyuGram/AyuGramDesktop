@@ -9,10 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
+#include "main/main_session.h"
 #include "storage/cache/storage_cache_database.h"
 #include "storage/file_download.h"
 #include "ui/image/image.h"
-#include "main/main_session.h"
 
 namespace Data {
 
@@ -242,7 +242,7 @@ void LoadCloudFile(
 		Fn<void(bool)> fail,
 		Fn<void()> progress,
 		int downloadFrontPartSize = 0) {
-	const auto loadSize = downloadFrontPartSize
+	const auto loadSize = (downloadFrontPartSize > 0)
 		? std::min(downloadFrontPartSize, file.byteSize)
 		: file.byteSize;
 	if (file.loader) {
@@ -256,6 +256,13 @@ void LoadCloudFile(
 	} else if ((file.flags & CloudFile::Flag::Failed)
 		|| !file.location.valid()
 		|| (finalCheck && !finalCheck())) {
+		return;
+	}
+	if (file.byteSize < 0 || file.byteSize > Storage::kMaxFileInMemory) {
+		file.flags |= CloudFile::Flag::Failed;
+		if (const auto onstack = fail) {
+			onstack(false);
+		}
 		return;
 	}
 	file.flags &= ~CloudFile::Flag::Cancelled;

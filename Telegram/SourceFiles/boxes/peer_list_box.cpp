@@ -7,38 +7,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/peer_list_box.h"
 
+#include "base/qt/qt_key_modifiers.h"
+#include "base/unixtime.h"
 #include "boxes/peer_list_section_headers.h"
 #include "boxes/peer_list_section_index.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_peer_values.h"
+#include "data/data_session.h"
 #include "history/history.h" // chatListNameSortKey.
+#include "lang/lang_keys.h"
 #include "main/session/session_show.h"
 #include "main/main_session.h"
 #include "mainwidget.h"
+#include "storage/file_download.h"
 #include "ui/effects/loading_element.h"
 #include "ui/effects/outline_segments.h"
-#include "ui/effects/round_checkbox.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/widgets/multi_select.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/empty_userpic.h"
-#include "ui/wrap/slide_wrap.h"
+#include "ui/effects/round_checkbox.h"
 #include "ui/text/text_options.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/multi_select.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/selecting_scroll.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "lang/lang_keys.h"
-#include "storage/file_download.h"
-#include "data/data_peer_values.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "base/unixtime.h"
-#include "styles/style_layers.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_dialogs.h"
+#include "styles/style_layers.h"
 #include "styles/style_widgets.h"
 
 #include <xxhash.h> // XXH64.
@@ -439,10 +441,6 @@ PeerListController::PeerListController(
 
 const style::PeerList &PeerListController::computeListSt() const {
 	return _listSt ? *_listSt : st::peerListBox;
-}
-
-const style::MultiSelect &PeerListController::computeSelectSt() const {
-	return _selectSt ? *_selectSt : st::defaultMultiSelect;
 }
 
 void PeerListController::showFinished() {
@@ -1204,6 +1202,12 @@ PeerListContent::PeerListContent(
 , _controller(controller)
 , _rowHeight(_st.item.height)
 , _rowsScrollCache([this] { update(); }) {
+	Ui::SetupSelectingScroll(this, [=](int pixels) {
+		_scrollToRequests.fire({ _visibleTop + pixels, -1 });
+	}, [=](QPoint globalPosition) {
+		return dragSelectScrollDelta(globalPosition);
+	});
+
 	_controller->session().downloaderTaskFinished(
 	) | rpl::on_next([=] {
 		invalidateLoadedUserpics();
@@ -1212,7 +1216,10 @@ PeerListContent::PeerListContent(
 
 	using UpdateFlag = Data::PeerUpdate::Flag;
 	_controller->session().changes().peerUpdates(
-		UpdateFlag::Name | UpdateFlag::Photo | UpdateFlag::EmojiStatus
+		UpdateFlag::Name
+		| UpdateFlag::Photo
+		| UpdateFlag::EmojiStatus
+		| UpdateFlag::BarSettings
 	) | rpl::on_next([=](const Data::PeerUpdate &update) {
 		if (update.flags & UpdateFlag::Name) {
 			handleNameChanged(update.peer);
@@ -1220,6 +1227,15 @@ PeerListContent::PeerListContent(
 		if (update.flags & UpdateFlag::Photo) {
 			invalidateLoadedUserpics();
 			this->update();
+		}
+		if (update.flags & UpdateFlag::BarSettings) {
+			const auto byPeer = _rowsByPeer.find(update.peer);
+			if (byPeer != _rowsByPeer.cend()) {
+				for (const auto &row : byPeer->second) {
+					_rowsScrollCache.invalidate(row->id());
+					updateRow(row);
+				}
+			}
 		}
 	}, lifetime());
 
@@ -1627,12 +1643,10 @@ int PeerListContent::labelHeight() const {
 
 void PeerListContent::refreshRows() {
 	if (!_hiddenRows.empty()) {
-		if (!_ignoreHiddenRowsOnSearch || _normalizedSearchQuery.isEmpty()) {
-			_filterResults.clear();
-			for (const auto &row : _rows) {
-				if (!row->hidden()) {
-					_filterResults.push_back(row.get());
-				}
+		_filterResults.clear();
+		for (const auto &row : _rows) {
+			if (!row->hidden()) {
+				_filterResults.push_back(row.get());
 			}
 		}
 	}
@@ -1850,6 +1864,65 @@ void PeerListContent::leaveEventHook(QEvent *e) {
 
 void PeerListContent::mouseMoveEvent(QMouseEvent *e) {
 	handleMouseMove(e->globalPos());
+	if (_dragSelectFrom) {
+		updateDragSelect(e->globalPos());
+	}
+}
+
+void PeerListContent::updateDragSelect(QPoint globalPosition) {
+	const auto row = findRow(*_dragSelectFrom);
+	if (!row) {
+		finishDragSelect();
+		return;
+	}
+	const auto from = findRowIndex(row).value;
+	const auto till = dragSelectIndexAt(globalPosition);
+	if (from < 0 || till < 0) {
+		return;
+	}
+	const auto step = (till < from) ? -1 : 1;
+	auto rows = std::vector<not_null<PeerListRow*>>();
+	rows.reserve(std::abs(till - from) + 1);
+	for (auto i = from; ; i += step) {
+		rows.push_back(getRow(RowIndex(i)));
+		if (i == till) {
+			break;
+		}
+	}
+	_controller->rowDragSelectUpdate(rows);
+}
+
+void PeerListContent::finishDragSelect() {
+	if (base::take(_dragSelectFrom)) {
+		_controller->rowDragSelectFinish();
+	}
+}
+
+int PeerListContent::dragSelectIndexAt(QPoint globalPosition) const {
+	const auto count = shownRowsCount();
+	if (!count) {
+		return -1;
+	}
+	const auto y = mapFromGlobal(globalPosition).y() - rowsTop();
+	if (y < 0) {
+		return 0;
+	} else if (!sectionsShown()) {
+		return std::min(y / _rowHeight, count - 1);
+	}
+	const auto index = _sections->rowFromY(y);
+	return (index >= 0)
+		? index
+		: (y >= sectionsFullHeight())
+		? (count - 1)
+		: -1;
+}
+
+int PeerListContent::dragSelectScrollDelta(QPoint globalPosition) const {
+	return _dragSelectFrom
+		? Ui::SelectingScrollDelta(
+			QRect(0, _visibleTop, width(), _visibleBottom - _visibleTop),
+			mapFromGlobal(globalPosition).y())
+		: 0;
 }
 
 void PeerListContent::handleMouseMove(QPoint globalPosition) {
@@ -1926,8 +1999,12 @@ void PeerListContent::mousePressEvent(QMouseEvent *e) {
 				row->addRipple(_st.item, maskGenerator, point, std::move(updateCallback));
 			}
 		}
-		if (_pressButton == Qt::LeftButton && _controller->rowTrackPress(row)) {
-			_trackPressStart = e->globalPos();
+		if (_pressButton == Qt::LeftButton) {
+			if (_controller->rowDragSelectStart(row)) {
+				_dragSelectFrom = row->id();
+			} else if (_controller->rowTrackPress(row)) {
+				_trackPressStart = e->globalPos();
+			}
 		}
 	}
 	if (anim::Disabled() && !_trackPressStart && !_selected.element) {
@@ -1940,6 +2017,7 @@ void PeerListContent::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 void PeerListContent::mousePressReleased(Qt::MouseButton button) {
+	finishDragSelect();
 	_trackPressStart = {};
 	_controller->rowTrackPressCancel();
 
@@ -2396,6 +2474,25 @@ void PeerListContent::loadProfilePhotos() {
 	}
 }
 
+QRegion PeerListContent::changedUserpicRows(QRect clip) {
+	auto result = QRegion();
+	for (auto i = 0, count = shownRowsCount(); i != count; ++i) {
+		const auto index = RowIndex(i);
+		const auto top = getRowTop(index);
+		if (top > clip.bottom()) {
+			break;
+		} else if (top + _rowHeight <= clip.top()) {
+			continue;
+		}
+		const auto row = getRow(index);
+		if (row->userpicKeyChanged()) {
+			_rowsScrollCache.invalidate(row->id());
+			result += QRect(0, top, width(), _rowHeight) & clip;
+		}
+	}
+	return result;
+}
+
 void PeerListContent::invalidateLoadedUserpics() {
 	if (!_rowsScrollCache.scrolling() || _visibleTop >= _visibleBottom) {
 		return;
@@ -2431,13 +2528,10 @@ void PeerListContent::checkScrollForPreload() {
 void PeerListContent::searchQueryChanged(QString query) {
 	const auto searchWordsList = TextUtilities::PrepareSearchWords(query);
 	const auto normalizedQuery = searchWordsList.join(' ');
-	if (_ignoreHiddenRowsOnSearch && !normalizedQuery.isEmpty()) {
-		_filterResults.clear();
-	}
 	if (_normalizedSearchQuery != normalizedQuery) {
 		setSearchQuery(query, normalizedQuery);
 		if (_controller->searchInLocal() && !searchWordsList.isEmpty()) {
-			Assert(_hiddenRows.empty() || _ignoreHiddenRowsOnSearch);
+			Assert(_hiddenRows.empty());
 
 			auto minimalList = (const std::vector<not_null<PeerListRow*>>*)nullptr;
 			for (const auto &searchWord : searchWordsList) {
@@ -2576,10 +2670,6 @@ void PeerListContent::dragLeft() {
 	clearSelection();
 }
 
-void PeerListContent::setIgnoreHiddenRowsOnSearch(bool value) {
-	_ignoreHiddenRowsOnSearch = value;
-}
-
 void PeerListContent::visibleTopBottomUpdated(
 		int visibleTop,
 		int visibleBottom) {
@@ -2589,6 +2679,9 @@ void PeerListContent::visibleTopBottomUpdated(
 	}
 	_visibleTop = visibleTop;
 	_visibleBottom = visibleBottom;
+	if (_dragSelectFrom) {
+		updateDragSelect(QCursor::pos());
+	}
 	loadProfilePhotos();
 	checkScrollForPreload();
 }

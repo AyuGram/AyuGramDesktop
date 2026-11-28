@@ -9,8 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_common.h"
 #include "base/object_ptr.h"
-#include "menu/menu_send.h"
 #include "data/data_poll.h"
+#include "menu/menu_send.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 
 class History;
@@ -90,6 +90,11 @@ void FillSenderUserpicMenu(
 void AddSenderUserpicModerateAction(
 	not_null<SessionController*> controller,
 	HistoryItem *moderateItem,
+	const PeerMenuCallback &addAction);
+
+void AddSendMoneyAction(
+	not_null<SessionController*> controller,
+	not_null<UserData*> user,
 	const PeerMenuCallback &addAction);
 
 void PeerMenuExportChat(
@@ -208,11 +213,6 @@ base::weak_qptr<Ui::BoxContent> ShowForwardMessagesBox(
 	not_null<Window::SessionNavigation*> navigation,
 	MessageIdsList &&items,
 	Fn<void()> &&successCallback = nullptr);
-base::weak_qptr<Ui::BoxContent> ShowShareUrlBox(
-	not_null<Window::SessionNavigation*> navigation,
-	const QString &url,
-	const QString &text,
-	FnMut<void()> &&successCallback = nullptr);
 base::weak_qptr<Ui::BoxContent> ShowShareGameBox(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<UserData*> bot,

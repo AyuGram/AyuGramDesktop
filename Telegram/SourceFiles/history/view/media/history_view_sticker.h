@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/weak_ptr.h"
 #include "history/view/media/history_view_media_unwrapped.h"
 #include "history/view/media/history_view_sticker_player_abstract.h"
-#include "base/weak_ptr.h"
 
 namespace Main {
 class Session;
@@ -92,7 +92,6 @@ public:
 	[[nodiscard]] static QSize Size(not_null<DocumentData*> document);
 	[[nodiscard]] static QSize PremiumEffectSize(
 		not_null<DocumentData*> document);
-	[[nodiscard]] static QSize UsualPremiumEffectSize();
 	[[nodiscard]] static QSize EmojiEffectSize();
 	[[nodiscard]] static QSize MessageEffectSize();
 	[[nodiscard]] static QSize EmojiSize();

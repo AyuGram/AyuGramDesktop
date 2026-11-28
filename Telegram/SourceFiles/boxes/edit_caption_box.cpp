@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "apiwrap.h"
 #include "base/event_filter.h"
+#include "boxes/message_video_edit.h"
 #include "boxes/premium_limits_box.h"
 #include "boxes/premium_preview_box.h"
 #include "boxes/send_files_box.h"
@@ -23,26 +24,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
 #include "data/data_document.h"
 #include "data/data_photo_media.h"
+#include "data/data_premium_limits.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/data_premium_limits.h"
-#include "data/stickers/data_stickers.h"
-#include "data/stickers/data_custom_emoji.h"
+#include "editor/video/video_editor_layer.h"
 #include "editor/editor_layer_widget.h"
 #include "editor/photo_editor.h"
 #include "editor/photo_editor_layer_widget.h"
-#include "editor/video/video_editor_layer.h"
+#include "history/view/controls/history_view_compose_ai_button.h"
+#include "history/history.h"
 #include "history/history_drag_area.h"
 #include "history/history_item.h"
-#include "history/history.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
 #include "lang/lang_keys.h"
-#include "menu/menu_checked_action.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "mainwidget.h" // controller->content() -> QWidget*
+#include "menu/menu_checked_action.h"
 #include "menu/menu_send.h"
 #include "mtproto/mtproto_config.h"
 #include "platform/platform_specific.h"
@@ -58,15 +59,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/scroll_content_shadow.h"
 #include "ui/image/image.h"
 #include "ui/toast/toast.h"
-#include "ui/painter.h"
-#include "ui/ui_utility.h"
-#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
@@ -361,7 +363,7 @@ void EditCaptionBox::StartMediaReplace(
 	}
 }
 
-void EditCaptionBox::StartPhotoEdit(
+void EditCaptionBox::StartMediaEdit(
 		not_null<Window::SessionController*> controller,
 		std::shared_ptr<Data::PhotoMedia> media,
 		FullMsgId itemId,
@@ -375,26 +377,34 @@ void EditCaptionBox::StartPhotoEdit(
 	if (!item) {
 		return;
 	}
-	EditPhotoImage(
+	const auto done = crl::guard(
 		controller,
-		media,
-		spoilered,
-		PhotoSideLimit(true),
 		[=](Ui::PreparedList &&list) mutable {
 			const auto item = session->data().message(itemId);
-			if (!item) {
+			if (!item || !item->allowsEditMedia()) {
 				return;
 			}
-			controller->show(Box<EditCaptionBox>(
-				controller,
-				item,
-				std::move(text),
-				suggest,
-				spoilered,
-				invertCaption,
-				std::move(list),
-				std::move(saved)));
+			controller->show(
+				Box<EditCaptionBox>(
+					controller,
+					item,
+					std::move(text),
+					suggest,
+					spoilered,
+					invertCaption,
+					std::move(list),
+					std::move(saved)));
 		});
+	if (media) {
+		EditPhotoImage(
+			controller,
+			std::move(media),
+			spoilered,
+			PhotoSideLimit(true),
+			done);
+	} else {
+		EditMessageVideo(controller, itemId, done);
+	}
 }
 
 void EditCaptionBox::showFinished() {

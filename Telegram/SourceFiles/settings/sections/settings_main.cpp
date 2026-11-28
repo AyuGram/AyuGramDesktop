@@ -7,8 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/sections/settings_main.h"
 
-#include "settings/settings_common_session.h"
-
 #include "api/api_cloud_password.h"
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
@@ -16,8 +14,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_premium.h"
 #include "api/api_sensitive_content.h"
 #include "apiwrap.h"
-#include "base/call_delayed.h"
 #include "base/platform/base_platform_info.h"
+#include "base/call_delayed.h"
+#include "boxes/keys_legend.h"
 #include "boxes/language_box.h"
 #include "boxes/star_gift_box.h"
 #include "boxes/username_box.h"
@@ -33,53 +32,62 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/info_profile_emoji_status_panel.h"
 #include "info/profile/info_profile_phone_menu.h"
 #include "info/profile/info_profile_values.h"
+#include "info/stories/info_stories_widget.h"
+#include "info/info_memento.h"
 #include "lang/lang_cloud_manager.h"
 #include "lang/lang_instance.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
-#include "menu/menu_checked_action.h"
 #include "main/main_account.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "settings/settings_builder.h"
+#include "menu/menu_checked_action.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/sections/settings_advanced.h"
 #include "settings/sections/settings_business.h"
 #include "settings/sections/settings_calls.h"
 #include "settings/sections/settings_chat.h"
-#include "settings/settings_codes.h"
-#include "settings/settings_faq_suggestions.h"
 #include "settings/sections/settings_credits.h"
 #include "settings/sections/settings_folders.h"
 #include "settings/sections/settings_information.h"
 #include "settings/sections/settings_notifications.h"
-#include "settings/settings_power_saving.h"
 #include "settings/sections/settings_premium.h"
 #include "settings/sections/settings_privacy_security.h"
+#include "settings/settings_builder.h"
+#include "settings/settings_codes.h"
+#include "settings/settings_common_session.h"
+#include "settings/settings_faq_suggestions.h"
+#include "settings/settings_power_saving.h"
 #include "settings/settings_scale_preview.h"
 #include "storage/localstorage.h"
-#include "ui/basic_click_handlers.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/peer_qr_box.h"
 #include "ui/controls/userpic_button.h"
+#include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
-#include "ui/new_badges.h"
-#include "ui/power_saving.h"
-#include "ui/rect.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_item_base.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/basic_click_handlers.h"
+#include "ui/new_badges.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
+#include "ui/vertical_list.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
+#include <QtGui/QWindow>
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
@@ -253,13 +261,9 @@ Cover::Cover(
 	_qrButton->setClickedCallback([=, show = controller->uiShow()] {
 		Ui::DefaultShowFillPeerQrBoxCallback(show, _user);
 	});
-	Info::Profile::UsernamesValue(
-		_user
-	) | rpl::on_next([=](const auto &usernames) {
-		_qrButton->setVisible(!usernames.empty());
-		refreshNameGeometry(width());
-		refreshQrButtonGeometry(width());
-	}, _qrButton->lifetime());
+	_qrButton->show();
+	refreshNameGeometry(width());
+	refreshQrButtonGeometry(width());
 }
 
 Cover::~Cover() = default;
@@ -401,10 +405,13 @@ void BuildSectionButtons(SectionBuilder &builder) {
 	builder.addSkip();
 
 	if (!session->supportMode()) {
-		builder.addSectionButton({
+		builder.addButton({
 			.title = tr::lng_settings_my_account(),
-			.targetSection = InformationId(),
 			.icon = { &st::menuIconProfile },
+			.onClick = [=] {
+				controller->showSection(
+					Info::Stories::MakeMyProfile(session->user()));
+			},
 			.keywords = { u"profile"_q, u"edit"_q, u"information"_q },
 		});
 	}
@@ -608,26 +615,60 @@ void BuildPremiumSection(SectionBuilder &builder) {
 	builder.addSkip();
 }
 
+class CircleRippleIconButton final : public Ui::IconButton {
+public:
+	using Ui::IconButton::IconButton;
+
+protected:
+	QImage prepareRippleMask() const override {
+		return Ui::RippleAnimation::EllipseMask(size());
+	}
+};
+
 void BuildHelpSection(SectionBuilder &builder) {
 	builder.addDivider();
 	builder.addSkip();
 
 	const auto controller = builder.controller();
-	builder.addButton({
+	const auto faq = builder.addButton({
 		.id = u"main/faq"_q,
 		.title = tr::lng_settings_faq(),
 		.icon = { &st::menuIconFaq },
 		.onClick = [=] { OpenFaq(controller); },
-		.keywords = { u"help"_q, u"support"_q, u"questions"_q },
+		.keywords = {
+			u"help"_q,
+			u"support"_q,
+			u"questions"_q,
+			u"shortcuts"_q,
+			u"keyboard"_q,
+			u"hotkeys"_q,
+			u"legend"_q,
+			u"gestures"_q,
+		},
 	});
+	if (faq) {
+		const auto legend = Ui::CreateChild<CircleRippleIconButton>(
+			faq,
+			st::settingsFaqKeysLegend);
+		legend->setAccessibleName(tr::lng_keys_legend_title(tr::now));
+		faq->sizeValue(
+		) | rpl::on_next([=](const QSize &size) {
+			const auto right = st::settingsButtonRightSkip
+				- st::settingsFaqKeysLegend.iconPosition.x();
+			legend->moveToRight(
+				right,
+				(size.height() - legend->height()) / 2);
+		}, legend->lifetime());
+		legend->setClickedCallback([=] {
+			ShowKeysLegend(&controller->window());
+		});
+	}
 
 	builder.addButton({
 		.id = u"main/features"_q,
 		.title = tr::lng_settings_features(),
 		.icon = { &st::menuIconEmojiObjects },
-		.onClick = [] {
-			UrlClickHandler::Open(tr::lng_telegram_features_url(tr::now));
-		},
+		.onClick = [=] { OpenFeatures(controller); },
 		.keywords = { u"tips"_q, u"tutorial"_q },
 	});
 
@@ -707,7 +748,7 @@ void Main::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 	const auto window = &controller()->window();
 	const auto logout = addAction({
 		.text = tr::lng_settings_logout(tr::now),
-		.handler = [=] { window->showLogoutConfirmation(); },
+		.handler = [=] { window->showLogoutOptions(); },
 		.icon = &st::menuIconLeaveAttention,
 		.isAttention = true,
 	});
@@ -898,8 +939,8 @@ void SetupValidatePhoneNumberSuggestion(
 		st::boxRowPadding);
 	label->setClickHandlerFilter([=, weak = base::make_weak(controller)](
 			const auto &...) {
-		UrlClickHandler::Open(
-			tr::lng_settings_suggestion_phone_number_about_link(tr::now),
+		HiddenUrlClickHandler::OpenTranslated(
+			tr::lng_settings_suggestion_phone_number_about_link,
 			QVariant::fromValue(ClickHandlerContext{
 				.sessionWindow = weak,
 			}));
@@ -1210,8 +1251,16 @@ Type MainId() {
 }
 
 void OpenFaq(base::weak_ptr<Window::SessionController> weak) {
-	UrlClickHandler::Open(
-		tr::lng_settings_faq_link(tr::now),
+	HiddenUrlClickHandler::OpenTranslated(
+		tr::lng_settings_faq_link,
+		QVariant::fromValue(ClickHandlerContext{
+			.sessionWindow = weak,
+		}));
+}
+
+void OpenFeatures(base::weak_ptr<Window::SessionController> weak) {
+	HiddenUrlClickHandler::OpenTranslated(
+		tr::lng_telegram_features_url,
 		QVariant::fromValue(ClickHandlerContext{
 			.sessionWindow = weak,
 		}));

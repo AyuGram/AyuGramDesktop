@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
 #include "chat_helpers/compose/compose_features.h"
 #include "chat_helpers/tabbed_selector.h"
 #include "ui/effects/animations.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/round_rect.h"
-#include "base/timer.h"
 
 #include <map>
 
@@ -84,6 +84,7 @@ enum class EmojiListMode {
 	UserpicBuilder,
 	BackgroundEmoji,
 	PeerTitle,
+	UnicodeOnly,
 	MessageEffects,
 	CustomOnly,
 };
@@ -154,8 +155,11 @@ public:
 	void provideRecent(const std::vector<EmojiStatusId> &customRecentList);
 
 	void setMarkedCustomIds(base::flat_set<DocumentId> ids);
+	void setMarkedCustomPainter(
+		Fn<void(QPainter&, QRect, DocumentId)> painter);
 
 	void setSearchRightReserved(int value);
+	void refreshSearchColors();
 
 	void prepareExpanding();
 	void paintExpanding(
@@ -498,6 +502,7 @@ private:
 	const std::shared_ptr<Show> _show;
 	const ComposeFeatures _features;
 	const bool _onlyUnicodeEmoji;
+	const bool _focusUnicodeSearch;
 	Mode _mode = Mode::Full;
 	QWidget *_mediaPreviewParent = nullptr;
 	QMargins _mediaPreviewMargins;
@@ -537,6 +542,7 @@ private:
 	Ui::RoundRect _overBg;
 	Ui::RoundRect _markedBg;
 	base::flat_set<DocumentId> _markedCustomIds;
+	Fn<void(QPainter&, QRect, DocumentId)> _markedCustomPainter;
 	QImage _searchExpandCache;
 
 	std::unique_ptr<StickerPremiumMark> _premiumMark;

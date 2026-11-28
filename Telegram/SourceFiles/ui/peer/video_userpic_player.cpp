@@ -7,14 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/peer/video_userpic_player.h"
 
+#include "data/data_file_origin.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_session.h"
 #include "data/data_streaming.h"
-#include "data/data_file_origin.h"
+#include "media/streaming/media_streaming_document.h"
 #include "media/streaming/media_streaming_instance.h"
 #include "media/streaming/media_streaming_player.h"
-#include "media/streaming/media_streaming_document.h"
 #include "ui/image/image_prepare.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
@@ -25,7 +25,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Ui {
 
-VideoUserpicPlayer::VideoUserpicPlayer() = default;
+VideoUserpicPlayer::VideoUserpicPlayer(Fn<void()> repaint)
+: _repaint(std::move(repaint)) {
+}
 
 VideoUserpicPlayer::~VideoUserpicPlayer() = default;
 
@@ -170,7 +172,10 @@ void VideoUserpicPlayer::handleUpdate(
 	v::match(update.data, [&](Information &update) {
 		streamingReady(std::move(update));
 	}, [](PreloadedVideo) {
-	}, [](UpdateVideo) {
+	}, [&](UpdateVideo) {
+		if (_repaint) {
+			_repaint();
+		}
 	}, [](PreloadedAudio) {
 	}, [](UpdateAudio) {
 	}, [](WaitingForData) {
@@ -183,10 +188,16 @@ void VideoUserpicPlayer::handleUpdate(
 void VideoUserpicPlayer::handleError(::Media::Streaming::Error &&error) {
 	_streamedPhoto->setVideoPlaybackFailed();
 	clear();
+	if (_repaint) {
+		_repaint();
+	}
 }
 
 void VideoUserpicPlayer::streamingReady(
 		::Media::Streaming::Information &&info) {
+	if (_repaint) {
+		_repaint();
+	}
 }
 
 } // namespace Ui

@@ -7,38 +7,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/reactions/history_view_reactions_selector.h"
 
-#include "ui/widgets/labels.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/shadow.h"
-#include "ui/wrap/vertical_layout.h"
+#include "apiwrap.h"
+#include "base/call_delayed.h"
+#include "boxes/premium_preview_box.h"
+#include "chat_helpers/emoji_list_widget.h"
+#include "chat_helpers/stickers_list_footer.h"
+#include "chat_helpers/stickers_list_widget.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_session.h"
+#include "history/view/media/history_view_sticker.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "mainwidget.h"
+#include "menu/menu_send.h"
+#include "ui/platform/ui_platform_utility.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_utilities.h"
-#include "ui/platform/ui_platform_utility.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/shadow.h"
+#include "ui/wrap/vertical_layout.h"
 #include "ui/integration.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
-#include "history/view/media/history_view_sticker.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "data/data_document.h"
-#include "data/data_document_media.h"
-#include "data/data_session.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "lang/lang_keys.h"
-#include "main/main_session.h"
-#include "menu/menu_send.h"
-#include "chat_helpers/emoji_list_widget.h"
-#include "chat_helpers/stickers_list_footer.h"
-#include "chat_helpers/stickers_list_widget.h"
 #include "window/window_session_controller.h"
-#include "boxes/premium_preview_box.h"
-#include "mainwidget.h"
-#include "apiwrap.h"
-#include "base/call_delayed.h"
-#include "styles/style_chat_helpers.h"
+
+#include <QCoreApplication>
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 
 // AyuGram includes
 #include "ayu/ui/context_menu/context_menu.h"
@@ -236,29 +238,6 @@ Selector::Selector(
 	mediaPreviewParent) {
 }
 
-#if 0 // not ready
-Selector::Selector(
-	not_null<QWidget*> parent,
-	const style::EmojiPan &st,
-	std::shared_ptr<ChatHelpers::Show> show,
-	ChatHelpers::EmojiListMode mode,
-	std::vector<DocumentId> recent,
-	Fn<void(bool fast)> close,
-	bool child)
-: Selector(
-	parent,
-	st,
-	std::move(show),
-	{ .customAllowed = true },
-	mode,
-	std::move(recent),
-	{},
-	nullptr,
-	close,
-	child) {
-}
-#endif
-
 Selector::Selector(
 	not_null<QWidget*> parent,
 	const style::EmojiPan &st,
@@ -289,7 +268,9 @@ Selector::Selector(
 	_st,
 	QRect(0, 0, st::reactStripSize, st::reactStripSize),
 	st::reactStripImage,
-	crl::guard(this, [=] { update(_inner); }),
+	crl::guard(this, [=] {
+		update(_inner.translated(0, -skipYBubbleUpShift()));
+	}),
 	std::move(iconFactory)))
 , _about(about.empty()
 	? nullptr
@@ -475,10 +456,17 @@ void Selector::setBubbleUp(bool bubbleUp) {
 		return;
 	}
 	_bubbleUp = bubbleUp;
+	if (!_appearing && !_expandScheduled) {
+		_paintBuffer = QImage();
+	}
 }
 
 void Selector::setExpandDown(bool expandDown) {
 	_expandDown = expandDown;
+}
+
+void Selector::setLowersAfterAppearance(bool low) {
+	_lowersAfterAppearance = low;
 }
 
 void Selector::initGeometry(int innerTop) {
@@ -511,6 +499,9 @@ void Selector::initGeometry(int innerTop) {
 	setGeometry(_outerWithBubble.marginsAdded(
 		{ 0, _outer.y(), 0, 0}
 	).translated(left, top));
+	if (!_about) {
+		setMask(QRect(QPoint(0, _outer.y()), _outerWithBubble.size()));
+	}
 	_inner = _outer.marginsRemoved(
 		margins + QMargins{ 0, _aboutExtend, 0, 0 });
 	if (_about) {
@@ -567,7 +558,7 @@ void Selector::updateShowState(
 	} else if (_toggling && !isHidden()) {
 		hide();
 	}
-	if (!_appearing && !_low) {
+	if (!_appearing && !_low && _lowersAfterAppearance) {
 		_low = true;
 		lower();
 	}
@@ -592,19 +583,30 @@ void Selector::paintAppearing(QPainter &p) {
 	const auto appearedWidth = countAppearedWidth(_appearProgress);
 	const auto fullWidth = _inner.x() + appearedWidth + margins.right();
 	const auto size = QSize(fullWidth, _outer.height());
-
-	q.translate(_inner.topLeft() - QPoint(0, _outer.y()));
+	if (_bubbleUp) {
+		q.translate(_inner.topLeft()
+			- QPoint(0, _outer.y())
+			+ QPoint(0, -skipYBubbleUpShift()));
+	} else {
+		q.translate(_inner.topLeft() - QPoint(0, _outer.y()));
+	}
 	_strip->paint(
 		q,
-		{ _skipx, _skipy - skipYBubbleUpShift() },
+		{ _skipx, _skipy },
 		{ _size, 0 },
 		{ 0, 0, appearedWidth, _inner.height() },
 		1.,
 		false);
+	q.resetTransform();
 
 	_cachedRound.setBackgroundColor(_st.bg->c);
 	_cachedRound.setShadowColor(st::shadowFg->c);
-	q.translate(QPoint(0, _outer.y()) - _inner.topLeft());
+	if (_bubbleUp) {
+		const auto centerY = _paintBuffer.height() / (2. * factor);
+		q.translate(0, centerY);
+		q.scale(1., -1.);
+		q.translate(0, -centerY);
+	}
 	const auto radius = st::reactStripHeight / 2;
 	_cachedRound.overlayExpandedBorder(
 		q,
@@ -880,6 +882,16 @@ void Selector::showEvent(QShowEvent *e) {
 	_shownAt = crl::now();
 }
 
+bool Selector::eventFilter(QObject *obj, QEvent *e) {
+	if (_expandScheduled
+		&& e->type() == QEvent::MouseButtonPress
+		&& !QRect(mapToGlobal(QPoint(0, 0)), size()).contains(
+			static_cast<QMouseEvent*>(e)->globalPosition().toPoint())) {
+		_escapes.fire({});
+	}
+	return RpWidget::eventFilter(obj, e);
+}
+
 void Selector::mouseMoveEvent(QMouseEvent *e) {
 	if (!_strip) {
 		return;
@@ -1014,6 +1026,7 @@ void Selector::expand() {
 		return;
 	}
 	_expandScheduled = true;
+	const auto parentTopBefore = parentWidget()->y();
 	_willExpand.fire({});
 	preloadAllRecentsAnimations();
 	const auto parent = parentWidget()->geometry();
@@ -1022,30 +1035,50 @@ void Selector::expand() {
 		? st::emojiPanMaxHeight
 		: minimalHeight(width());
 	const auto opaqueAdded = _useTransparency ? 0 : _opaqueHeightExpand;
+	const auto shift = _bubbleUp ? -skipYBubbleUpShift() : 0;
+	const auto parentGrown = parentWidget()->y() - parentTopBefore;
+	const auto additionalTop = _expandDown ? _topAddOnExpand : 0;
 	const auto willBeHeight = std::min(
-		parent.height() - y() + opaqueAdded,
+		parent.height()
+			- y()
+			+ opaqueAdded
+			+ additionalTop
+			- shift
+			- parentGrown,
 		margins.top() + heightLimit + margins.bottom());
 	const auto additionalBottom = willBeHeight - height();
 	const auto additional = _specialExpandTopSkip + additionalBottom;
-	const auto additionalTop = _expandDown ? _topAddOnExpand : 0;
 	if (additionalBottom < 0 || additional <= 0) {
+		_expandScheduled = false;
 		return;
 	} else if (additionalBottom > 0 || additionalTop > 0) {
 		setGeometry(
 			x(),
-			y() - additionalTop,
+			y() - additionalTop + shift + parentGrown,
 			width(),
-			height() + additionalTop + additionalBottom);
+			height()
+				+ additionalTop
+				+ additionalBottom
+				- shift
+				- parentGrown);
 		raise();
 		if (additionalTop > 0) {
 			_outer.translate(0, additionalTop);
 			_outerWithBubble.translate(0, additionalTop);
 			_inner.translate(0, additionalTop);
 			if (_about) {
-				_about->move(_about->x(), _about->y() + additionalTop);
+				_about->move(
+					_about->x(),
+					_about->y() + additionalTop - shift);
 			}
 		}
 	}
+	if (_bubbleUp) {
+		_bubbleUp = false;
+		paintBackgroundToBuffer();
+	}
+	clearMask();
+	QCoreApplication::instance()->installEventFilter(this);
 
 	createList();
 	cacheExpandIcon();
@@ -1137,7 +1170,7 @@ void Selector::createList() {
 	if (!_reactions.stickers.empty()) {
 		auto descriptors = ranges::views::all(
 			_reactions.stickers
-		) | ranges::view::transform([](const Data::Reaction &reaction) {
+		) | ranges::views::transform([](const Data::Reaction &reaction) {
 			return ChatHelpers::StickerCustomRecentDescriptor{
 				reaction.selectAnimation,
 				reaction.title
@@ -1357,78 +1390,6 @@ bool AdjustMenuGeometryForSelector(
 	return menu->prepareGeometryFor(desiredPosition);
 }
 
-#if 0 // not ready
-AttachSelectorResult MakeJustSelectorMenu(
-		not_null<Ui::PopupMenu*> menu,
-		not_null<Window::SessionController*> controller,
-		QPoint desiredPosition,
-		ChatHelpers::EmojiListMode mode,
-		std::vector<DocumentId> recent,
-		Fn<void(ChosenReaction)> chosen) {
-	const auto selector = Ui::CreateChild<Selector>(
-		menu.get(),
-		st::reactPanelEmojiPan,
-		controller->uiShow(),
-		mode,
-		std::move(recent),
-		[=](bool fast) { menu->hideMenu(fast); },
-		false); // child
-	if (!AdjustMenuGeometryForSelector(menu, desiredPosition, selector)) {
-		return AttachSelectorResult::Failed;
-	}
-	if (mode != ChatHelpers::EmojiListMode::RecentReactions) {
-		Ui::Platform::FixPopupMenuNativeEmojiPopup(menu);
-	}
-	const auto selectorInnerTop = menu->preparedPadding().top()
-		- st::reactStripExtend.top();
-	menu->animatePhaseValue(
-	) | rpl::on_next([=](Ui::PopupMenu::AnimatePhase phase) {
-		if (phase == Ui::PopupMenu::AnimatePhase::StartHide) {
-			selector->beforeDestroy();
-		}
-	}, selector->lifetime());
-	selector->initGeometry(selectorInnerTop);
-	selector->show();
-
-	selector->chosen() | rpl::on_next([=](ChosenReaction reaction) {
-		menu->hideMenu();
-		chosen(std::move(reaction));
-	}, selector->lifetime());
-
-	const auto correctTop = selector->y();
-	menu->showStateValue(
-	) | rpl::on_next([=](Ui::PopupMenu::ShowState state) {
-		const auto origin = menu->preparedOrigin();
-		using Origin = Ui::PanelAnimation::Origin;
-		if (origin == Origin::BottomLeft || origin == Origin::BottomRight) {
-			const auto add = state.appearing
-				? (menu->rect().marginsRemoved(
-					menu->preparedPadding()
-				).height() - state.appearingHeight)
-				: 0;
-			selector->move(selector->x(), correctTop + add);
-		}
-		selector->updateShowState(
-			state.widthProgress * state.heightProgress,
-			state.opacity,
-			state.appearing,
-			state.toggling);
-	}, selector->lifetime());
-
-	const auto weak = base::make_weak(controller);
-	controller->enableGifPauseReason(
-		Window::GifPauseReason::MediaPreview);
-	QObject::connect(menu.get(), &QObject::destroyed, [weak] {
-		if (const auto strong = weak.get()) {
-			strong->disableGifPauseReason(
-				Window::GifPauseReason::MediaPreview);
-		}
-	});
-
-	return AttachSelectorResult::Attached;
-}
-#endif
-
 AttachSelectorResult AttachSelectorToMenu(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<Window::SessionController*> controller,
@@ -1517,6 +1478,7 @@ auto AttachSelectorToMenu(
 		std::move(iconFactory),
 		std::move(paused),
 		false); // child
+	selector->setLowersAfterAppearance(true);
 	if (!AdjustMenuGeometryForSelector(menu, desiredPosition, selector)) {
 		return base::make_unexpected(AttachSelectorResult::Failed);
 	}

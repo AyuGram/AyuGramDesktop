@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/weak_ptr.h"
 #include "base/timer.h"
+#include "base/weak_ptr.h"
 
 class History;
 
@@ -34,6 +34,7 @@ public:
 	void apply(const MessageUpdate &update);
 	void apply(const TopicUpdate &update);
 	void applyDifferenceTooLong();
+	void markJustCreated();
 
 	[[nodiscard]] rpl::producer<MessagesSlice> source(
 		MessagePosition aroundId,
@@ -81,8 +82,6 @@ private:
 
 	void subscribeToUpdates();
 	void appendClientSideMessages(MessagesSlice &slice);
-	[[nodiscard]] std::optional<int> computeUnreadCountLocally(
-		MsgId afterId) const;
 
 	[[nodiscard]] bool buildFromData(not_null<Viewer*> viewer);
 	[[nodiscard]] bool applyItemDestroyed(

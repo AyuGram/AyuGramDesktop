@@ -8,8 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/iv_search_controller.h"
 
 #include "base/invoke_queued.h"
-#include "iv/iv_search_bar.h"
 #include "iv/markdown/iv_markdown_article.h"
+#include "iv/iv_search_bar.h"
 #include "logs.h"
 
 #include <algorithm>
@@ -84,9 +84,16 @@ bool SearchController::shown() const {
 }
 
 void SearchController::refresh() {
+	if (_searchResolving) {
+		return;
+	}
+	const auto preferred = _searchScanInFlight
+		? _searchDesiredCurrent
+		: _searchCurrentEntry;
 	invalidateSearchSession();
 	if (_searchBar->shown()) {
-		rebuildSearchResults(_searchCurrentEntry, false);
+		applySearchEntries({}, -1, false);
+		rebuildSearchResults(preferred, false);
 	}
 }
 
@@ -274,6 +281,10 @@ void SearchController::resolveCurrentSearchEntry() {
 	if (!_host.ready()) {
 		return;
 	}
+	_searchResolving = true;
+	const auto resolving = gsl::finally([&] {
+		_searchResolving = false;
+	});
 	while (_searchCurrentEntry >= 0
 		&& _searchCurrentEntry < int(_searchEntries.size())) {
 		const auto anchorId

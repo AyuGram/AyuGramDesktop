@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "data/data_cloud_file.h"
 #include "api/api_common.h"
+#include "data/data_cloud_file.h"
 #include "media/view/media_view_open_common.h"
 #include "ui/effects/message_sending_animation_common.h"
 
@@ -88,7 +88,6 @@ public:
 
 private:
 	void createGame(not_null<Main::Session*> session);
-	QSize thumbBox() const;
 	MTPWebDocument adjustAttributes(const MTPWebDocument &document);
 	MTPVector<MTPDocumentAttribute> adjustAttributes(
 		const MTPVector<MTPDocumentAttribute> &document,
@@ -107,6 +106,7 @@ private:
 		Geo,
 		Venue,
 		Game,
+		Widget,
 	};
 
 	friend class internal::SendData;

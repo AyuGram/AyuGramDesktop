@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/username_box.h"
 
-#include "boxes/peers/edit_peer_usernames_list.h"
 #include "base/timer.h"
 #include "boxes/peers/edit_peer_common.h"
+#include "boxes/peers/edit_peer_usernames_list.h"
 #include "data/data_channel.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
@@ -18,19 +18,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "mtproto/sender.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/vertical_list.h"
 #include "ui/text/text_utilities.h"
 #include "ui/text/text_variant.h"
 #include "ui/toast/toast.h"
-#include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/special_fields.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/follow_slide_wrap.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/painter.h"
+#include "ui/vertical_list.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_edit_peer_members.h"
 #include "styles/style_layers.h"
-#include "styles/style_boxes.h"
 
 namespace {
 
@@ -313,10 +314,9 @@ QString UsernameEditor::getName() const {
 
 } // namespace
 
-void FillUsernamesBox(
+void UsernamesBox(
 		not_null<Ui::GenericBox*> box,
-		not_null<PeerData*> peer,
-		Fn<void()> onSaved) {
+		not_null<PeerData*> peer) {
 	const auto isBot = peer && peer->isUser() && peer->asUser()->isBot();
 	box->setTitle(isBot
 		? tr::lng_bot_username_title()
@@ -375,9 +375,6 @@ void FillUsernamesBox(
 		) | rpl::on_done([=] {
 			editor->save(
 			) | rpl::on_done([=] {
-				if (onSaved) {
-					onSaved();
-				}
 				box->closeBox();
 			}, box->lifetime());
 		}, box->lifetime());
@@ -391,19 +388,6 @@ void FillUsernamesBox(
 		box->addButton(tr::lng_settings_save(), finish);
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	}
-}
-
-void UsernamesBox(
-		not_null<Ui::GenericBox*> box,
-		not_null<PeerData*> peer) {
-	FillUsernamesBox(box, peer, nullptr);
-}
-
-void UsernamesBoxWithCallback(
-		not_null<Ui::GenericBox*> box,
-		not_null<PeerData*> peer,
-		Fn<void()> onSaved) {
-	FillUsernamesBox(box, peer, std::move(onSaved));
 }
 
 void AddUsernameCheckLabel(

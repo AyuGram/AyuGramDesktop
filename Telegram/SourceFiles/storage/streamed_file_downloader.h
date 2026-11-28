@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "storage/file_download.h"
-#include "storage/cache/storage_cache_types.h"
 #include "data/data_file_origin.h"
+#include "storage/cache/storage_cache_types.h"
+#include "storage/file_download.h"
 
 namespace Media {
 namespace Streaming {
@@ -29,7 +29,7 @@ public:
 		MTP::DcId dcId,
 		Data::FileOrigin origin,
 		Cache::Key cacheKey,
-		MediaKey fileLocationKey,
+		std::optional<MediaKey> fileLocationKey,
 		std::shared_ptr<Media::Streaming::Reader> reader,
 
 		// For FileLoader
@@ -60,7 +60,7 @@ private:
 	uint64 _objectId = 0;
 	Data::FileOrigin _origin;
 	Cache::Key _cacheKey;
-	MediaKey _fileLocationKey;
+	std::optional<MediaKey> _fileLocationKey;
 	std::shared_ptr<Media::Streaming::Reader> _reader;
 
 	std::vector<bool> _partIsSaved; // vector<bool> :D

@@ -18,28 +18,29 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_group_call.h"
 #include "data/data_session.h"
 #include "info/bot/starref/info_bot_starref_common.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
 #include "tde2e/tde2e_api.h"
 #include "tde2e/tde2e_integration.h"
 #include "ui/boxes/boost_box.h"
+#include "ui/layers/generic_box.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/layers/generic_box.h"
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
-#include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "window/window_session_controller.h"
 #include "window/window_unlock_passcode_box.h"
-#include "styles/style_layers.h"
-#include "styles/style_media_view.h"
-#include "styles/style_menu_icons.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_layers.h"
+#include "styles/style_media_view.h"
+#include "styles/style_menu_icons.h"
 
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
@@ -47,7 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Calls::Group {
 
 object_ptr<Ui::GenericBox> ScreenSharingPrivacyRequestBox() {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	if (!Platform::IsMac10_15OrGreater()) {
 		return { nullptr };
 	}
@@ -74,9 +75,9 @@ object_ptr<Ui::GenericBox> ScreenSharingPrivacyRequestBox() {
 		});
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	});
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 	return { nullptr };
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 }
 
 void ShowUniqueCaptureOptions(

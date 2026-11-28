@@ -9,8 +9,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "apiwrap.h"
 #include "main/main_session.h"
-#include "storage/streamed_file_downloader.h"
 #include "storage/cache/storage_cache_types.h"
+#include "storage/streamed_file_downloader.h"
 
 namespace Media {
 namespace Streaming {
@@ -64,6 +64,10 @@ void LoaderMtproto::addToQueueWithPriority() {
 	addToQueue(_priority);
 }
 
+bool LoaderMtproto::havePendingWork() const {
+	return !_requested.empty() || haveSentRequests();
+}
+
 void LoaderMtproto::stop() {
 	crl::on_main(this, [=] {
 		cancelAllRequests();
@@ -74,7 +78,7 @@ void LoaderMtproto::stop() {
 
 void LoaderMtproto::tryRemoveFromQueue() {
 	crl::on_main(this, [=] {
-		if (_requested.empty() && !haveSentRequests()) {
+		if (!havePendingWork()) {
 			removeFromQueue();
 		}
 	});
@@ -117,8 +121,10 @@ void LoaderMtproto::setPriority(int priority) {
 		return;
 	}
 	_priority = priority;
-	if (haveSentRequests()) {
+	if (havePendingWork()) {
 		addToQueueWithPriority();
+	} else {
+		removeFromQueue();
 	}
 }
 

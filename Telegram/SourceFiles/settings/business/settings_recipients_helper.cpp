@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_settings.h"
 
 namespace Settings {
@@ -383,10 +384,6 @@ rpl::producer<int> ShortcutMessagesCountValue(
 	) | rpl::map([=] {
 		return ShortcutMessagesCount(session, name);
 	});
-}
-
-bool ShortcutExists(not_null<Main::Session*> session, const QString &name) {
-	return ShortcutMessagesCount(session, name) > 0;
 }
 
 rpl::producer<bool> ShortcutExistsValue(

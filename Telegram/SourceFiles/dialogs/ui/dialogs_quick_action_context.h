@@ -36,13 +36,21 @@ enum class QuickDialogActionLabel {
 	Disabled,
 };
 
+enum class QuickActionTrigger {
+	Swipe,
+	MiddleButton,
+};
+
 struct QuickActionContext {
 	::Ui::Controls::SwipeContextData data;
 	std::unique_ptr<Lottie::Icon> icon;
 	std::unique_ptr<Ui::RippleAnimation> ripple;
 	std::unique_ptr<Ui::RippleAnimation> rippleFg;
 	QuickDialogAction action;
+	QuickDialogActionLabel label = QuickDialogActionLabel::Disabled;
+	QuickActionTrigger trigger = QuickActionTrigger::Swipe;
 	crl::time finishedAt = 0;
+	bool staticFeedback = false;
 };
 
 } // namespace Dialogs::Ui

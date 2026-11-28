@@ -7,24 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_choose_join_as.h"
 
+#include "apiwrap.h"
+#include "base/timer_rpl.h"
+#include "base/unixtime.h"
+#include "boxes/peer_list_box.h"
 #include "calls/group/calls_group_common.h"
 #include "calls/group/calls_group_menu.h"
-#include "data/data_peer.h"
-#include "data/data_user.h"
 #include "data/data_channel.h"
-#include "data/data_session.h"
 #include "data/data_group_call.h"
-#include "main/main_session.h"
-#include "main/main_account.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
 #include "lang/lang_keys.h"
-#include "apiwrap.h"
-#include "ui/layers/generic_box.h"
+#include "main/main_account.h"
+#include "main/main_session.h"
 #include "ui/boxes/choose_date_time.h"
+#include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "boxes/peer_list_box.h"
-#include "base/unixtime.h"
-#include "base/timer_rpl.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_calls.h"
 #include "styles/style_chat_helpers.h"
@@ -337,7 +338,7 @@ void ChooseJoinAsProcess::start(
 			.changingJoinAsFrom = changingJoinAsFrom });
 	};
 
-	if (isScheduled) {
+	if (isScheduled && peer->isBroadcast()) {
 		auto box = Box(
 			ScheduleGroupCallBox,
 			JoinInfo{ .peer = peer, .joinAs = peer },
@@ -381,10 +382,15 @@ void ChooseJoinAsProcess::requestList() {
 		});
 		processList(std::move(list));
 	}).fail([=] {
-		finish({
+		auto info = JoinInfo{
 			.peer = _request->peer,
 			.joinAs = _request->peer->session().user(),
-		});
+		};
+		if (_request->context == Context::CreateScheduled) {
+			showScheduleBox(std::move(info));
+		} else {
+			finish(std::move(info));
+		}
 	}).send();
 }
 
@@ -396,6 +402,12 @@ void ChooseJoinAsProcess::finish(JoinInfo info) {
 	if (const auto strong = box.get()) {
 		strong->closeBox();
 	}
+}
+
+void ChooseJoinAsProcess::showScheduleBox(JoinInfo info) {
+	const auto request = base::take(_request);
+	request->show->showBox(
+		Box(ScheduleGroupCallBox, std::move(info), request->done));
 }
 
 void ChooseJoinAsProcess::processList(
@@ -424,6 +436,11 @@ void ChooseJoinAsProcess::processList(
 			: list.front();
 	}();
 	info.possibleJoinAs = std::move(list);
+
+	if (_request->context == Context::CreateScheduled) {
+		showScheduleBox(std::move(info));
+		return;
+	}
 
 	const auto onlyByMe = (info.possibleJoinAs.size() == 1)
 		&& (info.possibleJoinAs.front() == self);

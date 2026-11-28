@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "mainwindow.h"
 #include "window/main_window.h"
 #include "window/window_controller.h"
+
 #include "styles/style_window.h"
 
 #include <QtGui/QGuiApplication>
@@ -117,6 +118,10 @@ rpl::producer<int> DelegateImpl::ivZoomValue() const {
 void DelegateImpl::ivSetZoom(int value) {
 	Core::App().settings().setIvZoom(value);
 	Core::App().saveSettingsDelayed();
+}
+
+void DelegateImpl::ivActivated(not_null<Ui::RpWindow*> window) {
+	Core::App().registerWindowActivation(window);
 }
 
 } // namespace Iv

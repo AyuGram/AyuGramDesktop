@@ -27,20 +27,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "settings/settings_credits_graphics.h"
-#include "ui/layers/generic_box.h"
-#include "ui/text/text_utilities.h"
 #include "ui/boxes/choose_date_time.h"
 #include "ui/boxes/emoji_stake_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/controls/ton_common.h"
-#include "ui/widgets/fields/number_input.h"
+#include "ui/layers/generic_box.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/fields/number_input.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
@@ -113,12 +114,19 @@ StarsTonPriceInput AddStarsTonPriceInput(
 	struct State {
 		rpl::variable<bool> ton;
 		rpl::variable<CreditsAmount> price;
+		rpl::variable<bool> priceValid = true;
 		rpl::event_stream<> updates;
 		rpl::event_stream<> submits;
 	};
 	const auto state = container->lifetime().make_state<State>();
 	state->ton = std::move(args.showTon);
 	state->price = args.price;
+	const auto estimate = [=](rpl::producer<CreditsAmount> price) {
+		return rpl::conditional(
+			state->priceValid.value(),
+			std::move(price),
+			rpl::single(CreditsAmount()));
+	};
 
 	const auto session = args.session;
 	const auto added = st::boxRowPadding - st::defaultSubsectionTitlePadding;
@@ -147,7 +155,7 @@ StarsTonPriceInput AddStarsTonPriceInput(
 	AddApproximateUsd(
 		starsField,
 		session,
-		StarsPriceValue(state->price.value()));
+		estimate(StarsPriceValue(state->price.value())));
 
 	Ui::AddSkip(starsInner);
 	Ui::AddSkip(starsInner);
@@ -179,7 +187,7 @@ StarsTonPriceInput AddStarsTonPriceInput(
 	AddApproximateUsd(
 		tonField,
 		session,
-		TonPriceValue(state->price.value()));
+		estimate(TonPriceValue(state->price.value())));
 
 	Ui::AddSkip(tonInner);
 	Ui::AddSkip(tonInner);
@@ -227,9 +235,11 @@ StarsTonPriceInput AddStarsTonPriceInput(
 	};
 
 	const auto updatePrice = [=] {
-		if (auto result = computeResult()) {
+		const auto result = computeResult();
+		if (result) {
 			state->price = *result;
 		}
+		state->priceValid = result.has_value();
 		state->updates.fire({});
 	};
 	const auto updateTonFromStars = [=] {

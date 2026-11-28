@@ -7,40 +7,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/sections/settings_local_storage.h"
 
-#include "settings.h"
-#include "settings/settings_common.h"
-#include "data/data_session.h"
-#include "lottie/lottie_icon.h"
 #include "base/call_delayed.h"
 #include "base/random.h"
+#include "data/data_session.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
 #include "main/main_session.h"
+#include "settings/settings_common.h"
+#include "settings.h"
 #include "statistics/view/stack_linear_chart_common.h"
-#include "storage/storage_account.h"
 #include "storage/cache/storage_cache_database.h"
-#include "ui/text/format_values.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/widgets/continuous_sliders.h"
-#include "ui/widgets/labels.h"
-#include "ui/wrap/padding_wrap.h"
-#include "ui/wrap/slide_wrap.h"
-#include "ui/wrap/vertical_layout.h"
+#include "storage/storage_account.h"
+#include "tgw/tgw_storage.h"
 #include "ui/effects/animated_string.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/drifting_particles.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/effects/shake_animation.h"
-#include "ui/emoji_config.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
+#include "ui/text/format_values.h"
 #include "ui/text/text_entity.h"
 #include "ui/text/text_utilities.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/continuous_sliders.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/tooltip.h"
+#include "ui/wrap/padding_wrap.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/emoji_config.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
-#include "ui/widgets/tooltip.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_background_preview_box.h"
 #include "styles/style_boxes.h"
 #include "styles/style_edit_peer_members.h"
@@ -106,8 +108,8 @@ QString SizeLimitText(int64 limit) {
 	const auto mb = (limit / (1024 * 1024));
 	const auto gb = (mb / 1024);
 	return (gb > 0)
-		? (QString::number(gb) + " GB")
-		: (QString::number(mb) + " MB");
+		? (QString::number(gb) + ' ' + tr::lng_size_gigabytes(tr::now))
+		: (QString::number(mb) + ' ' + tr::lng_size_megabytes(tr::now));
 }
 
 size_type TimeLimitInDays(int index) {
@@ -282,9 +284,10 @@ not_null<Ui::SlideWrap<Ui::VerticalLayout>*> AddIslandWrap(
 	}
 	const auto tenthGb = size * 10 / kGigabyte;
 	return QString::number(tenthGb / 10)
-		+ '.'
+		+ QLocale().decimalPoint()
 		+ QString::number(tenthGb % 10)
-		+ u" GB"_q;
+		+ ' '
+		+ tr::lng_size_gigabytes(tr::now);
 }
 
 class CompleteParticles final {
@@ -957,7 +960,7 @@ void LocalStorage::Chart::paintEvent(QPaintEvent *e) {
 
 	const auto number = QString::number(
 		(_total + kMegabyte - 1) / kMegabyte);
-	const auto unit = u"MB"_q;
+	const auto unit = tr::lng_size_megabytes(tr::now);
 	const auto sizeFont = st::localStorageChartSizeFont;
 	const auto unitFont = st::localStorageChartUnitFont;
 	const auto blockHeight = sizeFont->height + unitFont->height;
@@ -1452,9 +1455,7 @@ QPoint LocalStorage::Row::prepareRippleStartPosition() const {
 
 QString LocalStorage::Row::sizeText(
 		const Database::TaggedSummary &data) const {
-	return data.totalSize
-		? Ui::FormatSizeText(data.totalSize)
-		: tr::lng_local_storage_empty(tr::now);
+	return Ui::FormatSizeText(data.totalSize);
 }
 
 LocalStorage::LocalStorage(
@@ -1765,6 +1766,7 @@ void LocalStorage::startClearing() {
 		_db->clear();
 		_dbBig->clear();
 		Ui::Emoji::ClearIrrelevantCache();
+		Tgw::EraseStorage(&_session->account());
 		return;
 	}
 	for (auto i = 0; i != kChartPartsCount; ++i) {

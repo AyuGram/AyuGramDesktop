@@ -7,8 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/tabs/info_profile_tabs_host.h"
 
-#include "info/profile/tabs/info_profile_tabs_strip.h"
-#include "info/profile/tabs/adapters/info_profile_tab_media.h"
 #include "apiwrap.h"
 #include "base/call_delayed.h"
 #include "base/options.h"
@@ -18,18 +16,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_forum_topic.h"
 #include "data/data_peer.h"
 #include "data/data_saved_sublist.h"
-#include "info/info_controller.h"
 #include "info/media/info_media_buttons.h"
+#include "info/profile/tabs/adapters/info_profile_tab_media.h"
+#include "info/profile/tabs/info_profile_tabs_strip.h"
+#include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/effects/slide_animation.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
-#include "ui/effects/slide_animation.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_basic.h"
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
@@ -295,18 +296,17 @@ Fn<void()> TabsHost::openInWindowFor(const MediaTabDescriptor &tab) const {
 	if (!tab.sharedMediaType) {
 		return nullptr;
 	}
-	const auto peer = _context.sublist
-		? _context.sublist->sublistPeer()
-		: _context.peer;
-	const auto separateId = Media::SeparateId(
+	const auto peer = _context.peer;
+	const auto topicRootId = _context.topic
+		? _context.topic->rootId()
+		: MsgId();
+	const auto type = *tab.sharedMediaType;
+	return Media::SeparateOpenCallback(
+		_context.controller,
 		peer,
-		_context.topic ? _context.topic->rootId() : MsgId(),
-		*tab.sharedMediaType);
-	if (!separateId) {
-		return nullptr;
-	}
-	const auto window = _context.controller->parentController();
-	return [=] { window->showInNewWindow(separateId); };
+		topicRootId,
+		_context.sublist,
+		type);
 }
 
 void TabsHost::showTabMenu(const QString &id) {
@@ -775,10 +775,6 @@ void TabsHost::pushViewportToActive() {
 	active->setVisibleRegion(
 		_visibleTop - _stripHeight,
 		_visibleBottom - _stripHeight);
-}
-
-rpl::producer<MediaTabContent*> TabsHost::activeTabValue() const {
-	return _activeTab.value();
 }
 
 rpl::producer<Ui::ScrollToRequest> TabsHost::scrollToRequests() const {

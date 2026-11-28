@@ -9,113 +9,104 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_chat_participants.h"
 #include "api/api_premium.h" // MessageMoneyRestriction.
+#include "apiwrap.h"
 #include "base/random.h"
+#include "base/unixtime.h"
 #include "boxes/filters/edit_filter_chats_list.h"
-#include "settings/settings_common.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_community.h"
+#include "data/data_folder.h"
+#include "data/data_forum.h"
+#include "data/data_forum_topic.h"
+#include "data/data_histories.h"
+#include "data/data_peer_values.h"
+#include "data/data_saved_messages.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_session.h"
+#include "data/data_stories.h"
+#include "data/data_user.h"
+#include "dialogs/ui/dialogs_layout.h"
+#include "dialogs/dialogs_main_list.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
+#include "payments/ui/payments_reaction_box.h"
 #include "settings/sections/settings_premium.h"
+#include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/effects/outline_segments.h"
 #include "ui/effects/round_checkbox.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/padding_wrap.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "main/main_session.h"
-#include "data/data_peer_values.h"
-#include "data/data_saved_messages.h"
-#include "data/data_saved_sublist.h"
-#include "data/data_session.h"
-#include "data/data_stories.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_community.h"
-#include "data/data_user.h"
-#include "data/data_forum.h"
-#include "data/data_forum_topic.h"
-#include "data/data_folder.h"
-#include "data/data_histories.h"
-#include "data/data_changes.h"
-#include "dialogs/ui/dialogs_layout.h"
-#include "apiwrap.h"
-#include "mainwidget.h"
-#include "mainwindow.h"
-#include "lang/lang_keys.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "dialogs/dialogs_main_list.h"
-#include "payments/ui/payments_reaction_box.h"
-#include "ui/effects/outline_segments.h"
-#include "ui/wrap/slide_wrap.h"
 #include "window/window_separate_id.h"
-#include "window/window_session_controller.h" // showAddContact()
-#include "base/unixtime.h"
+#include "window/window_session_controller.h" // showPeerHistory()
+
 #include "styles/style_boxes.h"
-#include "styles/style_dialogs.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_dialogs.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
-
-// AyuGram includes
-#include "styles/style_ayu_icons.h"
-
 
 namespace {
 
 constexpr auto kSortByOnlineThrottle = 3 * crl::time(1000);
 constexpr auto kSearchPerPage = 50;
 
-class ContactsMutualRow final : public PeerListRow {
-public:
-	using PeerListRow::PeerListRow;
-
-protected:
-	QSize rightActionSize() const override {
-		return isMutualContact()
-			? QSize(st::ayuContactsMutualIcon.width(), st::ayuContactsMutualIcon.height())
-			: QSize();
-	}
-
-	QMargins rightActionMargins() const override {
-		const auto size = rightActionSize();
-		if (size.isEmpty()) {
-			return QMargins();
-		}
-		const auto right = st::contactsWithStories.item.photoPosition.x();
-		return QMargins(
-			right,
-			(st::contactsWithStories.item.height - size.height()) / 2,
-			right,
-			0);
-	}
-
-	bool rightActionDisabled() const override {
-		return false;
-	}
-
-	void rightActionPaint(
-			Painter &p,
-			int x,
-			int y,
-			int outerWidth,
-			bool selected,
-			bool actionSelected) override {
-		if (!isMutualContact()) {
+void ShowChooseTopicBox(
+		not_null<PeerListController*> controller,
+		base::weak_ptr<base::has_weak_ptr> guard,
+		not_null<Data::Forum*> forum,
+		not_null<FnMut<void(not_null<Data::Thread*>)>*> storedCallback,
+		not_null<const Fn<bool(not_null<Data::Thread*>)>*> storedFilter) {
+	const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
+	auto callback = [=](not_null<Data::Thread*> thread) {
+		const auto exists = guard.get();
+		if (!exists) {
+			if (*weak) {
+				(*weak)->closeBox();
+			}
 			return;
 		}
-		(selected || actionSelected
-			? st::ayuContactsMutualIconOver
-			: st::ayuContactsMutualIcon).paint(p, x, y, outerWidth);
-	}
+		auto onstack = std::move(*storedCallback);
+		onstack(thread);
+		if (guard) {
+			*storedCallback = std::move(onstack);
+		} else if (*weak) {
+			(*weak)->closeBox();
+		}
+	};
+	const auto filter = [=](not_null<Data::Thread*> thread) {
+		return guard && (!*storedFilter || (*storedFilter)(thread));
+	};
+	auto owned = Box<PeerListBox>(
+		std::make_unique<ChooseTopicBoxController>(
+			forum,
+			std::move(callback),
+			filter),
+		[=](not_null<PeerListBox*> box) {
+			box->addButton(tr::lng_cancel(), [=] {
+				box->closeBox();
+			});
 
-private:
-	[[nodiscard]] bool isMutualContact() const {
-		const auto user = peer()->asUser();
-		return user && (user->flags() & UserDataFlag::MutualContact);
-	}
-
-};
+			forum->destroyed(
+			) | rpl::on_next([=] {
+				box->closeBox();
+			}, box->lifetime());
+		});
+	*weak = owned.data();
+	controller->delegate()->peerListUiShow()->showBox(std::move(owned));
+}
 
 } // namespace
 
@@ -125,86 +116,6 @@ Data::CommunityInfo *JoinedCommunityChats(not_null<PeerData*> peer) {
 		? channel->communityInfo()
 		: nullptr;
 	return (info && !info->histories().empty()) ? info : nullptr;
-}
-
-object_ptr<Ui::BoxContent> PrepareContactsBox(
-		not_null<Window::SessionController*> window) {
-	using Mode = ContactsBoxController::SortMode;
-	class Controller final : public ContactsBoxController {
-	public:
-		using ContactsBoxController::ContactsBoxController;
-
-		[[nodiscard]] rpl::producer<not_null<PeerData*>> wheelClicks() const {
-			return _wheelClicks.events();
-		}
-
-	protected:
-		std::unique_ptr<PeerListRow> createRow(
-				not_null<UserData*> user) override {
-			return !user->isSelf()
-				? std::make_unique<ContactsMutualRow>(user)
-				: nullptr;
-		}
-
-		void rowMiddleClicked(
-				not_null<PeerListRow*> row) override {
-			_wheelClicks.fire(row->peer());
-		}
-
-		void rowRightActionClicked(
-				not_null<PeerListRow*> row) override {
-			if (const auto user = row->peer()->asUser();
-				user && (user->flags() & UserDataFlag::MutualContact)) {
-				delegate()->peerListUiShow()->showToast(
-					tr::ayu_MutualContactInfo(tr::now));
-			}
-		}
-
-	private:
-		rpl::event_stream<not_null<PeerData*>> _wheelClicks;
-
-	};
-	auto controller = std::make_unique<Controller>(
-		&window->session());
-	controller->setStyleOverrides(&st::contactsWithStories);
-	controller->setStoriesShown(true);
-	controller->setSectionHeadersShown(true);
-	const auto raw = controller.get();
-	auto init = [=](not_null<PeerListBox*> box) {
-		struct State {
-			QPointer<::Ui::IconButton> toggleSort;
-			rpl::variable<Mode> mode = Mode::Online;
-			::Ui::Animations::Simple scrollAnimation;
-		};
-
-		const auto state = box->lifetime().make_state<State>();
-		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
-		box->addLeftButton(
-			tr::lng_profile_add_contact(),
-			[=] { window->showAddContact(); });
-		state->toggleSort = box->addTopButton(st::contactsSortButton, [=] {
-			const auto online = (state->mode.current() == Mode::Online);
-			const auto mode = online ? Mode::Alphabet : Mode::Online;
-			state->mode = mode;
-			raw->setSortMode(mode);
-			state->toggleSort->setIconOverride(
-				online ? &st::contactsSortOnlineIcon : nullptr,
-				online ? &st::contactsSortOnlineIconOver : nullptr);
-		});
-		raw->setSortMode(Mode::Online);
-
-		raw->wheelClicks() | rpl::on_next([=](not_null<PeerData*> p) {
-			window->showInNewWindow(p);
-		}, box->lifetime());
-
-		raw->setShowFinishedCallback([=] {
-			window->checkHighlightControl(
-				u"contacts/sort"_q,
-				state->toggleSort,
-				{ .rippleShape = true });
-		});
-	};
-	return Box<PeerListBox>(std::move(controller), std::move(init));
 }
 
 QBrush PeerListStoriesGradient(const style::PeerList &st) {
@@ -953,43 +864,7 @@ void ChooseRecipientBoxController::rowClicked(not_null<PeerListRow*> row) {
 	auto guard = base::make_weak(this);
 	const auto peer = row->peer();
 	if (const auto forum = peer->forum()) {
-		const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
-		auto callback = [=](not_null<Data::Thread*> thread) {
-			const auto exists = guard.get();
-			if (!exists) {
-				if (*weak) {
-					(*weak)->closeBox();
-				}
-				return;
-			}
-			auto onstack = std::move(_callback);
-			onstack(thread);
-			if (guard) {
-				_callback = std::move(onstack);
-			} else if (*weak) {
-				(*weak)->closeBox();
-			}
-		};
-		const auto filter = [=](not_null<Data::Thread*> thread) {
-			return guard && (!_filter || _filter(thread));
-		};
-		auto owned = Box<PeerListBox>(
-			std::make_unique<ChooseTopicBoxController>(
-				forum,
-				std::move(callback),
-				filter),
-			[=](not_null<PeerListBox*> box) {
-				box->addButton(tr::lng_cancel(), [=] {
-					box->closeBox();
-				});
-
-				forum->destroyed(
-				) | rpl::on_next([=] {
-					box->closeBox();
-				}, box->lifetime());
-			});
-		*weak = owned.data();
-		delegate()->peerListUiShow()->showBox(std::move(owned));
+		ShowChooseTopicBox(this, guard, forum, &_callback, &_filter);
 		return;
 	} else if (const auto monoforum = peer->monoforum()) {
 		const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
@@ -1157,16 +1032,22 @@ void ChooseTopicSearchController::searchOnServer() {
 		MTP_flags(MTPmessages_GetForumTopics::Flag::f_q),
 		_forum->peer()->input(),
 		MTP_string(_query),
+		MTPlong(), // icon_emoji_id
+		MTPBool(), // closed
 		MTP_int(_offsetDate),
 		MTP_int(_offsetId),
 		MTP_int(_offsetTopicId),
 		MTP_int(kSearchPerPage)
 	)).done([=](const MTPmessages_ForumTopics &result) {
 		_requestId = 0;
+		const auto weak = base::make_weak(this);
 		const auto savedTopicId = _offsetTopicId;
 		const auto byCreation = result.data().is_order_by_create_date();
-		_forum->applyReceivedTopics(result, [&](
+		const auto applied = _forum->applyReceivedTopics(result, [&](
 				not_null<Data::ForumTopic*> topic) {
+			if (!weak) {
+				return;
+			}
 			_offsetTopicId = topic->rootId();
 			if (byCreation) {
 				_offsetDate = topic->creationDate();
@@ -1179,12 +1060,17 @@ void ChooseTopicSearchController::searchOnServer() {
 			}
 			delegate()->peerListSearchAddRow(topic->rootId().bare);
 		});
+		if (!applied || !weak) {
+			return;
+		}
 		if (_offsetTopicId == savedTopicId) {
 			_allLoaded = true;
 		}
 		delegate()->peerListSearchRefreshRows();
 	}).fail([=] {
+		_requestId = 0;
 		_allLoaded = true;
+		delegate()->peerListSearchRefreshRows();
 	}).send();
 }
 
@@ -1541,43 +1427,7 @@ void ChooseCommunityChatBoxController::rowClicked(not_null<PeerListRow*> row) {
 	auto guard = base::make_weak(this);
 	const auto peer = row->peer();
 	if (const auto forum = peer->forum()) {
-		const auto weak = std::make_shared<base::weak_qptr<Ui::BoxContent>>();
-		auto callback = [=](not_null<Data::Thread*> thread) {
-			const auto exists = guard.get();
-			if (!exists) {
-				if (*weak) {
-					(*weak)->closeBox();
-				}
-				return;
-			}
-			auto onstack = std::move(_callback);
-			onstack(thread);
-			if (guard) {
-				_callback = std::move(onstack);
-			} else if (*weak) {
-				(*weak)->closeBox();
-			}
-		};
-		const auto filter = [=](not_null<Data::Thread*> thread) {
-			return guard && (!_filter || _filter(thread));
-		};
-		auto owned = Box<PeerListBox>(
-			std::make_unique<ChooseTopicBoxController>(
-				forum,
-				std::move(callback),
-				filter),
-			[=](not_null<PeerListBox*> box) {
-				box->addButton(tr::lng_cancel(), [=] {
-					box->closeBox();
-				});
-
-				forum->destroyed(
-				) | rpl::on_next([=] {
-					box->closeBox();
-				}, box->lifetime());
-			});
-		*weak = owned.data();
-		delegate()->peerListUiShow()->showBox(std::move(owned));
+		ShowChooseTopicBox(this, guard, forum, &_callback, &_filter);
 		return;
 	}
 	auto onstack = base::take(_callback);
@@ -1684,7 +1534,6 @@ void PaintRestrictionBadge(
 				st::premiumButtonFg->c,
 				&check);
 		} else {
-			auto hq = PainterHighQualityEnabler(p);
 			const auto &icon = st::stickersPremiumLock;
 			const auto width = icon.width();
 			const auto height = icon.height();
@@ -1700,6 +1549,7 @@ void PaintRestrictionBadge(
 			cache.badge.fill(Qt::transparent);
 			const auto inner = QRect(add, add, rect.width(), rect.height());
 			auto q = QPainter(&cache.badge);
+			auto hq = PainterHighQualityEnabler(q);
 			auto pen = check.border->p;
 			pen.setWidthF(check.width);
 			q.setPen(pen);

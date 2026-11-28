@@ -7,9 +7,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ffmpeg/ffmpeg_frame_generator.h"
 
+#include "ffmpeg/ffmpeg_bytes_io_wrap.h"
 #include "ffmpeg/ffmpeg_utility.h"
 #include "media/media_common.h"
 #include "base/debug_log.h"
+
+extern "C" {
+#include <libavutil/imgutils.h>
+#include <libavutil/pixdesc.h>
+}
 
 namespace FFmpeg {
 namespace {
@@ -18,11 +24,84 @@ constexpr auto kMaxArea = 1920 * 1080 * 4;
 
 using ::Media::ValidFrameSize;
 
+struct SourceRecipe {
+	int format = AV_PIX_FMT_NONE;
+	int width = 0;
+	int height = 0;
+	bool ok = false;
+	bool palette = false;
+	std::array<int, 4> visibleBytes = {};
+	std::array<int, 4> maxStride = {};
+};
+
+[[nodiscard]] SourceRecipe DeriveSourceRecipe(
+		int format,
+		int width,
+		int height) {
+	auto result = SourceRecipe{
+		.format = format,
+		.width = width,
+		.height = height,
+	};
+	const auto pixelFormat = AVPixelFormat(format);
+	const auto desc = av_pix_fmt_desc_get(pixelFormat);
+	if (!desc
+		|| av_image_fill_linesizes(
+			result.visibleBytes.data(),
+			pixelFormat,
+			width) < 0) {
+		return result;
+	}
+	result.palette = (desc->flags & AV_PIX_FMT_FLAG_PAL) != 0;
+	const auto maxPlaneBytes = std::numeric_limits<int>::max()
+		/ kPixelBytesSize;
+	for (auto plane = 0; plane != int(result.maxStride.size()); ++plane) {
+		const auto shift = (plane == 1 || plane == 2)
+			? desc->log2_chroma_h
+			: 0;
+		const auto rows = AV_CEIL_RSHIFT(height, shift);
+		if (rows <= 0) {
+			return result;
+		}
+		result.maxStride[plane] = maxPlaneBytes / rows;
+	}
+	result.ok = true;
+	return result;
+}
+
+[[nodiscard]] bool MatchesSourceRecipe(
+		not_null<AVFrame*> frame,
+		const SourceRecipe &recipe) {
+	for (auto plane = 0; plane != int(recipe.visibleBytes.size()); ++plane) {
+		const auto data = frame->data[plane];
+		if (recipe.palette && plane == 1) {
+			if (!data) {
+				return false;
+			}
+			continue;
+		}
+		const auto visible = recipe.visibleBytes[plane];
+		if (!visible) {
+			continue;
+		}
+		const auto stride = frame->linesize[plane];
+		if (!data || !stride || stride == std::numeric_limits<int>::min()) {
+			return false;
+		}
+		const auto magnitude = std::abs(stride);
+		if (magnitude < visible || magnitude > recipe.maxStride[plane]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 } // namespace
 
 class FrameGenerator::Impl final {
 public:
 	explicit Impl(const QByteArray &bytes);
+	explicit Impl(const QString &path);
 
 	[[nodiscard]] Frame renderNext(
 		QImage storage,
@@ -43,6 +122,9 @@ private:
 
 	void readNextFrame();
 	void resolveNextFrameTiming();
+	[[nodiscard]] bool validSourcePlanes(
+		not_null<AVFrame*> frame,
+		int format);
 
 	[[nodiscard]] QString wrapError(int result) const;
 
@@ -60,15 +142,19 @@ private:
 		int whence);
 	[[nodiscard]] int read(uint8_t *buf, int buf_size);
 	[[nodiscard]] int64_t seek(int64_t offset, int whence);
+	bool initFormat();
 
 	const QByteArray _bytes;
 	int _deviceOffset = 0;
+	std::unique_ptr<ReadFileWrap> _fileWrap;
 
 	FormatPointer _format;
 	ReadFrame _current;
 	ReadFrame _next;
 	CodecPointer _codec;
 	SwscalePointer _scale;
+	SourceRecipe _sourceRecipe;
+	QImage _rotationStorage;
 
 	int _streamId = 0;
 	int _rotation = 0;
@@ -87,13 +173,30 @@ FrameGenerator::Impl::Impl(const QByteArray &bytes)
 		&FrameGenerator::Impl::Read,
 		nullptr,
 		&FrameGenerator::Impl::Seek);
+	initFormat();
+}
 
-	if (!_format) {
+FrameGenerator::Impl::Impl(const QString &path)
+: _fileWrap(std::make_unique<ReadFileWrap>()) {
+	_fileWrap->file.setFileName(path);
+	if (!_fileWrap->file.open(QIODevice::ReadOnly)) {
 		return;
+	}
+	_format = MakeFormatPointer(
+		static_cast<void*>(_fileWrap.get()),
+		&ReadFileWrap::Read,
+		nullptr,
+		&ReadFileWrap::Seek);
+	initFormat();
+}
+
+bool FrameGenerator::Impl::initFormat() {
+	if (!_format) {
+		return false;
 	}
 	auto error = 0;
 	if ((error = avformat_find_stream_info(_format.get(), nullptr))) {
-		return;
+		return false;
 	}
 	_streamId = av_find_best_stream(
 		_format.get(),
@@ -103,17 +206,19 @@ FrameGenerator::Impl::Impl(const QByteArray &bytes)
 		nullptr,
 		0);
 	if (_streamId < 0) {
-		return;
+		return false;
 	}
 
 	const auto info = _format->streams[_streamId];
 	_rotation = ReadRotationFromMetadata(info);
 	//_aspect = ValidateAspectRatio(info->sample_aspect_ratio);
 	_codec = MakeCodecPointer({
-		.stream = info,
+		.parameters = info->codecpar,
+		.timeBase = info->time_base,
 		.hwAllowed = false,
 		.videoMaxArea = kMaxArea,
 	});
+	return true;
 }
 
 int FrameGenerator::Impl::Read(void *opaque, uint8_t *buf, int buf_size) {
@@ -121,6 +226,9 @@ int FrameGenerator::Impl::Read(void *opaque, uint8_t *buf, int buf_size) {
 }
 
 int FrameGenerator::Impl::read(uint8_t *buf, int buf_size) {
+	if (_fileWrap) {
+		return ReadFileWrap::Read(_fileWrap.get(), buf, buf_size);
+	}
 	const auto available = _bytes.size() - _deviceOffset;
 	if (available <= 0) {
 		return AVERROR_EOF;
@@ -139,6 +247,9 @@ int64_t FrameGenerator::Impl::Seek(
 }
 
 int64_t FrameGenerator::Impl::seek(int64_t offset, int whence) {
+	if (_fileWrap) {
+		return ReadFileWrap::Seek(_fileWrap.get(), offset, whence);
+	}
 	if (whence == AVSEEK_SIZE) {
 		return _bytes.size();
 	}
@@ -157,6 +268,20 @@ int64_t FrameGenerator::Impl::seek(int64_t offset, int whence) {
 	return now;
 }
 
+bool FrameGenerator::Impl::validSourcePlanes(
+		not_null<AVFrame*> frame,
+		int format) {
+	if (_sourceRecipe.format != format
+		|| _sourceRecipe.width != frame->width
+		|| _sourceRecipe.height != frame->height) {
+		_sourceRecipe = DeriveSourceRecipe(
+			format,
+			frame->width,
+			frame->height);
+	}
+	return _sourceRecipe.ok && MatchesSourceRecipe(frame, _sourceRecipe);
+}
+
 FrameGenerator::Frame FrameGenerator::Impl::renderCurrent(
 		QImage storage,
 		QSize size,
@@ -166,100 +291,190 @@ FrameGenerator::Frame FrameGenerator::Impl::renderCurrent(
 	const auto frame = _current.frame.get();
 	const auto width = frame->width;
 	const auto height = frame->height;
-	if (!width || !height) {
-		LOG(("Webm Error: Bad frame size %1x%2").arg(width).arg(height));
+	if (width <= 0 || height <= 0 || size.isEmpty()) {
+		LOG(("Webm Error: Bad frame size %1x%2 -> %3x%4"
+			).arg(width
+			).arg(height
+			).arg(size.width()
+			).arg(size.height()));
 		return {};
 	}
 
-	auto scaled = QSize(width, height).scaled(size, mode);
-	if (!scaled.isEmpty() && rotationSwapWidthHeight()) {
-		scaled.transpose();
+	if (rotationSwapWidthHeight()) {
+		size.transpose();
 	}
-	if (!GoodStorageForFrame(storage, size)) {
-		storage = CreateFrameStorage(size);
-		if (storage.isNull()) {
-			LOG(("Webm Error: Bad frame size %1x%2").arg(width).arg(height));
-			return {};
-		}
+	const auto srcSize = QSize(width, height);
+	// Qt narrows the expanding side to int, so check it wide before scaling.
+	const auto expanding = (mode == Qt::KeepAspectRatioByExpanding)
+		&& ((int64_t(size.height()) * width / height > size.width())
+			|| (int64_t(size.width()) * height / width > size.height()));
+	const auto scaled = expanding ? QSize() : srcSize.scaled(size, mode);
+	if (scaled.isEmpty()
+		|| scaled.width() > size.width()
+		|| scaled.height() > size.height()) {
+		LOG(("Webm Error: Bad scaled frame size %1x%2 -> %3x%4"
+			).arg(width
+			).arg(height
+			).arg(scaled.width()
+			).arg(scaled.height()));
+		return {};
 	}
-	const auto dx = (size.width() - scaled.width()) / 2;
-	const auto dy = (size.height() - scaled.height()) / 2;
-	Assert(dx >= 0 && dy >= 0 && (!dx || !dy));
-
 	const auto srcFormat = (frame->format == AV_PIX_FMT_NONE)
 		? _codec->pix_fmt
 		: frame->format;
-	const auto srcSize = QSize(frame->width, frame->height);
-	const auto dstFormat = AV_PIX_FMT_BGRA;
-	const auto dstSize = scaled;
+	if (!validSourcePlanes(frame, srcFormat)) {
+		LOG(("Webm Error: Bad frame planes, format %1.").arg(srcFormat));
+		return {};
+	}
 	const auto bgra = (srcFormat == AV_PIX_FMT_BGRA);
+	const auto bgr0 = (srcFormat == AV_PIX_FMT_BGR0);
 	const auto withAlpha = bgra || (srcFormat == AV_PIX_FMT_YUVA420P);
-	const auto dstPerLine = storage.bytesPerLine();
-	auto dst = storage.bits() + dx * sizeof(int32) + dy * dstPerLine;
-	if (bgra && srcSize == dstSize && frame->linesize[0] > 0) {
-		const auto srcPerLine = frame->linesize[0];
-		const auto perLine = std::min(srcPerLine, int(dstPerLine));
-		auto src = frame->data[0];
-		for (auto y = 0, height = srcSize.height(); y != height; ++y) {
-			memcpy(dst, src, perLine);
-			src += srcPerLine;
-			dst += dstPerLine;
+	const auto native = (bgra || bgr0) && (srcSize == scaled);
+	const auto dx = (size.width() - scaled.width()) / 2;
+	const auto dy = (size.height() - scaled.height()) / 2;
+	const auto aligned = [](int64_t bytes) {
+		return (bytes + kAlignImageBy - 1) & ~int64_t(kAlignImageBy - 1);
+	};
+	const auto canvasBytes = int64_t(size.width()) * kPixelBytesSize;
+	const auto visibleBytes = int64_t(scaled.width()) * kPixelBytesSize;
+	const auto shiftBytes = int64_t(dx) * kPixelBytesSize;
+	// WHY: swscale's BGRA kernels round each row's write up to kAlignImageBy
+	// bytes from the shifted start, so a centered row needs that rounded span
+	// after the shift, or the last row runs past the storage.
+	const auto neededPitch = native
+		? aligned(canvasBytes)
+		: std::max(
+			aligned(canvasBytes),
+			aligned(shiftBytes + aligned(visibleBytes)));
+	if (neededPitch > std::numeric_limits<int>::max()) {
+		LOG(("Webm Error: Bad frame pitch %1.").arg(neededPitch));
+		return {};
+	}
+	const auto minPitch = int(neededPitch);
+
+	const auto rotated = (_rotation != 0);
+	if (rotated) {
+		storage = base::take(_rotationStorage);
+	}
+	if (!GoodStorageForFrame(storage, size, minPitch)) {
+		storage = CreateFrameStorage(size, minPitch);
+	}
+	auto bits = storage.bits();
+	if (!bits) {
+		LOG(("Webm Error: Bad frame storage %1x%2."
+			).arg(size.width()
+			).arg(size.height()));
+		return {};
+	}
+	auto bytesPerLine = storage.bytesPerLine();
+	if ((bytesPerLine < minPitch)
+		|| (reinterpret_cast<uintptr_t>(bits) % kAlignImageBy != 0)
+		|| (bytesPerLine % kAlignImageBy != 0)) {
+		storage = CreateFrameStorage(size, minPitch);
+		bits = storage.bits();
+		if (!bits || !GoodStorageForFrame(storage, size, minPitch)) {
+			LOG(("Webm Error: Bad frame storage %1x%2."
+				).arg(size.width()
+				).arg(size.height()));
+			return {};
+		}
+		bytesPerLine = storage.bytesPerLine();
+	}
+	const auto pitch = int(bytesPerLine);
+	const auto line = int(visibleBytes);
+	const auto first = bits + (int64_t(dy) * pitch + shiftBytes);
+	const auto src = frame->data[0];
+	const auto srcStride = frame->linesize[0];
+	if (native && bgra) {
+		for (auto y = 0; y != height; ++y) {
+			memcpy(
+				first + int64_t(y) * pitch,
+				src + int64_t(y) * srcStride,
+				line);
+		}
+	} else if (native) {
+		static_assert(sizeof(uint32) == kPixelBytesSize);
+		for (auto y = 0; y != height; ++y) {
+			auto to = reinterpret_cast<uint32*>(first + int64_t(y) * pitch);
+			auto from = reinterpret_cast<const uint32*>(
+				src + int64_t(y) * srcStride);
+			for (auto x = 0; x != width; ++x) {
+				*to++ = 0xFF000000U | *from++;
+			}
 		}
 	} else {
 		_scale = MakeSwscalePointer(
 			srcSize,
 			srcFormat,
-			dstSize,
-			dstFormat,
+			scaled,
+			AV_PIX_FMT_BGRA,
 			&_scale);
-		Assert(_scale != nullptr);
+		if (!_scale) {
+			LOG(("Webm Error: Unable to create sws context."));
+			return {};
+		}
 
 		// AV_NUM_DATA_POINTERS defined in AVFrame struct
-		uint8_t *dstData[AV_NUM_DATA_POINTERS] = { dst, nullptr };
-		int dstLinesize[AV_NUM_DATA_POINTERS] = { int(dstPerLine), 0 };
-		sws_scale(
+		uint8_t *dstData[AV_NUM_DATA_POINTERS] = { first, nullptr };
+		int dstLinesize[AV_NUM_DATA_POINTERS] = { pitch, 0 };
+		const auto converted = sws_scale(
 			_scale.get(),
 			frame->data,
 			frame->linesize,
 			0,
-			frame->height,
+			height,
 			dstData,
 			dstLinesize);
-	}
-	if (dx && size.height() > 0) {
-		auto dst = storage.bits();
-		const auto line = scaled.width() * sizeof(int32);
-		memset(dst, 0, dx * sizeof(int32));
-		dst += dx * sizeof(int32);
-		for (auto y = 0; y != size.height() - 1; ++y) {
-			memset(dst + line, 0, (dstPerLine - line));
-			dst += dstPerLine;
+		if (converted != scaled.height()) {
+			LOG(("Webm Error: Bad sws_scale result %1.").arg(converted));
+			return {};
 		}
-		dst += line;
-		memset(dst, 0, (size.width() - scaled.width() - dx) * sizeof(int32));
-	} else if (dy && size.width() > 0) {
-		const auto dst = storage.bits();
-		memset(dst, 0, dstPerLine * dy);
-		memset(
-			dst + dstPerLine * (dy + scaled.height()),
-			0,
-			dstPerLine * (size.height() - scaled.height() - dy));
+	}
+	// Pitch slack past the canvas width is not visible, it is not cleared.
+	const auto lastRow = first + int64_t(scaled.height() - 1) * pitch;
+	if (first != bits) {
+		memset(bits, 0, first - bits);
+	}
+	if (shiftBytes + visibleBytes < canvasBytes || shiftBytes > 0) {
+		for (auto row = first; row != lastRow; row += pitch) {
+			memset(row + line, 0, pitch - line);
+		}
+	}
+	const auto tail = lastRow + line;
+	const auto end = (dy + scaled.height() < size.height())
+		? (bits + int64_t(size.height()) * pitch)
+		: (lastRow - shiftBytes + canvasBytes);
+	if (end != tail) {
+		memset(tail, 0, end - tail);
 	}
 	if (withAlpha) {
 		PremultiplyInplace(storage);
-	}
-	if (_rotation != 0) {
-		auto transform = QTransform();
-		transform.rotate(_rotation);
-		storage = storage.transformed(transform);
 	}
 
 	const auto duration = _next.frame
 		? (_next.position - _current.position)
 		: _current.duration;
+	if (!rotated) {
+		return {
+			.duration = duration,
+			.image = std::move(storage),
+			.last = !_next.frame,
+		};
+	}
+	auto transform = QTransform();
+	transform.rotate(_rotation);
+	// Qt's rotated output has an ordinary pitch, so the canvas stays private.
+	_rotationStorage = std::move(storage);
+	auto image = _rotationStorage.transformed(transform);
+	if (image.isNull()) {
+		LOG(("Webm Error: Unable to rotate frame %1x%2."
+			).arg(size.width()
+			).arg(size.height()));
+		return {};
+	}
 	return {
 		.duration = duration,
-		.image = std::move(storage),
+		.image = std::move(image),
 		.last = !_next.frame,
 	};
 }
@@ -395,6 +610,10 @@ QString FrameGenerator::Impl::wrapError(int result) const {
 
 FrameGenerator::FrameGenerator(const QByteArray &bytes)
 : _impl(std::make_unique<Impl>(bytes)) {
+}
+
+FrameGenerator::FrameGenerator(const QString &path)
+: _impl(std::make_unique<Impl>(path)) {
 }
 
 FrameGenerator::~FrameGenerator() = default;

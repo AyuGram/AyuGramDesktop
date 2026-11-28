@@ -53,6 +53,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/round_rect.h"
 #include "ui/ui_utility.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_dialogs.h"
@@ -100,8 +101,8 @@ template <typename T, typename U>
 class FieldAutocomplete::Inner final : public Ui::RpWidget {
 public:
 	struct ScrollTo {
-		int top;
-		int bottom;
+		int top = 0;
+		int bottom = 0;
 	};
 
 	Inner(
@@ -120,6 +121,7 @@ public:
 		FieldAutocomplete::ChooseMethod method,
 		int index,
 		Api::SendOptions options = {}) const;
+	void startPressDragSelect();
 
 	void setSendMenuDetails(Fn<SendMenu::Details()> &&callback);
 	void rowsUpdated();
@@ -193,6 +195,7 @@ private:
 	bool _mouseSelection = false;
 	bool _overDelete = false;
 	bool _previewShown = false;
+	bool _dragSelect = false;
 	bool _adjustShadowLeft = false;
 
 	const std::unique_ptr<Ui::PathShiftGradient> _pathGradient;
@@ -1044,6 +1047,12 @@ bool FieldAutocomplete::chooseSelected(ChooseMethod method) const {
 	return _inner->chooseSelected(method);
 }
 
+void FieldAutocomplete::startPressDragSelect() {
+	if (_inner && !_inner->isHidden()) {
+		_inner->startPressDragSelect();
+	}
+}
+
 void FieldAutocomplete::setSendMenuDetails(
 		Fn<SendMenu::Details()> &&callback) {
 	_inner->setSendMenuDetails(std::move(callback));
@@ -1683,12 +1692,32 @@ void FieldAutocomplete::Inner::mousePressEvent(QMouseEvent *e) {
 	}
 }
 
+void FieldAutocomplete::Inner::startPressDragSelect() {
+	if (_dragSelect || isHidden()) {
+		return;
+	}
+	_dragSelect = true;
+	selectByMouse(QCursor::pos());
+	grabMouse();
+}
+
 void FieldAutocomplete::Inner::mouseReleaseEvent(QMouseEvent *e) {
 	_previewTimer.cancel();
 
 	const auto pressed = std::exchange(_down, -1);
 
 	selectByMouse(e->globalPos());
+
+	if (_dragSelect) {
+		_dragSelect = false;
+		if (mouseGrabber() == this) {
+			releaseMouse();
+		}
+		if (_sel >= 0 && _srows->empty()) {
+			chooseSelected(FieldAutocomplete::ChooseMethod::ByClick);
+		}
+		return;
+	}
 
 	if (_previewShown) {
 		_previewShown = false;

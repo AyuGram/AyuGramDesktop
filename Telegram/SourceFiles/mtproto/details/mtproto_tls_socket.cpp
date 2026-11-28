@@ -494,10 +494,10 @@ void Generator::Part::writeBlock(const MTPDtlsBlockM &data) {
 	bytes::set_random(random);
 
 	auto chars = reinterpret_cast<char*>(storage.data());
-	const auto ints = reinterpret_cast<const uint32*>(random.data());
 	for (auto i = 0; i < kElements; ++i) {
-		const auto a = int(ints[i * 2] % 3329);
-		const auto b = int(ints[i * 2 + 1] % 3329);
+		const auto pair = random.data() + i * 2 * sizeof(uint32);
+		const auto a = int(qFromUnaligned<uint32>(pair) % 3329);
+		const auto b = int(qFromUnaligned<uint32>(pair + sizeof(uint32)) % 3329);
 		*chars++ = (char)(a & 255);
 		*chars++ = (char)((a >> 8) + ((b & 15) << 4));
 		*chars++ = (char)(b >> 4);
@@ -591,8 +591,7 @@ ClientHello Generator::take() {
 
 [[nodiscard]] int ReadPartLength(bytes::const_span data, int offset) {
 	const auto storage = data.subspan(offset, kLengthSize);
-	return qFromBigEndian(
-		*reinterpret_cast<const uint16*>(storage.data()));
+	return qFromBigEndian<uint16>(storage.data());
 }
 
 } // namespace
@@ -600,22 +599,13 @@ ClientHello Generator::take() {
 TlsSocket::TlsSocket(
 	not_null<QThread*> thread,
 	const bytes::vector &secret,
-	const QNetworkProxy &proxy,
-	bool protocolForFiles)
+	const QNetworkProxy &proxy)
 : AbstractSocket(thread)
 , _secret(secret) {
 	Expects(_secret.size() >= 21 && _secret[0] == bytes::type(0xEE));
 
 	_socket.moveToThread(thread);
 	_socket.setProxy(proxy);
-	if (protocolForFiles) {
-		_socket.setSocketOption(
-			QAbstractSocket::SendBufferSizeSocketOption,
-			kFilesSendBufferSize);
-		_socket.setSocketOption(
-			QAbstractSocket::ReceiveBufferSizeSocketOption,
-			kFilesReceiveBufferSize);
-	}
 	const auto wrap = [&](auto handler) {
 		return [=](auto &&...args) {
 			InvokeQueued(this, [=] { handler(args...); });

@@ -8,13 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/unique_qptr.h"
+#include "lottie/lottie_icon.h"
+#include "ui/controls/call_button.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/cross_line.h"
 #include "ui/effects/gradient.h"
 #include "ui/effects/radial_animation.h"
-#include "ui/controls/call_button.h"
 #include "ui/widgets/tooltip.h"
-#include "lottie/lottie_icon.h"
 
 namespace style {
 struct CallMuteButton;
@@ -75,6 +75,7 @@ public:
 
 	[[nodiscard]] QSize innerSize() const;
 	void moveInner(QPoint position);
+	void setLabelsMaxWidth(int width);
 
 	void shake();
 
@@ -175,6 +176,7 @@ private:
 	base::unique_qptr<AnimatedLabel> _label;
 	base::unique_qptr<AnimatedLabel> _sublabel;
 	int _labelShakeShift = 0;
+	int _labelsMaxWidth = 0;
 
 	RadialInfo _radialInfo;
 	std::unique_ptr<InfiniteRadialAnimation> _radial;

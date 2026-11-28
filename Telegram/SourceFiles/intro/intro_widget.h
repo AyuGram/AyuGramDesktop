@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "mtproto/sender.h"
-#include "ui/rp_widget.h"
-#include "ui/effects/animations.h"
-#include "window/window_lock_widgets.h"
 #include "core/core_cloud_password.h"
 #include "media/player/media_player_float.h"
+#include "mtproto/sender.h"
+#include "ui/effects/animations.h"
+#include "ui/rp_widget.h"
+#include "window/window_lock_widgets.h"
 
 namespace Main {
 class Account;
@@ -168,8 +168,6 @@ private:
 	// FloatDelegate
 	[[nodiscard]] auto floatPlayerDelegate()
 		-> not_null<Media::Player::FloatDelegate*>;
-	[[nodiscard]] auto floatPlayerSectionDelegate()
-		-> not_null<Media::Player::FloatSectionDelegate*>;
 	not_null<Ui::RpWidget*> floatPlayerWidget() override;
 	void floatPlayerToggleGifsPaused(bool paused) override;
 	not_null<Media::Player::FloatSectionDelegate*> floatPlayerGetSection(

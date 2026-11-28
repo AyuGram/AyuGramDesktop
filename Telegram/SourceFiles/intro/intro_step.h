@@ -9,9 +9,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/object_ptr.h"
 #include "mtproto/sender.h"
+#include "ui/effects/animations.h"
 #include "ui/text/text_variant.h"
 #include "ui/rp_widget.h"
-#include "ui/effects/animations.h"
 
 namespace style {
 struct RoundButton;
@@ -115,9 +115,6 @@ protected:
 	bool paintAnimated(QPainter &p, QRect clip);
 
 	void fillSentCodeData(const MTPDauth_sentCode &type);
-
-	void showDescription();
-	void hideDescription();
 
 	[[nodiscard]] not_null<Data*> getData() const {
 		return _data;

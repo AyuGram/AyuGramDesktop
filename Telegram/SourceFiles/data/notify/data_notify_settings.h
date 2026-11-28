@@ -7,9 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "data/notify/data_peer_notify_settings.h"
-
 #include "base/timer.h"
+#include "data/notify/data_peer_notify_settings.h"
 
 class PeerData;
 class ChannelData;
@@ -106,8 +105,6 @@ public:
 
 	void loadExceptions();
 	[[nodiscard]] rpl::producer<DefaultNotify> exceptionsUpdates() const;
-	[[nodiscard]] auto exceptionsUpdatesRealtime() const
-		-> rpl::producer<DefaultNotify>;
 	[[nodiscard]] const base::flat_set<not_null<PeerData*>> &exceptions(
 		DefaultNotify type) const;
 	void clearExceptions(DefaultNotify type);
@@ -162,7 +159,6 @@ private:
 	} _ringtones;
 
 	rpl::event_stream<DefaultNotify> _exceptionsUpdates;
-	rpl::event_stream<DefaultNotify> _exceptionsUpdatesRealtime;
 	std::array<
 		base::flat_set<not_null<PeerData*>>,
 		kDefaultNotifyTypes> _exceptions;

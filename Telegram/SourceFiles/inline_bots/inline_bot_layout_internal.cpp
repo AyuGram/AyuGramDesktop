@@ -7,35 +7,37 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "inline_bots/inline_bot_layout_internal.h"
 
-#include "data/data_photo.h"
-#include "data/data_document.h"
-#include "data/data_session.h"
-#include "data/data_file_origin.h"
-#include "data/data_photo_media.h"
-#include "data/data_document_media.h"
-#include "data/stickers/data_stickers.h"
 #include "chat_helpers/gifs_list_widget.h" // ChatHelpers::AddGifAction.
 #include "chat_helpers/stickers_lottie.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_session.h"
+// DrawThumbnailAsSongCover
+#include "history/view/media/history_view_document.h"
+#include "history/view/media/history_view_media_common.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/history_location_manager.h"
 #include "inline_bots/inline_bot_result.h"
+#include "lang/lang_keys.h"
 #include "lottie/lottie_single_player.h"
+#include "main/main_session.h"
 #include "media/audio/media_audio.h"
 #include "media/clip/media_clip_reader.h"
-#include "media/media_common.h"
 #include "media/player/media_player_instance.h"
-#include "history/history_location_manager.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/media/history_view_document.h" // DrawThumbnailAsSongCover
-#include "history/view/media/history_view_media_common.h"
+#include "media/media_common.h"
 #include "ui/image/image.h"
 #include "ui/text/format_values.h"
 #include "ui/cached_round_corners.h"
 #include "ui/painter.h"
-#include "main/main_session.h"
-#include "lang/lang_keys.h"
-#include "styles/style_chat_style.h"
-#include "styles/style_overview.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
+#include "styles/style_chat_style.h"
+#include "styles/style_overview.h"
 
 namespace InlineBots {
 namespace Layout {
@@ -45,6 +47,7 @@ namespace {
 using TextState = HistoryView::TextState;
 
 constexpr auto kMaxInlineArea = 1280 * 720;
+constexpr auto kMaxInlineFrameSide = 4096;
 
 using ::Media::ValidFrameSize;
 
@@ -61,6 +64,11 @@ using ::Media::ValidFrameSize;
 		}
 	}
 	return { w, h };
+}
+
+[[nodiscard]] QSize BoundFrameSize(int w, int h) {
+	const auto side = kMaxInlineFrameSide / style::DevicePixelRatio();
+	return HistoryView::DownscaledSize({ w, h }, { side, side });
 }
 
 [[nodiscard]] bool CanPlayInline(not_null<DocumentData*> document) {
@@ -135,7 +143,8 @@ void Gif::initDimensions() {
 	if (w <= 0 || h <= 0) {
 		_maxw = 0;
 	} else {
-		w = w * st::inlineMediaHeight / h;
+		const auto bounded = BoundFrameSize(w, h);
+		w = bounded.width() * st::inlineMediaHeight / bounded.height();
 		_maxw = std::max(w, int32(st::inlineResultsMinWidth));
 	}
 	_minh = st::inlineMediaHeight + st::inlineResultsSkip;
@@ -327,6 +336,9 @@ QSize Gif::countFrameSize() const {
 	if (framew <= 0 || frameh <= 0) {
 		return { _width, height };
 	}
+	const auto bounded = BoundFrameSize(framew, frameh);
+	framew = bounded.width();
+	frameh = bounded.height();
 	if (framew * height > frameh * _width) {
 		if (framew < st::maxStickerSize || frameh > height) {
 			if (frameh > height || (framew * height / frameh) <= st::maxStickerSize) {
@@ -348,7 +360,7 @@ QSize Gif::countFrameSize() const {
 			}
 		}
 	}
-	return QSize(framew, frameh);
+	return BoundFrameSize(framew, frameh);
 }
 
 void Gif::validateThumbnail(
@@ -692,7 +704,8 @@ void Photo::initDimensions() {
 	if (w <= 0 || h <= 0) {
 		w = h = 1;
 	}
-	w = w * st::inlineMediaHeight / h;
+	const auto bounded = BoundFrameSize(w, h);
+	w = bounded.width() * st::inlineMediaHeight / bounded.height();
 	_maxw = std::max(w, int32(st::inlineResultsMinWidth));
 	_minh = st::inlineMediaHeight + st::inlineResultsSkip;
 }
@@ -750,6 +763,9 @@ QSize Photo::countFrameSize() const {
 	if (framew <= 0 || frameh <= 0) {
 		return { _width, height };
 	}
+	const auto bounded = BoundFrameSize(framew, frameh);
+	framew = bounded.width();
+	frameh = bounded.height();
 	if (framew * height > frameh * _width) {
 		if (framew < st::maxStickerSize || frameh > height) {
 			if (frameh > height || (framew * height / frameh) <= st::maxStickerSize) {
@@ -771,7 +787,7 @@ QSize Photo::countFrameSize() const {
 			}
 		}
 	}
-	return QSize(framew, frameh);
+	return BoundFrameSize(framew, frameh);
 }
 
 void Photo::validateThumbnail(
@@ -1319,7 +1335,8 @@ void Thumbnail::initDimensions() {
 	if (w <= 0 || h <= 0) {
 		w = h = 1;
 	}
-	w = w * st::inlineMediaHeight / h;
+	const auto bounded = BoundFrameSize(w, h);
+	w = bounded.width() * st::inlineMediaHeight / bounded.height();
 	_maxw = std::max(w, int32(st::inlineResultsMinWidth));
 	_minh = st::inlineMediaHeight + st::inlineResultsSkip;
 }
@@ -1336,6 +1353,9 @@ QSize Thumbnail::countFrameSize() const {
 	if (w <= 0 || h <= 0) {
 		return { _width, st::inlineMediaHeight };
 	}
+	const auto bounded = BoundFrameSize(w, h);
+	w = bounded.width();
+	h = bounded.height();
 	// Aspect-fill: scale so the smaller dimension covers the cell.
 	const auto targetHeight = st::inlineMediaHeight;
 	if (w * targetHeight > h * _width) {
@@ -1345,7 +1365,7 @@ QSize Thumbnail::countFrameSize() const {
 		h = h * _width / w;
 		w = _width;
 	}
-	return { std::max(w, 1), std::max(h, 1) };
+	return BoundFrameSize(w, h);
 }
 
 void Thumbnail::validateThumbnail(
@@ -1705,6 +1725,9 @@ void Game::countFrameSize() {
 			if (documentSize.isEmpty()) {
 				documentSize = QSize(st::inlineThumbSize, st::inlineThumbSize);
 			}
+			documentSize = BoundFrameSize(
+				documentSize.width(),
+				documentSize.height());
 			auto resizeByHeight1 = (documentSize.width() > documentSize.height()) && (documentSize.height() >= st::inlineThumbSize);
 			auto resizeByHeight2 = (documentSize.height() >= documentSize.width()) && (documentSize.width() < st::inlineThumbSize);
 			if (resizeByHeight1 || resizeByHeight2) {
@@ -1721,6 +1744,11 @@ void Game::countFrameSize() {
 			}
 			if (!_frameSize.height()) {
 				_frameSize.setHeight(1);
+			}
+			if (_frameSize.isValid()) {
+				_frameSize = BoundFrameSize(
+					_frameSize.width(),
+					_frameSize.height());
 			}
 		}
 	}

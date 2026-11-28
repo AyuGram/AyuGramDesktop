@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_search_controller.h"
 #include "info/info_content_widget.h"
 #include "storage/storage_shared_media.h"
-#include "data/data_search_controller.h"
 
 namespace tr {
 template <typename ...Tags>
@@ -24,7 +24,6 @@ namespace Info::Media {
 
 using Type = Storage::SharedMediaType;
 
-[[nodiscard]] std::optional<int> TypeToTabIndex(Type type);
 [[nodiscard]] Type TabIndexToType(int index);
 [[nodiscard]] tr::phrase<> SharedMediaTitle(Type type);
 

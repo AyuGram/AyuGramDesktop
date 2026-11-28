@@ -143,6 +143,12 @@ struct FileReferenceAccumulator {
 		}, [](const MTPDmessageReplyStoryHeader &data) {
 		});
 	}
+	void push(const MTPBotPreviewMedia &data) {
+		push(data.data().vmedia());
+	}
+	void push(const MTPbots_PreviewInfo &data) {
+		push(data.data().vmedia());
+	}
 	void push(const MTPDraftMessage &data) {
 		data.match([&](const MTPDdraftMessage &data) {
 			push(data.vrich_message());
@@ -178,6 +184,7 @@ struct FileReferenceAccumulator {
 	void push(const MTPStoryItem &data) {
 		data.match([&](const MTPDstoryItem &data) {
 			push(data.vmedia());
+			push(data.vmusic());
 		}, [](const MTPDstoryItemDeleted &) {
 		}, [](const MTPDstoryItemSkipped &) {
 		});
@@ -371,6 +378,15 @@ UpdatedFileReferences GetFileReferences(const MTPstories_Stories &data) {
 }
 
 UpdatedFileReferences GetFileReferences(const MTPusers_SavedMusic &data) {
+	return GetFileReferencesHelper(data);
+}
+
+UpdatedFileReferences GetFileReferences(const MTPbots_PreviewInfo &data) {
+	return GetFileReferencesHelper(data);
+}
+
+UpdatedFileReferences GetFileReferences(
+		const MTPVector<MTPBotPreviewMedia> &data) {
 	return GetFileReferencesHelper(data);
 }
 

@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "export/data/export_data_types.h"
 #include "core/utils.h"
 
+#include <cmath>
+
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -49,7 +51,7 @@ QByteArray SerializeString(const QByteArray &value) {
 		} else if (ch == '\\') {
 			result.append("\\\\", 2);
 		} else if (ch >= 0 && ch < 32) {
-			result.append("\\x", 2).append('0' + (ch >> 4));
+			result.append("\\u00", 4).append('0' + (ch >> 4));
 			const auto left = (ch & 0x0F);
 			if (left >= 10) {
 				result.append('A' + (left - 10));
@@ -61,8 +63,10 @@ QByteArray SerializeString(const QByteArray &value) {
 			&& *(p + 1) == char(0x80)) {
 			if (*(p + 2) == char(0xA8)) { // Line separator.
 				result.append("\\u2028", 6);
+				p += 2;
 			} else if (*(p + 2) == char(0xA9)) { // Paragraph separator.
 				result.append("\\u2029", 6);
+				p += 2;
 			} else {
 				result.append(ch);
 			}
@@ -89,6 +93,12 @@ QByteArray StringAllowEmpty(const Data::Utf8String &data) {
 
 QByteArray StringAllowNull(const Data::Utf8String &data) {
 	return data.isEmpty() ? QByteArray("null") : SerializeString(data);
+}
+
+QByteArray FloatAllowNull(float64 value) {
+	return std::isfinite(value)
+		? Data::NumberToString(value)
+		: QByteArray("null");
 }
 
 QByteArray Indentation(int size) {
@@ -187,6 +197,7 @@ QByteArray SerializeText(
 			case Type::Strike: return "strikethrough";
 			case Type::Blockquote: return "blockquote";
 			case Type::BankCard: return "bank_card";
+			case Type::TonAddress: return "ton_address";
 			case Type::Spoiler: return "spoiler";
 			case Type::CustomEmoji: return "custom_emoji";
 			}
@@ -445,6 +456,7 @@ QByteArray RichTextTypeToString(Data::RichText::Type type) {
 	case Type::AutoEmail: return "email";
 	case Type::AutoPhone: return "phone";
 	case Type::BankCard: return "bank_card";
+	case Type::TonAddress: return "ton_address";
 	case Type::MentionName: return "mention_name";
 	case Type::FormattedDate: return "formatted_date";
 	case Type::InlineImage: return "inline_image";
@@ -610,6 +622,7 @@ QByteArray SerializeRichText(
 		case Type::AutoEmail:
 		case Type::AutoPhone:
 		case Type::BankCard:
+		case Type::TonAddress:
 			values.emplace_back(
 				"text",
 				SerializeRichTextChild(context, data.children));
@@ -1094,10 +1107,10 @@ QByteArray SerializeRichMapPoint(
 	case Source::InputGeoPoint:
 		values.emplace_back(
 			"latitude",
-			Data::NumberToString(data.latitude));
+			FloatAllowNull(data.latitude));
 		values.emplace_back(
 			"longitude",
-			Data::NumberToString(data.longitude));
+			FloatAllowNull(data.longitude));
 		break;
 	}
 	if (data.accessHash) {
@@ -1632,6 +1645,11 @@ QByteArray SerializeMessage(
 	const auto pushAction = [&](const QByteArray &action) {
 		push("action", action);
 	};
+	const auto pushPrice = [&](CreditsAmount price) {
+		push("price_amount_whole", NumberToString(price.whole()));
+		push("price_amount_nano", NumberToString(price.nano()));
+		push("price_currency", price.ton() ? "TON" : "Stars");
+	};
 	const auto pushTTL = [&](
 			const QByteArray &label = "self_destruct_period_seconds") {
 		if (const auto ttl = message.media.ttl) {
@@ -1858,7 +1876,7 @@ QByteArray SerializeMessage(
 		push("community_id", data.communityId.bare);
 	}, [&](const ActionWebViewDataSent &data) {
 		pushAction("send_webview_data");
-		push("text", data.text);
+		push("button_text", data.text);
 	}, [&](const ActionGiftPremium &data) {
 		pushActor();
 		pushAction("send_premium_gift");
@@ -1951,6 +1969,21 @@ QByteArray SerializeMessage(
 		push("transaction_id", data.transactionId);
 	}, [&](const ActionStarGift &data) {
 		pushActor();
+		if (data.offer) {
+			pushAction(data.offerOutcome
+				? "star_gift_purchase_offer_declined"
+				: "star_gift_purchase_offer");
+			push("gift_id", data.giftId);
+			pushPrice(data.offerPrice);
+			if (data.offerOutcome) {
+				push("expired", data.offerExpired);
+			} else {
+				push("expires", data.offerExpireAt);
+				push("accepted", data.offerAccepted);
+				push("declined", data.offerDeclined);
+			}
+			return;
+		}
 		pushAction("send_star_gift");
 		push("gift_id", data.giftId);
 		push("stars", data.stars);
@@ -2012,17 +2045,13 @@ QByteArray SerializeMessage(
 				push("comment", data.rejectComment);
 			}
 		} else {
-			push("price_amount_whole", NumberToString(data.price.whole()));
-			push("price_amount_nano", NumberToString(data.price.nano()));
-			push("price_currency", data.price.ton() ? "TON" : "Stars");
+			pushPrice(data.price);
 			push("scheduled_date", data.scheduleDate);
 		}
 	}, [&](const ActionSuggestedPostSuccess &data) {
 		pushActor();
 		pushAction("suggested_post_success");
-		push("price_amount_whole", NumberToString(data.price.whole()));
-		push("price_amount_nano", NumberToString(data.price.nano()));
-		push("price_currency", data.price.ton() ? "TON" : "Stars");
+		pushPrice(data.price);
 	}, [&](const ActionSuggestedPostRefund &data) {
 		pushActor();
 		pushAction("suggested_post_refund");
@@ -2056,6 +2085,38 @@ QByteArray SerializeMessage(
 		pushActor();
 		pushAction("managed_bot_created");
 		pushBare("bot", wrapUserName(data.botId));
+	}, [&](const ActionGramTransfer &data) {
+		pushActor();
+		pushAction("gram_transfer");
+		push("amount_whole", data.amount / Data::kNanosInGram);
+		push("amount_nano", data.amount % Data::kNanosInGram);
+		push("peer_address", data.peerAddress);
+		push("transaction_id", data.transactionId);
+		push("comment_encrypted", data.commentEncrypted);
+		if (data.commentEncrypted) {
+			push("encrypted_comment_base64", data.comment);
+		} else {
+			push("comment", data.comment);
+		}
+		if (!message.out) {
+			push("onramp_provider_name", data.onrampProviderName);
+		}
+	}, [&](const ActionWalletTonConnectRequest &data) {
+		pushActor();
+		pushAction("ton_connect_request");
+		push("session_id", data.sessionId);
+		push("expires", data.expires);
+		push("topic", data.topic);
+		push("trace_id", data.traceId);
+		push("accepted", data.accepted);
+		push("declined", data.declined);
+	}, [&](const ActionNoPaidMessagesTokenUsed &data) {
+		pushActor();
+		pushAction("no_paid_messages_token_used");
+	}, [&](const ActionBotInvite &data) {
+		pushActor();
+		pushAction("bot_invite");
+		pushBare("inviter", wrapUserName(data.inviterId));
 	}, [](v::null_t) {});
 
 	if (v::is_null(message.action.content)) {
@@ -2754,7 +2815,7 @@ Result JsonWriter::writeFrequentContacts(const Data::ContactsList &data) {
 				{ "category", SerializeString(category) },
 				{ "type", SerializeString(type) },
 				{ "name", StringAllowNull(top.peer.name()) },
-				{ "rating", Data::NumberToString(top.rating) },
+				{ "rating", FloatAllowNull(top.rating) },
 			}));
 		}
 	};

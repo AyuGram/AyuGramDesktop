@@ -7,13 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/flat_map.h"
 #include "iv/markdown/iv_markdown_button_row.h"
 #include "iv/markdown/iv_markdown_common.h"
 #include "iv/markdown/iv_markdown_media_block.h"
 #include "iv/markdown/iv_markdown_prepare.h"
 #include "iv/iv_rich_page.h"
-
-#include "base/flat_map.h"
 #include "spellcheck/spellcheck_highlight_syntax.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/unsupported_notice.h"
@@ -143,6 +142,22 @@ struct MarkdownArticleSearchMatch {
 	int to = 0;
 };
 
+struct MarkdownArticleTextRange {
+	int from = 0;
+	int till = 0;
+};
+
+enum class MarkdownArticleTextEdge : uchar {
+	Start,
+	End,
+};
+
+struct MarkdownArticleLeafPoint {
+	PreparedEditLeafSource leaf;
+	int position = 0;
+	int labelOffset = -1;
+};
+
 struct MarkdownArticleSearchSource {
 	QString text;
 	QString hiddenText;
@@ -207,11 +222,13 @@ struct MarkdownArticlePaintContext final : Ui::ChatPaintContext {
 	MarkdownArticlePaintCaches caches;
 	PaintSelectionState selectionState;
 	PaintSearchState searchState;
+	const std::vector<MarkdownArticleSearchMatch> *quoteRanges = nullptr;
 	MarkdownArticleRevealPaintState *reveal = nullptr;
 	int hiddenTextSegmentIndex = -1;
 	int hiddenSegmentIndex = -1;
 	bool debugBlockGeometry = false;
 	bool bubbleGradient = false;
+	bool suppressInteractiveControls = false;
 	RichButtonLoading buttonLoading;
 	RichButtonLoadingCoverage buttonLoadingCoverage;
 	double mediaPixelScale = 1.;
@@ -245,6 +262,7 @@ struct MarkdownArticleHitTestResult {
 	MarkdownArticleButtonRowHit buttonRow;
 	std::optional<QPoint> inlineButton;
 	QString customTooltip;
+	QString buttonUrl;
 	int forcedOffset = -1;
 	bool direct = false;
 	bool codeHeaderCopy = false;
@@ -373,6 +391,31 @@ struct MarkdownArticleMediaGeometry {
 	int activeItemIndex = -1;
 };
 
+struct MarkdownArticleBubbleEdges {
+	bool top = false;
+	bool bottom = false;
+	bool mediaAbove = false;
+	bool infoBelow = false;
+	Ui::BubbleRounding corners;
+
+	friend inline bool operator==(
+		const MarkdownArticleBubbleEdges &,
+		const MarkdownArticleBubbleEdges &) = default;
+};
+
+enum class MarkdownArticleEdgeBlock : uchar {
+	None,
+	Line,
+	CodeFrame,
+	QuoteFrame,
+	VisualMedia,
+};
+
+struct MarkdownArticleEdgeBlocks {
+	MarkdownArticleEdgeBlock top = MarkdownArticleEdgeBlock::None;
+	MarkdownArticleEdgeBlock bottom = MarkdownArticleEdgeBlock::None;
+};
+
 class MarkdownArticle {
 public:
 	MarkdownArticle(
@@ -396,6 +439,7 @@ public:
 		int current);
 	[[nodiscard]] auto searchSources() const
 	-> std::vector<MarkdownArticleSearchSource>;
+	[[nodiscard]] rpl::producer<> searchSourcesChanges() const;
 	void updatePreparedLeaf(
 		const PreparedEditLeafSource &source,
 		const MarkdownArticleContent &prepared);
@@ -484,6 +528,17 @@ public:
 	-> std::optional<PreparedEditLeafSource>;
 	[[nodiscard]] int segmentIndexForEditableLeaf(
 		const PreparedEditLeafSource &source) const;
+	void appendDisplayRangesForLeafText(
+		const PreparedEditLeafSource &source,
+		std::span<const MarkdownArticleTextRange> ranges,
+		not_null<std::vector<MarkdownArticleSearchMatch>*> result) const;
+	[[nodiscard]] std::optional<MarkdownArticleLeafPoint> leafPointForDisplay(
+		int segmentIndex,
+		int offset,
+		MarkdownArticleTextEdge edge) const;
+	[[nodiscard]] int groupedCaptionSegment(int segmentIndex) const;
+	[[nodiscard]] QRect displayRangesRect(
+		const std::vector<MarkdownArticleSearchMatch> &ranges) const;
 	[[nodiscard]] QRect textSegmentRect(int segmentIndex) const;
 	[[nodiscard]] QRect logicalSegmentRect(int segmentIndex) const;
 	[[nodiscard]] QRect segmentRect(int segmentIndex) const;
@@ -492,6 +547,12 @@ public:
 	[[nodiscard]] std::vector<QRect> buttonRowControlRects() const;
 	[[nodiscard]] std::vector<QRect> unsupportedNoticeRects() const;
 	[[nodiscard]] bool hasUnsupportedNotices() const;
+	void setBubbleEdges(MarkdownArticleBubbleEdges edges);
+	[[nodiscard]] MarkdownArticleBubbleEdges bubbleEdges() const;
+	[[nodiscard]] MarkdownArticleEdgeBlocks edgeBlocks() const;
+	bool updateSkipBlock(int width, int height);
+	bool removeSkipBlock();
+	[[nodiscard]] bool hasSkipBlock() const;
 	void setGroupedActiveIndex(
 		const PreparedEditBlockSource &source,
 		int index);

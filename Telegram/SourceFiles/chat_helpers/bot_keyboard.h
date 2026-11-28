@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/widgets/tooltip.h"
 #include "chat_helpers/bot_command.h"
+#include "ui/widgets/tooltip.h"
 
 class ReplyKeyboard;
 
@@ -41,13 +41,11 @@ public:
 		return _placeholder;
 	}
 
-	void step_selected(crl::time ms, bool timer);
 	void resizeToWidth(int newWidth, int maxOuterHeight) {
 		_maxOuterHeight = maxOuterHeight;
 		return RpWidget::resizeToWidth(newWidth);
 	}
 
-	[[nodiscard]] bool maximizeSize() const;
 	[[nodiscard]] bool singleUse() const;
 	[[nodiscard]] bool persistent() const;
 

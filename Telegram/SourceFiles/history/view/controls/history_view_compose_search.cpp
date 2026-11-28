@@ -15,10 +15,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_messages.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "dialogs/ui/dialogs_layout.h"
 #include "dialogs/dialogs_key.h"
 #include "dialogs/dialogs_search_from_controllers.h" // SearchFromBox
 #include "dialogs/dialogs_search_tags.h"
-#include "dialogs/ui/dialogs_layout.h"
 #include "history/view/history_view_context_menu.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -29,11 +29,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/labels.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/widgets/popup_menu.h"
-#include "ui/widgets/shadow.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/widgets/shadow.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
@@ -139,6 +140,15 @@ Main::Session &ListController::session() const {
 }
 
 void ListController::prepare() {
+	_history->owner().itemRemoved(
+	) | rpl::on_next([=](not_null<const HistoryItem*> item) {
+		const auto id = PeerListRowId(item->fullId().msg.bare);
+		const auto row = delegate()->peerListFindRow(id);
+		if (row && static_cast<Row*>(row)->fakeRow()->item() == item) {
+			delegate()->peerListRemoveRow(row);
+			delegate()->peerListRefreshRows();
+		}
+	}, lifetime());
 }
 
 void ListController::rowClicked(not_null<PeerListRow*> row) {
@@ -790,7 +800,7 @@ bool BottomBar::handleKeyPress(not_null<QKeyEvent*> e) {
 			return true;
 		}
 	}
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	if (e->key() == Qt::Key_G) {
 		const auto modifiers = e->modifiers();
 		if (modifiers.testFlag(Qt::ControlModifier)) {

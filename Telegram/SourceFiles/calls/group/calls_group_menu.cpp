@@ -7,25 +7,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_menu.h"
 
-#include "calls/group/calls_group_call.h"
-#include "calls/group/calls_group_settings.h"
-#include "calls/group/calls_group_panel.h"
+#include "base/timer_rpl.h"
+#include "base/unixtime.h"
 #include "calls/group/ui/calls_group_recording_box.h"
-#include "data/data_peer.h"
+#include "calls/group/calls_group_call.h"
+#include "calls/group/calls_group_panel.h"
+#include "calls/group/calls_group_settings.h"
 #include "data/data_group_call.h"
+#include "data/data_peer.h"
 #include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
-#include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/menu/menu.h"
-#include "ui/widgets/menu/menu_action.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/widgets/fields/input_field.h"
+#include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/menu/menu.h"
+#include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/dropdown_menu.h"
+#include "ui/widgets/labels.h"
 #include "ui/painter.h"
-#include "lang/lang_keys.h"
-#include "base/unixtime.h"
-#include "base/timer_rpl.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_layers.h"
 
@@ -488,9 +489,7 @@ void FillMenu(
 		not_null<Ui::DropdownMenu*> menu,
 		not_null<PeerData*> peer,
 		not_null<GroupCall*> call,
-		bool wide,
 		Fn<void()> chooseJoinAs,
-		Fn<void()> chooseShareScreenSource,
 		Fn<void(object_ptr<Ui::BoxContent>)> showBox) {
 	const auto weak = base::make_weak(call);
 	const auto resolveReal = [=] {
@@ -511,8 +510,6 @@ void FillMenu(
 	const auto addEditTitle = !conference && call->canManage();
 	const auto addEditRecording = !conference
 		&& call->canManage()
-		&& !real->scheduleDate();
-	const auto addScreenCast = call->videoIsWorking()
 		&& !real->scheduleDate();
 	if (addEditJoinAs) {
 		menu->addAction(MakeJoinAsAction(
@@ -578,23 +575,6 @@ void FillMenu(
 			menu->menu(),
 			real->recordStartDateValue(),
 			handler));
-	}
-	if (addScreenCast) {
-		const auto sharing = call->isSharingScreen();
-		const auto toggle = [=] {
-			if (const auto strong = weak.get()) {
-				if (sharing) {
-					strong->toggleScreenSharing(std::nullopt);
-				} else {
-					chooseShareScreenSource();
-				}
-			}
-		};
-		menu->addAction(
-			(call->isSharingScreen()
-				? tr::lng_group_call_screen_share_stop(tr::now)
-				: tr::lng_group_call_screen_share_start(tr::now)),
-			toggle);
 	}
 	menu->addAction(tr::lng_group_call_settings(tr::now), [=] {
 		if (const auto strong = weak.get()) {

@@ -9,33 +9,34 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_who_reacted.h"
 #include "boxes/peer_list_box.h"
-#include "data/data_chat.h"
 #include "data/data_channel.h"
-#include "data/data_session.h"
-#include "data/data_forum_topic.h"
+#include "data/data_chat.h"
 #include "data/data_forum.h"
+#include "data/data_forum_topic.h"
 #include "data/data_saved_messages.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
-#include "info/profile/info_profile_widget.h"
-#include "info/media/info_media_widget.h"
 #include "info/common_groups/info_common_groups_widget.h"
+#include "info/media/info_media_widget.h"
 #include "info/peer_gifts/info_peer_gifts_common.h"
+#include "info/profile/info_profile_widget.h"
 #include "info/saved/info_saved_music_common.h"
 #include "info/stories/info_stories_common.h"
+#include "info/info_controller.h"
 #include "info/info_layer_widget.h"
 #include "info/info_section_widget.h"
-#include "info/info_controller.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "menu/menu_send.h"
 #include "ui/controls/swipe_handler.h"
-#include "ui/widgets/scroll_area.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/scroll_area.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/search_field_controller.h"
 #include "ui/ui_utility.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_info.h"
 #include "styles/style_profile.h"
 
@@ -185,20 +186,21 @@ Ui::RpWidget *ContentWidget::doSetInnerWidget(
 
 	setupSwipeHandler(_innerWrap);
 
-	// MSVC BUG + REGRESSION rpl::mappers::tuple :(
 	rpl::combine(
 		_scroll->scrollTopValue(),
 		_scroll->heightValue(),
-		_innerWrap->entity()->desiredHeightValue()
+		_innerWrap->entity()->desiredHeightValue(),
+		_innerTopReserve.value(),
+		tuple(_1, _1 + _2, _3, _4)
 	) | rpl::on_next([this](
 			int top,
-			int height,
-			int desired) {
-		const auto bottom = top + height;
+			int bottom,
+			int desired,
+			int reserve) {
 		_innerDesiredHeight = desired;
 		_innerWrap->setVisibleTopBottom(top, bottom);
 		_scrollTillBottomChanges.fire_copy(
-			std::max(desired + _innerTopReserve - bottom, 0));
+			std::max(desired + reserve - bottom, 0));
 	}, _innerWrap->lifetime());
 
 	rpl::merge(
@@ -211,14 +213,16 @@ Ui::RpWidget *ContentWidget::doSetInnerWidget(
 	rpl::combine(
 		_scroll->heightValue(),
 		_innerWrap->entity()->heightValue(),
-		_controller->wrapValue()
+		_controller->wrapValue(),
+		_innerTopReserve.value()
 	) | rpl::on_next([=](
 			int scrollHeight,
 			int innerHeight,
-			Wrap wrap) {
+			Wrap wrap,
+			int reserve) {
 		const auto added = (wrap == Wrap::Layer)
 			? 0
-			: std::max(scrollHeight - innerHeight - _innerTopReserve, 0);
+			: std::max(scrollHeight - innerHeight - reserve, 0);
 		if (_addedHeight != added) {
 			_addedHeight = added;
 			updateInnerPadding();
@@ -264,7 +268,7 @@ int ContentWidget::scrollTillBottom(int forHeight) const {
 		- _scrollTopSkip.current()
 		- _scrollBottomSkip.current();
 	const auto scrollBottom = _scroll->scrollTop() + scrollHeight;
-	const auto desired = _innerDesiredHeight + _innerTopReserve;
+	const auto desired = _innerDesiredHeight + _innerTopReserve.current();
 	return std::max(desired - scrollBottom, 0);
 }
 
@@ -295,11 +299,12 @@ void ContentWidget::applyAdditionalScroll(int additionalScroll) {
 
 void ContentWidget::updateInnerPadding() {
 	const auto addedToBottom = std::max(_additionalScroll, _addedHeight);
-	_innerWrap->setPadding({ 0, _innerTopReserve, 0, addedToBottom });
+	const auto reserve = _innerTopReserve.current();
+	_innerWrap->setPadding({ 0, reserve, 0, addedToBottom });
 }
 
 void ContentWidget::setInnerTopReserve(int reserve) {
-	if (_innerTopReserve != reserve) {
+	if (_innerTopReserve.current() != reserve) {
 		_innerTopReserve = reserve;
 		if (_innerWrap) {
 			updateInnerPadding();
@@ -336,11 +341,12 @@ rpl::producer<int> ContentWidget::desiredHeightValue() const {
 	return rpl::combine(
 		_innerWrap->entity()->desiredHeightValue(),
 		_scrollTopSkip.value(),
-		_scrollBottomSkip.value()
+		_scrollBottomSkip.value(),
+		_innerTopReserve.value()
 	//) | rpl::map(_1 + _2 + _3);
-	) | rpl::map([=](int desired, int, int) {
+	) | rpl::map([=](int desired, int, int, int) {
 		return desired
-			+ _innerTopReserve
+			+ _innerTopReserve.current()
 			+ _scrollTopSkip.current()
 			+ _scrollBottomSkip.current();
 	});

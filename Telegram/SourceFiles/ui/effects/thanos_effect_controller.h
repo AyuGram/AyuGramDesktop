@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/effects/animations.h"
 #include "base/flat_map.h"
 #include "base/flat_set.h"
+#include "ui/effects/animations.h"
 
 namespace Main {
 class Session;
@@ -71,6 +71,7 @@ public:
 	void resetScrollBaseline();
 	void pinScroll();
 	void shiftGaps(int delta);
+	void shiftScrollBaseline(int delta);
 	void notePrependBaseline(int contentHeight);
 	void applyPrependBaseline(int contentHeight);
 
@@ -108,6 +109,7 @@ private:
 	void notePendingRemoval(int height, int top, int dateHeight);
 	void startCollapseAnimation(int height, int itemTop, int dateHeight);
 	void collapseAnimationCallback();
+	void handleEffectFailure();
 	void syncCollapseGapsToHost();
 	void ensureScrollBaseline();
 

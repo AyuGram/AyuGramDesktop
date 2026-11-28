@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_slideshow_chrome.h"
 
-#include "ui/image/image_prepare.h"
 #include "styles/palette.h"
+#include "ui/image/image_prepare.h"
+
 #include "styles/style_iv.h"
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace Iv::Markdown {
 namespace {
@@ -136,22 +136,6 @@ QImage PrepareWithBlurredBackground(
 			image);
 	}
 	return background;
-}
-
-int SlideshowFrameHeight(
-		int width,
-		int slideshowMinHeight,
-		gsl::span<const QSize> slideOriginalSizes) {
-	auto result = std::numeric_limits<int>::max();
-	for (const auto &original : slideOriginalSizes) {
-		result = std::min(
-			result,
-			MediaHeightForWidth(width, original.width(), original.height()));
-	}
-	if (result == std::numeric_limits<int>::max()) {
-		result = std::max(slideshowMinHeight, 1);
-	}
-	return std::max(result, std::max(slideshowMinHeight, 1));
 }
 
 SlideshowNavRects ComputeSlideshowNavRects(

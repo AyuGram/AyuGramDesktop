@@ -9,25 +9,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_text_entities.h"
 #include "base/random.h"
-#include "data/data_photo.h"
+#include "core/file_utilities.h"
+#include "core/mime_type.h"
 #include "data/data_document.h"
-#include "data/data_session.h"
+#include "data/data_document_media.h"
 #include "data/data_file_click_handler.h"
 #include "data/data_file_origin.h"
+#include "data/data_photo.h"
 #include "data/data_photo_media.h"
-#include "data/data_document_media.h"
+#include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_reply_markup.h"
 #include "inline_bots/inline_bot_layout_item.h"
 #include "inline_bots/inline_bot_send_data.h"
+#include "main/main_session.h"
+#include "mainwidget.h"
 #include "storage/file_download.h"
-#include "core/file_utilities.h"
-#include "core/mime_type.h"
 #include "ui/image/image.h"
 #include "ui/image/image_location_factory.h"
-#include "mainwidget.h"
-#include "main/main_session.h"
+
 #include "styles/style_chat_helpers.h"
 
 namespace InlineBots {
@@ -74,11 +75,14 @@ std::shared_ptr<Result> Result::Create(
 			{ u"geo"_q, Type::Geo },
 			{ u"game"_q, Type::Game },
 		};
-		const auto type = data.match([](const auto &data) {
-			return qs(data.vtype());
+		return data.match([](const auto &data) {
+			const auto &message = data.vsend_message();
+			if (message.type() == mtpc_botInlineMessageWidget) {
+				return Type::Widget;
+			}
+			const auto i = kStringToTypeMap.find(qs(data.vtype()));
+			return (i != kStringToTypeMap.end()) ? i->second : Type::Unknown;
 		});
-		const auto i = kStringToTypeMap.find(type);
-		return (i != kStringToTypeMap.end()) ? i->second : Type::Unknown;
 	}();
 	if (type == Type::Unknown) {
 		return nullptr;
@@ -274,6 +278,10 @@ std::shared_ptr<Result> Result::Create(
 			qs(data.vmessage()),
 			Api::EntitiesFromMTP(session, data.ventities().value_or_empty()),
 			false);
+	}, [&](const MTPDbotInlineMessageWidget &data) {
+		result->sendData = std::make_unique<internal::SendWidget>(
+			session,
+			data);
 	});
 
 	if (!result->sendData || !result->sendData->isValid()) {
@@ -433,10 +441,6 @@ void Result::createGame(not_null<Main::Session*> session) {
 		_description,
 		_photo,
 		_document);
-}
-
-QSize Result::thumbBox() const {
-	return (_type == Type::Photo) ? QSize(100, 100) : QSize(90, 90);
 }
 
 MTPWebDocument Result::adjustAttributes(const MTPWebDocument &document) {

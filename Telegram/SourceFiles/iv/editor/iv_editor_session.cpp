@@ -16,13 +16,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <rpl/variable.h>
 
 #include "api/api_common.h"
-#include "api/api_sending.h"
 #include "api/api_editing.h"
+#include "api/api_sending.h"
 #include "apiwrap.h"
 #include "base/flat_map.h"
 #include "base/timer.h"
-#include "base/weak_qptr.h"
 #include "base/weak_ptr.h"
+#include "base/weak_qptr.h"
 #include "boxes/premium_preview_box.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "core/application.h"
@@ -30,10 +30,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/shortcuts.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/components/welcome_messages.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
 #include "data/data_changes.h"
 #include "data/data_chat_participant_status.h"
-#include "data/data_drafts.h"
 #include "data/data_document.h"
+#include "data/data_drafts.h"
 #include "data/data_file_origin.h"
 #include "data/data_forum_topic.h"
 #include "data/data_location.h"
@@ -44,17 +46,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "data/stickers/data_stickers.h"
 #include "history/view/history_view_schedule_box.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
-#include "iv/iv_cached_media.h"
 #include "iv/editor/iv_editor_box.h"
 #include "iv/editor/iv_editor_clipboard_import.h"
 #include "iv/editor/iv_editor_state.h"
 #include "iv/editor/iv_editor_widget.h"
+#include "iv/iv_cached_media.h"
 #include "iv/iv_instance.h"
 #include "iv/iv_rich_message_serializer.h"
 #include "iv/iv_rich_page.h"
@@ -76,14 +76,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/send_button.h"
 #include "ui/image/image.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/rp_widget.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/separate_panel.h"
+#include "ui/painter.h"
+#include "ui/rp_widget.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
 
 #include <algorithm>
@@ -231,18 +231,6 @@ private:
 	Fn<void(std::shared_ptr<FilePrepareResult>)> _done;
 
 };
-
-[[nodiscard]] Ui::LocationPickerConfig ResolveMapsConfig(
-		not_null<Main::Session*> session) {
-	const auto &appConfig = session->appConfig();
-	auto map = appConfig.get<base::flat_map<QString, QString>>(
-		u"tdesktop_config_map"_q,
-		base::flat_map<QString, QString>());
-	return {
-		.mapsToken = map[u"maps"_q],
-		.geoToken = map[u"geo"_q],
-	};
-}
 
 [[nodiscard]] QString PreparedFileName(const PreparedFile &file) {
 	return file.displayName.isEmpty()
@@ -1780,7 +1768,7 @@ private:
 			return;
 		}
 		_editor = editor;
-		const auto config = ResolveMapsConfig(_session);
+		const auto config = Ui::ResolveMapsConfig(_session);
 		if (!Ui::LocationPicker::Available(config)) {
 			return;
 		}
@@ -1790,10 +1778,14 @@ private:
 			.parent = static_cast<Ui::RpWidget*>(parent.data()),
 			.config = config,
 			.chooseLabel = tr::lng_maps_point_send(),
-			.session = _session,
-			.callback = [weak, editorPointer](::Data::InputVenue venue) {
+			.callback = [weak, editorPointer](
+					::Data::LocationPoint point,
+					::Core::GeoAddress address) {
 				if (const auto session = weak.get()) {
-					session->applyMapSelection(editorPointer, std::move(venue));
+					session->applyMapSelection(
+						editorPointer,
+						point,
+						std::move(address.name));
 				}
 			},
 			.quit = [] { Shortcuts::Launch(Shortcuts::Command::Quit); },
@@ -2900,12 +2892,13 @@ private:
 
 	void applyMapSelection(
 		QPointer<Widget> editor,
-		::Data::InputVenue venue) {
+		::Data::LocationPoint point,
+		QString address) {
 		if (!editor) {
 			return;
 		}
 		_editor = editor;
-		editor->insertPreparedBlock(makeMapBlock(std::move(venue)));
+		editor->insertPreparedBlock(makeMapBlock(point, std::move(address)));
 	}
 
 	[[nodiscard]] RichPage::Block makeAttachmentBlock(
@@ -2988,27 +2981,19 @@ private:
 		return SplitGroupedMediaBlock(std::move(block));
 	}
 
-	[[nodiscard]] RichPage::Block makeMapBlock(::Data::InputVenue venue) const {
-		const auto point = ::Data::LocationPoint(
-			venue.lat,
-			venue.lon,
-			::Data::LocationPoint::NoAccessHash);
+	[[nodiscard]] RichPage::Block makeMapBlock(
+			const ::Data::LocationPoint &point,
+			QString address) const {
 		const auto preview = ::Data::ComputeLocation(point);
-		auto caption = QString();
-		if (!venue.title.isEmpty() && !venue.address.isEmpty()) {
-			caption = venue.title + u"\n"_q + venue.address;
-		} else {
-			caption = !venue.title.isEmpty() ? venue.title : venue.address;
-		}
 		auto block = RichPage::Block();
 		block.kind = RichPage::BlockKind::Map;
-		block.latitude = venue.lat;
-		block.longitude = venue.lon;
+		block.latitude = point.lat();
+		block.longitude = point.lon();
 		block.accessHash = point.accessHash();
 		block.width = preview.width;
 		block.height = preview.height;
 		block.zoom = preview.zoom;
-		block.caption = ToRichText(std::move(caption));
+		block.caption = ToRichText(std::move(address));
 		return block;
 	}
 
@@ -4344,7 +4329,9 @@ void ArticleSession::applyInitialPaste() {
 	if (!data || !_editor) {
 		return;
 	}
-	if (const auto structured = ClipboardDataFromMimeData(data.get())) {
+	if (const auto structured = ClipboardDataFromMimeData(
+			data.get(),
+			_session)) {
 		_editor->pasteStructuredClipboardData(*structured);
 		return;
 	}
@@ -4355,7 +4342,17 @@ void ArticleSession::applyInitialPaste() {
 		imported = BlocksFromMarkdown(data->text(), limits, used);
 	}
 	if (imported && !imported->blocks.empty()) {
-		_editor->insertPreparedBlocks(std::move(imported->blocks));
+		const auto editor = _editor.data();
+		if (imported->localMedia.empty()) {
+			editor->pasteImportedBlocks(std::move(*imported));
+		} else {
+			crl::on_main(editor, [
+				editor,
+				imported = std::move(*imported)
+			]() mutable {
+				editor->pasteImportedBlocks(std::move(imported));
+			});
+		}
 		return;
 	} else if (!data->hasText()) {
 		return;

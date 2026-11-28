@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_native_frame_mac.h"
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 
-#include "media/streaming/media_streaming_common.h"
 #include "ffmpeg/ffmpeg_utility.h"
+#include "media/streaming/media_streaming_common.h"
 
 #include <CoreVideo/CoreVideo.h>
 
@@ -126,4 +126,4 @@ QImage ConvertNativeFrameToARGB32(const NativeFrame &frame) {
 
 } // namespace Media::Streaming
 
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS

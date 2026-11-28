@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
@@ -151,6 +152,7 @@ struct LaidOutBlock {
 	QString collapseToggleId;
 	std::vector<QString> anchorIds;
 	int textWidth = 0;
+	int skipBlockLength = 0;
 	int labelWidth = 0;
 	int subtitleWidth = 0;
 	int actionWidth = 0;
@@ -183,6 +185,7 @@ struct LaidOutBlock {
 	int horizontalScrollLeft = 0;
 	int horizontalScrollMax = 0;
 	int horizontalScrollAncestorShift = 0;
+	int centeredShift = 0;
 	int segmentIndex = -1;
 	int secondarySegmentIndex = -1;
 	int tertiarySegmentIndex = -1;
@@ -223,6 +226,45 @@ struct EditableMaxLineWidthOverride {
 struct EditableTextEmptyOverride {
 	PreparedEditLeafSource leaf;
 	bool empty = true;
+};
+
+struct WidthAnalysisNode {
+	std::vector<WidthAnalysisNode> children;
+	int contentMinimumWidth = 1;
+	int contentPreferredWidth = 1;
+	int outerMinimumWidth = 1;
+	int outerPreferredWidth = 1;
+	int scrollOwnerMinimumWidth = 1;
+	int scrollOwnerOverflowWidth = 1;
+	int scrollViewportMinimumWidth = 1;
+	int outerScrollViewportMinimumWidth = 1;
+	int inlineButtonWidthCap = 0;
+	bool ownerEligible = false;
+	bool chosenScrollOwner = false;
+	bool subtreeNeedsScrollOwner = false;
+	bool subtreeHasChildMovingScrollOwner = false;
+	bool subtreeHasScrollOwner = false;
+	bool foldZeroLines = false;
+	bool foldBarrier = false;
+};
+
+enum class QuoteFoldState : uchar {
+	Counting,
+	Ended,
+	Refused,
+};
+
+struct QuoteFold {
+	int remainingLines = 0;
+	QuoteFoldState state = QuoteFoldState::Counting;
+	bool collapsed = false;
+	bool exceeded = false;
+};
+
+struct QuoteFoldHiddenRange {
+	std::span<const PreparedBlock> blocks;
+	QString toggleId;
+	int segmentIndex = -1;
 };
 
 enum class CachedTextLeafSlot {
@@ -333,17 +375,17 @@ struct LayoutContext {
 	int articleLeft = 0;
 	int articleWidth = 0;
 	int inlineButtonWidthCap = 0;
-	int collapsibleQuoteLines = 0;
+	QSize skipBlock;
 	double mediaPixelScale = 1.;
 	bool tightList = false;
 	bool useArticleBands = false;
 	bool editMode = false;
 	bool rtl = false;
 	bool hideEmptyQuoteAuthor = false;
-	bool collapsibleQuoteCollapsed = false;
 	bool allowAsyncSyntaxHighlighting = true;
 	CodeBlockSyntaxHighlightTracker *syntaxHighlightTracker = nullptr;
 	CachedTextLeafPool *cachedTextLeafs = nullptr;
+	QuoteFold *quoteFold = nullptr;
 	Fn<void()> repaint;
 	Fn<void(QRect)> repaintRect;
 	Fn<bool(const ClickContext&)> spoilerLinkFilter;
@@ -362,29 +404,48 @@ struct LayoutContext {
 		const PreparedEditListItemSource&)> taskMarkerRippleRuntimeFactory;
 };
 
-class LayoutContextScope {
-public:
-	explicit LayoutContextScope(const LayoutContext &context);
-	~LayoutContextScope();
-
-	LayoutContextScope(const LayoutContextScope &) = delete;
-	LayoutContextScope &operator=(const LayoutContextScope &) = delete;
-
-private:
-	const LayoutContext *_previous = nullptr;
-};
-
+void ResetBlockGeometryFields(LaidOutBlock *block);
 [[nodiscard]] bool TextNeedsRetainedLeaf(const QString &text);
 [[nodiscard]] bool MissingRetainedLeaf(
 	const QString &text,
 	const Ui::Text::String &leaf);
 [[nodiscard]] bool IsAnchorOnlyBlock(const PreparedBlock &block);
+[[nodiscard]] bool TakesMessageSkipBlock(const PreparedBlock &block);
 [[nodiscard]] bool PreparedBlockHasInlineButton(const PreparedBlock &prepared);
 [[nodiscard]] bool IsFlowKind(PreparedBlockKind kind);
 [[nodiscard]] bool QuoteHasCollapseControl(const LaidOutBlock &block);
 [[nodiscard]] QRect QuoteCollapseControlRect(
 	QRect outer,
 	const style::QuoteStyle &style);
+[[nodiscard]] int ConsumeQuoteFoldLines(
+	QuoteFold *fold,
+	const std::vector<Ui::Text::LineLayoutInfo> &lines);
+[[nodiscard]] bool QuoteFoldHidesBlock(
+	const LayoutContext &context,
+	const PreparedBlock &block,
+	bool anchorOnly,
+	const WidthAnalysisNode &analysis);
+void SummarizeQuoteFoldOpening(
+	const PreparedBlock &prepared,
+	WidthAnalysisNode *analysis);
+[[nodiscard]] int TightenQuoteFoldBand(
+	const PreparedBlock &prepared,
+	const WidthAnalysisNode &analysis,
+	LaidOutBlock *block,
+	const style::QuoteStyle &quoteStyle,
+	int band,
+	int excess,
+	const LayoutContext &context);
+void AppendPreparedBlocksText(
+	std::span<const PreparedBlock> blocks,
+	QString *to);
+void CollectQuoteFoldHiddenRanges(
+	const std::vector<PreparedBlock> &prepared,
+	const std::vector<LaidOutBlock> &laid,
+	std::vector<QuoteFoldHiddenRange> *ranges);
+[[nodiscard]] MarkdownArticleAnchorExpansion ExpandQuoteFold(
+	std::vector<PreparedBlock> *blocks,
+	const QString &toggleId);
 [[nodiscard]] QString ListMarkerText(const PreparedBlock &block);
 [[nodiscard]] int TextLineHeight(const style::TextStyle &style);
 [[nodiscard]] int TextLineAscent(const style::TextStyle &style);
@@ -413,7 +474,8 @@ private:
 	InlineFormulaObjectCache *inlineFormulaObjects,
 	const std::shared_ptr<MediaRuntime> &mediaRuntime,
 	const style::Markdown &st,
-	LayoutContext context = {});
+	LayoutContext context = {},
+	bool *empty = nullptr);
 [[nodiscard]] int CodeBlockMinimumWidth(const style::Markdown &st);
 [[nodiscard]] int CodeTextMinResizeWidth(const style::Markdown &st);
 [[nodiscard]] int CodeBlockPreferredWidth(
@@ -494,6 +556,7 @@ struct TableCellMinimumWidthConstraint {
 	const LaidOutBlock &block,
 	const style::Markdown &st);
 [[nodiscard]] QString CodeBlockDisplayText(const QString &text);
+[[nodiscard]] std::vector<int> CodeBlockDisplayOffsets(const QString &text);
 [[nodiscard]] TextWithEntities CodeBlockDisplayText(TextWithEntities text);
 [[nodiscard]] int BlockSkip(
 	const PreparedBlock &block,
@@ -512,12 +575,29 @@ struct TableCellMinimumWidthConstraint {
 [[nodiscard]] TextWithEntities EditPlaceholderTextValue(
 	const PreparedBlock &block,
 	const QString &text);
-void CopyCachedTextLeafs(
-	const std::vector<PreparedBlock> &preparedBlocks,
-	std::vector<LaidOutBlock> *blocks,
-	const style::Markdown &st,
-	CachedTextLeafPool *pool,
+[[nodiscard]] CachedTextLeafSourceSignature MarkedTextLeafSourceSignature(
+	TextWithEntities text,
+	const style::TextStyle &textStyle,
+	int minResizeWidth,
 	bool rtl);
+[[nodiscard]] CachedTextLeafSourceSignature PlainTextLeafSourceSignature(
+	const QString &text,
+	const style::TextStyle &textStyle,
+	int minResizeWidth,
+	bool rtl);
+[[nodiscard]] CachedTextLeafSourceSignature CodeTextLeafSourceSignature(
+	const PreparedBlock &prepared,
+	const style::Markdown &st);
+[[nodiscard]] CachedTextLeafKey BlockCachedTextLeafKey(
+	CachedTextLeafSlot slot,
+	const PreparedBlock &prepared,
+	const std::vector<int> &preparedPath);
+[[nodiscard]] CachedTextLeafKey TableCellCachedTextLeafKey(
+	CachedTextLeafSlot slot,
+	const PreparedTableCell &prepared,
+	const std::vector<int> &preparedPath,
+	int tableRowIndex,
+	int tableCellIndex);
 void BuildOrReuseMarkedTextLeaf(
 	Ui::Text::String *leaf,
 	CachedTextLeafSlot slot,
@@ -550,19 +630,6 @@ void BuildOrReuseEditPlaceholderLeaf(
 void ApplyPreparedEditSources(
 	LaidOutBlock *block,
 	const PreparedBlock &prepared);
-void LayoutMediaCaption(
-	LaidOutBlock *block,
-	const PreparedBlock &prepared,
-	const std::vector<PreparedFormulaSlot> *formulas,
-	InlineFormulaObjectCache *inlineFormulaObjects,
-	const std::shared_ptr<MediaRuntime> &mediaRuntime,
-	const style::Markdown &st,
-	int left,
-	int top,
-	int width,
-	int skip,
-	int *bottom,
-	LayoutContext context = {});
 void FillMediaCaptionContent(
 	LaidOutBlock *block,
 	const PreparedBlock &prepared,

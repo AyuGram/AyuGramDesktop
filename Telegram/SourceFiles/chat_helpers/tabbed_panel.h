@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/object_ptr.h"
+#include "base/timer.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/panel_animation.h"
-#include "ui/rp_widget.h"
 #include "ui/widgets/shadow.h"
-#include "base/timer.h"
-#include "base/object_ptr.h"
+#include "ui/rp_widget.h"
 
 namespace Window {
 class SessionController;
@@ -44,9 +44,7 @@ public:
 		object_ptr<TabbedSelector> selector);
 	TabbedPanel(QWidget *parent, TabbedPanelDescriptor &&descriptor);
 
-	[[nodiscard]] bool isSelectorStolen() const;
 	[[nodiscard]] not_null<TabbedSelector*> selector() const;
-	[[nodiscard]] rpl::producer<bool> pauseAnimations() const;
 
 	void moveBottomRight(int bottom, int right);
 	void moveTopRight(int top, int right);
@@ -105,7 +103,6 @@ private:
 	Window::SessionController * const _regularWindow = nullptr;
 	const object_ptr<TabbedSelector> _ownedSelector = { nullptr };
 	const not_null<TabbedSelector*> _selector;
-	rpl::event_stream<bool> _pauseAnimations;
 
 	int _contentMaxHeight = 0;
 	int _contentHeight = 0;

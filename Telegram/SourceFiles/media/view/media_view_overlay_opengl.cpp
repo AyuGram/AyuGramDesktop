@@ -7,15 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/view/media_view_overlay_opengl.h"
 
+#include "base/platform/base_platform_info.h"
+#include "core/crash_reports.h"
 #include "data/data_peer_values.h" // AmPremiumValue.
-#include "ui/gl/gl_shader.h"
-#include "ui/painter.h"
 #include "media/stories/media_stories_view.h"
 #include "media/streaming/media_streaming_common.h"
 #include "media/view/media_view_video_stream.h"
 #include "platform/platform_overlay_widget.h"
-#include "base/platform/base_platform_info.h"
-#include "core/crash_reports.h"
+#include "ui/gl/gl_shader.h"
+#include "ui/painter.h"
+
 #include "styles/style_media_view.h"
 
 namespace Media::View {
@@ -107,7 +108,9 @@ float roundedCorner() {
 	};
 }
 
-[[nodiscard]] QRectF StoryCropTextureRect(
+} // namespace
+
+QRectF OverlayWidget::Renderer::StoryCropTextureRect(
 		QSizeF imageSize,
 		QSizeF targetSize) {
 	if (imageSize.isEmpty() || targetSize.isEmpty()) {
@@ -134,8 +137,6 @@ float roundedCorner() {
 	}
 	return QRectF(0., 0., 1., 1.);
 }
-
-} // namespace
 
 OverlayWidget::RendererGL::RendererGL(not_null<OverlayWidget*> owner)
 : _owner(owner) {
@@ -231,12 +232,13 @@ void OverlayWidget::RendererGL::init(QOpenGLFunctions &f) {
 			FragmentRoundedCorners()
 		}));
 
+	_nv12ChromaFormat = TwoComponentTextureFormat();
 	_nv12Program.emplace();
 	LinkProgram(
 		&*_nv12Program,
 		_texturedVertexShader,
 		FragmentShader({
-			FragmentSampleNV12Texture(),
+			FragmentSampleNV12Texture(_nv12ChromaFormat),
 			FragmentApplyControlsFade(),
 			FragmentRoundedCorners()
 		}));
@@ -438,8 +440,8 @@ void OverlayWidget::RendererGL::paintTransformedVideoFrame(
 	_textures.bind(*_f, 4);
 	if (upload) {
 		uploadTexture(
-			nv12 ? GL_RG : GL_ALPHA,
-			nv12 ? GL_RG : GL_ALPHA,
+			nv12 ? _nv12ChromaFormat : GL_ALPHA,
+			nv12 ? _nv12ChromaFormat : GL_ALPHA,
 			yuv->chromaSize,
 			nv12changed ? QSize() : _chromaSize,
 			yuv->u.stride / (nv12 ? 2 : 1),
@@ -558,6 +560,13 @@ void OverlayWidget::RendererGL::paintTransformedStaticContent(
 				stride,
 				data);
 			_rgbaSize[index] = image.size();
+		}
+		if (_f->hasOpenGLFeature(QOpenGLFunctions::NPOTTextureRepeat)) {
+			_f->glGenerateMipmap(GL_TEXTURE_2D);
+			_f->glTexParameteri(
+				GL_TEXTURE_2D,
+				GL_TEXTURE_MIN_FILTER,
+				GL_LINEAR_MIPMAP_LINEAR);
 		}
 	}
 

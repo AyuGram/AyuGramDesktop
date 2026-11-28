@@ -11,6 +11,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lottie/lottie_icon.h"
 #include "settings/settings_common.h"
 #include "ui/widgets/labels.h"
+
 #include "styles/style_dialogs.h"
 
 namespace Dialogs {
@@ -25,7 +26,8 @@ SearchEmpty::SearchEmpty(
 
 void SearchEmpty::setMinimalHeight(int minimalHeight) {
 	const auto minimal = st::recentPeersEmptyHeightMin;
-	resize(width(), std::max(minimalHeight, minimal));
+	_minimalHeight = std::max(minimalHeight, minimal);
+	resize(width(), fullHeight());
 }
 
 void SearchEmpty::setup(Icon icon, rpl::producer<TextWithEntities> text) {
@@ -41,7 +43,7 @@ void SearchEmpty::setup(Icon icon, rpl::producer<TextWithEntities> text) {
 		}
 		Unexpected("Icon in SearchEmpty::setup.");
 	}();
-	const auto [widget, animate] = Settings::CreateLottieIcon(
+	const auto [widget, animate, animating] = Settings::CreateLottieIcon(
 		this,
 		{
 			.name = animation,
@@ -49,17 +51,26 @@ void SearchEmpty::setup(Icon icon, rpl::producer<TextWithEntities> text) {
 		},
 		st::recentPeersEmptyMargin);
 	const auto animated = widget.data();
+	_label = label;
+	_animated = animated;
 
-	sizeValue() | rpl::on_next([=](QSize size) {
-		const auto padding = st::recentPeersEmptyMargin;
-		const auto paddings = padding.left() + padding.right();
-		label->resizeToWidth(size.width() - paddings);
+	rpl::combine(
+		sizeValue(),
+		label->sizeValue()
+	) | rpl::on_next([=](QSize size, QSize labelSize) {
 		const auto x = (size.width() - animated->width()) / 2;
 		const auto y = (size.height() - animated->height()) / 3;
 		const auto top = y + animated->height() + st::recentPeersEmptySkip;
-		const auto sub = std::max(top + label->height() - size.height(), 0);
+		const auto bottom = top + labelSize.height();
+		const auto sub = std::max(bottom - size.height(), 0);
 		animated->move(x, y - sub);
-		label->move((size.width() - label->width()) / 2, top - sub);
+		label->move((size.width() - labelSize.width()) / 2, top - sub);
+	}, lifetime());
+
+	label->heightValue() | rpl::skip(1) | rpl::filter([=] {
+		return !_measuring;
+	}) | rpl::on_next([=] {
+		resize(width(), fullHeight());
 	}, lifetime());
 
 	label->setClickHandlerFilter([=](
@@ -72,6 +83,21 @@ void SearchEmpty::setup(Icon icon, rpl::producer<TextWithEntities> text) {
 	_animate = [animate] {
 		animate(anim::repeat::once);
 	};
+}
+
+int SearchEmpty::resizeGetHeight(int newWidth) {
+	const auto padding = st::recentPeersEmptyMargin;
+	_measuring = true;
+	_label->resizeToWidth(newWidth - padding.left() - padding.right());
+	_measuring = false;
+	return fullHeight();
+}
+
+int SearchEmpty::fullHeight() const {
+	const auto content = _animated->height()
+		+ st::recentPeersEmptySkip
+		+ _label->height();
+	return std::max(_minimalHeight, content);
 }
 
 void SearchEmpty::animate() {

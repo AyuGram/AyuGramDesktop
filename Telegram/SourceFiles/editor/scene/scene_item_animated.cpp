@@ -13,12 +13,28 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 namespace Editor {
 
+ItemAnimated *ItemAnimated::asAnimated() {
+	return this;
+}
+
+QString ItemAnimated::entityPath() const {
+	return QString();
+}
+
+VideoTrim ItemAnimated::trim() const {
+	return {};
+}
+
+bool ItemAnimated::roundVideo() const {
+	return false;
+}
+
 Media::Encode::AnimatedEntity ItemAnimated::animatedEntity(
 		const QTransform &sceneToCanvas) const {
 	const auto composed = QTransform().scale(flipped() ? -1. : 1., 1.)
 		* sceneTransform()
 		* sceneToCanvas;
-	const auto inner = contentRect();
+	const auto inner = entityRect();
 	const auto m11 = composed.m11();
 	const auto m12 = composed.m12();
 	const auto m21 = composed.m21();
@@ -30,15 +46,29 @@ Media::Encode::AnimatedEntity ItemAnimated::animatedEntity(
 		: (std::atan2(m12, m11) * 180. / M_PI);
 	const auto size = inner.size() * scale;
 	const auto center = composed.map(inner.center());
+	const auto segment = trim();
+	const auto path = entityPath();
 	return {
 		.kind = entityKind(),
-		.bytes = content(),
+		.path = path,
+		.bytes = path.isEmpty() ? content() : QByteArray(),
 		.geometry = QRectF(
 			center - QPointF(size.width() / 2., size.height() / 2.),
 			size),
 		.rotation = rotation,
 		.flipped = mirrored,
+		.round = roundVideo(),
+		.from = segment.from,
+		.till = segment.till,
 	};
+}
+
+QRectF ItemAnimated::entityRect() const {
+	return contentRect();
+}
+
+QRectF ItemAnimated::visibleRect() const {
+	return fittedRect(_paintedFrameSize);
 }
 
 void ItemAnimated::paintFrame(
@@ -49,13 +79,9 @@ void ItemAnimated::paintFrame(
 	if (frame.isNull()) {
 		return;
 	}
-	const auto rect = contentRect();
+	_paintedFrameSize = frame.size();
 	const auto ratio = style::DevicePixelRatio();
-	const auto fitted = QSizeF(frame.size())
-		.scaled(rect.size(), Qt::KeepAspectRatio);
-	const auto resultRect = QRectF(rect.topLeft(), fitted).translated(
-		(rect.width() - fitted.width()) / 2.,
-		(rect.height() - fitted.height()) / 2.);
+	const auto resultRect = visibleRect();
 	if (live) {
 		p->save();
 		p->setRenderHint(QPainter::SmoothPixmapTransform);
@@ -68,7 +94,7 @@ void ItemAnimated::paintFrame(
 		p->restore();
 		return;
 	}
-	auto pixelSize = (fitted * ratio).toSize();
+	auto pixelSize = (resultRect.size() * ratio).toSize();
 	if (pixelSize.width() > frame.width()) {
 		pixelSize = frame.size();
 	}

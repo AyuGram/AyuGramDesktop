@@ -7,23 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_game.h"
 
-#include "lang/lang_keys.h"
-#include "history/history_item_components.h"
-#include "history/history.h"
-#include "history/view/history_view_element.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/media/history_view_media_common.h"
-#include "ui/item_text_options.h"
-#include "ui/text/text_utilities.h"
-#include "ui/cached_round_corners.h"
-#include "ui/chat/chat_style.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
 #include "core/ui_integration.h"
-#include "data/data_session.h"
 #include "data/data_game.h"
 #include "data/data_media_types.h"
+#include "data/data_session.h"
+#include "history/view/media/history_view_media_common.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item_components.h"
+#include "lang/lang_keys.h"
+#include "ui/chat/chat_style.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/text/text_utilities.h"
+#include "ui/cached_round_corners.h"
+#include "ui/item_text_options.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+
 #include "styles/style_chat.h"
 
 namespace HistoryView {
@@ -56,13 +57,17 @@ QSize Game::countOptimalSize() {
 
 	const auto item = _parent->data();
 	if (!_openl && item->isRegular()) {
-		const auto row = 0;
-		const auto column = 0;
-		_openl = std::make_shared<ReplyMarkupClickHandler>(
-			&item->history()->owner(),
-			row,
-			column,
-			item->fullId());
+		if (item->hideInlineKeyboard()) {
+			item->setHasHiddenLinks(true);
+		} else {
+			const auto row = 0;
+			const auto column = 0;
+			_openl = std::make_shared<ReplyMarkupClickHandler>(
+				&item->history()->owner(),
+				row,
+				column,
+				item->fullId());
+		}
 	}
 
 	auto title = TextUtilities::SingleLine(_data->title);
@@ -137,7 +142,7 @@ QSize Game::countOptimalSize() {
 	minHeight += padding.top() + padding.bottom();
 
 	if (!_gameTagWidth) {
-		_gameTagWidth = st::msgDateFont->width(tr::lng_game_tag(tr::now).toUpper());
+		_gameTagWidth = st::msgDateFont->width(tr::lng_game_tag(tr::now, tr::upper));
 	}
 	return { maxWidth, minHeight };
 }
@@ -324,7 +329,7 @@ void Game::draw(Painter &p, const PaintContext &context) const {
 
 		p.setFont(st::msgDateFont);
 		p.setPen(st->msgDateImgFg());
-		p.drawTextLeft(gameX + st::msgDateImgPadding.x(), gameY + st::msgDateImgPadding.y(), pixwidth, tr::lng_game_tag(tr::now).toUpper());
+		p.drawTextLeft(gameX + st::msgDateImgPadding.x(), gameY + st::msgDateImgPadding.y(), pixwidth, tr::lng_game_tag(tr::now, tr::upper));
 
 		p.translate(-attachLeft, -attachTop);
 	}
@@ -448,7 +453,9 @@ bool Game::toggleSelectionByHandlerClick(const ClickHandlerPtr &p) const {
 	return _attach && _attach->toggleSelectionByHandlerClick(p);
 }
 
-bool Game::allowTextSelectionByHandler(const ClickHandlerPtr &p) const {
+bool Game::allowTextSelectionByHandler(
+		const ClickHandlerPtr &p,
+		bool fromTouch) const {
 	return (p == _openl);
 }
 

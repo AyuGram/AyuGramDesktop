@@ -9,23 +9,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "boxes/peer_list_box.h"
 #include "boxes/peer_list_controllers.h"
+#include "data/data_auto_download.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
+#include "export/view/export_view_settings.h"
 #include "history/history.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "data/data_peer.h"
-#include "data/data_session.h"
-#include "data/data_auto_download.h"
-#include "ui/vertical_list.h"
-#include "ui/widgets/continuous_sliders.h"
+#include "settings/settings_common.h"
+#include "storage/localstorage.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/continuous_sliders.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/wrap.h"
-#include "storage/localstorage.h"
-#include "settings/settings_common.h"
-#include "export/view/export_view_settings.h"
-#include "styles/style_layers.h"
+#include "ui/vertical_list.h"
+
 #include "styles/style_boxes.h"
+#include "styles/style_layers.h"
 #include "styles/style_settings.h"
 
 namespace {
@@ -156,7 +157,9 @@ not_null<int64*> AddSizeLimitSlider(
 			return tr::lng_media_size_up_to(
 				tr::now,
 				lt_size,
-				QString::number(value / kMegabyte) + " MB");
+				(QString::number(value / kMegabyte)
+					+ ' '
+					+ tr::lng_size_megabytes(tr::now)));
 		}),
 		st::autoDownloadLimitButton
 	)->setAttribute(Qt::WA_TransparentForMouseEvents);

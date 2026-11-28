@@ -7,22 +7,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/profile/info_profile_widget.h"
 
-#include "dialogs/ui/dialogs_stories_content.h"
-#include "history/history.h"
-#include "info/profile/info_profile_inner_widget.h"
-#include "info/profile/info_profile_members.h"
-#include "info/profile/tabs/info_profile_tabs_host.h"
-#include "info/settings/info_settings_widget.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/ui_utility.h"
-#include "data/data_peer.h"
+#include "base/event_filter.h"
 #include "data/data_channel.h"
 #include "data/data_forum_topic.h"
+#include "data/data_peer.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_user.h"
-#include "lang/lang_keys.h"
+#include "dialogs/ui/dialogs_stories_content.h"
+#include "history/history.h"
+#include "info/profile/tabs/info_profile_tabs_host.h"
+#include "info/profile/info_profile_inner_widget.h"
+#include "info/profile/info_profile_members.h"
+#include "info/settings/info_settings_widget.h"
 #include "info/info_controller.h"
-#include "base/event_filter.h"
+#include "lang/lang_keys.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/ui_utility.h"
 
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QScrollBar>
@@ -328,31 +328,8 @@ void Widget::showSearch() {
 }
 
 rpl::producer<QString> Widget::title() {
-	if (const auto topic = controller()->key().topic()) {
-		return topic->peer()->isBot()
-			? tr::lng_info_thread_title()
-			: tr::lng_info_topic_title();
-	} else if (controller()->key().sublist()
-		&& controller()->key().sublist()->parentChat()) {
-		return tr::lng_profile_direct_messages();
-	}
-	const auto peer = controller()->key().peer();
-	if (controller()->key().savedMessages()) {
-		return tr::lng_saved_messages();
-	} else if (const auto user = peer->asUser()) {
-		return (user->isBot() && !user->isSupport())
-			? tr::lng_info_bot_title()
-			: tr::lng_info_user_title();
-	} else if (const auto channel = peer->asChannel()) {
-		return channel->isMonoforum()
-			? tr::lng_profile_direct_messages()
-			: channel->isMegagroup()
-			? tr::lng_info_group_title()
-			: tr::lng_info_channel_title();
-	} else if (peer->isChat()) {
-		return tr::lng_info_group_title();
-	}
-	Unexpected("Bad peer type in Info::TitleValue()");
+	// Profile sections draw their own top bar, it never asks for this.
+	return rpl::never<QString>();
 }
 
 rpl::producer<Dialogs::Stories::Content> Widget::titleStories() {

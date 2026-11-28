@@ -17,12 +17,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_selector.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_changes.h"
 #include "data/data_media_types.h"
 #include "data/data_session.h"
 #include "data/data_todo_list.h"
 #include "data/data_user.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "history/view/history_view_schedule_box.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
@@ -31,10 +31,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_send.h"
 #include "ui/controls/emoji_button.h"
 #include "ui/controls/emoji_button_factory.h"
-#include "ui/rect.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
@@ -43,8 +41,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h" // defaultComposeFiles.
 #include "styles/style_layers.h"
 #include "styles/style_polls.h"
@@ -810,8 +811,12 @@ void Tasks::initTaskField(not_null<Task*> task, TextWithEntities text) {
 		Ui::PostponeCall(crl::guard(field, [=] {
 			Expects(!_list.empty());
 
-			const auto item = begin(_list) + findField(field);
-			if (item == _list.end() - 1) {
+			// The task may already be removed and be animating its hide,
+			// while its remove button still receives clicks.
+			const auto item = ranges::find(_list, field, &Task::field);
+			if (item == _list.end()) {
+				return;
+			} else if (item == _list.end() - 1) {
 				(*item)->clearValue();
 				return;
 			}

@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "boxes/peer_list_box.h"
-#include "boxes/edit_privacy_box.h"
-#include "history/view/history_view_element.h"
 #include "api/api_blocked_peers.h"
+#include "boxes/edit_privacy_box.h"
+#include "boxes/peer_list_box.h"
+#include "history/view/history_view_element.h"
 
 namespace Window {
 class SessionController;
@@ -36,8 +36,6 @@ public:
 	void rowRightActionClicked(not_null<PeerListRow*> row) override;
 	void loadMoreRows() override;
 
-	[[nodiscard]] rpl::producer<int> rowsCountChanges() const;
-
 	static void BlockNewPeer(not_null<Window::SessionController*> window);
 
 private:
@@ -54,8 +52,6 @@ private:
 	bool _allLoaded = false;
 
 	base::has_weak_ptr _guard;
-
-	rpl::event_stream<int> _rowsCountChanges;
 
 };
 

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_article_selection.h"
+
 #include "iv/markdown/iv_markdown_prepare_links.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
@@ -363,7 +364,12 @@ void RefreshBlockSegmentRect(
 	return result;
 }
 
-[[nodiscard]] std::optional<int> SingleTableCellSelection(
+struct TableEndpointCell {
+	int segment = -1;
+	bool leavesTable = false;
+};
+
+[[nodiscard]] std::optional<TableEndpointCell> SingleTableCellSelection(
 		const PaintSelectionState &selectionState,
 		int tableSegmentIndex) {
 	if (selectionState.empty()
@@ -409,7 +415,11 @@ void RefreshBlockSegmentRect(
 	if (tableHit || multipleCells || cellSegment < 0 || spansWholeTable) {
 		return std::nullopt;
 	}
-	return cellSegment;
+	return TableEndpointCell{
+		.segment = cellSegment,
+		.leavesTable = (normalized.from.segment < tableSegmentIndex)
+			|| (normalized.to.segment > lastCellSegment),
+	};
 }
 
 [[nodiscard]] std::optional<TextSelection> BaseTextSelectionForSegment(
@@ -764,16 +774,18 @@ void ApplyRichPageSliceEndTrim(TextWithEntities *target, int offset) {
 		return std::nullopt;
 	}
 	if (segment.tableSegmentIndex >= 0) {
-		if (const auto singleCell = SingleTableCellSelection(
-				selectionState,
-				segment.tableSegmentIndex);
-			singleCell && *singleCell != segment.index) {
+		const auto endpointCell = SingleTableCellSelection(
+			selectionState,
+			segment.tableSegmentIndex);
+		if (endpointCell
+			&& !endpointCell->leavesTable
+			&& (endpointCell->segment != segment.index)) {
 			return std::nullopt;
 		}
-	}
-	if (segment.tableSegmentIndex >= 0
-		&& TableSegmentSelected(selectionState, segment.tableSegmentIndex)) {
-		return std::nullopt;
+		if ((!endpointCell || selectionState.hasStructuralSelection())
+			&& TableSegmentSelected(selectionState, segment.tableSegmentIndex)) {
+			return std::nullopt;
+		}
 	}
 	if (const auto structural = StructuralTextSelectionForSegment(
 			segment,
@@ -921,7 +933,7 @@ void CollectSelectableSegments(
 			segment.textRect = block.textRect;
 			segment.textWidth = block.textWidth;
 			segment.align = block.flowTextAlign;
-			segment.length = block.leaf.length();
+			segment.length = block.leaf.length() - block.skipBlockLength;
 			block.segmentIndex = AddSelectableSegment(
 				segments,
 				std::move(segment));
@@ -1373,15 +1385,6 @@ std::optional<TextSelection> TextSelectionForSegment(
 		false);
 }
 
-std::optional<TextSelection> TextSelectionForSegmentIndex(
-		const PaintSelectionState &selectionState,
-		int index) {
-	const auto segment = FindSegment(selectionState.segments, index);
-	return segment
-		? TextSelectionForSegment(*segment, selectionState)
-		: std::nullopt;
-}
-
 std::optional<TextSelection> PaintTextSelectionForSegment(
 		const SelectableSegment &segment,
 		const PaintSelectionState &selectionState) {
@@ -1468,7 +1471,9 @@ TextForMimeData TextForSegment(
 	switch (segment.kind) {
 	case SelectableSegmentKind::TextLeaf:
 		return segment.leaf
-			? segment.leaf->toTextForMimeData(selection)
+			? segment.leaf->toTextForMimeData(TextSelection(
+				selection.from,
+				uint16(std::min(int(selection.to), SegmentLength(segment)))))
 			: TextForMimeData();
 	case SelectableSegmentKind::CodeBlock:
 		return segment.block

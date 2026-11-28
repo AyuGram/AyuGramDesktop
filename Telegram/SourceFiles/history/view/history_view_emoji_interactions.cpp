@@ -7,21 +7,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_emoji_interactions.h"
 
-#include "history/view/history_view_element.h"
-#include "history/view/media/history_view_sticker.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "chat_helpers/stickers_emoji_pack.h"
+#include "base/random.h"
 #include "chat_helpers/emoji_interactions.h"
+#include "chat_helpers/stickers_emoji_pack.h"
 #include "chat_helpers/stickers_lottie.h"
-#include "main/main_session.h"
-#include "data/data_session.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_message_reactions.h"
+#include "data/data_session.h"
+#include "history/view/media/history_view_sticker.h"
+#include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item.h"
 #include "lottie/lottie_common.h"
 #include "lottie/lottie_single_player.h"
-#include "base/random.h"
+#include "main/main_session.h"
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
 
@@ -69,10 +69,7 @@ EmojiInteractions::EmojiInteractions(
 	) | rpl::filter([=] {
 		return !_plays.empty() || !_delayed.empty();
 	}) | rpl::on_next([=](not_null<const Element*> view) {
-		_plays.erase(ranges::remove(_plays, view, &Play::view), end(_plays));
-		_delayed.erase(
-			ranges::remove(_delayed, view, &Delayed::view),
-			end(_delayed));
+		viewRemoved(view);
 	}, _lifetime);
 
 	_session->data().reactions().effectsUpdates(
@@ -148,6 +145,13 @@ void EmojiInteractions::cancelPremiumEffect(not_null<const Element*> view) {
 		}
 		return true;
 	}), end(_plays));
+}
+
+void EmojiInteractions::viewRemoved(not_null<const Element*> view) {
+	_plays.erase(ranges::remove(_plays, view, &Play::view), end(_plays));
+	_delayed.erase(
+		ranges::remove(_delayed, view, &Delayed::view),
+		end(_delayed));
 }
 
 void EmojiInteractions::play(
@@ -362,12 +366,6 @@ void EmojiInteractions::play(
 
 void EmojiInteractions::refreshLayerShift() {
 	_layerShift = Ui::MapFrom(_layerParent, _parent, QPoint(0, 0));
-}
-
-void EmojiInteractions::refreshLayerGeometryAndUpdate(QRect rect) {
-	if (!rect.isEmpty()) {
-		_layer->update(rect.translated(_layerShift));
-	}
 }
 
 void EmojiInteractions::visibleAreaUpdated(

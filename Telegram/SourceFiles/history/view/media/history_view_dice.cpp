@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_dice.h"
 
-#include "data/data_session.h"
 #include "chat_helpers/stickers_dice_pack.h"
+#include "data/data_session.h"
+#include "history/view/history_view_element.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
-#include "history/view/history_view_element.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 
@@ -78,7 +78,9 @@ void Dice::updateOutcomeMessage() {
 	const auto displayNano = won ? _outcomeNanoTon : _outcomeStakeNanoTon;
 	const auto amount = tr::marked(QString::fromUtf8("\xf0\x9f\x92\x8e")
 		+ " "
-		+ QString::number(displayNano / 1e9));
+		+ QString::number(displayNano / 1e9).replace(
+			'.',
+			QLocale().decimalPoint()));
 	const auto text = out
 		? (won
 			? tr::lng_action_stake_game_won_you

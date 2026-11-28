@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/weak_ptr.h"
 #include "history/history.h"
 #include "ui/text/text.h"
-#include "base/weak_ptr.h"
 
 class Painter;
 class HistoryItem;
@@ -20,7 +20,6 @@ class SpoilerAnimation;
 
 namespace Data {
 class Thread;
-struct WebPageDraft;
 } // namespace Data
 
 namespace Main {
@@ -30,10 +29,6 @@ class Session;
 namespace Window {
 class SessionController;
 } // namespace Window
-
-namespace ChatHelpers {
-class Show;
-} // namespace ChatHelpers
 
 namespace HistoryView::Controls {
 
@@ -82,12 +77,6 @@ void ClearDraftReplyTo(
 	MsgId topicRootId,
 	PeerId monoforumPeerId,
 	FullMsgId equalTo);
-
-void EditWebPageOptions(
-	std::shared_ptr<ChatHelpers::Show> show,
-	not_null<WebPageData*> webpage,
-	Data::WebPageDraft draft,
-	Fn<void(Data::WebPageDraft)> done);
 
 [[nodiscard]] bool HasOnlyForcedForwardedInfo(const HistoryItemsList &list);
 [[nodiscard]] bool HasOnlyDroppedForwardedInfo(const HistoryItemsList &list);

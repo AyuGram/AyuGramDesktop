@@ -11,14 +11,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/text/text.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/scroll_area.h"
 #include "ui/dynamic_image.h"
 #include "ui/painter.h"
 #include "ui/unread_badge_paint.h"
+#include "ui/unread_counter_format.h"
+
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
 
@@ -52,6 +54,11 @@ struct TopPeersStrip::Layout {
 	int inrow = 0;
 	float64 fsingle = 0.;
 	float64 added = 0.;
+
+	[[nodiscard]] int left(int index, int row, int scroll) const {
+		const auto column = index - row * inrow;
+		return base::SafeRound(column * fsingle + added - scroll);
+	}
 };
 
 TopPeersStrip::TopPeersStrip(
@@ -369,10 +376,25 @@ void TopPeersStrip::subscribeUserpic(Entry &entry) {
 			_entries,
 			raw,
 			[&](const Entry &entry) { return entry.userpic.get(); });
-		if (i != end(_entries)) {
-			i->userpicFrameDirty = 1;
+		if (i == end(_entries)) {
+			return;
 		}
-		update();
+		i->userpicFrameDirty = 1;
+		const auto layout = currentLayout();
+		const auto index = int(i - begin(_entries));
+		const auto scroll = scrollLeft();
+		const auto cell = outer();
+		const auto h = cell.height();
+		for (auto y = 0; y < _strip.height(); y += h) {
+			const auto x = layout.left(index, y / h, scroll);
+			const auto rect = cell.translated(x, y)
+				.intersected(_strip.rect());
+			if (!rect.isEmpty()) {
+				_strip.update(rect);
+				_userpicUpdates.fire(
+					rect.translated(_strip.pos()));
+			}
+		}
 	});
 	entry.subscribed = true;
 }
@@ -383,6 +405,9 @@ void TopPeersStrip::stripMouseReleaseEvent(QMouseEvent *e) {
 	_lastMousePosition = e->globalPos();
 	const auto guard = gsl::finally([&] {
 		_mouseDownPosition = std::nullopt;
+
+		// Opening a chat from _clicks could start dragging reentrantly.
+		_dragging = false;
 	});
 
 	const auto pressed = clearPressed();
@@ -436,6 +461,10 @@ rpl::producer<bool> TopPeersStrip::emptyValue() const {
 	return _count.value()
 		| rpl::map(!rpl::mappers::_1)
 		| rpl::distinct_until_changed();
+}
+
+rpl::producer<QRect> TopPeersStrip::userpicUpdates() const {
+	return _userpicUpdates.events();
 }
 
 rpl::producer<uint64> TopPeersStrip::clicks() const {
@@ -667,6 +696,7 @@ void TopPeersStrip::apply(Entry &entry, const TopPeersEntry &data) {
 			entry.userpic->subscribeToUpdates(nullptr);
 		}
 		entry.userpic = data.userpic;
+		entry.userpicFrameDirty = 1;
 		if (entry.subscribed) {
 			subscribeUserpic(entry);
 		}
@@ -730,7 +760,6 @@ void TopPeersStrip::paintStrip(QRect clip) {
 		rows);
 	const auto layout = currentLayout();
 	const auto fsingle = layout.fsingle;
-	const auto added = layout.added;
 
 	for (auto row = fromrow; row != tillrow; ++row) {
 		const auto shift = scroll + row * layout.inrow * fsingle;
@@ -744,7 +773,6 @@ void TopPeersStrip::paintStrip(QRect clip) {
 			from,
 			int(_entries.size()));
 
-		auto x = int(base::SafeRound(-shift + from * fsingle + added));
 		auto y = row * st.height;
 		const auto highlighted = (_contexted >= 0)
 			? _contexted
@@ -752,6 +780,7 @@ void TopPeersStrip::paintStrip(QRect clip) {
 			? _pressed
 			: _selected;
 		for (auto i = from; i != till; ++i) {
+			const auto x = layout.left(i, row, scroll);
 			auto &entry = _entries[i];
 			const auto selected = (i == highlighted);
 			if (selected) {
@@ -781,7 +810,6 @@ void TopPeersStrip::paintStrip(QRect clip) {
 				layout.single - 2 * st.nameLeft,
 				1,
 				style::al_top);
-			x += fsingle;
 		}
 	}
 }
@@ -855,9 +883,7 @@ void TopPeersStrip::paintUserpic(
 		if (entry.badgeString.isEmpty()) {
 			entry.badgeString = !entry.badge
 				? u" "_q
-				: (entry.badge < 1000)
-				? QString::number(entry.badge)
-				: (QString::number(entry.badge / 1000) + 'K');
+				: FormatUnreadCounterShort(entry.badge);
 		}
 		auto st = Ui::UnreadBadgeStyle();
 		st.selected = selected;

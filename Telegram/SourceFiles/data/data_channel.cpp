@@ -7,36 +7,38 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_channel.h"
 
+#include "api/api_chat_invite.h"
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
+#include "api/api_invite_links.h"
+#include "api/api_share_themes.h"
 #include "api/api_statistics.h"
+#include "apiwrap.h"
 #include "base/timer_rpl.h"
+#include "base/unixtime.h"
+#include "core/application.h"
 #include "data/components/credits.h"
+#include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
 #include "data/data_channel_admins.h"
-#include "data/data_user.h"
 #include "data/data_chat.h"
-#include "data/data_session.h"
-#include "data/data_stories.h"
 #include "data/data_folder.h"
 #include "data/data_forum.h"
 #include "data/data_forum_icons.h"
-#include "data/data_histories.h"
 #include "data/data_group_call.h"
+#include "data/data_histories.h"
 #include "data/data_message_reactions.h"
 #include "data/data_saved_messages.h"
+#include "data/data_session.h"
+#include "data/data_stories.h"
+#include "data/data_user.h"
 #include "data/data_wall_paper.h"
-#include "data/notify/data_notify_settings.h"
-#include "main/main_session.h"
-#include "main/session/send_as_peers.h"
-#include "base/unixtime.h"
-#include "core/application.h"
 #include "history/history.h"
 #include "history/history_item.h"
-#include "api/api_chat_invite.h"
-#include "api/api_invite_links.h"
-#include "apiwrap.h"
+#include "main/session/send_as_peers.h"
+#include "main/main_session.h"
 #include "storage/storage_account.h"
+#include "tgw/tgw_storage.h"
 #include "ui/unread_badge.h"
 #include "window/notifications_manager.h"
 
@@ -330,14 +332,15 @@ void ChannelData::setLocation(const MTPChannelLocation &data) {
 	const auto was = mgInfo->getLocation();
 	const auto wasValue = was ? *was : ChannelLocation();
 	data.match([&](const MTPDchannelLocation &data) {
-		data.vgeo_point().match([&](const MTPDgeoPoint &point) {
+		const auto point = Data::LocationPoint::FromMTP(data.vgeo_point());
+		if (point) {
 			mgInfo->setLocation({
 				qs(data.vaddress()),
-				Data::LocationPoint(point)
+				*point
 			});
-		}, [&](const MTPDgeoPointEmpty &) {
+		} else {
 			mgInfo->setLocation(ChannelLocation());
-		});
+		}
 	}, [&](const MTPDchannelLocationEmpty &) {
 		mgInfo->setLocation(ChannelLocation());
 	});
@@ -938,9 +941,16 @@ void ChannelData::setAdminRights(ChatAdminRights rights) {
 		this,
 		UpdateFlag::Rights | UpdateFlag::Admins | UpdateFlag::BannedUsers);
 	if (isBroadcast() && _monoforumLink) {
-		const auto flags = _monoforumLink->flags();
-		_monoforumLink->setFlags((flags & ~Flag::MonoforumAdmin)
-			| (canAccessMonoforum() ? Flag::MonoforumAdmin : Flag()));
+		if (canAccessMonoforum()) {
+			_monoforumLink->addFlags(Flag::MonoforumAdmin);
+		} else if (_monoforumLink->amMonoforumAdmin()) {
+			// A reply may revoke these rights while still using the sublists.
+			Core::App().postponeCall(crl::guard(&session(), [=] {
+				if (_monoforumLink && !canAccessMonoforum()) {
+					_monoforumLink->removeFlags(Flag::MonoforumAdmin);
+				}
+			}));
+		}
 	}
 }
 
@@ -1347,6 +1357,7 @@ void ApplyChannelUpdate(
 	}
 
 	channel->setAvailableMinId(update.vavailable_min_id().value_or_empty());
+	Tgw::ClearHistoryStorage(session, channel->id, channel->availableMinId());
 	auto canViewAdmins = channel->canViewAdmins();
 	auto canViewMembers = channel->canViewMembers();
 	auto canEditStickers = channel->canEditStickers();
@@ -1430,6 +1441,9 @@ void ApplyChannelUpdate(
 	channel->setSlowmodeSeconds(update.vslowmode_seconds().value_or_empty());
 	channel->setPeerGiftsCount(update.vstargifts_count().value_or_empty());
 	channel->setMainProfileTab(Data::ParseProfileTab(update.vmain_tab()));
+	channel->session().api().shareThemes().apply(
+		channel,
+		update.vshare_theme());
 	if (const auto next = update.vslowmode_next_send_date()) {
 		channel->growSlowmodeLastMessage(
 			next->v - channel->slowmodeSeconds());
@@ -1623,6 +1637,9 @@ void ApplyCommunityUpdate(
 		QVector<MTPlong>());
 	if (const auto info = channel->communityInfo()) {
 		info->applyLinkedPeers(update.vlinked_peers().v);
+	}
+	if (const auto settings = update.vnotify_settings()) {
+		channel->owner().notifySettings().apply(channel, *settings);
 	}
 	channel->fullUpdated();
 }

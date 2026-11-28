@@ -8,25 +8,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/media/history_view_location.h"
 
 #include "base/unixtime.h"
-#include "history/history.h"
-#include "history/history_item_components.h"
-#include "history/history_item.h"
-#include "history/history_location_manager.h"
+#include "data/data_cloud_file.h"
+#include "data/data_file_origin.h"
+#include "data/data_session.h"
+#include "history/view/history_view_cursor_state.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_message.h"
-#include "history/view/history_view_cursor_state.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "history/history_location_manager.h"
 #include "lang/lang_keys.h"
 #include "ui/chat/chat_style.h"
-#include "ui/dynamic_thumbnails.h"
-#include "ui/dynamic_image.h"
-#include "ui/widgets/shadow.h"
 #include "ui/image/image.h"
 #include "ui/text/text_options.h"
+#include "ui/widgets/shadow.h"
 #include "ui/cached_round_corners.h"
+#include "ui/dynamic_image.h"
+#include "ui/dynamic_thumbnails.h"
 #include "ui/painter.h"
-#include "data/data_session.h"
-#include "data/data_file_origin.h"
-#include "data/data_cloud_file.h"
+
 #include "styles/style_chat.h"
 
 namespace HistoryView {
@@ -410,9 +411,7 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 
 	const auto hasText = !_title.isEmpty() || !_description.isEmpty();
 	const auto square = hasText ? RectPart::FullBottom : RectPart();
-	const auto rounding = hostedInstantView
-		? Ui::BubbleRounding()
-		: adjustedBubbleRounding(square);
+	const auto rounding = adjustedBubbleRounding(square);
 	const auto paintText = [&] {
 		if (!hasText && !_live) {
 			return;
@@ -446,7 +445,10 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 
 	ensureMediaCreated();
 	validateImageCache(rthumb.size(), rounding);
-	const auto paintPrevious = _live && !_live->previous.isNull();
+	const auto mediaEditor = (_parent->context() == Context::MediaEditor);
+	const auto paintPrevious = !mediaEditor
+		&& _live
+		&& !_live->previous.isNull();
 	auto opacity = _imageCache.isNull() ? 0. : 1.;
 	if (paintPrevious) {
 		opacity = _live->crossfade.value(opacity);
@@ -556,7 +558,12 @@ void Location::draw(Painter &p, const PaintContext &context) const {
 	painty += thumbh;
 	if (_live) {
 		painth -= thumbh;
-		paintLiveRemaining(p, context, { paintx, painty, paintw, painth });
+		if (!mediaEditor) {
+			paintLiveRemaining(
+				p,
+				context,
+				{ paintx, painty, paintw, painth });
+		}
 	}
 	paintText();
 	if (!_live && !hasText && _parent->media() == this) {
@@ -811,8 +818,7 @@ bool Location::needsBubble() const {
 		return true;
 	}
 	const auto item = _parent->data();
-	return item->repliesAreComments()
-		|| item->externalReply()
+	return _parent->hasCommentsButton()
 		|| item->viaBot()
 		|| _parent->displayReply()
 		|| _parent->displayForwardedFrom()

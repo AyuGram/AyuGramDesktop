@@ -7,40 +7,41 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_members.h"
 
-#include "calls/group/calls_cover_item.h"
-#include "calls/group/calls_group_call.h"
-#include "calls/group/calls_group_menu.h"
-#include "calls/group/calls_volume_item.h"
-#include "calls/group/calls_group_members_row.h"
-#include "calls/group/calls_group_viewport.h"
-#include "calls/calls_emoji_fingerprint.h"
-#include "calls/calls_instance.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_peer.h"
-#include "data/data_changes.h"
-#include "data/data_group_call.h"
-#include "data/data_peer_values.h" // Data::CanWriteValue.
-#include "data/data_session.h" // Data::Session::invitedToCallUsers.
-#include "settings/settings_common.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/effects/cross_line.h"
-#include "ui/painter.h"
-#include "ui/power_saving.h"
-#include "core/application.h" // Core::App().domain, .activeWindow.
-#include "main/main_domain.h" // Core::App().domain().activate.
-#include "main/main_session.h"
-#include "lang/lang_keys.h"
-#include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
 #include "boxes/peers/edit_participants_box.h" // SubscribeToMigration.
 #include "boxes/peers/prepare_short_info_box.h" // PrepareShortInfo...
+#include "calls/group/calls_cover_item.h"
+#include "calls/group/calls_group_call.h"
+#include "calls/group/calls_group_members_row.h"
+#include "calls/group/calls_group_menu.h"
+#include "calls/group/calls_group_viewport.h"
+#include "calls/group/calls_volume_item.h"
+#include "calls/calls_emoji_fingerprint.h"
+#include "calls/calls_instance.h"
+#include "core/application.h" // Core::App().domain, .activeWindow.
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_group_call.h"
+#include "data/data_peer.h"
+#include "data/data_peer_values.h" // Data::CanWriteValue.
+#include "data/data_session.h" // Data::Session::invitedToCallUsers.
+#include "data/data_user.h"
+#include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
+#include "lang/lang_keys.h"
+#include "main/main_domain.h" // Core::App().domain().activate.
+#include "main/main_session.h"
+#include "settings/settings_common.h"
+#include "ui/effects/cross_line.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "webrtc/webrtc_video_track.h"
 #include "window/window_controller.h" // Controller::sessionController.
 #include "window/window_session_controller.h"
-#include "webrtc/webrtc_video_track.h"
+
 #include "styles/style_calls.h"
 
 namespace Calls::Group {
@@ -1611,6 +1612,8 @@ void Members::Controller::addMuteActionsToContextMenu(
 			Group::kMaxVolume,
 			muted,
 			st::groupCallMenuVolumePadding);
+		volumeItem->setCanMute(!isMe(participantPeer)
+			&& !(participantIsCallAdmin && _call->canManage()));
 
 		mutesFromVolume = volumeItem->toggleMuteRequests();
 
@@ -1671,6 +1674,10 @@ void Members::Controller::addMuteActionsToContextMenu(
 			return nullptr;
 		}
 		auto callback = [=] {
+			const auto row = findRow(participantPeer);
+			if (!row) {
+				return;
+			}
 			const auto state = row->state();
 			const auto muted = (state == Row::State::Muted)
 				|| (state == Row::State::RaisedHand);
@@ -1686,6 +1693,10 @@ void Members::Controller::addMuteActionsToContextMenu(
 		std::move(
 			mutesFromVolume
 		) | rpl::on_next([=](bool mutedFromVolume) {
+			const auto row = findRow(participantPeer);
+			if (!row) {
+				return;
+			}
 			const auto state = _call->canManage()
 				? (mutedFromVolume
 					? (row->raisedHandRating()

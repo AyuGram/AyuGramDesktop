@@ -8,12 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/expected.h"
+#include "base/flags.h"
 #include "base/object_ptr.h"
 #include "base/weak_ptr.h"
-#include "base/flags.h"
 #include "ui/platform/ui_platform_utility.h"
-#include "ui/rect_part.h"
+#include "ui/text/text_entity.h"
 #include "ui/widgets/separate_panel.h"
+#include "ui/rect_part.h"
 #include "webview/webview_common.h"
 #include <crl/crl_time.h>
 #include <QtCore/QRect>
@@ -37,6 +38,7 @@ namespace Webview {
 struct Available;
 struct PopupArgs;
 struct PopupResult;
+enum class PermissionType;
 } // namespace Webview
 
 namespace Ui::Text {
@@ -102,6 +104,13 @@ struct RequestChatRequest {
 	Fn<void(QString)> callback;
 };
 
+struct ShareStoryRequest {
+	QString mediaUrl;
+	TextWithTags caption;
+	QString widgetLinkUrl;
+	QString widgetLinkName;
+};
+
 class Delegate {
 public:
 	[[nodiscard]] virtual Webview::ThemeParams botThemeParams() = 0;
@@ -136,7 +145,9 @@ public:
 	virtual void botSendPreparedMessage(
 		SendPreparedMessageRequest request) = 0;
 	virtual void botRequestChat(RequestChatRequest request) = 0;
+	virtual void botShareToStory(ShareStoryRequest request) = 0;
 	virtual void botVerifyAge(int age) = 0;
+	virtual void botOpenTermsOfService() = 0;
 	virtual void botOpenPrivacyPolicy() = 0;
 	virtual void botClose() = 0;
 };
@@ -162,6 +173,9 @@ public:
 
 	void requestActivate();
 	void toggleProgress(bool shown);
+	void requestWindowClose();
+	void requestOpenLink(const QString &url, Fn<void()> open);
+	[[nodiscard]] bool isActiveWindow() const;
 
 	void showBox(object_ptr<BoxContent> box);
 	void showBox(
@@ -207,7 +221,6 @@ private:
 		std::optional<QColor> bottom;
 	};
 	struct ExternalShellAnchor {
-		std::optional<QRect> anchorGeometry;
 		std::optional<QSize> outerSize;
 		Platform::ForeignParent transientParent;
 	};
@@ -239,8 +252,8 @@ private:
 	void requestExternalShellButtonEmoji(const QString &name);
 	void applyExternalShellFullscreen(bool fullscreen);
 	void sendExternalShellChrome();
-	void setExternalShellBlocked(bool blocked);
-	void closeExternalShellLayer();
+	void setWebviewBlocked(bool blocked);
+	void closeExternalShellPopup();
 	[[nodiscard]] ExternalShellAnchor externalShellAnchor() const;
 	void showPopup(
 		Webview::PopupArgs &&args,
@@ -279,14 +292,16 @@ private:
 	void processDownloadRequest(const QJsonObject &args);
 	void openTgLink(const QJsonObject &args);
 	void openExternalLink(const QJsonObject &args);
+	void confirmExternalLink(const QString &url, Fn<void()> open);
 	void openInvoice(const QJsonObject &args);
 	void openPopup(const QJsonObject &args);
 	void openScanQrPopup(const QJsonObject &args);
-	void openShareStory(const QJsonObject &args);
+	void processShareToStory(const QJsonObject &args);
 	void requestWriteAccess();
 	void replyRequestWriteAccess(bool allowed);
 	void requestPhone();
 	void replyRequestPhone(bool shared);
+	void requestPermission(Webview::PermissionType type, Fn<void(bool)> done);
 	void invokeCustomMethod(const QJsonObject &args);
 	void replyCustomMethod(QJsonValue requestId, QJsonObject response);
 	void requestClipboardText(const QJsonObject &args);
@@ -301,6 +316,10 @@ private:
 	void createButton(std::unique_ptr<Button> &button);
 	void scheduleCloseWithConfirmation();
 	void closeWithConfirmation();
+	void toggleApplicationEventFilter(bool install);
+	bool filterApplicationEvent(
+		not_null<QObject*> object,
+		not_null<QEvent*> e);
 	void sendViewport();
 	void sendSafeArea();
 	void sendContentSafeArea();
@@ -313,7 +332,7 @@ private:
 	void postEvent(const QString &event);
 	void postEvent(const QString &event, EventData data);
 
-	[[nodiscard]] bool allowOpenLink() const;
+	[[nodiscard]] bool allowOpenLink();
 	[[nodiscard]] bool allowClipboardQuery() const;
 	[[nodiscard]] bool progressWithBackground() const;
 	[[nodiscard]] QRect progressRect() const;
@@ -324,7 +343,7 @@ private:
 	const not_null<Delegate*> _delegate;
 	QString _externalUrl;
 	QString _externalTitle;
-	int _externalBlockCount = 0;
+	int _webviewBlockCount = 0;
 	bool _closeNeedConfirmation = false;
 	bool _hasSettingsButton = false;
 	bool _externalTitleBadgeVisible = false;
@@ -333,7 +352,6 @@ private:
 	bool _externalWindowCloseRequested = false;
 	QString _externalShellToken;
 	QString _initialOrigin;
-	QString _currentOrigin;
 	uint64 _externalShellGeneration = 0;
 	bool _externalBackVisible = false;
 	ExternalShellColorState _externalShellColorState;
@@ -342,8 +360,10 @@ private:
 	ExternalButtonState _externalSecondaryButton;
 	std::unique_ptr<RpWidget> _externalPanelParent;
 	std::unique_ptr<SeparatePanel> _widget;
+	std::unique_ptr<QObject> _applicationEventFilter;
 	std::unique_ptr<WebviewWithLifetime> _webview;
 	std::unique_ptr<StandaloneLayerStack> _externalLayer;
+	Fn<void()> _closeExternalShellPopup;
 	std::unique_ptr<RpWidget> _externalWebviewParent;
 	std::unique_ptr<RpWidget> _webviewBottom;
 	QPointer<FlatLabel> _webviewBottomLabel;
@@ -362,7 +382,8 @@ private:
 	rpl::lifetime _bottomBarColorLifetime;
 	rpl::event_stream<> _downloadsUpdated;
 	rpl::variable<bool> _fullscreen = false;
-	crl::time _lastWebviewInteraction = 0;
+	crl::time _lastUserInteraction = 0;
+	crl::time _openLinkInteraction = 0;
 	bool _layerShown : 1 = false;
 	bool _webviewProgress : 1 = false;
 	bool _themeUpdateScheduled : 1 = false;

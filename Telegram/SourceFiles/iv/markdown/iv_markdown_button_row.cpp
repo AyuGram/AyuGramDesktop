@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_button_row.h"
+
 #include "api/api_bot.h"
 #include "base/weak_ptr.h"
 #include "core/click_handler_types.h"
@@ -513,6 +514,12 @@ const style::icon *RichButtonIcon(ButtonType type) {
 	Unexpected("TypeIcon in Iv::Markdown::RichButtonIcon.");
 }
 
+QString RichButtonUrl(ButtonType type, const QByteArray &data) {
+	return (type == ButtonType::Url || type == ButtonType::Auth)
+		? QString::fromUtf8(data)
+		: QString();
+}
+
 QString RichButtonTooltip(
 		ButtonType type,
 		const QByteArray &data,
@@ -523,9 +530,7 @@ QString RichButtonTooltip(
 			lt_text,
 			st::wrap_rtl(QString::fromUtf8(data)));
 	}
-	const auto url = (type == ButtonType::Url || type == ButtonType::Auth)
-		? QString::fromUtf8(data)
-		: QString();
+	const auto url = RichButtonUrl(type, data);
 	if (url.isEmpty()) {
 		return elidedLabel;
 	} else if (elidedLabel.isEmpty()) {

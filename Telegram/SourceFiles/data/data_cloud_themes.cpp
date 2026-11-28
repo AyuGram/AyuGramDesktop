@@ -8,21 +8,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_cloud_themes.h"
 
 #include "api/api_premium.h"
+#include "apiwrap.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
+#include "data/data_session.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "media/view/media_view_open_common.h"
+#include "ui/boxes/confirm_box.h"
 #include "window/themes/window_theme.h"
-#include "window/themes/window_themes_chat.h"
-#include "window/themes/window_theme_preview.h"
 #include "window/themes/window_theme_editor_box.h"
+#include "window/themes/window_theme_preview.h"
+#include "window/themes/window_themes_chat.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
-#include "data/data_session.h"
-#include "data/data_document.h"
-#include "data/data_file_origin.h"
-#include "data/data_document_media.h"
-#include "main/main_session.h"
-#include "ui/boxes/confirm_box.h"
-#include "media/view/media_view_open_common.h"
-#include "lang/lang_keys.h"
-#include "apiwrap.h"
 
 namespace Data {
 namespace {
@@ -200,9 +200,12 @@ CloudTheme CloudTheme::Parse(
 	};
 	const auto outgoingAccentColor = [&](const MTPThemeSettings &settings) {
 		const auto &data = settings.data();
-		return Ui::MaybeColorFromSerialized(
-			data.voutbox_accent_color()
-		);// .value_or(gift->unique->backdrop.patternColor);
+		const auto result = Ui::MaybeColorFromSerialized(
+			data.voutbox_accent_color());
+		return (result || basedOnDark(settings) || data.vmessage_colors())
+			? result
+			: std::make_optional(Ui::ColorFromSerialized(
+				data.vaccent_color()));
 	};
 	const auto settings = [&] {
 		auto result = base::flat_map<Type, Settings>();
@@ -443,6 +446,10 @@ void CloudThemes::loadDocumentAndInvoke(
 	const auto alreadyWaiting = (value.document != nullptr);
 	if (alreadyWaiting) {
 		value.document->cancel();
+	}
+	if (document->size > Window::Theme::kThemeFileSizeLimit) {
+		value = LoadingDocument();
+		return;
 	}
 	value.document = document;
 	value.documentMedia = document->createMediaView();

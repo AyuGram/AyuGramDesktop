@@ -12,14 +12,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_messages_search.h"
 #include "api/api_report.h"
 #include "apiwrap.h"
+#include "base/qt/qt_key_modifiers.h"
 #include "base/event_filter.h"
 #include "base/options.h"
 #include "base/timer.h"
-#include "boxes/delete_messages_box.h"
 #include "boxes/peers/community_box.h"
 #include "boxes/peers/edit_peer_permissions_box.h"
+#include "boxes/choose_filter_box.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/peer_list_box.h"
 #include "core/application.h"
 #include "core/ui_integration.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_chat_filters.h"
@@ -29,52 +33,48 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "main/main_session.h"
+#include "main/main_session_settings.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/effects/ripple_animation.h"
+#include "ui/effects/round_checkbox.h"
 #include "ui/effects/toggle_arrow.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/rect_part.h"
 #include "ui/text/text_lottie_custom_emoji.h"
 #include "ui/text/text_utilities.h"
-#include "ui/vertical_list.h"
+#include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/expandable_peer_list.h"
 #include "ui/widgets/participants_check_view.h"
+#include "ui/widgets/popup_menu.h"
 #include "ui/wrap/slide_wrap.h"
-#include "ui/ui_utility.h"
-#include "styles/style_boxes.h"
-#include "styles/style_layers.h"
-#include "styles/style_moderate_messages_box.h"
-#include "styles/style_window.h"
-
-#include "window/window_session_controller.h"
-#include "window/window_controller.h"
-#include "boxes/choose_filter_box.h"
-#include "boxes/peer_list_box.h"
-#include "main/main_session_settings.h"
+#include "ui/painter.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
-#include "ui/widgets/menu/menu_multiline_action.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/menu/menu_action.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "ui/effects/round_checkbox.h"
+#include "ui/rect.h"
+#include "ui/rect_part.h"
+#include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_chat.h"
-#include "styles/style_menu_icons.h"
 #include "styles/style_info.h"
+#include "styles/style_layers.h"
 #include "styles/style_media_player.h" // mediaPlayerMenuCheck
+#include "styles/style_menu_icons.h"
+#include "styles/style_moderate_messages_box.h"
+#include "styles/style_window.h"
 
 base::options::toggle ModerateCommonGroups({
 	.id = kModerateCommonGroups,
@@ -413,6 +413,48 @@ void ProccessCommonGroups(
 	});
 }
 
+[[nodiscard]] bool CanDeleteChatForEveryone(not_null<PeerData*> peer) {
+	if (const auto channel = peer->asChannel()) {
+		return channel->canDelete() && !channel->isMonoforum();
+	}
+	return peer->canRevokeFullHistory();
+}
+
+[[nodiscard]] std::vector<FilterId> FiltersWithChat(
+		not_null<History*> history) {
+	auto result = std::vector<FilterId>();
+	for (const auto &filter : history->owner().chatsFilters().list()) {
+		if (filter.withoutAlways(history) != filter) {
+			result.push_back(filter.id());
+		}
+	}
+	return result;
+}
+
+void RemoveChatFromFilters(not_null<PeerData*> peer) {
+	const auto history = peer->owner().history(peer).get();
+	const auto removeFrom = FiltersWithChat(history);
+	for (const auto &filter : peer->owner().chatsFilters().list()) {
+		if (!ranges::contains(removeFrom, filter.id())) {
+			continue;
+		}
+		const auto result = filter.withoutAlways(history);
+		if (result == filter) {
+			continue;
+		}
+		const auto tl = result.tl();
+		peer->owner().chatsFilters().apply(MTP_updateDialogFilter(
+			MTP_flags(MTPDupdateDialogFilter::Flag::f_filter),
+			MTP_int(filter.id()),
+			tl));
+		peer->session().api().request(MTPmessages_UpdateDialogFilter(
+			MTP_flags(MTPmessages_UpdateDialogFilter::Flag::f_filter),
+			MTP_int(filter.id()),
+			tl
+		)).send();
+	}
+}
+
 } // namespace
 
 void CreateModerateMessagesBox(
@@ -689,12 +731,13 @@ void CreateModerateMessagesBox(
 			return checkbox->checked();
 		});
 	};
-	Ui::Checkbox *deleteOptions = nullptr;
-	Ui::Checkbox *deleteMessages = nullptr;
-	Controller *deleteMessagesController = nullptr;
-	rpl::variable<base::flat_map<PeerId, int>> *deleteMessagesCounts = nullptr;
-	Ui::Checkbox *deleteReactions = nullptr;
-	Controller *deleteReactionsController = nullptr;
+	auto deleteOptions = (Ui::Checkbox*)nullptr;
+	auto deleteMessages = (Ui::Checkbox*)nullptr;
+	auto deleteMessagesController = (Controller*)nullptr;
+	auto deleteMessagesCounts
+		= (rpl::variable<base::flat_map<PeerId, int>>*)nullptr;
+	auto deleteReactions = (Ui::Checkbox*)nullptr;
+	auto deleteReactionsController = (Controller*)nullptr;
 	const auto effectiveCheckedParticipants = [](
 			Ui::Checkbox *checkbox,
 			Controller *controller) {
@@ -1278,6 +1321,9 @@ void CreateModerateMessagesBox(
 				options.banUser,
 				st::defaultBoxCheckbox),
 			st::boxRowPadding + buttonPadding);
+		if (isSingle) {
+			ban->setAllowTextLines();
+		}
 		const auto controller = box->lifetime().make_state<Controller>(
 			Controller::Data{ .participants = participants });
 		Ui::AddExpandablePeerList(ban, controller, inner);
@@ -1570,7 +1616,10 @@ void SafeSubmitOnEnter(not_null<Ui::GenericBox*> box) {
 	});
 }
 
-void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
+void DeleteChatBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<PeerData*> peer,
+		Fn<void(Fn<void()> leave)> leaveAsCreator) {
 	const auto container = box->verticalLayout();
 
 	const auto userpicPeer = peer->userpicPaintingPeer();
@@ -1620,7 +1669,7 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 			st::boxLabel));
 
 	const auto maybeCheckbox = [&]() -> Ui::Checkbox* {
-		if (!peer->canRevokeFullHistory()) {
+		if (!CanDeleteChatForEveryone(peer)) {
 			return nullptr;
 		}
 		Ui::AddSkip(container);
@@ -1655,22 +1704,11 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 				st::defaultBoxCheckbox));
 	}();
 
-	const auto removeFromChatsFilters = [=](
-			not_null<History*> history) -> std::vector<FilterId> {
-		auto result = std::vector<FilterId>();
-		for (const auto &filter : peer->owner().chatsFilters().list()) {
-			if (filter.withoutAlways(history) != filter) {
-				result.push_back(filter.id());
-			}
-		}
-		return result;
-	};
-
 	const auto maybeChatsFiltersCheckbox = [&]() -> Ui::Checkbox* {
 		const auto history = (isBot || !maybeUser)
 			? peer->owner().history(peer).get()
 			: nullptr;
-		if (!history || removeFromChatsFilters(history).empty()) {
+		if (!history || FiltersWithChat(history).empty()) {
 			return nullptr;
 		}
 		Ui::AddSkip(container);
@@ -1699,38 +1737,16 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 			return checked ? tr::lng_box_delete() : tr::lng_box_leave();
 		}) | rpl::flatten_latest();
 
-	const auto close = crl::guard(box, [=] { box->closeBox(); });
-	box->addButton(std::move(buttonText), [=] {
-		const auto revoke = maybeCheckbox && maybeCheckbox->checked();
-		const auto stopBot = maybeBotCheckbox && maybeBotCheckbox->checked();
-		const auto removeFromChats = maybeChatsFiltersCheckbox
-			&& maybeChatsFiltersCheckbox->checked();
+	const auto finish = [=](
+			bool revoke,
+			bool stopBot,
+			bool removeFromChats) {
 		Core::App().closeChatFromWindows(peer);
 		if (stopBot) {
 			peer->session().api().blockedPeers().block(peer);
 		}
 		if (removeFromChats) {
-			const auto history = peer->owner().history(peer).get();
-			const auto removeFrom = removeFromChatsFilters(history);
-			for (const auto &filter : peer->owner().chatsFilters().list()) {
-				if (!ranges::contains(removeFrom, filter.id())) {
-					continue;
-				}
-				const auto result = filter.withoutAlways(history);
-				if (result == filter) {
-					continue;
-				}
-				const auto tl = result.tl();
-				peer->owner().chatsFilters().apply(MTP_updateDialogFilter(
-					MTP_flags(MTPDupdateDialogFilter::Flag::f_filter),
-					MTP_int(filter.id()),
-					tl));
-				peer->session().api().request(MTPmessages_UpdateDialogFilter(
-					MTP_flags(MTPmessages_UpdateDialogFilter::Flag::f_filter),
-					MTP_int(filter.id()),
-					tl
-				)).send();
-			}
+			RemoveChatFromFilters(peer);
 		}
 		// Don't delete old history by default,
 		// because Android app doesn't.
@@ -1739,6 +1755,18 @@ void DeleteChatBox(not_null<Ui::GenericBox*> box, not_null<PeerData*> peer) {
 		//	peer->session().api().deleteConversation(from, false);
 		//}
 		peer->session().api().deleteConversation(peer, revoke);
+	};
+	const auto close = crl::guard(box, [=] { box->closeBox(); });
+	box->addButton(std::move(buttonText), [=] {
+		const auto revoke = maybeCheckbox && maybeCheckbox->checked();
+		const auto stopBot = maybeBotCheckbox && maybeBotCheckbox->checked();
+		const auto removeFromChats = maybeChatsFiltersCheckbox
+			&& maybeChatsFiltersCheckbox->checked();
+		if (!revoke && leaveAsCreator) {
+			leaveAsCreator([=] { finish(false, stopBot, removeFromChats); });
+		} else {
+			finish(revoke, stopBot, removeFromChats);
+		}
 		close();
 	}, st::attentionBoxButton);
 	box->addButton(tr::lng_cancel(), close);

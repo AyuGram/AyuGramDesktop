@@ -127,15 +127,20 @@ struct UniqueGift {
 	PeerData *releasedBy = nullptr;
 	PeerData *themeUser = nullptr;
 	int64 nanoTonForResale = -1;
+	int64 nanoTonMinOffer = 0;
 	int craftChancePermille = 0;
 	int starsForResale = -1;
 	int starsForTransfer = -1;
 	int starsMinOffer = -1;
+	std::optional<int> feeBps;
 	int number = 0;
 	bool onlyAcceptTon = false;
 	bool canBeTheme = false;
 	bool crafted = false;
 	bool burned = false;
+	bool onchainSale = false;
+	bool fixedSale = false;
+	bool mySale = false;
 	TimeId exportAt = 0;
 	TimeId canTransferAt = 0;
 	TimeId canResellAt = 0;
@@ -151,11 +156,25 @@ struct UniqueGift {
 [[nodiscard]] QString UniqueGiftName(const UniqueGift &gift);
 [[nodiscard]] QString UniqueGiftName(const QString &title, int number);
 
+[[nodiscard]] bool UniqueGiftOnSale(const UniqueGift &gift);
+[[nodiscard]] bool UniqueGiftOnchainPurchase(const UniqueGift &gift);
+
 [[nodiscard]] CreditsAmount UniqueGiftResaleStars(const UniqueGift &gift);
 [[nodiscard]] CreditsAmount UniqueGiftResaleTon(const UniqueGift &gift);
 [[nodiscard]] CreditsAmount UniqueGiftResaleAsked(const UniqueGift &gift);
+[[nodiscard]] bool UniqueGiftResaleBuyTon(
+	const UniqueGift &gift,
+	bool preferTon);
 
+[[nodiscard]] std::optional<int64> PriceAfterSaleFee(
+	int64 price,
+	std::optional<int> feeBps);
+
+[[nodiscard]] int64 GiftDisplayNanos(int64 nanos);
+[[nodiscard]] QString FormatGiftGramAmount(int64 nanos);
+[[nodiscard]] QString FormatGiftGramAmountWithUnit(int64 nanos);
 [[nodiscard]] TextWithEntities FormatGiftResaleStars(const UniqueGift &gift);
+[[nodiscard]] TextWithEntities FormatGiftResaleTon(int64 nanos);
 [[nodiscard]] TextWithEntities FormatGiftResaleTon(const UniqueGift &gift);
 [[nodiscard]] TextWithEntities FormatGiftResaleAsked(const UniqueGift &gift);
 
@@ -212,6 +231,8 @@ struct StarGift {
 		const StarGift &,
 		const StarGift &) = default;
 };
+
+[[nodiscard]] bool SameServedStarGift(const StarGift &a, const StarGift &b);
 
 class SavedStarGiftId {
 public:
@@ -281,6 +302,7 @@ struct SavedStarGift {
 	bool pinned = false;
 	bool hidden = false;
 	bool mine = false;
+	bool refunded = false;
 };
 
 struct GiftUpgradeSpinner {
@@ -374,6 +396,10 @@ enum class MyUniqueType {
 	OnlyOwned,
 };
 
+[[nodiscard]] rpl::producer<MyGiftsDescriptor> PeerUniqueGiftsSlice(
+	not_null<PeerData*> peer,
+	MyUniqueType type,
+	QString offset = QString());
 [[nodiscard]] rpl::producer<MyGiftsDescriptor> MyUniqueGiftsSlice(
 	not_null<Main::Session*> session,
 	MyUniqueType type,
@@ -398,6 +424,8 @@ struct ResaleGiftsFilter {
 	ResaleGiftsSort sort = ResaleGiftsSort::Price;
 	bool forCraft = false;
 	bool starsOnly = false;
+	bool tonOnly = false;
+	bool fragmentOnly = false;
 
 	friend inline bool operator==(
 		const ResaleGiftsFilter &,

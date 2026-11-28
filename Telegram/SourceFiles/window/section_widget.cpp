@@ -7,33 +7,35 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/section_widget.h"
 
-#include "mainwidget.h"
-#include "mainwindow.h"
-#include "ui/ui_utility.h"
-#include "ui/chat/chat_theme.h"
-#include "ui/painter.h"
 #include "boxes/premium_preview_box.h"
-#include "data/data_peer.h"
-#include "data/data_user.h"
+#include "core/application.h"
+#include "data/data_changes.h"
+#include "data/data_cloud_themes.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
-#include "data/data_changes.h"
-#include "data/data_session.h"
-#include "data/data_cloud_themes.h"
 #include "data/data_message_reactions.h"
+#include "data/data_peer.h"
 #include "data/data_peer_values.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
 #include "menu/menu_send.h"
 #include "settings/sections/settings_premium.h"
+#include "ui/chat/chat_theme.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/toast/toast.h"
-#include "window/section_memento.h"
-#include "window/window_slide_animation.h"
-#include "window/window_session_controller.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
 #include "window/themes/window_theme.h"
+#include "window/section_memento.h"
+#include "window/window_controller.h"
+#include "window/window_session_controller.h"
+#include "window/window_slide_animation.h"
 
 #include "styles/style_polls.h"
 
@@ -550,6 +552,32 @@ rpl::producer<int> SectionWidget::desiredHeight() const {
 }
 
 SectionWidget::~SectionWidget() = default;
+
+void SectionWidget::showHistoryAfterThreadDestroyed(
+		not_null<History*> history) {
+	const auto window = &controller()->window();
+	const auto id = controller()->windowId();
+	const auto weak = base::make_weak(this);
+	auto params = SectionShow(
+		SectionShow::Way::Backward,
+		anim::type::instant,
+		anim::activation::background);
+	params.preferCurrentWindow = true;
+	const auto showing = Core::App().windowForShowingHistory(history->peer);
+	if (!showing || showing == window) {
+		// WHY: background activation bypasses preventsClose(), so a pending
+		// recording cannot defer this; the thread is freed after the event.
+		controller()->showThread(history, ShowAtUnreadMsgId, params);
+	}
+	if (!weak) {
+		return;
+	} else if (id.hasChatsList()) {
+		controller()->clearSectionStack(
+			params.withWay(SectionShow::Way::ClearStack));
+	} else {
+		Core::App().closeWindow(window);
+	}
+}
 
 auto ChatThemeValueFromPeer(
 	not_null<SessionController*> controller,

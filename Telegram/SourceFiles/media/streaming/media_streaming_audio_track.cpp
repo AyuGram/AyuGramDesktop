@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_audio_track.h"
 
-#include "media/streaming/media_streaming_utility.h"
 #include "media/audio/media_audio.h"
 #include "media/audio/media_child_ffmpeg_loader.h"
 #include "media/player/media_player_instance.h"
+#include "media/streaming/media_streaming_utility.h"
 
 namespace Media {
 namespace Streaming {
@@ -135,6 +135,7 @@ void AudioTrack::mixerInit() {
 	data->codec = std::move(_stream.codec);
 	data->duration = _stream.duration;
 	data->speed = _options.speed;
+	data->volume = _options.volume;
 
 	Media::Player::mixer()->play(
 		_audioId,
@@ -186,6 +187,11 @@ void AudioTrack::stop() {
 void AudioTrack::setSpeed(float64 speed) {
 	_options.speed = speed;
 	Media::Player::mixer()->setSpeedFromExternal(_audioId, speed);
+}
+
+void AudioTrack::setVolume(float64 volume) {
+	_options.volume = volume;
+	Media::Player::mixer()->setVolumeFromExternal(_audioId, volume);
 }
 
 rpl::producer<> AudioTrack::waitingForData() const {

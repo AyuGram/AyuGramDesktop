@@ -7,24 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_intro.h"
 
+#include "boxes/abstract_box.h"
+#include "lang/lang_keys.h"
 #include "settings/sections/settings_advanced.h"
-#include "settings/sections/settings_main.h"
 #include "settings/sections/settings_chat.h"
+#include "settings/sections/settings_main.h"
 #include "settings/settings_codes.h"
-#include "ui/basic_click_handlers.h"
-#include "ui/wrap/fade_wrap.h"
-#include "ui/wrap/vertical_layout.h"
-#include "ui/widgets/shadow.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/scroll_area.h"
+#include "ui/widgets/shadow.h"
+#include "ui/wrap/fade_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/basic_click_handlers.h"
 #include "ui/cached_round_corners.h"
 #include "ui/vertical_list.h"
-#include "lang/lang_keys.h"
-#include "boxes/abstract_box.h"
 #include "window/window_controller.h"
-#include "styles/style_settings.h"
-#include "styles/style_layers.h"
+
 #include "styles/style_info.h"
+#include "styles/style_layers.h"
+#include "styles/style_settings.h"
 
 namespace Settings {
 namespace {
@@ -310,6 +311,8 @@ void IntroWidget::createTopBar(not_null<Window::Controller*> window) {
 }
 
 void IntroWidget::setInnerWidget(object_ptr<Ui::RpWidget> content) {
+	using namespace rpl::mappers;
+
 	_innerWrap = _scroll->setOwnedWidget(
 		object_ptr<Ui::PaddingWrap<Ui::RpWidget>>(
 			this,
@@ -317,16 +320,15 @@ void IntroWidget::setInnerWidget(object_ptr<Ui::RpWidget> content) {
 			_innerWrap ? _innerWrap->padding() : style::margins()));
 	_innerWrap->move(0, 0);
 
-	// MSVC BUG + REGRESSION rpl::mappers::tuple :(
 	rpl::combine(
 		_scroll->scrollTopValue(),
 		_scroll->heightValue(),
-		_innerWrap->entity()->desiredHeightValue()
+		_innerWrap->entity()->desiredHeightValue(),
+		tuple(_1, _1 + _2, _3)
 	) | rpl::on_next([this](
 			int top,
-			int height,
+			int bottom,
 			int desired) {
-		const auto bottom = top + height;
 		_innerDesiredHeight = desired;
 		_innerWrap->setVisibleTopBottom(top, bottom);
 		_scrollTillBottomChanges.fire_copy(std::max(desired - bottom, 0));

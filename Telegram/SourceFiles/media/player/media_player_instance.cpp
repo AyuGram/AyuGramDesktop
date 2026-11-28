@@ -7,41 +7,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/player/media_player_instance.h"
 
-#include "data/data_document.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/data_streaming.h"
-#include "data/data_file_click_handler.h"
 #include "base/options.h"
-#include "base/random.h"
 #include "base/power_save_blocker.h"
+#include "base/random.h"
+#include "calls/calls_instance.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include "core/shortcuts.h"
+#include "data/data_changes.h"
+#include "data/data_document.h"
+#include "data/data_file_click_handler.h"
+#include "data/data_file_origin.h"
+#include "data/data_media_types.h"
+#include "data/data_session.h"
+#include "data/data_streaming.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_helpers.h"
+#include "main/main_account.h" // session->account().sessionChanges().
+#include "main/main_domain.h" // Domain::activeSessionValue.
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "mainwindow.h"
 #include "media/audio/media_audio.h"
 #include "media/audio/media_audio_capture.h"
 #include "media/player/media_player_listen_tracker.h"
 #include "media/streaming/media_streaming_instance.h"
 #include "media/streaming/media_streaming_player.h"
 #include "media/view/media_view_playback_progress.h"
-#include "calls/calls_instance.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "data/data_media_types.h"
-#include "data/data_file_origin.h"
-#include "core/shortcuts.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "window/window_controller.h"
-#include "mainwindow.h"
-#include "main/main_domain.h" // Domain::activeSessionValue.
-#include "main/main_session.h"
-#include "main/main_account.h" // session->account().sessionChanges().
-#include "main/main_session_settings.h"
 #include "storage/storage_account.h"
+#include "window/window_controller.h"
 
 namespace Media {
 namespace Player {
 namespace {
 
-Instance *SingleInstance = nullptr;
+auto SingleInstance = (Instance*)nullptr;
 
 // Preload X message ids before and after current.
 constexpr auto kIdsLimit = 32;
@@ -145,8 +146,20 @@ void SaveLastPlaybackPosition(
 
 bool IsRealPlaybackContext(not_null<const HistoryItem*> item) {
 	return item->isRegular()
-		|| item->isScheduled()
+		|| (item->isScheduled() && !item->isSending() && !item->hasFailed())
 		|| item->isSavedMusicItem();
+}
+
+[[nodiscard]] std::vector<not_null<DocumentData*>> ItemPlaylistTracks(
+		not_null<HistoryItem*> item,
+		AudioMsgId::Type type) {
+	auto result = std::vector<not_null<DocumentData*>>();
+	for (const auto &document : ItemRichPageAudio(item)) {
+		if (AudioMsgId(document, FullMsgId()).type() == type) {
+			result.push_back(document);
+		}
+	}
+	return result;
 }
 
 Instance::Streamed::Streamed(
@@ -253,6 +266,9 @@ void Instance::setCurrent(const AudioMsgId &audioId) {
 		const auto item = (audioId.audio() && audioId.contextId())
 			? audioId.audio()->owner().message(audioId.contextId())
 			: nullptr;
+		data->currentTracks = item
+			? ItemPlaylistTracks(item, data->type)
+			: std::vector<not_null<DocumentData*>>();
 		const auto samePending = (_pendingContextFor.audio() == audioId.audio())
 			&& (_pendingContextFor.contextId() == audioId.contextId());
 		const auto context = samePending
@@ -558,11 +574,47 @@ HistoryItem *Instance::itemByIndex(not_null<Data*> data, int index) {
 	return data->history->owner().message(fullId);
 }
 
+AudioMsgId Instance::trackInItem(
+		not_null<const Data*> data,
+		int delta) const {
+	const auto &tracks = data->currentTracks;
+	const auto playing = data->current.audio();
+	const auto i = ranges::find_if(tracks, [&](
+			not_null<DocumentData*> track) {
+		return (track.get() == playing);
+	});
+	if (i == end(tracks)) {
+		return AudioMsgId();
+	}
+	const auto index = int(i - begin(tracks))
+		+ ((order(data) == OrderMode::Reverse) ? -delta : delta);
+	return (index >= 0 && index < int(tracks.size()))
+		? AudioMsgId(tracks[index], data->current.contextId())
+		: AudioMsgId();
+}
+
+bool Instance::moveInItem(not_null<Data*> data, int delta, bool autonext) {
+	const auto audioId = trackInItem(data, delta);
+	if (!audioId) {
+		return false;
+	}
+	if (autonext) {
+		_switchToNext.fire({ data->current, audioId.contextId() });
+	}
+	play(audioId, PlaylistContext{
+		data->topicRootId,
+		data->monoforumPeerId,
+	});
+	return true;
+}
+
 bool Instance::moveInPlaylist(
 		not_null<Data*> data,
 		int delta,
 		bool autonext) {
-	if (!data->playlistIndex) {
+	if (moveInItem(data, delta, autonext)) {
+		return true;
+	} else if (!data->playlistIndex) {
 		return false;
 	}
 	const auto jumpByItem = [&](not_null<HistoryItem*> item) {
@@ -754,7 +806,9 @@ bool Instance::previousAvailable(AudioMsgId::Type type) const {
 	const auto data = getData(type);
 	Assert(data != nullptr);
 
-	if (!data->playlistIndex || !data->playlistSlice) {
+	if (trackInItem(data, -1)) {
+		return true;
+	} else if (!data->playlistIndex || !data->playlistSlice) {
 		return false;
 	} else if (repeat(data) == RepeatMode::All) {
 		return true;
@@ -771,7 +825,9 @@ bool Instance::nextAvailable(AudioMsgId::Type type) const {
 	const auto data = getData(type);
 	Assert(data != nullptr);
 
-	if (!data->playlistIndex || !data->playlistSlice) {
+	if (trackInItem(data, 1)) {
+		return true;
+	} else if (!data->playlistIndex || !data->playlistSlice) {
 		return false;
 	} else if (repeat(data) == RepeatMode::All) {
 		return true;
@@ -842,6 +898,7 @@ void Instance::play(AudioMsgId::Type type) {
 			emitUpdate(type);
 		}
 		data->resumeOnCallEnd = false;
+		data->resumeOnVoiceEnd = false;
 	}
 }
 
@@ -862,6 +919,9 @@ void Instance::play(
 			audioId.contextId());
 		if (!shared) {
 			return;
+		}
+		if (audioId.type() == AudioMsgId::Type::Voice) {
+			pauseSongForVoice();
 		}
 		playStreamed(audioId, std::move(shared));
 	}
@@ -951,7 +1011,11 @@ void Instance::stop(AudioMsgId::Type type, bool asFinished) {
 			_listenTracker->finalize();
 		}
 		data->resumeOnCallEnd = false;
+		data->resumeOnVoiceEnd = false;
 		_playerStopped.fire_copy({type});
+		if (type == AudioMsgId::Type::Voice) {
+			resumeSongAfterVoice();
+		}
 	}
 	if (asFinished) {
 		_tracksFinished.fire_copy(type);
@@ -959,6 +1023,7 @@ void Instance::stop(AudioMsgId::Type type, bool asFinished) {
 }
 
 void Instance::stopAndClear(not_null<Data*> data) {
+	getData(AudioMsgId::Type::Song)->resumeOnVoiceEnd = false;
 	stop(data->type);
 	*data = Data(data->type, data->overview);
 	_tracksFinished.fire_copy(data->type);
@@ -1126,6 +1191,7 @@ void Instance::playPause(AudioMsgId::Type type) {
 			emitUpdate(type);
 		}
 		data->resumeOnCallEnd = false;
+		data->resumeOnVoiceEnd = false;
 	}
 }
 
@@ -1150,6 +1216,33 @@ void Instance::resumeOnCall(AudioMsgId::Type type) {
 			play(type);
 		}
 	}
+}
+
+void Instance::pauseSongForVoice() {
+	const auto state = getState(AudioMsgId::Type::Song);
+	if (!state.id
+		|| IsStopped(state.state)
+		|| IsPaused(state.state)
+		|| state.state == State::Pausing) {
+		return;
+	}
+	pause(AudioMsgId::Type::Song);
+	if (const auto data = getData(AudioMsgId::Type::Song)) {
+		data->resumeOnVoiceEnd = true;
+	}
+}
+
+void Instance::resumeSongAfterVoice(bool force) {
+	const auto data = getData(AudioMsgId::Type::Song);
+	if (!data->resumeOnVoiceEnd && !force) {
+		return;
+	}
+	data->resumeOnVoiceEnd = false;
+	if (Core::App().calls().currentCall()
+		|| Core::App().calls().currentGroupCall()) {
+		return;
+	}
+	play(AudioMsgId::Type::Song);
 }
 
 bool Instance::next(AudioMsgId::Type type) {
@@ -1264,6 +1357,17 @@ void Instance::updatePlaybackSpeed() {
 		}
 		if (const auto streamed = data->streamed.get()) {
 			streamed->instance.setSpeed(LookupPlaybackSpeed(data->current));
+		}
+	}
+}
+
+void Instance::setPlaybackSpeed(float64 speed) {
+	if (const auto data = getData(getActiveType())) {
+		if (!data->current.changeablePlaybackSpeed()) {
+			return;
+		}
+		if (const auto streamed = data->streamed.get()) {
+			streamed->instance.setSpeed(speed);
 		}
 	}
 }
@@ -1386,6 +1490,9 @@ void Instance::emitUpdate(AudioMsgId::Type type, CheckCallback check) {
 		data->isPlaying = !IsStopped(state.state);
 		if (finished) {
 			_tracksFinished.fire_copy(type);
+			if (type == AudioMsgId::Type::Voice) {
+				resumeSongAfterVoice();
+			}
 		}
 	}
 }
@@ -1425,8 +1532,8 @@ void Instance::stopAndClose() {
 	_listenTracker->finalize();
 	_closePlayerRequests.fire({});
 
-	stop(AudioMsgId::Type::Voice);
 	stop(AudioMsgId::Type::Song);
+	stop(AudioMsgId::Type::Voice);
 
 	Shortcuts::ToggleMediaShortcuts(false);
 }
@@ -1507,9 +1614,14 @@ void Instance::handleStreamingError(
 			document,
 			DocumentSaveClickHandler::Mode::ToFile);
 	}
+	const auto resumeSong = (data->type == AudioMsgId::Type::Voice)
+		&& getData(AudioMsgId::Type::Song)->resumeOnVoiceEnd;
 	emitUpdate(data->type);
 	if (data->streamed && data->streamed->instance.player().failed()) {
 		clearStreamed(data);
+	}
+	if (resumeSong && !data->streamed) {
+		resumeSongAfterVoice(true);
 	}
 }
 

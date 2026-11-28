@@ -7,31 +7,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_forum.h"
 
+#include "apiwrap.h"
+#include "base/random.h"
+#include "base/unixtime.h"
+#include "core/application.h"
 #include "data/components/recent_peers.h"
-#include "data/data_channel.h"
-#include "data/data_histories.h"
+#include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
-#include "data/data_session.h"
+#include "data/data_channel.h"
+#include "data/data_compose_stash.h"
 #include "data/data_forum_icons.h"
 #include "data/data_forum_topic.h"
+#include "data/data_histories.h"
 #include "data/data_replies_list.h"
+#include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/notify/data_notify_settings.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_unread_things.h"
-#include "main/main_session.h"
-#include "base/random.h"
-#include "base/unixtime.h"
-#include "apiwrap.h"
 #include "lang/lang_keys.h"
-#include "core/application.h"
-#include "ui/layers/generic_box.h"
-#include "ui/widgets/fields/input_field.h"
+#include "main/main_session.h"
 #include "storage/storage_facade.h"
 #include "storage/storage_shared_media.h"
-#include "window/window_session_controller.h"
+#include "tgw/tgw_storage.h"
+#include "ui/layers/generic_box.h"
+#include "ui/widgets/fields/input_field.h"
 #include "window/notifications_manager.h"
+#include "window/window_session_controller.h"
 
 namespace Data {
 namespace {
@@ -42,6 +44,59 @@ constexpr auto kTopicsPerPage = 500;
 constexpr auto kStalePerRequest = 100;
 constexpr auto kShowTopicNamesCount = 8;
 // constexpr auto kGeneralColorId = 0xA9A9A9;
+
+[[nodiscard]] MsgId TopicRootFromMessage(const MTPMessage &message) {
+	const auto replyRoot = [](
+			const MTPMessageReplyHeader *reply,
+			bool topicAction) {
+		if (!reply) {
+			return MsgId();
+		}
+		return reply->match([&](const MTPDmessageReplyHeader &data) {
+			const auto id = data.vreply_to_msg_id().value_or_empty();
+			return (id && (topicAction || data.is_forum_topic()))
+				? MsgId(data.vreply_to_top_id().value_or(id))
+				: MsgId();
+		}, [](const MTPDmessageReplyStoryHeader &) {
+			return MsgId();
+		});
+	};
+	return message.match([&](const MTPDmessage &data) {
+		return replyRoot(data.vreply_to(), false);
+	}, [&](const MTPDmessageService &data) {
+		const auto type = data.vaction().type();
+		const auto created = (type == mtpc_messageActionTopicCreate);
+		const auto edited = (type == mtpc_messageActionTopicEdit);
+		const auto root = replyRoot(data.vreply_to(), created || edited);
+		return root
+			? root
+			: created
+			? MsgId(data.vid().v)
+			: MsgId();
+	}, [](const MTPDmessageEmpty &) {
+		return MsgId();
+	});
+}
+
+[[nodiscard]] PeerId SinglePeerReferringTo(
+		const QVector<MTPMessage> &messages,
+		MsgId rootId) {
+	if (!rootId) {
+		return PeerId();
+	}
+	auto result = PeerId();
+	for (const auto &message : messages) {
+		if (TopicRootFromMessage(message) != rootId) {
+			continue;
+		}
+		const auto peerId = PeerFromMessage(message);
+		if (!peerId || (result && result != peerId)) {
+			return PeerId();
+		}
+		result = peerId;
+	}
+	return result;
+}
 
 } // namespace
 
@@ -77,7 +132,7 @@ Forum::~Forum() {
 		}
 	}
 	if (_staleRequestId) {
-		session().api().request(_staleRequestId).cancel();
+		owner().histories().cancelRequest(_staleRequestId);
 	}
 	if (_requestId) {
 		session().api().request(_requestId).cancel();
@@ -86,16 +141,22 @@ Forum::~Forum() {
 	auto &changes = session().changes();
 	const auto peerId = _history->peer->id;
 	for (const auto &[rootId, topic] : _topics) {
-		storage.unload(Storage::SharedMediaUnloadThread(
-			peerId,
-			rootId,
-			PeerId()));
+		if (rootId) {
+			storage.unload(Storage::SharedMediaUnloadThread(
+				peerId,
+				rootId,
+				PeerId()));
+		}
 		_history->setForwardDraft(rootId, PeerId(), {});
+		_history->setComposeStash(
+			Data::DraftKey::Local(rootId, PeerId()),
+			nullptr);
 
 		const auto raw = topic.get();
 		changes.topicRemoved(raw);
 		changes.entryRemoved(raw);
 	}
+	storage.unload(Storage::SharedMediaUnloadAllTopics(peerId));
 }
 
 Session &Forum::owner() const {
@@ -174,13 +235,17 @@ void Forum::requestTopics() {
 		MTP_flags(0),
 		peer()->input(),
 		MTPstring(), // q
+		MTPlong(), // icon_emoji_id
+		MTPBool(), // closed
 		MTP_int(_offset.date),
 		MTP_int(_offset.id),
 		MTP_int(_offset.topicId),
 		MTP_int(loadCount)
 	)).done([=](const MTPmessages_ForumTopics &result) {
 		const auto previousOffset = _offset;
-		applyReceivedTopics(result, _offset);
+		if (!applyReceivedTopics(result, _offset)) {
+			return;
+		}
 		const auto &list = result.data().vtopics().v;
 		if (list.isEmpty()
 			|| list.size() == result.data().vcount().v
@@ -200,15 +265,24 @@ void Forum::requestTopics() {
 		if (error.type() == u"CHANNEL_FORUM_MISSING"_q && channel()) {
 			const auto flags = channel()->flags() & ~ChannelDataFlag::Forum;
 			channel()->setFlags(flags);
+		} else {
+			requestSomeStale();
 		}
 	}).send();
 }
 
 void Forum::applyTopicDeleted(MsgId rootId) {
+	Tgw::ClearTopicStorage(_history, rootId);
 	_topicsDeleted.emplace(rootId);
 
 	const auto i = _topics.find(rootId);
 	if (i == end(_topics)) {
+		if (rootId) {
+			session().storage().unload(Storage::SharedMediaUnloadThread(
+				_history->peer->id,
+				rootId,
+				PeerId()));
+		}
 		return;
 	}
 	const auto raw = i->second.get();
@@ -230,14 +304,20 @@ void Forum::applyTopicDeleted(MsgId rootId) {
 	session().changes().entryUpdated(
 		raw,
 		Data::EntryUpdate::Flag::Destroyed);
-	_topics.erase(i);
+	// Callbacks above may insert topics, invalidating i.
+	_topics.erase(rootId);
 
 	_history->destroyMessagesByTopic(rootId);
-	session().storage().unload(Storage::SharedMediaUnloadThread(
-		_history->peer->id,
-		rootId,
-		PeerId()));
+	if (rootId) {
+		session().storage().unload(Storage::SharedMediaUnloadThread(
+			_history->peer->id,
+			rootId,
+			PeerId()));
+	}
 	_history->setForwardDraft(rootId, PeerId(), {});
+	_history->setComposeStash(
+		Data::DraftKey::Local(rootId, PeerId()),
+		nullptr);
 }
 
 void Forum::reorderLastTopics() {
@@ -340,10 +420,10 @@ void Forum::listMessageChanged(HistoryItem *from, HistoryItem *to) {
 	}
 }
 
-void Forum::applyReceivedTopics(
+bool Forum::applyReceivedTopics(
 		const MTPmessages_ForumTopics &topics,
 		ForumOffsets &updateOffsets) {
-	applyReceivedTopics(topics, [&](not_null<ForumTopic*> topic) {
+	return applyReceivedTopics(topics, [&](not_null<ForumTopic*> topic) {
 		if (const auto last = topic->lastServerMessage()) {
 			updateOffsets.date = last->date();
 			updateOffsets.id = last->id;
@@ -352,20 +432,28 @@ void Forum::applyReceivedTopics(
 	});
 }
 
-void Forum::applyReceivedTopics(
+bool Forum::applyReceivedTopics(
 		const MTPmessages_ForumTopics &topics,
 		Fn<void(not_null<ForumTopic*>)> callback) {
 	const auto &data = topics.data();
-	owner().processUsers(data.vusers());
-	owner().processChats(data.vchats());
-	owner().processMessages(data.vmessages(), NewMessageType::Existing);
-	if (const auto channel = this->channel()) {
+	const auto weak = base::make_weak(this);
+	const auto owner = &this->owner();
+	const auto channel = this->channel();
+	owner->processUsers(data.vusers());
+	owner->processChats(data.vchats());
+	owner->processMessages(data.vmessages(), NewMessageType::Existing);
+	if (channel) {
 		channel->ptsReceived(data.vpts().v);
+	}
+	// Applying the response's chats or users can drop this forum.
+	if (!weak) {
+		return false;
 	}
 	applyReceivedTopics(data.vtopics(), std::move(callback));
 	if (!_staleRootIds.empty()) {
 		requestSomeStale();
 	}
+	return true;
 }
 
 void Forum::applyReceivedTopics(
@@ -401,10 +489,25 @@ void Forum::applyReceivedTopics(
 			}
 		};
 
-		_staleRootIds.remove(rootId);
+		const auto min = topic.match([](const MTPDforumTopicDeleted &) {
+			return false;
+		}, [](const MTPDforumTopic &data) {
+			return data.is_short();
+		});
+		// A short record can't stand in for a pending full refresh.
+		if (!min && !_topicRequests.contains(rootId)) {
+			_staleRootIds.remove(rootId);
+		}
 		topic.match([&](const MTPDforumTopicDeleted &data) {
 			if (rootId != ForumTopic::kGeneralId) {
 				applyTopicDeleted(rootId);
+				if (_staleRootIds.remove(rootId)) {
+					// A request already sent finishes on its own response.
+					const auto i = _topicRequests.find(rootId);
+					if (i != end(_topicRequests) && !i->second.id) {
+						finishTopicRequest(rootId);
+					}
+				}
 			} else {
 				// We shouldn't delete general topic in any case.
 				// Here this happens in bot forums, for example.
@@ -451,11 +554,13 @@ void Forum::requestSomeStale() {
 				MTP_vector<MTPint>(rootIds))
 		).done([=](const MTPmessages_ForumTopics &result) {
 			_staleRequestId = 0;
-			applyReceivedTopics(result);
-			call();
+			if (applyReceivedTopics(result)) {
+				call();
+			}
 			finish();
 		}).fail([=] {
 			_staleRequestId = 0;
+			requestSomeStale();
 			call();
 			finish();
 		}).send();
@@ -552,9 +657,13 @@ void Forum::discardCreatingId(MsgId rootId) {
 	const auto i = _topics.find(rootId);
 	if (i != end(_topics)) {
 		Assert(!i->second->inChatList());
+		const auto raw = i->second.get();
+		session().changes().topicRemoved(raw);
+		session().changes().entryRemoved(raw);
 		_topics.erase(i);
 	}
 	_creatingRootIds.remove(rootId);
+	owner().histories().discardCreatingTopic(_history, rootId);
 }
 
 bool Forum::creating(MsgId rootId) const {
@@ -576,10 +685,15 @@ void Forum::created(MsgId rootId, MsgId realId) {
 			realId,
 			std::move(topic)
 		).first->second->setRealRootId(realId);
+		requestTopic(realId);
 
 		reorderLastTopics();
 	}
 	owner().notifyItemIdChange({ id, rootId });
+	if (const auto raw = topic.get()) {
+		session().changes().topicRemoved(raw);
+		session().changes().entryRemoved(raw);
+	}
 }
 
 void Forum::clearAllUnreadMentions() {
@@ -636,6 +750,28 @@ rpl::producer<> Forum::chatsListChanges() const {
 
 rpl::producer<> Forum::chatsListLoadedEvents() const {
 	return _chatsListLoadedEvents.events();
+}
+
+void ApplyResponseTopics(
+		not_null<Session*> owner,
+		const MTPVector<MTPForumTopic> *topics,
+		const QVector<MTPMessage> &messages,
+		ChannelData *channel) {
+	if (!topics) {
+		return;
+	}
+	for (const auto &topic : topics->v) {
+		const auto peerId = topic.match([](const MTPDforumTopic &data) {
+			return peerFromMTP(data.vpeer());
+		}, [&](const MTPDforumTopicDeleted &data) {
+			return channel
+				? channel->id
+				: SinglePeerReferringTo(messages, data.vid().v);
+		});
+		if (const auto peer = owner->peerLoaded(peerId)) {
+			peer->processTopics(MTP_vector<MTPForumTopic>(1, topic));
+		}
+	}
 }
 
 } // namespace Data

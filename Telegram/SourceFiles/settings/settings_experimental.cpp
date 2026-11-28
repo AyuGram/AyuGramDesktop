@@ -7,60 +7,61 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/settings_experimental.h"
 
-#include "settings/settings_common.h"
+#include "base/options.h"
+#include "boxes/moderate_messages_box.h"
+#include "chat_helpers/stickers_list_widget.h"
+#include "chat_helpers/tabbed_panel.h"
+#include "core/application.h"
+#include "core/launcher.h"
+#include "core/sandbox.h"
 #include "data/components/passkeys.h"
-#include "ui/layers/generic_box.h"
+#include "dialogs/ui/dialogs_layout.h"
+#include "dialogs/dialogs_entry.h"
+#include "dialogs/dialogs_widget.h"
+#include "ffmpeg/ffmpeg_utility.h"
+#include "history/view/controls/compose_controls_common.h"
+#include "history/view/history_view_message.h"
+#include "history/history_item_components.h"
+#include "info/profile/tabs/adapters/info_profile_tab_media.h"
+#include "info/profile/tabs/info_profile_tabs_host.h"
+#include "info/profile/info_profile_actions.h"
+#include "info/info_flexible_scroll.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "mainwidget.h"
+#include "mainwindow.h"
+#include "media/player/media_player_instance.h"
+#include "mtproto/session_private.h"
+#include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
-#include "ui/search_field_controller.h"
+#include "ui/chat/chat_style_radius.h"
+#include "ui/controls/compose_ai_button_factory.h"
+#include "ui/gl/gl_detection.h"
+#include "ui/layers/generic_box.h"
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/fields/input_field.h"
-#include "ui/wrap/vertical_layout.h"
-#include "ui/wrap/slide_wrap.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/kinetic_scroller.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/search_field_controller.h"
 #include "ui/vertical_list.h"
-#include "ui/gl/gl_detection.h"
-#include "ui/chat/chat_style_radius.h"
-#include "ui/controls/compose_ai_button_factory.h"
-#include "base/options.h"
-#include "boxes/moderate_messages_box.h"
-#include "core/application.h"
-#include "core/launcher.h"
-#include "core/sandbox.h"
-#include "chat_helpers/tabbed_panel.h"
-#include "dialogs/dialogs_entry.h"
-#include "dialogs/dialogs_widget.h"
-#include "dialogs/ui/dialogs_layout.h"
-#include "ffmpeg/ffmpeg_utility.h"
-#include "history/history_item_components.h"
-#include "history/view/controls/compose_controls_common.h"
-#include "history/view/history_view_message.h"
-#include "info/profile/info_profile_actions.h"
-#include "info/profile/tabs/adapters/info_profile_tab_media.h"
-#include "info/profile/tabs/info_profile_tabs_host.h"
-#include "lang/lang_keys.h"
-#include "mainwindow.h"
-#include "mainwidget.h"
-#include "media/player/media_player_instance.h"
-#include "mtproto/session_private.h"
 #include "webview/webview_embed.h"
 #include "window/main_window.h"
+#include "window/notifications_manager.h"
+#include "window/window_controller.h"
 #include "window/window_filters_favorite.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
-#include "window/window_controller.h"
-#include "window/notifications_manager.h"
-#include "info/info_flexible_scroll.h"
-#include "chat_helpers/stickers_list_widget.h"
+
 #include "styles/style_chat_helpers.h"
-#include "styles/style_settings.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 
 #include <QtCore/QJsonDocument>
 #include <QtGui/QGuiApplication>
@@ -166,6 +167,62 @@ struct ResolvedReferrer {
 	return QString();
 }
 
+enum class ImportResult {
+	Done,
+	Invalid,
+	Unsupported,
+};
+
+[[nodiscard]] ImportResult ImportOptions(const QString &text) {
+	const auto decoded = DecodeOptionsFromText(text.trimmed());
+	if (!decoded.ok) {
+		return ImportResult::Invalid;
+	}
+	return base::options::deserialize(decoded.json)
+		? ImportResult::Done
+		: ImportResult::Unsupported;
+}
+
+void ImportOptionsBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Window::Controller*> window,
+		Fn<void()> imported) {
+	box->setTitle(rpl::single(u"Import experimental settings"_q));
+
+	const auto field = box->addRow(object_ptr<Ui::InputField>(
+		box,
+		st::defaultInputField,
+		Ui::InputField::Mode::NoNewlines,
+		rpl::single(u"Experimental settings code"_q)));
+
+	const auto save = [=] {
+		const auto result = ImportOptions(field->getLastText());
+		if (result == ImportResult::Invalid) {
+			field->showError();
+			box->showToast(u"This is not a valid "
+				"experimental settings code."_q);
+			return;
+		} else if (result == ImportResult::Unsupported) {
+			field->showError();
+			box->showToast(u"Experimental settings code is valid"
+				", but data format is not supported."_q);
+			return;
+		}
+		imported();
+		box->closeBox();
+		window->showToast(u"Experimental settings imported."_q);
+	};
+	field->submits() | rpl::on_next(save, field->lifetime());
+
+	box->addButton(tr::lng_settings_save(), save);
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+	box->setFocusCallback([=] {
+		field->setFocusFast();
+	});
+}
+
 void SetupCopyDeepLink(
 		not_null<Window::Controller*> window,
 		not_null<Button*> button,
@@ -197,7 +254,10 @@ void SetupCopyDeepLink(
 		not_null<Ui::VerticalLayout*> container,
 		const QString &name,
 		const QString &description,
-		const style::SettingsButton &st) {
+		bool relevant) {
+	const auto &st = relevant
+		? st::settingsButtonNoIcon
+		: st::settingsOptionDisabled;
 	if (description.isEmpty()) {
 		return container->add(object_ptr<Button>(
 			container,
@@ -214,7 +274,9 @@ void SetupCopyDeepLink(
 		object_ptr<Ui::FlatLabel>(
 			container,
 			name,
-			st::settingsExperimentalTitle),
+			(relevant
+				? st::settingsExperimentalTitle
+				: st::settingsExperimentalTitleDisabled)),
 		titlePadding);
 	const auto about = container->add(
 		object_ptr<Ui::FlatLabel>(
@@ -280,9 +342,7 @@ QString AddOption(
 		inner,
 		name,
 		description,
-		(!referrer.isEmpty() || option.relevant())
-			? st::settingsButtonNoIcon
-			: st::settingsOptionDisabled);
+		(!referrer.isEmpty() || option.relevant()));
 	if (!referrer.isEmpty()) {
 		button->addClickHandler([=] {
 			const auto resolved = ResolveReferrer(
@@ -518,9 +578,10 @@ void SetupExperimental(
 				Core::kOptionFractionalScalingEnabled,
 				Core::kOptionHighDpiDownscale,
 				Ui::GL::kOptionUseQtRhi,
+				Ui::GL::kOptionForceANGLE,
 				Ui::GL::kOptionEnableVulkanRhi,
 				Core::kOptionFreeType,
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 				Ui::kOptionKineticScroller,
 #endif
 				Window::kOptionDisableTouchbar,
@@ -638,25 +699,23 @@ void Experimental::fillTopBarMenu(const Ui::Menu::MenuCallback &addAction) {
 			});
 		},
 		&st::menuIconCopy);
-	if (!DecodeOptionsFromText(QGuiApplication::clipboard()->text()).ok) {
-		return;
-	}
+	const auto reload = [=] {
+		_reloadOptionsRequests.fire({});
+	};
 	addAction(
 		u"Import"_q,
 		[=] {
-			const auto decoded = DecodeOptionsFromText(
+			const auto result = ImportOptions(
 				QGuiApplication::clipboard()->text());
-			if (!decoded.ok) {
-				window->showToast(u"Clipboard does not contain "
-					"a valid experimental settings code."_q);
+			if (result == ImportResult::Invalid) {
+				window->show(Box(ImportOptionsBox, window, reload));
 				return;
-			}
-			if (!base::options::deserialize(decoded.json)) {
+			} else if (result == ImportResult::Unsupported) {
 				window->showToast(u"Experimental settings code is valid"
 					", but data format is not supported."_q);
 				return;
 			}
-			_reloadOptionsRequests.fire({});
+			reload();
 			window->showToast(u"Experimental settings imported "
 				"from code in clipboard."_q);
 		},

@@ -7,11 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/weak_ptr.h"
-#include "base/timer.h"
 #include "base/bytes.h"
-#include "mtproto/sender.h"
+#include "base/timer.h"
+#include "base/weak_ptr.h"
 #include "mtproto/mtproto_auth_key.h"
+#include "mtproto/sender.h"
 #include "webrtc/webrtc_device_common.h"
 #include "webrtc/webrtc_device_resolver.h"
 
@@ -260,7 +260,6 @@ public:
 	[[nodiscard]] bool videoStream() const;
 	[[nodiscard]] Data::GroupCallOrigin origin() const;
 	[[nodiscard]] bool listenersHidden() const;
-	[[nodiscard]] bool emptyRtmp() const;
 	[[nodiscard]] rpl::producer<bool> emptyRtmpValue() const;
 	[[nodiscard]] int rtmpVolume() const;
 
@@ -557,8 +556,6 @@ private:
 		not_null<MediaChannelDescriptionsTask*> task);
 	void requestCurrentTimeStart(
 		std::shared_ptr<RequestCurrentTimeTask> task);
-	void requestCurrentTimeCancel(
-		not_null<RequestCurrentTimeTask*> task);
 	[[nodiscard]] int64 approximateServerTimeInMs() const;
 
 	[[nodiscard]] bool mediaChannelDescriptionsFill(

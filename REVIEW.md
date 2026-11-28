@@ -191,28 +191,6 @@ auto text = tr::lng_settings_title(tr::now);
 
 Do not call `std::optional::value()` because it throws an exception that is not available on older macOS targets. Use `has_value()`, `value_or()`, `operator bool()`, or `operator*` instead.
 
-## Sort includes alphabetically, nested folders first
-
-After the file's own header, sort `#include` directives alphabetically with two special rules:
-
-1. **Nested folders before files** in the same directory — like Finder / File Explorer (folders first, then files). E.g. `ui/controls/button.h` sorts before `ui/abstract_button.h`.
-2. **Style includes (`styles/style_*.h`) always go last**, separated from the rest.
-
-```cpp
-// BAD - arbitrary order, style mixed in:
-#include "media/audio/media_audio.h"
-#include "styles/style_media_player.h"
-#include "data/data_document.h"
-#include "apiwrap.h"
-
-// GOOD - alphabetical, folders first, styles last:
-#include "apiwrap.h"
-#include "data/data_document.h"
-#include "media/audio/media_audio.h"
-
-#include "styles/style_media_player.h"
-```
-
 ## Use C++17 nested namespace syntax
 
 Use `namespace A::B {` instead of nesting `namespace A { namespace B {`. The closing comment mirrors the opening: `} // namespace A::B`.
@@ -489,6 +467,37 @@ struct State {
 };
 const auto state = lifetime.make_state<State>();
 ```
+
+## Don't keep rpl per-subscription state in a mutable capture
+
+`rpl` stores the next-handler `OnNext _next` by value on `consumer_handlers`. Both `put_next` and `put_next_copy` copy it (`auto handler = this->_next;`) and invoke the copy. The stored `_next` stays intact while that copy runs, so a nested `put_next` copies `_next` again instead of re-entering the running object. `put_error` and `put_done` instead move the stored callback and terminate, because those complete the subscription.
+
+A `mutable` init-capture mutated inside `rpl::on_next` is written on that copy and discarded. The next emission starts from the original capture again. The result compiles and runs, and silently degrades a "the value grew" rule into "the value is non-zero".
+
+```cpp
+// BAD - the write never carries:
+events | rpl::on_next([last = 0](int value) mutable {
+	const auto grew = (value > last);
+	last = value;
+	if (grew) {
+		...
+	}
+}, lifetime);
+
+// GOOD - make_state lives beside the handler for the subscription's lifetime:
+const auto last = lifetime.make_state<int>(0);
+events | rpl::on_next([=](int value) {
+	const auto grew = (value > *last);
+	*last = value;
+	if (grew) {
+		...
+	}
+}, lifetime);
+```
+
+State behind a `shared_ptr` is the other correct shape when the pointer identity is the state (including a self-destroying `shared_ptr<rpl::lifetime>`). Mutating a member through captured `this` is not this trap.
+
+Do not flag a `mutable` lambda that is one-shot: `rpl::take(1)`, a self-destroying subscription, a `crl::on_main` or `crl::async` callback, or a `done` or `error` callback.
 
 ## Use trailing return type only when the normal form is too long
 

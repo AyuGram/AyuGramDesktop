@@ -22,15 +22,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "ui/controls/userpic_button.h"
 #include "ui/layers/generic_box.h"
-#include "ui/new_badges.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/new_badges.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
@@ -298,7 +299,7 @@ void SetupMenuBots(
 		wrap->clear();
 		for (const auto &bot : bots->attachBots()) {
 			const auto user = bot.user;
-			if (!bot.inMainMenu || !bot.media) {
+			if (!bot.inMainMenu || !bot.media || user->isOldWalletBot()) {
 				continue;
 			} else if (const auto media = bot.media; !media->loaded()) {
 				if (!*iconLoadLifetime) {

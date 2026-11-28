@@ -7,15 +7,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/widgets/multi_select.h"
 
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/scroll_area.h"
+#include "lang/lang_keys.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/cross_animation.h"
 #include "ui/text/text_options.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/scroll_area.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "lang/lang_keys.h"
 
 #include <set>
 
@@ -437,7 +437,7 @@ public:
 	void setFocusedChangedCallback(Fn<void(bool focused)> callback);
 	void setCancelButtonShown(bool shown);
 
-	void addItemInBunch(std::unique_ptr<Item> item);
+	bool addItemInBunch(std::unique_ptr<Item> item);
 	void finishItemsBunch(AddItemWay way);
 	void setItemText(uint64 itemId, const QString &text);
 
@@ -624,12 +624,14 @@ void MultiSelect::setQuery(const QString &query) {
 }
 
 void MultiSelect::addItem(uint64 itemId, const QString &text, style::color color, PaintRoundImage paintRoundImage, AddItemWay way) {
-	addItemInBunch(itemId, text, color, std::move(paintRoundImage));
-	_inner->finishItemsBunch(way);
+	if (addItemInBunch(itemId, text, color, std::move(paintRoundImage))) {
+		_inner->finishItemsBunch(way);
+	}
 }
 
-void MultiSelect::addItemInBunch(uint64 itemId, const QString &text, style::color color, PaintRoundImage paintRoundImage) {
-	_inner->addItemInBunch(std::make_unique<Item>(_st.item, itemId, text, color, std::move(paintRoundImage)));
+bool MultiSelect::addItemInBunch(uint64 itemId, const QString &text, style::color color, PaintRoundImage paintRoundImage) {
+	return _inner->addItemInBunch(
+		std::make_unique<Item>(_st.item, itemId, text, color, std::move(paintRoundImage)));
 }
 
 void MultiSelect::finishItemsBunch() {
@@ -986,7 +988,10 @@ void MultiSelect::Inner::mousePressEvent(QMouseEvent *e) {
 	}
 }
 
-void MultiSelect::Inner::addItemInBunch(std::unique_ptr<Item> item) {
+bool MultiSelect::Inner::addItemInBunch(std::unique_ptr<Item> item) {
+	if (_idsMap.find(item->id()) != _idsMap.cend()) {
+		return false;
+	}
 	auto wasEmpty = _items.empty();
 	item->setUpdateCallback([this, item = item.get()] {
 		auto itemRect = item->paintArea(width() - _st.padding.left() - _st.padding.top());
@@ -999,6 +1004,7 @@ void MultiSelect::Inner::addItemInBunch(std::unique_ptr<Item> item) {
 	if (wasEmpty) {
 		updateHasAnyItems(true);
 	}
+	return true;
 }
 
 void MultiSelect::Inner::finishItemsBunch(AddItemWay way) {

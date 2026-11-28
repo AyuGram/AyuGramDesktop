@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rp_widget.h"
 #include "webrtc/webrtc_video_track.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_chat_style.h"
@@ -30,7 +31,8 @@ constexpr auto kSide = 400;
 constexpr auto kUpdateEach = crl::time(100);
 constexpr auto kAudioFrequency = 48'000;
 constexpr auto kAudioBitRate = 64 * 1024;
-constexpr auto kVideoBitRate = 2 * 1024 * 1024;
+constexpr auto kVideoFrameRate = 30;
+constexpr auto kVideoBitRate = 1024 * 1024;
 constexpr auto kMinDuration = crl::time(200);
 constexpr auto kMaxDuration = 60 * crl::time(1000);
 constexpr auto kInitTimeout = 5 * crl::time(1000);
@@ -367,7 +369,7 @@ bool RoundVideoRecorder::Private::initVideo() {
 	_videoCodec->width = kSide;
 	_videoCodec->height = kSide;
 	_videoCodec->time_base = AVRational{ 1, 1'000'000 }; // Microseconds.
-	_videoCodec->framerate = AVRational{ 0, 1 }; // Variable frame rate.
+	_videoCodec->framerate = AVRational{ kVideoFrameRate, 1 };
 	_videoCodec->pix_fmt = AV_PIX_FMT_YUV420P;
 	_videoCodec->bit_rate = kVideoBitRate;
 
@@ -606,8 +608,8 @@ bool RoundVideoRecorder::Private::copyPackets(
 		not_null<AVFormatContext*> output,
 		CopyContext &context,
 		crl::time offset) {
-	AVPacket packet;
-	av_init_packet(&packet);
+	auto packetWrap = Packet();
+	auto &packet = packetWrap.fields();
 
 	auto offsets = std::array<int64, kMaxStreams>{ 0 };
 	while (av_read_frame(input, &packet) >= 0) {
@@ -1128,7 +1130,10 @@ RoundVideoRecorder::RoundVideoRecorder(
 	_gradientFg.color(),
 	[=] { _preview->update(); })
 , _preview(std::make_unique<RpWidget>(_descriptor.container))
-, _private(MinithumbSize()) {
+, _private(MinithumbSize())
+, _progressAnimation([=](crl::time now) {
+	return progressAnimationCallback(now);
+}) {
 	setup();
 }
 
@@ -1172,13 +1177,13 @@ void RoundVideoRecorder::progressTo(float64 progress) {
 	if (_progress == progress || _paused) {
 		return;
 	} else if (_progressReceived) {
-		_progressAnimation.start(
-			[=] { _preview->update(); },
-			_progress,
-			progress,
-			kUpdateEach * 1.1);
+		_progressShown.start(progress);
+		_progressDuration = (kUpdateEach * 11 / 10) * anim::SlowMultiplier();
+		_progressAnimation.start();
 	} else {
 		_progressReceived = true;
+		_progressAnimation.stop();
+		_progressShown = anim::value(progress, progress);
 		_fadeContentAnimation.start(
 			[=] { _preview->update(); },
 			0.,
@@ -1187,6 +1192,20 @@ void RoundVideoRecorder::progressTo(float64 progress) {
 	}
 	_progress = progress;
 	_preview->update();
+}
+
+bool RoundVideoRecorder::progressAnimationCallback(crl::time now) {
+	const auto time = now - _progressAnimation.started();
+	const auto dt = anim::Disabled()
+		? 1.
+		: (time / float64(_progressDuration));
+	if (dt >= 1.) {
+		_progressShown.finish();
+	} else {
+		_progressShown.update(dt, anim::linear);
+	}
+	_preview->update();
+	return (dt < 1.);
 }
 
 void RoundVideoRecorder::preparePlaceholder(const QImage &placeholder) {
@@ -1369,7 +1388,7 @@ void RoundVideoRecorder::setup() {
 			const auto add = _progressStroke * 3 / 2.;
 			const auto full = arc::kFullLength;
 			const auto length = int(base::SafeRound(
-				_progressAnimation.value(_progress) * full));
+				_progressShown.current() * full));
 			p.drawArc(
 				QRectF(inner).marginsAdded({ add, add, add, add }),
 				(full / 4) - length,

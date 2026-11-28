@@ -8,8 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "iv/editor/iv_editor_clipboard.h"
-#include "iv/iv_rich_page.h"
 #include "iv/markdown/iv_markdown_prepare.h"
+#include "iv/iv_rich_page.h"
 
 #include <optional>
 #include <vector>
@@ -37,6 +37,10 @@ enum class ListStyle : uchar {
 [[nodiscard]] std::optional<int> EffectiveOrderedItemValue(
 	const RichPage::Block &block,
 	int itemIndex);
+[[nodiscard]] bool OrderedItemsSupportRoman(
+	const RichPage::Block &block,
+	int from,
+	int till);
 
 void DropOrderedItemNumber(RichPage::ListItem *item);
 void AdoptListItemMarkers(

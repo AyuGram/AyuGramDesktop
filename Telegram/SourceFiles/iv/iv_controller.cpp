@@ -7,12 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/iv_controller.h"
 
-#include "base/event_filter.h"
 #include "base/platform/base_platform_info.h"
 #include "base/qt/qt_key_modifiers.h"
+#include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "core/file_utilities.h"
 #include "lang/lang_keys.h"
+#include "styles/palette.h"
 #include "ui/chat/attach/attach_bot_webview.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
@@ -22,7 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "webview/webview_embed.h"
 #include "webview/webview_interface.h"
-#include "styles/palette.h"
+
 #include "styles/style_iv.h"
 #include "styles/style_payments.h"
 #include "styles/style_window.h"
@@ -34,8 +35,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QWindow>
 
 #include <string>
-
-#include <ada.h>
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -49,12 +48,10 @@ constexpr auto kZoomStep = int(10);
 
 [[nodiscard]] QString TonsiteToHttps(QString value) {
 	const auto ChangeHost = [](QString tonsite) {
-		const auto fake = "http://" + tonsite.toStdString();
-		const auto parsed = ada::parse<ada::url>(fake);
-		if (!parsed) {
+		tonsite = QUrl("http://" + tonsite).host(QUrl::FullyEncoded);
+		if (tonsite.isEmpty()) {
 			return QString();
 		}
-		tonsite = QString::fromStdString(parsed->get_hostname());
 		tonsite = tonsite.replace('-', "-h");
 		tonsite = tonsite.replace('.', "-d");
 		return tonsite + ".magic.org";
@@ -81,17 +78,10 @@ constexpr auto kZoomStep = int(10);
 		https = https.mid(0, dot);
 		https = https.replace("-d", ".");
 		https = https.replace("-h", "-");
-		auto parts = https.split('.');
-		for (auto &part : parts) {
-			if (part.startsWith(u"xn--"_q)) {
-				const auto utf8 = part.mid(4).toStdString();
-				auto out = std::u32string();
-				if (ada::idna::punycode_to_utf32(utf8, out)) {
-					part = QString::fromUcs4(out.data(), out.size());
-				}
-			}
-		}
-		return parts.join('.');
+		const auto unicode = QUrl::fromAce(
+			https.toLatin1(),
+			QUrl::IgnoreIDNWhitelist);
+		return unicode.isEmpty() ? https : unicode;
 	};
 	const auto prefix = u"https://"_q;
 	if (!value.toLower().startsWith(prefix)) {
@@ -353,7 +343,7 @@ void Controller::createWebview(const Webview::StorageId &storageId) {
 		}
 	}, _container->lifetime());
 
-	raw->setNavigationStartHandler([=](const QString &uri, bool newWindow) {
+	raw->setNavigationPolicyHandler([=](const QString &uri, bool newWindow) {
 		Q_UNUSED(newWindow);
 
 		if (uri == u"about:blank"_q
@@ -405,6 +395,7 @@ void Controller::activate() {
 	_window->activateWindow();
 	_window->setFocus();
 	setInnerFocus();
+	_delegate->ivActivated(_window.get());
 }
 
 void Controller::setInnerFocus() {

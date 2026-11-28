@@ -7,10 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/transfer_gift_box.h"
 
-#include "apiwrap.h"
 #include "api/api_cloud_password.h"
 #include "api/api_credits.h"
 #include "api/api_text_entities.h"
+#include "apiwrap.h"
+#include "base/call_delayed.h"
 #include "base/unixtime.h"
 #include "boxes/filters/edit_filter_chats_list.h" // CreatePe...tionSubtitle.
 #include "boxes/peers/replace_boost_box.h"
@@ -23,6 +24,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/star_gift_resale_box.h"
 #include "chat_helpers/compose/compose_show.h"
 #include "data/data_cloud_themes.h"
+#include "data/data_document.h"
 #include "data/data_session.h"
 #include "data/data_star_gift.h"
 #include "data/data_thread.h"
@@ -30,35 +32,55 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
+#include "info/channel_statistics/boosts/giveaway/boost_badge.h"
+#include "lang/lang_hardcoded.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "payments/payments_checkout_process.h"
 #include "settings/settings_common.h"
+#include "storage/storage_account.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/controls/custom_emoji_toast_icon.h"
 #include "ui/controls/sub_tabs.h"
 #include "ui/controls/ton_common.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
+#include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/basic_click_handlers.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/vertical_list.h"
+#include "wallet/wallet_collectible_media.h"
+#include "wallet/wallet_content.h"
+#include "wallet/wallet_panel.h"
+#include "wallet/wallet_session.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h" // peerListSingleRow.
+#include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h" // starIconEmoji.
 #include "styles/style_dialogs.h" // recentPeersSpecialName.
 #include "styles/style_info.h" // defaultSubTabs.
 #include "styles/style_layers.h" // boxLabel.
 #include "styles/style_settings.h"
+#include "styles/style_wallet.h"
 
 namespace {
+
+constexpr auto kPlateGroupsPerLine = 4;
+constexpr auto kMovedToWalletToastDuration = 5 * crl::time(1000);
+constexpr auto kTmpPasswordPeriod = 10 * TimeId(60);
+constexpr auto kPasswordStateTimeout = 10 * crl::time(1000);
+constexpr auto kGiftMoveKeepOnProfilePref = "gift_move_keep_on_profile"_cs;
 
 struct ExportOption {
 	object_ptr<Ui::RpWidget> content = { nullptr };
@@ -72,6 +94,7 @@ public:
 		not_null<Window::SessionController*> window,
 		std::shared_ptr<Data::UniqueGift> gift,
 		Data::SavedStarGiftId savedId,
+		bool shownOnProfile,
 		Fn<void(not_null<PeerData*>, Fn<void()>)> choose);
 
 	void init(not_null<PeerListBox*> box);
@@ -93,16 +116,67 @@ private:
 	const not_null<Window::SessionController*> _window;
 	const std::shared_ptr<Data::UniqueGift> _gift;
 	const Data::SavedStarGiftId _giftId;
+	const bool _shownOnProfile = false;
 	const Fn<void(not_null<PeerData*>, Fn<void()>)> _choose;
 	ExportOption _exportOption;
 	QPointer<PeerListBox> _box;
 
 };
 
+class GiftPasswordFlow final
+	: public std::enable_shared_from_this<GiftPasswordFlow> {
+public:
+	GiftPasswordFlow(
+		not_null<Window::SessionController*> window,
+		not_null<Ui::BoxContent*> confirmation,
+		GiftPasswordStep step);
+
+	void start();
+
+private:
+	[[nodiscard]] bool canPrompt() const;
+	void confirmationClosing();
+	void waitForState();
+	void stateReady(std::optional<Core::CloudPasswordState> state);
+	void stateTimeout();
+	void showPasswordBox(const Core::CloudPasswordState &state);
+	bool showPrePasswordBox(const QString &type);
+	void showBox(object_ptr<Ui::BoxContent> box);
+	void boxClosing(not_null<Ui::BoxContent*> box);
+	void requestTmpPassword(
+		const Core::CloudPasswordResult &check,
+		base::weak_qptr<PasscodeBox> box);
+	void tmpPasswordReady(const MTPaccount_TmpPassword &result);
+	void tmpPasswordFailed(
+		const MTP::Error &error,
+		base::weak_qptr<PasscodeBox> box);
+	void sendGift(const QByteArray &tmpPassword, bool stored);
+	void giftSent();
+	void giftFailed(
+		const MTP::Error &error,
+		const QByteArray &tmpPassword,
+		bool stored);
+	void fail(const MTP::Error &error);
+
+	const base::weak_ptr<Main::Session> _session;
+	const std::shared_ptr<Ui::Show> _show;
+	const base::weak_qptr<Ui::BoxContent> _confirmation;
+	const GiftPasswordStep _step;
+	base::weak_qptr<Ui::BoxContent> _box;
+	bool _waiting = false;
+	bool _issuing = false;
+	bool _sending = false;
+	bool _handedOff = false;
+	bool _abandoned = false;
+	bool _done = false;
+	rpl::lifetime _lifetime;
+
+};
+
 void ConfirmExportBox(
 		not_null<Ui::GenericBox*> box,
 		std::shared_ptr<Data::UniqueGift> gift,
-		Fn<void(Fn<void()> close)> confirmed) {
+		Fn<void(not_null<Ui::GenericBox*> confirmation)> confirmed) {
 	box->setTitle(tr::lng_gift_transfer_confirm_title());
 	box->addRow(object_ptr<Ui::FlatLabel>(
 		box,
@@ -112,84 +186,594 @@ void ConfirmExportBox(
 			tr::marked),
 		st::boxLabel));
 	box->addButton(tr::lng_gift_transfer_confirm_button(), [=] {
-		confirmed([weak = base::make_weak(box)] {
-			if (const auto strong = weak.get()) {
-				strong->closeBox();
-			}
-		});
+		confirmed(box);
 	});
 	box->addButton(tr::lng_cancel(), [=] {
 		box->closeBox();
 	});
 }
 
+// WHY: the guarded call's only credential is its temporary password.
+[[nodiscard]] bool TmpPasswordRefused(const QString &type) {
+	const auto refusals = std::array{
+		u"TMP_PASSWORD_INVALID"_q,
+		u"TMP_PASSWORD_REQUIRED"_q,
+		u"PASSWORD_HASH_INVALID"_q,
+		u"SRP_PASSWORD_CHANGED"_q,
+	};
+	return ranges::contains(refusals, type);
+}
+
+GiftPasswordFlow::GiftPasswordFlow(
+	not_null<Window::SessionController*> window,
+	not_null<Ui::BoxContent*> confirmation,
+	GiftPasswordStep step)
+: _session(base::make_weak(&window->session()))
+, _show(window->uiShow())
+, _confirmation(confirmation)
+, _step(std::move(step)) {
+}
+
+void GiftPasswordFlow::start() {
+	const auto session = _session.get();
+	const auto confirmation = _confirmation.get();
+	if (!session || !confirmation) {
+		return;
+	}
+	confirmation->boxClosing() | rpl::on_next([=] {
+		confirmationClosing();
+	}, _lifetime);
+	const auto stored = session->validTmpPassword();
+	if (stored.isEmpty()) {
+		waitForState();
+	} else {
+		sendGift(stored, true);
+	}
+}
+
+bool GiftPasswordFlow::canPrompt() const {
+	return !_abandoned
+		&& (_handedOff ? (_box != nullptr) : (_confirmation != nullptr));
+}
+
+void GiftPasswordFlow::confirmationClosing() {
+	if (!_handedOff) {
+		_abandoned = true;
+	}
+}
+
+void GiftPasswordFlow::waitForState() {
+	const auto session = _session.get();
+	if (!session) {
+		return;
+	}
+	_waiting = true;
+	base::call_delayed(
+		kPasswordStateTimeout,
+		_handedOff ? _box.get() : _confirmation.get(),
+		[self = shared_from_this()] { self->stateTimeout(); });
+	session->api().cloudPassword().reload([weak = weak_from_this()](
+			std::optional<Core::CloudPasswordState> state) {
+		if (const auto strong = weak.lock()) {
+			strong->stateReady(std::move(state));
+		}
+	});
+}
+
+void GiftPasswordFlow::stateReady(
+		std::optional<Core::CloudPasswordState> state) {
+	if (!base::take(_waiting) || !canPrompt()) {
+		return;
+	} else if (!state) {
+		fail(MTP::Error::Local(
+			u"PASSWORD_STATE_FAILED"_q,
+			u"account.getPassword failed"_q));
+	} else if (!state->hasPassword) {
+		showPrePasswordBox(u"PASSWORD_MISSING"_q);
+	} else {
+		showPasswordBox(*state);
+	}
+}
+
+void GiftPasswordFlow::stateTimeout() {
+	if (base::take(_waiting) && canPrompt()) {
+		fail(MTP::Error::Local(
+			u"PASSWORD_STATE_TIMEOUT"_q,
+			u"account.getPassword timed out"_q));
+	}
+}
+
+void GiftPasswordFlow::showPasswordBox(
+		const Core::CloudPasswordState &state) {
+	const auto session = _session.get();
+	if (!session) {
+		return;
+	}
+	auto fields = PasscodeBox::CloudFields::From(state);
+	fields.customTitle = tr::lng_gift_transfer_password_title();
+	fields.customDescription
+		= tr::lng_gift_transfer_password_description(tr::now);
+	fields.customSubmitButton = tr::lng_passcode_submit();
+	fields.customCheckCallback = [self = shared_from_this()](
+			const Core::CloudPasswordResult &check,
+			base::weak_qptr<PasscodeBox> box) {
+		self->requestTmpPassword(check, box);
+	};
+	showBox(Box<PasscodeBox>(session, fields));
+}
+
+bool GiftPasswordFlow::showPrePasswordBox(const QString &type) {
+	const auto session = _session.get();
+	if (!session) {
+		return false;
+	}
+	auto box = PrePasswordErrorBox(
+		type,
+		session,
+		tr::lng_gift_transfer_password_about(tr::now, tr::marked));
+	if (!box) {
+		return false;
+	}
+	showBox(std::move(box));
+	return true;
+}
+
+void GiftPasswordFlow::showBox(object_ptr<Ui::BoxContent> box) {
+	const auto raw = box.data();
+	const auto previous = std::exchange(_box, raw);
+	_handedOff = true;
+	raw->boxClosing() | rpl::on_next([self = shared_from_this(), raw] {
+		self->boxClosing(raw);
+	}, raw->lifetime());
+	if (const auto strong = previous.get()) {
+		strong->closeBox();
+	}
+	_show->show(std::move(box));
+	if (_step.boxShown) {
+		_step.boxShown();
+	}
+}
+
+void GiftPasswordFlow::boxClosing(not_null<Ui::BoxContent*> box) {
+	if (_box.get() != box.get()) {
+		return;
+	}
+	_box = nullptr;
+	if (_done || _sending) {
+		return;
+	}
+	_abandoned = true;
+	if (_step.dismissed) {
+		_step.dismissed();
+	}
+}
+
+void GiftPasswordFlow::requestTmpPassword(
+		const Core::CloudPasswordResult &check,
+		base::weak_qptr<PasscodeBox> box) {
+	const auto session = _session.get();
+	if (!session
+		|| !canPrompt()
+		|| _waiting
+		|| _issuing
+		|| _sending
+		|| _done) {
+		return;
+	}
+	_issuing = true;
+	session->api().request(MTPaccount_GetTmpPassword(
+		check.result,
+		MTP_int(kTmpPasswordPeriod)
+	)).done([self = shared_from_this()](
+			const MTPaccount_TmpPassword &result) {
+		self->tmpPasswordReady(result);
+	}).fail([self = shared_from_this(), box](const MTP::Error &error) {
+		self->tmpPasswordFailed(error, box);
+	}).handleFloodErrors().send();
+}
+
+void GiftPasswordFlow::tmpPasswordReady(
+		const MTPaccount_TmpPassword &result) {
+	_issuing = false;
+	const auto session = _session.get();
+	if (!session || !canPrompt()) {
+		return;
+	}
+	const auto &data = result.data();
+	const auto tmpPassword = data.vtmp_password().v;
+	if (tmpPassword.isEmpty()) {
+		fail(MTP::Error::Local(
+			u"TMP_PASSWORD_EMPTY"_q,
+			u"account.getTmpPassword returned no bytes"_q));
+		return;
+	}
+	session->setTmpPassword(tmpPassword, data.vvalid_until().v);
+	sendGift(tmpPassword, false);
+}
+
+void GiftPasswordFlow::tmpPasswordFailed(
+		const MTP::Error &error,
+		base::weak_qptr<PasscodeBox> box) {
+	_issuing = false;
+	if (!canPrompt()) {
+		return;
+	}
+	const auto &type = error.type();
+	if (showPrePasswordBox(type)) {
+		return;
+	}
+	const auto strong = box.get();
+	if (!strong || !strong->handleCustomCheckError(type)) {
+		fail(error);
+	}
+}
+
+void GiftPasswordFlow::sendGift(const QByteArray &tmpPassword, bool stored) {
+	Expects(!tmpPassword.isEmpty());
+
+	_sending = true;
+	const auto self = shared_from_this();
+	_step.send(
+		tmpPassword,
+		[=] { self->giftSent(); },
+		[=](const MTP::Error &error) {
+			self->giftFailed(error, tmpPassword, stored);
+		});
+}
+
+void GiftPasswordFlow::giftSent() {
+	_sending = false;
+	_done = true;
+	_step.succeeded();
+	if (const auto strong = _box.get()) {
+		strong->closeBox();
+	}
+}
+
+void GiftPasswordFlow::giftFailed(
+		const MTP::Error &error,
+		const QByteArray &tmpPassword,
+		bool stored) {
+	_sending = false;
+	const auto &type = error.type();
+	const auto refused = TmpPasswordRefused(type);
+	const auto session = _session.get();
+	if (refused && session) {
+		session->dropTmpPassword(tmpPassword);
+	}
+	const auto reask = refused
+		&& (stored || type.startsWith(u"TMP_PASSWORD_"_q));
+	if (_abandoned) {
+		return;
+	} else if (_step.closeOnFail && MTP::IgnoreError(error)) {
+		fail(error);
+	} else if (reask && canPrompt()) {
+		waitForState();
+	} else if (!canPrompt() || !showPrePasswordBox(type)) {
+		fail(error);
+	}
+}
+
+void GiftPasswordFlow::fail(const MTP::Error &error) {
+	if (_step.closeOnFail) {
+		_done = true;
+		if (const auto strong = _box.get()) {
+			strong->closeBox();
+		}
+	}
+	if (_show->valid()) {
+		_step.failed(error);
+	}
+}
+
 void ExportOnBlockchain(
 		not_null<Window::SessionController*> window,
-		not_null<Ui::RpWidget*> parent,
+		not_null<Ui::BoxContent*> confirmation,
 		std::shared_ptr<Data::UniqueGift> gift,
 		Data::SavedStarGiftId giftId,
 		Fn<void()> boxShown,
-		Fn<void()> wentToUrl) {
-	struct State {
-		bool loading = false;
-		rpl::lifetime lifetime;
-	};
-	const auto state = std::make_shared<State>();
+		Fn<void()> wentToUrl,
+		Fn<void()> failed) {
 	const auto session = &window->session();
 	const auto show = window->uiShow();
-	session->api().cloudPassword().reload();
-	session->api().request(
-		MTPpayments_GetStarGiftWithdrawalUrl(
-			Api::InputSavedStarGiftId(giftId),
-			MTP_inputCheckPasswordEmpty())
-	).fail([=](const MTP::Error &error) {
-		auto box = PrePasswordErrorBox(
-			error.type(),
-			session,
-			TextWithEntities{
-				tr::lng_gift_transfer_password_about(tr::now),
-			});
-		if (box) {
-			show->show(std::move(box));
-			boxShown();
+	const auto send = [=](
+			const QByteArray &tmpPassword,
+			Fn<void()> done,
+			Fn<void(const MTP::Error &)> fail) {
+		using ExportUrl = MTPpayments_StarGiftWithdrawalUrl;
+		session->api().request(
+			MTPpayments_GetStarGiftWithdrawalUrl(
+				MTP_flags(0),
+				Api::InputSavedStarGiftId(giftId),
+				MTP_bytes(tmpPassword))
+		).done([=](const ExportUrl &result) {
+			UrlClickHandler::Open(qs(result.data().vurl()));
+			done();
+		}).fail(fail).send();
+	};
+	RequestWithGiftPassword(window, confirmation, {
+		.send = send,
+		.boxShown = boxShown,
+		.succeeded = wentToUrl,
+		.failed = [=](const MTP::Error &error) {
+			failed();
+			show->showToast(error.type());
+		},
+	});
+}
+
+[[nodiscard]] bool ListedGift(
+		const Gram::NftItem &item,
+		const std::shared_ptr<Data::UniqueGift> &gift) {
+	return Wallet::UniqueGiftMatchesAddress(gift, item.address)
+		|| (item.kind == Gram::NftKind::TelegramGift
+			&& !item.key.isEmpty()
+			&& !item.key.compare(gift->slug, Qt::CaseInsensitive));
+}
+
+[[nodiscard]] rpl::producer<TextWithEntities> CollectiblesPathText() {
+	return rpl::single(
+		rpl::empty
+	) | rpl::then(
+		Lang::Updated()
+	) | rpl::map([] {
+		return WalletCollectiblesPath();
+	});
+}
+
+void MoveToWalletBox(
+		not_null<Ui::GenericBox*> box,
+		not_null<Window::SessionController*> window,
+		base::weak_qptr<PeerListBox> chooser,
+		std::shared_ptr<Data::UniqueGift> gift,
+		Data::SavedStarGiftId savedId,
+		bool shownOnProfile) {
+	struct MoveState {
+		rpl::variable<bool> busy;
+		uint64 expectId = 0;
+		bool watching = false;
+		bool withdrawn = false;
+		bool finished = false;
+	};
+	const auto state = std::make_shared<MoveState>();
+	const auto session = &window->session();
+	const auto wallet = &session->wallet();
+	const auto show = window->uiShow();
+	const auto weakSession = base::make_weak(session);
+	const auto weakBox = base::make_weak(box);
+	const auto falseError = MTP::Error::Local(
+		u"STARGIFT_WITHDRAW_FALSE"_q,
+		u"payments.withdrawStarGift returned false"_q);
+
+	wallet->startPolling();
+	box->lifetime().add([=] {
+		if (const auto strong = weakSession.get()) {
+			strong->wallet().stopPolling();
+		}
+	});
+
+	const auto &padding = st::boxPadding;
+	box->setTitle(tr::lng_gift_transfer_to_wallet());
+	box->addRow(object_ptr<Ui::FlatLabel>(
+		box,
+		tr::lng_gift_transfer_to_wallet_text(),
+		st::boxLabel));
+	const auto plate = box->addRow(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			box,
+			object_ptr<Ui::VerticalLayout>(box)),
+		style::margins());
+	auto address = rpl::merge(
+		wallet->presenceValue() | rpl::to_empty,
+		wallet->transferWalletIdentityChanges()
+	) | rpl::map([=] {
+		return wallet->addressFriendly(false);
+	}) | rpl::distinct_until_changed();
+	const auto plateShown = [=] {
+		return wallet->presenceValue(
+		) | rpl::map([](Wallet::Presence presence) {
+			return (presence == Wallet::Presence::Unknown)
+				|| (presence == Wallet::Presence::Provisioning)
+				|| (presence == Wallet::Presence::Ready);
+		});
+	};
+	Wallet::AddAddressPlate(
+		plate->entity(),
+		std::move(address),
+		QMargins(
+			padding.left(),
+			st::walletAddressPlateSkip,
+			padding.right(),
+			0),
+		kPlateGroupsPerLine,
+		show,
+		plateShown());
+	plate->toggleOn(plateShown());
+	plate->finishAnimating();
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			tr::lng_gift_transfer_to_wallet_appear(),
+			st::giftMoveToWalletAppear),
+		QMargins(
+			padding.left(),
+			st::walletAddressPlateSkip,
+			padding.right(),
+			0),
+		style::al_justify);
+	box->addRow(
+		object_ptr<Ui::FlatLabel>(
+			box,
+			CollectiblesPathText(),
+			st::giftMoveToWalletPath),
+		QMargins(padding.left(), 0, padding.right(), padding.bottom()),
+		style::al_justify);
+	const auto checkbox = shownOnProfile
+		? box->addRow(
+			object_ptr<Ui::Checkbox>(
+				box,
+				tr::lng_gift_transfer_to_wallet_keep_on_profile(),
+				session->local().readPref<bool>(kGiftMoveKeepOnProfilePref, true),
+				st::defaultBoxCheckbox),
+			st::boxRowPadding + QMargins(0, padding.top(), 0, padding.bottom()))
+		: nullptr;
+	if (checkbox) {
+		checkbox->setAllowTextLines(0);
+	}
+
+	const auto finish = [=](bool keepOnProfile) {
+		if (state->finished) {
 			return;
 		}
-		state->lifetime = session->api().cloudPassword().state(
-		) | rpl::take(
-			1
-		) | rpl::on_next([=](const Core::CloudPasswordState &pass) {
-			state->lifetime.destroy();
-
-			auto fields = PasscodeBox::CloudFields::From(pass);
-			fields.customTitle = tr::lng_gift_transfer_password_title();
-			fields.customDescription
-				= tr::lng_gift_transfer_password_description(tr::now);
-			fields.customSubmitButton = tr::lng_passcode_submit();
-			fields.customCheckCallback = crl::guard(parent, [=](
-					const Core::CloudPasswordResult &result,
-					base::weak_qptr<PasscodeBox> box) {
-				using ExportUrl = MTPpayments_StarGiftWithdrawalUrl;
-				session->api().request(
-					MTPpayments_GetStarGiftWithdrawalUrl(
-						Api::InputSavedStarGiftId(giftId),
-						result.result)
-				).done([=](const ExportUrl &result) {
-					UrlClickHandler::Open(qs(result.data().vurl()));
-					wentToUrl();
-					if (box) {
-						box->closeBox();
-					}
-				}).fail([=](const MTP::Error &error) {
-					const auto message = error.type();
-					if (box && !box->handleCustomCheckError(message)) {
-						show->showToast(message);
-					}
-				}).send();
+		state->finished = true;
+		state->busy = false;
+		if (keepOnProfile) {
+			session->data().notifyGiftUpdate({
+				.id = savedId,
+				.slug = gift->slug,
+				.action = Data::GiftUpdate::Action::HostChange,
 			});
-			show->show(Box<PasscodeBox>(session, fields));
-			boxShown();
+		}
+		if (show->valid()) {
+			ShowGiftMovedToast(
+				show,
+				gift->model.document,
+				tr::lng_gift_transfer_to_wallet_done(tr::now, tr::marked),
+				[=] {
+					if (const auto strong = weakSession.get()) {
+						strong->wallet().setCollectiblesTab(true);
+						Wallet::ShowWallet(strong);
+					}
+				});
+		}
+		if (const auto strong = weakBox.get()) {
+			strong->closeBox();
+		}
+		if (const auto strong = chooser.get()) {
+			strong->closeBox();
+		}
+	};
+	const auto disarm = [=] {
+		if (const auto id = base::take(state->expectId)) {
+			wallet->cancelIncomingCollectible(id);
+		}
+		state->watching = false;
+	};
+	const auto arm = [=](bool keepOnProfile) {
+		disarm();
+		state->expectId = wallet->expectIncomingCollectible([=](
+				const Gram::NftItem &item) {
+			return ListedGift(item, gift);
+		}, [=](bool) {
+			state->expectId = 0;
+			state->watching = false;
+			if (state->withdrawn) {
+				finish(keepOnProfile);
+			}
 		});
-	}).send();
+		state->watching = (state->expectId != 0);
+	};
+	const auto withdraw = [=](
+			bool keepOnProfile,
+			const QByteArray &tmpPassword,
+			Fn<void()> done,
+			Fn<void(const MTP::Error &)> fail) {
+		state->busy = true;
+		using Flag = MTPpayments_WithdrawStarGift::Flag;
+		arm(keepOnProfile);
+		session->api().request(MTPpayments_WithdrawStarGift(
+			MTP_flags(keepOnProfile ? Flag::f_keep_on_profile : Flag()),
+			Api::InputSavedStarGiftId(savedId, gift),
+			MTP_bytes(tmpPassword)
+		)).done([=](const MTPBool &result) {
+			if (mtpIsTrue(result)) {
+				done();
+				return;
+			}
+			disarm();
+			fail(falseError);
+		}).fail([=](const MTP::Error &error) {
+			disarm();
+			fail(error);
+		}).send();
+	};
+	const auto withdrawn = [=](bool keepOnProfile) {
+		state->withdrawn = true;
+		state->busy = true;
+		if (!keepOnProfile) {
+			session->data().notifyGiftUpdate({
+				.id = savedId,
+				.action = Data::GiftUpdate::Action::Transfer,
+			});
+		}
+		if (!state->watching) {
+			finish(keepOnProfile);
+		}
+	};
+	const auto failed = [=](const MTP::Error &error) {
+		if (!state->withdrawn) {
+			state->busy = false;
+		}
+		if (MTP::IgnoreError(error)) {
+			return;
+		}
+		if (!Ui::ShowGiftErrorToast(show, error)) {
+			show->showToast((error.type() == falseError.type())
+				? Lang::Hard::ServerError()
+				: error.type());
+		}
+	};
+	const auto press = [=] {
+		if (state->busy.current()
+			|| state->finished
+			|| state->withdrawn) {
+			return;
+		}
+		const auto keepOnProfile = checkbox && checkbox->checked();
+		if (checkbox) {
+			session->local().writePref<bool>(
+				kGiftMoveKeepOnProfilePref,
+				keepOnProfile);
+		}
+		state->busy = true;
+		RequestWithGiftPassword(window, box, {
+			.send = [=](
+					const QByteArray &tmpPassword,
+					Fn<void()> done,
+					Fn<void(const MTP::Error &)> fail) {
+				withdraw(
+					keepOnProfile,
+					tmpPassword,
+					std::move(done),
+					std::move(fail));
+			},
+			.succeeded = [=] { withdrawn(keepOnProfile); },
+			.failed = failed,
+			.dismissed = [=] {
+				if (!state->withdrawn) {
+					state->busy = false;
+				}
+			},
+		});
+	};
+
+	const auto move = box->addButton(
+		tr::lng_gift_transfer_to_wallet_button(),
+		press).data();
+	box->addButton(tr::lng_cancel(), [=] {
+		box->closeBox();
+	});
+	const auto loading = Info::Statistics::InfiniteRadialAnimationWidget(
+		move,
+		move->height() / 2,
+		&st::editStickerSetNameLoading);
+	Info::Statistics::AddChildToWidgetCenter(move, loading);
+	loading->showOn(state->busy.value());
+	state->busy.value() | rpl::on_next([=](bool busy) {
+		move->setTextFgOverride(busy
+			? std::make_optional(QColor(Qt::transparent))
+			: std::optional<QColor>());
+	}, move->lifetime());
 }
 
 [[nodiscard]] ExportOption MakeExportOption(
@@ -197,23 +781,42 @@ void ExportOnBlockchain(
 		not_null<PeerListBox*> box,
 		std::shared_ptr<Data::UniqueGift> gift,
 		Data::SavedStarGiftId giftId,
-		TimeId when) {
+		TimeId when,
+		bool toWallet,
+		bool shownOnProfile) {
 	struct State {
 		bool exporting = false;
 	};
-	const auto state = std::make_shared<State>();
 	const auto activate = [=] {
 		const auto now = base::unixtime::now();
 		const auto weak = base::make_weak(box);
 		const auto left = (when > now) ? (when - now) : 0;
 		const auto hours = left ? std::max((left + 1800) / 3600, 1) : 0;
 		if (!hours) {
-			window->show(Box(ConfirmExportBox, gift, [=](Fn<void()> close) {
+			if (toWallet) {
+				window->show(Box(
+					MoveToWalletBox,
+					window,
+					weak,
+					gift,
+					giftId,
+					shownOnProfile));
+				return;
+			}
+			const auto state = std::make_shared<State>();
+			const auto confirmed = [=](
+					not_null<Ui::GenericBox*> confirmation) {
 				if (state->exporting) {
 					return;
 				}
 				state->exporting = true;
-				ExportOnBlockchain(window, box, gift, giftId, [=] {
+				const auto weakConfirmation = base::make_weak(confirmation);
+				const auto close = [=] {
+					if (const auto strong = weakConfirmation.get()) {
+						strong->closeBox();
+					}
+				};
+				ExportOnBlockchain(window, confirmation, gift, giftId, [=] {
 					state->exporting = false;
 					close();
 				}, [=] {
@@ -221,8 +824,11 @@ void ExportOnBlockchain(
 						strong->closeBox();
 					}
 					close();
+				}, [=] {
+					state->exporting = false;
 				});
-			}));
+			};
+			window->show(Box(ConfirmExportBox, gift, confirmed));
 			return;
 		}
 		window->show(Ui::MakeInformBox({
@@ -241,8 +847,9 @@ void ExportOnBlockchain(
 
 	class ExportRow final : public PeerListRow {
 	public:
-		explicit ExportRow(TimeId when)
-		: PeerListRow(Data::FakePeerIdForJustName("ton-export").value) {
+		ExportRow(TimeId when, bool toWallet)
+		: PeerListRow(Data::FakePeerIdForJustName("ton-export").value)
+		, _toWallet(toWallet) {
 			const auto now = base::unixtime::now();
 			_available = (when <= now);
 			if (const auto left = when - now; left > 0) {
@@ -261,20 +868,33 @@ void ExportOnBlockchain(
 		}
 
 		QString generateName() override {
-			return tr::lng_gift_transfer_via_blockchain(tr::now);
+			return _toWallet
+				? tr::lng_gift_transfer_to_wallet(tr::now)
+				: tr::lng_gift_transfer_via_blockchain(tr::now);
 		}
 		QString generateShortName() override {
 			return generateName();
 		}
 		auto generatePaintUserpicCallback(bool forceRound)
 		-> PaintRoundImageCallback override {
+			const auto toWallet = _toWallet;
 			return [=](
 					Painter &p,
 					int x,
 					int y,
 					int outerWidth,
 					int size) mutable {
-				Ui::EmptyUserpic::PaintCurrency(p, x, y, outerWidth, size);
+				if (toWallet) {
+					PaintGiftMoveUserpic(
+						p,
+						x,
+						y,
+						outerWidth,
+						size,
+						st::giftMoveToWalletUserpic);
+				} else {
+					Ui::EmptyUserpic::PaintCurrency(p, x, y, outerWidth, size);
+				}
 			};
 		}
 
@@ -288,6 +908,7 @@ void ExportOnBlockchain(
 
 	private:
 		mutable style::PeerListItem _st;
+		bool _toWallet = false;
 		bool _available = false;
 
 	};
@@ -297,15 +918,17 @@ void ExportOnBlockchain(
 		ExportController(
 			not_null<Main::Session*> session,
 			TimeId when,
+			bool toWallet,
 			Fn<void()> activate)
 		: _session(session)
 		, _when(when)
+		, _toWallet(toWallet)
 		, _activate(std::move(activate)) {
 		}
 
 		void prepare() override {
 			delegate()->peerListAppendRow(
-				std::make_unique<ExportRow>(_when));
+				std::make_unique<ExportRow>(_when, _toWallet));
 			delegate()->peerListRefreshRows();
 		}
 		void loadMoreRows() override {
@@ -320,6 +943,7 @@ void ExportOnBlockchain(
 	private:
 		const not_null<Main::Session*> _session;
 		TimeId _when = 0;
+		bool _toWallet = false;
 		Fn<void()> _activate;
 
 	};
@@ -334,7 +958,7 @@ void ExportOnBlockchain(
 	>();
 	const auto controller = container->lifetime().make_state<
 		ExportController
-	>(&window->session(), when, activate);
+	>(&window->session(), when, toWallet, activate);
 	controller->setStyleOverrides(&st::peerListSingleRow);
 	const auto content = container->add(object_ptr<PeerListContent>(
 		container,
@@ -383,11 +1007,13 @@ Controller::Controller(
 	not_null<Window::SessionController*> window,
 	std::shared_ptr<Data::UniqueGift> gift,
 	Data::SavedStarGiftId giftId,
+	bool shownOnProfile,
 	Fn<void(not_null<PeerData*>, Fn<void()>)> choose)
 : ContactsBoxController(&window->session())
 , _window(window)
 , _gift(std::move(gift))
 , _giftId(giftId)
+, _shownOnProfile(shownOnProfile)
 , _choose(std::move(choose)) {
 	if (_gift->exportAt) {
 		setStyleOverrides(&st::peerListSmallSkips);
@@ -397,7 +1023,14 @@ Controller::Controller(
 void Controller::init(not_null<PeerListBox*> box) {
 	_box = box;
 	if (const auto when = _gift->exportAt) {
-		_exportOption = MakeExportOption(_window, box, _gift, _giftId, when);
+		_exportOption = MakeExportOption(
+			_window,
+			box,
+			_gift,
+			_giftId,
+			when,
+			_window->session().appConfig().walletAvailable(),
+			_shownOnProfile);
 		delegate()->peerListSetAboveWidget(std::move(_exportOption.content));
 		delegate()->peerListRefreshRows();
 	}
@@ -578,6 +1211,7 @@ void BuyResaleGift(
 		*completed = true;
 		if (result == Payments::CheckoutResult::Paid) {
 			purchase.gift->starsForResale = 0;
+			purchase.gift->nanoTonForResale = 0;
 		}
 		done(result);
 		if (result == Payments::CheckoutResult::Paid) {
@@ -619,32 +1253,10 @@ void BuyResaleGift(
 		if (failure) {
 			paymentDone(*failure, nullptr);
 		} else if (price != was) {
-			const auto cost = price.ton()
-				? Ui::Text::IconEmoji(&st::tonIconEmoji).append(
-					Lang::FormatCreditsAmountDecimal(price))
-				: Ui::Text::IconEmoji(&st::starIconEmoji).append(
-					Lang::FormatCountDecimal(price.whole()));
-			const auto cancelled = [=](Fn<void()> close) {
-				close();
+			const auto cancelled = [=] {
 				paymentDone(Payments::CheckoutResult::Cancelled, nullptr);
 			};
-			show->show(Ui::MakeConfirmBox({
-				.text = tr::lng_gift_buy_price_change_text(
-					tr::now,
-					lt_price,
-					Ui::Text::Wrapped(cost, EntityType::Bold),
-					tr::marked),
-				.confirmed = [=](Fn<void()> close) {
-					close();
-					submit();
-				},
-				.cancelled = cancelled,
-				.confirmText = tr::lng_gift_buy_resale_button(
-					lt_cost,
-					rpl::single(cost),
-					tr::marked),
-				.title = tr::lng_gift_buy_price_change_title(),
-			}));
+			show->show(MakeResaleGiftPriceChangeBox(price, submit, cancelled));
 		} else {
 			submit();
 		}
@@ -669,15 +1281,18 @@ base::weak_qptr<Ui::GenericBox> ShowBuyResaleGiftConfirm(
 		});
 		const auto gift = state->purchase.gift;
 		const auto to = state->purchase.recipient;
+		const auto choice = !gift->onlyAcceptTon
+			&& (gift->starsForResale > 0)
+			&& (gift->nanoTonForResale > 0);
 
-		if (gift->onlyAcceptTon) {
+		if (!choice && initiallyTon) {
 			box->addRow(
 				object_ptr<Ui::FlatLabel>(
 					box,
 					tr::lng_gift_buy_resale_only_ton(tr::rich),
 					st::resaleConfirmTonOnly),
 				st::boxRowPadding + st::resaleConfirmTonOnlyMargin);
-		} else {
+		} else if (choice) {
 			const auto tabs = box->addRow(
 				object_ptr<Ui::SubTabs>(
 					box,
@@ -748,18 +1363,19 @@ base::weak_qptr<Ui::GenericBox> ShowBuyResaleGiftConfirm(
 			BuyResaleGift(show, std::move(selected), done);
 		};
 
-		auto price = state->ton.value() | rpl::map([=](bool ton) {
+		auto price = rpl::combine(
+			state->ton.value(),
+			rpl::single(rpl::empty) | rpl::then(Lang::Updated())
+		) | rpl::map([=](bool ton, rpl::empty_value) {
 			return ton
-				? tr::lng_action_gift_for_ton(
-					lt_count_decimal,
-					rpl::single(gift->nanoTonForResale
-						/ float64(Ui::kNanosInOne)),
-					tr::bold)
+				? tr::bold(Data::FormatGiftGramAmountWithUnit(
+					gift->nanoTonForResale))
 				: tr::lng_action_gift_for_stars(
+					tr::now,
 					lt_count_decimal,
-					rpl::single(gift->starsForResale * 1.),
+					gift->starsForResale * 1.,
 					tr::bold);
-		}) | rpl::flatten_latest();
+		});
 		Ui::ConfirmBox(box, {
 			.text = to->isSelf()
 				? tr::lng_gift_buy_resale_confirm_self(
@@ -783,6 +1399,160 @@ base::weak_qptr<Ui::GenericBox> ShowBuyResaleGiftConfirm(
 }
 
 } // namespace
+
+object_ptr<Ui::GenericBox> MakeResaleGiftPriceChangeBox(
+		CreditsAmount price,
+		Fn<void()> confirmed,
+		Fn<void()> cancelled) {
+	const auto cost = price.ton()
+		? Data::FormatGiftResaleTon(
+			price.whole() * Ui::kNanosInOne + price.nano())
+		: Ui::Text::IconEmoji(&st::starIconEmoji).append(
+			Lang::FormatCountDecimal(price.whole()));
+	return Ui::MakeConfirmBox({
+		.text = tr::lng_gift_buy_price_change_text(
+			tr::now,
+			lt_price,
+			Ui::Text::Wrapped(cost, EntityType::Bold),
+			tr::marked),
+		.confirmed = [=](Fn<void()> close) {
+			close();
+			confirmed();
+		},
+		.cancelled = [=](Fn<void()> close) {
+			close();
+			cancelled();
+		},
+		.confirmText = tr::lng_gift_buy_resale_button(
+			lt_cost,
+			rpl::single(cost),
+			tr::marked),
+		.title = tr::lng_gift_buy_price_change_title(),
+	});
+}
+
+void PaintGiftMoveUserpic(
+		Painter &p,
+		int x,
+		int y,
+		int outerWidth,
+		int size,
+		const style::icon &icon) {
+	x = style::RightToLeft() ? (outerWidth - x - size) : x;
+
+	auto bg = QLinearGradient(x, y, x, y + size);
+	bg.setStops({
+		{ 0., st::historyPeerSavedMessagesBg->c },
+		{ 1., st::historyPeerSavedMessagesBg2->c }
+	});
+	PainterHighQualityEnabler hq(p);
+	p.setBrush(bg);
+	p.setPen(Qt::NoPen);
+	p.drawEllipse(x, y, size, size);
+
+	icon.paintInCenter(p, QRect(x, y, size, size));
+}
+
+void ShowToastWithAction(
+		std::shared_ptr<Ui::Show> show,
+		Ui::Toast::Config &&config,
+		rpl::producer<QString> action,
+		Fn<void()> callback) {
+	const auto &st = st::historyPremiumToast;
+	const auto &viewSt = st::historyPremiumViewSet;
+	const auto font = viewSt.style.font;
+	const auto skip = viewSt.width + st.padding.right();
+	config.padding = rpl::duplicate(
+		action
+	) | rpl::map([=](const QString &label) {
+		return QMargins(0, 0, font->width(label) - skip, 0);
+	});
+	config.st = &st;
+	config.acceptinput = true;
+	const auto weak = show->showToast(std::move(config));
+	const auto strong = weak.get();
+	if (!strong) {
+		return;
+	}
+	const auto widget = strong->widget();
+	const auto button = Ui::CreateChild<Ui::RoundButton>(
+		widget.get(),
+		std::move(action),
+		viewSt);
+	button->show();
+	button->setClickedCallback([=] {
+		if (const auto strong = weak.get()) {
+			strong->hideAnimated();
+		}
+		callback();
+	});
+	rpl::combine(
+		widget->sizeValue(),
+		button->sizeValue()
+	) | rpl::on_next([=](QSize outer, QSize inner) {
+		button->moveToRight(
+			0,
+			(outer.height() - inner.height()) / 2,
+			outer.width());
+	}, widget->lifetime());
+}
+
+void ShowGiftMovedToast(
+		std::shared_ptr<Ui::Show> show,
+		not_null<DocumentData*> sticker,
+		TextWithEntities text,
+		Fn<void()> view) {
+	const auto side = Ui::Emoji::GetCustomSizeLarge();
+	ShowToastWithAction(
+		std::move(show),
+		Ui::Toast::Config{
+			.text = std::move(text),
+			.iconContent = Ui::MakeCustomEmojiToastIcon(
+				&sticker->session(),
+				sticker->id,
+				QSize(side, side)),
+			.duration = kMovedToWalletToastDuration,
+		},
+		tr::lng_gift_transfer_to_wallet_view(),
+		std::move(view));
+}
+
+TextWithEntities WalletCollectiblesPath() {
+	const auto prefixed = [](
+			not_null<const style::IconEmoji*> emoji,
+			const QString &text) {
+		return Ui::Text::IconEmoji(emoji).append(' ').append(text);
+	};
+	const auto arrow = Ui::Text::IconEmoji(&st::giftMoveToWalletArrowEmoji);
+	return tr::lng_gift_transfer_to_wallet_path_icons(
+		tr::now,
+		lt_menu,
+		Ui::Text::IconEmoji(&st::giftMoveToWalletMenuEmoji),
+		lt_arrow,
+		arrow,
+		lt_money,
+		prefixed(
+			&st::giftMoveToWalletMoneyEmoji,
+			tr::lng_wallet_menu(tr::now)),
+		lt_arrow_next,
+		arrow,
+		lt_collectibles,
+		prefixed(
+			&st::giftMoveToWalletCollectiblesEmoji,
+			tr::lng_wallet_rows_collectibles(tr::now)),
+		tr::marked);
+}
+
+void RequestWithGiftPassword(
+		not_null<Window::SessionController*> window,
+		not_null<Ui::BoxContent*> confirmation,
+		GiftPasswordStep step) {
+	const auto flow = std::make_shared<GiftPasswordFlow>(
+		window,
+		confirmation,
+		std::move(step));
+	flow->start();
+}
 
 void ShowTransferToBox(
 		not_null<Window::SessionController*> controller,
@@ -869,7 +1639,8 @@ void ShowTransferToBox(
 void ShowTransferGiftBox(
 		not_null<Window::SessionController*> window,
 		std::shared_ptr<Data::UniqueGift> gift,
-		Data::SavedStarGiftId savedId) {
+		Data::SavedStarGiftId savedId,
+		bool shownOnProfile) {
 	if (ShowTransferGiftLater(window->uiShow(), gift)) {
 		return;
 	}
@@ -877,6 +1648,7 @@ void ShowTransferGiftBox(
 		window,
 		gift,
 		savedId,
+		shownOnProfile,
 		[=](not_null<PeerData*> peer, Fn<void()> done) {
 			ShowTransferToBox(window, peer, gift, savedId, done);
 		});
@@ -1154,25 +1926,29 @@ void SetPeerTheme(
 		true);
 }
 
-void ShowBuyResaleGiftBox(
+bool CanBuyResaleGiftByInvoice(const Data::UniqueGift &gift) {
+	return !Data::UniqueGiftOnchainPurchase(gift)
+		&& !(gift.fixedSale && !gift.onchainSale);
+}
+
+void ShowResaleGiftComposer(
 		std::shared_ptr<ChatHelpers::Show> show,
 		std::shared_ptr<Data::UniqueGift> gift,
-		bool forceTon,
 		not_null<PeerData*> to,
-		Fn<void(bool ok)> closeParentBox) {
-	const auto attempt = std::make_shared<ResaleGiftAttemptState>();
+		TextWithEntities cost,
+		Fn<base::weak_qptr<Ui::GenericBox>(
+			not_null<Ui::GenericBox*> composer,
+			ResaleGiftMessage message)> confirm) {
 	show->show(Box([=](not_null<Ui::GenericBox*> box) {
 		struct State {
 			rpl::variable<TextWithEntities> message;
 			rpl::variable<bool> hideName;
 			rpl::variable<bool> messageAllowed;
-			std::shared_ptr<ResaleGiftAttemptState> attempt;
 			bool confirmationOpen = false;
 		};
 		const auto state = box->lifetime().make_state<State>();
 		state->hideName = to->isSelf();
 		state->messageAllowed = Ui::StarGiftMessageAllowedValue(to);
-		state->attempt = attempt;
 
 		box->setStyle(st::giftBox);
 		box->setWidth(st::boxWideWidth);
@@ -1183,10 +1959,6 @@ void ShowBuyResaleGiftBox(
 		});
 
 		const auto container = box->verticalLayout();
-		const auto initiallyTon = gift->onlyAcceptTon || forceTon;
-		const auto initialCost = initiallyTon
-			? Data::FormatGiftResaleTon(*gift)
-			: Data::FormatGiftResaleStars(*gift);
 		auto message = rpl::combine(
 			state->message.value(),
 			tr::lng_gift_send_message_preview(),
@@ -1208,7 +1980,7 @@ void ShowBuyResaleGiftBox(
 			container,
 			to,
 			gift,
-			initialCost,
+			cost,
 			std::move(message)));
 
 		const auto messageWrap = container->add(
@@ -1266,30 +2038,18 @@ void ShowBuyResaleGiftBox(
 					rpl::single(to->shortName()))));
 
 		const auto button = box->addButton(rpl::single(QString()), [=] {
-			if (state->confirmationOpen || state->attempt->inFlight) {
+			if (state->confirmationOpen) {
 				return;
 			}
 			state->confirmationOpen = true;
-			const auto finish = crl::guard(box, [=](bool ok) {
-				closeParentBox(ok);
-				box->closeBox();
-			});
-			const auto confirmation = ShowBuyResaleGiftConfirm(
-				show,
-				ResaleGiftPurchase{
-					.slug = gift->slug,
-					.recipient = to,
-					.gift = gift,
-					.message = state->messageAllowed.current()
+			const auto confirmation = confirm(
+				box,
+				ResaleGiftMessage{
+					.text = (state->messageAllowed.current()
 						? state->message.current()
-						: tr::marked(),
+						: tr::marked()),
 					.hideName = state->hideName.current(),
-					.currency = initiallyTon
-						? CreditsType::Ton
-						: CreditsType::Stars,
-				},
-				state->attempt,
-				finish);
+				});
 			if (const auto strong = confirmation.get()) {
 				strong->boxClosing() | rpl::on_next(crl::guard(box, [=] {
 					state->confirmationOpen = false;
@@ -1300,9 +2060,51 @@ void ShowBuyResaleGiftBox(
 		});
 		button->setText(tr::lng_gift_buy_resale_button(
 			lt_cost,
-			rpl::single(initialCost),
+			rpl::single(cost),
 			tr::marked));
 	}));
+}
+
+void ShowBuyResaleGiftBox(
+		std::shared_ptr<ChatHelpers::Show> show,
+		std::shared_ptr<Data::UniqueGift> gift,
+		bool forceTon,
+		not_null<PeerData*> to,
+		Fn<void(bool ok)> closeParentBox) {
+	if (!CanBuyResaleGiftByInvoice(*gift)) {
+		return;
+	}
+	const auto attempt = std::make_shared<ResaleGiftAttemptState>();
+	const auto ton = Data::UniqueGiftResaleBuyTon(*gift, forceTon);
+	ShowResaleGiftComposer(
+		show,
+		gift,
+		to,
+		(ton
+			? Data::FormatGiftResaleTon(*gift)
+			: Data::FormatGiftResaleStars(*gift)),
+		[=](not_null<Ui::GenericBox*> box, ResaleGiftMessage message)
+		-> base::weak_qptr<Ui::GenericBox> {
+			if (attempt->inFlight) {
+				return nullptr;
+			}
+			const auto finish = crl::guard(box, [=](bool ok) {
+				closeParentBox(ok);
+				box->closeBox();
+			});
+			return ShowBuyResaleGiftConfirm(
+				show,
+				ResaleGiftPurchase{
+					.slug = gift->slug,
+					.recipient = to,
+					.gift = gift,
+					.message = std::move(message.text),
+					.hideName = message.hideName,
+					.currency = ton ? CreditsType::Ton : CreditsType::Stars,
+				},
+				attempt,
+				finish);
+		});
 }
 
 bool ShowResaleGiftLater(

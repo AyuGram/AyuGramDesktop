@@ -7,23 +7,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_story_mention.h"
 
+#include "api/api_peer_photo.h"
+#include "apiwrap.h"
 #include "core/click_handler_types.h" // ClickHandlerContext
 #include "data/data_document.h"
-#include "data/data_photo.h"
-#include "data/data_user.h"
-#include "data/data_photo_media.h"
 #include "data/data_file_click_handler.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "data/data_stories.h"
+#include "data/data_user.h"
 #include "editor/photo_editor_common.h"
 #include "editor/photo_editor_layer_widget.h"
-#include "history/history.h"
-#include "history/history_item.h"
 #include "history/view/media/history_view_sticker_player_abstract.h"
 #include "history/view/history_view_element.h"
+#include "history/history.h"
+#include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "window/window_session_controller.h"
+#include "mainwidget.h"
+#include "settings/sections/settings_information.h" // UpdatePhotoLocally
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/effects/outline_segments.h"
@@ -32,10 +35,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_image.h"
 #include "ui/dynamic_thumbnails.h"
 #include "ui/painter.h"
-#include "mainwidget.h"
-#include "apiwrap.h"
-#include "api/api_peer_photo.h"
-#include "settings/sections/settings_information.h" // UpdatePhotoLocally
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 
 namespace HistoryView {
@@ -126,20 +127,22 @@ void StoryMention::draw(
 
 	const auto thumbnail = QRectF(geometry.marginsRemoved(
 		QMargins(padding, padding, padding, padding)));
-	const auto added = 0.5 * (_unread
+	const auto unread = _unread
+		&& (_parent->context() != Context::MediaEditor);
+	const auto added = 0.5 * (unread
 		? st::storyMentionUnreadSkipTwice
 		: st::storyMentionReadSkipTwice);
 	const auto outline = thumbnail.marginsAdded(
 		QMarginsF(added, added, added, added));
-	if (_unread && _paletteVersion != style::PaletteVersion()) {
+	if (unread && _paletteVersion != style::PaletteVersion()) {
 		_paletteVersion = style::PaletteVersion();
 		_unreadBrush = QBrush(Ui::UnreadStoryOutlineGradient(outline));
 	}
 	auto readColor = context.st->msgServiceFg()->c;
 	readColor.setAlphaF(std::min(1. * readColor.alphaF(), kReadOutlineAlpha));
 	p.setPen(QPen(
-		_unread ? _unreadBrush : QBrush(readColor),
-		0.5 * (_unread
+		unread ? _unreadBrush : QBrush(readColor),
+		0.5 * (unread
 			? st::storyMentionUnreadStrokeTwice
 			: st::storyMentionReadStrokeTwice)));
 	p.setBrush(Qt::NoBrush);

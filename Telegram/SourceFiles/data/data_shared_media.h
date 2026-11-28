@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "storage/storage_shared_media.h"
-#include "base/weak_ptr.h"
 #include "base/qt/qt_compare.h"
+#include "base/weak_ptr.h"
 #include "data/data_sparse_ids.h"
+#include "storage/storage_shared_media.h"
 
 namespace Main {
 class Session;
@@ -19,6 +19,9 @@ class Session;
 [[nodiscard]] std::optional<Storage::SharedMediaType> SharedMediaOverviewType(
 	Storage::SharedMediaType type);
 bool SharedMediaAllowSearch(Storage::SharedMediaType type);
+
+[[nodiscard]] Storage::SharedMediaKey SharedMediaLoadableKey(
+	Storage::SharedMediaKey key);
 
 rpl::producer<SparseIdsSlice> SharedMediaViewer(
 	not_null<Main::Session*> session,

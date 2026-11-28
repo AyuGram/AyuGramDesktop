@@ -7,36 +7,37 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_download_manager.h"
 
-#include "data/data_session.h"
-#include "data/data_photo.h"
+#include "apiwrap.h"
+#include "base/random.h"
+#include "base/unixtime.h"
+#include "core/application.h"
+#include "core/mime_type.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
-#include "data/data_web_page.h"
-#include "data/data_changes.h"
-#include "data/data_user.h"
-#include "data/data_channel.h"
 #include "data/data_file_origin.h"
-#include "base/unixtime.h"
-#include "base/random.h"
-#include "main/main_session.h"
-#include "main/main_account.h"
-#include "lang/lang_keys.h"
-#include "storage/storage_account.h"
-#include "iv/iv_rich_page.h"
+#include "data/data_photo.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "data/data_web_page.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
-#include "core/application.h"
-#include "core/mime_type.h"
-#include "ui/controls/download_bar.h"
-#include "ui/text/format_song_document_name.h"
-#include "ui/layers/generic_box.h"
-#include "ui/ui_utility.h"
+#include "iv/iv_rich_page.h"
+#include "lang/lang_keys.h"
+#include "main/main_account.h"
+#include "main/main_session.h"
 #include "storage/serialize_common.h"
+#include "storage/storage_account.h"
+#include "ui/controls/download_bar.h"
+#include "ui/layers/generic_box.h"
+#include "ui/text/format_song_document_name.h"
+#include "ui/ui_utility.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
-#include "apiwrap.h"
+
 #include "styles/style_layers.h"
 
 namespace Data {
@@ -601,6 +602,10 @@ void DownloadManager::deleteAll() {
 		while (!data.downloading.empty()) {
 			cancel(data, data.downloading.end() - 1);
 		}
+		// resolveNeeded / resolveSentTotal index into downloaded, and
+		// resolve requests may still be in flight, so drop them together.
+		data.resolveNeeded = 0;
+		data.resolveSentTotal = 0;
 		for (auto &id : base::take(data.downloaded)) {
 			const auto object = id.object.get();
 			const auto document = object ? object->document : nullptr;
@@ -678,10 +683,6 @@ auto DownloadManager::loadingList() const
 			return &id;
 		});
 	}) | ranges::views::join;
-}
-
-DownloadProgress DownloadManager::loadingProgress() const {
-	return _loadingProgress.current();
 }
 
 rpl::producer<> DownloadManager::loadingListChanges() const {

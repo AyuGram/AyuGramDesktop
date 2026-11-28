@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_history_view_media.h"
 
-#include "iv/markdown/iv_markdown_article.h"
-#include "base/unixtime.h"
 #include "base/flat_set.h"
+#include "base/unixtime.h"
+#include "iv/markdown/iv_markdown_article.h"
 #include "iv/markdown/iv_markdown_media_block.h"
 #include "iv/markdown/iv_markdown_slideshow_chrome.h"
 
@@ -23,9 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <unordered_set>
 
 #include "settings.h"
-#include "ui/effects/animations.h"
-#include "ui/image/image_location.h"
-#include "data/data_types.h"
+
+// History headers use rtl() from settings.h.
 #include "data/data_auto_download.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
@@ -34,24 +33,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_session.h"
-#include "history/history.h"
-#include "history/history_item.h"
+#include "data/data_types.h"
 #include "history/admin_log/history_admin_log_item.h"
-#include "history/history_location_manager.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/history_view_top_toast.h"
-#include "history/view/history_view_element.h"
-#include "history/view/history_view_message.h"
 #include "history/view/media/history_view_media.h"
 #include "history/view/media/history_view_media_grouped.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_element.h"
+#include "history/view/history_view_message.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_location_manager.h"
+#include "history/history_view_top_toast.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "ui/basic_click_handlers.h"
-#include "window/window_session_controller.h"
-
 #include "rpl/event_stream.h"
 #include "rpl/filter.h"
 #include "rpl/lifetime.h"
+#include "ui/effects/animations.h"
+#include "ui/image/image_location.h"
+#include "ui/basic_click_handlers.h"
+#include "window/window_session_controller.h"
 
 #include <utility>
 
@@ -365,7 +366,7 @@ private:
 	const bool _spoiler = false;
 	const bool _editMode = false;
 	const std::shared_ptr<IvHistoryViewMediaHost> _host;
-	const std::vector<std::shared_ptr<void>> _keepAlive;
+	std::vector<std::shared_ptr<void>> _keepAlive;
 	std::unique_ptr<HistoryView::Media> _media;
 	rpl::lifetime _itemDeathLifetime;
 	QRect _geometry;
@@ -399,9 +400,11 @@ IvHistoryViewBlock::IvHistoryViewBlock(
 	_supported = _media && probeSupport();
 
 	// We outlive the view our media is parented to, so drop the media while
-	// that view is still alive.
+	// that view is still alive. The kept alive Data::Media objects are
+	// parented to the dying item as well, their destructors use it.
 	_host->itemDeath() | rpl::on_next([this] {
 		_media = nullptr;
+		_keepAlive.clear();
 	}, _itemDeathLifetime);
 }
 
@@ -467,6 +470,7 @@ void IvHistoryViewBlock::paint(
 	p.translate(_geometry.topLeft());
 	auto local = context.translated(-_geometry.topLeft());
 	local.clip = visible.translated(-_geometry.topLeft());
+	_media->setBubbleRounding(bubbleRounding());
 	_media->draw(p, local);
 	p.restore();
 }
@@ -882,6 +886,19 @@ private:
 		not_null<HistoryView::Media*> media,
 		int shift) const;
 
+	void paintFrame(
+		Painter &p,
+		const MarkdownArticlePaintContext &context,
+		QRect visible,
+		const style::MarkdownGroupedMedia &st) const;
+
+	void paintRoundedFrame(
+		Painter &p,
+		const MarkdownArticlePaintContext &context,
+		QRect visible,
+		const style::MarkdownGroupedMedia &st,
+		Images::CornersMaskRef mask) const;
+
 	[[nodiscard]] bool probeSupport();
 
 	void mediaPixelScaleUpdated() override;
@@ -891,7 +908,7 @@ private:
 	const uint64 _stableId = 0;
 	const QString _copyText;
 	const std::shared_ptr<IvHistoryViewMediaHost> _host;
-	const std::vector<std::shared_ptr<void>> _keepAlive;
+	std::vector<std::shared_ptr<void>> _keepAlive;
 	const base::flat_map<
 		uint64,
 		std::shared_ptr<PhotoRuntime>> _groupedPhotoRuntimes;
@@ -925,6 +942,7 @@ private:
 	bool _supported = false;
 	MediaBlockHost *_registeredBridgeHost = nullptr;
 	mutable SlideshowDotsBackdrop _dotsBackdrop;
+	mutable QImage _frameCache;
 	base::flat_map<int, SlidePreload> _preloads;
 	rpl::lifetime _downloadLifetime;
 	int _residencyIndex = -1;
@@ -953,6 +971,7 @@ IvHistoryViewSlideshowBlock::IvHistoryViewSlideshowBlock(
 		for (auto &media : _slides) {
 			media = nullptr;
 		}
+		_keepAlive.clear();
 	}, _itemDeathLifetime);
 
 	_slides.reserve(descriptor.slideMediaFactories.size());
@@ -1113,6 +1132,7 @@ bool IvHistoryViewSlideshowBlock::hasHeavyPart() const {
 }
 
 void IvHistoryViewSlideshowBlock::unloadHeavyPart() {
+	_frameCache = QImage();
 	if (!alive()) {
 		return;
 	}
@@ -1713,24 +1733,12 @@ void IvHistoryViewSlideshowBlock::paintSlide(
 	p.restore();
 }
 
-void IvHistoryViewSlideshowBlock::paint(
+void IvHistoryViewSlideshowBlock::paintFrame(
 		Painter &p,
-		const MarkdownArticlePaintContext &context) const {
+		const MarkdownArticlePaintContext &context,
+		QRect visible,
+		const style::MarkdownGroupedMedia &st) const {
 	const auto media = activeMedia();
-	if (!media || _geometry.isEmpty()) {
-		return;
-	}
-	const auto visible = context.clip.intersected(_geometry);
-	if (visible.isEmpty()) {
-		return;
-	}
-	const auto &st = context.paintMarkdownStyle(layoutStyle()).groupedMedia;
-	p.save();
-	p.setClipRect(visible);
-	p.setClipPath(
-		RoundedRectPath(_geometry, st.radius),
-		Qt::IntersectClip);
-
 	const auto count = int(_slides.size());
 	const auto transition = _slideAnimation.animating()
 		&& (_transitionFrom >= 0)
@@ -1784,7 +1792,8 @@ void IvHistoryViewSlideshowBlock::paint(
 	}
 
 	if (_slides.size() >= 2) {
-		if (!_previousRect.isEmpty()) {
+		if (!_previousRect.isEmpty()
+			&& !context.suppressInteractiveControls) {
 			const auto active = ClickHandler::showAsActive(_previousLink)
 				|| ClickHandler::showAsPressed(_previousLink);
 			PaintRoundButton(
@@ -1793,7 +1802,7 @@ void IvHistoryViewSlideshowBlock::paint(
 				active ? st.navButtonBgOver : st.navButtonBg,
 				active ? st.navPreviousIconOver : st.navPreviousIcon);
 		}
-		if (!_nextRect.isEmpty()) {
+		if (!_nextRect.isEmpty() && !context.suppressInteractiveControls) {
 			const auto active = ClickHandler::showAsActive(_nextLink)
 				|| ClickHandler::showAsPressed(_nextLink);
 			PaintRoundButton(
@@ -1816,7 +1825,60 @@ void IvHistoryViewSlideshowBlock::paint(
 			st,
 			_dotsBackdrop);
 	}
-	p.restore();
+}
+
+void IvHistoryViewSlideshowBlock::paintRoundedFrame(
+		Painter &p,
+		const MarkdownArticlePaintContext &context,
+		QRect visible,
+		const style::MarkdownGroupedMedia &st,
+		Images::CornersMaskRef mask) const {
+	const auto ratio = style::DevicePixelRatio();
+	const auto size = _geometry.size() * ratio;
+	if (_frameCache.size() != size) {
+		_frameCache = QImage(size, QImage::Format_ARGB32_Premultiplied);
+	}
+	_frameCache.setDevicePixelRatio(ratio);
+	_frameCache.fill(Qt::transparent);
+	auto q = Painter(&_frameCache);
+	q.setFont(p.font());
+	q.setPen(p.pen());
+	q.setBrush(p.brush());
+	q.setRenderHints(p.renderHints());
+	q.setInactive(p.inactive());
+	q.setTextPalette(p.textPalette());
+	q.translate(-_geometry.topLeft());
+	q.setClipRect(visible);
+	paintFrame(q, context, visible, st);
+	q.end();
+	_frameCache = Images::Round(std::move(_frameCache), mask);
+	p.drawImage(_geometry, _frameCache);
+}
+
+void IvHistoryViewSlideshowBlock::paint(
+		Painter &p,
+		const MarkdownArticlePaintContext &context) const {
+	const auto media = activeMedia();
+	if (!media || _geometry.isEmpty()) {
+		return;
+	}
+	const auto visible = context.clip.intersected(_geometry);
+	if (visible.isEmpty()) {
+		return;
+	}
+	const auto &st = context.paintMarkdownStyle(layoutStyle()).groupedMedia;
+	const auto mask = HistoryView::MediaRoundingMask(bubbleRounding());
+	if (mask.empty()) {
+		p.save();
+		p.setClipRect(visible);
+		p.setClipPath(
+			RoundedRectPath(_geometry, st.radius),
+			Qt::IntersectClip);
+		paintFrame(p, context, visible, st);
+		p.restore();
+	} else {
+		paintRoundedFrame(p, context, visible, st, mask);
+	}
 	const auto that = const_cast<IvHistoryViewSlideshowBlock*>(this);
 	that->_painted = true;
 	that->updatePreloads();

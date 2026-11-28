@@ -6,9 +6,10 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_microtex.h"
+
 #include "base/base_file_utilities.h"
-#include "platform/qt/graphic_qt.h"
 #include "latex.h"
+#include "platform/qt/graphic_qt.h"
 
 #include <QtCore/QSize>
 #include <QtCore/QString>
@@ -23,11 +24,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <mutex>
 #include <utility>
 
-#ifndef Q_OS_MAC
+#ifndef Q_OS_MACOS
 void InitIvMarkdownMicrotexBundledResource() {
 	Q_INIT_RESOURCE(bundled);
 }
-#endif // !Q_OS_MAC
+#endif // !Q_OS_MACOS
 
 namespace Iv::Markdown {
 namespace {
@@ -346,15 +347,15 @@ void FinalizeFailure(MeasuredFormula *result) {
 bool EnsureMicrotexInitialized(QString *error) {
 	std::call_once(MicrotexInitOnce, [] {
 		try {
-#ifdef Q_OS_MAC // Use resources from the .app bundle on macOS.
+#ifdef Q_OS_MACOS // Use resources from the .app bundle on macOS.
 
 			base::RegisterBundledResources(u"external_microtex_bundled.rcc"_q);
 
-#else // Q_OS_MAC
+#else // Q_OS_MACOS
 
 			InitIvMarkdownMicrotexBundledResource();
 
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 
 			tex::LaTeX::initBundled();
 			MicrotexInitialized = true;
@@ -451,10 +452,6 @@ MicrotexRenderResult RenderWithMicrotex(const MicrotexRenderRequest &request) {
 	}
 	result.image = std::move(image);
 	return result;
-}
-
-bool MicrotexBackendLinked() {
-	return true;
 }
 
 } // namespace Iv::Markdown

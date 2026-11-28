@@ -7,20 +7,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/audio/media_audio.h"
 
-#include "media/audio/media_audio_ffmpeg_loader.h"
-#include "media/audio/media_child_ffmpeg_loader.h"
-#include "media/audio/media_audio_loaders.h"
-#include "media/audio/media_audio_track.h"
-#include "media/media_common.h"
-#include "media/streaming/media_streaming_utility.h"
-#include "webrtc/webrtc_environment.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
-#include "core/application.h"
-#include "core/core_settings.h"
 #include "main/main_session.h"
+#include "media/audio/media_audio_ffmpeg_loader.h"
+#include "media/audio/media_audio_loaders.h"
+#include "media/audio/media_audio_track.h"
+#include "media/audio/media_child_ffmpeg_loader.h"
+#include "media/streaming/media_streaming_utility.h"
+#include "media/media_common.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "webrtc/webrtc_environment.h"
 
 #include <al.h>
 #include <alc.h>
@@ -37,8 +37,8 @@ constexpr auto kSuppressRatioSong = 0.05;
 constexpr auto kWaveformCounterBufferSize = 256 * 1024;
 
 QMutex AudioMutex;
-ALCdevice *AudioDevice = nullptr;
-ALCcontext *AudioContext = nullptr;
+auto AudioDevice = (ALCdevice*)nullptr;
+auto AudioContext = (ALCcontext*)nullptr;
 Webrtc::DeviceResolvedId AudioDeviceLastUsedId{
 	.type = Webrtc::DeviceType::Playback
 };
@@ -52,7 +52,7 @@ namespace Media {
 namespace Audio {
 namespace {
 
-Player::Mixer *MixerInstance = nullptr;
+auto MixerInstance = (Player::Mixer*)nullptr;
 
 // Thread: Any.
 bool ContextErrorHappened() {
@@ -147,8 +147,8 @@ void Start(not_null<Instance*> instance) {
 	qRegisterMetaType<AudioMsgId>();
 	qRegisterMetaType<VoiceWaveform>();
 
-	const auto loglevel = getenv("ALSOFT_LOGLEVEL");
-	LOG(("OpenAL Logging Level: %1").arg(loglevel ? loglevel : "(not set)"));
+	LOG(("OpenAL Logging Level: %1").arg(
+		qEnvironmentVariable("ALSOFT_LOGLEVEL", u"(not set)"_q)));
 
 	MixerInstance = new Player::Mixer(instance);
 }
@@ -321,7 +321,7 @@ void Mixer::Track::reattach(AudioMsgId::Type type) {
 	if (!IsStopped(state.state)
 		&& (state.state != State::PausedAtEnd)
 		&& !state.waitingForData) {
-		alSourcef(stream.source, AL_GAIN, ComputeVolume(type));
+		alSourcef(stream.source, AL_GAIN, ComputeVolume(type) * volume);
 		alSourcePlay(stream.source);
 		if (IsPaused(state.state)) {
 			// We must always start the source if we want the AL_SAMPLE_OFFSET to be applied.
@@ -424,6 +424,7 @@ int Mixer::Track::getNotQueuedBufferIndex() {
 void Mixer::Track::setExternalData(
 		std::unique_ptr<ExternalSoundData> data) {
 	nextSpeed = speed = data ? data->speed : 1.;
+	volume = data ? data->volume : 1.;
 	externalData = std::move(data);
 }
 
@@ -759,6 +760,26 @@ void Mixer::setSpeedFromExternal(const AudioMsgId &audioId, float64 speed) {
 	}
 }
 
+// Thread: Main. Locks: AudioMutex.
+void Mixer::setVolumeFromExternal(
+		const AudioMsgId &audioId,
+		float64 volume) {
+	QMutexLocker lock(&AudioMutex);
+	const auto type = audioId.type();
+	const auto track = trackForType(type);
+	if (!track || track->state.id != audioId || track->volume == volume) {
+		return;
+	}
+	track->volume = volume;
+	if (track->isStreamCreated() && track->state.state == State::Playing) {
+		alSourcef(
+			track->stream.source,
+			AL_GAIN,
+			ComputeVolume(type) * volume);
+		checkCurrentALError(type);
+	}
+}
+
 Streaming::TimePoint Mixer::getExternalSyncTimePoint(
 		const AudioMsgId &audio) const {
 	Expects(audio.externalPlayId() != 0);
@@ -771,21 +792,6 @@ Streaming::TimePoint Mixer::getExternalSyncTimePoint(
 	if (track && track->state.id == audio && track->lastUpdateWhen > 0) {
 		result.trackTime = track->lastUpdatePosition;
 		result.worldTime = track->lastUpdateWhen;
-	}
-	return result;
-}
-
-crl::time Mixer::getExternalCorrectedTime(const AudioMsgId &audio, crl::time frameMs, crl::time systemMs) {
-	auto result = frameMs;
-	const auto type = audio.type();
-
-	QMutexLocker lock(&AudioMutex);
-	const auto track = trackForType(type);
-	if (track && track->state.id == audio && track->lastUpdateWhen > 0) {
-		result = static_cast<crl::time>(track->lastUpdatePosition);
-		if (systemMs > track->lastUpdateWhen) {
-			result += (systemMs - track->lastUpdateWhen);
-		}
 	}
 	return result;
 }
@@ -897,7 +903,10 @@ void Mixer::resume(const AudioMsgId &audio, bool fast) {
 						return;
 					}
 
-					alSourcef(track->stream.source, AL_GAIN, ComputeVolume(type));
+					alSourcef(
+						track->stream.source,
+						AL_GAIN,
+						ComputeVolume(type) * track->volume);
 					if (!checkCurrentALError(type)) return;
 
 					if (state == AL_STOPPED) {
@@ -972,7 +981,8 @@ void Mixer::stop(const AudioMsgId &audio, State state) {
 }
 
 void Mixer::stopAndClear() {
-	Track *current_audio = nullptr, *current_song = nullptr;
+	auto current_audio = (Track*)nullptr;
+	auto current_song = (Track*)nullptr;
 	{
 		QMutexLocker lock(&AudioMutex);
 		if ((current_audio = trackForType(AudioMsgId::Type::Voice))) {
@@ -1150,7 +1160,12 @@ void Fader::onTimer() {
 		auto track = mixer()->trackForType(type, index);
 		if (IsStopped(track->state.state) || track->state.state == State::Paused || !track->isStreamCreated()) return;
 
-		auto emitSignals = updateOnePlayback(track, hasPlaying, hasFading, volumeMultiplier, suppressGainChanged);
+		auto emitSignals = updateOnePlayback(
+			track,
+			hasPlaying,
+			hasFading,
+			volumeMultiplier * track->volume,
+			suppressGainChanged);
 		if (emitSignals & EmitError) error(track->state.id);
 		if (emitSignals & EmitStopped) audioStopped(track->state.id);
 		if (emitSignals & EmitPositionUpdated) playPositionUpdated(track->state.id);

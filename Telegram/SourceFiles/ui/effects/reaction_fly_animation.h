@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/effects/animations.h"
 #include "data/data_message_reaction_id.h"
+#include "ui/effects/animations.h"
 
 namespace Ui::Text {
 class CustomEmoji;
@@ -49,6 +49,13 @@ struct ReactionFlyCenter {
 	int size = 0;
 	bool forceFirstFrame = false;
 };
+
+// The arc every fly takes, its apex `top` above the higher end.
+struct FlyParabola {
+	float64 a = 0.;
+	float64 b = 0.;
+};
+[[nodiscard]] FlyParabola ComputeFlyParabola(int from, int to, int top);
 
 class ReactionFlyAnimation final {
 public:

@@ -7,79 +7,81 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/send_files_box.h"
 
+#include "base/call_delayed.h"
+#include "base/event_filter.h"
+#include "boxes/premium_limits_box.h"
+#include "boxes/premium_preview_box.h"
+#include "boxes/send_credits_box.h"
+#include "boxes/send_files_box_reply_header.h"
+#include "boxes/send_gif_with_caption_box.h"
+#include "chat_helpers/emoji_suggestions_widget.h"
+#include "chat_helpers/field_autocomplete.h"
+#include "chat_helpers/message_field.h"
+#include "chat_helpers/tabbed_panel.h"
+#include "chat_helpers/tabbed_selector.h"
+#include "core/application.h"
+#include "core/click_handler_types.h"
+#include "core/core_settings.h"
+#include "core/mime_type.h"
+#include "core/shortcuts.h"
+#include "core/ui_integration.h"
+#include "data/components/ephemeral_messages.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_channel.h"
+#include "data/data_document.h"
+#include "data/data_media_types.h"
+#include "data/data_peer_values.h" // Data::AmPremiumValue.
+#include "data/data_premium_limits.h"
+#include "data/data_user.h"
+#include "editor/video/video_editor_layer.h"
+#include "editor/photo_editor_layer_widget.h"
+#include "history/view/controls/history_view_characters_limit.h"
+#include "history/view/controls/history_view_compose_ai_button.h"
+#include "history/view/history_view_schedule_box.h"
+#include "history/history_drag_area.h"
 #include "lang/lang_keys.h"
+#include "lottie/lottie_single_player.h"
+#include "main/main_app_config.h"
+#include "main/main_session.h"
+#include "main/main_session_settings.h"
+#include "mainwidget.h"
+#include "menu/menu_checked_action.h"
+#include "menu/menu_send.h"
+#include "mtproto/mtproto_config.h"
 #include "storage/localimageloader.h"
 #include "storage/localstorage.h"
 #include "storage/storage_folder_archive.h"
 #include "storage/storage_media_prepare.h"
-#include "iv/iv_instance.h"
-#include "mainwidget.h"
-#include "main/main_app_config.h"
-#include "main/main_session.h"
-#include "main/main_session_settings.h"
-#include "mtproto/mtproto_config.h"
-#include "chat_helpers/message_field.h"
-#include "menu/menu_checked_action.h"
-#include "menu/menu_send.h"
-#include "chat_helpers/emoji_suggestions_widget.h"
-#include "chat_helpers/field_autocomplete.h"
-#include "chat_helpers/tabbed_panel.h"
-#include "chat_helpers/tabbed_selector.h"
-#include "editor/photo_editor_layer_widget.h"
-#include "editor/video/video_editor_layer.h"
-#include "history/history_drag_area.h"
-#include "history/view/controls/history_view_characters_limit.h"
-#include "history/view/controls/history_view_compose_ai_button.h"
-#include "history/view/history_view_schedule_box.h"
-#include "core/mime_type.h"
-#include "core/ui_integration.h"
-#include "base/event_filter.h"
-#include "base/call_delayed.h"
-#include "boxes/premium_limits_box.h"
-#include "boxes/premium_preview_box.h"
-#include "boxes/send_gif_with_caption_box.h"
-#include "boxes/send_credits_box.h"
-#include "boxes/send_files_box_reply_header.h"
 #include "ui/boxes/time_picker_box.h"
-#include "ui/effects/scroll_content_shadow.h"
-#include "ui/text/format_values.h"
-#include "ui/widgets/fields/number_input.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/widgets/scroll_area.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/menu/menu_multiline_action.h"
 #include "ui/chat/attach/attach_album_preview.h"
 #include "ui/chat/attach/attach_single_file_preview.h"
 #include "ui/chat/attach/attach_single_media_preview.h"
-#include "ui/grouped_layout.h"
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
 #include "ui/controls/compose_ai_button_factory.h"
 #include "ui/controls/emoji_button.h"
+#include "ui/effects/scroll_content_shadow.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/fields/number_input.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/scroll_area.h"
+#include "ui/grouped_layout.h"
 #include "ui/painter.h"
-#include "ui/vertical_list.h"
 #include "ui/ui_utility.h"
-#include "lottie/lottie_single_player.h"
-#include "data/components/ephemeral_messages.h"
-#include "data/data_channel.h"
-#include "data/data_document.h"
-#include "data/data_media_types.h"
-#include "data/data_user.h"
-#include "data/data_peer_values.h" // Data::AmPremiumValue.
-#include "data/data_premium_limits.h"
-#include "data/stickers/data_stickers.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "window/window_session_controller.h"
+#include "ui/vertical_list.h"
 #include "window/window_controller.h"
-#include "core/application.h"
-#include "core/core_settings.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
-#include "styles/style_settings.h"
 #include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_settings.h"
 
 #include <QtCore/QMimeData>
 
@@ -96,6 +98,8 @@ namespace {
 
 constexpr auto kMaxMessageLength = 4096;
 constexpr auto kMaxDisplayNameLength = 64;
+constexpr auto kStashFilesLimit = 100;
+constexpr auto kStashFilesMemoryLimit = int64(256) * 1024 * 1024;
 
 constexpr auto kDragMime = "application/x-tg-sendfile-index";
 
@@ -170,7 +174,11 @@ void RenameFileBox(
 		field->setFocusFast();
 	});
 	const auto save = [=] {
-		const auto newName = field->getLastText().trimmed();
+		auto newName = field->getLastText().trimmed();
+		if (!extension.isEmpty()
+			&& newName.endsWith(extension, Qt::CaseInsensitive)) {
+			newName.chop(extension.size());
+		}
 		if (newName.isEmpty()) {
 			field->showError();
 			return;
@@ -343,9 +351,12 @@ void EditPriceBox(
 			st::paidAmountAbout),
 		st::boxRowPadding + QMargins(0, st::sendMediaRowSkip, 0, 0));
 	about->setClickHandlerFilter([=](const auto &...) {
-		Core::App().iv().openWithIvPreferred(
+		HiddenUrlClickHandler::OpenTranslatedWithIv(
 			session,
-			tr::lng_paid_about_link_url(tr::now));
+			tr::lng_paid_about_link_url,
+			QVariant::fromValue(ClickHandlerContext{
+				.show = box->uiShow(),
+			}));
 		return false;
 	});
 
@@ -556,6 +567,21 @@ rpl::producer<int> SendFilesBox::Block::itemRenameRequest() const {
 	}
 }
 
+rpl::producer<int> SendFilesBox::Block::itemSelectRequest() const {
+	using namespace rpl::mappers;
+
+	const auto preview = _preview.get();
+	const auto from = _from;
+	if (_isAlbum) {
+		const auto album = static_cast<Ui::AlbumPreview*>(preview);
+		return album->thumbSelected() | rpl::map(_1 + from);
+	} else if (_isSingleMedia) {
+		return rpl::never<int>();
+	}
+	const auto single = static_cast<Ui::SingleFilePreview*>(preview);
+	return single->selectRequests() | rpl::map_to(from);
+}
+
 rpl::producer<> SendFilesBox::Block::orderUpdated() const {
 	if (_isAlbum) {
 		const auto album = static_cast<Ui::AlbumPreview*>(_preview.get());
@@ -590,6 +616,28 @@ void SendFilesBox::Block::toggleSpoilers(bool enabled) {
 		const auto media = static_cast<Ui::SingleMediaPreview*>(
 			_preview.get());
 		media->setSpoiler(enabled);
+	}
+}
+
+void SendFilesBox::Block::setSelectionMode(bool enabled) {
+	if (_isAlbum) {
+		const auto album = static_cast<Ui::AlbumPreview*>(_preview.get());
+		album->setSelectionMode(enabled);
+	} else if (!_isSingleMedia) {
+		const auto single = static_cast<Ui::SingleFilePreview*>(
+			_preview.get());
+		single->setSelectionMode(enabled);
+	}
+}
+
+void SendFilesBox::Block::setSelected(int index, bool selected) {
+	if (_isAlbum) {
+		const auto album = static_cast<Ui::AlbumPreview*>(_preview.get());
+		album->setSelected(index - _from, selected);
+	} else if (!_isSingleMedia) {
+		const auto single = static_cast<Ui::SingleFilePreview*>(
+			_preview.get());
+		single->setSelected(selected);
 	}
 }
 
@@ -901,13 +949,34 @@ void SendFilesBox::prepare() {
 	setCloseByOutsideClick(false);
 
 	boxClosing() | rpl::on_next([=] {
-		if (!_confirmed && !_textTaken && _cancelledCallback) {
+		if (!_confirmed
+			&& !_stashed
+			&& !_textTaken
+			&& _cancelledCallback) {
 			_cancelledCallback();
 		}
 		auto text = _caption->getTextWithAppliedMarkdown();
-		if (!_confirmed && _cancelled2Callback && !text.empty()) {
+		if (!_confirmed
+			&& !_stashed
+			&& !_textTaken
+			&& _cancelled2Callback
+			&& !text.empty()) {
 			_cancelled2Callback(std::move(text));
 		}
+	}, lifetime());
+
+	Shortcuts::Requests(
+	) | rpl::filter([=] {
+		return _stashCallback
+			&& isVisible()
+			&& Ui::AppInFocus()
+			&& window()->isActiveWindow();
+	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
+		using Command = Shortcuts::Command;
+		request->check(Command::StashMessage, 2) && request->handle([=] {
+			stash();
+			return true;
+		});
 	}, lifetime());
 
 	setupDragArea();
@@ -977,6 +1046,171 @@ void SendFilesBox::refreshAllAfterChanges(int fromItem, Fn<void()> perform) {
 	_inner->resizeToWidth(st::boxWideWidth);
 	refreshControls();
 	captionResized();
+	updateSelectionMode();
+}
+
+void SendFilesBox::unpackArchive(int index) {
+	if (_preparing || index < 0 || index >= _list.files.size()) {
+		return;
+	}
+	const auto archive = _list.files[index].archive;
+	if (!archive) {
+		return;
+	}
+	const auto paths = archive->folder.isEmpty()
+		? archive->paths
+		: Storage::FolderFilesForSending(archive->folder);
+	auto list = Storage::PrepareMediaList(
+		paths,
+		st::sendMediaPreviewSize,
+		_show->session().premium());
+	if (list.error != Ui::PreparedList::Error::None
+		|| list.files.empty()) {
+		showToast(tr::lng_send_media_invalid_files(tr::now));
+		return;
+	} else if (!checkWith(list, _sendWay.current())) {
+		return;
+	} else if (_limits & SendFilesAllow::OnlyOne) {
+		auto removing = std::move(_list.files[index]);
+		std::swap(_list.files[index], _list.files.back());
+		_list.files.pop_back();
+		const auto ok = _list.canBeSentInSlowmodeWith(list);
+		_list.files.push_back(std::move(removing));
+		std::swap(_list.files[index], _list.files.back());
+		if (!ok) {
+			showToast(tr::lng_slowmode_no_many(tr::now));
+			return;
+		}
+	}
+	for (auto i = 0; i != archive->names.size(); ++i) {
+		if (archive->names[i].isEmpty()) {
+			continue;
+		}
+		for (auto &file : list.files) {
+			if (file.path == archive->paths[i]) {
+				file.displayName = archive->names[i];
+			}
+		}
+	}
+	refreshAllAfterChanges(index, [&] {
+		_list.files.erase(_list.files.begin() + index);
+		_list.files.insert(
+			_list.files.begin() + index,
+			std::make_move_iterator(list.files.begin()),
+			std::make_move_iterator(list.files.end()));
+	});
+	_list.filesToProcess.insert(
+		_list.filesToProcess.end(),
+		std::make_move_iterator(list.filesToProcess.begin()),
+		std::make_move_iterator(list.filesToProcess.end()));
+	enqueueNextPrepare();
+}
+
+std::vector<int> SendFilesBox::archivableIndices(bool selectedOnly) const {
+	auto result = std::vector<int>();
+	for (auto i = 0, count = int(_list.files.size()); i != count; ++i) {
+		const auto &file = _list.files[i];
+		if (!file.archive
+			&& !file.path.isEmpty()
+			&& (!selectedOnly || file.selected)) {
+			result.push_back(i);
+		}
+	}
+	return result;
+}
+
+bool SendFilesBox::canArchiveAll() const {
+	const auto count = int(_list.files.size());
+	return !_preparing
+		&& (count > 0)
+		&& (archivableIndices(false).size() == count);
+}
+
+bool SendFilesBox::hasArchives() const {
+	return !_preparing && ranges::any_of(_list.files, [](const auto &file) {
+		return file.archive != nullptr;
+	});
+}
+
+void SendFilesBox::unpackArchives() {
+	for (auto i = int(_list.files.size()); i != 0;) {
+		--i;
+		if (_list.files[i].archive) {
+			unpackArchive(i);
+		}
+	}
+}
+
+bool SendFilesBox::hasSelection() const {
+	return ranges::any_of(_list.files, &Ui::PreparedFile::selected);
+}
+
+void SendFilesBox::toggleSelection(int index) {
+	applyBlockChanges();
+	if (index < 0 || index >= _list.files.size()) {
+		return;
+	}
+	auto &file = _list.files[index];
+	file.selected = !file.selected;
+	for (auto &block : _blocks) {
+		if (index >= block.fromIndex() && index < block.tillIndex()) {
+			block.setSelected(index, file.selected);
+		}
+	}
+	updateSelectionMode();
+}
+
+bool SendFilesBox::clearSelection() {
+	if (!hasSelection()) {
+		return false;
+	}
+	for (auto i = 0, count = int(_list.files.size()); i != count; ++i) {
+		auto &file = _list.files[i];
+		if (!file.selected) {
+			continue;
+		}
+		file.selected = false;
+		for (auto &block : _blocks) {
+			if (i >= block.fromIndex() && i < block.tillIndex()) {
+				block.setSelected(i, false);
+			}
+		}
+	}
+	updateSelectionMode();
+	return true;
+}
+
+void SendFilesBox::updateSelectionMode() {
+	const auto enabled = hasSelection();
+	for (auto &block : _blocks) {
+		block.setSelectionMode(enabled);
+	}
+}
+
+void SendFilesBox::archiveFiles(const std::vector<int> &indices) {
+	if (_preparing || indices.empty()) {
+		return;
+	}
+	auto paths = QStringList();
+	auto names = QStringList();
+	for (const auto index : indices) {
+		const auto &file = _list.files[index];
+		paths.push_back(file.path);
+		names.push_back(file.displayName);
+	}
+	auto list = Ui::PreparedList();
+	list.files.push_back(Storage::PrepareFilesArchive(paths, names));
+	if (!checkWith(list, _sendWay.current())) {
+		return;
+	}
+	refreshAllAfterChanges(indices.front(), [&] {
+		for (const auto index : ranges::views::reverse(indices)) {
+			_list.files.erase(_list.files.begin() + index);
+		}
+		_list.files.insert(
+			_list.files.begin() + indices.front(),
+			std::move(list.files.front()));
+	});
 }
 
 bool SendFilesBox::setDisplayNameInSingleFilePreview(
@@ -1262,7 +1496,7 @@ QImage SendFilesBox::preparePriceTagBg(QSize size) const {
 
 void SendFilesBox::addMenuButton() {
 	const auto details = _sendMenuDetails();
-	if (!hasSendMenu(details)) {
+	if (!hasSendMenu(details) && !canArchiveAll() && !hasArchives()) {
 		return;
 	}
 
@@ -1303,6 +1537,18 @@ void SendFilesBox::addMenuButton() {
 				&st::menuIconStickers);
 		}
 
+		if (canArchiveAll()) {
+			_menu->addAction(
+				tr::lng_folder_archive_pack(tr::now),
+				[=] { archiveFiles(archivableIndices(false)); },
+				&st::menuIconArchive);
+		}
+		if (hasArchives()) {
+			_menu->addAction(
+				tr::lng_folder_archive_unpack(tr::now),
+				[=] { unpackArchives(); },
+				&st::menuIconUnarchive);
+		}
 		const auto result = SendMenu::FillSendMenu(
 			_menu.get(),
 			_show,
@@ -1310,11 +1556,11 @@ void SendFilesBox::addMenuButton() {
 			_sendMenuCallback,
 			&_st.tabbed.icons,
 			position);
-		if (result != SendMenu::FillMenuResult::Prepared) {
+		if (result == SendMenu::FillMenuResult::Failed || _menu->empty()) {
 			_menu = nullptr;
 			return true;
 		}
-		_menu->popupPrepared();
+		_menu->popup(position);
 		return true;
 	});
 }
@@ -1398,11 +1644,14 @@ void SendFilesBox::generatePreviewFrom(int fromBlock) {
 	auto albumStart = -1;
 	for (auto i = fromItem, till = int(_list.files.size()); i != till; ++i) {
 		const auto type = _list.files[i].type;
+		// A video turned into a GIF leaves the album when it is sent.
+		const auto separate = _list.files[i].sendsVideoAsGif();
 		if (albumStart >= 0) {
 			const auto albumCount = (i - albumStart);
 			if ((type == Type::File)
 				|| (type == Type::None)
 				|| (type == Type::Music)
+				|| separate
 				|| (albumCount == Ui::MaxAlbumItems())) {
 				pushBlock(std::exchange(albumStart, -1), i);
 			} else {
@@ -1411,7 +1660,8 @@ void SendFilesBox::generatePreviewFrom(int fromBlock) {
 		}
 		if (type != Type::File
 			&& type != Type::Music
-			&& type != Type::None) {
+			&& type != Type::None
+			&& !separate) {
 			if (albumStart < 0) {
 				albumStart = i;
 			}
@@ -1445,6 +1695,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 		gifPaused,
 		_sendWay.current());
 	auto &block = _blocks.back();
+	block.setSelectionMode(hasSelection());
 	const auto widget = _inner->add(
 		block.takeWidget(),
 		QMargins(0, _inner->count() ? st::sendMediaRowSkip : 0, 0, 0));
@@ -1485,6 +1736,8 @@ void SendFilesBox::pushBlock(int from, int till) {
 			show->session().saveSettings();
 		}
 		*openedOnce = true;
+		const auto videos = (_limits & SendFilesAllow::Videos);
+		const auto animated = videos || (_limits & SendFilesAllow::Gifs);
 		Editor::OpenWithPreparedFile(
 			this,
 			show,
@@ -1493,7 +1746,8 @@ void SendFilesBox::pushBlock(int from, int till) {
 			std::move(done),
 			PhotoSideLimit(true),
 			QSize(),
-			true);
+			animated,
+			videos);
 	};
 	const auto replaceAttachment = [=, show = _show](int index) {
 		applyBlockChanges();
@@ -1649,7 +1903,7 @@ void SendFilesBox::pushBlock(int from, int till) {
 		if (!canEditFileData) {
 			return;
 		}
-		const auto allowExtensionEdit = file.path.isEmpty();
+		const auto allowExtensionEdit = file.path.isEmpty() && !file.archive;
 		_show->show(Box(
 			RenameFileBox,
 			file.displayName,
@@ -1859,6 +2113,23 @@ void SendFilesBox::pushBlock(int from, int till) {
 					&st::menuIconCancel);
 			}
 		}
+		if (!compressed && !_preparing && !file.archive) {
+			const auto selected = archivableIndices(true);
+			if (!selected.empty()) {
+				state->menu->addAction(
+					tr::lng_folder_archive_pack_selected(tr::now),
+					[=] { archiveFiles(selected); },
+					&st::menuIconArchive);
+			}
+			if (!file.path.isEmpty()) {
+				state->menu->addAction(
+					(file.selected
+						? tr::lng_folder_archive_deselect
+						: tr::lng_folder_archive_select)(tr::now),
+					[=] { toggleSelection(fileIndex); },
+					&st::menuIconSelect);
+			}
+		}
 		if (state->menu->empty()) {
 			state->menu = nullptr;
 			return false;
@@ -1913,6 +2184,11 @@ void SendFilesBox::pushBlock(int from, int till) {
 		renameFile(index);
 	}, widget->lifetime());
 
+	block.itemSelectRequest(
+	) | rpl::on_next([=](int index) {
+		toggleSelection(index);
+	}, widget->lifetime());
+
 	block.orderUpdated() | rpl::on_next([=]{
 		if (_priceTag) {
 			_priceTagBg = QImage();
@@ -1955,8 +2231,13 @@ void SendFilesBox::refreshControls(bool initial) {
 }
 
 void SendFilesBox::setupSendWayControls() {
+	const auto onlyOne = (_limits & SendFilesAllow::OnlyOne);
 	const auto groupFilesFirst = _sendWay.current().groupFiles();
-	const auto asPhotosFirst = _sendWay.current().sendImagesAsPhotos();
+	const auto asPhotosFirst = (_list.hasSendImagesAsPhotosOption(onlyOne)
+			&& (_list.overrideSendImagesAsPhotos
+				== _sendWay.current().sendImagesAsPhotos()))
+		? Core::App().settings().sendFilesWay().sendImagesAsPhotos()
+		: _sendWay.current().sendImagesAsPhotos();
 	_groupFiles.create(
 		this,
 		tr::lng_send_grouped(tr::now),
@@ -2120,6 +2401,9 @@ void SendFilesBox::setupCaption() {
 	}, _caption->lifetime());
 	_caption->cancelled(
 	) | rpl::on_next([=] {
+		if (hasSelection()) {
+			return;
+		}
 		requestToTakeTextWithTags();
 		closeBox();
 	}, _caption->lifetime());
@@ -2487,6 +2771,8 @@ void SendFilesBox::keyPressEvent(QKeyEvent *e) {
 			|| modifiers.testFlag(Qt::MetaModifier);
 		const auto shift = modifiers.testFlag(Qt::ShiftModifier);
 		send({}, ctrl && shift);
+	} else if (e->key() == Qt::Key_Escape && clearSelection()) {
+		e->accept();
 	} else {
 		BoxContent::keyPressEvent(e);
 	}
@@ -2601,9 +2887,7 @@ void SendFilesBox::saveSendWaySettings(bool rememberAll) {
 	} else if (_groupFiles->isHidden()) {
 		way.setGroupFiles(oldWay.groupFiles());
 	}
-	if (rememberAll
-		&& (_list.overrideSendImagesAsPhotos == way.sendImagesAsPhotos()
-			|| _sendImagesAsPhotos->isHidden())) {
+	if (rememberAll && _sendImagesAsPhotos->isHidden()) {
 		way.setSendImagesAsPhotos(oldWay.sendImagesAsPhotos());
 	}
 	if (way != oldWay) {
@@ -2740,6 +3024,40 @@ void SendFilesBox::send(
 		_confirmedCallback(std::move(bundle), options, _replyTo);
 	}
 	closeBox();
+}
+
+void SendFilesBox::stash() {
+	if (!_stashCallback || (_stashCheck && !_stashCheck())) {
+		return;
+	} else if (_preparing) {
+		_whenReadySend = [=] { stash(); };
+		return;
+	}
+	for (auto &item : _list.files) {
+		item.spoiler = false;
+	}
+	applyBlockChanges();
+
+	Assert(_list.filesToProcess.empty());
+
+	if ((int(_list.files.size()) > kStashFilesLimit)
+		|| (_list.memoryUsage() > kStashFilesMemoryLimit)) {
+		showToast(tr::lng_stash_files_limit(tr::now));
+		return;
+	}
+	const auto way = _sendWay.current();
+	_list.overrideSendImagesAsPhotos = way.sendImagesAsPhotos();
+	_stashed = true;
+	_stashCallback(SendFilesStashed{
+		.list = std::move(_list),
+		.caption = _caption->getTextWithTags(),
+		.replyTo = _replyTo,
+	});
+	closeBox();
+}
+
+void SendFilesBox::sendWithOptions(Api::SendOptions options) {
+	send(options, false);
 }
 
 Fn<void(Api::SendOptions)> SendFilesBox::sendCallback() {

@@ -8,15 +8,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "media/view/media_view_pip_renderer.h"
-#include "ui/rhi/rhi_renderer.h"
-#include "ui/rhi/rhi_image.h"
 #include "ui/gl/gl_math.h"
+#include "ui/rhi/rhi_image.h"
+#include "ui/rhi/rhi_renderer.h"
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 #include "media/view/media_view_metal_texture.h"
 #endif
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
 class QRhi;
 class QRhiBuffer;
@@ -54,12 +54,6 @@ public:
 	}
 
 private:
-	struct Control {
-		int index = -1;
-		not_null<const style::icon*> icon;
-		not_null<const style::icon*> iconOver;
-	};
-
 	void paintTransformedVideoFrame(ContentGeometry geometry) override;
 	void paintTransformedStaticContent(
 		const QImage &image,
@@ -99,7 +93,7 @@ private:
 	};
 
 	void createShadowTexture();
-	void createPipelines();
+	[[nodiscard]] bool createPipelines();
 	void validateControls();
 	void invalidateControls();
 
@@ -166,7 +160,6 @@ private:
 	Ui::Rhi::Image _playbackImage;
 	Ui::Rhi::Image _volumeControllerImage;
 
-	static constexpr auto kControlsCount = 7;
 	static constexpr auto kMaxDraws = 12;
 	static constexpr auto kVertexSlotSize = 4 * 6 * sizeof(float);
 	std::array<QRect, kControlsCount * 2> _controlsTextures;
@@ -175,7 +168,7 @@ private:
 
 	bool _initialized = false;
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	MetalTextureCache _metalTextureCache;
 #endif
 
@@ -185,4 +178,4 @@ private:
 
 } // namespace Media::View
 
-#endif // Qt >= 6.7
+#endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API

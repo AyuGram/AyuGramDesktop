@@ -21,9 +21,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/stickers/data_custom_emoji.h"
 #include "data/stickers/data_stickers.h"
 #include "data/data_document.h"
-#include "data/data_peer.h"
-#include "data/data_message_reactions.h"
 #include "data/data_message_reaction_id.h"
+#include "data/data_message_reactions.h"
+#include "data/data_peer.h"
 #include "data/data_session.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
@@ -38,8 +38,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/custom_emoji_text_badge.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/menu/menu_item_base.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/popup_menu.h"
@@ -47,9 +47,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
 #include "ui/userpic_view.h"
+
 #include "styles/style_calls.h"
-#include "styles/style_chat_helpers.h"
 #include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
 #include "styles/style_info_levels.h"
 #include "styles/style_media_view.h"
@@ -410,7 +411,7 @@ void MessagesUi::setupBadges() {
 	auto helper = Ui::Text::CustomEmojiHelper();
 	const auto liveText = helper.paletteDependent(
 		Ui::Text::CustomEmojiTextBadge(
-			tr::lng_video_stream_live(tr::now).toUpper(),
+			tr::lng_video_stream_live(tr::now, tr::upper),
 			st::groupCallMessageBadge,
 			st::groupCallMessageBadgeMargin));
 	_liveBadge.setMarkedText(
@@ -1566,10 +1567,16 @@ void MessagesUi::setupPinnedWidget() {
 
 	struct Animation {
 		base::Timer seconds;
-		Ui::Animations::Simple smooth;
+		crl::time smoothDuration = 0;
+		Ui::Animations::Basic smooth; // Simple would pause mtproto delivery
 		bool requiresSmooth = false;
 	};
 	const auto animation = _pinned->lifetime().make_state<Animation>();
+	animation->smooth.init([=](crl::time now) {
+		_pinned->update();
+		const auto time = now - animation->smooth.started();
+		return !anim::Disabled() && (time < animation->smoothDuration);
+	});
 	animation->seconds.setCallback([=] {
 		const auto now = crl::now();
 		auto smooth = false;
@@ -1585,9 +1592,8 @@ void MessagesUi::setupPinnedWidget() {
 			}
 		}
 		if (smooth && !anim::Disabled()) {
-			animation->smooth.start([=] {
-				_pinned->update();
-			}, 0., 1., 900.);
+			animation->smoothDuration = crl::time(900) * anim::SlowMultiplier();
+			animation->smooth.start();
 		} else {
 			_pinned->update();
 		}

@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "menu/menu_ttl_validator.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
+
 #include "styles/style_chat_helpers.h"
 
 namespace HistoryView::Controls {
@@ -37,7 +38,7 @@ TTLButton::TTLButton(
 		peer,
 		Data::PeerUpdate::Flag::MessagesTTL
 	) | rpl::on_next([=] {
-		_button.setText(Ui::FormatTTLTiny(peer->messagesTTL()));
+		_button.setText(Ui::FormatTTLBadge(peer->messagesTTL()));
 	}, _button.lifetime());
 }
 

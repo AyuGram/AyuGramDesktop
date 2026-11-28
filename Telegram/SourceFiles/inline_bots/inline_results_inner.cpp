@@ -9,31 +9,32 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_common.h"
 #include "chat_helpers/gifs_list_widget.h" // ChatHelpers::AddGifAction
-#include "menu/menu_send.h" // SendMenu::FillSendMenu
 #include "core/click_handler_types.h"
-#include "data/data_document.h"
-#include "data/data_file_origin.h"
-#include "data/data_user.h"
 #include "data/data_changes.h"
 #include "data/data_chat_participant_status.h"
+#include "data/data_document.h"
+#include "data/data_file_origin.h"
 #include "data/data_session.h"
-#include "inline_bots/bot_attach_web_view.h"
-#include "inline_bots/inline_bot_result.h"
-#include "inline_bots/inline_bot_layout_item.h"
-#include "lang/lang_keys.h"
-#include "layout/layout_position.h"
-#include "mainwindow.h"
-#include "main/main_session.h"
-#include "window/window_session_controller.h"
-#include "ui/text/text_utilities.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
-#include "ui/effects/path_shift_gradient.h"
-#include "ui/painter.h"
-#include "ui/ui_utility.h"
+#include "data/data_user.h"
 #include "history/view/history_view_cursor_state.h"
 #include "history/history.h"
+#include "inline_bots/bot_attach_web_view.h"
+#include "inline_bots/inline_bot_layout_item.h"
+#include "inline_bots/inline_bot_result.h"
+#include "lang/lang_keys.h"
+#include "layout/layout_position.h"
+#include "main/main_session.h"
+#include "mainwindow.h"
+#include "menu/menu_send.h" // SendMenu::FillSendMenu
+#include "ui/effects/path_shift_gradient.h"
+#include "ui/text/text_utilities.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h"
 
 #include <QtWidgets/QApplication>
@@ -571,7 +572,16 @@ int Inner::refreshInlineRows(PeerData *queryPeer, UserData *bot, const CacheEntr
 			return item != nullptr;
 		}) | ranges::to<std::vector<not_null<ItemBase*>>>;
 
-		_mosaic.addItems(resultItems);
+		auto pending = std::vector<not_null<ItemBase*>>();
+		for (const auto &item : resultItems) {
+			if (item->isFullLine()) {
+				_mosaic.addItems(base::take(pending));
+				_mosaic.addItems({ item });
+			} else {
+				pending.push_back(item);
+			}
+		}
+		_mosaic.addItems(pending);
 		added = resultItems.size();
 		preloadImages();
 	}
@@ -737,8 +747,8 @@ void Inner::switchPm() {
 		});
 	} else {
 		_inlineBot->botInfo->startToken = _switchPmStartToken;
-		_inlineBot->botInfo->inlineReturnTo
-			= _controller->dialogsEntryStateCurrent();
+		_inlineBot->botInfo->setInlineReturnTo(
+			_controller->dialogsEntryStateCurrent());
 		_controller->showPeerHistory(
 			_inlineBot,
 			Window::SectionShow::Way::ClearStack,

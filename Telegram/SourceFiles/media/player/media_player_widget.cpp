@@ -7,35 +7,36 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/player/media_player_widget.h"
 
-#include "platform/platform_specific.h"
-#include "data/data_document.h"
-#include "data/data_session.h"
-#include "data/data_peer.h"
 #include "core/application.h"
 #include "core/core_settings.h"
-#include "ui/widgets/labels.h"
-#include "ui/widgets/continuous_sliders.h"
-#include "ui/widgets/shadow.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/dropdown_menu.h"
-#include "ui/widgets/menu/menu_action.h"
-#include "ui/wrap/fade_wrap.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/text/format_values.h"
-#include "ui/text/format_song_document_name.h"
-#include "lang/lang_keys.h"
-#include "media/audio/media_audio.h"
-#include "media/view/media_view_playback_progress.h"
-#include "media/player/media_player_button.h"
-#include "media/player/media_player_instance.h"
-#include "media/player/media_player_dropdown.h"
-#include "media/player/media_player_volume_controller.h"
+#include "data/data_document.h"
+#include "data/data_peer.h"
+#include "data/data_session.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
-#include "storage/storage_account.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_button.h"
+#include "media/player/media_player_dropdown.h"
+#include "media/player/media_player_instance.h"
+#include "media/player/media_player_volume_controller.h"
+#include "media/view/media_view_playback_progress.h"
+#include "platform/platform_specific.h"
+#include "storage/storage_account.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/text/format_song_document_name.h"
+#include "ui/text/format_values.h"
+#include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/continuous_sliders.h"
+#include "ui/widgets/dropdown_menu.h"
+#include "ui/widgets/labels.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/widgets/shadow.h"
+#include "ui/wrap/fade_wrap.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_media_player.h"
 
 namespace Media {
@@ -76,6 +77,9 @@ Widget::Widget(
 		[=](bool over) { markOver(over); },
 		[=](bool lastNonDefault) { return speedLookup(lastNonDefault); },
 		[=](float64 speed) { saveSpeed(speed); })) {
+	_speedController->setApplySpeed([=](float64 speed) {
+		instance()->setPlaybackSpeed(speed);
+	});
 	_speedController->realtimeValue(
 	) | rpl::on_next([=](float64 speed) {
 		_speedToggle->setSpeed(speed);
@@ -217,7 +221,18 @@ Widget::Widget(
 	hidePlaylistOn(_close);
 	hidePlaylistOn(_rightControls);
 
+	hideDropdownsOn(_volumeToggle);
+	hideDropdownsOn(_orderToggle);
+	hideDropdownsOn(_speedToggle);
+
+	const auto otherDropdownCheck = [=](QPoint globalPosition) {
+		return overDropdownControl(globalPosition);
+	};
+	_orderController->setOtherDropdownCheck(otherDropdownCheck);
+	_speedController->setOtherDropdownCheck(otherDropdownCheck);
+
 	setType(AudioMsgId::Type::Song);
+	_playPause->finishTransform();
 }
 
 void Widget::hidePlaylistOn(not_null<Ui::RpWidget*> widget) {
@@ -227,6 +242,42 @@ void Widget::hidePlaylistOn(not_null<Ui::RpWidget*> widget) {
 	}) | rpl::on_next([=] {
 		updateOverLabelsState(false);
 	}, widget->lifetime());
+}
+
+void Widget::hideDropdownsOn(not_null<Ui::RpWidget*> widget) {
+	widget->events(
+	) | rpl::filter([=](not_null<QEvent*> e) {
+		return (e->type() == QEvent::Enter);
+	}) | rpl::on_next([=] {
+		hideDropdowns(widget);
+	}, widget->lifetime());
+}
+
+bool Widget::overDropdownControl(QPoint globalPosition) const {
+	const auto over = [&](not_null<Ui::RpWidget*> control) {
+		return !control->isHidden()
+			&& control->rect().contains(
+				control->mapFromGlobal(globalPosition));
+	};
+	return over(_volumeToggle)
+		|| over(_orderToggle)
+		|| over(_speedToggle);
+}
+
+void Widget::hideDropdowns(not_null<Ui::RpWidget*> except) {
+	if (except.get() != _volumeToggle.data()) {
+		_volume->hideFast();
+	}
+	if (except.get() != _orderToggle.data()) {
+		if (const auto menu = _orderController->menu()) {
+			menu->hideFast();
+		}
+	}
+	if (except.get() != _speedToggle.data()) {
+		if (const auto menu = _speedController->menu()) {
+			menu->hideFast();
+		}
+	}
 }
 
 void Widget::setupRightControls() {
@@ -651,11 +702,11 @@ void Widget::handleSongUpdate(const TrackState &state) {
 	if (instance()->isSeeking(_type)) {
 		showPause = true;
 	}
-	_playPause->setIconOverride(state.id.audio()->loading()
-		? &st::mediaPlayerCancelIcon
+	_playPause->setState(state.id.audio()->loading()
+		? PlayButton::State::Cancel
 		: showPause
-		? &st::mediaPlayerPauseIcon
-		: nullptr);
+		? PlayButton::State::Pause
+		: PlayButton::State::Play);
 	_playPause->setAccessibleName(showPause
 		? tr::lng_shortcuts_media_pause(tr::now)
 		: tr::lng_shortcuts_media_play(tr::now));

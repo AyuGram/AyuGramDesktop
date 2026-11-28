@@ -22,6 +22,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/platform/mac/base_confirm_quit.h"
 #include "base/platform/mac/base_utilities_mac.h"
 #include "base/platform/base_platform_info.h"
+#include "platform/mac/wallet_protection_mac.h"
 
 #include <QtCore/QDirIterator>
 #include <QtGui/QDesktopServices>
@@ -33,6 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <sys/mount.h>
 #include <sys/sysctl.h>
 #include <sys/xattr.h>
+#include <unistd.h>
 
 #include <Cocoa/Cocoa.h>
 #include <CoreFoundation/CFURL.h>
@@ -263,6 +265,7 @@ namespace Platform {
 
 void start() {
 	objc_start();
+	RegisterWalletProtectionProvider();
 }
 
 void finish() {
@@ -326,6 +329,14 @@ QString SingleInstanceLocalServerName(const QString &hash) {
 #else // OS_MAC_STORE
 	return objc_documentsPath() + hash.left(4);
 #endif // OS_MAC_STORE
+}
+
+bool LocalSocketPeerAllowed(qintptr descriptor) {
+	auto uid = uid_t();
+	auto gid = gid_t();
+	return (descriptor >= 0)
+		&& !getpeereid(int(descriptor), &uid, &gid)
+		&& (uid == geteuid());
 }
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
@@ -435,6 +446,10 @@ void IgnoreApplicationActivationRightNow() {
 	objc_ignoreApplicationActivationRightNow();
 }
 
+int64 ClipboardChangeCount() {
+	return [[NSPasteboard generalPasteboard] changeCount];
+}
+
 void AutostartToggle(bool enabled, Fn<void(bool)> done) {
 	if (done) {
 		done(false);
@@ -524,6 +539,24 @@ void LaunchMaps(const Data::LocationPoint &point, Fn<void()> fail) {
 			point.latAsString(),
 			point.lonAsString()))) {
 		fail();
+	}
+}
+
+QString LocalizedCurrencyName(
+		const QString &currency,
+		const QString &languageId) {
+	@autoreleasepool {
+		NSLocale *locale = [NSLocale localeWithLocaleIdentifier:
+			Q2NSString(languageId)];
+		// An unknown language falls back to the system one, not to English.
+		NSString *language = locale.languageCode;
+		if (!language || ![[NSLocale availableLocaleIdentifiers]
+				containsObject:language]) {
+			return QString();
+		}
+		NSString *name = [locale localizedStringForCurrencyCode:
+			Q2NSString(currency)];
+		return name ? NS2QString(name) : QString();
 	}
 }
 

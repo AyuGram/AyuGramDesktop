@@ -7,30 +7,31 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/info_controller.h"
 
-#include "ui/search_field_controller.h"
-#include "history/history.h"
-#include "info/info_content_widget.h"
-#include "info/info_memento.h"
-#include "info/global_media/info_global_media_widget.h"
-#include "info/media/info_media_widget.h"
-#include "info/polls/info_polls_list_widget.h"
 #include "core/application.h"
 #include "data/data_changes.h"
-#include "data/data_peer.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/data_forum_topic.h"
+#include "data/data_download_manager.h"
 #include "data/data_forum.h"
+#include "data/data_forum_topic.h"
+#include "data/data_media_types.h"
+#include "data/data_peer.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
-#include "data/data_user.h"
 #include "data/data_shared_media.h"
-#include "data/data_media_types.h"
-#include "data/data_download_manager.h"
+#include "data/data_user.h"
+#include "history/history.h"
 #include "history/history_item.h"
+#include "info/global_media/info_global_media_widget.h"
+#include "info/media/info_media_widget.h"
+#include "info/polls/info_polls_list_widget.h"
+#include "info/info_content_widget.h"
+#include "info/info_memento.h"
 #include "main/main_session.h"
+#include "ui/search_field_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_profile.h"
 
 namespace Info {
@@ -244,6 +245,18 @@ rpl::producer<SparseIdsMergedSlice> AbstractController::mediaSource(
 		SparseIdsMergedSlice::UniversalMsgId aroundId,
 		int limitBefore,
 		int limitAfter) const {
+	return sharedMediaSource(
+		section().mediaType(),
+		aroundId,
+		limitBefore,
+		limitAfter);
+}
+
+rpl::producer<SparseIdsMergedSlice> AbstractController::sharedMediaSource(
+		Storage::SharedMediaType type,
+		SparseIdsMergedSlice::UniversalMsgId aroundId,
+		int limitBefore,
+		int limitAfter) const {
 	Expects(peer() != nullptr);
 
 	const auto isScheduled = [&] {
@@ -272,7 +285,7 @@ rpl::producer<SparseIdsMergedSlice> AbstractController::mediaSource(
 				sublist() ? sublist()->sublistPeer()->id : PeerId(),
 				migratedPeerId(),
 				aroundId),
-			section().mediaType()),
+			type),
 		limitBefore,
 		limitAfter);
 }
@@ -436,6 +449,8 @@ not_null<Ui::RpWidget*> Controller::wrapWidget() const {
 bool Controller::validateMementoPeer(
 		not_null<ContentMemento*> memento) const {
 	return memento->peer() == peer()
+		&& memento->topic() == topic()
+		&& memento->sublist() == sublist()
 		&& memento->migratedPeerId() == migratedPeerId()
 		&& memento->settingsSelf() == settingsSelf()
 		&& memento->storiesPeer() == storiesPeer()
@@ -464,7 +479,9 @@ void Controller::updateSearchControllers(
 		? _section.mediaType()
 		: Section::MediaType::kCount;
 	const auto hasMediaSearch = isMedia
-		&& SharedMediaAllowSearch(mediaType);
+		&& (SharedMediaAllowSearch(mediaType)
+			|| (type == Type::GlobalMedia
+				&& mediaType == Section::MediaType::RoundVoiceFile));
 	const auto hasRequestsListSearch = (type == Type::RequestsList);
 	const auto hasCommonGroupsSearch = (type == Type::CommonGroups);
 	const auto hasDownloadsSearch = (type == Type::Downloads);
@@ -540,16 +557,20 @@ void Controller::removeFromStack(const std::vector<Section> &sections) const {
 	_widget->removeFromStack(sections);
 }
 
-auto Controller::produceSearchQuery(
-		const QString &query) const -> SearchQuery {
-	Expects(_key.peer() != nullptr);
+auto AbstractController::produceSearchQuery(
+		const QString &query) const
+-> SearchQuery {
+	Expects(peer() != nullptr);
 
 	auto result = SearchQuery();
-	result.type = _section.mediaType();
-	result.peerId = _key.peer()->id;
-	result.topicRootId = _key.topic() ? _key.topic()->rootId() : 0;
+	result.type = section().mediaType();
+	result.peerId = peer()->id;
+	result.topicRootId = topic() ? topic()->rootId() : 0;
+	result.monoforumPeerId = sublist()
+		? sublist()->sublistPeer()->id
+		: PeerId();
 	result.query = query;
-	result.migratedPeerId = _migrated ? _migrated->id : PeerId(0);
+	result.migratedPeerId = migratedPeerId();
 	return result;
 }
 
@@ -559,6 +580,18 @@ rpl::producer<bool> Controller::searchEnabledByContent() const {
 
 rpl::producer<QString> Controller::mediaSourceQueryValue() const {
 	return _searchController->currentQueryValue();
+}
+
+Storage::SharedMediaType Controller::mediaSourceType() const {
+	return _searchController->currentQuery().type;
+}
+
+void Controller::setMediaSourceType(Storage::SharedMediaType type) {
+	auto query = _searchController->currentQuery();
+	if (query.type != type) {
+		query.type = type;
+		_searchController->setQueryFast(query);
+	}
 }
 
 rpl::producer<QString> Controller::searchQueryValue() const {

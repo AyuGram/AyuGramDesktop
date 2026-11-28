@@ -50,6 +50,8 @@ public:
 	explicit Panel(not_null<PanelDelegate*> delegate);
 	~Panel();
 
+	[[nodiscard]] not_null<QWidget*> widget() const;
+
 	void requestActivate();
 	void toggleProgress(bool shown);
 
@@ -120,7 +122,6 @@ private:
 	[[nodiscard]] bool progressWithBackground() const;
 	[[nodiscard]] QRect progressRect() const;
 	void setupProgressGeometry();
-	void updateFooterHeight();
 
 	const not_null<PanelDelegate*> _delegate;
 	std::unique_ptr<SeparatePanel> _widget;

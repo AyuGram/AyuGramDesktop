@@ -22,10 +22,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/tabbed_selector.h"
 #include "core/file_utilities.h"
 #include "core/mime_type.h"
+#include "data/components/recent_inline_bots.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_changes.h"
 #include "data/data_chat_participant_status.h"
-#include "data/components/recent_inline_bots.h"
 #include "data/data_document.h"
 #include "data/data_group_call.h"
 #include "data/data_message_reaction_id.h"
@@ -36,8 +36,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/controls/compose_controls_common.h"
 #include "history/view/controls/history_view_compose_controls.h"
 #include "history/view/history_view_schedule_box.h" // ScheduleBoxStyleArgs
-#include "history/history_item_helpers.h"
 #include "history/history.h"
+#include "history/history_item_helpers.h"
 #include "inline_bots/inline_bot_result.h"
 #include "lang/lang_keys.h"
 #include "main/session/send_as_peers.h"
@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/text/format_values.h"
 #include "ui/round_rect.h"
 #include "window/section_widget.h"
+
 #include "styles/style_boxes.h" // sendMediaPreviewSize.
 #include "styles/style_chat_helpers.h"
 #include "styles/style_media_view.h"
@@ -361,6 +362,7 @@ void ReplyArea::sendVoice(const VoiceToSend &data) {
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		std::move(action));
 
 	_controls->clearListenState();
@@ -858,8 +860,8 @@ void ReplyArea::show(
 	invalidate_weak_ptrs(&_shownPeerGuard);
 	const auto peer = data.peer;
 	const auto history = peer ? peer->owner().history(peer).get() : nullptr;
-	const auto user = peer->asUser();
-	_type = peer->isMegagroup()
+	const auto user = peer ? peer->asUser() : nullptr;
+	_type = (peer && peer->isMegagroup())
 		? ReplyAreaType::Comment
 		: ReplyAreaType::Reply;
 	auto writeRestriction = stream
@@ -877,6 +879,8 @@ void ReplyArea::show(
 					.type = WriteRestrictionType::Rights,
 				};
 		}) | rpl::type_erased
+		: !peer
+		? rpl::producer<HistoryView::Controls::WriteRestriction>()
 		: Data::CanSendAnythingValue(
 			peer
 		) | rpl::map([=](bool can) {
@@ -900,8 +904,12 @@ void ReplyArea::show(
 		.videoStream = _data.videoStream,
 		.showSlowmodeError = [=] { return showSlowmodeError(); },
 		.sendActionFactory = [=] { return prepareSendAction({}); },
-		.slowmodeSecondsLeft = SlowmodeSecondsLeft(history->peer),
-		.sendDisabledBySlowmode = SendDisabledBySlowmode(history->peer),
+		.slowmodeSecondsLeft = (history
+			? SlowmodeSecondsLeft(history->peer)
+			: rpl::producer<int>()),
+		.sendDisabledBySlowmode = (history
+			? SendDisabledBySlowmode(history->peer)
+			: rpl::producer<bool>()),
 		.liked = std::move(
 			likedValue
 		) | rpl::map([](const Data::ReactionId &id) {
@@ -918,6 +926,7 @@ void ReplyArea::show(
 		&& !stream;
 	const auto cant = !peer;
 	if (!hidden && !cant) {
+		_cant = nullptr;
 		_controls->show();
 	} else {
 		_controls->hide();

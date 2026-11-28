@@ -42,6 +42,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/top_background_gradient.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
 #include "styles/style_polls.h"
@@ -569,7 +570,8 @@ auto GenerateUniqueGiftMedia(
 				std::move(image)));
 		}
 
-		if (descriptor.skipViewAction) {
+		if (descriptor.skipViewAction
+			|| (parent->context() == Context::MediaEditor)) {
 			push(std::make_unique<LambdaGenericPart>(
 				QSize(0, st::chatUniqueButtonPadding.bottom()),
 				nullptr));
@@ -825,7 +827,8 @@ auto AuctionBg(
 			p.setClipping(false);
 		}*/
 
-		if (state->particles) {
+		if (state->particles
+			&& (view->context() != Context::MediaEditor)) {
 			p.setClipRect(full);
 			state->particles->paint(p, full, context.now, context.paused);
 			p.setClipping(false);
@@ -834,7 +837,8 @@ auto AuctionBg(
 		const auto now = base::unixtime::now();
 		const auto startsIn = std::max(startDate - now, 0);
 		const auto left = std::max(endDate - now, 0);
-		if (startsIn > 0 || left > 0) {
+		if ((startsIn > 0 || left > 0)
+			&& (view->context() != Context::MediaEditor)) {
 			if (!state->timer) {
 				state->timer = std::make_unique<base::Timer>([=] {
 					view->repaint();

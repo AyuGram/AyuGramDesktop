@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/widgets/scroll_area.h"
 #include "ui/effects/animations.h"
+#include "ui/widgets/scroll_area.h"
 #include "ui/rp_widget.h"
 
 namespace Info {
@@ -47,6 +47,7 @@ public:
 private:
 	void setupScrollAnimation();
 	void setupScrollHandling();
+	void clearScrollState();
 	void scrollToY(int value);
 	void applyScrollToPinnedLayout(int scrollCurrent);
 

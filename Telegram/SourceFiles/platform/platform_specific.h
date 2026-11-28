@@ -47,11 +47,15 @@ enum class SystemSettingsType {
 
 void SetApplicationIcon(const QIcon &icon);
 [[nodiscard]] QString SingleInstanceLocalServerName(const QString &hash);
+[[nodiscard]] bool LocalSocketPeerAllowed(qintptr descriptor);
 [[nodiscard]] PermissionStatus GetPermissionStatus(PermissionType type);
 void RequestPermission(PermissionType type, Fn<void(PermissionStatus)> resultCallback);
 void OpenSystemSettingsForPermission(PermissionType type);
 bool OpenSystemSettings(SystemSettingsType type);
 void IgnoreApplicationActivationRightNow();
+// macOS Hide (Cmd+H) leaves Qt windows shown and unminimized.
+[[nodiscard]] rpl::producer<bool> ApplicationHiddenValue();
+[[nodiscard]] int64 ClipboardChangeCount();
 [[nodiscard]] bool AutostartSupported();
 void AutostartRequestStateFromSystem(Fn<void(bool)> callback);
 void AutostartToggle(bool enabled, Fn<void(bool)> done = nullptr);
@@ -68,6 +72,9 @@ void NewVersionLaunched(int oldVersion);
 [[nodiscard]] bool PreventsQuit(Core::QuitReason reason);
 [[nodiscard]] QString ExecutablePathForShortcuts();
 void LaunchMaps(const Data::LocationPoint &point, Fn<void()> fail);
+[[nodiscard]] QString LocalizedCurrencyName(
+	const QString &currency,
+	const QString &languageId);
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
 [[nodiscard]] std::optional<bool> IsDarkMode();
@@ -83,8 +90,8 @@ void finish();
 
 #ifdef Q_OS_WIN
 #include "platform/win/specific_win.h"
-#elif defined Q_OS_MAC // Q_OS_WIN
+#elif defined Q_OS_MACOS // Q_OS_WIN
 #include "platform/mac/specific_mac.h"
-#else // Q_OS_WIN || Q_OS_MAC
+#else // Q_OS_WIN || Q_OS_MACOS
 #include "platform/linux/specific_linux.h"
-#endif // else for Q_OS_WIN || Q_OS_MAC
+#endif // else for Q_OS_WIN || Q_OS_MACOS

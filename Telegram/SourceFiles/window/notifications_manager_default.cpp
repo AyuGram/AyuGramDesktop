@@ -7,38 +7,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/notifications_manager_default.h"
 
-#include "platform/platform_notifications_manager.h"
-#include "platform/platform_specific.h"
-#include "core/application.h"
-#include "core/ui_integration.h"
+#include "base/platform/base_platform_last_input.h"
+#include "base/call_delayed.h"
+#include "base/qt_signal_producer.h"
 #include "chat_helpers/emoji_suggestions_widget.h"
 #include "chat_helpers/message_field.h"
+#include "core/application.h"
+#include "core/ui_integration.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_forum_topic.h"
+#include "data/data_premium_limits.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_session.h"
+#include "dialogs/ui/dialogs_layout.h"
+#include "history/view/history_view_item_preview.h"
+#include "history/history.h"
+#include "history/history_item.h"
 #include "lang/lang_keys.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/input_field.h"
+#include "main/main_account.h"
+#include "main/main_session.h"
+#include "platform/platform_notifications_manager.h"
+#include "platform/platform_specific.h"
+#include "storage/file_download.h"
 #include "ui/platform/ui_platform_utility.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
 #include "ui/emoji_config.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
 #include "ui/ui_utility.h"
-#include "data/data_premium_limits.h"
-#include "data/data_saved_sublist.h"
-#include "data/data_session.h"
-#include "data/data_forum_topic.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "dialogs/ui/dialogs_layout.h"
 #include "window/window_controller.h"
-#include "storage/file_download.h"
-#include "main/main_session.h"
-#include "main/main_account.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/view/history_view_item_preview.h"
-#include "base/platform/base_platform_last_input.h"
-#include "base/call_delayed.h"
+
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_window.h"
@@ -97,11 +99,22 @@ Manager::Manager(System *system)
 	) | rpl::on_next([=](ChangeType change) {
 		settingsChanged(change);
 	}, _lifetime);
+
+	// Notifications are kept in the queue while there are no screens.
+	base::qt_signal_producer(
+		qApp,
+		&QGuiApplication::screenAdded
+	) | rpl::filter([=] {
+		return !_queuedNotifications.empty();
+	}) | rpl::on_next([=] {
+		showNextFromQueue();
+	}, _lifetime);
 }
 
 Manager::QueuedNotification::QueuedNotification(NotificationFields &&fields)
 : history(fields.item->history())
 , topicRootId(fields.item->topicRootId())
+, monoforumPeerId(ItemContextId(fields.item).monoforumPeerId)
 , peer(history->peer)
 , reaction(fields.reactionId)
 , author(!fields.reactionFrom
@@ -223,6 +236,10 @@ void Manager::stopAllHiding() {
 }
 
 void Manager::showNextFromQueue() {
+	if (!QGuiApplication::primaryScreen()) {
+		// Creating a window without screens is a Qt fatal error.
+		return;
+	}
 	auto guard = gsl::finally([this] {
 		if (_positionsOutdated) {
 			moveWidgets();
@@ -409,7 +426,7 @@ void Manager::doClearFromTopic(not_null<Data::ForumTopic*> topic) {
 
 void Manager::doClearFromSublist(not_null<Data::SavedSublist*> sublist) {
 	const auto history = sublist->owningHistory();
-	const auto sublistPeerId = sublist->sublistPeer()->id;
+	const auto sublistPeerId = SublistContextId(sublist).monoforumPeerId;
 	for (auto i = _queuedNotifications.begin(); i != _queuedNotifications.cend();) {
 		if (i->history == history && i->monoforumPeerId == sublistPeerId) {
 			i = _queuedNotifications.erase(i);
@@ -487,8 +504,22 @@ void Manager::doMaybeFlashBounce(Fn<void()> flashBounce) {
 }
 
 void Manager::doUpdateAll() {
+	const auto locked = Core::App().passcodeLocked();
+	auto unlinked = false;
 	for (const auto &notification : _notifications) {
-		notification->updateNotifyDisplay();
+		if (locked
+			&& (notification->isReplying() || notification->isUnlinked())) {
+			notification->hide();
+			if (notification->unlinkHistory()) {
+				unlinked = true;
+			}
+		} else {
+			notification->updateNotifyDisplay();
+		}
+	}
+	if (unlinked) {
+		_positionsOutdated = true;
+		showNextFromQueue();
 	}
 }
 
@@ -1112,7 +1143,7 @@ void Notification::toggleActionButtons(bool visible) {
 }
 
 void Notification::showReplyField() {
-	if (!_item) {
+	if (!canReply()) {
 		return;
 	}
 	raise();

@@ -7,32 +7,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_bottom_info.h"
 
-#include "ui/chat/message_bubble.h"
+#include "base/unixtime.h"
+#include "chat_helpers/emoji_interactions.h"
+#include "core/click_handler_types.h"
+#include "core/ui_integration.h"
+#include "data/data_channel.h"
+#include "data/data_message_reactions.h"
+#include "data/data_session.h"
+#include "history/view/media/history_view_media.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_message.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
+#include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
+#include "main/main_session.h"
 #include "ui/chat/chat_style.h"
+#include "ui/chat/message_bubble.h"
 #include "ui/effects/reaction_fly_animation.h"
 #include "ui/text/custom_emoji_helper.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
-#include "core/ui_integration.h"
-#include "lang/lang_keys.h"
-#include "history/history_item_components.h"
-#include "history/history_item_helpers.h"
-#include "history/history_item.h"
-#include "history/history.h"
-#include "history/view/media/history_view_media.h"
-#include "history/view/history_view_message.h"
-#include "history/view/history_view_cursor_state.h"
-#include "base/unixtime.h"
-#include "chat_helpers/emoji_interactions.h"
-#include "core/click_handler_types.h"
-#include "main/main_session.h"
-#include "lottie/lottie_icon.h"
-#include "data/data_channel.h"
-#include "data/data_session.h"
-#include "data/data_message_reactions.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
 
@@ -275,9 +276,14 @@ void BottomInfo::paint(
 		int outerWidth,
 		bool unread,
 		bool inverted,
+		bool leftToRight,
 		const PaintContext &context) const {
 	const auto st = context.st;
 	const auto stm = context.messageStyle();
+	// RTL mirrors icons around outer width; this one leaves an icon in place.
+	const auto outer = [&](int left, const style::icon &icon) {
+		return leftToRight ? (2 * left + icon.width()) : outerWidth;
+	};
 
 	auto right = position.x() + width();
 	const auto firstLineBottom = position.y() + st::msgDateFont->height;
@@ -296,7 +302,7 @@ void BottomInfo::paint(
 		icon.paint(
 			p,
 			QPoint(right, firstLineBottom) + st::historySendStatePosition,
-			outerWidth);
+			outer(right + st::historySendStatePosition.x(), icon));
 		right -= st::historySendStateSpace;
 	}
 
@@ -318,7 +324,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historySilentTop,
-			outerWidth);
+			outer(right, icon));
 	}
 	if (_data.flags & Data::Flag::Ephemeral) {
 		const auto &icon = inverted
@@ -329,7 +335,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historyEphemeralStateTop,
-			outerWidth);
+			outer(right, icon));
 	}
 
 	if (_data.flags & Data::Flag::Pinned) {
@@ -341,7 +347,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historyPinTop,
-			outerWidth);
+			outer(right, icon));
 	}
 	if (!_views.isEmpty()) {
 		const auto viewsWidth = _views.maxWidth();
@@ -356,7 +362,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historyViewsTop,
-			outerWidth);
+			outer(right, icon));
 	}
 	if (!_replies.isEmpty()) {
 		const auto repliesWidth = _replies.maxWidth();
@@ -371,7 +377,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historyViewsTop,
-			outerWidth);
+			outer(right, icon));
 	}
 	if (!AyuFeatures::MessageShot::isTakingShot() && (_data.flags & Data::Flag::Sending)
 		&& !(_data.flags & Data::Flag::OutLayout)) {
@@ -383,7 +389,7 @@ void BottomInfo::paint(
 			p,
 			right,
 			firstLineBottom + st::historyViewsTop,
-			outerWidth);
+			outer(right, icon));
 	}
 	if (_effect) {
 		auto left = position.x();
@@ -515,7 +521,8 @@ void BottomInfo::layoutDateText() {
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
 		const auto date = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: edited + ((_data.flags & Data::Flag::ForwardedDate)
+			: edited + ((_data.flags
+				& (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time()));
 		const auto afterAuthor = prefix + date;
@@ -604,7 +611,8 @@ void BottomInfo::layoutDateText() {
 
 		const auto dateStr = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: (_data.flags & Data::Flag::ForwardedDate)
+			: (_data.flags
+				& (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time());
 
@@ -792,6 +800,8 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (message->context() == Context::ShortcutMessages) {
 		result.flags |= Flag::Shortcut;
+	} else if (message->context() == Context::MediaEditor) {
+		result.flags |= Flag::FullDate;
 	}
 	if (!item->isPost()
 		|| !item->hasRealFromId()

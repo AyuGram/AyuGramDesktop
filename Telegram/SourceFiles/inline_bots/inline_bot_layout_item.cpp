@@ -8,16 +8,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "inline_bots/inline_bot_layout_item.h"
 
 #include "base/never_freed_pointer.h"
-#include "data/data_photo.h"
-#include "data/data_document.h"
-#include "data/data_peer.h"
-#include "data/data_file_origin.h"
-#include "data/data_document_media.h"
 #include "core/click_handler_types.h"
-#include "inline_bots/inline_bot_result.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
+#include "data/data_peer.h"
+#include "data/data_photo.h"
 #include "inline_bots/inline_bot_layout_internal.h"
-#include "storage/localstorage.h"
+#include "inline_bots/inline_bot_result.h"
 #include "mainwidget.h"
+#include "storage/localstorage.h"
 #include "ui/image/image.h"
 #include "ui/empty_userpic.h"
 
@@ -152,6 +152,14 @@ std::unique_ptr<ItemBase> ItemBase::createLayout(
 			context,
 			std::move(result),
 			forceThumb);
+	case Type::Widget: {
+		// The list-wide hint misses thumbnails first seen on later pages.
+		const auto withThumb = forceThumb || result->hasThumbDisplay();
+		return std::make_unique<internal::Article>(
+			context,
+			std::move(result),
+			withThumb);
+	}
 	case Type::Game:
 		return std::make_unique<internal::Game>(context, std::move(result));
 	case Type::Contact:

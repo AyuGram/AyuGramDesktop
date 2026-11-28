@@ -104,6 +104,11 @@ void PromoSuggestions::refreshTopPromotion() {
 
 		result.match([&](const MTPDhelp_promoDataEmpty &data) {
 			setTopPromoted(nullptr, QString(), QString());
+			if (!_pendingSuggestions.empty() || _custom) {
+				_pendingSuggestions.clear();
+				_custom = std::nullopt;
+				_refreshed.fire({});
+			}
 		}, [&](const MTPDhelp_promoData &data) {
 			_session->data().processChats(data.vchats());
 			_session->data().processUsers(data.vusers());
@@ -280,9 +285,7 @@ void PromoSuggestions::dismissSetupEmail(Fn<void()> done) {
 }
 
 void PromoSuggestions::invalidate() {
-	if (_topPromotionRequestId) {
-		_session->api().request(_topPromotionRequestId).cancel();
-	}
+	_session->api().request(base::take(_topPromotionRequestId)).cancel();
 	_topPromotionNextRequestTime = 0;
 	_topPromotionTimer.callOnce(crl::time(200));
 }
@@ -359,6 +362,11 @@ std::optional<UserIds> PromoSuggestions::knownBirthdaysToday() const {
 
 QString PromoSuggestions::SugValidatePassword() {
 	static const auto key = u"VALIDATE_PASSWORD"_q;
+	return key;
+}
+
+QString PromoSuggestions::SugWalletFirstIncomingTransfer() {
+	static const auto key = u"WALLET_FIRST_INCOMING_TRANSFER"_q;
 	return key;
 }
 

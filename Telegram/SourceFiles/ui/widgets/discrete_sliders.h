@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
-#include "ui/round_rect.h"
 #include "ui/effects/animations.h"
 #include "ui/text/text.h"
+#include "ui/round_rect.h"
+#include "ui/rp_widget.h"
 
 namespace style {
 struct TextStyle;
@@ -46,8 +46,6 @@ public:
 	void setActiveSectionFast(int index);
 	void finishAnimating();
 	void selectSection(int index);
-
-	void setAdditionalContentWidthToSection(int index, int width);
 
 	[[nodiscard]] rpl::producer<int> sectionActivated() const {
 		return _sectionActivated.events();

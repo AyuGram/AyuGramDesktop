@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/object_ptr.h"
 #include "base/flat_map.h"
+#include "base/object_ptr.h"
 #include "base/unique_qptr.h"
 #include "info/profile/tabs/info_profile_tab_content.h"
 #include "ui/rp_widget.h"
@@ -44,7 +44,6 @@ public:
 	TabsHost(not_null<QWidget*> parent, Descriptor descriptor);
 	~TabsHost();
 
-	[[nodiscard]] rpl::producer<MediaTabContent*> activeTabValue() const;
 	[[nodiscard]] rpl::producer<TabTopBarBindings> activeTabBindings();
 	[[nodiscard]] rpl::producer<Ui::ScrollToRequest> scrollToRequests() const;
 

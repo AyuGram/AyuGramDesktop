@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "boxes/peer_list_box.h"
 #include "base/flat_map.h"
+#include "boxes/peer_list_box.h"
 #include "ui/effects/animations.h"
 #include "ui/unread_badge.h"
 
@@ -65,6 +65,14 @@ public:
 		QPoint point,
 		Fn<void()> updateCallback) override;
 	void elementsStopLastRipple() override;
+	int paintNameIconGetLeadingWidth(
+		Painter &p,
+		Fn<void()> repaint,
+		crl::time now,
+		int nameLeft,
+		int nameTop,
+		int outerWidth,
+		bool selected) override;
 	void elementsPaint(
 		Painter &p,
 		int outerWidth,

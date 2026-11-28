@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/text/text_variant.h"
-#include "ui/rp_widget.h"
-#include "ui/round_rect.h"
 #include "base/object_ptr.h"
 #include "base/weak_qptr.h"
 #include "settings/settings_type.h"
+#include "ui/text/text_variant.h"
+#include "ui/round_rect.h"
+#include "ui/rp_widget.h"
 
 #include <any>
 
@@ -139,6 +139,9 @@ public:
 		close();
 	}
 	[[nodiscard]] virtual rpl::producer<QString> title() = 0;
+	[[nodiscard]] virtual rpl::producer<QString> titleBadge() {
+		return nullptr;
+	}
 	virtual void sectionSaveChanges(FnMut<void()> done) {
 		done();
 	}
@@ -306,6 +309,7 @@ void AddDividerTextWithLottie(
 struct LottieIcon {
 	object_ptr<Ui::RpWidget> widget;
 	Fn<void(anim::repeat repeat)> animate;
+	Fn<bool()> animating;
 };
 [[nodiscard]] LottieIcon CreateLottieIcon(
 	not_null<QWidget*> parent,

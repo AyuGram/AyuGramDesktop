@@ -7,11 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/weak_ptr.h"
-#include "base/timer.h"
 #include "base/bytes.h"
-#include "mtproto/sender.h"
+#include "base/timer.h"
+#include "base/weak_ptr.h"
 #include "mtproto/mtproto_auth_key.h"
+#include "mtproto/sender.h"
 #include "webrtc/webrtc_device_resolver.h"
 #include "webrtc/webrtc_system_audio_capture.h"
 
@@ -254,7 +254,6 @@ public:
 	QString getDebugLog() const;
 
 	//void setAudioVolume(bool input, float level);
-	void setAudioDuckingEnabled(bool enabled);
 
 	[[nodiscard]] QString videoDeviceId() const {
 		return _videoCaptureDeviceId;
@@ -263,7 +262,6 @@ public:
 	[[nodiscard]] bool isSharingVideo() const;
 	[[nodiscard]] bool isSharingCamera() const;
 	[[nodiscard]] bool isSharingScreen() const;
-	[[nodiscard]] QString cameraSharingDeviceId() const;
 	[[nodiscard]] QString screenSharingDeviceId() const;
 	void toggleCameraSharing(bool enabled);
 	void toggleScreenSharing(
@@ -324,8 +322,6 @@ private:
 	void confirmAcceptedCall(const MTPDphoneCallAccepted &call);
 	void startConfirmedCall(const MTPDphoneCall &call);
 	void setState(State state);
-	void setStateQueued(State state);
-	void setFailedQueued(const QString &error);
 	void setSignalBarCount(int count);
 	void destroyController();
 

@@ -7,10 +7,6 @@ if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
     return()
 endif()
 
-if (QT_VERSION_MAJOR LESS 6)
-    return()
-endif()
-
 find_program(QSB_EXECUTABLE qsb
     HINTS
         "${QT_DIR}/../../../libexec"
@@ -45,8 +41,12 @@ foreach(_src ${_shader_sources})
         set(_glsl_ver "310es,430")
     else()
         file(READ ${_src} _src_contents)
-        string(FIND "${_src_contents}" "texelFetch" _has_texelfetch)
-        if(NOT _has_texelfetch EQUAL -1)
+        # GLSL 100 es and 120 have neither texelFetch nor unsigned integers.
+        string(REGEX MATCH
+            "texelFetch|[^A-Za-z0-9_]u(int|vec[234])[^A-Za-z0-9_]"
+            _needs_glsl_300
+            "${_src_contents}")
+        if(_needs_glsl_300)
             set(_glsl_ver "300es,150")
         else()
             set(_glsl_ver "100es,120,150")

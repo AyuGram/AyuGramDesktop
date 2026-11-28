@@ -14,16 +14,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "calls/calls_instance.h"
 #include "core/application.h"
 #include "data/components/sponsored_messages.h"
-#include "data/data_channel.h"
 #include "data/data_changes.h"
+#include "data/data_channel.h"
 #include "data/data_forum_topic.h"
 #include "data/data_peer.h"
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_shared_media.h"
 #include "data/data_thread.h"
-#include "history/history.h"
-#include "history/history_item.h"
 #include "history/view/history_view_contact_status.h"
 #include "history/view/history_view_group_call_bar.h"
 #include "history/view/history_view_pinned_bar.h"
@@ -32,22 +30,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/history_view_requests_bar.h"
 #include "history/view/history_view_translate_bar.h"
 #include "history/view/history_view_translate_tracker.h"
+#include "history/history.h"
+#include "history/history_item.h"
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
-#include "styles/style_chat.h"
-#include "styles/style_chat_helpers.h"
 #include "ui/chat/group_call_bar.h"
 #include "ui/chat/pinned_bar.h"
 #include "ui/chat/requests_bar.h"
 #include "ui/chat/sponsored_message_bar.h"
-#include "ui/wrap/slide_wrap.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/popup_menu.h"
+#include "ui/wrap/slide_wrap.h"
 #include "window/window_peer_menu.h"
 #include "window/window_session_controller.h"
+
+#include "styles/style_chat.h"
+#include "styles/style_chat_helpers.h"
 
 namespace HistoryView {
 namespace {
@@ -87,7 +88,7 @@ TopControls::TopControls(
 , _repliesRootId(descriptor.repliesRootId)
 , _topic(descriptor.topic)
 , _sublist(descriptor.sublist)
-, _monoforumPeerId(descriptor.monoforumPeerId)
+, _monoforumPeerId(activeThread()->monoforumPeerId())
 , _scroll(descriptor.scroll)
 , _list(descriptor.list)
 , _keyboardReservedHeight(std::move(descriptor.keyboardReservedHeight))
@@ -100,6 +101,15 @@ TopControls::TopControls(
 	_wrap->show();
 	setupTranslateBar();
 	rebuildModeSensitiveBars();
+	_history->owner().itemRemoved(
+	) | rpl::on_next([=](not_null<const HistoryItem*> item) {
+		if (_shownRepliesRootItem == item) {
+			_shownRepliesRootItem = nullptr;
+		}
+		if (_shownPinnedBarItem == item) {
+			_shownPinnedBarItem = nullptr;
+		}
+	}, _wrap->lifetime());
 	requestSponsoredMessageBar();
 	rpl::merge(
 		_list->heightValue() | rpl::to_empty,
@@ -206,12 +216,9 @@ void TopControls::setRepliesRootId(MsgId repliesRootId) {
 	}
 	const auto was = height();
 	_repliesRootId = repliesRootId;
+	_repliesRootDestroyed = false;
 	resetPinnedState();
-	_repliesRootView = nullptr;
-	_repliesRootViewHeight = 0;
-	_repliesRootViewInited = false;
-	_repliesRootViewInitScheduled = false;
-	_shownRepliesRootItem = nullptr;
+	resetRepliesRootView();
 	rebuildModeSensitiveBars();
 	updateLayout();
 	applyHeightChangeWithRelayout(was, height());
@@ -224,13 +231,9 @@ void TopControls::setTopic(Data::ForumTopic *topic) {
 	const auto was = height();
 	_topic = topic;
 	resetPinnedState();
-	_repliesRootView = nullptr;
-	_repliesRootViewHeight = 0;
-	_repliesRootViewInited = false;
-	_repliesRootViewInitScheduled = false;
+	resetRepliesRootView();
 	_topicReopenBar = nullptr;
 	_topicReopenBarHeight = 0;
-	_shownRepliesRootItem = nullptr;
 	rebuildModeSensitiveBars();
 	updateLayout();
 	applyHeightChangeWithRelayout(was, height());
@@ -290,8 +293,12 @@ void TopControls::setRepliesRootVisible(bool shown) {
 	}
 }
 
-rpl::producer<bool> TopControls::repliesRootVisibleValue() const {
-	return _repliesRootVisible.value();
+void TopControls::repliesRootDestroyed() {
+	_repliesRootDestroyed = true;
+	const auto was = height();
+	resetRepliesRootView();
+	updateLayout();
+	applyHeightChangeWithTopMoved(was, height());
 }
 
 void TopControls::updatePinnedViewer() {
@@ -320,7 +327,7 @@ void TopControls::updatePinnedViewer() {
 		const auto fullHistory = !_repliesRootId && !_topic && !_sublist;
 		_minPinnedId = Data::ResolveMinPinnedId(
 			_history->peer,
-			fullHistory ? MsgId(0) : _repliesRootId,
+			activeThread()->topicRootId(),
 			fullHistory ? PeerId(0) : _monoforumPeerId,
 			migrated);
 	}
@@ -374,7 +381,7 @@ void TopControls::setupRootView() {
 	) | rpl::map([=](Ui::MessageBarContent &&content, bool show) {
 		const auto shown = !content.title.isEmpty() && !content.text.empty();
 		crl::on_main(_wrap.get(), [=] {
-			_shownRepliesRootItem = shown
+			_shownRepliesRootItem = (shown && _repliesRootView)
 				? _history->owner().message(_history->peer->id, _repliesRootId)
 				: nullptr;
 		});
@@ -409,6 +416,14 @@ void TopControls::setupRootView() {
 		updateLayout();
 		applyHeightChangeWithTopMoved(was, this->height());
 	}, _repliesRootView->lifetime());
+}
+
+void TopControls::resetRepliesRootView() {
+	_repliesRootView = nullptr;
+	_repliesRootViewHeight = 0;
+	_repliesRootViewInited = false;
+	_repliesRootViewInitScheduled = false;
+	_shownRepliesRootItem = nullptr;
 }
 
 void TopControls::setupTopicReopenBar() {
@@ -737,12 +752,13 @@ void TopControls::setupPinnedTracker() {
 		checkPinnedBarState();
 		return;
 	}
+	const auto topicRootId = thread->topicRootId();
 
 	SharedMediaViewer(
 		&_history->session(),
 		Storage::SharedMediaKey(
 			_history->peer->id,
-			_repliesRootId,
+			topicRootId,
 			_monoforumPeerId,
 			Storage::SharedMediaType::Pinned,
 			ServerMaxMsgId - 1),
@@ -757,13 +773,13 @@ void TopControls::setupPinnedTracker() {
 			const auto peerId = _history->peer->id;
 			const auto hiddenId = settings.hiddenPinnedMessageId(
 				peerId,
-				_repliesRootId,
+				topicRootId,
 				_monoforumPeerId);
 			const auto last = result.size() ? result[result.size() - 1] : 0;
 			if (hiddenId && hiddenId != last) {
 				settings.setHiddenPinnedMessageId(
 					peerId,
-					_repliesRootId,
+					topicRootId,
 					_monoforumPeerId,
 					0);
 				_history->session().saveSettingsDelayed();
@@ -778,7 +794,7 @@ void TopControls::checkPinnedBarState() {
 
 	const auto fullHistory = !_repliesRootId && !_topic && !_sublist;
 	const auto migrated = migratedPeer();
-	const auto topicRootId = fullHistory ? MsgId(0) : _repliesRootId;
+	const auto topicRootId = activeThread()->topicRootId();
 	const auto monoforumPeerId = fullHistory ? PeerId(0) : _monoforumPeerId;
 	const auto hiddenId = _history->peer->canPinMessages()
 		? MsgId(0)
@@ -1061,7 +1077,7 @@ void TopControls::hidePinnedMessage() {
 		Window::HidePinnedBar(
 			_controller,
 			_history->peer,
-			fullHistory ? MsgId(0) : _repliesRootId,
+			activeThread()->topicRootId(),
 			fullHistory ? PeerId(0) : _monoforumPeerId,
 			crl::guard(_wrap.get(), [=] {
 				if (_pinnedTracker) {
@@ -1111,13 +1127,9 @@ void TopControls::rebuildModeSensitiveBars() {
 	}
 	if (_topic || !_repliesRootId) {
 		if (_repliesRootView) {
-			_repliesRootView = nullptr;
-			_repliesRootViewHeight = 0;
-			_repliesRootViewInited = false;
-			_repliesRootViewInitScheduled = false;
-			_shownRepliesRootItem = nullptr;
+			resetRepliesRootView();
 		}
-	} else if (!_repliesRootView) {
+	} else if (!_repliesRootView && !_repliesRootDestroyed) {
 		setupRootView();
 	}
 	if (_topic) {
@@ -1222,16 +1234,6 @@ void TopControls::updateZOrder() {
 	}
 	if (_repliesRootView) {
 		_repliesRootView->raise();
-	}
-}
-
-void TopControls::applyHeightChange(int was, int now, bool preserveTop) {
-	if (was == now) {
-		return;
-	} else if (preserveTop) {
-		applyHeightChangeWithTopMoved(was, now);
-	} else {
-		applyHeightChangeWithRelayout(was, now);
 	}
 }
 

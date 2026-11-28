@@ -7,11 +7,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_adaptive.h"
 
-#include "history/history_item.h"
-#include "data/data_media_types.h"
-#include "data/data_session.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "data/data_media_types.h"
+#include "data/data_session.h"
+#include "history/history_item.h"
 
 namespace Window {
 
@@ -68,11 +68,6 @@ rpl::producer<bool> Adaptive::chatWideValue() const {
 		) | rpl::map(rpl::mappers::_1 == Adaptive::ChatLayout::Wide),
 		Core::App().settings().adaptiveForWideValue()
 	) | rpl::map(rpl::mappers::_1 && rpl::mappers::_2);
-}
-
-bool Adaptive::isChatWide() const {
-	return Core::App().settings().adaptiveForWide()
-		&& (_chatLayout.current() == Adaptive::ChatLayout::Wide);
 }
 
 } // namespace Window

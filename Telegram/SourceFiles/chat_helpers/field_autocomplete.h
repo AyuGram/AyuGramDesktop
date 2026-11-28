@@ -99,6 +99,8 @@ public:
 
 	bool chooseSelected(ChooseMethod method) const;
 
+	void startPressDragSelect();
+
 	[[nodiscard]] bool stickersShown() const {
 		return !_srows.empty();
 	}
@@ -179,7 +181,7 @@ private:
 	ChatData *_chat = nullptr;
 	UserData *_user = nullptr;
 	ChannelData *_channel = nullptr;
-	EmojiPtr _emoji;
+	EmojiPtr _emoji = nullptr;
 	uint64 _stickersSeed = 0;
 	Type _type = Type::Mentions;
 	QString _filter;

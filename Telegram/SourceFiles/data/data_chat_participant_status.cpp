@@ -11,8 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/peers/edit_peer_permissions_box.h"
 #include "boxes/premium_limits_box.h" // FileSizeLimitBox.
 #include "chat_helpers/compose/compose_show.h"
-#include "data/data_chat.h"
 #include "data/data_channel.h"
+#include "data/data_chat.h"
 #include "data/data_forum_topic.h"
 #include "data/data_peer_values.h"
 #include "data/data_user.h"
@@ -315,7 +315,12 @@ SendError RestrictionError(
 			.text = tr::lng_frozen_restrict_title(tr::now),
 			.frozen = true,
 		});
-	} else if (const auto restricted = peer->amRestricted(restriction)) {
+	} else if (const auto user = peer->asUser()) {
+		if (user->isInaccessible()) {
+			return tr::lng_deleted(tr::now);
+		}
+	}
+	if (const auto restricted = peer->amRestricted(restriction)) {
 		if (const auto user = peer->asUser()) {
 			if (user->requiresPremiumToWrite()
 				&& !user->session().premium()) {
@@ -516,7 +521,9 @@ SendError FileRestrictionError(
 	}
 	switch (file.type) {
 	case Type::Photo:
-		if (compress == true && photos) {
+		if (compress == true && videos && file.hasAudioEditScene()) {
+			return videos;
+		} else if (compress == true && photos) {
 			return photos;
 		} else if (const auto other = file.isSticker() ? stickers : files) {
 			if ((compress == false || photos) && other) {
@@ -525,7 +532,9 @@ SendError FileRestrictionError(
 		}
 		break;
 	case Type::Video:
-		if (const auto error = file.isGifv() ? gifs : videos) {
+		if (const auto error = (file.isGifv() || file.sendsVideoAsGif())
+				? gifs
+				: videos) {
 			return error;
 		}
 		break;

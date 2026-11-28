@@ -6,9 +6,10 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_prepare_native_blocks.h"
+
 #include "base/unixtime.h"
-#include "iv/iv_rich_page.h"
 #include "iv/markdown/iv_markdown_prepare_links.h"
+#include "iv/iv_rich_page.h"
 #include "lang/lang_keys.h"
 
 #include <algorithm>
@@ -283,7 +284,7 @@ bool AppendPreparedQuoteParagraph(
 }
 
 [[nodiscard]] QString PreparedOrderedRomanText(int value, bool upper) {
-	if (value <= 0) {
+	if (!OrderedRomanSupported(value)) {
 		return QString::number(value);
 	}
 	struct RomanPart {
@@ -1319,7 +1320,10 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 	block.pullquote = data.pullquote;
 	const auto collapsible = RichBlockquoteIsCollapsible(data);
 	const auto atomic = collapsible && data.collapsed && state->editMode;
-	if (collapsible && (data.collapsed || state->editMode)) {
+	const auto toggleable = state->editMode
+		? collapsible
+		: (data.collapsed && !data.pullquote);
+	if (toggleable) {
 		block.collapseToggleId = NativeIvQuoteToggleId(state);
 		block.collapsed = data.collapsed;
 	}
@@ -1874,7 +1878,9 @@ void ClearPreparedEditSources(std::vector<PreparedBlock> *blocks) {
 			0,
 			block.text,
 			block.anchorId,
-			std::nullopt,
+			(IsQuotableNativeContent(state->result)
+				? std::make_optional(path)
+				: std::nullopt),
 			state);
 	case RichPageBlockKind::AuthorDate: {
 		auto prepared = PreparedIvRichText();
@@ -2197,6 +2203,66 @@ NativeInstantViewLeafUpdateResult UpdatePreparedNativeIvLeaf(
 			formulaRange);
 	}
 	return NativeInstantViewLeafUpdateResult::Unsupported;
+}
+
+const QString *ResolveCanonicalNativeIvLeafText(
+		const Iv::RichPage &page,
+		const PreparedEditLeafSource &source) {
+	if (source.kind == PreparedEditLeafKind::MathFormula) {
+		const auto block = ResolveCanonicalNativeIvBlock(page, source.block);
+		return (block && block->kind == RichPageBlockKind::Math)
+			? &block->formula
+			: nullptr;
+	}
+	const auto text = ResolveCanonicalNativeIvLeafRichText(page, source);
+	return text ? &text->text : nullptr;
+}
+
+const TextWithEntities *ResolveCanonicalNativeIvLeafRichText(
+		const Iv::RichPage &page,
+		const PreparedEditLeafSource &source) {
+	const auto block = ResolveCanonicalNativeIvBlock(page, source.block);
+	if (!block) {
+		return nullptr;
+	}
+	switch (source.kind) {
+	case PreparedEditLeafKind::BlockText:
+		return &block->text.text;
+	case PreparedEditLeafKind::BlockCaption:
+		return &block->caption.text;
+	case PreparedEditLeafKind::ListItemText: {
+		const auto &items = block->listItems;
+		if (block->kind != RichPageBlockKind::List
+			|| source.listItemIndex < 0
+			|| std::size_t(source.listItemIndex) >= items.size()) {
+			return nullptr;
+		}
+		return &items[source.listItemIndex].text.text;
+	}
+	case PreparedEditLeafKind::TableCellText: {
+		const auto &rows = block->tableRows;
+		if (block->kind != RichPageBlockKind::Table
+			|| source.tableRowIndex < 0
+			|| std::size_t(source.tableRowIndex) >= rows.size()) {
+			return nullptr;
+		}
+		const auto &cells = rows[source.tableRowIndex].cells;
+		if (source.tableCellIndex < 0
+			|| std::size_t(source.tableCellIndex) >= cells.size()) {
+			return nullptr;
+		}
+		return &cells[source.tableCellIndex].text.text;
+	}
+	case PreparedEditLeafKind::MathFormula:
+		return nullptr;
+	}
+	return nullptr;
+}
+
+bool IsQuotableNativeContent(const MarkdownArticleContent &content) {
+	return !content.editMode
+		&& content.richPage
+		&& (content.richPage->quoteModel.get() != nullptr);
 }
 
 } // namespace Iv::Markdown

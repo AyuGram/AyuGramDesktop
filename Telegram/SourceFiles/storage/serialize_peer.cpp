@@ -7,12 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/serialize_peer.h"
 
-#include "storage/serialize_common.h"
-#include "main/main_session.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "data/data_user.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
+#include "main/main_session.h"
+#include "storage/serialize_common.h"
 #include "ui/image/image.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 
@@ -53,33 +53,6 @@ std::optional<StorageImageLocation> readLegacyStorageImageLocationOrTag(
 				MTP_bytes(fileReference))),
 		width,
 		height);
-}
-
-int storageImageLocationSize(const StorageImageLocation &location) {
-	// Modern image location tag + (size + content) of the serialization.
-	return sizeof(qint32) * 2 + location.serializeSize();
-}
-
-void writeStorageImageLocation(
-		QDataStream &stream,
-		const StorageImageLocation &location) {
-	stream << kModernImageLocationTag << location.serialize();
-}
-
-std::optional<StorageImageLocation> readStorageImageLocation(
-		int streamAppVersion,
-		QDataStream &stream) {
-	const auto legacy = readLegacyStorageImageLocationOrTag(
-		streamAppVersion,
-		stream);
-	if (legacy) {
-		return legacy;
-	}
-	auto serialized = QByteArray();
-	stream >> serialized;
-	return (stream.status() == QDataStream::Ok)
-		? StorageImageLocation::FromSerialized(serialized)
-		: std::nullopt;
 }
 
 int imageLocationSize(const ImageLocation &location) {

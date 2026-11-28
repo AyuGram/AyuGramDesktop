@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/weak_ptr.h"
+#include "data/data_messages.h"
 #include "dialogs/dialogs_entry.h"
 #include "dialogs/dialogs_main_list.h"
-#include "data/data_messages.h"
-#include "base/weak_ptr.h"
 
 class ChannelData;
 
@@ -96,6 +96,7 @@ private:
 	Dialogs::MainList _chatsList;
 
 	QString _name;
+	int _nameVersion = 1;
 	base::flat_set<QString> _nameWords;
 	base::flat_set<QChar> _nameFirstLetters;
 

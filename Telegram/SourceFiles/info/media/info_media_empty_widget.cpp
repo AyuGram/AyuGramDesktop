@@ -7,9 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/media/info_media_empty_widget.h"
 
-#include "ui/widgets/labels.h"
-#include "styles/style_info.h"
 #include "lang/lang_keys.h"
+#include "ui/widgets/labels.h"
+
+#include "styles/style_info.h"
 
 namespace Info {
 namespace Media {
@@ -73,7 +74,9 @@ void EmptyWidget::setSearchQuery(const QString &query) {
 				? tr::lng_media_link_empty(tr::now)
 				: tr::lng_media_link_empty_search(tr::now);
 		case Type::RoundVoiceFile:
-			return tr::lng_media_audio_empty(tr::now);
+			return query.isEmpty()
+				? tr::lng_media_audio_empty(tr::now)
+				: tr::lng_media_audio_empty_search(tr::now);
 		}
 		Unexpected("Bad type in EmptyWidget::setSearchQuery()");
 	}());

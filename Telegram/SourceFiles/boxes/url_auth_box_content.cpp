@@ -9,18 +9,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/qthelp_url.h"
 #include "lang/lang_keys.h"
-#include "ui/dynamic_image.h"
+#include "ui/controls/button_busy.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/layers/generic_box.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/horizontal_fit_container.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/tooltip.h"
-#include "ui/emoji_config.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/dynamic_image.h"
+#include "ui/emoji_config.h"
 #include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
@@ -45,7 +47,7 @@ void PrepareFullWidthRoundButton(
 
 [[nodiscard]] bool TitleFitsBesideSwitcher(const TextWithEntities &title) {
 	const auto &st = st::urlAuthBoxTitle;
-	const auto available = st::boxWidth
+	const auto available = st::boxWideWidth
 		- st::boxRowPadding.left()
 		- st::boxRowPadding.right();
 	const auto widths = Ui::Text::String(
@@ -54,9 +56,9 @@ void PrepareFullWidthRoundButton(
 		kMarkupTextOptions,
 		st.minWidth
 	).countLineWidths(available);
-	const auto free = st::boxWidth / 2
+	const auto free = st::boxWideWidth / 2
 		- SwitchableUserpicButton::MaxWidth()
-		- SwitchableUserpicButton::Skip();
+		- SwitchableUserpicButton::RightSkip();
 	return widths.empty() || (widths.front() <= 2 * free);
 }
 
@@ -238,6 +240,14 @@ int SwitchableUserpicButton::Skip() {
 	return st::lineWidth * 4;
 }
 
+int SwitchableUserpicButton::RightSkip() {
+	return st::boxScroll.width - Skip();
+}
+
+int SwitchableUserpicButton::TopSkip() {
+	return st::boxTopMargin;
+}
+
 SwitchableUserpicButton::SwitchableUserpicButton(
 	not_null<Ui::RpWidget*> parent)
 : RippleButton(parent, st::defaultRippleAnimation)
@@ -248,6 +258,9 @@ SwitchableUserpicButton::SwitchableUserpicButton(
 }
 
 void SwitchableUserpicButton::setUserpic(not_null<Ui::RpWidget*> userpic) {
+	if (_userpic && _userpic != userpic) {
+		delete _userpic;
+	}
 	_userpic = userpic;
 	_userpic->setParent(this);
 	_userpic->moveToRight(_skip, _skip);
@@ -299,34 +312,34 @@ QPoint SwitchableUserpicButton::prepareRippleStartPosition() const {
 	return mapFromGlobal(QCursor::pos());
 }
 
-void AddAuthInfoRow(
+AuthInfoRowLabels AddAuthInfoRow(
 		not_null<Ui::VerticalLayout*> container,
-		const QString &topText,
-		const QString &bottomText,
+		const TextWithEntities &topText,
+		const TextWithEntities &bottomText,
 		const QString &leftText,
-		const style::icon &icon) {
-	const auto row = container->add(
-		object_ptr<Ui::RpWidget>(container),
-		st::boxRowPadding);
+		const style::icon &icon,
+		const style::FlatLabel *valueSt) {
+	auto owned = object_ptr<Ui::RpWidget>(container);
+	const auto row = owned.data();
 
 	const auto topLabel = Ui::CreateChild<Ui::FlatLabel>(
 		row,
-		topText,
-		st::urlAuthBoxRowTopLabel);
+		rpl::single(topText),
+		valueSt ? *valueSt : st::urlAuthBoxRowTopLabel);
 	topLabel->setSelectable(true);
 	Ui::InstallTooltip(topLabel, [=] {
 		return (topLabel->textMaxWidth() > topLabel->width())
-			? topText
+			? topText.text
 			: QString();
 	});
 	const auto bottomLabel = Ui::CreateChild<Ui::FlatLabel>(
 		row,
-		bottomText,
-		st::urlAuthBoxRowBottomLabel);
+		rpl::single(bottomText),
+		valueSt ? *valueSt : st::urlAuthBoxRowBottomLabel);
 	bottomLabel->setSelectable(true);
 	Ui::InstallTooltip(bottomLabel, [=] {
 		return (bottomLabel->textMaxWidth() > bottomLabel->width())
-			? bottomText
+			? bottomText.text
 			: QString();
 	});
 	const auto leftLabel = Ui::CreateChild<Ui::FlatLabel>(
@@ -374,6 +387,8 @@ void AddAuthInfoRow(
 			icon.paintInCenter(p, widget->rect());
 		}, widget->lifetime());
 	}
+	container->add(std::move(owned), st::boxRowPadding);
+	return { topLabel, bottomLabel };
 }
 
 void Show(
@@ -462,11 +477,16 @@ void ShowDetails(
 		const QString &ip,
 		const QString &region,
 		rpl::producer<QStringList> matchCodes,
-		bool isApp) {
-	box->setWidth(st::boxWidth);
-	box->setStyle(st::urlAuthBox);
+		bool isApp,
+		object_ptr<Ui::RpWidget> extraSection,
+		rpl::producer<bool> busy) {
+	box->setWidth(st::boxWideWidth);
+	box->setStyle(st::urlAuthDetailsBox);
+	box->setNoContentMargin(true);
 
 	const auto content = box->verticalLayout();
+	const auto bottom = box->setPinnedToBottomContent(
+		object_ptr<Ui::VerticalLayout>(box));
 
 	const auto withUserpic = (userpicOwned != nullptr);
 	const auto reserve = content->add(object_ptr<Ui::RpWidget>(content));
@@ -504,9 +524,10 @@ void ShowDetails(
 		title->setMarkedText(text);
 		reserve->resize(
 			reserve->width(),
-			(withUserpic || TitleFitsBesideSwitcher(text))
-				? (2 * st::defaultVerticalListSkip)
-				: SwitchableUserpicButton::Size());
+			SwitchableUserpicButton::TopSkip()
+				+ ((withUserpic || TitleFitsBesideSwitcher(text))
+					? (2 * st::defaultVerticalListSkip)
+					: SwitchableUserpicButton::Size()));
 	}, title->lifetime());
 	Ui::AddSkip(content);
 
@@ -524,8 +545,8 @@ void ShowDetails(
 	if (!platform.isEmpty() || !browser.isEmpty()) {
 		AddAuthInfoRow(
 			content,
-			platform,
-			browser,
+			tr::marked(platform),
+			tr::marked(browser),
 			tr::lng_url_auth_device_label(tr::now),
 			st::menuIconDevices);
 	}
@@ -535,8 +556,8 @@ void ShowDetails(
 	if (!ip.isEmpty() || !region.isEmpty()) {
 		AddAuthInfoRow(
 			content,
-			ip,
-			region,
+			tr::marked(ip),
+			tr::marked(region),
 			tr::lng_url_auth_ip_label(tr::now),
 			st::menuIconAddress);
 	}
@@ -547,6 +568,10 @@ void ShowDetails(
 		content,
 		rpl::single(tr::lng_url_auth_login_attempt(tr::now)));
 	Ui::AddSkip(content);
+
+	if (extraSection) {
+		content->add(std::move(extraSection));
+	}
 
 	auto allowMessages = (Ui::SettingsButton*)(nullptr);
 	if (botName) {
@@ -572,16 +597,21 @@ void ShowDetails(
 		state->matchCodes = codes;
 	}, box->lifetime());
 
-	Ui::AddSkip(content);
+	Ui::AddSkip(bottom);
 	{
 		const auto &padding = st::boxRowPadding;
-		const auto button = content->add(
+		const auto button = bottom->add(
 			object_ptr<Ui::RoundButton>(
-				content,
+				bottom,
 				tr::lng_url_auth_login_button(),
 				st::defaultLightButton),
 			padding);
-		PrepareFullWidthRoundButton(button, content, padding);
+		PrepareFullWidthRoundButton(button, bottom, padding);
+		if (busy) {
+			std::move(busy) | rpl::on_next([=](bool value) {
+				Ui::SetButtonBusy(button, value);
+			}, button->lifetime());
+		}
 		button->setClickedCallback([=] {
 			if (state->matchCodes.isEmpty()) {
 				callback({
@@ -597,32 +627,33 @@ void ShowDetails(
 					emojiImageFactory,
 					domain,
 					state->matchCodes,
-					[=](QString matchCode) {
+					crl::guard(box, [=](QString matchCode) {
 						callback({
 							.auth = true,
 							.allowWrite = (allowMessages
 								&& allowMessages->toggled()),
 							.matchCode = std::move(matchCode),
 						});
-					},
+					}),
 					isApp);
 			}));
 		});
 	}
-	Ui::AddSkip(content);
+	Ui::AddSkip(bottom);
 	{
 		const auto &padding = st::boxRowPadding;
-		const auto button = content->add(
+		const auto button = bottom->add(
 			object_ptr<Ui::RoundButton>(
-				content,
+				bottom,
 				tr::lng_suggest_action_decline(),
 				st::attentionBoxButton),
 			padding);
-		PrepareFullWidthRoundButton(button, content, padding);
+		PrepareFullWidthRoundButton(button, bottom, padding);
 		button->setClickedCallback([=] {
 			box->closeBox();
 		});
 	}
+	Ui::AddSkip(bottom, st::urlAuthBox.buttonPadding.bottom());
 }
 
 } // namespace UrlAuthBox

@@ -15,7 +15,6 @@ namespace {
 
 using namespace FFmpeg;
 
-constexpr auto kMaxDecodeSpan = crl::time(10000);
 constexpr auto kForwardDecodeWindow = crl::time(3000);
 constexpr auto kMaxDecodeArea = 4096 * int64(4096);
 
@@ -84,7 +83,8 @@ struct Source {
 	source.rotation = ReadRotationFromMetadata(source.videoStream);
 	if (withDecoder) {
 		source.codec = MakeCodecPointer({
-			.stream = source.videoStream,
+			.parameters = source.videoStream->codecpar,
+			.timeBase = source.videoStream->time_base,
 			.videoMaxArea = kMaxDecodeArea,
 		});
 		if (!source.codec) {
@@ -304,7 +304,6 @@ QImage Extractor::take(crl::time position) {
 		seekTo(position);
 	}
 	auto has = false;
-	auto firstAt = crl::time(-1);
 	while (true) {
 		if (!receiveInto(_frame.get())) {
 			break;
@@ -312,17 +311,12 @@ QImage Extractor::take(crl::time position) {
 		const auto at = FramePosition(_frame.get(), timeBase);
 		if (at >= 0) {
 			_decodedPosition = at;
-			if (firstAt < 0) {
-				firstAt = at;
-			}
 		}
 		av_frame_unref(_kept.get());
 		av_frame_ref(_kept.get(), _frame.get());
 		has = true;
 		av_frame_unref(_frame.get());
 		if (at < 0 || at >= position) {
-			break;
-		} else if (firstAt >= 0 && at - firstAt > kMaxDecodeSpan) {
 			break;
 		}
 	}

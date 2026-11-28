@@ -7,24 +7,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/ui/dialogs_message_view.h"
 
-#include "history/history.h"
-#include "history/history_item.h"
-#include "history/view/history_view_element.h"
-#include "history/view/history_view_item_preview.h"
-#include "main/main_session.h"
-#include "dialogs/dialogs_three_state_icon.h"
+#include "core/ui_integration.h"
 #include "dialogs/ui/dialogs_layout.h"
 #include "dialogs/ui/dialogs_topics_view.h"
+#include "dialogs/dialogs_three_state_icon.h"
+#include "history/view/history_view_element.h"
+#include "history/view/history_view_item_preview.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
+#include "lang/lang_keys.h"
+#include "lang/lang_text_entity.h"
+#include "main/main_session.h"
 #include "ui/effects/spoiler_mess.h"
 #include "ui/text/custom_emoji_helper.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
 #include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/power_saving.h"
-#include "core/ui_integration.h"
-#include "lang/lang_keys.h"
-#include "lang/lang_text_entity.h"
+#include "ui/rect.h"
+
 #include "styles/style_dialogs.h"
 
 namespace {
@@ -235,17 +237,22 @@ void MessageView::prepare(
 			}
 		}
 
-		if (minFrom == std::numeric_limits<uint16>::max()
-			&& !item->replyTo().quote.empty()) {
+		const auto reply = (minFrom == std::numeric_limits<uint16>::max())
+			? item->Get<HistoryMessageReply>()
+			: nullptr;
+		const auto quote = (reply && reply->messageId())
+			? reply->fields().displayQuote()
+			: TextWithEntities();
+		if (!quote.empty()) {
 			auto textQuote = TextWithEntities();
 			for (const auto &word : words) {
 				const auto selection = HistoryView::FindSearchQueryHighlight(
-					item->replyTo().quote.text,
+					quote.text,
 					word);
 				if (!selection.empty()) {
 					minFrom = 0;
 					if (textQuote.empty()) {
-						textQuote = item->replyTo().quote;
+						textQuote = quote;
 					}
 					textQuote.entities.push_back(EntityInText{
 						EntityType::Colorized,

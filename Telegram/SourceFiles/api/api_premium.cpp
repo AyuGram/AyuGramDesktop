@@ -130,11 +130,6 @@ rpl::producer<> Premium::stickersUpdated() const {
 	return _stickersUpdated.events();
 }
 
-auto Premium::cloudSet() const
--> const std::vector<not_null<DocumentData*>> & {
-	return _cloudSet;
-}
-
 rpl::producer<> Premium::cloudSetUpdated() const {
 	return _cloudSetUpdated.events();
 }
@@ -253,12 +248,8 @@ void Premium::reloadCloudSet() {
 		}, [&](const MTPDmessages_stickers &data) {
 			_cloudSetHash = data.vhash().v;
 			const auto owner = &_session->data();
-			_cloudSet.clear();
 			for (const auto &sticker : data.vstickers().v) {
-				const auto document = owner->processDocument(sticker);
-				if (document->isPremiumSticker()) {
-					_cloudSet.push_back(document);
-				}
+				owner->processDocument(sticker);
 			}
 			_cloudSetUpdated.fire({});
 		});
@@ -444,10 +435,14 @@ void Premium::requestPremiumRequiredSlice() {
 			= base::take(_resolveMessageMoneyRequiredUsers);
 	}
 	const auto finish = [=](const QVector<MTPRequirementToContact> &list) {
-
+		const auto superseded = base::take(
+			_resolveMessageMoneySupersededUsers);
 		auto index = 0;
 		for (const auto &user : base::take(_resolveMessageMoneyRequestedUsers)) {
 			const auto set = [&](bool requirePremium, int stars) {
+				if (superseded.contains(user)) {
+					return;
+				}
 				using Flag = UserDataFlag;
 				constexpr auto me = Flag::RequiresPremiumToWrite;
 				constexpr auto known = Flag::MessageMoneyRestrictionsKnown;
@@ -487,6 +482,69 @@ void Premium::requestPremiumRequiredSlice() {
 	}).fail([=] {
 		finish({});
 	}).send();
+}
+
+void Premium::importNoPaidMessagesToken(
+		not_null<UserData*> user,
+		const QString &token,
+		Fn<void(bool priceRemoved)> done,
+		Fn<void(const MTP::Error &)> fail) {
+	const auto key = std::pair(user, token);
+	auto &callbacks = _noPaidTokenImports[key];
+	callbacks.push_back({ std::move(done), std::move(fail) });
+	if (callbacks.size() > 1) {
+		return;
+	}
+	const auto priced = [=] {
+		return user->hasStarsPerMessage() || (user->starsPerMessage() > 0);
+	};
+	_api.request(MTPcontacts_ImportNoPaidMessagesToken(
+		user->inputUser(),
+		MTP_string(token)
+	)).done([=](const MTPUser &result) {
+		const auto pricedBefore = priced();
+		if (_resolveMessageMoneyRequestedUsers.contains(user)) {
+			_resolveMessageMoneySupersededUsers.emplace(user);
+		}
+		_session->api().reloadFullPeer(user);
+		_session->data().processUser(result);
+		const auto priceRemoved = pricedBefore && !priced();
+		if (const auto callbacks = _noPaidTokenImports.take(key)) {
+			for (const auto &callback : *callbacks) {
+				if (callback.done) {
+					callback.done(priceRemoved);
+				}
+			}
+		}
+	}).fail([=](const MTP::Error &error) {
+		if (const auto callbacks = _noPaidTokenImports.take(key)) {
+			for (const auto &callback : *callbacks) {
+				if (callback.fail) {
+					callback.fail(error);
+				}
+			}
+		}
+	}).handleAllErrors().send();
+}
+
+void Premium::exportNoPaidMessagesToken(
+		NoPaidTokenExport args,
+		Fn<void(NoPaidMessagesToken)> done,
+		Fn<void(const MTP::Error &)> fail) {
+	using Flag = MTPcontacts_ExportNoPaidMessagesToken::Flag;
+	_api.request(MTPcontacts_ExportNoPaidMessagesToken(
+		MTP_flags((args.revoke ? Flag::f_revoke : Flag())
+			| (args.temporary ? Flag::f_temporary : Flag()))
+	)).done([=](const MTPExportedNoPaidMessagesToken &result) {
+		const auto &data = result.data();
+		done({
+			.token = qs(data.vtoken()),
+			.url = qs(data.vurl()),
+			.expires = data.vexpires().value_or_empty(),
+		});
+	}).fail([=](const MTP::Error &error) {
+		fail(error);
+	}).handleFloodErrors().send();
 }
 
 PremiumGiftCodeOptions::PremiumGiftCodeOptions(not_null<PeerData*> peer)
@@ -577,7 +635,7 @@ const std::vector<int> &PremiumGiftCodeOptions::availablePresets() const {
 	return _availablePresets;
 }
 
-[[nodiscard]] int PremiumGiftCodeOptions::monthsFromPreset(int monthsIndex) {
+int PremiumGiftCodeOptions::monthsFromPreset(int monthsIndex) {
 	Expects(monthsIndex >= 0 && monthsIndex < _availablePresets.size());
 
 	return _optionsForOnePerson.months[monthsIndex];
@@ -948,15 +1006,23 @@ std::optional<Data::StarGift> FromTL(
 				.releasedBy = releasedBy,
 				.themeUser = themeUser,
 				.nanoTonForResale = FindTonForResale(data.vresell_amount()),
+				.nanoTonMinOffer = int64(
+					data.voffer_min_amount().value_or_empty()),
 				.craftChancePermille
 					= data.vcraft_chance_permille().value_or_empty(),
 				.starsForResale = FindStarsForResale(data.vresell_amount()),
 				.starsMinOffer = data.voffer_min_stars().value_or(-1),
+				.feeBps = (data.vfee_bps()
+					? std::make_optional(data.vfee_bps()->v)
+					: std::nullopt),
 				.number = data.vnum().v,
 				.onlyAcceptTon = data.is_resale_ton_only(),
 				.canBeTheme = data.is_theme_available(),
 				.crafted = data.is_crafted(),
 				.burned = data.is_burned(),
+				.onchainSale = data.is_onchain_sale(),
+				.fixedSale = data.is_fixed_sale(),
+				.mySale = data.is_my_sale(),
 				.model = *model,
 				.pattern = *pattern,
 				.value = (data.vvalue_amount()
@@ -1043,6 +1109,7 @@ std::optional<Data::SavedStarGift> FromTL(
 		.pinned = data.is_pinned_to_top() && hasUnique,
 		.hidden = data.is_unsaved(),
 		.mine = to->isSelf(),
+		.refunded = data.is_refunded(),
 	};
 }
 

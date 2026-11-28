@@ -7,18 +7,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_video_track.h"
 
+#include "base/concurrent_timer.h"
+#include "base/debug_log.h"
+#include "core/crash_reports.h"
 #include "ffmpeg/ffmpeg_utility.h"
 #include "media/audio/media_audio.h"
 #include "media/media_common.h"
-#include "base/concurrent_timer.h"
-#include "core/crash_reports.h"
-#include "base/debug_log.h"
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 #include "media/streaming/media_streaming_native_frame_mac.h"
 
 #include <CoreVideo/CoreVideo.h>
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 
 namespace Media {
 namespace Streaming {
@@ -285,7 +285,7 @@ int VideoTrackObject::durationByPacket(const FFmpeg::Packet &packet) {
 
 void VideoTrackObject::queueReadFrames(crl::time delay) {
 	if (delay > 0) {
-		_readFramesTimer.callOnce(delay);
+		_readFramesTimer.callOnce(std::min(delay, kDurationMax - 1));
 	} else if (!_queued) {
 		_queued = true;
 		_weak.with([](VideoTrackObject &that) {
@@ -472,7 +472,7 @@ void VideoTrackObject::rasterizeFrame(not_null<Frame*> frame) {
 	frame->format = FrameFormat::None;
 	frame->nativeFrame = NativeFrame();
 	if (frame->decoded->hw_frames_ctx) {
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 		const auto hwFormat = frame->decoded->format;
 		const auto wantARGB = requireARGB32();
 		const auto isVT = (hwFormat == AV_PIX_FMT_VIDEOTOOLBOX);
@@ -505,7 +505,7 @@ void VideoTrackObject::rasterizeFrame(not_null<Frame*> frame) {
 				}
 				return;
 		}
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 		if (!frame->transferred) {
 			frame->transferred = FFmpeg::MakeFramePointer();
 		}
@@ -762,7 +762,9 @@ bool VideoTrackObject::processFirstFrame() {
 
 crl::time VideoTrackObject::currentFramePosition() const {
 	const auto position = FramePosition(_stream);
-	if (position == kTimeUnknown || position == kFinishedPosition) {
+	if (position == kTimeUnknown
+		|| position == kFinishedPosition
+		|| position > kDurationMax) {
 		return kTimeUnknown;
 	}
 	return _loopingShift + std::clamp(
@@ -1298,10 +1300,10 @@ QImage VideoTrack::frameImage(
 		if (frame->format == FrameFormat::YUV420
 			|| frame->format == FrameFormat::NV12) {
 			frame->original = ConvertToARGB32(frame->format, frame->yuv);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 		} else if (frame->format == FrameFormat::NativeTexture) {
 			frame->original = ConvertNativeFrameToARGB32(frame->nativeFrame);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 		}
 	}
 	if (GoodForRequest(
@@ -1344,10 +1346,10 @@ QImage VideoTrack::currentFrameImage() {
 		if (frame->format == FrameFormat::YUV420
 			|| frame->format == FrameFormat::NV12) {
 			frame->original = ConvertToARGB32(frame->format, frame->yuv);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 		} else if (frame->format == FrameFormat::NativeTexture) {
 			frame->original = ConvertNativeFrameToARGB32(frame->nativeFrame);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 		}
 	}
 	return frame->original;

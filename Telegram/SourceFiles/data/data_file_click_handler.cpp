@@ -7,13 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_file_click_handler.h"
 
+#include "core/application.h"
 #include "core/click_handler_types.h"
 #include "core/file_utilities.h"
-#include "core/application.h"
 #include "data/data_document.h"
-#include "data/data_session.h"
+#include "data/data_document_resolver.h"
 #include "data/data_download_manager.h"
 #include "data/data_photo.h"
+#include "data/data_session.h"
 #include "main/main_session.h"
 
 FileClickHandler::FileClickHandler(FullMsgId context)
@@ -173,7 +174,13 @@ void DocumentOpenWithClickHandler::Open(
 	data->saveFromDataSilent();
 	const auto path = data->filepath(true);
 	if (!path.isEmpty()) {
-		File::OpenWith(path);
+		const auto session = &data->session();
+		const auto itemId = v::is<FullMsgId>(origin.data)
+			? v::get<FullMsgId>(origin.data)
+			: FullMsgId();
+		File::OpenWith(path, crl::guard(session, [=] {
+			Data::LaunchWithWarning(path, session->data().message(itemId));
+		}));
 	} else {
 		DocumentSaveClickHandler::Save(
 			origin,

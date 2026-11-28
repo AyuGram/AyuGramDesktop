@@ -25,7 +25,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/single_choice_box.h"
 #include "ui/effects/animations.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
@@ -33,11 +32,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/level_meter.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/vertical_list.h"
 #include "webrtc/webrtc_audio_input_tester.h"
 #include "webrtc/webrtc_create_adm.h"
 #include "webrtc/webrtc_environment.h"
 #include "webrtc/webrtc_video_track.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
@@ -115,8 +116,6 @@ void InitCaptureButton(
 		std::unique_ptr<Webrtc::DeviceResolver> deviceId;
 		std::unique_ptr<Webrtc::AudioInputTester> tester;
 		base::Timer timer;
-		Ui::Animations::Simple animation;
-		float level = 0.;
 	};
 	const auto level = container->add(
 		object_ptr<Ui::LevelMeter>(
@@ -127,11 +126,9 @@ void InitCaptureButton(
 	level->resize(QSize(0, st::defaultLevelMeter.height));
 
 	state->timer.setCallback([=] {
-		const auto was = state->level;
-		state->level = state->tester->getAndResetLevel();
-		state->animation.start([=] {
-			level->setValue(state->animation.value(state->level));
-		}, was, state->level, kMicTestAnimationDuration);
+		level->animateTo(
+			state->tester->getAndResetLevel(),
+			kMicTestAnimationDuration);
 	});
 	testingMicrophone->value() | rpl::on_next([=](bool testing) {
 		if (testing) {
@@ -144,7 +141,7 @@ void InitCaptureButton(
 			state->timer.callEach(kMicTestUpdateInterval);
 		} else {
 			state->timer.cancel();
-			state->animation.stop();
+			level->stopAnimation();
 			state->tester = nullptr;
 			state->deviceId = nullptr;
 		}

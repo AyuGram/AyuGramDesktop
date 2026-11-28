@@ -7,38 +7,38 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_call.h"
 
-#include "calls/group/calls_group_common.h"
-#include "calls/group/calls_group_messages.h"
-#include "calls/calls_instance.h"
-#include "main/session/session_show.h"
-#include "main/main_app_config.h"
-#include "main/main_session.h"
 #include "api/api_send_progress.h"
 #include "api/api_updates.h"
 #include "apiwrap.h"
-#include "lang/lang_keys.h"
-#include "lang/lang_hardcoded.h"
-#include "boxes/peers/edit_participants_box.h" // SubscribeToMigration.
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
-#include "ui/ui_utility.h"
+#include "base/global_shortcuts.h"
+#include "base/random.h"
 #include "base/unixtime.h"
+#include "boxes/peers/edit_participants_box.h" // SubscribeToMigration.
+#include "calls/group/calls_group_common.h"
+#include "calls/group/calls_group_messages.h"
+#include "calls/calls_instance.h"
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/data_changes.h"
-#include "data/data_user.h"
-#include "data/data_chat.h"
 #include "data/data_channel.h"
+#include "data/data_chat.h"
 #include "data/data_group_call.h"
 #include "data/data_peer_values.h"
 #include "data/data_session.h"
-#include "base/global_shortcuts.h"
-#include "base/random.h"
+#include "data/data_user.h"
+#include "lang/lang_hardcoded.h"
+#include "lang/lang_keys.h"
+#include "main/session/session_show.h"
+#include "main/main_app_config.h"
+#include "main/main_session.h"
 #include "tde2e/tde2e_api.h"
 #include "tde2e/tde2e_integration.h"
-#include "webrtc/webrtc_video_track.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/ui_utility.h"
 #include "webrtc/webrtc_create_adm.h"
 #include "webrtc/webrtc_environment.h"
+#include "webrtc/webrtc_video_track.h"
 
 #include <tgcalls/group/GroupInstanceCustomImpl.h>
 #include <tgcalls/VideoCaptureInterface.h>
@@ -313,19 +313,22 @@ struct ParticipantVideoParams {
 			return false;
 		}
 		const auto &list = data.vsource_groups().v;
-		if (list.size() != was.ssrcGroups.size()) {
-			return false;
-		}
+		const auto count = int(was.ssrcGroups.size());
 		auto index = 0;
 		for (const auto &group : list) {
 			const auto equal = group.match([&](
 					const MTPDgroupCallParticipantVideoSourceGroup &data) {
+				const auto list = data.vsources().v;
+				if (list.isEmpty()) {
+					return true; // ParseVideoParams() drops such groups.
+				} else if (index >= count) {
+					return false;
+				}
 				const auto &group = was.ssrcGroups[index++];
 				if (gsl::make_span(data.vsemantics().v)
 					!= gsl::make_span(group.semantics)) {
 					return false;
 				}
-				const auto list = data.vsources().v;
 				if (list.size() != group.ssrcs.size()) {
 					return false;
 				}
@@ -341,7 +344,7 @@ struct ParticipantVideoParams {
 				return false;
 			}
 		}
-		return true;
+		return (index == count);
 	});
 }
 
@@ -361,6 +364,9 @@ struct ParticipantVideoParams {
 			group.match([&](
 					const MTPDgroupCallParticipantVideoSourceGroup &data) {
 				const auto &list = data.vsources().v;
+				if (list.isEmpty()) {
+					return; // tgcalls reads the first ssrc of a group.
+				}
 				auto ssrcs = std::vector<uint32_t>();
 				ssrcs.reserve(list.size());
 				for (const auto &ssrc : list) {
@@ -1254,10 +1260,6 @@ Data::GroupCallOrigin GroupCall::origin() const {
 
 bool GroupCall::listenersHidden() const {
 	return _listenersHidden;
-}
-
-bool GroupCall::emptyRtmp() const {
-	return _emptyRtmp.current();
 }
 
 rpl::producer<bool> GroupCall::emptyRtmpValue() const {
@@ -3368,14 +3370,6 @@ void GroupCall::requestCurrentTimeStart(
 	).send();
 }
 
-void GroupCall::requestCurrentTimeCancel(
-		not_null<RequestCurrentTimeTask*> task) {
-	const auto i = _requestCurrentTimes.find(task.get());
-	if (i != end(_requestCurrentTimes)) {
-		_requestCurrentTimes.erase(i);
-	}
-}
-
 int64 GroupCall::approximateServerTimeInMs() const {
 	Expects(_serverTimeMs != 0);
 
@@ -3516,10 +3510,11 @@ void GroupCall::fillActiveVideoEndpoints() {
 		return;
 	}
 
+	// A missing self row is a rejoin or a gap, not a video withdrawal.
 	const auto me = real->participantByPeer(joinAs());
 	if (me && me->videoJoined) {
 		_videoIsWorking = true;
-	} else {
+	} else if (me) {
 		_videoIsWorking = false;
 		toggleVideo(false);
 		toggleScreenSharing(std::nullopt);

@@ -164,6 +164,7 @@ enum class GiftType : uchar {
 	ChatTheme,
 	BirthdaySuggest,
 	GiftOffer,
+	OnchainOffer,
 };
 
 struct GiftCode {
@@ -209,6 +210,8 @@ struct GiftCode {
 };
 
 inline constexpr auto kTimeToLiveSingleView = crl::time(0x7FFFFFFF);
+
+class MediaDice;
 
 class Media {
 public:

@@ -14,22 +14,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 #include "dialogs/dialogs_key.h"
 #include "history/history.h"
-#include "info/info_controller.h"
 #include "info/media/info_media_buttons.h"
 #include "info/media/info_media_empty_widget.h"
 #include "info/media/info_media_list_widget.h"
-#include "info/profile/info_profile_values.h"
+#include "info/media/info_media_voice_filter.h"
 #include "info/profile/tabs/adapters/info_profile_tab_sub_controller.h"
 #include "info/profile/tabs/info_profile_tab_skeleton.h"
+#include "info/profile/info_profile_values.h"
+#include "info/info_controller.h"
 #include "lang/lang_keys.h"
-#include "ui/text/text_utilities.h"
 #include "ui/effects/animations.h"
+#include "ui/text/text_utilities.h"
+#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
 #include "ui/ui_utility.h"
-#include "ui/widgets/menu/menu_add_action_callback.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_info.h"
 #include "styles/style_menu_icons.h"
 
@@ -72,10 +74,6 @@ base::options::toggle MediaTabsExpandedOption({
 	}
 }
 
-[[nodiscard]] QString MediaTabId(SharedMediaType type) {
-	return u"media:"_q + QString::number(int(type));
-}
-
 [[nodiscard]] Data::ProfileTab MediaProfileTab(SharedMediaType type) {
 	switch (type) {
 	case SharedMediaType::PhotoVideo:
@@ -94,9 +92,7 @@ public:
 	MediaTabAdapter(MediaTabContext context, SharedMediaType type)
 	: _context(context)
 	, _type(type)
-	, _countPeer(context.sublist
-		? context.sublist->sublistPeer()
-		: context.peer)
+	, _countPeer(context.peer)
 	, _topicRootId(context.topic ? context.topic->rootId() : MsgId())
 	, _monoforumPeerId(context.sublist
 		? context.sublist->sublistPeer()->id
@@ -171,7 +167,7 @@ public:
 					? phrase(tr::now, lt_count, count)
 					: QString() };
 			}),
-			.fillMenu = (MediaTabGrid(_type)
+			.fillMenu = (MediaTabGrid(_type) || Media::HasVoiceFilter(_type)
 				? Fn<void(const Ui::Menu::MenuCallback&)>(crl::guard(
 					base::make_weak(_list),
 					[this](const Ui::Menu::MenuCallback &addAction) {
@@ -247,7 +243,15 @@ private:
 	}
 
 	void fillMenu(const Ui::Menu::MenuCallback &addAction) {
-		if (!MediaTabGrid(_type)) {
+		if (Media::HasVoiceFilter(_type)) {
+			Media::FillVoiceFilterMenu(
+				addAction,
+				_subController.mediaSourceType(),
+				[=](SharedMediaType type) {
+					_subController.setMediaSourceType(type);
+				});
+			return;
+		} else if (!MediaTabGrid(_type)) {
 			return;
 		}
 		const auto list = _list;
@@ -297,6 +301,10 @@ private:
 };
 
 } // namespace
+
+QString MediaTabId(Storage::SharedMediaType type) {
+	return u"media:"_q + QString::number(int(type));
+}
 
 const char kOptionProfileMediaTabsExpanded[] = "profile-media-tabs-expanded";
 

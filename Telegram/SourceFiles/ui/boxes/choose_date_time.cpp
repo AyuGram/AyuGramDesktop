@@ -7,23 +7,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/boxes/choose_date_time.h"
 
-#include "base/unixtime.h"
 #include "base/event_filter.h"
+#include "base/unixtime.h"
+#include "lang/lang_keys.h"
 #include "ui/boxes/calendar_box.h"
 #include "ui/effects/ripple_animation.h"
-#include "ui/painter.h"
 #include "ui/text/text_utilities.h"
-#include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
 #include "ui/widgets/time_input.h"
+#include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "lang/lang_keys.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_choose_date_time.h"
 #include "styles/style_layers.h"
-#include "styles/style_boxes.h"
 #include "styles/style_passcode_box.h"
 
 #include <QtWidgets/QTextEdit>
@@ -55,6 +56,28 @@ QString TimeString(QTime time) {
 	).arg(time.minute(), 2, 10, QLatin1Char('0'));
 }
 
+QDate DateFollowingTimeWheel(
+		QDate date,
+		QTime was,
+		QTime now,
+		QDateTime minimum,
+		QDate maxDate) {
+	const auto minDate = minimum.date();
+	if (!was.isValid()) {
+		return date;
+	} else if (was.hour() == 23
+		&& now.hour() == 0
+		&& QDateTime(date, now) < minimum) {
+		return std::clamp(date.addDays(1), minDate, maxDate);
+	} else if (was.hour() == 0
+		&& now.hour() == 23
+		&& date == minDate.addDays(1)
+		&& QDateTime(minDate, now) >= minimum) {
+		return std::clamp(date.addDays(-1), minDate, maxDate);
+	}
+	return date;
+}
+
 class RepeatButton final : public Ui::RippleButton {
 public:
 	explicit RepeatButton(not_null<QWidget*> parent);
@@ -62,6 +85,7 @@ public:
 	void setMarkedText(TextWithEntities text);
 
 protected:
+	void mousePressEvent(QMouseEvent *e) override;
 	void paintEvent(QPaintEvent *e) override;
 
 	QImage prepareRippleMask() const override;
@@ -91,6 +115,14 @@ RepeatButton::RepeatButton(not_null<QWidget*> parent)
 
 void RepeatButton::setMarkedText(TextWithEntities text) {
 	_label->setMarkedText(std::move(text));
+}
+
+void RepeatButton::mousePressEvent(QMouseEvent *e) {
+	if (e->button() != Qt::LeftButton) {
+		return RippleButton::mousePressEvent(e);
+	}
+	e->accept();
+	clicked(e->modifiers(), e->button());
 }
 
 void RepeatButton::paintEvent(QPaintEvent *e) {
@@ -202,6 +234,27 @@ ChooseDateTimeBoxDescriptor ChooseDateTimeBox(
 		}
 		return base::EventFilterResult::Continue;
 	});
+
+	const auto lastTime = box->lifetime().make_state<QTime>(
+		parsed.time());
+	state->time->value(
+	) | rpl::on_next([=](const QString &value) {
+		const auto parts = value.split(':');
+		if (parts.size() != 2) {
+			return;
+		}
+		const auto time = QTime(parts[0].toInt(), parts[1].toInt());
+		if (!time.isValid()) {
+			return;
+		}
+		state->date = DateFollowingTimeWheel(
+			state->date.current(),
+			*lastTime,
+			time,
+			base::unixtime::parse(min()),
+			maxDate());
+		*lastTime = time;
+	}, state->time->lifetime());
 
 	state->at->widthValue() | rpl::on_next([=](int width) {
 		const auto full = st::scheduleDateWidth
@@ -414,6 +467,9 @@ object_ptr<Ui::RpWidget> ChooseRepeatPeriod(
 				anchor.x() - menu->width() / 2,
 				menu->y()
 					- Ui::BoxShadow::ExtendFor(menu->st().shadow).bottom());
+			if (QGuiApplication::mouseButtons() & Qt::LeftButton) {
+				menu->menu()->handlePressedOutside(QCursor::pos());
+			}
 			menu->popupPrepared();
 		}
 	});

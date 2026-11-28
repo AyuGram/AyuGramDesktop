@@ -9,25 +9,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_peer_photo.h"
 #include "apiwrap.h"
-#include "data/data_user.h"
-#include "data/data_session.h"
+#include "base/unixtime.h"
+#include "boxes/premium_preview_box.h"
+#include "chat_helpers/tabbed_panel.h"
+#include "chat_helpers/tabbed_selector.h"
 #include "data/data_document.h"
 #include "data/data_emoji_statuses.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
 #include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "mainwindow.h"
 #include "menu/menu_send.h" // SendMenu::Type.
 #include "ui/boxes/confirm_box.h"
 #include "ui/boxes/time_picker_box.h"
 #include "ui/effects/emoji_fly_animation.h"
 #include "ui/text/format_values.h"
 #include "ui/ui_utility.h"
-#include "base/unixtime.h"
-#include "boxes/premium_preview_box.h"
-#include "window/window_session_controller.h"
 #include "window/window_controller.h"
-#include "main/main_session.h"
-#include "mainwindow.h"
-#include "chat_helpers/tabbed_panel.h"
-#include "chat_helpers/tabbed_selector.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h"
 
 namespace Info::Profile {
@@ -68,10 +69,6 @@ EmojiStatusPanel::~EmojiStatusPanel() {
 		// the focus inside a child destructor, it won't be cleared at all.
 		_panel->window()->setFocus();
 	}
-}
-
-void EmojiStatusPanel::setChooseFilter(Fn<bool(EmojiStatusId)> filter) {
-	_chooseFilter = std::move(filter);
 }
 
 void EmojiStatusPanel::show(
@@ -319,9 +316,7 @@ void EmojiStatusPanel::create(const Descriptor &descriptor) {
 bool EmojiStatusPanel::filter(
 		not_null<Window::SessionController*> controller,
 		EmojiStatusId chosenId) const {
-	if (_chooseFilter) {
-		return _chooseFilter(chosenId);
-	} else if (chosenId && !controller->session().premium()) {
+	if (chosenId && !controller->session().premium()) {
 		ShowPremiumPreviewBox(controller, PremiumFeature::EmojiStatus);
 		return false;
 	}

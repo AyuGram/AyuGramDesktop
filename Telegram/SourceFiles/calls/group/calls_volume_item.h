@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
 #include "ui/widgets/menu/menu_item_base.h"
+#include "ui/rp_widget.h"
 
 namespace Ui {
 class CrossLineAnimation;
@@ -41,6 +41,8 @@ public:
 	not_null<QAction*> action() const override;
 	bool isEnabled() const override;
 
+	void setCanMute(bool canMute);
+
 	[[nodiscard]] rpl::producer<bool> toggleMuteRequests() const;
 	[[nodiscard]] rpl::producer<bool> toggleMuteLocallyRequests() const;
 	[[nodiscard]] rpl::producer<int> changeVolumeRequests() const;
@@ -64,6 +66,7 @@ private:
 	bool _waitingForUpdateVolume = false;
 	bool _cloudMuted = false;
 	bool _localMuted = false;
+	bool _canMute = true;
 
 	QRect _itemRect;
 	QRect _speakerRect;

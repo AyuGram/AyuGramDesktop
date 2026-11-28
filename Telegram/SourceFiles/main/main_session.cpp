@@ -7,28 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "main/main_session.h"
 
-#include "apiwrap.h"
 #include "api/api_peer_colors.h"
 #include "api/api_updates.h"
 #include "api/api_user_privacy.h"
-#include "main/main_account.h"
-#include "main/main_domain.h"
-#include "main/main_session_settings.h"
-#include "main/main_app_config.h"
-#include "main/session/send_as_peers.h"
-#include "mtproto/mtproto_config.h"
-#include "chat_helpers/stickers_emoji_pack.h"
+#include "apiwrap.h"
+#include "base/unixtime.h"
+#include "calls/calls_instance.h"
 #include "chat_helpers/stickers_dice_pack.h"
+#include "chat_helpers/stickers_emoji_pack.h"
 #include "chat_helpers/stickers_gift_box_pack.h"
-#include "history/view/reactions/history_view_reactions_strip.h"
-#include "history/history.h"
-#include "history/history_item.h"
-#include "inline_bots/bot_attach_web_view.h"
-#include "storage/file_download.h"
-#include "storage/download_manager_mtproto.h"
-#include "storage/file_upload.h"
-#include "storage/storage_account.h"
-#include "storage/storage_facade.h"
+#include "core/application.h"
 #include "data/components/credits.h"
 #include "data/components/ephemeral_messages.h"
 #include "data/components/factchecks.h"
@@ -37,29 +25,49 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/components/passkeys.h"
 #include "data/components/promo_suggestions.h"
 #include "data/components/recent_inline_bots.h"
+#include "data/components/recent_money_recipients.h"
 #include "data/components/recent_peers.h"
 #include "data/components/recent_shared_media_gifts.h"
 #include "data/components/scheduled_messages.h"
 #include "data/components/sponsored_messages.h"
 #include "data/components/top_peers.h"
 #include "data/components/welcome_messages.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_changes.h"
+#include "data/data_download_manager.h"
+#include "data/data_session.h"
+#include "data/data_stories.h"
+#include "data/data_story_drafts.h"
+#include "data/data_story_edit_sources.h"
+#include "data/data_user.h"
+#include "history/view/reactions/history_view_reactions_strip.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "inline_bots/bot_attach_web_view.h"
+#include "lang/lang_keys.h"
+#include "main/session/send_as_peers.h"
+#include "main/main_account.h"
+#include "main/main_app_config.h"
+#include "main/main_domain.h"
+#include "main/main_session_settings.h"
+#include "mtproto/mtproto_config.h"
 #include "settings/settings_faq_suggestions.h"
 #include "settings/settings_recent_searches.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/data_user.h"
-#include "data/data_download_manager.h"
-#include "data/stickers/data_stickers.h"
-#include "window/window_session_controller.h"
+#include "storage/download_manager_mtproto.h"
+#include "storage/file_download.h"
+#include "storage/file_upload.h"
+#include "storage/storage_account.h"
+#include "storage/storage_facade.h"
+#include "support/support_helper.h"
+#include "tgw/tgw_storage.h"
+#include "ui/layers/generic_box.h"
+#include "ui/text/text_utilities.h"
+#include "wallet/wallet_panel.h"
+#include "wallet/wallet_session.h"
 #include "window/window_controller.h"
 #include "window/window_lock_widgets.h"
-#include "base/unixtime.h"
-#include "calls/calls_instance.h"
-#include "support/support_helper.h"
-#include "lang/lang_keys.h"
-#include "core/application.h"
-#include "ui/text/text_utilities.h"
-#include "ui/layers/generic_box.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_layers.h"
 
 #ifndef TDESKTOP_DISABLE_SPELLCHECK
@@ -160,6 +168,7 @@ Session::Session(
 , _sendAsPeers(std::make_unique<SendAsPeers>(this))
 , _attachWebView(std::make_unique<InlineBots::AttachWebView>(this))
 , _recentPeers(std::make_unique<Data::RecentPeers>(this))
+, _recentMoneyRecipients(std::make_unique<Data::RecentMoneyRecipients>(this))
 , _recentSharedGifts(std::make_unique<Data::RecentSharedMediaGifts>(this))
 , _giftAuctions(std::make_unique<Data::GiftAuctions>(this))
 , _scheduledMessages(std::make_unique<Data::ScheduledMessages>(this))
@@ -176,6 +185,7 @@ Session::Session(
 , _factchecks(std::make_unique<Data::Factchecks>(this))
 , _locationPickers(std::make_unique<Data::LocationPickers>())
 , _credits(std::make_unique<Data::Credits>(this))
+, _wallet(std::make_unique<Wallet::Session>(this))
 , _promoSuggestions(std::make_unique<Data::PromoSuggestions>(this, [=] {
 	using State = Data::SetupEmailState;
 	if (_promoSuggestions->setupEmailState() == State::Setup
@@ -309,6 +319,7 @@ Session::Session(
 	_api->requestNotifySettings(MTP_inputNotifyBroadcasts());
 
 	Core::App().downloadManager().trackSession(this);
+	Tgw::StartStorage(this);
 
 	appConfig().value(
 	) | rpl::on_next([=] {
@@ -345,6 +356,13 @@ void Session::setTmpPassword(const QByteArray &password, TimeId validUntil) {
 	}
 }
 
+void Session::dropTmpPassword(const QByteArray &password) {
+	if (_tmpPassword == password) {
+		_tmpPassword = QByteArray();
+		_tmpPasswordValidUntil = 0;
+	}
+}
+
 QByteArray Session::validTmpPassword() const {
 	return (_tmpPasswordValidUntil
 		>= base::unixtime::now() + kTmpPasswordReserveTime)
@@ -354,12 +372,16 @@ QByteArray Session::validTmpPassword() const {
 
 // Can be called only right before ~Session.
 void Session::finishLogout() {
+	Wallet::CloseWallet(this);
 	unlockTerms();
+	data().stories().drafts().clear();
+	data().stories().editSources().clear();
 	data().clear();
 	data().clearLocalStorage();
 }
 
 Session::~Session() {
+	Wallet::CloseWallet(this);
 	unlockTerms();
 	data().clear();
 	ClickHandler::clearActive();
@@ -597,6 +619,7 @@ void Session::addWindow(not_null<Window::SessionController*> controller) {
 	) | rpl::map([=](Dialogs::Key chat) {
 		return chat.peer();
 	}) | rpl::distinct_until_changed());
+	_windowAdded.fire({});
 }
 
 bool Session::uploadsInProgress() const {
@@ -654,6 +677,10 @@ void Session::uploadsStop() {
 auto Session::windows() const
 -> const base::flat_set<not_null<Window::SessionController*>> & {
 	return _windows;
+}
+
+rpl::producer<> Session::windowAdded() const {
+	return _windowAdded.events();
 }
 
 Window::SessionController *Session::tryResolveWindow(

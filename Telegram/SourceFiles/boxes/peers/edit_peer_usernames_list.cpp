@@ -19,14 +19,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/show.h"
-#include "ui/painter.h"
 #include "ui/text/text_utilities.h" // tr::rich.
 #include "ui/toast/toast.h"
-#include "ui/ui_utility.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/wrap/vertical_layout_reorder.h"
+#include "ui/painter.h"
+#include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
+
 #include "styles/style_boxes.h" // contactsStatusFont.
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
@@ -397,6 +398,16 @@ void UsernamesList::rebuild(const Data::Usernames &usernames) {
 					_rows,
 					data.oldPosition,
 					data.newPosition);
+				if (_isBot) {
+					auto &usernames = _peer->session().api().usernames();
+					_reorderLifetime.destroy();
+					_reorderLifetime = usernames.reorder(
+						_peer,
+						order()
+					) | rpl::on_done(crl::guard(this, [=] {
+						_reorderLifetime.destroy();
+					}));
+				}
 			}
 		}
 	}, content->lifetime());

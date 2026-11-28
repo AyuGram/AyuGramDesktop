@@ -11,11 +11,13 @@ ENV LD_LIBRARY_PATH=$LIBRARY_PATH
 ENV PKG_CONFIG_PATH=/opt/rh/$TOOLSET/root/usr/lib64/pkgconfig:/opt/rh/$TOOLSET/root/usr/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig
 
 RUN --mount=type=cache,target=/var/cache/dnf <<EOF
+dnf -y upgrade
 dnf -y install epel-release
 dnf config-manager --set-enabled powertools
 dnf -y install cmake autoconf automake libtool pkgconfig make patch git \
 	python3.11-pip python3.11-devel gperf flex bison clang-tools-extra \
 	lld ccache nasm file which wget perl-open perl-XML-Parser perl-IPC-Cmd \
+	perl-Time-Piece \
 	xorg-x11-util-macros $TOOLSET-gcc $TOOLSET-gcc-c++ $TOOLSET-binutils \
 	$TOOLSET-gdb $TOOLSET-libasan-devel libffi-devel fontconfig-devel \
 	freetype-devel libX11-devel wayland-devel alsa-lib-devel \
@@ -94,14 +96,14 @@ cd build
 implib() {
 	LIBFILE=$(basename $1)
 	LIBNAME=$(basename $1 .so)
-	../implib-gen.py -q $1
+	../implib-gen.py -q "$@"
 	gcc $CFLAGS -g0 -c -o $LIBFILE.tramp.o $LIBFILE.tramp.S
 	gcc $CFLAGS -c -o $LIBFILE.init.o $LIBFILE.init.c
 	ar rcs /usr/local/lib64/$LIBNAME.a $LIBFILE.tramp.o $LIBFILE.init.o
 }
 
 implib /usr/lib64/libgtk-3.so
-implib /usr/lib64/libgdk-3.so
+implib /usr/lib64/libgdk-3.so --dlsym-callback=implib_gdk_dlsym
 implib /usr/lib64/libgdk_pixbuf-2.0.so
 implib /usr/lib64/libvdpau.so
 implib /usr/lib64/libva-x11.so
@@ -151,6 +153,29 @@ EOF2
 gcc $CFLAGS -c -o libX11.locks.o libX11.locks.c
 ar rs /usr/local/lib64/libX11.a libX11.locks.o
 
+# Qt checks the GdkWindow type of both backends, while GTK
+# may be built without one of them.
+cat > libgdk-3.dlsym.c <<'EOF2'
+#include <dlfcn.h>
+#include <string.h>
+
+static unsigned long InvalidType(void) {
+	return 0;
+}
+
+void *implib_gdk_dlsym(void *handle, const char *name) {
+	void *result = dlsym(handle, name);
+	if (!result
+		&& (!strcmp(name, "gdk_wayland_window_get_type")
+			|| !strcmp(name, "gdk_x11_window_get_type"))) {
+		return (void*)InvalidType;
+	}
+	return result;
+}
+EOF2
+gcc $CFLAGS -c -o libgdk-3.dlsym.o libgdk-3.dlsym.c
+ar rs /usr/local/lib64/libgdk-3.a libgdk-3.dlsym.o
+
 cd ../..
 rm -rf Implib.so
 EOF
@@ -160,7 +185,7 @@ RUN <<EOF
 git init patches
 cd patches
 git remote add origin https://github.com/desktop-app/patches.git
-git fetch --depth=1 origin 519aaa084608fa6f9a2bfbd1959d133c44d94227
+git fetch --depth=1 origin b6ab1d68dcb0ddff1f03628c110efc24db123c87
 git reset --hard FETCH_HEAD
 rm -rf .git
 EOF
@@ -189,7 +214,7 @@ EOF
 
 FROM builder AS xz
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v5.8.1 --depth=1 https://github.com/tukaani-project/xz.git
+git clone -b v5.8.4 --depth=1 https://github.com/tukaani-project/xz.git
 cd xz
 cmake -B build .
 cmake --build build
@@ -211,7 +236,7 @@ EOF
 
 FROM builder AS brotli
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v1.2.0 --depth=1 https://github.com/google/brotli.git
+git clone -b v1.2.1 --depth=1 https://github.com/google/brotli.git
 cd brotli
 cmake -B build . -DBUILD_SHARED_LIBS=OFF -DBROTLI_DISABLE_TESTS=ON
 cmake --build build
@@ -258,10 +283,11 @@ cd ..
 rm -rf opus
 EOF
 
-FROM builder AS dav1d
+FROM patches AS dav1d
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
 git clone -b 1.5.4 --depth=1 https://github.com/videolan/dav1d.git
 cd dav1d
+git apply ../patches/dav1d.patch
 meson build \
 	--buildtype=plain \
 	--default-library=static \
@@ -284,28 +310,14 @@ cd ..
 rm -rf openh264
 EOF
 
-FROM builder AS de265
-RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v1.1.1 --depth=1 https://github.com/strukturag/libde265.git
-cd libde265
-cmake -B build . \
-	-DCMAKE_BUILD_TYPE=None \
-	-DBUILD_SHARED_LIBS=OFF \
-	-DENABLE_DECODER=OFF \
-	-DENABLE_SDL=OFF
-cmake --build build
-DESTDIR=/usr/src/de265-cache cmake --install build
-cd ..
-rm -rf libde265
-EOF
-
-FROM builder AS vpx
+FROM patches AS vpx
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
 git init libvpx
 cd libvpx
 git remote add origin https://github.com/webmproject/libvpx.git
 git fetch --depth=1 origin 12f3a2ac603e8f10742105519e0cd03c3b8f71dd
 git reset --hard FETCH_HEAD
+find ../patches/libvpx -type f -name '*.patch' -print0 | sort -z | xargs -r0 git apply
 CFLAGS="$CFLAGS -fno-lto" CXXFLAGS="$CXXFLAGS -fno-lto" ./configure \
 	--disable-examples \
 	--disable-unit-tests \
@@ -352,35 +364,6 @@ cmake --build build
 DESTDIR=/usr/src/avif-cache cmake --install build
 cd ..
 rm -rf libavif
-EOF
-
-FROM builder AS heif
-COPY --link --from=de265 /usr/src/de265-cache /
-
-RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v1.23.1 --depth=1 https://github.com/strukturag/libheif.git
-cd libheif
-cmake -B build . \
-	-DBUILD_SHARED_LIBS=OFF \
-	-DBUILD_DOCUMENTATION=OFF \
-	-DBUILD_TESTING=OFF \
-	-DENABLE_PLUGIN_LOADING=OFF \
-	-DWITH_X265=OFF \
-	-DWITH_AOM_DECODER=OFF \
-	-DWITH_AOM_ENCODER=OFF \
-	-DWITH_X264=OFF \
-	-DWITH_OpenH264_DECODER=OFF \
-	-DWITH_RAV1E=OFF \
-	-DWITH_RAV1E_PLUGIN=OFF \
-	-DWITH_SvtEnc=OFF \
-	-DWITH_SvtEnc_PLUGIN=OFF \
-	-DWITH_DAV1D=OFF \
-	-DWITH_LIBSHARPYUV=OFF \
-	-DWITH_EXAMPLES=OFF
-cmake --build build
-DESTDIR=/usr/src/heif-cache cmake --install build
-cd ..
-rm -rf libheif
 EOF
 
 FROM builder AS jxl
@@ -439,7 +422,7 @@ FROM builder AS xcb
 COPY --link --from=xcb-proto /usr/src/xcb-proto-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libxcb-1.16 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxcb.git
+git clone -b libxcb-1.16.1 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxcb.git
 cd libxcb
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -553,7 +536,7 @@ EOF
 
 FROM builder AS xtst
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXtst-1.2.4 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxtst.git
+git clone -b libXtst-1.2.5 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxtst.git
 cd libxtst
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -577,7 +560,7 @@ FROM builder AS xv
 COPY --link --from=xext /usr/src/xext-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXv-1.0.12 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxv.git
+git clone -b libXv-1.0.13 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxv.git
 cd libxv
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -588,7 +571,7 @@ EOF
 
 FROM builder AS xrandr
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXrandr-1.5.3 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrandr.git
+git clone -b libXrandr-1.5.4 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrandr.git
 cd libxrandr
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -599,7 +582,7 @@ EOF
 
 FROM builder AS xrender
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b libXrender-0.9.11 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrender.git
+git clone -b libXrender-0.9.12 --depth=1 https://github.com/gitlab-freedesktop-mirrors/libxrender.git
 cd libxrender
 ./autogen.sh --enable-static --disable-shared
 make -j$(nproc)
@@ -638,7 +621,7 @@ make -C nv-codec-headers DESTDIR=/usr/src/nv-codec-headers-cache install
 rm -rf nv-codec-headers
 EOF
 
-FROM builder AS ffmpeg
+FROM patches AS ffmpeg
 COPY --link --from=opus /usr/src/opus-cache /
 COPY --link --from=openh264 /usr/src/openh264-cache /
 COPY --link --from=dav1d /usr/src/dav1d-cache /
@@ -648,11 +631,15 @@ COPY --link --from=xv /usr/src/xv-cache /
 COPY --link --from=nv-codec-headers /usr/src/nv-codec-headers-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b n6.1.6 --depth=1 https://github.com/FFmpeg/FFmpeg.git
+git init FFmpeg
 cd FFmpeg
+git remote add origin https://github.com/FFmpeg/FFmpeg.git
+git fetch --depth=1 origin e22a4510c982b048945052bd6a503475014b7ba0
+git reset --hard FETCH_HEAD
+find ../patches/ffmpeg -type f -name '*.patch' -print0 | sort -z | xargs -r0 git apply
 ./configure \
-	--extra-cflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
-	--extra-cxxflags="-fno-lto -DCONFIG_SAFE_BITSTREAM_READER=1" \
+	--extra-cflags="-fno-lto" \
+	--extra-cxxflags="-fno-lto" \
 	--extra-ldflags="-Wl,--push-state,--no-as-needed,-lstdc++,--pop-state" \
 	--disable-debug \
 	--disable-programs \
@@ -673,9 +660,9 @@ cd FFmpeg
 	--enable-libdrm \
 	--enable-ffnvcodec \
 	--enable-nvdec \
-	--enable-cuvid \
 	--enable-protocol=file \
 	--enable-hwaccel=av1_vaapi \
+	--enable-hwaccel=av1_vdpau \
 	--enable-hwaccel=av1_nvdec \
 	--enable-hwaccel=h264_vaapi \
 	--enable-hwaccel=h264_vdpau \
@@ -683,6 +670,8 @@ cd FFmpeg
 	--enable-hwaccel=hevc_vaapi \
 	--enable-hwaccel=hevc_vdpau \
 	--enable-hwaccel=hevc_nvdec \
+	--enable-hwaccel=mpeg1_vdpau \
+	--enable-hwaccel=mpeg1_nvdec \
 	--enable-hwaccel=mpeg2_vaapi \
 	--enable-hwaccel=mpeg2_vdpau \
 	--enable-hwaccel=mpeg2_nvdec \
@@ -698,7 +687,6 @@ cd FFmpeg
 	--enable-decoder=ac3 \
 	--enable-decoder=alac \
 	--enable-decoder=av1 \
-	--enable-decoder=av1_cuvid \
 	--enable-decoder=eac3 \
 	--enable-decoder=flac \
 	--enable-decoder=gif \
@@ -712,11 +700,11 @@ cd FFmpeg
 	--enable-decoder=mp2 \
 	--enable-decoder=mp2float \
 	--enable-decoder=mp3 \
-	--enable-decoder=mp3adu \
-	--enable-decoder=mp3adufloat \
 	--enable-decoder=mp3float \
 	--enable-decoder=mp3on4 \
 	--enable-decoder=mp3on4float \
+	--enable-decoder=mpeg1video \
+	--enable-decoder=mpeg2video \
 	--enable-decoder=mpeg4 \
 	--enable-decoder=msmpeg4v2 \
 	--enable-decoder=msmpeg4v3 \
@@ -726,23 +714,16 @@ cd FFmpeg
 	--enable-decoder=pcm_f32le \
 	--enable-decoder=pcm_f64be \
 	--enable-decoder=pcm_f64le \
-	--enable-decoder=pcm_lxf \
 	--enable-decoder=pcm_mulaw \
 	--enable-decoder=pcm_s16be \
-	--enable-decoder=pcm_s16be_planar \
 	--enable-decoder=pcm_s16le \
-	--enable-decoder=pcm_s16le_planar \
 	--enable-decoder=pcm_s24be \
-	--enable-decoder=pcm_s24daud \
 	--enable-decoder=pcm_s24le \
-	--enable-decoder=pcm_s24le_planar \
 	--enable-decoder=pcm_s32be \
 	--enable-decoder=pcm_s32le \
-	--enable-decoder=pcm_s32le_planar \
 	--enable-decoder=pcm_s64be \
 	--enable-decoder=pcm_s64le \
 	--enable-decoder=pcm_s8 \
-	--enable-decoder=pcm_s8_planar \
 	--enable-decoder=pcm_u16be \
 	--enable-decoder=pcm_u16le \
 	--enable-decoder=pcm_u24be \
@@ -750,7 +731,6 @@ cd FFmpeg
 	--enable-decoder=pcm_u32be \
 	--enable-decoder=pcm_u32le \
 	--enable-decoder=pcm_u8 \
-	--enable-decoder=pcm_zork \
 	--enable-decoder=vorbis \
 	--enable-decoder=vp8 \
 	--enable-decoder=wavpack \
@@ -767,27 +747,25 @@ cd FFmpeg
 	--enable-filter=atempo \
 	--enable-parser=aac \
 	--enable-parser=aac_latm \
+	--enable-parser=ac3 \
 	--enable-parser=flac \
 	--enable-parser=gif \
 	--enable-parser=h264 \
 	--enable-parser=hevc \
 	--enable-parser=mpeg4video \
 	--enable-parser=mpegaudio \
+	--enable-parser=mpegvideo \
 	--enable-parser=opus \
 	--enable-parser=vorbis \
 	--enable-demuxer=aac \
 	--enable-demuxer=flac \
 	--enable-demuxer=gif \
-	--enable-demuxer=h264 \
-	--enable-demuxer=hevc \
 	--enable-demuxer=matroska \
-	--enable-demuxer=m4v \
 	--enable-demuxer=mov \
 	--enable-demuxer=mp3 \
 	--enable-demuxer=ogg \
 	--enable-demuxer=wav \
 	--enable-muxer=mp4 \
-	--enable-muxer=ogg \
 	--enable-muxer=opus \
 	--enable-muxer=wav \
 	--enable-muxer=webm
@@ -795,6 +773,39 @@ make -j$(nproc)
 make DESTDIR=/usr/src/ffmpeg-cache install
 cd ..
 rm -rf ffmpeg
+EOF
+
+FROM patches AS heif
+COPY --link --from=ffmpeg /usr/src/ffmpeg-cache /
+
+RUN --mount=type=cache,target=/var/cache/ccache <<EOF
+git clone -b v1.23.5 --depth=1 https://github.com/strukturag/libheif.git
+cd libheif
+git apply ../patches/libheif.patch
+cmake -B build . \
+	-DBUILD_SHARED_LIBS=OFF \
+	-DBUILD_DOCUMENTATION=OFF \
+	-DBUILD_TESTING=OFF \
+	-DENABLE_PLUGIN_LOADING=OFF \
+	-DWITH_X265=OFF \
+	-DWITH_AOM_DECODER=OFF \
+	-DWITH_AOM_ENCODER=OFF \
+	-DWITH_X264=OFF \
+	-DWITH_OpenH264_DECODER=OFF \
+	-DWITH_RAV1E=OFF \
+	-DWITH_RAV1E_PLUGIN=OFF \
+	-DWITH_SvtEnc=OFF \
+	-DWITH_SvtEnc_PLUGIN=OFF \
+	-DWITH_DAV1D=OFF \
+	-DWITH_LIBDE265=OFF \
+	-DWITH_FFMPEG_DECODER=ON \
+	-DWITH_GDK_PIXBUF=OFF \
+	-DWITH_LIBSHARPYUV=OFF \
+	-DWITH_EXAMPLES=OFF
+cmake --build build
+DESTDIR=/usr/src/heif-cache cmake --install build
+cd ..
+rm -rf libheif
 EOF
 
 FROM builder AS pipewire
@@ -833,7 +844,7 @@ EOF
 
 FROM builder AS openssl
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b openssl-3.2.1 --depth=1 https://github.com/openssl/openssl.git
+git clone -b openssl-3.5.9 --depth=1 https://github.com/openssl/openssl.git
 cd openssl
 sed -i 's/$cmd $cmdflags -c -o/$cmd $cmdflags -g0 -c -o/' Configurations/unix-Makefile.tmpl
 ./config --openssldir=/etc/ssl no-shared no-tests no-dso
@@ -880,12 +891,13 @@ COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
 RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-QT=6.11.2
+QT=6.12.0
 git clone -b v$QT --depth=1 https://github.com/qt/qt5.git
 cd qt5
 git submodule update --init --recursive --depth=1 \
 	qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools
 find $PWD/../patches/qtbase_$QT -type f -print0 | sort -z | xargs -r0 git -C qtbase apply
+find $PWD/../patches/qtsvg_$QT -type f -print0 | sort -z | xargs -r0 git -C qtsvg apply
 find $PWD/../patches/qtwayland_$QT -type f -print0 | sort -z | xargs -r0 git -C qtwayland apply
 cmake -B build . \
 	-DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -962,7 +974,7 @@ RUN --mount=type=cache,target=/var/cache/ccache <<EOF
 git init tg_owt
 cd tg_owt
 git remote add origin https://github.com/desktop-app/tg_owt.git
-git fetch --depth=1 origin 5c5c71258777d0196dbb3a09cc37d2f56ead28ab
+git fetch --depth=1 origin a9d098a8f126dff818889d56f4241d7d2aaac9c1
 git reset --hard FETCH_HEAD
 git submodule update --init --recursive --depth=1
 cmake -B build . -DTG_OWT_DLOPEN_PIPEWIRE=ON
@@ -970,17 +982,6 @@ cmake --build build
 DESTDIR=/usr/src/webrtc-cache cmake --install build
 cd ..
 rm -rf tg_owt
-EOF
-
-FROM builder AS ada
-RUN --mount=type=cache,target=/var/cache/ccache <<EOF
-git clone -b v3.2.4 --depth=1 https://github.com/ada-url/ada.git
-cd ada
-cmake -B build . -DADA_TESTING=OFF -DADA_TOOLS=OFF -DADA_INCLUDE_URL_PATTERN=OFF
-cmake --build build
-DESTDIR=/usr/src/ada-cache cmake --install build
-cd ..
-rm -rf ada
 EOF
 
 FROM builder AS tde2e
@@ -1001,32 +1002,59 @@ cd ..
 rm -rf tde2e
 EOF
 
-FROM patches AS tlottie
+FROM builder AS rust
 RUN <<EOF
-RUST_TOOLCHAIN=1.96.1
-export RUSTUP_HOME=/usr/src/rustup
-export CARGO_HOME=/usr/src/cargo
+export RUSTUP_HOME=/opt/rust/rustup
+export CARGO_HOME=/opt/rust/cargo
 wget -O rustup-init.sh https://sh.rustup.rs
-sh rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain $RUST_TOOLCHAIN
+sh rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain 1.96.1
 rm rustup-init.sh
-export RUSTUP_TOOLCHAIN=$RUST_TOOLCHAIN
-export PATH=$CARGO_HOME/bin:$PATH
-export DESTDIR=/usr/src/tlottie-cache
+EOF
+
+FROM patches AS tdesktop_rust
+COPY --link --from=rust /opt/rust /opt/rust
+RUN <<EOF
+export RUSTUP_HOME=/opt/rust/rustup
+export CARGO_HOME=/usr/src/cargo
+export CARGO_BUILD_JOBS={{ JOBS or "default" }}
+export PATH=/opt/rust/cargo/bin:$PATH
+export DESTDIR=/usr/src/tdesktop_rust-cache
 git init tlottie
 cd tlottie
 git remote add origin https://github.com/dkaraush/tlottie.git
-git fetch --depth=1 origin 31f1b542f88e7b4be9a01e749920d857535fc715
+git fetch --depth=1 origin 92df98dc209bc39b1e567ec74a8c86a0af5239de
 git reset --hard FETCH_HEAD
-git apply ../patches/tlottie.patch
-cargo rustc --lib --release --locked \
-	--features c-api --crate-type staticlib \
-	--target x86_64-unknown-linux-gnu \
-	-- --print native-static-libs
-mkdir -p $DESTDIR/usr/local/lib $DESTDIR/usr/local/include/tlottie
-objcopy --strip-debug target/x86_64-unknown-linux-gnu/release/libtlottie.a $DESTDIR/usr/local/lib/libtlottie.a
-cp include/tlottie.h $DESTDIR/usr/local/include/tlottie/tlottie.h
 cd ..
-rm -rf tlottie rustup cargo
+git init wallet-engine
+cd wallet-engine
+git remote add origin https://github.com/i582/wallet-engine.git
+git fetch --depth=1 origin e59e0d89d7ee90c388bf36e3334c5b276f396697
+git reset --hard FETCH_HEAD
+git apply ../patches/wallet-engine.patch
+cd ..
+# One archive for every Rust library. Each staticlib carries its own copy of
+# the Rust standard library, so separate builds define the runtime symbols
+# that must stay global twice and the linker refuses the binary.
+cargo new --lib --vcs none tdesktop_rust
+cd tdesktop_rust
+printf 'pub use ::tlottie;\npub use ::wallet_engine;\n' > src/lib.rs
+cargo add --path ../tlottie --features c-api
+cargo add --path ../wallet-engine
+cargo rustc --lib --release \
+	--crate-type staticlib --crate-type cdylib \
+	--config "profile.release.opt-level={% if MINSIZE %}'z'{% else %}3{% endif %}" \
+	--config "profile.release.lto='{% if LTO %}thin{% else %}off{% endif %}'" \
+	--config "profile.release.codegen-units=1" \
+	--config "profile.release.panic='unwind'" \
+	-- --print native-static-libs
+mkdir -p $DESTDIR/usr/local/lib64 $DESTDIR/usr/local/include/tlottie $DESTDIR/usr/local/include/wallet_engine
+objcopy --strip-debug target/release/libtdesktop_rust.a $DESTDIR/usr/local/lib64/libtdesktop_rust.a
+cp ../tlottie/include/tlottie.h $DESTDIR/usr/local/include/tlottie/tlottie.h
+cargo run --manifest-path ../wallet-engine/bindgen/cpp/bindgen/Cargo.toml --locked -- \
+	--library --out-dir $DESTDIR/usr/local/include/wallet_engine \
+	target/release/libtdesktop_rust.so
+cd ..
+rm -rf tlottie wallet-engine tdesktop_rust cargo
 EOF
 
 FROM builder
@@ -1039,7 +1067,6 @@ COPY --link --from=mozjpeg /usr/src/mozjpeg-cache /
 COPY --link --from=opus /usr/src/opus-cache /
 COPY --link --from=dav1d /usr/src/dav1d-cache /
 COPY --link --from=openh264 /usr/src/openh264-cache /
-COPY --link --from=de265 /usr/src/de265-cache /
 COPY --link --from=vpx /usr/src/vpx-cache /
 COPY --link --from=webp /usr/src/webp-cache /
 COPY --link --from=avif /usr/src/avif-cache /
@@ -1069,9 +1096,9 @@ COPY --link --from=qt /usr/src/qt-cache /
 COPY --link --from=boost /usr/src/boost-cache /
 COPY --link --from=breakpad /usr/src/breakpad-cache /
 COPY --link --from=webrtc /usr/src/webrtc-cache /
-COPY --link --from=ada /usr/src/ada-cache /
 COPY --link --from=tde2e /usr/src/tde2e-cache /
-COPY --link --from=tlottie /usr/src/tlottie-cache /
+COPY --link --from=tdesktop_rust /usr/src/tdesktop_rust-cache /
+COPY --link --from=rust /opt/rust /opt/rust
 
 COPY --link --from=patches /usr/src/patches patches
 RUN <<EOF
@@ -1079,6 +1106,8 @@ patch -p1 -d /usr/lib64/gobject-introspection -i $PWD/patches/gobject-introspect
 rm -rf patches
 EOF
 
+ENV RUSTUP_HOME=/opt/rust/rustup
+ENV PATH=/opt/rust/cargo/bin:$PATH
 ENV CCACHE_DISABLE=true
 WORKDIR /usr/src/tdesktop
 USER user

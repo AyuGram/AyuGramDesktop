@@ -8,14 +8,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "api/api_peer_search.h"
+#include "api/api_single_message_search.h"
 #include "base/timer.h"
 #include "dialogs/dialogs_key.h"
-#include "window/section_widget.h"
+#include "mtproto/sender.h"
 #include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animations.h"
 #include "ui/userpic_view.h"
-#include "mtproto/sender.h"
-#include "api/api_single_message_search.h"
+#include "window/section_widget.h"
 
 class ChannelData;
 
@@ -77,6 +77,7 @@ namespace Dialogs {
 
 extern const char kOptionForumHideChatsList[];
 
+class BottomButton;
 struct RowDescriptor;
 class Row;
 class FakeRow;
@@ -162,6 +163,11 @@ protected:
 	void paintEvent(QPaintEvent *e) override;
 
 private:
+	[[nodiscard]] bool updateStoriesDrag(not_null<QDragMoveEvent*> e);
+	[[nodiscard]] bool addStoryDragAccepted(
+		not_null<QDropEvent*> e) const;
+	[[nodiscard]] bool updateAddStoryDrag(not_null<QDragMoveEvent*> e);
+	void addStoryDragLeft();
 	struct SearchProcessState {
 		base::flat_map<QString, MTPmessages_Messages> cache;
 		base::flat_map<mtpRequestId, QString> queries;
@@ -222,6 +228,7 @@ private:
 	void setupDownloadBar();
 	void setupShortcuts();
 	void setupStories();
+	void setupAddStory();
 	void setupSwipeBack();
 	void setupTopBarSuggestions();
 #ifdef _DEBUG
@@ -236,6 +243,7 @@ private:
 
 	// Child list may be unable to set specific search state.
 	bool applySearchState(SearchState state);
+	void trackSearchInChatDestroyed();
 
 	void showCalendar();
 	void showSearchFrom();
@@ -249,10 +257,12 @@ private:
 	[[nodiscard]] bool communityOverlaysShown() const;
 	void updateFrozenAccountBar();
 	void updateControlsVisibility(bool fast = false);
-	void updateLockUnlockVisibility(
-		anim::type animated = anim::type::instant);
+	[[nodiscard]] bool showingSuggestionsDuringWidthAnimation() const;
+	[[nodiscard]] bool searchHidesTopBarContent() const;
+	void updateTopBarActionsVisibility(anim::type animated);
 	void updateLoadMoreChatsVisibility();
-	void updateStoriesVisibility();
+	void updateStoriesVisibility(anim::type animated
+		= anim::type::normal);
 	void updateStoriesTitleShown();
 	void updateJumpToDateVisibility(bool fast = false);
 	void updateSearchFromVisibility(bool fast = false);
@@ -305,10 +315,11 @@ private:
 	void updateScrollUpVisibility();
 	void startScrollUpButtonAnimation(bool shown);
 	void updateScrollUpPosition();
-	void updateLockUnlockPosition();
+	void updateTopBarActionsPosition();
 	void updateSuggestions(anim::type animated);
 	void processSearchFocusChange();
 	void closeSuggestions();
+	[[nodiscard]] bool suggestionsCoverList() const;
 	[[nodiscard]] bool searchActive() const;
 
 	[[nodiscard]] bool redirectToSearchPossible() const;
@@ -318,8 +329,10 @@ private:
 	struct CancelSearchOptions {
 		bool forceFullCancel = false;
 		bool jumpBackToSearchedChat = false;
+		bool leaveSearch = false;
 	};
 	bool cancelSearch(CancelSearchOptions options);
+	void escape(CancelSearchOptions options);
 
 	MTP::Sender _api;
 
@@ -344,6 +357,7 @@ private:
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _jumpToDate;
 	object_ptr<Ui::CrossButton> _cancelSearch;
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _lockUnlock;
+	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _addStory;
 
 	std::unique_ptr<Ui::MoreChatsBar> _moreChatsBar;
 
@@ -368,14 +382,14 @@ private:
 	rpl::event_stream<> _communityAddChatRefresh;
 	rpl::event_stream<bool> _searchStateForTopBarSuggestion;
 	rpl::event_stream<> _prepareTopBarSnapshot;
-	rpl::event_stream<bool> _openedFolderOrForumChanges;
+	rpl::variable<bool> _openedFolderOrForum;
+	rpl::variable<FilterId> _chatsFilterForTopBarSuggestion;
 
 	object_ptr<Ui::ElasticScroll> _scroll;
 	Ui::VerticalLayout *_innerList = nullptr;
 	InnerWidget *_inner = nullptr;
 	std::unique_ptr<Suggestions> _suggestions;
 	std::vector<std::unique_ptr<Suggestions>> _hidingSuggestions;
-	class BottomButton;
 	object_ptr<BottomButton> _updateTelegram = { nullptr };
 	object_ptr<BottomButton> _loadMoreChats = { nullptr };
 	std::unique_ptr<Ui::DownloadBar> _downloadBar;
@@ -399,6 +413,7 @@ private:
 	SearchState _searchState;
 	History *_searchInMigrated = nullptr;
 	rpl::lifetime _searchTagsLifetime;
+	rpl::lifetime _searchInChatLifetime;
 	QString _lastSearchText;
 	bool _searchSuggestionsLocked = false;
 	bool _searchHasFocus = false;
@@ -438,10 +453,12 @@ private:
 	bool _chatsFilterSwipeSwitch = false;
 	bool _swipeBackMirrored = false;
 	bool _swipeBackIconMirrored = false;
+	bool _swipeSearchTabs = false;
 
 	SearchProcessState _searchProcess;
 	SearchProcessState _migratedProcess;
 	SearchProcessState _postsProcess;
+	uint64 _searchGeneration = 0;
 	int _historiesRequest = 0; // Not real mtpRequestId.
 
 	Api::PeerSearch _peerSearch;
@@ -458,6 +475,7 @@ private:
 	std::unique_ptr<Ui::RpWidget> _childListShadow;
 	rpl::variable<float64> _childListShown;
 	rpl::variable<PeerId> _childListPeerId;
+	bool _childListPostponed = false;
 	std::unique_ptr<Ui::RpWidget> _hideChildListCanvas;
 	std::unique_ptr<Ui::RpWidget> _chatsFilterSlideCanvas;
 

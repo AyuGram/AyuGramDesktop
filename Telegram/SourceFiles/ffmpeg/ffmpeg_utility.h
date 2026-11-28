@@ -33,6 +33,8 @@ class QImage;
 namespace FFmpeg {
 
 inline constexpr auto kPixelBytesSize = 4;
+// See https://github.com/telegramdesktop/tdesktop/issues/7225
+inline constexpr auto kAlignImageBy = 64;
 inline constexpr auto kAVBlockSize = 4096; // 4Kb for ffmpeg blocksize
 
 constexpr auto kUniversalTimeBase = AVRational{ 1, AV_TIME_BASE };
@@ -170,11 +172,21 @@ struct CodecDeleter {
 using CodecPointer = std::unique_ptr<AVCodecContext, CodecDeleter>;
 
 struct CodecDescriptor {
-	not_null<AVStream*> stream;
+	not_null<const AVCodecParameters*> parameters;
+	AVRational timeBase = {};
 	bool hwAllowed = false;
 	int64_t videoMaxArea = 0;
 };
 [[nodiscard]] CodecPointer MakeCodecPointer(CodecDescriptor descriptor);
+
+struct CodecParametersDeleter {
+	void operator()(AVCodecParameters *value);
+};
+using CodecParametersPointer = std::unique_ptr<
+	AVCodecParameters,
+	CodecParametersDeleter>;
+[[nodiscard]] CodecParametersPointer CopyCodecParameters(
+	not_null<const AVCodecParameters*> parameters);
 
 struct FrameDeleter {
 	void operator()(AVFrame *value);
@@ -231,7 +243,9 @@ void LogError(
 	FFmpeg::AvErrorWrap error,
 	const QString &details = {});
 
-[[nodiscard]] const AVCodec *FindDecoder(not_null<AVCodecContext*> context);
+[[nodiscard]] const AVCodec *FindDecoder(
+	not_null<AVCodecContext*> context,
+	bool preferHw = false);
 [[nodiscard]] int64_t MaxPixelsForAreaLimit(int64_t area);
 [[nodiscard]] crl::time PtsToTime(int64_t pts, AVRational timeBase);
 // Used for full duration conversion.
@@ -252,8 +266,11 @@ void LogError(
 [[nodiscard]] QSize TransposeSizeByRotation(QSize size, int rotation);
 [[nodiscard]] QSize CorrectByAspect(QSize size, AVRational aspect);
 
-[[nodiscard]] bool GoodStorageForFrame(const QImage &storage, QSize size);
-[[nodiscard]] QImage CreateFrameStorage(QSize size);
+[[nodiscard]] bool GoodStorageForFrame(
+	const QImage &storage,
+	QSize size,
+	int minBytesPerLine = 0);
+[[nodiscard]] QImage CreateFrameStorage(QSize size, int minBytesPerLine = 0);
 
 void UnPremultiply(QImage &to, const QImage &from);
 void PremultiplyInplace(QImage &image);

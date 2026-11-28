@@ -7,41 +7,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/add_contact_box.h"
 
-#include "lang/lang_keys.h"
-#include "base/call_delayed.h"
-#include "base/random.h"
-#include "ui/boxes/confirm_box.h"
-#include "boxes/abstract_box.h"
-#include "boxes/premium_limits_box.h"
-#include "boxes/peers/add_participants_box.h"
-#include "boxes/peers/edit_peer_common.h"
-#include "boxes/peers/edit_participant_box.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "chat_helpers/emoji_suggestions_widget.h"
-#include "countries/countries_instance.h" // Countries::ExtractPhoneCode.
-#include "history/history_item_reply_markup.h"
-#include "window/window_session_controller.h"
-#include "menu/menu_ttl.h"
-#include "ui/controls/userpic_button.h"
-#include "ui/widgets/checkbox.h"
-#include "ui/toast/toast.h"
-#include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/fields/special_fields.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/text/format_values.h"
-#include "ui/text/text_utilities.h"
-#include "ui/painter.h"
-#include "data/data_channel.h"
-#include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "apiwrap.h"
 #include "api/api_invite_links.h"
 #include "api/api_peer_photo.h"
 #include "api/api_self_destruct.h"
+#include "apiwrap.h"
+#include "base/call_delayed.h"
+#include "base/random.h"
+#include "boxes/peers/add_participants_box.h"
+#include "boxes/peers/edit_participant_box.h"
+#include "boxes/peers/edit_peer_common.h"
+#include "boxes/abstract_box.h"
+#include "boxes/premium_limits_box.h"
+#include "chat_helpers/emoji_suggestions_widget.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include "countries/countries_instance.h" // Countries::ExtractPhoneCode.
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/history_item_reply_markup.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "menu/menu_ttl.h"
+#include "ui/boxes/confirm_box.h"
+#include "ui/controls/userpic_button.h"
+#include "ui/text/format_values.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/fields/special_fields.h"
+#include "ui/widgets/checkbox.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/painter.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_add_contact_box.h"
 #include "styles/style_boxes.h"
 #include "styles/style_chat_helpers.h"
@@ -539,7 +540,8 @@ GroupInfoBox::GroupInfoBox(
 	not_null<Window::SessionNavigation*> navigation,
 	not_null<UserData*> bot,
 	RequestPeerQuery query,
-	Fn<void(not_null<PeerData*>)> done)
+	Fn<void(not_null<PeerData*>)> done,
+	Fn<void(QString, Fn<void()>)> creationConfirm)
 : _navigation(navigation)
 , _api(&_navigation->session().mtp())
 , _type((query.type == RequestPeerQuery::Type::Broadcast)
@@ -551,7 +553,8 @@ GroupInfoBox::GroupInfoBox(
 	: Type::Group)
 , _mustBePublic(query.hasUsername == RequestPeerQuery::Restriction::Yes)
 , _canAddBot(query.isBotParticipant ? bot.get() : nullptr)
-, _done(std::move(done)) {
+, _done(std::move(done))
+, _creationConfirm(std::move(creationConfirm)) {
 }
 
 void GroupInfoBox::prepare() {
@@ -747,8 +750,19 @@ void GroupInfoBox::createGroup(
 		const auto period = ttlPeriod();
 		const auto navigation = _navigation;
 		const auto done = _done;
+		const auto request = (_creationConfirm != nullptr);
 
-		getDelegate()->hideLayer(); // Destroys 'this'.
+		if (request) {
+			// WHY: hideLayer would also close the still-unsent chooser below
+			// and fire its cancelled() before _done sends; close only this
+			// form and the participant selector it opened for this request.
+			if (const auto strong = selectUsersBox.get()) {
+				strong->closeBox();
+			}
+			closeBox();
+		} else {
+			getDelegate()->hideLayer(); // Destroys 'this'.
+		}
 		ChatCreateDone(navigation, std::move(image), period, result, done);
 	}).fail([=](const MTP::Error &error) {
 		const auto &type = error.type();
@@ -792,6 +806,18 @@ void GroupInfoBox::submit() {
 		_title->showError();
 		return;
 	}
+	if (_creationConfirm) {
+		_creationConfirm(title, crl::guard(this, [=] {
+			performCreate(title, description);
+		}));
+	} else {
+		performCreate(title, description);
+	}
+}
+
+void GroupInfoBox::performCreate(
+		const QString &title,
+		const QString &description) {
 	if (_type != Type::Group) {
 		createChannel(title, description);
 	} else if (_canAddBot) {
@@ -1679,7 +1705,7 @@ void EditNameBox::saveSelfFail(const QString &error) {
 			TextUtilities::SingleLine(_first->getLastText().trimmed()),
 			TextUtilities::SingleLine(_last->getLastText().trimmed()),
 			QString(),
-			TextUtilities::SingleLine(_user->username()));
+			TextUtilities::SingleLine(_user->editableUsername()));
 		closeBox();
 	} else if (error == "FIRSTNAME_INVALID") {
 		_first->setFocus();

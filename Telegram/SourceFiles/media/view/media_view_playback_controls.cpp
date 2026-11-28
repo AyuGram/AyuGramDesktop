@@ -7,19 +7,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/view/media_view_playback_controls.h"
 
+#include "lang/lang_keys.h"
 #include "media/audio/media_audio.h"
 #include "media/player/media_player_button.h"
 #include "media/player/media_player_dropdown.h"
 #include "media/view/media_view_playback_progress.h"
+#include "ui/effects/fade_animation.h"
+#include "ui/text/format_values.h"
+#include "ui/widgets/menu/menu_item_base.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/continuous_sliders.h"
 #include "ui/widgets/cross_fade_label.h"
 #include "ui/widgets/labels.h"
-#include "ui/widgets/continuous_sliders.h"
-#include "ui/effects/fade_animation.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/menu/menu_item_base.h"
-#include "ui/text/format_values.h"
 #include "ui/cached_round_corners.h"
-#include "lang/lang_keys.h"
+
 #include "styles/style_media_view.h"
 
 namespace Media {
@@ -243,8 +244,17 @@ void PlaybackControls::updateSpeedToggleQuality() {
 
 void PlaybackControls::updatePlaybackSpeed(float64 speed) {
 	DEBUG_LOG(("Media playback speed: update to %1.").arg(speed));
-	_delegate->playbackControlsSpeedChanged(speed);
+	saveSpeed(speed);
+	if (_speedController) {
+		_speedController->reloadFromLookup();
+	}
 	resizeEvent(nullptr);
+}
+
+void PlaybackControls::updatePlaybackVolume(float64 volume) {
+	_delegate->playbackControlsVolumeChanged(volume);
+	_volumeController->setValue(volume);
+	updateVolumeToggleIcon();
 }
 
 void PlaybackControls::updatePlayback(const Player::TrackState &state) {

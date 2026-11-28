@@ -93,7 +93,7 @@ public:
 	void requestConfigIfOld();
 	void requestCDNConfig();
 	void setUserPhone(const QString &phone);
-	void badConfigurationError();
+	void badConfigurationError(const ProxyData &proxy);
 	void syncHttpUnixtime();
 
 	void restartedByTimeout(ShiftedDcId shiftedDcId);
@@ -111,7 +111,8 @@ public:
 	void cancel(mtpRequestId requestId);
 	[[nodiscard]] int32 state(mtpRequestId requestId); // < 0 means waiting for such count of ms
 	void killSession(ShiftedDcId shiftedDcId);
-	void stopSession(ShiftedDcId shiftedDcId);
+	void killSessionsByShift(int shift);
+	[[nodiscard]] bool killSessionIfIdle(ShiftedDcId shiftedDcId);
 	void reInitConnection(DcId dcId);
 	void logout(Fn<void()> done);
 
@@ -191,6 +192,13 @@ private:
 		const MTPauth_ExportedAuthorization &result,
 		const Response &response);
 	bool exportFail(const Error &error, const Response &response);
+	void sendAuthExport(DcId dcId);
+	void failOverAuthImports(ShiftedDcId shiftedDcId);
+	void restartAuthImport(DcId dcId, mtpRequestId requestId);
+	void authImportFailed(DcId dcId, const Error &error);
+	void failAuthWaiters(
+		const std::vector<mtpRequestId> &waiters,
+		const Error &error);
 	bool onErrorDefault(const Error &error, const Response &response);
 
 	void unpaused();
@@ -216,6 +224,7 @@ private:
 		mtpRequestId requestId) const;
 	std::optional<ShiftedDcId> changeRequestByDc(
 		mtpRequestId requestId, DcId newdc);
+	[[nodiscard]] ResponseHandler takeResponseHandler(mtpRequestId requestId);
 
 	void checkDelayedRequests();
 
@@ -263,8 +272,11 @@ private:
 	std::map<mtpRequestId, ShiftedDcId> _requestsByDc;
 	mutable QMutex _requestByDcLock;
 
-	// holds target dcWithShift for auth export request
-	std::map<mtpRequestId, ShiftedDcId> _authExportRequests;
+	// holds target bare dc id for auth export request
+	std::map<mtpRequestId, DcId> _authExportRequests;
+
+	// holds target bare dc id for auth import request
+	std::map<mtpRequestId, DcId> _authImportRequests;
 
 	std::map<mtpRequestId, ResponseHandler> _parserMap;
 	mutable QMutex _parserMapLock;
@@ -341,7 +353,9 @@ Instance::Private::Private(
 		_customDeviceModel = value;
 		lock.unlock();
 
-		reInitConnection(mainDcId());
+		if (hasMainDcId()) {
+			reInitConnection(mainDcId());
+		}
 	}, _lifetime);
 
 	for (auto &key : fields.keys) {
@@ -535,9 +549,9 @@ void Instance::Private::setUserPhone(const QString &phone) {
 	}
 }
 
-void Instance::Private::badConfigurationError() {
+void Instance::Private::badConfigurationError(const ProxyData &proxy) {
 	if (_mode == Mode::Normal) {
-		Core::App().badMtprotoConfigurationError();
+		Core::App().badMtprotoConfigurationError(proxy);
 	}
 }
 
@@ -672,6 +686,9 @@ void Instance::Private::cancel(mtpRequestId requestId) {
 		}
 	}
 	unregisterRequest(requestId);
+	for (auto &[dcId, waiters] : _authWaiters) {
+		waiters.erase(ranges::remove(waiters, requestId), end(waiters));
+	}
 	if (shiftedDcId) {
 		const auto session = getSession(std::abs(*shiftedDcId));
 		session->cancel(requestId, msgId);
@@ -702,19 +719,52 @@ void Instance::Private::killSession(ShiftedDcId shiftedDcId) {
 	scheduleSessionDestroy(shiftedDcId);
 }
 
-void Instance::Private::stopSession(ShiftedDcId shiftedDcId) {
-	if (const auto session = findSession(shiftedDcId)) {
-		if (session != _mainSession) { // don't stop main session
-			session->stop();
+void Instance::Private::killSessionsByShift(int shift) {
+	Expects(shift > 0);
+
+	auto selected = std::vector<ShiftedDcId>();
+	for (const auto &[shiftedDcId, session] : _sessions) {
+		if (GetDcIdShift(shiftedDcId) == shift) {
+			selected.push_back(shiftedDcId);
 		}
+	}
+	for (const auto shiftedDcId : selected) {
+		killSession(shiftedDcId);
 	}
 }
 
+bool Instance::Private::killSessionIfIdle(ShiftedDcId shiftedDcId) {
+	if (!findSession(shiftedDcId)) {
+		return true;
+	}
+	{
+		QMutexLocker locker(&_requestByDcLock);
+		for (const auto &[requestId, registered] : _requestsByDc) {
+			if (std::abs(registered) == shiftedDcId
+				&& !_authImportRequests.contains(requestId)) {
+				return false;
+			}
+		}
+	}
+	killSession(shiftedDcId);
+	return true;
+}
+
 void Instance::Private::reInitConnection(DcId dcId) {
+	const auto dc = findDc(dcId);
+	auto selected = std::vector<not_null<Session*>>();
 	for (const auto &[shiftedDcId, session] : _sessions) {
 		if (BareDcId(shiftedDcId) == dcId) {
-			session->reInitConnection();
+			session->prepareReInitConnection();
+			selected.push_back(session.get());
+		} else if (dc && getDcById(shiftedDcId).get() == dc) {
+			// Shares the flag, keeps its connection for its config request.
+			session->prepareReInitConnection();
 		}
+	}
+	for (const auto &session : selected) {
+		session->setConnectionNotInited();
+		session->restart();
 	}
 }
 
@@ -1143,20 +1193,24 @@ bool Instance::Private::hasCallback(mtpRequestId requestId) const {
 	return (it != _parserMap.cend());
 }
 
+ResponseHandler Instance::Private::takeResponseHandler(
+		mtpRequestId requestId) {
+	QMutexLocker locker(&_parserMapLock);
+	const auto i = _parserMap.find(requestId);
+	if (i == end(_parserMap)) {
+		return ResponseHandler();
+	}
+	auto result = std::move(i->second);
+	_parserMap.erase(i);
+	return result;
+}
+
 void Instance::Private::processCallback(const Response &response) {
 	const auto requestId = response.requestId;
-	ResponseHandler handler;
-	{
-		QMutexLocker locker(&_parserMapLock);
-		auto it = _parserMap.find(requestId);
-		if (it != _parserMap.cend()) {
-			handler = std::move(it->second);
-			_parserMap.erase(it);
-
-			DEBUG_LOG(("RPC Info: found parser for request %1, trying to parse response...").arg(requestId));
-		}
-	}
+	auto handler = takeResponseHandler(requestId);
 	if (handler.done || handler.fail) {
+		DEBUG_LOG(("RPC Info: found parser for request %1, trying to parse response...").arg(requestId));
+
 		const auto handleError = [&](const Error &error) {
 			DEBUG_LOG(("RPC Info: "
 				"error received, code %1, type %2, description: %3").arg(
@@ -1277,8 +1331,10 @@ void Instance::Private::importDone(
 
 	DEBUG_LOG(("MTP Info: auth import to dc %1 succeeded").arg(newdc));
 
-	auto &waiters = _authWaiters[newdc];
-	if (waiters.size()) {
+	_authImportRequests.erase(response.requestId);
+
+	auto waiters = base::take(_authWaiters[newdc]);
+	if (!waiters.empty()) {
 		QReadLocker locker(&_requestMapLock);
 		for (auto waitedRequestId : waiters) {
 			auto it = _requestMap.find(waitedRequestId);
@@ -1297,7 +1353,6 @@ void Instance::Private::importDone(
 			const auto session = getSession(*shiftedDcId);
 			session->sendPrepared(it->second);
 		}
-		waiters.clear();
 	}
 }
 
@@ -1308,6 +1363,11 @@ bool Instance::Private::importFail(
 		return false;
 	}
 
+	auto it = _authImportRequests.find(response.requestId);
+	if (it != _authImportRequests.cend()) {
+		authImportFailed(it->second, error);
+		_authImportRequests.erase(it);
+	}
 	//
 	// Don't log out on export/import problems, perhaps this is a server side error.
 	//
@@ -1338,8 +1398,24 @@ void Instance::Private::exportDone(
 		return;
 	}
 
+	const auto dcId = it->second;
+	const auto waiters = _authWaiters.find(dcId);
+	if (waiters == end(_authWaiters) || waiters->second.empty()) {
+		_authExportRequests.erase(it);
+		return;
+	}
+
+	auto target = ShiftedDcId(dcId);
+	for (const auto waitedRequestId : waiters->second) {
+		const auto shiftedDcId = queryRequestByDc(waitedRequestId);
+		if (shiftedDcId && findSession(std::abs(*shiftedDcId))) {
+			target = std::abs(*shiftedDcId);
+			break;
+		}
+	}
+
 	const auto &data = result.c_auth_exportedAuthorization();
-	_instance->send(MTPauth_ImportAuthorization(
+	const auto importRequestId = _instance->send(MTPauth_ImportAuthorization(
 		data.vid(),
 		data.vbytes()
 	), [this](const Response &response) {
@@ -1352,7 +1428,8 @@ void Instance::Private::exportDone(
 		return true;
 	}, [this](const Error &error, const Response &response) {
 		return importFail(error, response);
-	}, it->second);
+	}, target);
+	_authImportRequests.emplace(importRequestId, dcId);
 	_authExportRequests.erase(response.requestId);
 }
 
@@ -1365,7 +1442,8 @@ bool Instance::Private::exportFail(
 
 	auto it = _authExportRequests.find(response.requestId);
 	if (it != _authExportRequests.cend()) {
-		_authWaiters[BareDcId(it->second)].clear();
+		authImportFailed(it->second, error);
+		_authExportRequests.erase(it);
 	}
 	//
 	// Don't log out on export/import problems, perhaps this is a server side error.
@@ -1374,6 +1452,101 @@ bool Instance::Private::exportFail(
 	//	_globalFailHandler(error, response); // auth failed in main dc
 	//}
 	return true;
+}
+
+void Instance::Private::sendAuthExport(DcId dcId) {
+	const auto exportRequestId = _instance->send(MTPauth_ExportAuthorization(
+		MTP_int(dcId)
+	), [this](const Response &response) {
+		auto result = MTPauth_ExportedAuthorization();
+		auto from = response.reply.constData();
+		if (!result.read(from, from + response.reply.size())) {
+			return false;
+		}
+		exportDone(result, response);
+		return true;
+	}, [this](const Error &error, const Response &response) {
+		return exportFail(error, response);
+	});
+	_authExportRequests.emplace(exportRequestId, dcId);
+}
+
+void Instance::Private::failOverAuthImports(ShiftedDcId shiftedDcId) {
+	auto i = _authImportRequests.begin();
+	while (i != _authImportRequests.end()) {
+		const auto registered = queryRequestByDc(i->first);
+		if (!registered || std::abs(*registered) != shiftedDcId) {
+			++i;
+			continue;
+		}
+		const auto requestId = i->first;
+		const auto dcId = i->second;
+
+		// A due retry would recreate the session before the queued restart.
+		_delayedRequests.erase(
+			ranges::remove(
+				_delayedRequests,
+				requestId,
+				[](const auto &entry) { return entry.first; }),
+			end(_delayedRequests));
+		i = _authImportRequests.erase(i);
+		InvokeQueued(_instance, [=] {
+			restartAuthImport(dcId, requestId);
+		});
+	}
+}
+
+void Instance::Private::restartAuthImport(
+		DcId dcId,
+		mtpRequestId requestId) {
+	// Private::cancel() must not be used for a request whose session was
+	// just killed: it would resolve the session through getSession() and
+	// start the one being destroyed, and it takes _requestMapLock for
+	// writing while importDone may hold it for reading - which is why
+	// failOverAuthImports() defers this call. Forgetting the request
+	// leaves nothing to resolve, so a delayed resend of it is skipped.
+	unregisterRequest(requestId);
+	{
+		QMutexLocker locker(&_parserMapLock);
+		_parserMap.erase(requestId);
+	}
+
+	const auto i = _authWaiters.find(dcId);
+	if (i != end(_authWaiters) && !i->second.empty()) {
+		sendAuthExport(dcId);
+	}
+}
+
+void Instance::Private::authImportFailed(DcId dcId, const Error &error) {
+	auto waiters = base::take(_authWaiters[dcId]);
+	if (waiters.empty()) {
+		return;
+	}
+	LOG(("MTP Error: auth transfer to dc %1 failed with %2, "
+		"%3 waiting requests fail."
+		).arg(dcId
+		).arg(error.type()
+		).arg(waiters.size()));
+	InvokeQueued(_instance, [=, waiters = std::move(waiters)] {
+		failAuthWaiters(waiters, error);
+	});
+}
+
+void Instance::Private::failAuthWaiters(
+		const std::vector<mtpRequestId> &waiters,
+		const Error &error) {
+	const auto guard = QPointer<Instance>(_instance);
+	for (const auto requestId : waiters) {
+		const auto handler = takeResponseHandler(requestId);
+		_badGuestDcRequests.erase(requestId);
+		if (handler.fail) {
+			handler.fail(error, Response{ .requestId = requestId });
+			if (!guard) {
+				return;
+			}
+		}
+		unregisterRequest(requestId);
+	}
 }
 
 bool Instance::Private::onErrorDefault(
@@ -1398,7 +1571,11 @@ bool Instance::Private::onErrorDefault(
 		} else {
 			LOG(("MTP Error: could not find request %1 for migrating to %2").arg(requestId).arg(newdcWithShift));
 		}
-		if (!dcWithShift || !newdcWithShift) return false;
+		if (!dcWithShift
+			|| newdcWithShift <= 0
+			|| newdcWithShift >= kDcShift) {
+			return false;
+		}
 
 		DEBUG_LOG(("MTP Info: changing request %1 from dcWithShift%2 to dc%3").arg(requestId).arg(dcWithShift).arg(newdcWithShift));
 		if (dcWithShift < 0) { // newdc shift = 0
@@ -1569,20 +1746,7 @@ bool Instance::Private::onErrorDefault(
 			).arg(dcWithShift));
 		auto &waiters(_authWaiters[newdc]);
 		if (!waiters.size()) {
-			auto exportRequestId = _instance->send(MTPauth_ExportAuthorization(
-				MTP_int(newdc)
-			), [this](const Response &response) {
-				auto result = MTPauth_ExportedAuthorization();
-				auto from = response.reply.constData();
-				if (!result.read(from, from + response.reply.size())) {
-					return false;
-				}
-				exportDone(result, response);
-				return true;
-			}, [this](const Error &error, const Response &response) {
-				return exportFail(error, response);
-			});
-			_authExportRequests.emplace(exportRequestId, abs(dcWithShift));
+			sendAuthExport(newdc);
 		}
 		waiters.push_back(requestId);
 		if (badGuestDc) _badGuestDcRequests.insert(requestId);
@@ -1667,6 +1831,7 @@ void Instance::Private::scheduleSessionDestroy(ShiftedDcId shiftedDcId) {
 	if (i == _sessions.cend()) {
 		return;
 	}
+	failOverAuthImports(shiftedDcId);
 	i->second->kill();
 	_sessionsToDestroy.push_back(std::move(i->second));
 	_sessions.erase(i);
@@ -1923,8 +2088,8 @@ void Instance::setUserPhone(const QString &phone) {
 	_private->setUserPhone(phone);
 }
 
-void Instance::badConfigurationError() {
-	_private->badConfigurationError();
+void Instance::badConfigurationError(const ProxyData &proxy) {
+	_private->badConfigurationError(proxy);
 }
 
 void Instance::syncHttpUnixtime() {
@@ -1987,8 +2152,12 @@ void Instance::killSession(ShiftedDcId shiftedDcId) {
 	_private->killSession(shiftedDcId);
 }
 
-void Instance::stopSession(ShiftedDcId shiftedDcId) {
-	_private->stopSession(shiftedDcId);
+void Instance::killSessionsByShift(int shift) {
+	_private->killSessionsByShift(shift);
+}
+
+bool Instance::killSessionIfIdle(ShiftedDcId shiftedDcId) {
+	return _private->killSessionIfIdle(shiftedDcId);
 }
 
 void Instance::reInitConnection(DcId dcId) {

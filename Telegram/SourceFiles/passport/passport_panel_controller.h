@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "passport/passport_form_view_controller.h"
 #include "passport/passport_form_controller.h"
+#include "passport/passport_form_view_controller.h"
 #include "ui/layers/layer_widget.h"
 
 namespace Ui {
@@ -37,7 +37,6 @@ EditContactScheme GetContactScheme(Scope::Type type);
 
 const std::map<QString, QString> &LatinToNativeMap();
 const std::map<QString, QString> &NativeToLatinMap();
-QString AdjustKeyName(not_null<const Value*> value, const QString &key);
 bool SkipFieldCheck(not_null<const Value*> value, const QString &key);
 
 struct ScanInfo {

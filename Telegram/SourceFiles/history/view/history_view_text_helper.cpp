@@ -7,20 +7,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_text_helper.h"
 
+#include "base/weak_ptr.h"
 #include "core/click_handler_types.h"
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_document.h"
 #include "data/data_session.h"
-#include "data/stickers/data_custom_emoji.h"
 #include "history/view/history_view_element.h"
 #include "history/view/history_view_reaction_preview.h"
 #include "history/history.h"
 #include "main/main_session.h"
 #include "window/window_session_controller.h"
-#include "base/weak_ptr.h"
 
 namespace HistoryView {
 
 void InitElementTextPart(not_null<Element*> view, Ui::Text::String &text) {
+	if (view->context() == Context::MediaEditor) {
+		text.setSpoilerRevealed(true, anim::type::instant);
+	}
 	if (text.hasSpoilers()) {
 		text.setSpoilerLinkFilter([weak = base::make_weak(view)](
 				const ClickContext &context) {

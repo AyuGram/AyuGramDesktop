@@ -7,14 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/controls/window_outdated_bar.h"
 
-#include "ui/widgets/labels.h" // Ui::FlatLabel
-#include "ui/widgets/buttons.h" // Ui::IconButton
-#include "ui/wrap/slide_wrap.h" // Ui::SlideWrap
 #include "base/platform/base_platform_info.h"
 #include "lang/lang_keys.h"
+#include "ui/widgets/buttons.h" // Ui::IconButton
+#include "ui/widgets/labels.h" // Ui::FlatLabel
+#include "ui/wrap/slide_wrap.h" // Ui::SlideWrap
+
 #include "styles/style_window.h"
 
 #include <QtCore/QFile>
+#include <QtCore/QtEndian>
 
 namespace Ui {
 namespace {
@@ -110,7 +112,7 @@ void Bar::paintEvent(QPaintEvent *e) {
 	if (content.size() != sizeof(qint32)) {
 		return false;
 	}
-	const auto value = *reinterpret_cast<const qint32*>(content.constData());
+	const auto value = qFromUnaligned<qint32>(content.constData());
 	const auto year = (value / 10000);
 	const auto month = (value % 10000) / 100;
 	const auto day = (value % 100);

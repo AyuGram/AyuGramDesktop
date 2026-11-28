@@ -11,9 +11,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/cloud_password/settings_cloud_password_common.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/cloud_password/settings_cloud_password_step.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/vertical_list.h"
+
 #include "styles/style_settings.h"
 
 namespace Settings {
@@ -35,12 +36,7 @@ rpl::producer<QString> Start::title() {
 void Start::setupContent() {
 	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
 
-	SetupHeader(
-		content,
-		u"cloud_password/intro"_q,
-		showFinishes(),
-		tr::lng_settings_cloud_password_start_title(),
-		tr::lng_settings_cloud_password_start_about());
+	SetupIntroHeader(content, showFinishes());
 
 	AddSkip(content, st::settingLocalPasscodeDescriptionBottomSkip);
 

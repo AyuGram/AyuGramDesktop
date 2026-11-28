@@ -8,14 +8,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "calls/group/calls_group_viewport.h"
-#include "ui/gl/gl_surface.h"
-#include "ui/rhi/rhi_renderer.h"
-#include "ui/rhi/rhi_image.h"
-#include "ui/round_rect.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/cross_line.h"
+#include "ui/gl/gl_surface.h"
+#include "ui/rhi/rhi_image.h"
+#include "ui/rhi/rhi_renderer.h"
+#include "ui/round_rect.h"
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
 class QRhi;
 class QRhiBuffer;
@@ -110,7 +110,7 @@ private:
 		QSize size;
 	};
 
-	void createPipelines();
+	[[nodiscard]] bool createPipelines();
 	void ensureNoiseTexture();
 	void validateDatas();
 	void validateOutlineAnimation(
@@ -254,4 +254,4 @@ private:
 
 } // namespace Calls::Group
 
-#endif // Qt >= 6.7
+#endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API

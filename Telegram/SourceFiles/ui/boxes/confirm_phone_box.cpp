@@ -8,15 +8,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/confirm_phone_box.h"
 
 #include "core/file_utilities.h"
+#include "lang/lang_keys.h"
 #include "ui/boxes/confirm_box.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
 #include "ui/text/format_values.h" // Ui::FormatPhone
 #include "ui/text/text_utilities.h"
-#include "lang/lang_keys.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/labels.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_edit_peer_members.h"
 #include "styles/style_layers.h"
-#include "styles/style_boxes.h"
 
 namespace Ui {
 
@@ -53,6 +54,7 @@ void ConfirmPhoneBox::prepare() {
 			rpl::single(tr::bold(Ui::FormatPhone(_phone))),
 			tr::marked),
 		st::confirmPhoneAboutLabel);
+	_about->resizeToWidth(st::boxWidth - 2 * st::usernamePadding.left());
 
 	_code.create(this, st::confirmPhoneCodeField, tr::lng_code_ph());
 	_code->setAutoSubmit(_sentCodeLength, [=] { sendCode(); });
@@ -182,10 +184,6 @@ void ConfirmPhoneBox::showServerError(const QString &text) {
 	_code->setDisabled(false);
 	_code->setFocus();
 	showError(text);
-}
-
-QString ConfirmPhoneBox::getPhone() const {
-	return _phone;
 }
 
 } // namespace Ui

@@ -7,13 +7,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_player.h"
 
+#include "data/data_document.h" // for DocumentData::duration()
+#include "media/audio/media_audio.h" // for SupportsSpeedControl()
+#include "media/streaming/media_streaming_audio_track.h"
 #include "media/streaming/media_streaming_file.h"
 #include "media/streaming/media_streaming_loader.h"
-#include "media/streaming/media_streaming_audio_track.h"
 #include "media/streaming/media_streaming_video_track.h"
-#include "media/audio/media_audio.h" // for SupportsSpeedControl()
 #include "media/media_common.h"
-#include "data/data_document.h" // for DocumentData::duration()
 
 namespace Media {
 namespace Streaming {
@@ -99,7 +99,8 @@ void Player::checkNextFrameRender() {
 	const auto now = crl::now();
 	if (now < _nextFrameTime) {
 		if (!_renderFrameTimer.isActive()) {
-			_renderFrameTimer.callOnce(_nextFrameTime - now);
+			_renderFrameTimer.callOnce(
+				std::min(_nextFrameTime - now, kDurationMax - 1));
 		}
 	} else {
 		_renderFrameTimer.cancel();
@@ -532,13 +533,14 @@ void Player::fail(Error error) {
 
 void Player::play(const PlaybackOptions &options) {
 	Expects(options.speed >= kSpeedMin && options.speed <= kSpeedMax);
+	Expects(options.volume >= 0. && options.volume <= 1.);
 
 	// Looping video with audio is not supported for now.
 	Expects(!options.loop || (options.mode != Mode::Both));
 
 	const auto previous = getCurrentReceivedTill(computeTotalDuration());
 
-	stop(true);
+	stop(!finished());
 	_lastFailure = std::nullopt;
 
 	savePreviousReceivedTill(options, previous);
@@ -857,6 +859,17 @@ void Player::setSpeed(float64 speed) {
 			if (_video) {
 				_video->setSpeed(speed);
 			}
+		}
+	}
+}
+
+void Player::setVolume(float64 volume) {
+	Expects(volume >= 0. && volume <= 1.);
+
+	if (_options.volume != volume) {
+		_options.volume = volume;
+		if (active() && _audio) {
+			_audio->setVolume(volume);
 		}
 	}
 }

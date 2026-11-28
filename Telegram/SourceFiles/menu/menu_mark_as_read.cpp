@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/controls/userpic_button.h"
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_window.h"
@@ -228,7 +229,9 @@ void AddChatListAction(
 		}
 	};
 	addAction(
-		tr::lng_context_mark_read(tr::now),
+		(kind == ChatListKind::AllChats
+			? tr::lng_context_mark_read_all(tr::now)
+			: tr::lng_context_mark_read(tr::now)),
 		std::move(callback),
 		&st::menuIconMarkRead);
 }

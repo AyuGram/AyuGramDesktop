@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "boxes/star_gift_box.h"
 #include "chat_helpers/message_field.h"
+#include "data/notify/data_notify_settings.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_chat_participant_status.h"
@@ -20,17 +21,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_saved_sublist.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/notify/data_notify_settings.h"
+#include "history/view/controls/compose_controls_common.h"
 #include "history/history.h"
 #include "history/history_item_helpers.h"
-#include "history/view/controls/compose_controls_common.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
+#include "ui/text/text_utilities.h"
+#include "ui/widgets/buttons.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "ui/widgets/buttons.h"
 #include "window/section_widget.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 
@@ -227,19 +229,19 @@ void BottomControls::setupButtons() {
 	if (_mode == BottomControlsMode::History) {
 		_unblock = std::make_unique<Ui::FlatButton>(
 			this,
-			tr::lng_unblock_button(tr::now).toUpper(),
+			tr::lng_unblock_button(tr::now, tr::upper),
 			st::historyUnblock);
 		_botStart = std::make_unique<Ui::FlatButton>(
 			this,
-			tr::lng_bot_start(tr::now).toUpper(),
+			tr::lng_bot_start(tr::now, tr::upper),
 			st::historyComposeButton);
 		_joinChannel = std::make_unique<Ui::FlatButton>(
 			this,
-			tr::lng_profile_join_channel(tr::now).toUpper(),
+			tr::lng_profile_join_channel(tr::now, tr::upper),
 			st::historyComposeButton);
 		_muteUnmute = std::make_unique<Ui::FlatButton>(
 			this,
-			tr::lng_channel_mute(tr::now).toUpper(),
+			tr::lng_channel_mute(tr::now, tr::upper),
 			st::historyComposeButton);
 		_reportMessages = std::make_unique<Ui::FlatButton>(
 			this,
@@ -431,11 +433,11 @@ void BottomControls::refreshJoinChannelText() {
 		return;
 	}
 	if (const auto channel = _peer->asChannel()) {
-		_joinChannel->setText((channel->isBroadcast()
+		_joinChannel->setText(Ui::Text::Upper(channel->isBroadcast()
 			? tr::lng_profile_join_channel(tr::now)
 			: (channel->requestToJoin() && !channel->amCreator())
 			? tr::lng_profile_apply_to_join_group(tr::now)
-			: tr::lng_profile_join_group(tr::now)).toUpper());
+			: tr::lng_profile_join_group(tr::now)));
 	}
 }
 
@@ -444,11 +446,11 @@ void BottomControls::refreshJoinGroupText() {
 		return;
 	}
 	if (const auto channel = _peer->asChannel()) {
-		_joinGroup->setText((channel->isBroadcast()
+		_joinGroup->setText(Ui::Text::Upper(channel->isBroadcast()
 			? tr::lng_profile_join_channel(tr::now)
 			: (channel->requestToJoin() && !channel->amCreator())
 			? tr::lng_profile_apply_to_join_group(tr::now)
-			: tr::lng_profile_join_group(tr::now)).toUpper());
+			: tr::lng_profile_join_group(tr::now)));
 	}
 	_canSendTexts = !isJoinGroup();
 }
@@ -457,20 +459,20 @@ void BottomControls::refreshUnblockText() {
 	if (!_unblock) {
 		return;
 	}
-	_unblock->setText(((_peer->isUser()
+	_unblock->setText(Ui::Text::Upper((_peer->isUser()
 		&& _peer->asUser()->isBot()
 		&& !_peer->asUser()->isSupport())
 			? tr::lng_restart_button(tr::now)
-			: tr::lng_unblock_button(tr::now)).toUpper());
+			: tr::lng_unblock_button(tr::now)));
 }
 
 void BottomControls::refreshMuteUnmuteText() {
 	if (!_muteUnmute) {
 		return;
 	}
-	_muteUnmute->setText((_history->muted()
+	_muteUnmute->setText(Ui::Text::Upper(_history->muted()
 		? tr::lng_channel_unmute(tr::now)
-		: tr::lng_channel_mute(tr::now)).toUpper());
+		: tr::lng_channel_mute(tr::now)));
 }
 
 void BottomControls::refreshGiftToChannelShown() {

@@ -73,4 +73,3 @@ int psFixPrevious();
 
 void psDownloadPathEnableAccess();
 QByteArray psDownloadPathBookmark(const QString &path);
-QByteArray psPathBookmark(const QString &path);

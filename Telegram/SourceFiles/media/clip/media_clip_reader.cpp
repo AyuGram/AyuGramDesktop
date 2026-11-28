@@ -7,14 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/clip/media_clip_reader.h"
 
-#include "media/clip/media_clip_ffmpeg.h"
+#include "base/invoke_queued.h"
+#include "base/random.h"
+#include "core/file_location.h"
+#include "logs.h"
 #include "media/clip/media_clip_check_streaming.h"
+#include "media/clip/media_clip_ffmpeg.h"
 #include "ui/chat/attach/attach_prepare.h"
 #include "ui/painter.h"
-#include "core/file_location.h"
-#include "base/random.h"
-#include "base/invoke_queued.h"
-#include "logs.h"
 
 #include <QtCore/QBuffer>
 #include <QtCore/QAbstractEventDispatcher>
@@ -434,16 +434,6 @@ crl::time Reader::getDurationMs() const {
 	return ready() ? _durationMs : 0;
 }
 
-void Reader::pauseResumeVideo() {
-	if (Workers.size() <= _threadIndex) {
-		error();
-	}
-	if (_state == State::Error) return;
-
-	_videoPauseRequest.storeRelease(1 - _videoPauseRequest.loadAcquire());
-	Workers[_threadIndex]->manager.start(this);
-}
-
 bool Reader::videoPaused() const {
 	return _videoPauseRequest.loadAcquire() != 0;
 }
@@ -534,6 +524,7 @@ public:
 				return error();
 			}
 			frame()->positionMs = _implementation->frameRealTime();
+			frame()->when = ms;
 
 			_width = frame()->original.width();
 			_height = frame()->original.height();

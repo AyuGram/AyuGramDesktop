@@ -7,63 +7,67 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_scheduled_section.h"
 
-#include "history/view/controls/history_view_compose_controls.h"
-#include "history/view/history_view_empty_list_bubble.h"
-#include "history/view/history_view_top_bar_widget.h"
-#include "history/view/history_view_schedule_box.h"
-#include "history/view/history_view_sticker_toast.h"
-#include "data/data_chat_participant_status.h"
-#include "history/history.h"
-#include "history/history_drag_area.h"
-#include "history/history_item_helpers.h" // GetErrorForSending.
-#include "history/history_view_swipe_back_session.h"
-#include "menu/menu_send.h" // SendMenu::Type.
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/tooltip.h"
-#include "ui/widgets/elastic_scroll.h"
-#include "ui/widgets/shadow.h"
-#include "ui/chat/chat_style.h"
-#include "ui/text/text_utilities.h"
-#include "ui/toast/toast.h"
-#include "ui/dynamic_image.h"
-#include "ui/dynamic_thumbnails.h"
-#include "ui/screen_reader_mode.h"
-#include "ui/ui_utility.h"
 #include "api/api_editing.h"
 #include "api/api_sending.h"
 #include "apiwrap.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/send_files_box.h"
-#include "boxes/premium_limits_box.h"
-#include "window/window_session_controller.h"
-#include "window/window_peer_menu.h"
-#include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
-#include "core/mime_type.h"
+#include "base/call_delayed.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/premium_limits_box.h"
+#include "boxes/send_files_box.h"
 #include "chat_helpers/tabbed_selector.h"
-#include "main/main_session.h"
-#include "mainwindow.h"
+#include "core/application.h"
+#include "core/mime_type.h"
 #include "data/components/recent_inline_bots.h"
 #include "data/components/scheduled_messages.h"
+#include "data/data_changes.h"
+#include "data/data_chat_participant_status.h"
 #include "data/data_document.h"
 #include "data/data_file_origin.h"
 #include "data/data_forum.h"
 #include "data/data_forum_topic.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/data_user.h"
 #include "data/data_message_reactions.h"
 #include "data/data_peer_values.h"
 #include "data/data_premium_limits.h"
-#include "storage/storage_folder_archive.h"
-#include "storage/storage_media_prepare.h"
-#include "storage/storage_account.h"
-#include "storage/localimageloader.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/view/controls/history_view_compose_controls.h"
+#include "history/view/history_view_chat_section.h"
+#include "history/view/history_view_empty_list_bubble.h"
+#include "history/view/history_view_schedule_box.h"
+#include "history/view/history_view_sticker_toast.h"
+#include "history/view/history_view_top_bar_widget.h"
+#include "history/history.h"
+#include "history/history_drag_area.h"
+#include "history/history_item_helpers.h" // GetErrorForSending.
+#include "history/history_view_swipe_back_session.h"
 #include "inline_bots/inline_bot_result.h"
 #include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "mainwindow.h"
+#include "menu/menu_send.h" // SendMenu::Type.
+#include "storage/localimageloader.h"
+#include "storage/storage_account.h"
+#include "storage/storage_folder_archive.h"
+#include "storage/storage_media_prepare.h"
+#include "ui/chat/chat_style.h"
+#include "ui/text/text_utilities.h"
+#include "ui/toast/toast.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/elastic_scroll.h"
+#include "ui/widgets/shadow.h"
+#include "ui/widgets/tooltip.h"
+#include "ui/dynamic_image.h"
+#include "ui/dynamic_thumbnails.h"
+#include "ui/screen_reader_mode.h"
+#include "ui/ui_utility.h"
+#include "window/window_controller.h"
+#include "window/window_peer_menu.h"
+#include "window/window_session_controller.h"
+
+#include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
-#include "styles/style_boxes.h"
 
 #include <QtCore/QMimeData>
 
@@ -135,6 +139,14 @@ object_ptr<Window::SectionWidget> ScheduledMemento::createWidget(
 	if (column == Window::Column::Third) {
 		return nullptr;
 	}
+	if (_forumTopic
+		&& (_forumTopic->dying() || _forumTopic->creating())) {
+		// WHY: a back navigation inside a dying topic's destruction must not
+		// rebuild it, and a topic being created is discarded, without
+		// destroyed(), by the chat this section replaces.
+		auto memento = ChatMemento(ChatViewId{ .history = _history });
+		return memento.createWidget(parent, controller, column, geometry);
+	}
 	auto result = object_ptr<ScheduledWidget>(
 		parent,
 		controller,
@@ -142,6 +154,10 @@ object_ptr<Window::SectionWidget> ScheduledMemento::createWidget(
 		_forumTopic);
 	result->setInternalState(geometry, this);
 	return result;
+}
+
+Data::ForumTopic *ScheduledMemento::topicForRemoveRequests() const {
+	return _forumTopic;
 }
 
 ScheduledWidget::ScheduledWidget(
@@ -193,7 +209,7 @@ ScheduledWidget::ScheduledWidget(
 	if (_forumTopic) {
 		_forumTopic->destroyed(
 		) | rpl::on_next([=] {
-			controller->showBackFromStack();
+			topicDestroyed();
 		}, lifetime());
 	}
 
@@ -279,7 +295,22 @@ ScheduledWidget::ScheduledWidget(
 	Window::SetupSwipeBackSection(this, _scroll, _inner);
 }
 
-ScheduledWidget::~ScheduledWidget() = default;
+ScheduledWidget::~ScheduledWidget() {
+	if (const auto box = _sendFilesBox.data()) {
+		box->closeBox();
+	}
+	_composeControls->closeSendAsFileBox();
+}
+
+void ScheduledWidget::topicDestroyed() {
+	const auto window = &controller()->window();
+	const auto id = controller()->windowId();
+	if (id.chat() == _forumTopic) {
+		Core::App().closeWindow(window);
+		return;
+	}
+	showHistoryAfterThreadDestroyed(_history);
+}
 
 void ScheduledWidget::setupComposeControls() {
 	auto writeRestriction = _forumTopic
@@ -482,12 +513,14 @@ void ScheduledWidget::setupComposeControls() {
 		_composeControls->scrollKeyEvents(),
 		_inner->scrollKeyEvents()
 	) | rpl::on_next([=](not_null<QKeyEvent*> e) {
+		Tgw::ListScroll::Input(_inner.data());
 		_scroll->keyPressEvent(e);
 	}, lifetime());
 
 	_composeControls->editLastMessageRequests(
 	) | rpl::on_next([=](not_null<QKeyEvent*> e) {
 		if (!_inner->lastMessageEditRequestNotify()) {
+			Tgw::ListScroll::Input(_inner.data());
 			_scroll->keyPressEvent(e);
 		}
 	}, lifetime());
@@ -581,14 +614,6 @@ bool ScheduledWidget::confirmSendingFiles(
 			}
 			return true;
 		}
-		if (overrideSendImagesAsPhotos == true
-			&& (Storage::ComputeMimeDataState(data)
-				== Storage::MimeDataState::FilesArchive)) {
-			auto list = Ui::PreparedList();
-			list.files.push_back(Storage::PrepareFilesArchive(urls));
-			confirmSendingFiles(std::move(list), QString());
-			return true;
-		}
 		auto list = Storage::PrepareMediaList(
 			urls,
 			st::sendMediaPreviewSize,
@@ -634,6 +659,7 @@ bool ScheduledWidget::confirmSendingFiles(
 			: Api::SendType::Scheduled),
 		SendMenu::Details(),
 		[=](const TextWithTags &text) { _composeControls->setText(text); });
+	_sendFilesBox = box.data();
 
 	box->setConfirmedCallback(crl::guard(this, [=](
 			std::shared_ptr<Ui::PreparedBundle> bundle,
@@ -814,6 +840,7 @@ void ScheduledWidget::sendVoice(
 		data.waveform,
 		data.duration,
 		data.video,
+		data.videoSource,
 		prepareSendAction(options));
 	_composeControls->clearListenState();
 }
@@ -1599,9 +1626,16 @@ bool ScheduledWidget::showMessage(
 		}
 		return nullptr;
 	}();
-	showAtPosition(
-		message->position(),
-		originItem ? originItem->fullId() : FullMsgId());
+	const auto position = message->position();
+	const auto originId = originItem ? originItem->fullId() : FullMsgId();
+	if (params.highlight.richQuote) {
+		_inner->showAtPosition(
+			position,
+			params,
+			_cornerButtons.doneJumpFrom(position.fullId, originId));
+	} else {
+		showAtPosition(position, originId);
+	}
 	return true;
 }
 

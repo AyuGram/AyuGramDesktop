@@ -7,10 +7,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "media/streaming/media_streaming_player.h"
-#include "ui/effects/radial_animation.h"
-#include "ui/effects/animations.h"
 #include "base/timer.h"
+#include "media/streaming/media_streaming_player.h"
+#include "ui/effects/animations.h"
+#include "ui/effects/radial_animation.h"
 
 class DocumentData;
 
@@ -79,6 +79,7 @@ private:
 
 	DocumentData *_document = nullptr;
 	PhotoData *_photo = nullptr;
+	const not_null<Reader*> _reader;
 	Player _player;
 	Information _info;
 

@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "iv/markdown/iv_markdown_article_text.h"
+
 #include "api/api_bot.h"
 #include "base/weak_ptr.h"
 #include "core/click_handler_types.h"
@@ -14,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "iv/markdown/iv_markdown_prepare_links.h"
 #include "iv/markdown/iv_markdown_prepare_serialize.h"
 #include "lang/lang_keys.h"
+#include "styles/palette.h"
 #include "ui/effects/animation_value.h"
 #include "ui/style/style_core.h"
 #include "ui/style/style_core_scale.h"
@@ -25,7 +27,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/integration.h"
 #include "ui/painter.h"
 
-#include "styles/palette.h"
 #include "styles/style_iv.h"
 
 #include <algorithm>
@@ -774,6 +775,18 @@ void InlineButtonClickHandler::onClick(ClickContext context) const {
 
 QString InlineButtonClickHandler::tooltip() const {
 	return InlineButtonTooltip(_data);
+}
+
+[[nodiscard]] Ui::Text::CustomEmojiLinkTexts InlineButtonLinkTexts(
+		QStringView data) {
+	const auto url = InlineButtonUrl(data);
+	return {
+		.tooltip = InlineButtonTooltip(data),
+		.copyText = url,
+		.copyContextItemText = (url.isEmpty()
+			? QString()
+			: tr::lng_context_copy_link(tr::now)),
+	};
 }
 
 [[nodiscard]] QString InlineButtonPlainEmojiPrefix() {
@@ -2346,6 +2359,11 @@ QString InlineButtonTooltip(QStringView data) {
 		: QString();
 }
 
+QString InlineButtonUrl(QStringView data) {
+	const auto button = ActionableInlineButtonDataFor(data);
+	return button ? RichButtonUrl(button->type, button->data) : QString();
+}
+
 void SetTextLeaf(
 		Ui::Text::String *leaf,
 		const style::TextStyle &textStyle,
@@ -2361,7 +2379,8 @@ void SetTextLeaf(
 		Fn<void()> repaint,
 		Fn<void(QRect)> repaintRect,
 		Fn<bool(const ClickContext&)> spoilerLinkFilter,
-		bool richButtonLabel) {
+		bool richButtonLabel,
+		bool keepLeadingSpaces) {
 	*leaf = Ui::Text::String(TextMinResizeWidth(minResizeWidth));
 	auto context = mediaRuntime
 		? mediaRuntime->textContext()
@@ -2444,10 +2463,14 @@ void SetTextLeaf(
 	const auto resolved = richButtonLabel
 		? ResolveRichButtonLabelDates(text, context.formattedDateFactory)
 		: TextWithEntities();
+	auto options = rtl ? kIvMarkedTextOptionsRtl : kIvMarkedTextOptions;
+	if (keepLeadingSpaces) {
+		options.flags |= TextParseKeepLeadingSpaces;
+	}
 	leaf->setMarkedText(
 		textStyle,
 		richButtonLabel ? resolved : text,
-		rtl ? kIvMarkedTextOptionsRtl : kIvMarkedTextOptions,
+		options,
 		context);
 	SetTextLeafSpoilerLinkFilter(leaf, std::move(spoilerLinkFilter));
 	if (inlineButtonPaintState
@@ -2456,15 +2479,10 @@ void SetTextLeaf(
 			return (entity.type() == EntityType::CustomEmoji)
 				&& InlineButtonActionable(entity.data());
 		})) {
-		leaf->setCustomEmojiClickHandler([
-			state = inlineButtonPaintState
-		](QStringView data) {
-			if (!InlineButtonActionable(data)) {
-				return false;
-			}
-			state->lookedUpButton = data.toString();
-			return true;
-		}, ActivateInlineButton);
+		leaf->setCustomEmojiClickHandler(
+			InlineButtonActionable,
+			ActivateInlineButton,
+			InlineButtonLinkTexts);
 	}
 }
 

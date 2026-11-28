@@ -11,7 +11,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_earn.h"
 #include "api/api_statistics.h"
 #include "base/call_delayed.h"
-#include "base/invoke_queued.h"
 #include "boxes/gift_credits_box.h"
 #include "boxes/gift_premium_box.h"
 #include "boxes/star_gift_box.h"
@@ -29,48 +28,49 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
-#include "info/info_memento.h"
 #include "info/settings/info_settings_widget.h"
 #include "info/statistics/info_statistics_list_controllers.h"
+#include "info/info_memento.h"
 #include "lang/lang_keys.h"
+#include "main/main_account.h"
 #include "main/main_session.h"
 #include "settings/sections/settings_main.h"
+#include "settings/sections/settings_premium_common.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "settings/settings_common_session.h"
 #include "settings/settings_credits_graphics.h"
 #include "statistics/widgets/chart_header_widget.h"
 #include "ui/boxes/boost_box.h"
-#include "ui/controls/swipe_handler.h"
-#include "ui/controls/swipe_handler_data.h"
 #include "ui/effects/animation_value_f.h"
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/effects/premium_top_bar.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/text/custom_emoji_instance.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_utilities.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/slider_natural_width.h"
 #include "ui/widgets/sliding_tabs.h"
 #include "ui/wrap/fade_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
+#include "styles/style_channel_earn.h"
 #include "styles/style_chat.h"
 #include "styles/style_credits.h"
 #include "styles/style_giveaway.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
+#include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 #include "styles/style_settings.h"
-#include "styles/style_menu_icons.h"
-#include "styles/style_channel_earn.h"
 
 namespace Settings {
 namespace {
@@ -79,7 +79,9 @@ using namespace Builder;
 
 void BuildCurrencyWithdrawalSection(
 	not_null<Ui::VerticalLayout*> content,
-	not_null<Window::SessionController*> controller);
+	not_null<Window::SessionController*> controller,
+	rpl::producer<CreditsAmount> availableUpdates,
+	Fn<void()> withdrawn);
 
 void BuildCreditsButtons(
 	SectionBuilder &builder,
@@ -94,8 +96,45 @@ void BuildCreditsSectionContent(
 	QPointer<Ui::SettingsButton> *statsButton,
 	QPointer<Ui::SettingsButton> *giftButton,
 	QPointer<Ui::SettingsButton> *earnButton,
+	Fn<void(not_null<Ui::VerticalLayout*>)> setupWithdrawal,
 	Fn<void(not_null<Ui::VerticalLayout*>)> setupSubscriptions,
 	Fn<void(not_null<Ui::VerticalLayout*>)> setupHistory);
+
+[[nodiscard]] std::optional<CreditsAmount> SelfTonAvailableBalance(
+		not_null<Main::Session*> session,
+		const MTPUpdates &updates) {
+	auto result = std::optional<CreditsAmount>();
+	const auto check = [&](const MTPUpdate &update) {
+		update.match([&](const MTPDupdateStarsRevenueStatus &data) {
+			if (peerFromMTP(data.vpeer()) != session->userPeerId()) {
+				return;
+			}
+			const auto &status = data.vstatus().data();
+			const auto current = CreditsAmountFromTL(
+				status.vcurrent_balance());
+			const auto available = CreditsAmountFromTL(
+				status.vavailable_balance());
+			if (current.ton() && available.ton()) {
+				result = available;
+			}
+		}, [](const auto &) {
+		});
+	};
+	const auto checkList = [&](const MTPVector<MTPUpdate> &list) {
+		for (const auto &update : list.v) {
+			check(update);
+		}
+	};
+	updates.match([&](const MTPDupdates &data) {
+		checkList(data.vupdates());
+	}, [&](const MTPDupdatesCombined &data) {
+		checkList(data.vupdates());
+	}, [&](const MTPDupdateShort &data) {
+		check(data.vupdate());
+	}, [](const auto &) {
+	});
+	return result;
+}
 
 class Credits : public Section<Credits> {
 public:
@@ -119,9 +158,11 @@ public:
 
 private:
 	void setupContent();
-	void setupSwipeBack();
+	void setupWithdrawal(not_null<Ui::VerticalLayout*> container);
 	void setupHistory(not_null<Ui::VerticalLayout*> container);
 	void setupSubscriptions(not_null<Ui::VerticalLayout*> container);
+	void setupRevenueUpdates();
+	void revenueChanged();
 
 	void visibleTopBottomUpdated(
 		int visibleTop,
@@ -142,6 +183,8 @@ private:
 
 	rpl::event_stream<> _showBack;
 	rpl::event_stream<> _showFinished;
+	rpl::event_stream<CreditsAmount> _availableUpdates;
+	rpl::event_stream<> _revenueChanges;
 	rpl::variable<QString> _buttonText;
 
 	QPointer<Ui::SettingsButton> _statsButton;
@@ -158,13 +201,16 @@ Credits::Credits(
 , _creditsType(type)
 , _star(Ui::GenerateStars(st::creditsTopupButton.height, 1))
 , _balanceStar((_creditsType == CreditsType::Ton)
-		? Ui::Earn::IconCurrencyColored(
+		? Ui::Earn::IconCurrencyTwoTone(
 			st::tonFieldIconSize,
 			st::currencyFg->c)
 		: Ui::GenerateStars(st::creditsBalanceStarHeight, 1)) {
 	controller->session().giftBoxStickersPacks().tonLoad();
 	setupContent();
-	setupSwipeBack();
+	if (_creditsType == CreditsType::Ton) {
+		setupRevenueUpdates();
+	}
+	SetupSectionSwipeBack(this, &_showBack);
 
 	controller->session().premiumPossibleValue(
 	) | rpl::on_next([=](bool premiumPossible) {
@@ -198,6 +244,31 @@ void Credits::setStepDataReference(std::any &data) {
 		) | rpl::map_to(true);
 		_wrap = std::move(my->wrapValue);
 	}
+}
+
+void Credits::setupRevenueUpdates() {
+	const auto session = &controller()->session();
+	session->account().mtpUpdates(
+	) | rpl::on_next([=](const MTPUpdates &updates) {
+		const auto available = SelfTonAvailableBalance(session, updates);
+		if (available) {
+			_availableUpdates.fire_copy(*available);
+			revenueChanged();
+		}
+	}, lifetime());
+}
+
+void Credits::revenueChanged() {
+	_revenueChanges.fire({});
+	controller()->session().credits().tonLoad(true);
+}
+
+void Credits::setupWithdrawal(not_null<Ui::VerticalLayout*> container) {
+	BuildCurrencyWithdrawalSection(
+		container,
+		controller(),
+		_availableUpdates.events(),
+		crl::guard(this, [=] { revenueChanged(); }));
 }
 
 void Credits::setupSubscriptions(not_null<Ui::VerticalLayout*> container) {
@@ -282,13 +353,14 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 
 	Ui::AddSkip(content, st::lineWidth * 6);
 
+	const auto lists = content->add(object_ptr<Ui::VerticalLayout>(content));
 	const auto currency = (_creditsType == CreditsType::Ton);
 
 	const auto fill = [=](
+			not_null<Ui::VerticalLayout*> inner,
 			const Data::CreditsStatusSlice &fullSlice,
 			const Data::CreditsStatusSlice &inSlice,
 			const Data::CreditsStatusSlice &outSlice) {
-		const auto inner = content;
 		if (fullSlice.list.empty()) {
 			return;
 		}
@@ -413,21 +485,46 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 		inner->resizeToWidth(container->width());
 	};
 
-	const auto apiLifetime = content->lifetime().make_state<rpl::lifetime>();
-	{
+	const auto replace = [=](
+			const Data::CreditsStatusSlice &fullSlice,
+			const Data::CreditsStatusSlice &inSlice,
+			const Data::CreditsStatusSlice &outSlice) {
+		const auto failed = [](const Data::CreditsStatusSlice &slice) {
+			return slice.list.empty()
+				&& !slice.allLoaded
+				&& slice.token.isEmpty();
+		};
+		const auto rendered = (lists->count() > 0);
+		if (failed(fullSlice)
+			|| (rendered && (failed(inSlice) || failed(outSlice)))) {
+			return;
+		}
+		fill(
+			lists->add(object_ptr<Ui::VerticalLayout>(lists)),
+			fullSlice,
+			inSlice,
+			outSlice);
+		while (lists->count() > 1) {
+			delete lists->widgetAt(0);
+		}
+	};
+
+	const auto requests = content->lifetime().make_state<rpl::lifetime>();
+	const auto load = [=] {
+		requests->destroy();
 		using Api = Api::CreditsHistory;
 		constexpr auto kFirstPageLimit = 20;
-		const auto apiFull = apiLifetime->make_state<Api>(
+		const auto apiFull = requests->make_state<Api>(
 			self,
 			true,
 			true,
 			currency);
-		const auto apiIn = apiLifetime->make_state<Api>(
+		const auto apiIn = requests->make_state<Api>(
 			self,
 			true,
 			false,
 			currency);
-		const auto apiOut = apiLifetime->make_state<Api>(
+		const auto apiOut = requests->make_state<Api>(
 			self,
 			false,
 			true,
@@ -435,52 +532,16 @@ void Credits::setupHistory(not_null<Ui::VerticalLayout*> container) {
 		apiFull->request({}, [=](Data::CreditsStatusSlice fullSlice) {
 			apiIn->request({}, [=](Data::CreditsStatusSlice inSlice) {
 				apiOut->request({}, [=](Data::CreditsStatusSlice outSlice) {
-					fill(fullSlice, inSlice, outSlice);
-					InvokeQueued(container, [=] { apiLifetime->destroy(); });
+					replace(fullSlice, inSlice, outSlice);
 				}, kFirstPageLimit);
 			}, kFirstPageLimit);
 		}, kFirstPageLimit);
+	};
+	load();
+	if (currency) {
+		_revenueChanges.events(
+		) | rpl::on_next(load, content->lifetime());
 	}
-}
-
-void Credits::setupSwipeBack() {
-	using namespace Ui::Controls;
-
-	auto swipeBackData = lifetime().make_state<SwipeBackResult>();
-
-	auto update = [=](SwipeContextData data) {
-		if (data.translation > 0) {
-			if (!swipeBackData->callback) {
-				(*swipeBackData) = SetupSwipeBack(
-					this,
-					[]() -> std::pair<QColor, QColor> {
-						return {
-							st::historyForwardChooseBg->c,
-							st::historyForwardChooseFg->c,
-						};
-					});
-			}
-			swipeBackData->callback(data);
-			return;
-		} else if (swipeBackData->lifetime) {
-			(*swipeBackData) = {};
-		}
-	};
-
-	auto init = [=](Ui::Controls::SwipeHandlerInitData data) {
-		return (data.direction == Qt::RightToLeft)
-			? DefaultSwipeBackHandlerFinishData([=] {
-				_showBack.fire({});
-			})
-			: SwipeHandlerFinishData();
-	};
-
-	SetupSwipeHandler({
-		.widget = this,
-		.scroll = v::null,
-		.update = std::move(update),
-		.init = std::move(init),
-	});
 }
 
 void Credits::setupContent() {
@@ -541,8 +602,13 @@ void Credits::setupContent() {
 						tr::marked)));
 		const auto show = controller()->uiShow();
 		if (isCurrency) {
-			const auto url = tr::lng_suggest_low_ton_fragment_url(tr::now);
-			button->setClickedCallback([=] { UrlClickHandler::Open(url); });
+			button->setClickedCallback([=] {
+				HiddenUrlClickHandler::OpenTranslated(
+					tr::lng_suggest_low_ton_fragment_url,
+					QVariant::fromValue(ClickHandlerContext{
+						.show = show,
+					}));
+			});
 		} else {
 			const auto paid = [parent = QPointer<QWidget>(_parent)] {
 				if (parent) {
@@ -573,7 +639,7 @@ void Credits::setupContent() {
 				isCurrency
 					? std::make_unique<Ui::CustomEmoji::Internal>(
 						u"currency_icon:%1"_q.arg(height),
-						Ui::Earn::IconCurrencyColored(
+						Ui::Earn::IconCurrencyTwoTone(
 							st::tonFieldIconSize,
 							st::currencyFg->c))
 					: Ui::MakeCreditsIconEmoji(height, 1),
@@ -633,6 +699,9 @@ void Credits::setupContent() {
 	}
 	Ui::AddSkip(content, st::lineWidth * 4);
 
+	const auto setupWithdraw = [=](not_null<Ui::VerticalLayout*> container) {
+		setupWithdrawal(container);
+	};
 	const auto setupSubs = [=](not_null<Ui::VerticalLayout*> container) {
 		setupSubscriptions(container);
 	};
@@ -661,6 +730,7 @@ void Credits::setupContent() {
 			statsButton,
 			giftButton,
 			earnButton,
+			setupWithdraw,
 			setupSubs,
 			setupHist);
 	};
@@ -700,6 +770,11 @@ base::weak_qptr<Ui::RpWidget> Credits::createPinnedToTop(
 				.use3dDiamond = isCurrency,
 				.gradientStops = Ui::Premium::CreditsIconGradientStops(),
 				.showFinished = _showFinished.events(),
+				.lottie = isCurrency ? u"gram"_q : QString(),
+				.lottieSize = (isCurrency
+					? st::creditsCurrencyCoverLottieSize
+					: QSize()),
+				.lottieTop = isCurrency ? st::creditsCurrencyCoverLottieTop : 0,
 			});
 	}();
 	controller()->boxShownValue(
@@ -813,14 +888,29 @@ class Currency {
 
 void BuildCurrencyWithdrawalSection(
 		not_null<Ui::VerticalLayout*> content,
-		not_null<Window::SessionController*> controller) {
+		not_null<Window::SessionController*> controller,
+		rpl::producer<CreditsAmount> availableUpdates,
+		Fn<void()> withdrawn) {
 	using namespace Info::ChannelEarn;
 	const auto self = controller->session().user();
 
-	const auto fill = [=](
-			not_null<Ui::VerticalLayout*> container,
-			CreditsAmount value,
-			float64 multiplier) {
+	struct State {
+		rpl::variable<CreditsAmount> available;
+		rpl::event_stream<> withdrawals;
+		float64 multiplier = 0.;
+		uint64 revision = 0;
+		bool loaded = false;
+		bool filled = false;
+		rpl::lifetime apiLifetime;
+	};
+	const auto wrap = content->add(
+		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+			content,
+			object_ptr<Ui::VerticalLayout>(content)));
+	wrap->toggle(false, anim::type::instant);
+	const auto state = wrap->lifetime().make_state<State>();
+
+	const auto fill = [=](not_null<Ui::VerticalLayout*> container) {
 		Ui::AddSkip(container);
 		Ui::AddSkip(container);
 
@@ -838,12 +928,14 @@ void BuildCurrencyWithdrawalSection(
 				-m.top(),
 				m.right(),
 				m.bottom());
-			AddEmojiToMajor(majorLabel, rpl::single(value), {}, p);
+			AddEmojiToMajor(majorLabel, state->available.value(), {}, p);
 		}
 		majorLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 		const auto minorLabel = Ui::CreateChild<Ui::FlatLabel>(
 			labels,
-			MinorPart(value),
+			state->available.value() | rpl::map([](CreditsAmount value) {
+				return MinorPart(value);
+			}),
 			st::channelEarnBalanceMinorLabel);
 		minorLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 		rpl::combine(
@@ -865,10 +957,13 @@ void BuildCurrencyWithdrawalSection(
 		Ui::ToggleChildrenVisibility(labels, true);
 
 		Ui::AddSkip(container);
+		const auto multiplier = state->multiplier;
 		container->add(
 			object_ptr<Ui::FlatLabel>(
 				container,
-				ToUsd(value, multiplier, 0),
+				state->available.value() | rpl::map([=](CreditsAmount v) {
+					return ToUsd(v, multiplier, 0);
+				}),
 				st::channelEarnOverviewSubMinorLabel),
 			style::al_top);
 
@@ -886,7 +981,7 @@ void BuildCurrencyWithdrawalSection(
 
 		const auto label = Ui::CreateChild<Ui::FlatLabel>(
 			button,
-			tr::lng_channel_earn_balance_button(tr::now),
+			tr::lng_credits_currency_withdraw_button(tr::now),
 			st::channelEarnSemiboldLabel);
 		label->setTextColorOverride(stButton.textFg->c);
 		label->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -911,39 +1006,59 @@ void BuildCurrencyWithdrawalSection(
 			Qt::WA_TransparentForMouseEvents,
 			!withdrawalEnabled);
 
-		Api::HandleWithdrawalButton(
-			{ .currencyReceiver = self },
+		Api::HandleWalletWithdrawalButton(
+			controller,
 			button,
-			controller->uiShow());
+			[=] { return state->available.current(); },
+			[=] { state->withdrawals.fire({}); });
 		Ui::ToggleChildrenVisibility(button, true);
 
 		Ui::AddSkip(container);
 		Ui::AddSkip(container);
 		Ui::AddSkip(container);
-		Ui::AddDividerText(
-			container,
-			tr::lng_credits_currency_summary_subtitle());
+		Ui::AddDivider(container);
 		Ui::AddSkip(container);
 	};
 
-	const auto wrap = content->add(
-		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			content,
-			object_ptr<Ui::VerticalLayout>(content)));
-	const auto apiLifetime = wrap->lifetime().make_state<rpl::lifetime>();
-	const auto api = apiLifetime->make_state<Api::EarnStatistics>(self);
-	wrap->toggle(false, anim::type::instant);
-	api->request() | rpl::on_error_done([] {
-	}, [=] {
-		if (!api->data().availableBalance.empty()) {
-			wrap->toggle(true, anim::type::normal);
-			fill(
-				wrap->entity(),
-				api->data().availableBalance,
-				api->data().usdRate);
+	const auto refresh = [=] {
+		const auto zero = CreditsAmount(0, CreditsType::Ton);
+		const auto shown = (state->available.current() > zero);
+		wrap->toggle(shown, anim::type::normal);
+		if (shown && !state->filled) {
+			state->filled = true;
+			fill(wrap->entity());
 			content->resizeToWidth(content->width());
 		}
-	}, *apiLifetime);
+	};
+	const auto load = [=] {
+		const auto revision = state->revision;
+		state->apiLifetime.destroy();
+		const auto api = state->apiLifetime.make_state<Api::EarnStatistics>(
+			self);
+		api->request() | rpl::on_error_done([] {
+		}, [=] {
+			if (state->revision == revision) {
+				state->available = api->data().availableBalance;
+			}
+			state->multiplier = api->data().usdRate;
+			state->loaded = true;
+			refresh();
+		}, state->apiLifetime);
+	};
+	std::move(
+		availableUpdates
+	) | rpl::on_next([=](CreditsAmount available) {
+		++state->revision;
+		state->available = available;
+		if (state->loaded) {
+			refresh();
+		}
+	}, wrap->lifetime());
+	state->withdrawals.events() | rpl::on_next([=] {
+		withdrawn();
+		load();
+	}, wrap->lifetime());
+	load();
 }
 
 void BuildCreditsButtons(
@@ -1019,13 +1134,14 @@ void BuildCreditsSectionContent(
 		QPointer<Ui::SettingsButton> *statsButton,
 		QPointer<Ui::SettingsButton> *giftButton,
 		QPointer<Ui::SettingsButton> *earnButton,
+		Fn<void(not_null<Ui::VerticalLayout*>)> setupWithdrawal,
 		Fn<void(not_null<Ui::VerticalLayout*>)> setupSubscriptions,
 		Fn<void(not_null<Ui::VerticalLayout*>)> setupHistory) {
 	BuildCreditsButtons(builder, isCurrency, statsButton, giftButton, earnButton);
 
 	if (isCurrency) {
-		builder.add([](const WidgetContext &ctx) {
-			BuildCurrencyWithdrawalSection(ctx.container, ctx.controller);
+		builder.add([=](const WidgetContext &ctx) {
+			setupWithdrawal(ctx.container);
 			return SectionBuilder::WidgetToAdd{};
 		});
 	}

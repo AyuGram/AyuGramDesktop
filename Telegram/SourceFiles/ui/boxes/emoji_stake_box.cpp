@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "base/object_ptr.h"
 #include "chat_helpers/stickers_lottie.h"
+#include "core/click_handler_types.h"
 #include "data/components/credits.h"
 #include "data/stickers/data_custom_emoji.h"
 #include "data/data_document.h"
@@ -38,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_calls.h" // confcallLinkFooterOr
 #include "styles/style_chat.h"
@@ -337,10 +339,15 @@ void InsufficientTonBox(
 	label->resizeToWidth(
 		st::boxWidth - st::boxRowPadding.left() - st::boxRowPadding.right());
 
-	const auto url = tr::lng_suggest_low_ton_fragment_url(tr::now);
 	const auto button = box->addButton(
 		tr::lng_suggest_low_ton_fragment(),
-		[=] { UrlClickHandler::Open(url); });
+		[=] {
+			HiddenUrlClickHandler::OpenTranslated(
+				tr::lng_suggest_low_ton_fragment_url,
+				QVariant::fromValue(ClickHandlerContext{
+					.show = box->uiShow(),
+				}));
+		});
 	const auto buttonWidth = st::boxWidth
 		- rect::m::sum::h(st::suggestPriceBox.buttonPadding);
 	button->widthValue() | rpl::filter([=] {
@@ -431,7 +438,7 @@ void EmojiGameStakeBox(
 	auto helper = Text::CustomEmojiHelper();
 	const auto beta = helper.paletteDependent(
 		Text::CustomEmojiTextBadge(
-			tr::lng_stake_game_beta(tr::now).toUpper(),
+			tr::lng_stake_game_beta(tr::now, tr::upper),
 			st::customEmojiTextBadge));
 	const auto sixText = helper.image({
 		.image = MakeEmojiFrame(6, st::emojiSize),

@@ -9,9 +9,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/zlib_help.h"
 #include "lang/lang_keys.h"
-#include "ui/text/format_values.h"
 #include "main/main_account.h"
 #include "main/main_session.h"
+#include "ui/text/format_values.h"
 
 namespace Storage::CloudBlob {
 
@@ -145,7 +145,14 @@ void BlobLoader::setImplementation(
 		unpack(filepath);
 	}, _implementation->lifetime());
 
-	QDir(_folder).removeRecursively();
+	auto folderDir = QDir(_folder);
+	const auto folderName = folderDir.dirName();
+	if (!folderName.isEmpty()
+		&& folderName != u"."_q
+		&& folderName != u".."_q
+		&& !folderName.contains(':')) {
+		folderDir.removeRecursively();
+	}
 	_implementation->start();
 }
 

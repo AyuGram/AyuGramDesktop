@@ -20,7 +20,7 @@ public:
 		rpl::producer<QString> title,
 		rpl::producer<QString> description,
 		Settings::IconDescriptor icon,
-		rpl::producer<bool> toggled,
+		std::optional<rpl::producer<bool>> toggled,
 		const style::DetailedSettingsButtonStyle &rowStyle);
 
 	QString accessibilityName() override;
@@ -31,7 +31,6 @@ public:
 
 	[[nodiscard]] bool toggled() const;
 	[[nodiscard]] rpl::producer<bool> toggledChanges() const;
-	[[nodiscard]] rpl::producer<not_null<QEvent*>> clickAreaEvents() const;
 	void setToggleLocked(bool locked);
 	void finishAnimating();
 

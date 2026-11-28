@@ -15,20 +15,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
-#include "ui/rect.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/rect.h"
+#include "ui/vertical_list.h"
 
 namespace Menu {
 
 Fn<void(bool)> RateTranscribeCallbackFactory(
 		not_null<HistoryItem*> item) {
-	return [item](bool good) {
-		item->history()->peer->session().api().transcribes().rate(
-			item,
-			good);
+	const auto owner = &item->history()->owner();
+	const auto itemId = item->fullId();
+	return [=](bool good) {
+		if (const auto item = owner->message(itemId)) {
+			owner->session().api().transcribes().rate(item, good);
+		}
 	};
 }
 

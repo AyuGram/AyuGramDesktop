@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "ui/rp_widget.h"
 #include "base/object_ptr.h"
 #include "media/media_common.h"
+#include "ui/rp_widget.h"
 
 namespace Ui {
 class CrossFadeLabel;
@@ -73,6 +73,7 @@ public:
 	void setTimestamps(std::vector<TimestampData> timestamps);
 	void setInFullScreen(bool inFullScreen);
 	void updatePlaybackSpeed(float64 speed);
+	void updatePlaybackVolume(float64 volume);
 	void updateSpeedToggleQuality();
 	[[nodiscard]] bool hasTimestamps() const;
 	[[nodiscard]] std::optional<TimestampData> nextTimestamp(

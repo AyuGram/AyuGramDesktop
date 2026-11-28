@@ -10,20 +10,22 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_common.h"
 #include "base/object_ptr.h"
 #include "base/required.h"
-#include "base/unique_qptr.h"
 #include "base/timer.h"
+#include "base/unique_qptr.h"
 #include "chat_helpers/compose/compose_features.h"
 #include "chat_helpers/field_characters_count_manager.h"
+#include "chat_helpers/rich_paste_toast.h"
 #include "dialogs/dialogs_key.h"
 #include "history/view/controls/compose_controls_common.h"
-#include "ui/round_rect.h"
-#include "ui/rp_widget.h"
+#include "history/view/controls/history_view_bot_menu_button.h"
 #include "ui/effects/animations.h"
 #include "ui/widgets/fields/input_field.h"
+#include "ui/round_rect.h"
+#include "ui/rp_widget.h"
 
 class History;
 class DocumentData;
-class Image;
+class SendFilesBox;
 struct InlineBotQuery;
 
 namespace style {
@@ -47,6 +49,7 @@ class FieldAutocomplete;
 namespace Data {
 struct MessagePosition;
 struct Draft;
+struct ComposeStash;
 class DraftKey;
 class PhotoMedia;
 class GroupCall;
@@ -114,6 +117,7 @@ class CharactersLimitLabel;
 class ComposeAiButton;
 class ComposeTooltipManager;
 using AiTooltipManager = ComposeTooltipManager;
+class StashHintManager;
 } // namespace HistoryView::Controls
 
 namespace HistoryView {
@@ -218,6 +222,7 @@ public:
 	[[nodiscard]] rpl::producer<> replyCancelled() const;
 	[[nodiscard]] rpl::producer<> replyCancelledExternal() const;
 	[[nodiscard]] rpl::producer<Api::SendOptions> sendRequests() const;
+	[[nodiscard]] rpl::producer<> replyToForwardRequests() const;
 	[[nodiscard]] rpl::producer<VoiceToSend> sendVoiceRequests() const;
 	[[nodiscard]] rpl::producer<QString> sendCommandRequests() const;
 	[[nodiscard]] rpl::producer<MessageToEdit> editRequests() const;
@@ -226,6 +231,7 @@ public:
 		Fn<void(
 			std::shared_ptr<Ui::PreparedBundle>,
 			Api::SendOptions)> confirmed);
+	void closeSendAsFileBox(bool restoreText = true);
 	void processChosenSticker(FileChosen &&chosen);
 	void clearFieldAfterStickerSend();
 	[[nodiscard]] rpl::producer<FileChosen> fileChosen() const;
@@ -324,6 +330,13 @@ public:
 	void applyDraft(
 		FieldHistoryAction fieldHistoryAction = FieldHistoryAction::Clear);
 
+	[[nodiscard]] Data::DraftKey composeStashKey() const;
+	[[nodiscard]] bool canUseComposeStash() const;
+	[[nodiscard]] bool hasStashableContent() const;
+	[[nodiscard]] bool canSendTexts() const;
+	[[nodiscard]] std::unique_ptr<Data::ComposeStash> takeComposeStash();
+	void applyComposeStash(Data::ComposeStash &&stash);
+
 	void saveFieldToHistoryLocalDraft(bool save = true);
 
 	Fn<void()> restoreTextCallback(const QString &insertTextOnCancel) const;
@@ -405,6 +418,7 @@ private:
 		not_null<Ui::RpWidget*> button,
 		Fn<void(Api::SendOptions)> send);
 	bool updateReplaceMediaButton();
+	void startMediaReplace();
 	void updateOuterGeometry(QRect rect);
 	void paintBackground(QPainter &p, QRect full, QRect clip);
 
@@ -415,6 +429,7 @@ private:
 	[[nodiscard]] SendMenu::Details sendMenuDetails() const;
 	[[nodiscard]] SendMenu::Details saveMenuDetails() const;
 	[[nodiscard]] SendMenu::Details sendButtonMenuDetails() const;
+	[[nodiscard]] bool canReplyToForward() const;
 	[[nodiscard]] Api::SendOptions adjustedSupportSendOptions(
 		Qt::KeyboardModifiers modifiers) const;
 
@@ -425,7 +440,9 @@ private:
 	void orderControls();
 	void updateFieldPlaceholder();
 	void updateSilentBroadcast();
-	void editMessage(not_null<HistoryItem*> item);
+	void editMessage(
+		not_null<HistoryItem*> item,
+		const TextWithTags &editData);
 
 	void escape();
 	void fieldChanged();
@@ -573,16 +590,14 @@ private:
 	const not_null<Ui::EmojiButton*> _tabbedSelectorToggle;
 	rpl::variable<QString> _fieldCustomPlaceholder;
 	QPointer<QWidget> _pasteToastParent;
+	ChatHelpers::RichPasteOfferThrottle _richPasteOfferThrottle;
 	std::shared_ptr<QMimeData> _pendingRichPaste;
 	const not_null<Ui::InputField*> _field;
 	std::unique_ptr<Controls::RichDraftPreview> _richDraftPreview;
 	base::unique_qptr<Ui::RpWidget> _fieldDisabled;
 	Ui::IconButton * const _botCommandStart = nullptr;
-	struct {
-		object_ptr<Ui::RoundButton> button = { nullptr };
-		QString text;
-		bool small = false;
-	} _botMenu;
+	std::unique_ptr<BotMenuButton> _botMenu;
+	PeerId _botMenuPeer = 0;
 	std::unique_ptr<Ui::SendAsButton> _sendAs;
 	rpl::variable<bool> _videoStreamAdmin;
 	std::unique_ptr<Ui::SilentToggle> _silent;
@@ -608,6 +623,7 @@ private:
 	const std::unique_ptr<Controls::VoiceRecordBar> _voiceRecordBar;
 	std::unique_ptr<Controls::AiTooltipManager> _aiTooltipManager;
 	std::unique_ptr<Controls::AiTooltipManager> _sendAsFileTooltipManager;
+	std::unique_ptr<Controls::StashHintManager> _stashHintManager;
 	std::shared_ptr<Ui::ChatStyle> _chatStyle;
 
 	const Fn<SendMenu::Details()> _sendMenuDetails;
@@ -617,6 +633,7 @@ private:
 	const Fn<void(not_null<DocumentData*>)> _unavailableEmojiPasted;
 
 	rpl::event_stream<Api::SendOptions> _sendCustomRequests;
+	rpl::event_stream<> _replyToForwardRequests;
 	rpl::event_stream<Qt::KeyboardModifiers> _fieldSubmits;
 	rpl::event_stream<Api::SendOptions> _scrollToMaxRequests;
 	rpl::event_stream<> _cancelRequests;
@@ -630,6 +647,7 @@ private:
 	rpl::event_stream<not_null<QKeyEvent*>> _editLastMessageRequests;
 	rpl::event_stream<std::optional<bool>> _attachRequests;
 	Fn<void(std::shared_ptr<Ui::PreparedBundle>, Api::SendOptions)> _sendAsFileConfirmed;
+	QPointer<SendFilesBox> _sendAsFileBox;
 	rpl::event_stream<> _likeToggled;
 	rpl::event_stream<ReplyNextRequest> _replyNextRequests;
 	rpl::event_stream<> _replyCancelled;
@@ -672,8 +690,11 @@ private:
 	bool _threadFieldVisible = false;
 
 	rpl::lifetime _historyLifetime;
+	rpl::lifetime _sessionLifetime;
 	rpl::lifetime _threadFieldVisibleLifetime;
 	rpl::lifetime _uploaderSubscriptions;
+	// Last, so the handler ends before any members it uses are destroyed.
+	rpl::lifetime _recordingStateLifetime;
 
 };
 
@@ -681,15 +702,5 @@ private:
 	not_null<PeerData*> peer);
 [[nodiscard]] rpl::producer<bool> SendDisabledBySlowmode(
 	not_null<PeerData*> peer);
-
-void ShowPhotoEditSpoilerMenu(
-	not_null<Ui::RpWidget*> parent,
-	not_null<HistoryItem*> item,
-	const std::optional<bool> &override,
-	Fn<void(bool)> callback);
-
-[[nodiscard]] Image *MediaPreviewWithOverriddenSpoiler(
-	not_null<HistoryItem*> item,
-	bool spoiler);
 
 } // namespace HistoryView

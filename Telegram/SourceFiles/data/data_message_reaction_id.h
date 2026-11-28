@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/basic_types.h"
 #include "base/qt/qt_compare.h"
+#include "base/basic_types.h"
 
 #include <variant>
 
@@ -85,6 +85,7 @@ struct HashtagWithUsername {
 	QStringView query);
 
 [[nodiscard]] QString ReactionEntityData(const ReactionId &id);
+[[nodiscard]] ReactionId ReactionFromEntityData(QStringView data);
 
 [[nodiscard]] ReactionId ReactionFromMTP(const MTPReaction &reaction);
 [[nodiscard]] MTPReaction ReactionToMTP(ReactionId id);

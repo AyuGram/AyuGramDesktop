@@ -8,39 +8,40 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "chat_helpers/gifs_list_widget.h"
 
 #include "api/api_toggling_media.h" // Api::ToggleSavedGif
-#include "base/const_string.h"
 #include "base/qt/qt_key_modifiers.h"
+#include "base/const_string.h"
+#include "boxes/stickers_box.h"
 #include "chat_helpers/stickers_list_footer.h"
-#include "data/data_photo.h"
-#include "data/data_document.h"
+#include "core/click_handler_types.h"
 #include "data/stickers/data_custom_emoji.h"
+#include "data/stickers/data_stickers.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_file_origin.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "data/data_file_origin.h"
-#include "data/data_photo_media.h"
-#include "data/data_document_media.h"
-#include "data/stickers/data_stickers.h"
-#include "menu/menu_send.h" // SendMenu::FillSendMenu
-#include "mtproto/mtproto_config.h"
-#include "core/click_handler_types.h"
-#include "ui/controls/tabbed_search.h"
-#include "ui/layers/generic_box.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/fields/input_field.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/effects/ripple_animation.h"
-#include "ui/image/image.h"
-#include "ui/painter.h"
-#include "boxes/stickers_box.h"
+#include "history/view/history_view_cursor_state.h"
 #include "inline_bots/inline_bot_result.h"
-#include "storage/localstorage.h"
 #include "lang/lang_keys.h"
 #include "layout/layout_position.h"
-#include "mainwindow.h"
 #include "main/main_session.h"
-#include "window/window_session_controller.h"
-#include "history/view/history_view_cursor_state.h"
+#include "mainwindow.h"
+#include "menu/menu_send.h" // SendMenu::FillSendMenu
+#include "mtproto/mtproto_config.h"
+#include "storage/localstorage.h"
 #include "storage/storage_account.h" // Account::writeSavedGifs
+#include "ui/controls/tabbed_search.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/image/image.h"
+#include "ui/layers/generic_box.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/painter.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_menu_icons.h"
 
@@ -114,11 +115,13 @@ GifsListWidget::GifsListWidget(
 	descriptor.paused)
 , _show(std::move(descriptor.show))
 , _requireConfirmation(descriptor.requireConfirmation)
+, _chooseBeforeLoad(descriptor.chooseBeforeLoad)
 , _api(&session().mtp())
 , _section(Section::Gifs)
 , _updateInlineItems([=] { updateInlineItems(); })
 , _mosaic(st::emojiPanWidth - st::inlineResultsLeft)
 , _previewTimer([=] { showPreview(); }) {
+	setInlineQueryPeer(descriptor.inlineQueryPeer);
 	setMouseTracking(true);
 	setAttribute(Qt::WA_OpaquePaintEvent);
 
@@ -323,6 +326,14 @@ void GifsListWidget::inlineResultsDone(const MTPmessages_BotResults &result) {
 		}
 		auto added = 0;
 		for (const auto &res : v) {
+			const auto widget = res.match([](const auto &data) {
+				return (data.vsend_message().type()
+					== mtpc_botInlineMessageWidget);
+			});
+			if (widget) {
+				// GIF selection needs a media rect that widget rows lack.
+				continue;
+			}
 			auto result = InlineBots::Result::Create(
 				&session(),
 				queryId,
@@ -510,7 +521,7 @@ void GifsListWidget::selectInlineResult(
 		};
 	};
 
-	forceSend |= base::IsCtrlPressed();
+	forceSend |= _chooseBeforeLoad || base::IsCtrlPressed();
 	if (const auto photo = item->getPhoto()) {
 		using Data::PhotoSize;
 		const auto media = photo->activeMediaView();
@@ -560,7 +571,7 @@ void GifsListWidget::selectInlineResult(
 			}
 		}
 	} else if (const auto inlineResult = item->getResult()) {
-		if (inlineResult->onChoose(item)) {
+		if (_chooseBeforeLoad || inlineResult->onChoose(item)) {
 			options.hideViaBot = true;
 			_inlineResultChosen.fire({
 				.result = inlineResult,
@@ -865,7 +876,7 @@ void GifsListWidget::beforeHiding() {
 
 bool GifsListWidget::refreshInlineRows(int32 *added) {
 	auto it = _inlineCache.find(_inlineQuery);
-	const InlineCacheEntry *entry = nullptr;
+	auto entry = (const InlineCacheEntry*)nullptr;
 	if (it != _inlineCache.cend()) {
 		entry = it->second.get();
 		_inlineNextOffset = it->second->nextOffset;

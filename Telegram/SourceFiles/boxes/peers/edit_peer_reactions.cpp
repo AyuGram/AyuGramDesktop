@@ -26,14 +26,15 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/text/text_utilities.h"
-#include "ui/vertical_list.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/continuous_sliders.h"
-#include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/ui_utility.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
 #include "window/window_session_controller_link_info.h"
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 #include "styles/style_layers.h"
@@ -904,7 +905,7 @@ void EditAllowedReactionsBox(
 			(*reactionsLimit) = limit;
 		};
 		const auto current = args.allowed.maxCount
-			? std::clamp(1, args.allowed.maxCount, max)
+			? std::clamp(args.allowed.maxCount, 1, max)
 			: max / 2;
 		slider->setPseudoDiscrete(
 			max,

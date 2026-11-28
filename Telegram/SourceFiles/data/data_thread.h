@@ -8,8 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/flags.h"
-#include "dialogs/dialogs_entry.h"
 #include "dialogs/ui/dialogs_message_view.h"
+#include "dialogs/dialogs_entry.h"
 #include "ui/text/text.h"
 
 #include <deque>
@@ -88,7 +88,8 @@ public:
 
 	void removeNotification(not_null<HistoryItem*> item);
 	void clearNotifications();
-	void clearIncomingNotifications();
+	void clearIncomingNotifications(
+		Fn<bool(not_null<HistoryItem*>)> filter = nullptr);
 	[[nodiscard]] auto currentNotification() const
 		-> std::optional<ItemNotification>;
 	bool hasNotification() const;

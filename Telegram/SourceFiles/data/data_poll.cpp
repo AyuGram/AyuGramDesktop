@@ -8,13 +8,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_poll.h"
 
 #include "api/api_text_entities.h"
+#include "base/call_delayed.h"
 #include "countries/countries_instance.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
-#include "data/data_user.h"
 #include "data/data_session.h"
+#include "data/data_user.h"
 #include "data/data_web_page.h"
-#include "base/call_delayed.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/text/text_options.h"
@@ -527,15 +527,9 @@ PollMedia PollMediaFromMTP(
 			});
 		}
 	}, [&](const MTPDmessageMediaGeo &data) {
-		data.vgeo().match([&](const MTPDgeoPoint &point) {
-			result.geo = Data::LocationPoint(point);
-		}, [](const MTPDgeoPointEmpty &) {
-		});
+		result.geo = Data::LocationPoint::FromMTP(data.vgeo());
 	}, [&](const MTPDmessageMediaVenue &data) {
-		data.vgeo().match([&](const MTPDgeoPoint &point) {
-			result.geo = Data::LocationPoint(point);
-		}, [](const MTPDgeoPointEmpty &) {
-		});
+		result.geo = Data::LocationPoint::FromMTP(data.vgeo());
 	}, [&](const MTPDmessageMediaWebPage &data) {
 		data.vwebpage().match([&](const MTPDwebPage &page) {
 			result.webpage = owner->processWebpage(page);
@@ -574,10 +568,9 @@ PollMedia PollMediaFromInputMTP(
 		});
 	}, [&](const MTPDinputMediaGeoPoint &data) {
 		data.vgeo_point().match([&](const MTPDinputGeoPoint &point) {
-			result.geo.emplace(
+			result.geo = Data::LocationPoint::FromCoordinates(
 				point.vlat().v,
-				point.vlong().v,
-				Data::LocationPoint::NoAccessHash);
+				point.vlong().v);
 		}, [](const auto &) {
 		});
 	}, [&](const MTPDinputMediaWebPage &data) {

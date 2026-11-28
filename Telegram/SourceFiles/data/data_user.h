@@ -7,20 +7,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/flags.h"
+#include "base/weak_ptr.h"
 #include "core/credits_amount.h"
 #include "data/components/credits.h"
 #include "data/data_birthday.h"
-#include "data/data_peer.h"
 #include "data/data_chat_participant_status.h"
 #include "data/data_lastseen_status.h"
+#include "data/data_peer.h"
 #include "data/data_user_names.h"
 #include "dialogs/dialogs_key.h"
-#include "base/flags.h"
 
 namespace Data {
 class Forum;
+class Thread;
 struct BotCommand;
 struct BusinessDetails;
+struct WalletCard;
 } // namespace Data
 
 namespace Api {
@@ -42,7 +45,7 @@ struct StarRefProgram {
 struct BotVerifierSettings {
 	DocumentId iconId = 0;
 	QString company;
-	QString customDescription;
+	TextWithEntities customDescription;
 	bool canModifyDescription = false;
 
 	explicit operator bool() const {
@@ -68,6 +71,9 @@ struct BotInfo {
 	[[nodiscard]] Data::Forum *forum() const;
 	[[nodiscard]] std::unique_ptr<Data::Forum> takeForumData();
 
+	void setInlineReturnTo(Dialogs::EntryState state);
+	[[nodiscard]] Dialogs::EntryState inlineReturnTo() const;
+
 	QString description;
 	QString inlinePlaceholder;
 	std::vector<Data::BotCommand> commands;
@@ -85,7 +91,6 @@ struct BotInfo {
 	QColor botAppColorBodyNight = QColor(0, 0, 0, 0);
 
 	QString startToken;
-	Dialogs::EntryState inlineReturnTo;
 
 	ChatAdminRights groupAdminRights;
 	ChatAdminRights channelAdminRights;
@@ -105,6 +110,7 @@ struct BotInfo {
 	bool canManageEmojiStatus : 1 = false;
 	bool supportsBusiness : 1 = false;
 	bool hasMainApp : 1 = false;
+	bool hasPreviewMedias : 1 = false;
 	bool userCreatesTopics : 1 = false;
 	bool setBotPhotoHidden : 1 = false;
 	bool canManageBots : 1 = false;
@@ -113,6 +119,9 @@ struct BotInfo {
 
 private:
 	std::unique_ptr<Data::Forum> _forum;
+	Dialogs::EntryState _inlineReturnTo;
+	// A topic or sublist can be freed without a destroyed() event.
+	base::weak_ptr<Data::Thread> _inlineReturnThread;
 
 };
 
@@ -148,6 +157,7 @@ enum class UserDataFlag : uint32 {
 	HasActiveVideoStream = (1 << 28),
 	NoForwardsMyEnabled = (1 << 29),
 	NoForwardsPeerEnabled = (1 << 30),
+	CloseFriend = (1U << 31),
 };
 inline constexpr bool is_flag_type(UserDataFlag) { return true; };
 using UserDataFlags = base::flags<UserDataFlag>;
@@ -234,7 +244,6 @@ public:
 	[[nodiscard]] Data::StarsRating starsRating() const;
 
 	[[nodiscard]] bool canShareThisContact() const;
-	[[nodiscard]] bool canAddContact() const;
 
 	// In Data::Session::processUsers() we check only that.
 	// When actually trying to share contact we perform
@@ -246,6 +255,8 @@ public:
 	[[nodiscard]] QString editableUsername() const;
 	[[nodiscard]] const std::vector<QString> &usernames() const;
 	[[nodiscard]] bool isUsernameEditable(QString username) const;
+
+	[[nodiscard]] bool isOldWalletBot() const;
 
 	void setBotVerifyDetails(Ui::BotVerifyDetails details);
 	void setBotVerifyDetailsIcon(DocumentId iconId);
@@ -261,6 +272,8 @@ public:
 	[[nodiscard]] ContactStatus contactStatus() const;
 	[[nodiscard]] bool isContact() const;
 	void setIsContact(bool is);
+	[[nodiscard]] bool isCloseFriend() const;
+	void setIsCloseFriend(bool is);
 
 	[[nodiscard]] Data::LastseenStatus lastseen() const;
 	bool updateLastseen(Data::LastseenStatus value);
@@ -285,9 +298,15 @@ public:
 	[[nodiscard]] int peerGiftsCount() const;
 	void setPeerGiftsCount(int count);
 
-	[[nodiscard]] bool hasPrivateForwardName() const;
-	[[nodiscard]] QString privateForwardName() const;
-	void setPrivateForwardName(const QString &name);
+	// Disengaged means no source has answered about this user yet; engaged
+	// and empty means a source answered and this user has no wallet; engaged
+	// and non-empty is the canonical raw address. Every write is an answer,
+	// never a nullopt: answers come from wallet.getUserAddresses.
+	[[nodiscard]] const std::optional<QString> &gramAddress() const;
+	void setGramAddress(QString address);
+
+	[[nodiscard]] const Data::WalletCard *walletCard() const;
+	void setWalletCard(std::optional<Data::WalletCard> card);
 
 	[[nodiscard]] bool hasActiveStories() const;
 	[[nodiscard]] bool hasUnreadStories() const;
@@ -350,8 +369,9 @@ private:
 	std::unique_ptr<Data::BusinessDetails> _businessDetails;
 	std::vector<Data::UnavailableReason> _unavailableReasons;
 	QString _phone;
-	QString _privateForwardName;
+	std::optional<QString> _gramAddress;
 	std::unique_ptr<Ui::BotVerifyDetails> _botVerifyDetails;
+	std::unique_ptr<Data::WalletCard> _walletCard;
 	Data::StarsRating _starsRating;
 
 	ChannelId _personalChannelId = 0;
@@ -370,7 +390,9 @@ private:
 
 namespace Data {
 
-void ApplyUserUpdate(not_null<UserData*> user, const MTPDuserFull &update);
+void ApplyUserUpdate(
+	not_null<UserData*> user,
+	const MTPDuserFull &update);
 
 [[nodiscard]] StarRefProgram ParseStarRefProgram(
 	const MTPStarRefProgram *program);

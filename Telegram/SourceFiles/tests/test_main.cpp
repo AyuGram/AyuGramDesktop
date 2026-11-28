@@ -17,12 +17,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QApplication>
 #include <QAbstractNativeEventFilter>
+#include <QFileInfo>
 #include <QScreen>
 #include <QThread>
 #include <QDir>
 #include <QtCore/qmath.h>
-
-#include <qpa/qplatformscreen.h>
 
 namespace Test {
 
@@ -176,9 +175,10 @@ int main(int argc, char *argv[]) {
 	auto app = App(argc, argv);
 	app.installNativeEventFilter(&app);
 
-#ifdef Q_OS_MAC
-	base::RegisterBundledResources(u"test_text.rcc"_q);
-#endif // Q_OS_MAC
+#ifdef Q_OS_MACOS
+	const auto rccName = QFileInfo(app.applicationFilePath()).baseName();
+	base::RegisterBundledResources(rccName + u".rcc"_q);
+#endif // Q_OS_MACOS
 
 	const auto ratio = app.devicePixelRatio();
 	const auto useRatio = std::clamp(int(std::ceil(ratio)), 1, 3);
@@ -186,9 +186,8 @@ int main(int argc, char *argv[]) {
 
 	const auto screen = App::primaryScreen();
 	const auto dpi = screen->logicalDotsPerInch();
-	const auto basePair = screen->handle()->logicalBaseDpi();
-	const auto baseMiddle = (basePair.first + basePair.second) * 0.5;
-	const auto screenExact = dpi / baseMiddle;
+	const auto baseDpi = style::BaseDpi();
+	const auto screenExact = dpi / baseDpi;
 	const auto screenScale = int(base::SafeRound(screenExact * 20)) * 5;
 	const auto chosen = std::clamp(
 		screenScale,

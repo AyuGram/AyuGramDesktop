@@ -7,29 +7,30 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/localstorage.h"
 
-#include "storage/serialize_common.h"
-#include "storage/storage_account.h"
-#include "storage/details/storage_file_utilities.h"
-#include "storage/details/storage_settings_scheme.h"
-#include "data/data_session.h"
-#include "data/data_document.h"
-#include "data/data_document_media.h"
 #include "base/platform/base_platform_info.h"
 #include "base/random.h"
-#include "ui/power_saving.h"
-#include "core/update_checker.h"
-#include "core/file_location.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+#include "core/file_location.h"
+#include "core/update_checker.h"
 #include "core/version.h"
+#include "data/data_document.h"
+#include "data/data_document_media.h"
+#include "data/data_session.h"
+#include "lang/lang_instance.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
 #include "media/audio/media_audio.h"
 #include "mtproto/mtproto_config.h"
 #include "mtproto/mtproto_dc_options.h"
-#include "main/main_domain.h"
-#include "main/main_account.h"
-#include "main/main_session.h"
+#include "storage/details/storage_file_utilities.h"
+#include "storage/details/storage_settings_scheme.h"
+#include "storage/serialize_common.h"
+#include "storage/storage_account.h"
+#include "ui/power_saving.h"
 #include "window/themes/window_theme.h"
-#include "lang/lang_instance.h"
+#include "window/window_saved_windows.h"
 
 #include <QtCore/QDirIterator>
 #include <QtCore/QSaveFile>
@@ -66,7 +67,7 @@ using Database = Storage::Cache::Database;
 
 QString _basePath, _userBasePath, _userDbPath;
 
-TaskQueue *_localLoader = nullptr;
+auto _localLoader = (TaskQueue*)nullptr;
 
 QByteArray _settingsSalt;
 
@@ -616,7 +617,8 @@ void writeUpdateManifest(
 		|| f.write(signature) != signature.size()
 		|| f.write(manifest) != manifest.size()
 		|| !f.commit()) {
-		LOG(("Storage Error: Could not write the update manifest."));
+		LOG(("Storage Error: Could not write the update manifest: %1."
+			).arg(f.errorString()));
 	}
 }
 
@@ -626,13 +628,16 @@ bool readUpdateManifest(QByteArray *manifest, QByteArray *signature) {
 	if (Core::UpdaterDisabled()) {
 		return false;
 	}
-	QFile f(updateManifestFile());
-	if (!f.open(QIODevice::ReadOnly)) {
-		return false;
-	}
 	constexpr auto kSignatureSize = 64;
 	constexpr auto kMaxManifestSize = 256 * 1024;
-	const auto content = f.readAll();
+	const auto info = QFileInfo(updateManifestFile());
+	QFile f(info.filePath());
+	if (info.isSymLink()
+		|| !info.isFile()
+		|| !f.open(QIODevice::ReadOnly)) {
+		return false;
+	}
+	const auto content = f.read(kSignatureSize + kMaxManifestSize + 1);
 	if (content.size() <= kSignatureSize
 		|| content.size() > kSignatureSize + kMaxManifestSize) {
 		return false;
@@ -854,6 +859,10 @@ void reset() {
 	Window::Theme::Background()->reset();
 	_oldSettingsVersion = 0;
 	Core::App().settings().resetOnLastLogout();
+	Core::App().reseedWindowInSettings();
+	if (const auto saved = Core::App().savedWindows()) {
+		saved->resetOnLastLogout();
+	}
 	writeSettings();
 }
 

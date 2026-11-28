@@ -14,18 +14,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "api/api_text_entities.h"
 #include "api/api_updates.h"
 #include "base/unixtime.h"
-#include "boxes/gift_premium_box.h"
 #include "boxes/peers/edit_peer_color_box.h" // AddLevelBadge.
-#include "chat_helpers/stickers_emoji_pack.h"
+#include "boxes/gift_premium_box.h"
 #include "core/application.h"
 #include "core/ui_integration.h" // TextContext.
 #include "data/components/credits.h"
 #include "data/data_channel.h"
 #include "data/data_premium_limits.h"
 #include "data/data_session.h"
-#include "data/data_web_page.h"
 #include "data/data_user.h"
-#include "data/stickers/data_custom_emoji.h"
+#include "data/data_web_page.h"
 #include "dialogs/ui/chat_search_empty.h"
 #include "history/view/controls/history_view_webpage_processor.h"
 #include "info/bot/starref/info_bot_starref_join_widget.h"
@@ -33,11 +31,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/earn_format.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/channel_statistics/earn/info_channel_earn_widget.h"
-#include "info/info_controller.h"
-#include "info/info_memento.h"
 #include "info/profile/info_profile_values.h" // Info::Profile::NameValue.
 #include "info/statistics/info_statistics_inner_widget.h" // FillLoading.
 #include "info/statistics/info_statistics_list_controllers.h"
+#include "info/info_controller.h"
+#include "info/info_memento.h"
 #include "iv/iv_instance.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
@@ -45,7 +43,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "settings/settings_credits_graphics.h"
 #include "statistics/chart_widget.h"
-#include "ui/basic_click_handlers.h"
 #include "ui/boxes/boost_box.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/controls/userpic_button.h"
@@ -53,16 +50,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/toggle_arrow.h"
 #include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/peer_bubble.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/slider_natural_width.h"
 #include "ui/wrap/slide_wrap.h"
+#include "ui/basic_click_handlers.h"
+#include "ui/painter.h"
+#include "ui/rect.h"
+#include "ui/vertical_list.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_channel_earn.h"
 #include "styles/style_chat.h"
@@ -180,22 +179,6 @@ void AddRecipient(not_null<Ui::GenericBox*> box, const TextWithEntities &t) {
 		});
 	});
 }
-
-#if 0
-[[nodiscard]] TextWithEntities EmojiCurrency(
-		not_null<Main::Session*> session) {
-	auto emoji = TextWithEntities{
-		.text = (QString(QChar(0xD83D)) + QChar(0xDC8E)),
-	};
-	if (const auto e = Ui::Emoji::Find(emoji.text)) {
-		const auto sticker = session->emojiStickersPack().stickerForEmoji(e);
-		if (sticker.document) {
-			emoji = Data::SingleCustomEmoji(sticker.document);
-		}
-	}
-	return emoji;
-}
-#endif
 
 [[nodiscard]] QString FormatDate(const QDateTime &date) {
 	return tr::lng_group_call_starts_short_date(
@@ -441,7 +424,7 @@ void InnerWidget::fill() {
 				auto emojiHelper = Ui::Text::CustomEmojiHelper();
 				const auto bigCurrencyIcon = emojiHelper.paletteDependent({
 					.factory = [=] {
-						return Ui::Earn::IconCurrencyColored(
+						return Ui::Earn::IconCurrencyTwoTone(
 							st::boxTitle.style.font,
 							st::currencyFg->c);
 					}, .margin = st::channelEarnCurrencyLearnMargins });
@@ -1512,7 +1495,7 @@ void AddEmojiToMajor(
 		auto helper = Ui::Text::CustomEmojiHelper();
 		auto icon = helper.paletteDependent({
 			.factory = [=] {
-				return Ui::Earn::IconCurrencyColored(
+				return Ui::Earn::IconCurrencyTwoTone(
 					st.style.font,
 					!isIn
 					? st::currencyFg->c

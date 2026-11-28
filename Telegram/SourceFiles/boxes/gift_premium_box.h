@@ -27,10 +27,6 @@ struct UniqueGift;
 struct GiftUpgradeSpinner;
 } // namespace Data
 
-namespace Main {
-class Session;
-} // namespace Main
-
 namespace Settings {
 struct CreditsEntryBoxStyleOverrides;
 } // namespace Settings
@@ -38,6 +34,8 @@ struct CreditsEntryBoxStyleOverrides;
 namespace Ui {
 class Show;
 class GenericBox;
+class RpWidget;
+class TableLayout;
 class VerticalLayout;
 } // namespace Ui
 
@@ -69,10 +67,6 @@ void ResolveGiveawayInfo(
 	std::optional<Data::GiveawayStart> start,
 	std::optional<Data::GiveawayResults> results);
 
-[[nodiscard]] QString TonAddressUrl(
-	not_null<Main::Session*> session,
-	const QString &address);
-
 void AddStarGiftTable(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
@@ -86,6 +80,12 @@ void AddTransferGiftTable(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,
 	std::shared_ptr<Data::UniqueGift> unique);
+void AddUniqueGiftPropertyRows(
+	not_null<Ui::RpWidget*> container,
+	std::shared_ptr<ChatHelpers::Show> show,
+	not_null<Ui::TableLayout*> table,
+	std::shared_ptr<Data::UniqueGift> unique,
+	std::shared_ptr<Data::GiftUpgradeSpinner> spinner);
 void AddCreditsHistoryEntryTable(
 	std::shared_ptr<ChatHelpers::Show> show,
 	not_null<Ui::VerticalLayout*> container,

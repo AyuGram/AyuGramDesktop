@@ -13,12 +13,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/settings_common.h"
 #include "ui/effects/animation_value.h"
 #include "ui/layers/generic_box.h"
+#include "ui/widgets/buttons.h"
+#include "ui/widgets/labels.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
-#include "ui/widgets/buttons.h"
-#include "ui/widgets/labels.h"
+
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
@@ -29,7 +30,9 @@ namespace Dialogs {
 void ShowAuthDeniedBox(
 		not_null<Ui::GenericBox*> box,
 		float64 count,
-		const QString &messageText) {
+		const QString &messageText,
+		bool bot,
+		bool mixed) {
 	box->setStyle(st::showOrBox);
 	box->setWidth(st::boxWideWidth);
 	const auto buttonPadding = QMargins(
@@ -56,9 +59,13 @@ void ShowAuthDeniedBox(
 	box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
-			tr::lng_unconfirmed_auth_denied_title(
-				lt_count,
-				rpl::single(count)),
+			((bot || mixed) && count > 1)
+				? tr::lng_unconfirmed_auth_connections_denied()
+				: bot
+				? tr::lng_unconfirmed_auth_denied_title_bot()
+				: tr::lng_unconfirmed_auth_denied_title(
+					lt_count,
+					rpl::single(count)),
 			st::boostCenteredTitle),
 		st::showOrTitlePadding + buttonPadding,
 		style::al_top);
@@ -74,7 +81,9 @@ void ShowAuthDeniedBox(
 	const auto warning = box->addRow(
 		object_ptr<Ui::FlatLabel>(
 			box,
-			tr::lng_unconfirmed_auth_denied_warning(tr::bold),
+			bot
+				? tr::lng_unconfirmed_auth_denied_warning_bot(tr::bold)
+				: tr::lng_unconfirmed_auth_denied_warning(tr::bold),
 			st::boostText),
 		st::showOrAboutPadding + buttonPadding
 			+ QMargins(st::boostTextSkip, 0, st::boostTextSkip, 0),

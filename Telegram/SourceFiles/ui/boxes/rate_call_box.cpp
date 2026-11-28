@@ -8,10 +8,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/boxes/rate_call_box.h"
 
 #include "lang/lang_keys.h"
-#include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
-#include "styles/style_layers.h"
+#include "ui/widgets/buttons.h"
+
 #include "styles/style_calls.h"
+#include "styles/style_layers.h"
 
 namespace Ui {
 
@@ -44,7 +45,7 @@ void RateCallBox::prepare() {
 void RateCallBox::resizeEvent(QResizeEvent *e) {
 	BoxContent::resizeEvent(e);
 
-	const auto starsWidth = (_stars.size() * st::callRatingStar.width);
+	const auto starsWidth = int(_stars.size()) * st::callRatingStar.width;
 	auto starLeft = (width() - starsWidth) / 2;
 	const auto starTop = st::callRatingStarTop;
 	for (auto &star : _stars) {

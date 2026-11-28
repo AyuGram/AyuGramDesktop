@@ -11,6 +11,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/streaming/media_streaming_loader.h"
 #include "storage/cache/storage_cache_database.h"
 
+#include <QtCore/QtEndian>
+
 namespace Media {
 namespace Streaming {
 namespace {
@@ -78,8 +80,7 @@ bytes::const_span ParseComplexCachedMap(
 		if (data.size() < sizeof(uint32)) {
 			return std::nullopt;
 		}
-		const auto bytes = data.data();
-		const auto result = *reinterpret_cast<const uint32*>(bytes);
+		const auto result = qFromUnaligned<uint32>(data.data());
 		data = data.subspan(sizeof(uint32));
 		return result;
 	};
@@ -920,7 +921,7 @@ void Reader::stopStreaming(bool stillActive) {
 
 	_stopStreamingAsync = false;
 	_waiting.store(nullptr, std::memory_order_release);
-	if (_cacheHelper && _cacheHelper->waiting != nullptr) {
+	if (_cacheHelper) {
 		QMutexLocker lock(&_cacheHelper->mutex);
 		_cacheHelper->waiting.store(nullptr, std::memory_order_release);
 	}
@@ -928,6 +929,7 @@ void Reader::stopStreaming(bool stillActive) {
 		_streamingActive = false;
 		refreshLoaderPriority();
 		_loadingOffsets.clear();
+		_loadedParts.take();
 		processDownloaderRequests();
 	}
 }
@@ -1265,7 +1267,7 @@ Reader::FillState Reader::fill(
 
 	checkForSomethingMoreReceived();
 	if (_streamingError) {
-		return FillState::Failed;
+		return failed();
 	}
 
 	auto lastResult = FillState();
@@ -1275,7 +1277,7 @@ Reader::FillState Reader::fill(
 			return done();
 		}
 		startWaiting();
-	} while (checkForSomethingMoreReceived());
+	} while (checkForSomethingMoreReceived() && !_streamingError);
 
 	return _streamingError ? failed() : lastResult;
 }
@@ -1376,6 +1378,7 @@ bool Reader::processLoadedParts() {
 	for (auto &part : loaded) {
 		if (!part.valid(size())) {
 			_streamingError = Error::LoadFailed;
+			finalizeCache(); // a retry's new reader will share these keys
 			return false;
 		} else if (!_loadingOffsets.remove(part.offset)) {
 			continue;
@@ -1409,11 +1412,13 @@ void Reader::finalizeCache() {
 		putToCache(std::move(toCache));
 		toCache = _slices.unloadToCache();
 	}
-	_cache->sync();
 }
 
 Reader::~Reader() {
 	finalizeCache();
+	if (_cacheHelper) {
+		_cache->sync();
+	}
 }
 
 QByteArray SerializeComplexPartsMap(

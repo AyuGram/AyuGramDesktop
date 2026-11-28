@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "platform/win/windows_autostart_task.h"
 #include "base/platform/base_platform_info.h"
 #include "base/platform/win/base_windows_co_task_mem.h"
+#include "base/platform/win/base_windows_safe_library.h"
 #include "base/platform/win/base_windows_shlobj_h.h"
 #include "base/platform/win/base_windows_winrt.h"
 #include "base/call_delayed.h"
@@ -142,28 +143,21 @@ void DeleteMyModules() {
 		return;
 	}
 	const auto modules = exe.substr(0, last + 1) + L"modules";
-	const auto deleteOne = [&](const wchar_t *name, const wchar_t *arch) {
-		const auto path = modules + L'\\' + arch + L'\\' + name;
-		DeleteFile(path.c_str());
-	};
-	const auto deleteBoth = [&](const wchar_t *name) {
-		deleteOne(name, L"x86");
-		deleteOne(name, L"x64");
-	};
-	const auto removeOne = [&](const std::wstring &name) {
-		const auto path = modules + L'\\' + name;
-		RemoveDirectory(path.c_str());
-	};
-	const auto removeBoth = [&](const std::wstring &name) {
-		removeOne(L"x86\\" + name);
-		removeOne(L"x64\\" + name);
-	};
-	deleteBoth(L"d3d\\d3dcompiler_47.dll");
-
-	removeBoth(L"d3d");
-	removeOne(L"x86");
-	removeOne(L"x64");
+	for (const auto arch : { L"x86", L"x64", L"arm64" }) {
+		const auto folder = modules + L'\\' + arch;
+		DeleteFile((folder + L"\\d3d\\d3dcompiler_47.dll").c_str());
+		DeleteFile((folder + L"\\TelegramWidgetHelper.exe").c_str());
+		RemoveDirectory((folder + L"\\d3d").c_str());
+		RemoveDirectory(folder.c_str());
+	}
 	RemoveDirectory(modules.c_str());
+}
+
+void DeleteMyStartLogs() {
+	Logs::closeMain();
+	for (auto i = 0; i != 10; ++i) {
+		QFile::remove(cWorkingDir() + u"log_start%1.txt"_q.arg(i));
+	}
 }
 
 bool ManageAppLink(
@@ -271,6 +265,7 @@ void psDoCleanup() {
 		psSendToMenu(false, true);
 		AppUserModelId::CleanupShortcut();
 		DeleteMyModules();
+		DeleteMyStartLogs();
 	} catch (...) {
 	}
 }
@@ -710,6 +705,53 @@ void NewVersionLaunched(int oldVersion) {
 
 QImage DefaultApplicationIcon() {
 	return Window::Logo();
+}
+
+QString LocalizedCurrencyName(
+		const QString &currency,
+		const QString &languageId) {
+	// Windows 10 1903+ ships ICU as icu.dll and 1703+ as icuuc.dll, both
+	// exporting the unversioned C API. ucurr_getName() reports
+	// U_USING_DEFAULT_WARNING both when it has no name and answers the ISO
+	// code itself, and when it fell back to the default (system) locale,
+	// which here would mean a name in the wrong language.
+	using GetName = const char16_t*(*)(
+		const char16_t *currency,
+		const char *locale,
+		int nameStyle,
+		int8_t *isChoiceFormat,
+		int32_t *length,
+		int *errorCode);
+	static const auto method = [] {
+		auto result = GetName();
+		for (const auto name : { L"icu.dll", L"icuuc.dll" }) {
+			const auto library = base::Platform::SafeLoadLibrary(name);
+			if (base::Platform::LoadMethod(library, "ucurr_getName", result)) {
+				break;
+			}
+		}
+		return result;
+	}();
+	if (!method) {
+		return QString();
+	}
+	constexpr auto kLongName = 1;
+	constexpr auto kUsingDefaultWarning = -127;
+	const auto code = currency.toUpper();
+	const auto locale = languageId.toUtf8();
+	auto choice = int8_t();
+	auto length = int32_t();
+	auto error = 0;
+	const auto name = method(
+		reinterpret_cast<const char16_t*>(code.utf16()),
+		locale.constData(),
+		kLongName,
+		&choice,
+		&length,
+		&error);
+	return (!name || error > 0 || error == kUsingDefaultWarning || length <= 0)
+		? QString()
+		: QString(reinterpret_cast<const QChar*>(name), length);
 }
 
 void LaunchMaps(const Data::LocationPoint &point, Fn<void()> fail) {

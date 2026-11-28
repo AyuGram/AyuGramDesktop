@@ -10,12 +10,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "ui/image/image_prepare.h"
 #include "ui/text/text_utilities.h"
-#include "ui/painter.h"
-#include "ui/rp_widget.h"
-#include "ui/ui_utility.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/chat_filters_tabs_slider.h"
 #include "ui/widgets/labels.h"
+#include "ui/painter.h"
+#include "ui/rp_widget.h"
+#include "ui/ui_utility.h"
+
 #include "styles/style_chat_helpers.h" // defaultEmojiSuggestions
 #include "styles/style_dialogs.h" // dialogsSearchTabs
 #include "styles/style_filter_icons.h"
@@ -219,7 +220,10 @@ private:
 	};
 	p.setFont(st.style.font);
 	p.setPen(st.textFg);
-	fillName({ tr::lng_filters_all(tr::now) });
+	fillName(tr::lng_filters_all(tr::now, tr::marked));
+	if (state->string.maxWidth() > available) {
+		fillName(tr::lng_filters_all_short(tr::now, tr::marked));
+	}
 	paintName(p, st::filterLinkPreviewAllTop);
 	fillName(title);
 

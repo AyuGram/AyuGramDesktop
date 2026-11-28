@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "info/info_content_widget.h"
 #include "info/media/info_media_widget.h"
 #include "info/stories/info_stories_common.h"
+#include "info/info_content_widget.h"
 #include "ui/effects/animations.h"
 
 namespace Ui {
@@ -41,14 +41,25 @@ public:
 		return _media;
 	}
 
+	void setMyProfile(bool myProfile) {
+		_myProfile = myProfile;
+	}
+	[[nodiscard]] bool myProfile() const {
+		return _myProfile;
+	}
+
 private:
 	Media::Memento _media;
+	bool _myProfile = false;
 
 };
 
 class Widget final : public ContentWidget {
 public:
-	Widget(QWidget *parent, not_null<Controller*> controller);
+	Widget(
+		QWidget *parent,
+		not_null<Controller*> controller,
+		bool myProfile);
 
 	void setInnerFocus() override;
 	void setIsStackBottom(bool isStackBottom) override;
@@ -67,6 +78,7 @@ public:
 
 	rpl::producer<bool> desiredBottomShadowVisibility() override;
 
+	void enableBackButton() override;
 	void showFinished() override;
 
 private:
@@ -86,6 +98,7 @@ private:
 	rpl::variable<bool> _hasPinnedToBottom;
 	rpl::variable<bool> _emptyAlbumShown;
 	bool _shown = false;
+	bool _bottomNear = false;
 	std::unique_ptr<FlexibleScrollHelper> _flexibleScrollHelper;
 
 };
@@ -93,5 +106,7 @@ private:
 [[nodiscard]] std::shared_ptr<Info::Memento> Make(
 	not_null<PeerData*> peer,
 	int albumId = 0);
+[[nodiscard]] std::shared_ptr<Info::Memento> MakeMyProfile(
+	not_null<PeerData*> peer);
 
 } // namespace Info::Stories

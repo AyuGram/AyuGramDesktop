@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/basic_types.h"
 #include "base/assertion.h"
+#include "base/basic_types.h"
 #include "base/debug_log.h"
 
 namespace Logs {
@@ -22,7 +22,6 @@ bool started();
 void finish();
 
 bool instanceChecked();
-void multipleInstances();
 
 void closeMain();
 

@@ -9,30 +9,29 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_communities.h"
 #include "apiwrap.h"
-#include "boxes/add_contact_box.h"
-#include "boxes/peer_list_box.h"
 #include "boxes/peers/add_to_community_box.h"
 #include "boxes/peers/community_pending_requests_box.h"
+#include "boxes/add_contact_box.h"
+#include "boxes/peer_list_box.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
 #include "data/data_community.h"
 #include "data/data_peer_values.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
-#include "dialogs/dialogs_community_chats_list.h"
 #include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
+#include "dialogs/dialogs_community_chats_list.h"
 #include "history/history.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_hardcoded.h"
 #include "lang/lang_keys.h"
-#include "main/main_session.h"
 #include "main/session/session_show.h"
+#include "main/main_session.h"
 #include "settings/settings_common.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/menu/menu_add_action_callback.h"
 #include "ui/widgets/menu/menu_add_action_callback_factory.h"
 #include "ui/widgets/buttons.h"
@@ -41,7 +40,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_info.h"
@@ -72,7 +73,7 @@ public:
 		not_null<Main::Session*> session,
 		rpl::producer<std::vector<not_null<PeerData*>>> chats,
 		Fn<void(not_null<PeerData*>)> callback,
-		Fn<void(not_null<PeerListRow*>)> remove = nullptr);
+		Fn<void(not_null<PeerData*>)> remove = nullptr);
 
 	Main::Session &session() const override;
 	void prepare() override;
@@ -89,7 +90,7 @@ private:
 	const not_null<Main::Session*> _session;
 	rpl::producer<std::vector<not_null<PeerData*>>> _chats;
 	Fn<void(not_null<PeerData*>)> _callback;
-	Fn<void(not_null<PeerListRow*>)> _remove;
+	Fn<void(not_null<PeerData*>)> _remove;
 	rpl::variable<int> _count = 0;
 
 };
@@ -98,7 +99,7 @@ ChatsController::ChatsController(
 	not_null<Main::Session*> session,
 	rpl::producer<std::vector<not_null<PeerData*>>> chats,
 	Fn<void(not_null<PeerData*>)> callback,
-	Fn<void(not_null<PeerListRow*>)> remove)
+	Fn<void(not_null<PeerData*>)> remove)
 : _session(session)
 , _chats(std::move(chats))
 , _callback(std::move(callback))
@@ -159,7 +160,7 @@ base::unique_qptr<Ui::PopupMenu> ChatsController::rowContextMenu(
 			: broadcast
 			? tr::lng_community_chat_remove_channel
 			: tr::lng_community_chat_remove_group)(tr::now),
-		.handler = [=] { _remove(row); },
+		.handler = [=] { _remove(peer); },
 		.icon = &st::menuIconDeleteAttention,
 		.isAttention = true,
 	});
@@ -415,8 +416,7 @@ void SetupCommunityEditChatsList(
 	const auto delegate = container->lifetime().make_state<
 		PeerListContentDelegateShow
 	>(show);
-	const auto removeChat = [=](not_null<PeerListRow*> row) {
-		const auto peer = row->peer();
+	const auto removeChat = [=](not_null<PeerData*> peer) {
 		const auto remove = [=](Fn<void()> close) {
 			community->session().api().communities().removePeerLink(
 				community,

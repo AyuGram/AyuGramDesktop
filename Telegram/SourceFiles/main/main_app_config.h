@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "mtproto/sender.h"
 #include "base/algorithm.h"
+#include "mtproto/sender.h"
 
 namespace Ui {
 struct ColorIndicesCompressed;
@@ -22,6 +22,12 @@ struct StarsColoring;
 namespace Main {
 
 class Account;
+
+enum class GiftResaleFilterMode : uchar {
+	Default,
+	Visible,
+	Hidden,
+};
 
 class AppConfig final {
 public:
@@ -91,8 +97,6 @@ public:
 	[[nodiscard]] int paidMessageChannelStarsDefault() const;
 
 	[[nodiscard]] int pinnedGiftsLimit() const;
-	[[nodiscard]] int giftCollectionsLimit() const;
-	[[nodiscard]] int giftCollectionGiftsLimit() const;
 
 	[[nodiscard]] bool callsDisabledForSession() const;
 	[[nodiscard]] int confcallSizeLimit() const;
@@ -104,6 +108,10 @@ public:
 	[[nodiscard]] int64 giftResaleNanoTonMin() const;
 	[[nodiscard]] int64 giftResaleNanoTonMax() const;
 	[[nodiscard]] int giftResaleNanoTonThousandths() const;
+	[[nodiscard]] bool giftResaleFragmentEnabled() const;
+	[[nodiscard]] GiftResaleFilterMode giftResaleTonFilter() const;
+	[[nodiscard]] GiftResaleFilterMode giftResaleStarsFilter() const;
+	[[nodiscard]] bool giftOnchainOffersEnabled() const;
 
 	[[nodiscard]] int pollOptionsLimit() const;
 	[[nodiscard]] int pollAnswerDeletePeriod() const;
@@ -128,8 +136,14 @@ public:
 	[[nodiscard]] int ageVerifyMinAge() const;
 	[[nodiscard]] QString ageVerifyBotUsername() const;
 
-	[[nodiscard]] int storiesAlbumsLimit() const;
+	[[nodiscard]] QString oldWalletBotUsername() const;
+	[[nodiscard]] bool walletAvailable() const;
+
 	[[nodiscard]] int storiesAlbumLimit() const;
+	[[nodiscard]] bool storiesPostingAvailable() const;
+	[[nodiscard]] bool storiesPostingPremiumOnly() const;
+	[[nodiscard]] bool storiesEntitiesPremiumOnly() const;
+	[[nodiscard]] bool storiesEntitiesAvailable() const;
 
 	[[nodiscard]] int groupCallMessageLengthLimit() const;
 	[[nodiscard]] TimeId groupCallMessageTTL() const;
@@ -145,6 +159,7 @@ public:
 	[[nodiscard]] std::vector<StarsColoring> groupCallColorings() const;
 
 	[[nodiscard]] std::vector<std::vector<int>> craftAttributePermilles() const;
+	[[nodiscard]] bool craftMintedFirstSource() const;
 
 	void refresh(bool force = false);
 

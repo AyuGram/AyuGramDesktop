@@ -7,11 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "info/media/info_media_list_section.h"
 
-#include "storage/storage_shared_media.h"
 #include "layout/layout_selection.h"
-#include "ui/rect.h"
+#include "storage/storage_shared_media.h"
 #include "ui/painter.h"
+#include "ui/rect.h"
 #include "ui/rows_scroll_cache.h"
+
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
 
@@ -53,6 +54,10 @@ void ListSection::setCanReorder(bool value) {
 
 void ListSection::setMinGridSize(int value) {
 	_minGridSize = value;
+}
+
+void ListSection::setMaxGridColumns(int value) {
+	_maxGridColumns = value;
 }
 
 int ListSection::height() const {
@@ -151,12 +156,6 @@ QRect ListSection::findItemRect(
 	const auto left = _itemsLeft
 		+ indexInRow * (_itemWidth + st::infoMediaSkip);
 	return QRect(left, top, _itemWidth, item->height());
-}
-
-ListFoundItem ListSection::completeResult(
-		not_null<BaseLayout*> item,
-		bool exact) const {
-	return { item, findItemRect(item), exact };
 }
 
 ListFoundItem ListSection::findItemByPoint(QPoint point) const {
@@ -437,6 +436,9 @@ void ListSection::resizeToWidth(int newWidth) {
 		_itemsTop = st::infoMediaSkip;
 		_itemsInRow = (newWidth - _itemsLeft * 2 + skip)
 			/ (gridSize + skip);
+		if (_maxGridColumns > 0) {
+			_itemsInRow = std::min(_itemsInRow, _maxGridColumns);
+		}
 		_itemWidth = ((newWidth - _itemsLeft * 2 + skip) / _itemsInRow)
 			- st::infoMediaSkip;
 		_itemsLeft = (newWidth - (_itemWidth + skip) * _itemsInRow + skip)

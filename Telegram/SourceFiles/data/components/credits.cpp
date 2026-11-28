@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/components/credits.h"
 
-#include "apiwrap.h"
 #include "api/api_credits.h"
+#include "apiwrap.h"
 #include "data/data_user.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
@@ -103,9 +103,10 @@ rpl::producer<CreditsAmount> Credits::balanceValue() const {
 }
 
 void Credits::tonLoad(bool force) {
-	if (_tonRequestId
-		|| (!force
-			&& _tonLastLoaded
+	if (force) {
+		_session->api().request(base::take(_tonRequestId)).cancel();
+	} else if (_tonRequestId
+		|| (_tonLastLoaded
 			&& _tonLastLoaded + kReloadThreshold > crl::now())) {
 		return;
 	}
@@ -227,37 +228,6 @@ bool Credits::statsEnabled() const {
 }
 
 } // namespace Data
-
-CreditsAmount CreditsAmountFromTL(const MTPStarsAmount &amount) {
-	return amount.match([&](const MTPDstarsAmount &data) {
-		return CreditsAmount(
-			data.vamount().v,
-			data.vnanos().v,
-			CreditsType::Stars);
-	}, [&](const MTPDstarsTonAmount &data) {
-		const auto isNegative = (static_cast<int64_t>(data.vamount().v) < 0);
-		const auto absValue = isNegative
-			? uint64(~data.vamount().v + 1)
-			: data.vamount().v;
-		const auto result = CreditsAmount(
-			int64(absValue / 1'000'000'000),
-			absValue % 1'000'000'000,
-			CreditsType::Ton);
-		return isNegative
-			? CreditsAmount(0, CreditsType::Ton) - result
-			: result;
-	});
-}
-
-CreditsAmount CreditsAmountFromTL(const MTPStarsAmount *amount) {
-	return amount ? CreditsAmountFromTL(*amount) : CreditsAmount();
-}
-
-MTPStarsAmount StarsAmountToTL(CreditsAmount amount) {
-	return amount.ton() ? MTP_starsTonAmount(
-		MTP_long(amount.whole() * uint64(1'000'000'000) + amount.nano())
-	) : MTP_starsAmount(MTP_long(amount.whole()), MTP_int(amount.nano()));
-}
 
 QString PrepareCreditsAmountText(CreditsAmount amount) {
 	return amount.stars()

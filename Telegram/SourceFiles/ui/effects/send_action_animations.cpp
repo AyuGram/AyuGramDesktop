@@ -11,8 +11,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/never_freed_pointer.h"
 #include "ui/effects/animation_value.h"
 #include "ui/painter.h"
-#include "styles/style_widgets.h"
+
 #include "styles/style_dialogs.h"
+#include "styles/style_widgets.h"
 
 namespace Ui {
 namespace {
@@ -34,7 +35,7 @@ public:
 	}
 
 	struct MetaData {
-		int index;
+		int index = 0;
 		std::unique_ptr<Impl>(*creator)();
 	};
 	virtual const MetaData *metaData() const = 0;
@@ -612,17 +613,17 @@ public:
 
 private:
 	const struct {
-		const float64 outWidth;
-		const float64 outHeight;
-		const float64 step;
-		const float64 inLeftOffset;
-		const float64 inRightOffset;
-		const float64 outXOffset;
-		const float64 outStrokeWidth;
-		const float64 inStrokeWidth;
-		const float64 inSize;
-		const float64 minProgress;
-		const float64 outHeightOffset;
+		const float64 outWidth = 0.;
+		const float64 outHeight = 0.;
+		const float64 step = 0.;
+		const float64 inLeftOffset = 0.;
+		const float64 inRightOffset = 0.;
+		const float64 outXOffset = 0.;
+		const float64 outStrokeWidth = 0.;
+		const float64 inStrokeWidth = 0.;
+		const float64 inSize = 0.;
+		const float64 minProgress = 0.;
+		const float64 outHeightOffset = 0.;
 	} _eye;
 
 };

@@ -9,20 +9,21 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "data/data_premium_subscription_option.h"
 #include "lang/lang_keys.h"
-#include "ui/abstract_button.h"
 #include "ui/effects/animations.h"
 #include "ui/effects/credits_graphics.h"
 #include "ui/effects/gradient.h"
 #include "ui/effects/numbers_animation.h"
 #include "ui/effects/premium_bubble.h"
-#include "ui/text/text_utilities.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_options.h"
+#include "ui/text/text_utilities.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/abstract_button.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_premium.h"
@@ -244,19 +245,23 @@ Line::Line(
 	set(_rightLabel, labels.rightLabel);
 	set(_rightText, labels.rightCount);
 
-	std::move(state) | rpl::on_next([=](LimitRowState state) {
-		_dynamic = state.dynamic;
-		if (width() > 0) {
-			const auto from = state.animateFromZero
-				? 0.
-				: _animation.value(_ratio);
-			const auto duration = Bubble::SlideNoDeflectionDuration();
-			_animation.start([=] {
-				update();
-			}, from, state.ratio, duration, anim::easeOutCirc);
-		}
-		_ratio = state.ratio;
-	}, lifetime());
+	std::move(state) | rpl::on_next(
+		[=](LimitRowState state) {
+			_dynamic = state.dynamic;
+			if (width() > 0) {
+				const auto from = state.animateFromZero
+					? 0.
+					: _animation.value(_ratio);
+				_animation.start(
+					[=] { update(); },
+					from,
+					state.ratio,
+					kLimitSlideDuration,
+					LimitSlideProgress);
+			}
+			_ratio = state.ratio;
+		},
+		lifetime());
 
 	rpl::combine(
 		sizeValue(),
@@ -632,7 +637,7 @@ void AddAccountsRow(
 
 	container->sizeValue(
 	) | rpl::on_next([=](const QSize &size) {
-		const auto count = state->accounts.size();
+		const auto count = int(state->accounts.size());
 		const auto columnWidth = size.width() / count;
 		for (auto i = 0; i < count; i++) {
 			auto &account = state->accounts[i];
@@ -674,10 +679,6 @@ QGradientStops ButtonGradientStops() {
 	};
 }
 
-QGradientStops LockGradientStops() {
-	return ButtonGradientStops();
-}
-
 QGradientStops FullHeightGradientStops() {
 	return {
 		{ 0.0, st::premiumIconBg1->c },
@@ -717,20 +718,21 @@ QLinearGradient ComputeGradient(
 		int width) {
 	// Take a full width of parent box without paddings.
 	const auto fullGradientWidth = content->parentWidget()->width();
-	auto fullGradient = QLinearGradient(0, 0, fullGradientWidth, 0);
-	fullGradient.setStops(ButtonGradientStops());
+	const auto stops = ButtonGradientStops();
+	const auto fullWidth = float64(std::max(fullGradientWidth, 1));
+	const auto colorAt = [&](float64 position) {
+		if (position <= 0.) {
+			return stops.front().second;
+		} else if (position >= fullWidth) {
+			return stops.back().second;
+		}
+		return anim::gradient_color_at(stops, position / fullWidth);
+	};
 
 	auto gradient = QLinearGradient(0, 0, width, 0);
-	const auto fullFinal = float64(fullGradient.finalStop().x());
 	left += ((fullGradientWidth - content->width()) / 2);
-	gradient.setColorAt(
-		.0,
-		anim::gradient_color_at(fullGradient, left / fullFinal));
-	gradient.setColorAt(
-		1.,
-		anim::gradient_color_at(
-			fullGradient,
-			std::min(1., (left + width) / fullFinal)));
+	gradient.setColorAt(0., colorAt(left));
+	gradient.setColorAt(1., colorAt(left + width));
 
 	return gradient;
 }
@@ -741,7 +743,6 @@ void ShowListBox(
 		std::vector<ListEntry> entries) {
 	box->setWidth(st::boxWideWidth);
 
-	const auto &stLabel = st::defaultFlatLabel;
 	const auto &titlePadding = st::settingsPremiumPreviewTitlePadding;
 	const auto &aboutPadding = st::settingsPremiumPreviewAboutPadding;
 	const auto iconTitlePadding = st::settingsPremiumPreviewIconTitlePadding;
@@ -758,13 +759,13 @@ void ShowListBox(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				base::take(entry.title) | rpl::map(tr::bold),
-				stLabel),
+				st.listTitle),
 			entry.icon ? iconTitlePadding : titlePadding);
 		content->add(
 			object_ptr<Ui::FlatLabel>(
 				content,
 				base::take(entry.about),
-				st::boxDividerLabel),
+				st.listAbout),
 			entry.icon ? iconAboutPadding : aboutPadding);
 		if (const auto outlined = entry.icon) {
 			if (!icons) {

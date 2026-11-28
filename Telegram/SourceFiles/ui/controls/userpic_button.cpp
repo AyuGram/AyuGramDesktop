@@ -7,52 +7,54 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/controls/userpic_button.h"
 
-#include "apiwrap.h"
 #include "api/api_peer_photo.h"
-#include "ui/effects/upload_progress_overlay.h"
+#include "api/api_peer_photo.h"
 #include "api/api_user_privacy.h"
+#include "apiwrap.h"
+#include "apiwrap.h"
 #include "base/call_delayed.h"
-#include "boxes/edit_privacy_box.h"
 #include "boxes/peers/edit_peer_info_box.h" // EditPeerInfoBox::Available.
-#include "ui/effects/ripple_animation.h"
-#include "ui/empty_userpic.h"
-#include "data/data_photo.h"
-#include "data/data_session.h"
-#include "data/data_changes.h"
-#include "data/data_user.h"
-#include "data/data_histories.h"
-#include "data/data_streaming.h"
-#include "data/data_file_origin.h"
-#include "data/data_photo_media.h"
-#include "history/history.h"
+#include "boxes/edit_privacy_box.h"
 #include "calls/calls_instance.h"
 #include "core/application.h"
+#include "data/data_changes.h"
+#include "data/data_file_origin.h"
+#include "data/data_histories.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_session.h"
+#include "data/data_streaming.h"
+#include "data/data_user.h"
+#include "editor/video/video_editor_layer.h"
+#include "editor/photo_editor_common.h"
+#include "editor/photo_editor_layer_widget.h"
+#include "history/history.h"
+#include "info/userpic/info_userpic_emoji_builder_common.h"
+#include "info/userpic/info_userpic_emoji_builder_menu_item.h"
+#include "lang/lang_keys.h"
+#include "main/main_session.h"
+#include "media/streaming/media_streaming_document.h"
+#include "media/streaming/media_streaming_instance.h"
+#include "media/streaming/media_streaming_player.h"
+#include "settings/sections/settings_calls.h" // AddCameraSubsection.
+#include "settings/settings_privacy_controllers.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/effects/premium_graphics.h"
+#include "ui/effects/ripple_animation.h"
+#include "ui/effects/upload_progress_overlay.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/menu/menu_action.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/ui_utility.h"
-#include "editor/photo_editor_common.h"
-#include "editor/photo_editor_layer_widget.h"
-#include "editor/video/video_editor_layer.h"
-#include "info/userpic/info_userpic_emoji_builder_common.h"
-#include "info/userpic/info_userpic_emoji_builder_menu_item.h"
-#include "media/streaming/media_streaming_instance.h"
-#include "media/streaming/media_streaming_player.h"
-#include "media/streaming/media_streaming_document.h"
-#include "settings/sections/settings_calls.h" // AddCameraSubsection.
-#include "settings/settings_privacy_controllers.h"
 #include "webrtc/webrtc_environment.h"
 #include "webrtc/webrtc_video_track.h"
-#include "ui/widgets/popup_menu.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
-#include "lang/lang_keys.h"
-#include "main/main_session.h"
-#include "apiwrap.h"
-#include "api/api_peer_photo.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_userpic_button.h"
@@ -286,21 +288,21 @@ bool UserpicButton::canSuggestPhoto(not_null<UserData*> user) const {
 
 bool UserpicButton::hasPersonalPhotoLocally() const {
 	if (const auto user = _peer->asUser()) {
-		return _overrideHasPersonalPhoto.value_or(user->hasPersonalPhoto());
+		return user->hasPersonalPhoto();
 	}
 	return false;
 }
 
 void UserpicButton::setClickHandlerByRole() {
-	requestSuggestAvailability();
-
 	switch (_role) {
 	case Role::ChoosePhoto:
 	case Role::ChangePhoto:
+		requestSuggestAvailability();
 		addClickHandler([=] { choosePhotoLocally(); });
 		break;
 
 	case Role::OpenPhoto:
+		requestSuggestAvailability();
 		addClickHandler([=] { openPeerPhoto(); });
 		break;
 	}
@@ -413,7 +415,7 @@ void UserpicButton::choosePhotoLocally() {
 						_window,
 						editorData(type),
 						callback(type),
-						qvariant_cast<QImage>(data->imageData()));
+						QGuiApplication::clipboard()->image());
 				});
 				_menu->addAction(
 					std::move(text)(tr::now),
@@ -445,7 +447,7 @@ void UserpicButton::choosePhotoLocally() {
 		addUserpicBuilder(ChosenType::Set);
 		if (hasPersonalPhotoLocally()) {
 			_menu->addSeparator(&st::expandedMenuSeparator);
-			_menu->addAction(makeResetToOriginalAction());
+			_menu->addAction(makeResetToOriginalAction(user));
 		}
 	} else {
 		const auto hasCamera = IsCameraAvailable();
@@ -501,7 +503,7 @@ void UserpicButton::choosePhotoLocally() {
 	_menu->popup(position);
 }
 
-auto UserpicButton::makeResetToOriginalAction()
+auto UserpicButton::makeResetToOriginalAction(not_null<UserData*> user)
 -> base::unique_qptr<Menu::ItemBase> {
 	auto item = base::make_unique_q<Menu::Action>(
 		_menu->menu(),
@@ -509,7 +511,19 @@ auto UserpicButton::makeResetToOriginalAction()
 		Menu::CreateAction(
 			_menu.get(),
 			tr::lng_profile_photo_reset(tr::now),
-			[=] { _resetPersonalRequests.fire({}); }),
+			[=] {
+				_controller->show(Ui::MakeConfirmBox({
+					.text = tr::lng_profile_photo_reset_sure(
+						tr::now,
+						lt_user,
+						user->shortName()),
+					.confirmed = [user](Fn<void()> close) {
+						user->session().api().peerPhoto().clearPersonal(user);
+						close();
+					},
+					.confirmText = tr::lng_profile_photo_reset_button(tr::now),
+				}));
+			}),
 		nullptr,
 		nullptr);
 	const auto icon = CreateChild<UserpicButton>(
@@ -1193,16 +1207,6 @@ void UserpicButton::showSource(Source source) {
 
 	prepareUserpicPixmap();
 	update();
-}
-
-void UserpicButton::overrideHasPersonalPhoto(bool has) {
-	Expects(_peer && _peer->isUser());
-
-	_overrideHasPersonalPhoto = has;
-}
-
-rpl::producer<> UserpicButton::resetPersonalRequests() const {
-	return _resetPersonalRequests.events();
 }
 
 void UserpicButton::showUploadProgress() {

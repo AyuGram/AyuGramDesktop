@@ -18,10 +18,6 @@ class PhotoData;
 class DocumentData;
 struct FilePrepareResult;
 
-namespace Data {
-struct InputVenue;
-} // namespace Data
-
 namespace Main {
 class Session;
 } // namespace Main
@@ -42,7 +38,8 @@ void SendExistingDocument(
 
 void SendMusicSelection(
 	MessageToSend &&message,
-	std::vector<MusicSelectionItem> items);
+	std::vector<MusicSelectionItem> items,
+	Fn<void()> done = nullptr);
 
 void SendExistingPhoto(
 	MessageToSend &&message,
@@ -56,12 +53,15 @@ bool SendDice(MessageToSend &message);
 // map thumbnail in messages history without access hash.
 void SendLocation(SendAction action, float64 lat, float64 lon);
 
-void SendVenue(SendAction action, Data::InputVenue venue);
-
 void FillMessagePostFlags(
 	const SendAction &action,
 	not_null<PeerData*> peer,
 	MessageFlags &flags);
+
+[[nodiscard]] MTPmessages_SendMedia::Flags PrepareSendMedia(
+	not_null<Main::Session*> session,
+	SendAction &action,
+	int &starsPaid);
 
 void SendConfirmedFile(
 	not_null<Main::Session*> session,

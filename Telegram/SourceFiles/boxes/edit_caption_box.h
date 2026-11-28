@@ -8,8 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "history/view/controls/history_view_compose_media_edit_manager.h"
-#include "ui/layers/box_content.h"
 #include "ui/chat/attach/attach_prepare.h"
+#include "ui/layers/box_content.h"
 
 namespace ChatHelpers {
 class TabbedPanel;
@@ -68,7 +68,7 @@ public:
 		bool spoilered,
 		bool invertCaption,
 		Fn<void()> saved);
-	static void StartPhotoEdit(
+	static void StartMediaEdit(
 		not_null<Window::SessionController*> controller,
 		std::shared_ptr<Data::PhotoMedia> media,
 		FullMsgId itemId,

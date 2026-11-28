@@ -7,25 +7,26 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_media_grouped.h"
 
-#include "history/history_item_components.h"
-#include "history/history_item.h"
-#include "history/history.h"
-#include "history/view/history_view_element.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/history_view_message.h"
 #include "data/data_document.h"
 #include "data/data_media_types.h"
 #include "data/data_session.h"
-#include "storage/storage_shared_media.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_element.h"
+#include "history/view/history_view_message.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "lang/lang_keys.h"
+#include "layout/layout_selection.h"
 #include "media/streaming/media_streaming_utility.h"
-#include "ui/grouped_layout.h"
+#include "storage/storage_shared_media.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
 #include "ui/text/text_options.h"
+#include "ui/grouped_layout.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
-#include "layout/layout_selection.h"
+
 #include "styles/style_chat.h"
 
 // AyuGram includes
@@ -333,16 +334,6 @@ QRect GroupedMedia::groupItemRect(int index) const {
 	return {};
 }
 
-Media *GroupedMedia::partMediaAt(QPoint point) const {
-	point -= QPoint(0, groupedPadding().top());
-	for (const auto &part : _parts) {
-		if (part.geometry.contains(point)) {
-			return part.content.get();
-		}
-	}
-	return nullptr;
-}
-
 Media *GroupedMedia::lookupSpoilerTagMedia() const {
 	// Only Photo and Gif parts implement the spoiler tag methods, and they
 	// are the only kinds a Mode::Grid group holds. A Mode::Column group is
@@ -442,9 +433,7 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 		&& !IsSubGroupSelection(selection);
 	const auto inWebPage = (_parent->media() != this);
 	constexpr auto kSmall = Ui::BubbleCornerRounding::Small;
-	const auto rounding = IsHostedInstantViewMedia(_parent)
-		? Ui::BubbleRounding()
-		: inWebPage
+	const auto rounding = (inWebPage && !IsHostedInstantViewMedia(_parent))
 		? Ui::BubbleRounding{ kSmall, kSmall, kSmall, kSmall }
 		: adjustedBubbleRounding();
 	auto highlight = context.highlight.range;
@@ -554,7 +543,7 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 		history()->owner().registerHeavyViewPart(_parent);
 	}
 
-	if (tagged) {
+	if (tagged && (_parent->context() != Context::MediaEditor)) {
 		tagged->drawSpoilerTag(p, fullRect, context, [&] {
 			return generateSpoilerTagBackground(fullRect);
 		});
@@ -1018,8 +1007,7 @@ bool GroupedMedia::computeNeedBubble() const {
 		return true;
 	}
 	if (const auto item = _parent->data()) {
-		if (item->repliesAreComments()
-			|| item->externalReply()
+		if (_parent->hasCommentsButton()
 			|| item->viaBot()
 			|| _parent->displayReply()
 			|| _parent->displayForwardedFrom()

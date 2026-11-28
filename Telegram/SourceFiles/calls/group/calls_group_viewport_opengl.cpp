@@ -7,15 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "calls/group/calls_group_viewport_opengl.h"
 
-#include "calls/group/calls_group_viewport_tile.h"
-#include "webrtc/webrtc_video_track.h"
-#include "media/view/media_view_pip.h"
-#include "media/streaming/media_streaming_utility.h"
 #include "calls/group/calls_group_members_row.h"
+#include "calls/group/calls_group_viewport_tile.h"
+#include "data/data_peer.h"
 #include "lang/lang_keys.h"
+#include "media/streaming/media_streaming_utility.h"
+#include "media/view/media_view_pip.h"
 #include "ui/gl/gl_shader.h"
 #include "ui/painter.h"
-#include "data/data_peer.h"
+#include "webrtc/webrtc_video_track.h"
+
 #include "styles/style_calls.h"
 #include "styles/style_media_view.h"
 
@@ -225,16 +226,18 @@ vec4 background() {
 	};
 }
 
-[[nodiscard]] bool UseExpandForCamera(QSize original, QSize viewport) {
-	using namespace ::Media::Streaming;
-	return DecideFrameResize(viewport, original).expanding;
-}
-
 [[nodiscard]] QSize NonEmpty(QSize size) {
 	return QSize(std::max(size.width(), 1), std::max(size.height(), 1));
 }
 
-[[nodiscard]] QSize CountBlurredSize(
+} // namespace
+
+bool UseExpandForCamera(QSize original, QSize viewport) {
+	using namespace ::Media::Streaming;
+	return DecideFrameResize(viewport, original).expanding;
+}
+
+QSize CountBlurredSize(
 		QSize unscaled,
 		QSize outer,
 		float factor) {
@@ -247,7 +250,7 @@ vec4 background() {
 		: NonEmpty(scaled);
 }
 
-[[nodiscard]] QSize InterpolateScaledSize(
+QSize InterpolateScaledSize(
 		QSize unscaled,
 		QSize size,
 		float64 ratio) {
@@ -270,6 +273,8 @@ vec4 background() {
 		anim::interpolate(notExpanded.width(), expanded.width(), ratio),
 		anim::interpolate(notExpanded.height(), expanded.height(), ratio));
 }
+
+namespace {
 
 [[nodiscard]] std::array<std::array<GLfloat, 2>, 4> CountTexCoords(
 		QSize unscaled,
@@ -565,7 +570,7 @@ void Viewport::RendererGL::paintTile(
 	const auto pauseIconTop = !_owner->wide()
 		? (y + (height - st::groupCallPaused.height()) / 2)
 		: (pausedSpace < 3 * st::semiboldFont->height)
-		? (pausedSpace / 3)
+		? (y + (pausedSpace / 3))
 		: std::min(
 			y + (height / 2) - pauseIconSkip,
 			(nameTop

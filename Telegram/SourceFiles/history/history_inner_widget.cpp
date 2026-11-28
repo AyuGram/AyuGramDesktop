@@ -7,17 +7,59 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_inner_widget.h"
 
+#include "api/api_attached_stickers.h"
 #include "api/api_polls.h"
+#include "api/api_stickers_creator.h"
+#include "api/api_suggest_post.h"
+#include "api/api_toggling_media.h"
+#include "api/api_views.h"
+#include "api/api_who_reacted.h"
+#include "apiwrap.h"
+#include "base/platform/base_platform_info.h"
+#include "base/qt/qt_common_adapters.h"
+#include "base/qt/qt_key_modifiers.h"
+#include "base/call_delayed.h"
+#include "base/unixtime.h"
+#include "boxes/about_sponsored_box.h"
+#include "boxes/delete_messages_box.h"
+#include "boxes/moderate_messages_box.h"
+#include "boxes/report_messages_box.h"
+#include "boxes/send_gif_with_caption_box.h"
+#include "boxes/sticker_set_box.h"
+#include "boxes/translate_box.h"
+#include "chat_helpers/emoji_interactions.h"
+#include "chat_helpers/message_field.h"
 #include "chat_helpers/stickers_emoji_pack.h"
 #include "core/application.h"
-#include "core/file_utilities.h"
+#include "core/application.h"
 #include "core/click_handler_types.h"
+#include "core/file_utilities.h"
 #include "core/phone_click_handler.h"
+#include "data/components/factchecks.h"
+#include "data/components/sponsored_messages.h"
+#include "data/data_changes.h"
+#include "data/data_channel.h"
+#include "data/data_chat.h"
 #include "data/data_chat_participant_status.h"
-#include "history/history_item_helpers.h"
-#include "history/view/controls/history_view_forward_panel.h"
+#include "data/data_document.h"
+#include "data/data_file_click_handler.h"
+#include "data/data_forum_topic.h"
+#include "data/data_histories.h"
+#include "data/data_message_reaction_id.h"
+#include "data/data_messages.h"
+#include "data/data_peer_values.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_poll.h"
+#include "data/data_saved_music.h"
+#include "data/data_saved_sublist.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "dialogs/ui/dialogs_video_userpic.h"
 #include "history/view/controls/history_view_draft_options.h"
+#include "history/view/controls/history_view_forward_panel.h"
 #include "history/view/controls/history_view_suggest_options.h"
+#include "history/view/media/history_view_gram_transfer.h"
 #include "history/view/media/history_view_save_document_action.h"
 #include "history/view/media/history_view_sticker.h"
 #include "history/view/media/history_view_web_page.h"
@@ -25,109 +67,75 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/view/reactions/history_view_reactions_button.h"
 #include "history/view/reactions/history_view_reactions_selector.h"
 #include "history/view/history_view_about_view.h"
-#include "history/view/history_view_drag.h"
-#include "history/view/history_view_message.h"
-#include "history/view/history_view_service_message.h"
-#include "history/view/history_view_cursor_state.h"
-#include "history/view/history_view_reply_button.h"
-#include "history/view/history_view_context_menu.h"
-#include "history/view/history_view_reaction_preview.h"
-#include "history/view/history_view_quick_action.h"
 #include "history/view/history_view_add_poll_option.h"
+#include "history/view/history_view_context_menu.h"
+#include "history/view/history_view_copy_selection.h"
+#include "history/view/history_view_cursor_state.h"
+#include "history/view/history_view_drag.h"
 #include "history/view/history_view_element_overlay.h"
 #include "history/view/history_view_emoji_interactions.h"
+#include "history/view/history_view_message.h"
+#include "history/view/history_view_quick_action.h"
+#include "history/view/history_view_reaction_preview.h"
+#include "history/view/history_view_read_metrics_tracker.h"
+#include "history/view/history_view_reply_button.h"
+#include "history/view/history_view_selection_modifier.h"
+#include "history/view/history_view_service_message.h"
 #include "history/view/history_view_top_peers_selector.h"
+#include "history/view/history_view_touch_speed.h"
+#include "history/view/history_view_translate_tracker.h"
 #include "history/history_inner_widget_accessibility.h"
 #include "history/history_item_components.h"
+#include "history/history_item_helpers.h"
 #include "history/history_item_text.h"
-#include "payments/payments_reaction_process.h"
-#include "ui/widgets/menu/menu_add_action_callback_factory.h"
-#include "ui/widgets/menu/menu_multiline_action.h"
-#include "ui/widgets/popup_menu.h"
-#include "ui/widgets/elastic_scroll.h"
-#include "ui/delayed_activation.h"
-#include "ui/power_saving.h"
-#include "ui/effects/path_shift_gradient.h"
-#include "ui/effects/message_sending_animation_controller.h"
-#include "ui/effects/reaction_fly_animation.h"
-#include "ui/text/text_isolated_emoji.h"
-#include "ui/text/text_utilities.h"
-#include "ui/boxes/edit_factcheck_box.h"
-#include "ui/boxes/report_box_graphics.h"
-#include "ui/controls/delete_message_context_action.h"
-#include "ui/controls/who_reacted_context_action.h"
-#include "ui/controls/swipe_handler.h"
-#include "ui/inactive_press.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/screen_reader_mode.h"
-#include "ui/ui_utility.h"
-#include "window/window_session_controller.h"
-#include "window/window_controller.h"
-#include "window/window_peer_menu.h"
-#include "window/notifications_manager.h"
-#include "info/info_memento.h"
-#include "info/statistics/info_statistics_widget.h"
-#include "boxes/about_sponsored_box.h"
-#include "boxes/delete_messages_box.h"
-#include "boxes/moderate_messages_box.h"
-#include "boxes/report_messages_box.h"
-#include "boxes/send_gif_with_caption_box.h"
-#include "boxes/star_gift_box.h" // ShowStarGiftBox
-#include "boxes/sticker_set_box.h"
-#include "boxes/translate_box.h"
-#include "chat_helpers/message_field.h"
-#include "chat_helpers/emoji_interactions.h"
 #include "history/history_widget.h"
-#include "history/view/history_view_translate_tracker.h"
-#include "history/view/history_view_read_metrics_tracker.h"
-#include "base/platform/base_platform_info.h"
-#include "base/qt/qt_common_adapters.h"
-#include "base/qt/qt_key_modifiers.h"
-#include "base/unixtime.h"
-#include "base/call_delayed.h"
+#include "info/statistics/info_statistics_widget.h"
+#include "info/info_memento.h"
+#include "iv/editor/iv_editor_session.h"
+#include "iv/iv_rich_message_html_export.h"
+#include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
 #include "mainwidget.h"
-#include "iv/editor/iv_editor_session.h"
-#include "iv/iv_rich_message_html_export.h"
+#include "media/player/media_player_instance.h"
 #include "menu/menu_item_download_files.h"
 #include "menu/menu_item_rate_transcribe.h"
 #include "menu/menu_item_rate_transcribe_session.h"
-#include "menu/menu_timecode_action.h"
 #include "menu/menu_sponsored.h"
-#include "core/application.h"
-#include "apiwrap.h"
-#include "api/api_attached_stickers.h"
-#include "api/api_suggest_post.h"
-#include "api/api_stickers_creator.h"
-#include "api/api_toggling_media.h"
-#include "media/player/media_player_instance.h"
-#include "api/api_who_reacted.h"
-#include "api/api_views.h"
+#include "menu/menu_timecode_action.h"
+#include "payments/payments_reaction_process.h"
+#include "tgw/tgw_log_box.h"
+#include "tgw/tgw_scroll.h"
+#include "tgw/tgw_selection.h"
+#include "tgw/tgw_touch.h"
 #include "ui/accessible/ui_accessible_item.h"
-#include "lang/lang_keys.h"
-#include "data/components/factchecks.h"
-#include "data/components/sponsored_messages.h"
-#include "data/data_saved_music.h"
-#include "data/data_saved_sublist.h"
-#include "data/data_session.h"
-#include "data/data_document.h"
-#include "data/data_photo.h"
-#include "data/data_channel.h"
-#include "data/data_forum_topic.h"
-#include "data/data_photo_media.h"
-#include "data/data_peer_values.h"
-#include "data/data_chat.h"
-#include "data/data_user.h"
-#include "data/data_message_reaction_id.h"
-#include "data/data_messages.h"
-#include "data/data_poll.h"
-#include "data/data_file_click_handler.h"
-#include "data/data_histories.h"
-#include "data/data_changes.h"
-#include "dialogs/ui/dialogs_video_userpic.h"
+#include "ui/boxes/edit_factcheck_box.h"
+#include "ui/boxes/report_box_graphics.h"
+#include "ui/controls/delete_message_context_action.h"
+#include "ui/controls/swipe_handler.h"
+#include "ui/controls/who_reacted_context_action.h"
+#include "ui/effects/message_sending_animation_controller.h"
+#include "ui/effects/path_shift_gradient.h"
+#include "ui/effects/reaction_fly_animation.h"
+#include "ui/text/text_isolated_emoji.h"
+#include "ui/text/text_utilities.h"
+#include "ui/widgets/menu/menu_add_action_callback_factory.h"
+#include "ui/widgets/menu/menu_multiline_action.h"
+#include "ui/widgets/elastic_scroll.h"
+#include "ui/widgets/popup_menu.h"
+#include "ui/delayed_activation.h"
+#include "ui/inactive_press.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
+#include "ui/screen_reader_mode.h"
+#include "ui/ui_utility.h"
+#include "window/notifications_manager.h"
+#include "window/window_controller.h"
+#include "window/window_peer_menu.h"
+#include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
 
@@ -361,6 +369,10 @@ public:
 		return false;
 	}
 
+	HistoryView::GramReadLine *elementGramReadLine() override {
+		return _widget ? _widget->elementGramReadLine() : nullptr;
+	}
+
 	not_null<HistoryView::ElementDelegate*> delegate() override {
 		return this;
 	}
@@ -372,7 +384,7 @@ HistoryInner::HistoryInner(
 	not_null<Ui::ElasticScroll*> scroll,
 	not_null<Window::SessionController*> controller,
 	not_null<History*> history)
-: RpWidget(nullptr)
+: RpWidget(scroll)
 , _widget(historyWidget)
 , _scroll(scroll)
 , _controller(controller)
@@ -400,7 +412,10 @@ HistoryInner::HistoryInner(
 	std::make_unique<HistoryView::ReplyButton::Manager>(
 		[=](QRect updated) { update(updated); }))
 , _touchSelectTimer([=] { onTouchSelect(); })
+, _widgetTouch(Tgw::ListTouch::Create(this))
+, _widgetSelection(Tgw::ListSelection::Create(this))
 , _touchScrollTimer([=] { onTouchScrollTimer(); })
+, _touchElastic(scroll, [=](QPoint d, bool) { return _widget->touchScroll(d); })
 , _middleClickAutoscroll(
 	[=](int d) { _scroll->scrollToY(_scroll->scrollTop() + d); },
 	[=](const QCursor &cursor) { setCursor(cursor); },
@@ -408,6 +423,7 @@ HistoryInner::HistoryInner(
 	[=] { return window()->isActiveWindow(); })
 , _scrollDateCheck([this] { scrollDateCheck(); })
 , _scrollDateHideTimer([this] { scrollDateHideByTimer(); }) {
+	hide();
 	_history->delegateMixin()->setCurrent(this);
 	if (_migrated) {
 		_migrated->delegateMixin()->setCurrent(this);
@@ -811,7 +827,9 @@ void HistoryInner::setupSwipeReplyAndBack() {
 					&& (!view->data()->isEphemeral()
 						|| view->data()->out()))
 				|| view->data()->showSimilarChannels()
-				|| view->data()->isService()) {
+				|| (view->data()->isService()
+					&& !HistoryView::ServiceAllowsSwipeReply(
+						view->data()))) {
 				return true;
 			}
 			const auto item = lookupItemByPoint(
@@ -844,8 +862,9 @@ void HistoryInner::setupSwipeReplyAndBack() {
 					.messageId = exact->fullId(),
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
+					.richQuote = selected.highlight.richQuote,
 				});
-				if (!selected.highlight.quote.empty()) {
+				if (selected) {
 					_widget->clearSelected();
 				}
 			};
@@ -865,6 +884,7 @@ void HistoryInner::setupSwipeReplyAndBack() {
 		) | rpl::map([](bool selecting, Ui::ElasticScrollPosition position) {
 			return selecting || (position.overscroll > 0);
 		}),
+		.handoff = _widgetTouch->swipeHandoff(),
 		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
 			const auto delta = Ui::ScrollDelta(event);
 			if (std::abs(delta.x()) <= std::abs(delta.y())) {
@@ -1297,6 +1317,9 @@ void HistoryInner::enumerateForumThreadBars(Method method) {
 	enumerateItems<EnumItemsDirection::BottomToTop>(barCallback);
 }
 
+template void HistoryInner::enumerateDates(Tgw::ListTouch::Floating);
+template void HistoryInner::enumerateForumThreadBars(Tgw::ListTouch::Floating);
+
 auto HistoryInner::computeRenderSelection(
 		not_null<const SelectedItems*> selected,
 		not_null<Element*> view) const -> RenderSelectionState {
@@ -1369,6 +1392,7 @@ void HistoryInner::clearTextSelection() {
 		_selectedTextSelection = MessageSelection();
 		_selectedText = TextForMimeData();
 	}
+	_widgetSelection->clear();
 }
 
 void HistoryInner::setTextSelection(
@@ -1582,12 +1606,18 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		const auto yShown = [&](int y) {
 			return (_visibleAreaBottom >= y && _visibleAreaTop <= y);
 		};
+		const auto unreadShown = [&] {
+			return _history->peer->isBroadcast()
+				? yShown(top + height * 4 / 5)
+				: (_visibleAreaBottom > top
+					&& _visibleAreaTop < top + height);
+		};
 		const auto markShown = isSponsored
 			? view->markSponsoredViewed(_visibleAreaBottom - top)
 			: withReaction
 			? yShown(top + context.reactionInfo->position.y())
 			: isUnread
-			? yShown(top + height)
+			? unreadShown()
 			: yShown(top + height / 2);
 		if (markShown) {
 			if (isSponsored) {
@@ -1623,7 +1653,9 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			} else if (item->isUnreadMention()
 				&& !item->isUnreadMedia()) {
 				readContents.insert(item);
-				_widget->enqueueMessageHighlight({ item });
+				if (markingAsViewed) {
+					_widget->enqueueMessageHighlight({ item });
+				}
 			}
 			if (item->hasUnreadPollVote()) {
 				readContents.insert(item);
@@ -2006,15 +2038,25 @@ void HistoryInner::onTouchScrollTimer() {
 			Qt::NoScrollPhase);
 		if (consumedHorizontal) {
 			_horizontalScrollLocked = true;
+		} else if (!_horizontalScrollLocked && delta.y()) {
+			Tgw::ListScroll::Input(_widget);
 		}
+		const auto weak = base::make_weak(this);
 		const auto hasScrolled = consumedHorizontal
-			|| (!_horizontalScrollLocked && _widget->touchScroll(delta));
+			|| (!_horizontalScrollLocked && _touchElastic.fling(delta));
+		if (!weak) {
+			return;
+		}
 
 		if (_touchSpeed.isNull() || !hasScrolled) {
 			_touchScrollState = Ui::TouchScrollState::Manual;
 			_touchScroll = false;
 			_horizontalScrollLocked = false;
 			_touchScrollTimer.cancel();
+			_touchElastic.finish();
+			if (!weak) {
+				return;
+			}
 		} else {
 			_touchTime = nowTime;
 		}
@@ -2023,60 +2065,13 @@ void HistoryInner::onTouchScrollTimer() {
 }
 
 void HistoryInner::touchUpdateSpeed() {
-	const auto nowTime = crl::now();
-	if (_touchPrevPosValid) {
-		const int elapsed = nowTime - _touchSpeedTime;
-		if (elapsed) {
-			const QPoint newPixelDiff = (_touchPos - _touchPrevPos);
-			const QPoint pixelsPerSecond = newPixelDiff * (1000 / elapsed);
-
-			// fingers are inacurates, we ignore small changes to avoid stopping the autoscroll because
-			// of a small horizontal offset when scrolling vertically
-			const int newSpeedY = (std::abs(pixelsPerSecond.y())
-				> Ui::kFingerAccuracyThreshold)
-				? pixelsPerSecond.y()
-				: 0;
-			const int newSpeedX = (std::abs(pixelsPerSecond.x())
-				> Ui::kFingerAccuracyThreshold)
-				? pixelsPerSecond.x()
-				: 0;
-			if (_touchScrollState == Ui::TouchScrollState::Auto) {
-				const int oldSpeedY = _touchSpeed.y();
-				const int oldSpeedX = _touchSpeed.x();
-				if ((oldSpeedY <= 0 && newSpeedY <= 0) || ((oldSpeedY >= 0 && newSpeedY >= 0)
-					&& (oldSpeedX <= 0 && newSpeedX <= 0)) || (oldSpeedX >= 0 && newSpeedX >= 0)) {
-					_touchSpeed.setY(std::clamp(
-						(oldSpeedY + (newSpeedY / 4)),
-						-Ui::kMaxScrollAccelerated,
-						+Ui::kMaxScrollAccelerated));
-					_touchSpeed.setX(std::clamp(
-						(oldSpeedX + (newSpeedX / 4)),
-						-Ui::kMaxScrollAccelerated,
-						+Ui::kMaxScrollAccelerated));
-				} else {
-					_touchSpeed = QPoint();
-				}
-			} else {
-				// we average the speed to avoid strange effects with the last delta
-				if (!_touchSpeed.isNull()) {
-					_touchSpeed.setX(std::clamp(
-						(_touchSpeed.x() / 4) + (newSpeedX * 3 / 4),
-						-Ui::kMaxScrollFlick,
-						+Ui::kMaxScrollFlick));
-					_touchSpeed.setY(std::clamp(
-						(_touchSpeed.y() / 4) + (newSpeedY * 3 / 4),
-						-Ui::kMaxScrollFlick,
-						+Ui::kMaxScrollFlick));
-				} else {
-					_touchSpeed = QPoint(newSpeedX, newSpeedY);
-				}
-			}
-		}
-	} else {
-		_touchPrevPosValid = true;
-	}
-	_touchSpeedTime = nowTime;
-	_touchPrevPos = _touchPos;
+	HistoryView::UpdateTouchSpeed(
+		_touchSpeed,
+		_touchSpeedTime,
+		_touchPrevPos,
+		_touchPrevPosValid,
+		_touchPos,
+		_touchScrollState);
 }
 
 void HistoryInner::touchResetSpeed() {
@@ -2100,6 +2095,7 @@ void HistoryInner::touchDeaccelerate(int32 elapsed) {
 }
 
 void HistoryInner::touchEvent(QTouchEvent *e) {
+	const auto bridge = Tgw::TouchBridge();
 	if (e->type() == QEvent::TouchCancel) { // cancel
 		if (!_touchInProgress) {
 			return;
@@ -2109,8 +2105,12 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 		_touchScroll = _touchSelect = false;
 		_horizontalScrollLocked = false;
 		_touchScrollState = Ui::TouchScrollState::Manual;
+		_touchScrollTimer.cancel();
+		touchResetSpeed();
 		_touchMaybeSelecting = false;
 		mouseActionCancel();
+		_widgetTouch->cancel();
+		_touchElastic.finish(true);
 		return;
 	}
 
@@ -2122,10 +2122,12 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 
 	switch (e->type()) {
 	case QEvent::TouchBegin: {
+		_widgetSelection->dismiss();
 		if (_menu) {
 			e->accept();
 			return; // ignore mouse press, that was hiding context menu
 		}
+		_widgetTouch->retire();
 		if (_touchInProgress || e->touchPoints().isEmpty()) {
 			return;
 		}
@@ -2141,8 +2143,10 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			_touchStart = _touchPos;
 		} else {
 			_touchScroll = false;
-			_touchMaybeSelecting = true;
-			_touchSelectTimer.callOnce(QApplication::startDragTime());
+			if (!_widgetTouch->begin(_touchPos)) {
+				_touchMaybeSelecting = true;
+				_touchSelectTimer.callOnce(QApplication::startDragTime());
+			}
 		}
 		_touchSelect = false;
 		_touchStart = _touchPrevPos = _touchPos;
@@ -2151,12 +2155,19 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 	case QEvent::TouchUpdate: {
 		if (!_touchInProgress) {
 			return;
+		}
+		const auto widget = _widgetTouch->update(_touchPos);
+		if (widget == false) {
+			return;
 		} else if (_touchSelect) {
 			mouseActionUpdate(_touchPos);
-		} else if (!_touchScroll && (_touchPos - _touchStart).manhattanLength() >= QApplication::startDragDistance()) {
+		} else if (!_touchScroll
+			&& widget.value_or((_touchPos - _touchStart).manhattanLength()
+				>= QApplication::startDragDistance())) {
 			_touchSelectTimer.cancel();
 			_touchMaybeSelecting = false;
 			_touchScroll = true;
+			_touchElastic.start(_touchPos - _touchStart);
 			touchUpdateSpeed();
 		}
 		if (_touchScroll) {
@@ -2180,9 +2191,11 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 		const auto notMoved = (_touchPos - _touchStart).manhattanLength()
 			< QApplication::startDragDistance();
 		auto weak = base::make_weak(this);
+		const auto widget = _widgetTouch->end(_touchPos);
+		_touchScroll = widget.value_or(_touchScroll);
 		if (_touchSelect) {
 			if (notMoved || _touchMaybeSelecting.current()) {
-				mouseActionFinish(_touchPos, Qt::RightButton);
+				mouseActionFinish(_touchPos, Qt::RightButton, true);
 				auto contextMenu = QContextMenuEvent(
 					QContextMenuEvent::Mouse,
 					mapFromGlobal(_touchPos),
@@ -2191,6 +2204,10 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 			}
 			_touchScroll = false;
 		} else if (_touchScroll) {
+			_touchElastic.release();
+			if (!weak) {
+				return;
+			}
 			if (_touchScrollState == Ui::TouchScrollState::Manual) {
 				_touchScrollState = Ui::TouchScrollState::Auto;
 				_touchPrevPosValid = false;
@@ -2201,14 +2218,15 @@ void HistoryInner::touchEvent(QTouchEvent *e) {
 				_horizontalScrollLocked = false;
 				_touchScroll = false;
 				touchResetSpeed();
+				_touchElastic.finish();
 			} else if (_touchScrollState == Ui::TouchScrollState::Acceleration) {
 				_touchScrollState = Ui::TouchScrollState::Auto;
 				_touchWaitingAcceleration = false;
 				_touchPrevPosValid = false;
 			}
-		} else if (notMoved) { // One short tap is like left mouse click.
-			mouseActionStart(_touchPos, Qt::LeftButton);
-			mouseActionFinish(_touchPos, Qt::LeftButton);
+		} else if (notMoved && !widget) { // One short tap is like left mouse click.
+			mouseActionStart(_touchPos, Qt::LeftButton, true);
+			mouseActionFinish(_touchPos, Qt::LeftButton, true);
 		}
 		if (weak) {
 			_touchSelectTimer.cancel();
@@ -2255,7 +2273,12 @@ void HistoryInner::touchScrollUpdated(const QPoint &screenPos) {
 	if (consumeScrollAction(_touchPos - _touchPrevPos, Qt::NoScrollPhase)) {
 		_horizontalScrollLocked = true;
 	} else if (!_horizontalScrollLocked) {
-		_widget->touchScroll(_touchPos - _touchPrevPos);
+		if ((_touchPos - _touchPrevPos).y()) {
+			Tgw::ListScroll::Input(_widget);
+		}
+		if (!_touchElastic.drag(_touchPos - _touchPrevPos)) {
+			return;
+		}
 	}
 	touchUpdateSpeed();
 }
@@ -2283,6 +2306,7 @@ not_null<HistoryItem*> HistoryInner::lookupItemByPoint(
 }
 
 void HistoryInner::mousePressEvent(QMouseEvent *e) {
+	_widgetSelection->listPress(e->button(), bool(_menu));
 	if (_menu) {
 		e->accept();
 		return; // ignore mouse press, that was hiding context menu
@@ -2307,11 +2331,18 @@ void HistoryInner::mousePressEvent(QMouseEvent *e) {
 	mouseActionStart(e->globalPos(), e->button());
 }
 
-void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton button) {
+void HistoryInner::mouseActionStart(
+		const QPoint &screenPos,
+		Qt::MouseButton button,
+		bool fromTouch) {
 	mouseActionUpdate(screenPos);
-	if (button != Qt::LeftButton) return;
+	if (button != Qt::LeftButton) {
+		_widgetTouch->mousePress(button);
+		return;
+	}
 
 	ClickHandler::pressed();
+	_widgetSelection->press();
 	if (Element::Pressed() != Element::Hovered()) {
 		repaintItem(Element::Pressed());
 		Element::Pressed(Element::Hovered());
@@ -2332,7 +2363,9 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 	const auto pressed = ClickHandler::getPressed();
 	if (pressed
 		&& (!Element::Hovered()
-			|| !Element::Hovered()->allowTextSelectionByHandler(pressed))) {
+			|| !Element::Hovered()->allowTextSelectionByHandler(
+				pressed,
+				fromTouch))) {
 		_mouseAction = MouseAction::PrepareDrag;
 	} else if (hasSelectedItems()) {
 		if (_dragStateItem
@@ -2380,7 +2413,7 @@ void HistoryInner::mouseActionStart(const QPoint &screenPos, Qt::MouseButton but
 							mouseActionView->selectionFromStates(
 								_mouseTextAnchor,
 								dragState,
-								_mouseSelectType));
+								HistoryView::MouseTextSelectType(_mouseSelectType)));
 						_mouseAction = MouseAction::Selecting;
 					} else if (!hasSelectRestriction()) {
 						_mouseAction = MouseAction::PrepareSelect;
@@ -2435,6 +2468,9 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 			uponSelected = isPressInSelectedText(pressedView, dragState);
 		}
 	}
+	if (uponSelected && hasCopyRestrictionForSelected()) {
+		return nullptr;
+	}
 	auto urls = QList<QUrl>();
 	const auto selectedText = [&] {
 		if (uponSelected) {
@@ -2463,6 +2499,12 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 		}
 		return mimeData;
 	} else if (pressedView) {
+		const auto pressedItem = HistoryView::LookupItemByPoint(
+			pressedView,
+			_dragStartPosition);
+		if (hasCopyRestriction(pressedItem)) {
+			return nullptr;
+		}
 		auto forwardIds = MessageIdsList();
 		const auto tryForwardSelection = uponSelected
 			&& !_controller->adaptive().isOneColumn();
@@ -2531,6 +2573,11 @@ std::unique_ptr<QMimeData> HistoryInner::prepareDrag() {
 }
 
 void HistoryInner::performDrag() {
+	// Fades started below must tick inside the drag's nested event loop.
+	Ui::Animations::Manager::SetScheduleWithInvokeQueued(true);
+	const auto guard = gsl::finally([] {
+		Ui::Animations::Manager::SetScheduleWithInvokeQueued(false);
+	});
 	if (auto mimeData = prepareDrag()) {
 		// This call enters event loop and can destroy any QObject.
 		_reactionsManager->updateButton({});
@@ -2594,6 +2641,7 @@ void HistoryInner::itemRemoved(not_null<const HistoryItem*> item) {
 }
 
 void HistoryInner::viewRemoved(not_null<const Element*> view) {
+	invalidateAccessibleElements();
 	if (_overlayHost) {
 		_overlayHost->viewGone(view);
 	}
@@ -2610,7 +2658,8 @@ void HistoryInner::viewRemoved(not_null<const Element*> view) {
 
 void HistoryInner::mouseActionFinish(
 		const QPoint &screenPos,
-		Qt::MouseButton button) {
+		Qt::MouseButton button,
+		bool fromTouch) {
 	mouseActionUpdate(screenPos);
 
 	const auto toggleByHandler = [&](const ClickHandlerPtr &handler) {
@@ -2620,7 +2669,22 @@ void HistoryInner::mouseActionFinish(
 		return false;
 	};
 
+	const auto pressed = ClickHandler::getPressed();
+	const auto pressedView = Element::PressedLink();
+	const auto keepFocus = !fromTouch
+		&& pressedView
+		&& pressedView->media()
+		&& pressedView->media()->keepFocusByHandler(pressed);
+	const auto wasPressed = bool(pressed);
 	auto activated = ClickHandler::unpressed();
+	_widgetSelection->release();
+	if (const auto view = Element::HoveredLink()) {
+		if (wasPressed && !activated && view == Element::Moused()) {
+			const auto point = _widget->clampMousePosition(
+				mapFromGlobal(_mousePosition));
+			view->updatePressed(mapPointToItem(point, view));
+		}
+	}
 	const auto pressedItemView = Element::Pressed();
 	if (pressedItemView) {
 		repaintItem(pressedItemView);
@@ -2729,7 +2793,7 @@ void HistoryInner::mouseActionFinish(
 	_mouseSelectType = TextSelectType::Letters;
 	_mouseTextAnchor = TextState();
 	_selectScroll.cancel();
-	_widget->updateTopBarSelection();
+	_widget->updateTopBarSelection(keepFocus);
 
 	if (QGuiApplication::clipboard()->supportsSelection()
 		&& hasSelectedText()
@@ -2754,6 +2818,7 @@ void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
 		return;
 	}
 	if (_middleClickAutoscroll.active()) {
+		_widgetTouch->mouseRelease(e->button());
 		e->accept();
 		return;
 	}
@@ -2764,6 +2829,7 @@ void HistoryInner::mouseReleaseEvent(QMouseEvent *e) {
 
 	registerReadMetricsActivity();
 	mouseActionFinish(e->globalPos(), e->button());
+	_widgetTouch->mouseRelease(e->button());
 	if (!rect().contains(e->pos())) {
 		leaveEvent(e);
 	}
@@ -2847,11 +2913,19 @@ HistoryView::SelectedQuote HistoryInner::selectedQuote(
 	if (!view) {
 		return {};
 	}
-	return view->selectedQuote(_selectedTextSelection);
+	return view->selectedReplyQuote(_selectedTextSelection);
 }
 
 void HistoryInner::contextMenuEvent(QContextMenuEvent *e) {
+	if (e->reason() == QContextMenuEvent::Mouse) {
+		mouseActionUpdate(e->globalPos());
+	}
+	if (_widgetTouch->mouseMenu(e)) {
+		e->accept();
+		return;
+	}
 	showContextMenu(e);
+	_widgetSelection->watch(_menu.get());
 }
 
 void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
@@ -3073,12 +3147,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				: item->replyToTop();
 			const auto phrase = topicRootId
 				? tr::lng_replies_view_topic(tr::now)
-				: (repliesCount > 0)
-				? tr::lng_replies_view(
+				: tr::lng_replies_view(
 					tr::now,
 					lt_count,
-					repliesCount)
-				: tr::lng_replies_view_thread(tr::now);
+					repliesCount);
 			_menu->addAction(phrase, [=] {
 				controller->showRepliesForMessage(
 					_history,
@@ -3399,8 +3471,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					.quote = selected.highlight.quote,
 					.quoteOffset = selected.highlight.quoteOffset,
 					.todoItemId = todoListTaskId,
+					.richQuote = selected.highlight.richQuote,
 				});
-				if (!selected.highlight.quote.empty()) {
+				if (selected) {
 					_widget->clearSelected();
 				}
 			}, &st::menuIconReply);
@@ -3476,7 +3549,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					(isUponSelected > 1
 						? tr::lng_context_copy_selected_items(tr::now)
 						: tr::lng_context_copy_selected(tr::now)),
-					[=] { copySelectedText(); },
+					[=] {
+						copySelectedText();
+						if (hasSelectedItems()) {
+							clearSelected();
+						}
+					},
 					&st::menuIconCopy);
 			}
 			if (item && !Ui::SkipTranslate(selectedText.rich)) {
@@ -3640,7 +3718,12 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					((isUponSelected > 1)
 						? tr::lng_context_copy_selected_items(tr::now)
 						: tr::lng_context_copy_selected(tr::now)),
-					[=] { copySelectedText(); },
+					[=] {
+						copySelectedText();
+						if (hasSelectedItems()) {
+							clearSelected();
+						}
+					},
 					&st::menuIconCopy);
 			}
 			if (item && !Ui::SkipTranslate(selectedText.rich)) {
@@ -3672,6 +3755,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			addItemActions(item, editItem);
 		} else {
 			addReplyAction(partItemOrLeader);
+			Tgw::ListSelection::FillMenu(this, item);
 			addTodoListAction(partItemOrLeader);
 			addItemActions(item, albumPartItem);
 			if (item && !isUponSelected) {
@@ -3718,37 +3802,26 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 						_menu->addAction(tr::lng_profile_copy_phone(tr::now), [=] {
 							QGuiApplication::clipboard()->setText(phone);
 						}, &st::menuIconCopy);
-					} else if (const auto gift = media->gift()) {
-						const auto peer = item->history()->peer;
-						const auto user = peer->asUser();
-						if (!user
-							|| (!user->isInaccessible()
-								&& !user->isNotificationsUser())) {
-							const auto controller = _controller;
-							const auto starGiftUpgrade = gift->upgrade
-								&& (gift->type == Data::GiftType::StarGift);
-							const auto isGift = gift->slug.isEmpty()
-								|| !gift->channel;
-							const auto out = item->out();
-							const auto outgoingGift = isGift
-								&& (starGiftUpgrade ? !out : out);
-							if (outgoingGift
-								&& gift->type
-									!= Data::GiftType::BirthdaySuggest) {
-								_menu->addAction(
-									tr::lng_context_gift_send(tr::now),
-									[=] {
-										Ui::ShowStarGiftBox(controller, peer);
-									},
-									&st::menuIconGiftPremium);
-							}
-						}
+					} else if (media->gift()) {
+						HistoryView::AddGiftMessageAction(
+							_menu,
+							item,
+							controller);
 					} else if (!rateTranscriptionItem && media->document()) {
 						if ((media->document()->isVoiceMessage()
 								|| media->document()->isVideoMessage())
 							&& Menu::HasRateTranscribeItem(item)) {
 							rateTranscriptionItem = item;
 						}
+					}
+				}
+				if (item->isRegular()
+					&& item->Has<HistoryServiceGramTransfer>()) {
+					if (const auto user = item->history()->peer->asUser()) {
+						Window::AddSendMoneyAction(
+							controller,
+							user,
+							Ui::Menu::CreateAddActionCallback(_menu));
 					}
 				}
 				if (!item->isService() && view && actionText.isEmpty()) {
@@ -3781,6 +3854,9 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 							}, &st::menuIconTranslate);
 						}
 					}
+				}
+				if (view) {
+					Tgw::AddLogAction(_menu, view, controller->uiShow());
 				}
 			}
 		}
@@ -4054,9 +4130,10 @@ bool HistoryInner::hasCopyRestrictionForSelected() const {
 			return true;
 		}
 	}
-	return hasSelectedText()
-		&& _selectedTextItem
-		&& _selectedTextItem->forbidsForward();
+	const auto textItem = hasSelectedText()
+		? _selectedTextItem
+		: _widgetSelection->item();
+	return textItem && textItem->forbidsForward();
 }
 
 bool HistoryInner::showCopyRestrictionForSelected() {
@@ -4065,23 +4142,27 @@ bool HistoryInner::showCopyRestrictionForSelected() {
 			return true;
 		}
 	}
-	return hasSelectedText()
-		&& _selectedTextItem
-		&& showCopyRestriction(_selectedTextItem);
+	const auto textItem = hasSelectedText()
+		? _selectedTextItem
+		: _widgetSelection->item();
+	return textItem && showCopyRestriction(textItem);
 }
 
-void HistoryInner::copySelectedText() {
+void HistoryInner::copySelectedText(bool withImageText) {
 	if (showCopyRestrictionForSelected()) {
 		return;
 	}
-	const auto text = getSelectedText();
-	if (text.empty()) {
+	auto text = getSelectedTextParts();
+	if (text.empty() && (!withImageText || text.images.empty())) {
 		return;
 	}
-	Iv::SetRichBlocksClipboard(
-		text,
-		getSelectedRichBlocks(),
-		&session());
+	HistoryView::CopySelection({
+		.show = _controller->uiShow(),
+		.session = &session(),
+		.text = std::move(text),
+		.blocks = getSelectedRichBlocks(),
+		.withImageText = withImageText,
+	});
 }
 
 void HistoryInner::editCaptionUploadLayer(not_null<HistoryItem*> item) {
@@ -4199,6 +4280,10 @@ void HistoryInner::resizeEvent(QResizeEvent *e) {
 }
 
 TextForMimeData HistoryInner::getSelectedText() const {
+	return getSelectedTextParts().composed();
+}
+
+HistorySelectedTextParts HistoryInner::getSelectedTextParts() const {
 	auto selected = _selected;
 
 	if (_mouseAction == MouseAction::Selecting && _dragSelFrom && _dragSelTo) {
@@ -4207,9 +4292,11 @@ TextForMimeData HistoryInner::getSelectedText() const {
 
 	if (selected.empty()) {
 		if (const auto view = viewByItem(_selectedTextItem)) {
-			return view->selectedText(_selectedTextSelection);
+			return { .texts = { view->selectedText(_selectedTextSelection) } };
+		} else if (_selectedTextItem) {
+			return { .texts = { _selectedText } };
 		}
-		return _selectedText;
+		return { .texts = { _widgetSelection->text() } };
 	}
 
 	const auto richContext = (selected.size() > 1);
@@ -4252,19 +4339,12 @@ TextForMimeData HistoryInner::getSelectedText() const {
 			addItem(item);
 		}
 	}
-	if (!richContext && texts.size() == 1) {
-		const auto &part = texts.front().second;
-		if (part.group) {
-			return HistoryGroupText(not_null<const Data::Group*>{ part.group });
-		}
-		return HistoryItemText(part.item);
-	}
 	auto entries = std::vector<HistorySelectedTextEntry>();
 	entries.reserve(texts.size());
 	for (const auto &entry : texts) {
 		entries.push_back(entry.second);
 	}
-	return HistorySelectedItemsText(entries, richContext);
+	return HistorySelectedItemsTextParts(entries, richContext);
 }
 
 Iv::RichPageBlocksSlice HistoryInner::getSelectedRichBlocks() const {
@@ -4300,7 +4380,7 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 			const auto elements = accessibleElements();
 			const auto barIndex
 				= accessibilityUnreadBarIndex();
-			if (accessibilityItemAtIndex(
+			if (HistoryView::AccessibilityItemAtIndex(
 					_accessibilityFocusedIndex,
 					elements,
 					barIndex) != _accessibilityFocusedItem) {
@@ -4405,7 +4485,7 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 			const auto elements = accessibleElements();
 			const auto barIndex
 				= accessibilityUnreadBarIndex();
-			const auto item = accessibilityItemAtIndex(
+			const auto item = HistoryView::AccessibilityItemAtIndex(
 				newIndex,
 				elements,
 				barIndex);
@@ -4472,12 +4552,15 @@ void HistoryInner::keyPressEvent(QKeyEvent *e) {
 	} else if (e == QKeySequence::Copy
 		&& canCopySelected()) {
 		copySelectedText();
-#ifdef Q_OS_MAC
+	} else if (HistoryView::IsCopyWithImageTextShortcut(e, &session())
+		&& canCopySelected()) {
+		copySelectedText(true);
+#ifdef Q_OS_MACOS
 	} else if (e->key() == Qt::Key_E
 		&& e->modifiers().testFlag(Qt::ControlModifier)
 		&& !showCopyRestrictionForSelected()) {
 		TextUtilities::SetClipboardText(getSelectedText(), QClipboard::FindBuffer);
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 	} else if (e == QKeySequence::Delete || e->key() == Qt::Key_Backspace) {
 		auto selectedState = getSelectionState();
 		if (selectedState.count > 0
@@ -4557,6 +4640,7 @@ void HistoryInner::checkActivation() {
 }
 
 void HistoryInner::recountHistoryGeometry(bool initial) {
+	invalidateAccessibleElements();
 	_contentWidth = _scroll->width();
 
 	if (_history->hasPendingResizedItems()
@@ -5103,7 +5187,8 @@ auto HistoryInner::nextItem(Element *view) -> Element* {
 
 bool HistoryInner::canCopySelected() const {
 	return hasSelectedItems()
-		|| (hasSelectedText() && !_selectedTextSelection.empty());
+		|| (hasSelectedText() && !_selectedTextSelection.empty())
+		|| _widgetSelection->has();
 }
 
 bool HistoryInner::canDeleteSelected() const {
@@ -5343,6 +5428,15 @@ void HistoryInner::elementStartEffect(
 	_emojiInteractions->playEffect(view);
 }
 
+HistoryView::GramReadLine *HistoryInner::elementGramReadLine() {
+	if (!_gramReadLine) {
+		_gramReadLine = std::make_unique<HistoryView::GramReadLine>([=] {
+			update();
+		});
+	}
+	return _gramReadLine.get();
+}
+
 auto HistoryInner::getSelectionState() const
 -> HistoryView::TopBarWidget::SelectedState {
 	auto result = HistoryView::TopBarWidget::SelectedState {};
@@ -5355,8 +5449,9 @@ auto HistoryInner::getSelectionState() const
 			++result.canForwardCount;
 		}
 	}
-	result.textSelected = hasSelectedText()
-		&& !_selectedTextSelection.empty();
+	result.textSelected = (hasSelectedText()
+			&& !_selectedTextSelection.empty())
+		|| _widgetSelection->has();
 	return result;
 }
 
@@ -5371,6 +5466,7 @@ void HistoryInner::clearSelected(bool onlyTextSelection) {
 		clearTextSelection();
 		changed = true;
 	}
+	changed = _widgetSelection->clear() || changed;
 	if (changed) {
 		_widget->updateTopBarSelection();
 		_widget->update();
@@ -5432,9 +5528,10 @@ std::vector<not_null<HistoryItem*>> HistoryInner::getSelectedEphemeral() const {
 }
 
 void HistoryInner::onTouchSelect() {
+	const auto bridge = Tgw::TouchBridge();
 	_touchSelect = true;
 	_touchMaybeSelecting = true;
-	mouseActionStart(_touchPos, Qt::LeftButton);
+	mouseActionStart(_touchPos, Qt::LeftButton, true);
 }
 
 auto HistoryInner::reactionButtonParameters(
@@ -5495,6 +5592,14 @@ void HistoryInner::mouseActionUpdate() {
 
 	auto mousePos = mapFromGlobal(_mousePosition);
 	auto point = _widget->clampMousePosition(mousePos);
+
+	// Voice message seek support.
+	if (const auto pressedView = Element::PressedLink()) {
+		if (itemTop(pressedView) >= 0) {
+			pressedView->updatePressed(mapPointToItem(mousePos, pressedView));
+		}
+	}
+	_widgetSelection->update();
 
 	auto m = QPoint();
 
@@ -5562,7 +5667,7 @@ void HistoryInner::mouseActionUpdate() {
 	}
 
 	TextState dragState;
-	ClickHandlerHost *lnkhost = nullptr;
+	auto lnkhost = (ClickHandlerHost*)nullptr;
 	auto dragStateUserpic = false;
 	auto selectingText = (item == _mouseActionItem)
 		&& (view == Element::Hovered())
@@ -5748,7 +5853,7 @@ void HistoryInner::mouseActionUpdate() {
 	_acceptsHorizontalScroll = dragState.horizontalScroll;
 	if (_mouseAction == MouseAction::None) {
 		_mouseCursorState = dragState.cursor;
-		if (dragState.link) {
+		if (dragState.link && _mouseCursorState != CursorState::Default) {
 			cur = style::cur_pointer;
 		} else if (_mouseCursorState == CursorState::Text && !hasSelectedItems()) {
 			cur = style::cur_text;
@@ -5763,7 +5868,7 @@ void HistoryInner::mouseActionUpdate() {
 					view->selectionFromStates(
 						_mouseTextAnchor,
 						dragState,
-						_mouseSelectType));
+						HistoryView::MouseTextSelectType(_mouseSelectType)));
 				updateDragSelection(nullptr, nullptr, false);
 			} else {
 				auto selectingDown = (itemTop(_mouseActionItem) < itemTop(item)) || (_mouseActionItem == item && _dragStartPosition.y() < m.y());
@@ -5828,14 +5933,8 @@ void HistoryInner::mouseActionUpdate() {
 		}
 	}
 
-	// Voice message seek support.
-	if (const auto pressedItem = _dragStateItem) {
-		if (const auto pressedView = viewByItem(pressedItem)) {
-			if (pressedItem->history() == _history || pressedItem->history() == _migrated) {
-				auto adjustedPoint = mapPointToItem(point, pressedView);
-				pressedView->updatePressed(adjustedPoint);
-			}
-		}
+	if (view && !ClickHandler::getPressed()) {
+		view->updatePressed(m);
 	}
 
 	if (_mouseAction == MouseAction::Selecting) {
@@ -6031,6 +6130,10 @@ void HistoryInner::refreshAboutView(bool force) {
 				|| user->isFullLoaded()) {
 				refresh();
 			} else {
+				if (force && _aboutView) {
+					_aboutView = nullptr;
+					updateSize();
+				}
 				session().api().requestFullPeer(user);
 			}
 		}
@@ -6232,7 +6335,7 @@ void HistoryInner::changeAccessibilitySelection(
 	clearTextSelection();
 	repaintItem(item);
 	_widget->updateTopBarSelection();
-	accessibilityChildStateChanged(index, { .selected = true });
+	accessibilityChildSelectionChanged(index);
 	accessibilityChildNameChanged(index);
 }
 
@@ -6249,7 +6352,7 @@ void HistoryInner::extendAccessibilitySelection(
 	const auto elements = accessibleElements();
 	const auto barIndex = accessibilityUnreadBarIndex();
 	const auto itemAt = [&](int index) {
-		return accessibilityItemAtIndex(index, elements, barIndex);
+		return HistoryView::AccessibilityItemAtIndex(index, elements, barIndex);
 	};
 	if (oldIndex < 0) {
 		_accessibilitySelectionAnchor = itemAt(newIndex);
@@ -6296,7 +6399,7 @@ void HistoryInner::extendAccessibilitySelection(
 
 void HistoryInner::playPauseFocusedMedia() {
 	const auto elements = accessibleElements();
-	const auto item = accessibilityItemAtIndex(
+	const auto item = HistoryView::AccessibilityItemAtIndex(
 		_accessibilityFocusedIndex,
 		elements,
 		accessibilityUnreadBarIndex());
@@ -6636,8 +6739,15 @@ bool CanSendReply(not_null<const HistoryItem*> item) {
 
 // Accessibility.
 
-std::vector<HistoryView::Element*> HistoryInner::accessibleElements() const {
-	std::vector<Element*> result;
+auto HistoryInner::accessibleElements() const
+-> const std::vector<HistoryView::Element*> & {
+	// Accessibility asks about each row separately, several times per row,
+	// and every answer needs this list, so building it on each call made
+	// reading a long history quadratic. Keep it until the rows change.
+	if (_accessibleElements) {
+		return *_accessibleElements;
+	}
+	auto &result = _accessibleElements.emplace();
 	const auto gather = [&](not_null<History*> history) {
 		for (const auto &block : history->blocks) {
 			for (const auto &message : block->messages) {
@@ -6654,6 +6764,11 @@ std::vector<HistoryView::Element*> HistoryInner::accessibleElements() const {
 	return result;
 }
 
+void HistoryInner::invalidateAccessibleElements() {
+	_accessibleElements = std::nullopt;
+	_accessibilityUnreadBar = nullptr;
+}
+
 int HistoryInner::accessibilityUnreadBarIndex() const {
 	auto *barElement = _history->unreadBar();
 	if (!barElement && _migrated) {
@@ -6662,31 +6777,18 @@ int HistoryInner::accessibilityUnreadBarIndex() const {
 	if (!barElement) {
 		return -1;
 	}
-	const auto elements = accessibleElements();
-	for (auto i = 0, count = int(elements.size()); i < count; ++i) {
-		if (elements[i] == barElement) {
-			return i;
+	const auto &elements = accessibleElements();
+	if (_accessibilityUnreadBar != barElement) {
+		_accessibilityUnreadBar = barElement;
+		_accessibilityUnreadBarIndex = -1;
+		for (auto i = 0, count = int(elements.size()); i < count; ++i) {
+			if (elements[i] == barElement) {
+				_accessibilityUnreadBarIndex = i;
+				break;
+			}
 		}
 	}
-	return -1;
-}
-
-HistoryItem *HistoryInner::accessibilityItemAtIndex(
-		int index,
-		const std::vector<Element*> &elements,
-		int barIndex) const {
-	// The unread bar row maps to no item: a focused bar is cached as
-	// a null item with a nonnegative index, so it can never be
-	// mistaken for the message it is anchored to when rows shift.
-	if (index < 0 || (barIndex >= 0 && index == barIndex)) {
-		return nullptr;
-	}
-	const auto elementIndex = (barIndex >= 0 && index > barIndex)
-		? (index - 1)
-		: index;
-	return (elementIndex < int(elements.size()))
-		? elements[elementIndex]->data().get()
-		: nullptr;
+	return _accessibilityUnreadBarIndex;
 }
 
 int HistoryInner::accessibilityChildCount() const {
@@ -6705,7 +6807,7 @@ QString HistoryInner::accessibilityChildName(int index) const {
 			? HistoryView::UnreadBarAccessibilityName(barElement)
 			: tr::lng_unread_bar_some(tr::now);
 	}
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto elementIndex = (barIndex >= 0 && index > barIndex)
 		? (index - 1)
 		: index;
@@ -6735,7 +6837,7 @@ QAccessible::State HistoryInner::accessibilityChildState(int index) const {
 	const auto barIndex = accessibilityUnreadBarIndex();
 	if (barIndex < 0 || index != barIndex) {
 		state.selectable = true;
-		const auto elements = accessibleElements();
+		const auto &elements = accessibleElements();
 		const auto elementIndex = (barIndex >= 0 && index > barIndex)
 			? (index - 1)
 			: index;
@@ -6758,6 +6860,16 @@ QAccessible::Role HistoryInner::accessibilityChildRole() const {
 	return QAccessible::Role::ListItem;
 }
 
+QAccessible::Role HistoryInner::accessibilityChildRoleAt(int index) const {
+	// The unread bar divides the read messages from the unread ones, it
+	// is not a message itself - a separator to a screen reader, which also
+	// keeps it out of the selection and the item count.
+	const auto barIndex = accessibilityUnreadBarIndex();
+	return (barIndex >= 0 && index == barIndex)
+		? QAccessible::Role::Separator
+		: accessibilityChildRole();
+}
+
 QRect HistoryInner::accessibilityChildRect(int index) const {
 	const auto barIndex = accessibilityUnreadBarIndex();
 	if (barIndex >= 0 && index == barIndex) {
@@ -6778,7 +6890,7 @@ QRect HistoryInner::accessibilityChildRect(int index) const {
 		return QRect();
 	}
 
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto elementIndex = (barIndex >= 0 && index > barIndex)
 		? (index - 1)
 		: index;
@@ -6835,7 +6947,7 @@ QString HistoryInner::accessibilityChildSubItemValue(
 	if (column < 0 || column >= int(active.size())) {
 		return {};
 	}
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto elementIndex = (barIndex >= 0 && row > barIndex)
 		? (row - 1)
 		: row;
@@ -6856,7 +6968,7 @@ auto HistoryInner::computeActiveColumns(int row) const
 		_activeColumnsView = nullptr;
 		return _activeColumns;
 	}
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto elementIndex = (barIndex >= 0 && row > barIndex)
 		? (row - 1)
 		: row;
@@ -6946,7 +7058,7 @@ void HistoryInner::announceAccessibilityFocusedChild() {
 		? (barIndex + 1)
 		: (count - 1);
 	const auto elements = accessibleElements();
-	const auto item = accessibilityItemAtIndex(
+	const auto item = HistoryView::AccessibilityItemAtIndex(
 		index,
 		elements,
 		barIndex);
@@ -6986,7 +7098,7 @@ quintptr HistoryInner::accessibilityChildIdentity(int index) const {
 	if (barIndex >= 0 && index == barIndex) {
 		return 0;
 	}
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto elementIndex = (barIndex >= 0 && index > barIndex)
 		? (index - 1)
 		: index;
@@ -7012,7 +7124,7 @@ int HistoryInner::accessibilityChildIndexByIdentity(
 	if (!identity) {
 		return -1;
 	}
-	const auto elements = accessibleElements();
+	const auto &elements = accessibleElements();
 	const auto barIndex = accessibilityUnreadBarIndex();
 	for (auto i = 0, n = int(elements.size()); i != n; ++i) {
 		const auto j = _accessibilityIdentities.find(
@@ -7030,7 +7142,10 @@ void HistoryInner::applyAccessibilityFocus(
 		bool announceAlways) {
 	const auto elements = accessibleElements();
 	const auto barIndex = accessibilityUnreadBarIndex();
-	const auto item = accessibilityItemAtIndex(index, elements, barIndex);
+	const auto item = HistoryView::AccessibilityItemAtIndex(
+		index,
+		elements,
+		barIndex);
 	const auto changed = (_accessibilityFocusedIndex != index)
 		|| (_accessibilityFocusedItem != item);
 	_accessibilitySelectionAnchor = nullptr;

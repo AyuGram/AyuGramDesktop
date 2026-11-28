@@ -10,9 +10,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_pill.h"
 #include "dialogs/ui/dialogs_top_bar_suggestion_content.h"
 #include "lang/lang_keys.h"
+#include "ui/widgets/buttons.h"
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
-#include "ui/widgets/buttons.h"
+
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_widgets.h"
@@ -196,14 +197,7 @@ void RestoreWindowsOffer::paintEvent(QPaintEvent *e) {
 		pill.width() / 2,
 		pill.height() / 2,
 	});
-	_shadow.paint(p, pill, radius);
-	{
-		auto hq = PainterHighQualityEnabler(p);
-		p.setBrush(st::dialogsBg);
-		p.setPen(Qt::NoPen);
-		p.drawRoundedRect(pill, radius, radius);
-	}
-	PaintPillOutline(p, pill, radius);
+	PaintPillBackground(p, _shadow, pill, radius);
 	p.setPen(st::windowFg);
 	_question.draw(p, {
 		.position = _questionPosition,

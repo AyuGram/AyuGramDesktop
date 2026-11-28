@@ -7,57 +7,58 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/message_field.h"
 
-#include "history/history_widget.h"
+#include "base/qt/qt_common_adapters.h"
+#include "base/event_filter.h"
+#include "base/qthelp_regex.h"
+#include "base/qthelp_url.h"
+#include "base/unixtime.h"
+#include "chat_helpers/emoji_suggestions_widget.h"
+#include "core/application.h"
+#include "core/core_settings.h"
+#include "core/shortcuts.h"
+#include "core/ui_integration.h"
+#include "data/stickers/data_custom_emoji.h"
+#include "data/data_document.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/view/controls/compose_controls_common.h"
 #include "history/history.h" // History::session
 #include "history/history_item.h" // HistoryItem::originalText
 #include "history/history_item_helpers.h" // DropDisallowedCustomEmoji
-#include "base/unixtime.h"
-#include "base/qthelp_regex.h"
-#include "base/qthelp_url.h"
-#include "base/event_filter.h"
-#include "ui/chat/chat_style.h"
-#include "ui/layers/generic_box.h"
+#include "history/history_widget.h"
+#include "info/profile/info_profile_icon.h"
+#include "lang/lang_keys.h"
+#include "lottie/lottie_icon.h"
+#include "main/main_session.h"
+#include "mainwindow.h"
+#include "settings/sections/settings_premium.h"
+#include "settings/settings_common.h"
 #include "ui/boxes/calendar_box.h"
 #include "ui/boxes/choose_date_time.h"
-#include "ui/basic_click_handlers.h"
-#include "ui/rect.h"
-#include "core/shortcuts.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "core/ui_integration.h"
-#include "lottie/lottie_icon.h"
-#include "info/profile/info_profile_icon.h"
+#include "ui/chat/chat_style.h"
+#include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/wrap/vertical_layout.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/popup_menu.h"
 #include "ui/widgets/shadow.h"
+#include "ui/wrap/vertical_layout.h"
+#include "ui/basic_click_handlers.h"
 #include "ui/power_saving.h"
-#include "ui/vertical_list.h"
+#include "ui/rect.h"
 #include "ui/ui_utility.h"
-#include "data/data_session.h"
-#include "data/data_user.h"
-#include "data/data_document.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "chat_helpers/emoji_suggestions_widget.h"
-#include "history/view/controls/compose_controls_common.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
-#include "lang/lang_keys.h"
-#include "mainwindow.h"
-#include "main/main_session.h"
-#include "settings/settings_common.h"
-#include "settings/sections/settings_premium.h"
-#include "styles/style_layers.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_credits.h"
 #include "styles/style_dialogs.h"
+#include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_premium.h"
 #include "styles/style_settings.h"
-#include "base/qt/qt_common_adapters.h"
 
 #include <QtCore/QMimeData>
 #include <QtCore/QStack>
@@ -934,6 +935,17 @@ InlineBotQuery ParseInlineBotQuery(
 	return result;
 }
 
+TextWithEntities PreventInlineBotQuery(TextWithEntities text) {
+	const auto &string = text.text;
+	const auto first = ranges::find_if(string, [](QChar ch) {
+		return (ch != QChar::ObjectReplacementCharacter);
+	});
+	if (first != string.cend() && *first == '@') {
+		return tr::marked(u" "_q).append(std::move(text));
+	}
+	return text;
+}
+
 AutocompleteQuery ParseMentionHashtagBotCommandQuery(
 		not_null<const Ui::InputField*> field,
 		ChatHelpers::ComposeFeatures features) {
@@ -1041,6 +1053,10 @@ void MessageLinksParser::parseNow() {
 
 void MessageLinksParser::setDisabled(bool disabled) {
 	_disabled = disabled;
+}
+
+bool MessageLinksParser::disabled() const {
+	return _disabled;
 }
 
 bool MessageLinksParser::eventFilter(QObject *object, QEvent *event) {
@@ -1560,6 +1576,57 @@ std::unique_ptr<Ui::AbstractButton> FrozenWriteRestriction(
 		show->show(Box(FrozenInfoBox, &show->session(), st));
 	});
 	return result;
+}
+
+TextSelection EditFieldSelection(
+		const TextWithTags &text,
+		TextSelection selection) {
+	const auto data = text.text.constData();
+	const auto size = int(text.text.size());
+	const auto isCustomEmoji = [](const QString &id) {
+		for (const auto &tag : TextUtilities::SplitTags(id)) {
+			if (tag.startsWith(Ui::InputField::kCustomEmojiTagStart)) {
+				return true;
+			}
+		}
+		return false;
+	};
+	const auto fieldOffset = [&](int requested, bool isEnd) {
+		const auto offset = std::min(requested, size);
+		auto result = 0;
+		auto p = 0;
+		while (p < offset) {
+			auto length = 1;
+			auto collapsed = false;
+			for (const auto &tag : text.tags) {
+				if (tag.offset == p && isCustomEmoji(tag.id)) {
+					length = tag.length;
+					collapsed = true;
+					break;
+				}
+			}
+			if (!collapsed) {
+				auto emojiLength = 0;
+				if (Ui::Emoji::Find(data + p, data + size, &emojiLength)) {
+					length = emojiLength;
+					collapsed = true;
+				}
+			}
+			if (p + length > offset) {
+				return result
+					+ (collapsed
+						? (isEnd ? 1 : 0)
+						: (offset - p));
+			}
+			result += collapsed ? 1 : length;
+			p += length;
+		}
+		return result + (offset - p);
+	};
+	return TextSelection{
+		uint16(fieldOffset(selection.from, false)),
+		uint16(fieldOffset(selection.to, true)),
+	};
 }
 
 void SelectTextInFieldWithMargins(

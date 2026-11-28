@@ -13,6 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <crl/crl_object_on_queue.h>
 
+namespace Media::Encode {
+struct VideoSource;
+} // namespace Media::Encode
+
 namespace Media::Capture {
 struct Chunk;
 struct Update;
@@ -49,6 +53,7 @@ struct RoundVideoResult {
 	QImage minithumbs;
 	int minithumbsCount = 0;
 	int minithumbSize = 0;
+	std::shared_ptr<Media::Encode::VideoSource> videoSource;
 };
 
 struct RoundVideoPartial {
@@ -90,6 +95,7 @@ private:
 	void preparePlaceholder(const QImage &placeholder);
 	void createImages();
 	void progressTo(float64 progress);
+	bool progressAnimationCallback(crl::time now);
 	void fade(bool visible);
 
 	[[nodiscard]] Fn<void()> updater() const;
@@ -101,7 +107,9 @@ private:
 	PathShiftGradient _gradient;
 	std::unique_ptr<RpWidget> _preview;
 	crl::object_on_queue<Private> _private;
-	Ui::Animations::Simple _progressAnimation;
+	anim::value _progressShown;
+	crl::time _progressDuration = 0;
+	Ui::Animations::Basic _progressAnimation;
 	Ui::Animations::Simple _fadeAnimation;
 	Ui::Animations::Simple _fadeContentAnimation;
 	rpl::event_stream<QImage> _placeholderUpdates;

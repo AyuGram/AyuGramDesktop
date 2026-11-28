@@ -22,17 +22,18 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <cstdarg>
 #include <ctime>
 #include <iostream>
+#include <memory>
 
 using std::string;
 using std::deque;
 using std::vector;
 using std::cout;
 
-bool do_mkdir(const char *path) { // from http://stackoverflow.com/questions/675039/how-can-i-create-directory-tree-in-c-linux
+bool do_mkdir(const char *path, mode_t mode = S_IRWXU) { // from http://stackoverflow.com/questions/675039/how-can-i-create-directory-tree-in-c-linux
 	struct stat statbuf;
 	if (stat(path, &statbuf) != 0) {
 		/* Directory does not exist. EEXIST for race condition */
-		if (mkdir(path, S_IRWXU) != 0 && errno != EEXIST) return false;
+		if (mkdir(path, mode) != 0 && errno != EEXIST) return false;
 	} else if (!S_ISDIR(statbuf.st_mode)) {
 		errno = ENOTDIR;
 		return false;
@@ -49,6 +50,9 @@ string workDir;
 string exeName;
 string exePath;
 string argv0;
+
+// Every user of a root-owned install must be able to enter the folders an update adds.
+constexpr auto kInstallDirMode = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 
 FILE *_logFile = 0;
 void openLog() {
@@ -91,45 +95,67 @@ void writeLog(const char *format, ...) {
 }
 
 bool copyFile(const char *from, const char *to) {
-	FILE *ffrom = fopen(from, "rb"), *fto = fopen(to, "wb");
+	auto ffrom = std::unique_ptr<FILE, int(*)(FILE*)>(
+		fopen(from, "rb"),
+		fclose);
 	if (!ffrom) {
-		if (fto) fclose(fto);
+		writeLog("Failed to open source file '%s'", from);
 		return false;
 	}
+	auto fto = std::unique_ptr<FILE, int(*)(FILE*)>(
+		fopen(to, "wb"),
+		fclose);
 	if (!fto) {
-		fclose(ffrom);
+		writeLog("Failed to open destination file '%s'", to);
 		return false;
 	}
 	static const int BufSize = 65536;
 	char buf[BufSize];
-	while (size_t size = fread(buf, 1, BufSize, ffrom)) {
-		fwrite(buf, 1, size, fto);
+	while (const auto size = fread(buf, 1, BufSize, ffrom.get())) {
+		if (fwrite(buf, 1, size, fto.get()) != size) {
+			writeLog("Failed to write destination file '%s'", to);
+			return false;
+		}
+	}
+	if (ferror(ffrom.get())) {
+		writeLog("Failed to read source file '%s'", from);
+		return false;
+	}
+	if (ferror(fto.get())) {
+		writeLog("Write error in destination file '%s'", to);
+		return false;
+	}
+	if (fflush(fto.get()) != 0) {
+		writeLog("Failed to flush destination file '%s'", to);
+		return false;
 	}
 
 	struct stat fst; // from http://stackoverflow.com/questions/5486774/keeping-fileowner-and-permissions-after-copying-file-in-c
-	//let's say this wont fail since you already worked OK on that fp
-	if (fstat(fileno(ffrom), &fst) != 0) {
-		fclose(ffrom);
-		fclose(fto);
+	if (fstat(fileno(ffrom.get()), &fst) != 0) {
+		writeLog("Failed to stat source file '%s'", from);
 		return false;
 	}
 	//update to the same uid/gid
-	if (!writeprotected && fchown(fileno(fto), fst.st_uid, fst.st_gid) != 0) {
-		fclose(ffrom);
-		fclose(fto);
+	if (!writeprotected
+		&& fchown(fileno(fto.get()), fst.st_uid, fst.st_gid) != 0) {
+		writeLog("Failed to set owner of destination file '%s'", to);
 		return false;
 	}
 	//update the permissions
-	if (fchmod(fileno(fto), fst.st_mode) != 0) {
-		fclose(ffrom);
-		fclose(fto);
+	if (fchmod(fileno(fto.get()), fst.st_mode) != 0) {
+		writeLog("Failed to set permissions of destination file '%s'", to);
 		return false;
 	}
 
-	fclose(ffrom);
-	fclose(fto);
-
-	return true;
+	const auto fromClosed = (fclose(ffrom.release()) == 0);
+	const auto toClosed = (fclose(fto.release()) == 0);
+	if (!fromClosed) {
+		writeLog("Failed to close source file '%s'", from);
+	}
+	if (!toClosed) {
+		writeLog("Failed to close destination file '%s'", to);
+	}
+	return fromClosed && toClosed;
 }
 
 bool remove_directory(const string &path) { // from http://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
@@ -172,7 +198,7 @@ bool remove_directory(const string &path) { // from http://stackoverflow.com/que
 	return !rmdir(path.c_str());
 }
 
-bool mkpath(const char *path) {
+bool mkpath(const char *path, mode_t mode) {
 	int status = 0, pathsize = strlen(path) + 1;
 	char *copypath = new char[pathsize];
 	memcpy(copypath, path, pathsize);
@@ -182,7 +208,7 @@ bool mkpath(const char *path) {
 		if (sp != pp) {
 			/* Neither root nor double slash in path */
 			*sp = '\0';
-			if (!do_mkdir(copypath)) {
+			if (!do_mkdir(copypath, mode)) {
 				delete[] copypath;
 				return false;
 			}
@@ -191,7 +217,7 @@ bool mkpath(const char *path) {
 		pp = sp + 1;
 	}
 	delete[] copypath;
-	return do_mkdir(path);
+	return do_mkdir(path, mode);
 }
 
 bool equal(string a, string b) {
@@ -292,7 +318,7 @@ bool update() {
 	for (size_t i = 0; i < forcedirs.size(); ++i) {
 		string forcedir = forcedirs[i];
 		writeLog("Forcing dir '%s'..", forcedir.c_str());
-		if (!forcedir.empty() && !mkpath(forcedir.c_str())) {
+		if (!forcedir.empty() && !mkpath(forcedir.c_str(), kInstallDirMode)) {
 			writeLog("Error: failed to create dir '%s'..", forcedir.c_str());
 			delFolder();
 			return false;
@@ -334,7 +360,7 @@ bool update() {
 			}
 		} while (copyTries < triesLimit);
 		if (copyTries == triesLimit) {
-			writeLog("Error: failed to copy, asking to retry..");
+			writeLog("Error: failed to copy after %d attempts.", triesLimit);
 			delFolder();
 			return false;
 		}
@@ -460,7 +486,12 @@ int main(int argc, char *argv[]) {
 				} else {
 					writeLog("Passed workpath is '%s'", workDir.c_str());
 				}
-				update();
+				if (!update()) {
+					writeLog("Update installation failed.");
+					fprintf(stderr, "Update installation failed.\n");
+					closeLog();
+					return 1;
+				}
 			}
 		} else {
 			writeLog("Error: bad exe name!");

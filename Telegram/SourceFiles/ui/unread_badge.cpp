@@ -7,18 +7,19 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/unread_badge.h"
 
+#include "data/stickers/data_custom_emoji.h"
 #include "data/data_emoji_statuses.h"
 #include "data/data_peer.h"
-#include "data/data_user.h"
 #include "data/data_session.h"
-#include "data/stickers/data_custom_emoji.h"
-#include "main/main_session.h"
+#include "data/data_user.h"
 #include "lang/lang_keys.h"
-#include "ui/painter.h"
-#include "ui/rect.h"
-#include "ui/power_saving.h"
+#include "main/main_session.h"
 #include "ui/text/text_custom_emoji.h"
+#include "ui/painter.h"
+#include "ui/power_saving.h"
+#include "ui/rect.h"
 #include "ui/unread_badge_paint.h"
+
 #include "styles/style_dialogs.h"
 
 // AyuGram includes
@@ -118,6 +119,18 @@ bool ScaledBotVerifiedEmoji::readyInDefaultState() {
 }
 
 } // namespace
+
+std::unique_ptr<Text::CustomEmoji> CreateBotVerifiedEmoji(
+		DocumentId iconId,
+		Text::CustomEmojiFactory factory,
+		Fn<void()> repaint) {
+	const auto outer = st::emojiSize;
+	const auto inner = int(base::SafeRound(outer * kBotVerifiedScale));
+	return MakeWrappedEmoji<ScaledBotVerifiedEmoji>(
+		factory(Data::SerializeCustomEmojiId(iconId), { .repaint = repaint }),
+		inner,
+		outer);
+}
 
 struct PeerBadge::EmojiStatus {
 	EmojiStatusId id;
@@ -260,7 +273,8 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		&& peer->session().premiumBadgesShown();
 	const auto emojiStatus = premiumMark
 		&& peer->emojiStatusId()
-		&& (peer->isPremium() || peer->isChannel());
+		&& (peer->isPremium() || peer->isChannel())
+		&& !peer->hideEmojiStatus();
 	const auto premiumStar = premiumMark
 		&& !emojiStatus
 		&& peer->isPremium();
@@ -601,15 +615,10 @@ void PeerBadge::set(
 		_botVerifiedData = std::make_unique<BotVerifiedData>();
 	}
 	if (details->iconId) {
-		const auto outer = st::emojiSize;
-		const auto inner = int(base::SafeRound(
-			st::emojiSize * kBotVerifiedScale));
-		_botVerifiedData->icon = MakeWrappedEmoji<ScaledBotVerifiedEmoji>(
-			factory(
-				Data::SerializeCustomEmojiId(details->iconId),
-				{ .repaint = repaint }),
-			inner,
-			outer);
+		_botVerifiedData->icon = CreateBotVerifiedEmoji(
+			details->iconId,
+			std::move(factory),
+			std::move(repaint));
 	}
 }
 

@@ -7,8 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "settings/sections/settings_privacy_security.h"
 
-#include "settings/settings_common_session.h"
-
 #include "api/api_authorizations.h"
 #include "api/api_blocked_peers.h"
 #include "api/api_cloud_password.h"
@@ -34,40 +32,42 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer_values.h"
 #include "data/data_session.h"
 #include "history/view/media/history_view_media_common.h"
-#include "ui/chat/chat_style.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "platform/platform_webauthn.h"
-#include "settings/settings_builder.h"
 #include "settings/cloud_password/settings_cloud_password_email_confirm.h"
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/cloud_password/settings_cloud_password_start.h"
-#include "settings/sections/settings_main.h"
 #include "settings/sections/settings_active_sessions.h"
 #include "settings/sections/settings_blocked_peers.h"
 #include "settings/sections/settings_global_ttl.h"
 #include "settings/sections/settings_local_passcode.h"
+#include "settings/sections/settings_main.h"
 #include "settings/sections/settings_passkeys.h"
 #include "settings/sections/settings_premium.h"
-#include "settings/settings_privacy_controllers.h"
 #include "settings/sections/settings_websites.h"
+#include "settings/settings_builder.h"
+#include "settings/settings_common_session.h"
+#include "settings/settings_privacy_controllers.h"
 #include "storage/storage_domain.h"
 #include "ui/boxes/confirm_box.h"
+#include "ui/chat/chat_style.h"
 #include "ui/effects/premium_graphics.h"
 #include "ui/layers/generic_box.h"
-#include "ui/rect.h"
 #include "ui/text/format_values.h"
 #include "ui/text/text_utilities.h"
 #include "ui/toast/toast.h"
-#include "ui/vertical_list.h"
+#include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
-#include "ui/widgets/fields/input_field.h"
 #include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/rect.h"
+#include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
@@ -332,13 +332,15 @@ bool CheckEditCloudPassword(not_null<::Main::Session*> session) {
 	return !current->outdatedClient;
 }
 
-object_ptr<Ui::BoxContent> EditCloudPasswordBox(not_null<::Main::Session*> session) {
+object_ptr<Ui::BoxContent> EditCloudPasswordBox(
+		not_null<::Main::Session*> session,
+		std::shared_ptr<Ui::Show> show) {
 	const auto current = session->api().cloudPassword().stateCurrent();
 	Assert(current.has_value());
 
-	auto result = Box<PasscodeBox>(
-		session,
-		PasscodeBox::CloudFields::From(*current));
+	auto fields = PasscodeBox::CloudFields::From(*current);
+	fields.customShow = std::move(show);
+	auto result = Box<PasscodeBox>(session, fields);
 	const auto box = result.data();
 
 	rpl::merge(
@@ -381,6 +383,7 @@ void OpenFileConfirmationsBox(not_null<Ui::GenericBox*> box) {
 		tr::lng_settings_edit_ip_confirm(),
 		st::settingsButtonNoIcon
 	))->toggleOn(rpl::single(settings->ipRevealWarning()));
+	ip->setAllowTextLines();
 	Ui::AddSkip(layout);
 	Ui::AddDividerText(layout, tr::lng_settings_edit_ip_confirm_about());
 
@@ -407,34 +410,6 @@ void OpenFileConfirmationsBox(not_null<Ui::GenericBox*> box) {
 
 	});
 	box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
-}
-
-void RemoveCloudPassword(not_null<Window::SessionController*> controller) {
-	const auto session = &controller->session();
-	const auto current = session->api().cloudPassword().stateCurrent();
-	Assert(current.has_value());
-
-	if (!current->hasPassword) {
-		session->api().cloudPassword().clearUnconfirmedPassword();
-		return;
-	}
-	auto fields = PasscodeBox::CloudFields::From(*current);
-	fields.turningOff = true;
-	auto box = Box<PasscodeBox>(session, fields);
-
-	rpl::merge(
-		box->newPasswordSet() | rpl::to_empty,
-		box->passwordReloadNeeded()
-	) | rpl::on_next([=] {
-		session->api().cloudPassword().reload();
-	}, box->lifetime());
-
-	box->clearUnconfirmedPassword(
-	) | rpl::on_next([=] {
-		session->api().cloudPassword().clearUnconfirmedPassword();
-	}, box->lifetime());
-
-	controller->show(std::move(box));
 }
 
 object_ptr<Ui::BoxContent> CloudPasswordAppOutdatedBox() {
@@ -631,7 +606,7 @@ void BuildSecuritySection(
 	auto passcodeHas = rpl::single(rpl::empty) | rpl::then(
 		session->domain().local().localPasscodeChanged()
 	) | rpl::map([=] {
-		return session->domain().local().hasLocalPasscode();
+		return session->domain().local().hasPasscode();
 	});
 	auto passcodeLabel = rpl::combine(
 		tr::lng_settings_cloud_password_on(),

@@ -36,6 +36,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "ui/rect.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_chat.h"
 
 namespace HistoryView {
@@ -87,7 +88,7 @@ namespace HistoryView {
 			(isSelf
 				? st::birthdaySuggestTableLastPadding
 				: st::birthdaySuggestTablePadding)));
-		if (!isSelf) {
+		if (!isSelf && (parent->context() != Context::MediaEditor)) {
 			auto link = std::make_shared<LambdaClickHandler>([=](
 					ClickContext context) {
 				Core::App().openInternalUrl(

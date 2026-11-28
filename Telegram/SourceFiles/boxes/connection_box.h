@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "base/timer.h"
 #include "base/object_ptr.h"
+#include "base/timer.h"
 #include "core/core_settings_proxy.h"
 #include "mtproto/connection_abstract.h"
 #include "mtproto/mtproto_proxy_data.h"
@@ -74,7 +74,6 @@ public:
 		bool selected = false;
 		bool deleted = false;
 		bool supportsShare = false;
-		bool supportsCalls = false;
 		bool web = false;
 		bool canOpenBrowser = false;
 		ItemState state = ItemState::Checking;
@@ -83,15 +82,16 @@ public:
 
 	void deleteItem(int id);
 	void deleteItems();
+	void deleteItems(const base::flat_set<int> &ids);
 	void restoreItem(int id);
 	void shareItem(int id, bool qr);
 	void shareItems();
+	void shareItems(const base::flat_set<int> &ids);
 	void applyItem(int id);
 	void openBrowser(int id);
 	object_ptr<Ui::BoxContent> editItemBox(int id);
 	object_ptr<Ui::BoxContent> addNewItemBox();
 	bool setProxySettings(ProxyData::Settings value);
-	void setProxyForCalls(bool enabled);
 	void setProxyRotationEnabled(bool enabled);
 	void setProxyRotationTimeout(int value);
 	void setTryIPv6(bool enabled);

@@ -53,7 +53,20 @@ private:
 
 };
 
+[[nodiscard]] bool WriteUpdateVersionFile(
+	const QString &directory,
+	quint32 version,
+	quint64 canaryVersion);
+
 bool checkReadyUpdate();
+#if defined Q_OS_MACOS || defined Q_OS_WIN
+enum class ReadyUpdateInstall {
+	Failed,
+	Unpacked,
+	Protected,
+};
+[[nodiscard]] ReadyUpdateInstall prepareReadyUpdate();
+#endif // Q_OS_MACOS || Q_OS_WIN
 void UpdateApplication();
 QString countAlphaVersionSignature(uint64 version);
 

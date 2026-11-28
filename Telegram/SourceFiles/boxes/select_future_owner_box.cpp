@@ -9,32 +9,32 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "api/api_chat_participants.h"
 #include "api/api_cloud_password.h"
-#include "apiwrap.h"
 #include "base/unixtime.h"
 #include "boxes/filters/edit_filter_chats_list.h"
+#include "boxes/peers/channel_ownership_transfer.h"
+#include "boxes/peers/replace_boost_box.h" // CreateUserpicsTransfer.
 #include "boxes/passcode_box.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/peer_lists_box.h"
-#include "boxes/peers/replace_boost_box.h" // CreateUserpicsTransfer.
 #include "core/application.h"
 #include "core/core_cloud_password.h"
 #include "data/data_channel.h"
 #include "data/data_chat.h"
-#include "dialogs/ui/chat_search_empty.h"
-#include "boxes/peers/channel_ownership_transfer.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
+#include "dialogs/ui/chat_search_empty.h"
 #include "info/profile/info_profile_values.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/format_values.h"
-#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
+#include "ui/vertical_list.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 
@@ -255,7 +255,8 @@ void LegacyParticipantsController::loadMoreRows() {
 void SelectFutureOwnerbox(
 		not_null<Ui::GenericBox*> box,
 		not_null<PeerData*> peer,
-		not_null<UserData*> user) {
+		not_null<UserData*> user,
+		Fn<void()> leaveChat) {
 	const auto content = box->verticalLayout();
 	const auto channel = peer->asChannel();
 	const auto chat = peer->asChat();
@@ -345,9 +346,9 @@ void SelectFutureOwnerbox(
 			st::attentionBoxButton),
 		st::boxRowPadding,
 		style::al_justify);
-	leave->setClickedCallback([=, revoke = false] {
-		peer->session().api().deleteConversation(peer, revoke);
+	leave->setClickedCallback([=] {
 		box->closeBox();
+		leaveChat();
 	});
 	select->setClickedCallback([=] {
 		const auto window = Core::App().findWindow(box);
@@ -456,9 +457,14 @@ void SelectFutureOwnerbox(
 				) | rpl::filter_size() | rpl::on_next([=](QSize s) {
 					state->noLists->setMinimalHeight(s.height() / 3);
 					state->noLists->resizeToWidth(s.width() / 3 * 2);
+				}, state->noLists->lifetime());
+				rpl::combine(
+					selectBox->sizeValue(),
+					state->noLists->sizeValue()
+				) | rpl::on_next([=](QSize outer, QSize inner) {
 					state->noLists->moveToLeft(
-						(s.width() - state->noLists->width()) / 2,
-						(s.height() - state->noLists->height()) / 2);
+						(outer.width() - inner.width()) / 2,
+						(outer.height() - inner.height()) / 2);
 				}, state->noLists->lifetime());
 				crl::on_main(state->noLists.get(), [=] {
 					state->noLists->animate();
@@ -499,11 +505,10 @@ void SelectFutureOwnerbox(
 							user,
 							selectBox->uiShow(),
 							[=](std::shared_ptr<Ui::Show> show) {
-								const auto revoke = false;
-								peer->session().api().deleteConversation(
-									peer,
-									revoke);
+								// The calls below may destroy this lambda.
+								const auto leave = leaveChat;
 								show->hideLayer();
+								leave();
 							})->start();
 					}
 				});

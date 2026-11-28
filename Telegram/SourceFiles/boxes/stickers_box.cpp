@@ -37,9 +37,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/shadow.h"
 #include "ui/cached_round_corners.h"
 #include "ui/painter.h"
-#include "ui/ui_utility.h"
 #include "ui/rect.h"
+#include "ui/ui_utility.h"
 #include "ui/unread_badge_paint.h"
+
 #include "styles/style_boxes.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_layers.h"
@@ -2470,8 +2471,8 @@ void StickersBox::Inner::rebuild(bool masks) {
 			: stickers.setsOrder().empty();
 		_megagroupSubTitle->setText(usingFeatured
 			? (_megagroupSetEmoji
-				? tr::lng_stickers_group_from_featured(tr::now)
-				: tr::lng_emoji_group_from_featured(tr::now))
+				? tr::lng_emoji_group_from_featured(tr::now)
+				: tr::lng_stickers_group_from_featured(tr::now))
 			: _megagroupSetEmoji
 			? tr::lng_emoji_group_from_your(tr::now)
 			: tr::lng_stickers_group_from_your(tr::now));

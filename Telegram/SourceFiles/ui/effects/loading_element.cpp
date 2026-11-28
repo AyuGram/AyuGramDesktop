@@ -14,20 +14,33 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
+
 #include "styles/style_basic.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_widgets.h"
 
 namespace Ui {
+
+LoadingLine::LoadingLine(int thickness, int skip, const QColor &color)
+: _thickness(thickness)
+, _skip(skip)
+, _color(color) {
+}
+
+int LoadingLine::height() const {
+	return _thickness + _skip;
+}
+
+void LoadingLine::paint(QPainter &p, int width) {
+	auto hq = PainterHighQualityEnabler(p);
+
+	p.setPen(Qt::NoPen);
+	p.setBrush(_color);
+	const auto radius = _thickness / 2.;
+	p.drawRoundedRect(QRect(0, 0, width, _thickness), radius, radius);
+}
+
 namespace {
-
-class LoadingElement {
-public:
-	LoadingElement() = default;
-
-	[[nodiscard]] virtual int height() const = 0;
-	virtual void paint(QPainter &p, int width) = 0;
-};
 
 class LoadingText final : public LoadingElement {
 public:

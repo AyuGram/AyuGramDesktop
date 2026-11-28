@@ -7,8 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "info/info_content_widget.h"
 #include "info/media/info_media_widget.h"
+#include "info/info_content_widget.h"
 
 namespace Ui {
 class SearchFieldController;
@@ -70,6 +70,11 @@ private:
 	InnerWidget *_inner = nullptr;
 
 };
+
+void AddDeleteAllAction(
+	not_null<QWidget*> widget,
+	not_null<Controller*> controller,
+	const Ui::Menu::MenuCallback &addAction);
 
 [[nodiscard]] std::shared_ptr<Info::Memento> Make(not_null<UserData*> self);
 

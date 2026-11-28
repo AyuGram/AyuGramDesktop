@@ -7,11 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/controls/history_view_voice_record_button.h"
 
+#include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
 #include "ui/paint/blobs.h"
 #include "ui/painter.h"
+
 #include "styles/style_chat_helpers.h"
-#include "lang/lang_keys.h"
 
 #include <QtMath>
 
@@ -201,6 +202,12 @@ void VoiceRecordButton::init() {
 
 	_state.changes(
 	) | rpl::on_next([=](Type newState) {
+		if (_showProgress.current() == 0.) {
+			_stateChangedAnimation.stop();
+			*currentState = newState;
+			update();
+			return;
+		}
 		const auto to = 1.;
 		auto callback = [=](float64 value) {
 			if (value >= (to * .5)) {

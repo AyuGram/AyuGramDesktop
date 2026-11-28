@@ -7,29 +7,30 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/admin_log/history_admin_log_section.h"
 
-#include "history/admin_log/history_admin_log_inner.h"
-#include "history/admin_log/history_admin_log_filter.h"
-#include "profile/profile_back_button.h"
+#include "apiwrap.h"
+#include "base/timer.h"
 #include "core/shortcuts.h"
+#include "data/data_channel.h"
+#include "data/data_session.h"
+#include "history/admin_log/history_admin_log_filter.h"
+#include "history/admin_log/history_admin_log_inner.h"
 #include "info/profile/info_profile_values.h"
+#include "lang/lang_keys.h"
+#include "profile/profile_back_button.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_style.h"
 #include "ui/controls/jump_down_button.h"
 #include "ui/controls/swipe_handler.h"
+#include "ui/controls/userpic_button.h"
 #include "ui/effects/animations.h"
+#include "ui/widgets/fields/input_field.h"
+#include "ui/widgets/buttons.h"
 #include "ui/widgets/elastic_scroll.h"
 #include "ui/widgets/shadow.h"
-#include "ui/widgets/buttons.h"
-#include "ui/controls/userpic_button.h"
-#include "ui/widgets/fields/input_field.h"
 #include "ui/ui_utility.h"
-#include "apiwrap.h"
 #include "window/themes/window_theme.h"
 #include "window/window_session_controller.h"
-#include "ui/boxes/confirm_box.h"
-#include "base/timer.h"
-#include "data/data_channel.h"
-#include "data/data_session.h"
-#include "lang/lang_keys.h"
+
 #include "styles/style_chat.h"
 #include "styles/style_chat_helpers.h"
 #include "styles/style_info.h"
@@ -322,6 +323,11 @@ Widget::Widget(
 	_scroll->lockWheelDirection();
 	_inner = _scroll->setOwnedWidget(
 		object_ptr<InnerWidget>(this, controller, channel));
+	Tgw::ListScroll::WatchInput(_scroll.data(), [=] {
+		if (_inner) {
+			Tgw::ListScroll::Input(_inner.data());
+		}
+	});
 	_inner->lower();
 	_inner->showSearchSignal(
 	) | rpl::on_next([=] {
@@ -380,6 +386,10 @@ void Widget::scrollDownClicked() {
 		_scrollToAnimation.stop();
 		return;
 	}
+	const auto consumed = [=] {
+		return _inner ? Tgw::ListScroll::Consumed(_inner.data()) : uint32();
+	};
+	const auto count = consumed();
 	const auto maxAnimatedDelta = _scroll->height();
 	auto transition = anim::sineInOut;
 	if (scrollTo > scrollTop + maxAnimatedDelta) {
@@ -388,7 +398,18 @@ void Widget::scrollDownClicked() {
 		transition = anim::easeOutCubic;
 	}
 	_scrollToAnimation.stop();
-	_scrollToAnimation.start(
+	Tgw::ListScroll::Input(_inner.data());
+	_scrollToFlight.start(
+		scrollTop,
+		scrollTo,
+		consumed,
+		count,
+		[=] {
+			return _inner ? Tgw::ListScroll::Inputs(_inner.data()) : uint32();
+		},
+		[=] { return std::make_optional(_scroll->scrollTopMax()); });
+	_scrollToFlight.animate(
+		&_scrollToAnimation,
 		[=] { scrollToAnimationCallback(); },
 		scrollTop,
 		scrollTo,
@@ -399,7 +420,12 @@ void Widget::scrollDownClicked() {
 void Widget::scrollToAnimationCallback() {
 	const auto scrollTo = _scroll->scrollTopMax();
 	const auto value = _scrollToAnimation.value(scrollTo);
-	_scroll->scrollToY(int(base::SafeRound(value)));
+	_scrollToFlight.frame(
+		0,
+		value,
+		_scroll->scrollTop(),
+		!_scrollToAnimation.animating(),
+		[=](int top) { _scroll->scrollToY(top); });
 }
 
 void Widget::updateScrollDownVisibility() {
@@ -555,6 +581,7 @@ void Widget::setupSwipeReply() {
 		.scroll = _scroll.data(),
 		.update = std::move(update),
 		.init = std::move(init),
+		.handoff = _inner->touchSwipeHandoff(),
 	});
 }
 

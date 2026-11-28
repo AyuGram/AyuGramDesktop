@@ -7,9 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/streaming/media_streaming_file.h"
 
-#include "media/streaming/media_streaming_loader.h"
-#include "media/streaming/media_streaming_file_delegate.h"
 #include "ffmpeg/ffmpeg_utility.h"
+#include "media/streaming/media_streaming_file_delegate.h"
+#include "media/streaming/media_streaming_loader.h"
 
 namespace Media {
 namespace Streaming {
@@ -170,12 +170,18 @@ Stream File::Context::initStream(
 			return Stream();
 		}
 		result.codec = FFmpeg::MakeCodecPointer({
-			.stream = info,
+			.parameters = info->codecpar,
+			.timeBase = info->time_base,
 			.hwAllowed = options.hwAllow,
 			.videoMaxArea = kMaxFrameArea,
 		});
 		if (!result.codec) {
 			return result;
+		} else if (result.codec->codec
+			!= FFmpeg::FindDecoder(result.codec.get())) {
+			result.parameters = FFmpeg::CopyCodecParameters(
+				info->codecpar);
+			result.softwareFallback = bool(result.parameters);
 		}
 		result.rotation = FFmpeg::ReadRotationFromMetadata(info);
 		result.aspect = FFmpeg::ValidateAspectRatio(
@@ -189,7 +195,10 @@ Stream File::Context::initStream(
 		if (!result.frequency) {
 			return result;
 		}
-		result.codec = FFmpeg::MakeCodecPointer({ .stream = info });
+		result.codec = FFmpeg::MakeCodecPointer({
+			.parameters = info->codecpar,
+			.timeBase = info->time_base,
+		});
 		if (!result.codec) {
 			return result;
 		}

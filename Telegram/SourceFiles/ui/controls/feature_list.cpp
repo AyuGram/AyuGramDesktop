@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 #include "info/profile/info_profile_icon.h"
 #include "ui/widgets/labels.h"
+
 #include "styles/style_info.h"
 
 namespace Ui {
@@ -43,6 +44,7 @@ object_ptr<RpWidget> MakeFeatureListEntry(
 	title->show();
 	about->show();
 	about->setLinksTrusted();
+	about->setTryMakeSimilarLines(feature.similarLines);
 	widget->widthValue(
 	) | rpl::on_next([=](int width) {
 		const auto left = st::infoStarsFeatureLabelLeft;

@@ -7,14 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
-#include "data/data_types.h"
-#include "data/data_peer.h"
-#include "data/data_drafts.h"
-#include "data/data_thread.h"
-#include "history/view/history_view_send_action.h"
-#include "base/variant.h"
-#include "base/flat_set.h"
 #include "base/flags.h"
+#include "base/flat_set.h"
+#include "base/variant.h"
+#include "data/data_drafts.h"
+#include "data/data_peer.h"
+#include "data/data_thread.h"
+#include "data/data_types.h"
+#include "history/view/history_view_send_action.h"
 
 class History;
 class HistoryBlock;
@@ -24,10 +24,12 @@ struct HistoryItemCommonFields;
 struct HistoryMessageMarkupData;
 class HistoryMainElementDelegateMixin;
 class HistoryStreamedDrafts;
+class HistoryTopMessageHint;
 struct LanguageId;
 
 namespace Data {
 struct Draft;
+struct ComposeStash;
 class CommunityInfo;
 class Forum;
 class Session;
@@ -105,7 +107,6 @@ public:
 	[[nodiscard]] HistoryItem *joinedMessageInstance() const;
 	void checkLocalMessages();
 	void removeJoinedMessage();
-	void removeNewPeerMessages();
 
 	void reactionsEnabledChanged(bool enabled);
 
@@ -243,7 +244,6 @@ public:
 	void destroyUnreadBar();
 	[[nodiscard]] Element *unreadBar() const;
 	void calculateFirstUnreadMessage();
-	void unsetFirstUnreadMessage();
 	[[nodiscard]] Element *firstUnreadMessage() const;
 
 	[[nodiscard]] bool loadedAtBottom() const; // last message is in the list
@@ -262,6 +262,11 @@ public:
 	void unknownMessageDeleted(MsgId messageId);
 	[[nodiscard]] bool isUnknownMessageDeleted(MsgId messageId) const;
 	void applyDialogTopMessage(MsgId topMessageId);
+	[[nodiscard]] bool applyTopMessageHint(MsgId id, TimeId date);
+	[[nodiscard]] bool topMessageHintActive(MsgId id) const;
+	void topMessageHintLoaded(MsgId id, const MTPMessage *message);
+	void clearTopMessageHint();
+	[[nodiscard]] TimeId topMessageHintDate() const;
 	void applyDialog(Data::Folder *requestFolder, const MTPDdialog &data);
 	void applyPinnedUpdate(const MTPDupdateDialogPinned &data);
 	void applyDialogFields(
@@ -308,9 +313,7 @@ public:
 		Data::SavedSublist *sublist);
 	void clearUnreadPollVotesFor(MsgId topicRootId);
 
-	[[nodiscard]] int unreadPollVotesCount() const;
 	void setUnreadPollVotesCount(int count);
-	[[nodiscard]] rpl::producer<int> unreadPollVotesCountChanges() const;
 
 	Data::Draft *draft(Data::DraftKey key) const;
 	void setDraft(Data::DraftKey key, std::unique_ptr<Data::Draft> &&draft);
@@ -403,6 +406,13 @@ public:
 		PeerId monoforumPeerId,
 		Data::ForwardDraft &&draft);
 
+	[[nodiscard]] Data::ComposeStash *composeStash(Data::DraftKey key) const;
+	void setComposeStash(
+		Data::DraftKey key,
+		std::unique_ptr<Data::ComposeStash> stash);
+	[[nodiscard]] std::unique_ptr<Data::ComposeStash> takeComposeStash(
+		Data::DraftKey key);
+
 	History *migrateSibling() const;
 	[[nodiscard]] bool useTopPromotion() const;
 	int fixedOnTopIndex() const override;
@@ -412,6 +422,9 @@ public:
 	Dialogs::BadgesState chatListBadgesState() const override;
 	HistoryItem *chatListMessage() const override;
 	bool chatListMessageKnown() const override;
+	[[nodiscard]] HistoryItem *chatListPreviewMessage() const;
+	[[nodiscard]] bool chatListPreviewMessageUnread(
+		not_null<const HistoryItem*> item);
 	const QString &chatListName() const override;
 	const QString &chatListNameSortKey() const override;
 	int chatListNameVersion() const override;
@@ -516,6 +529,7 @@ public:
 
 private:
 	friend class HistoryBlock;
+	friend class HistoryTopMessageHint;
 
 	enum class Flag : ushort {
 		HasPendingResizedItems = (1 << 0),
@@ -561,6 +575,8 @@ private:
 	not_null<HistoryItem*> addNewToBack(
 		not_null<HistoryItem*> item,
 		bool unread);
+	void applyReplyKeyboard(not_null<HistoryItem*> item);
+	void applyStreamedDraftFinish(not_null<HistoryItem*> item);
 
 	friend class Data::SponsoredMessages;
 	not_null<HistoryItem*> addNewInTheMiddle(
@@ -648,6 +664,7 @@ private:
 	HistoryItem *insertJoinedMessage();
 	void insertMessageToBlocks(not_null<HistoryItem*> item);
 	void checkNewPeerMessages();
+	[[nodiscard]] bool isNewPeerMessage(not_null<HistoryItem*> item) const;
 
 	[[nodiscard]] Dialogs::BadgesState computeBadgesState() const;
 	[[nodiscard]] Dialogs::BadgesState adjustBadgesStateByFolder(
@@ -682,7 +699,6 @@ private:
 	std::optional<MsgId> _outboxReadBefore;
 	std::optional<int> _unreadCount;
 	int _unreadPollVotesCount = 0;
-	rpl::event_stream<int> _unreadPollVotesCountChanges;
 	std::optional<HistoryItem*> _lastMessage;
 	std::optional<HistoryItem*> _lastServerMessage;
 	base::flat_set<not_null<HistoryItem*>> _clientSideMessages;
@@ -690,6 +706,7 @@ private:
 
 	std::unique_ptr<Data::HistoryMessages> _messages;
 	std::unique_ptr<HistoryStreamedDrafts> _streamedDrafts;
+	std::unique_ptr<HistoryTopMessageHint> _topMessageHint;
 
 	// This almost always is equal to _lastMessage. The only difference is
 	// for a group that migrated to a supergroup. Then _lastMessage can
@@ -712,6 +729,9 @@ private:
 	base::flat_map<Data::DraftKey, TimeId> _acceptCloudDraftsAfter;
 	base::flat_map<Data::DraftKey, int> _savingCloudDraftRequests;
 	base::flat_map<Data::DraftKey, Data::ForwardDraft> _forwardDrafts;
+	base::flat_map<
+		Data::DraftKey,
+		std::unique_ptr<Data::ComposeStash>> _composeStashes;
 
 	base::flat_map<MsgId, TimeId> _unknownDeletedMessages;
 

@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/const_string.h"
 #include "lang/lang_file_parser.h"
 #include "ui/integration.h"
+#include "ui/text/text_utilities.h"
 
 #include <QtCore/QLocale>
 
@@ -126,7 +127,9 @@ QString langDayOfMonthFull(const QDate &date) {
 QString langDayOfMonthShort(const QDate &date) {
 	auto day = date.day();
 	return langDateMaybeWithYear(date, [&](int month, int year) {
-		return QLocale().toString(date, QLocale::ShortFormat);
+		return QLocale().toString(
+			date,
+			QLocale::ShortFormat).replace(QChar(' '), QChar(0x00A0));
 	}, [day](int month, int year) {
 		return tr::lng_month_day(
 			tr::now,
@@ -134,25 +137,6 @@ QString langDayOfMonthShort(const QDate &date) {
 			MonthSmall(month)(tr::now),
 			lt_day,
 			QString::number(day));
-	});
-}
-
-QString langMonthOfYear(int month, int year) {
-	return (month > 0 && month <= 12)
-		? tr::lng_month_year(
-			tr::now,
-			lt_month,
-			MonthSmall(month)(tr::now),
-			lt_year,
-			QString::number(year))
-		: u"MONTH_ERR"_q;
-}
-
-QString langMonth(const QDate &date) {
-	return langDateMaybeWithYear(date, [](int month, int year) {
-		return langMonthOfYear(month, year);
-	}, [](int month, int year) {
-		return MonthSmall(month)(tr::now);
 	});
 }
 
@@ -168,11 +152,13 @@ QString langMonthOfYearFull(int month, int year) {
 }
 
 QString langMonthFull(const QDate &date) {
-	return langDateMaybeWithYear(date, [](int month, int year) {
+	const auto text = langDateMaybeWithYear(date, [](int month, int year) {
 		return langMonthOfYearFull(month, year);
 	}, [](int month, int year) {
 		return Month(month)(tr::now);
 	});
+	// The month heads a section, even where months are lowercase.
+	return Ui::Text::Capitalized(text);
 }
 
 QString langDayOfWeek(int index) {
